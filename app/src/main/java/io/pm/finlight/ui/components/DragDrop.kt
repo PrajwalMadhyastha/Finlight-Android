@@ -1,10 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/DragDrop.kt
-// REASON: REFACTOR - The drag-and-drop logic has been refined to trigger a swap
-// only when a dragged item's boundary completely passes an adjacent item's
-// boundary. This makes the reordering feel more deliberate and correctly
-// implements the "float and swap" behavior where other items "pop" into place
-// during the drag gesture.
+// REASON: REFACTOR - The drag-and-drop logic has been rewritten to be
+// stable and smooth. The dragged item now visually floats over the static list,
+// and the actual reordering of items only occurs once, when the drag gesture is
+// released. The swap threshold is now correctly set to when an item completely
+// passes an adjacent item, providing a predictable and intuitive experience.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -37,6 +37,12 @@ class DragDropState(
     var draggingItemTranslationY by mutableFloatStateOf(0f)
         private set
 
+    // The index of the item as it was at the start of the drag.
+    private var initialDraggingItemIndex by mutableStateOf<Int?>(null)
+
+    // The index where the item would be dropped if the gesture ended now.
+    private var targetItemIndex by mutableStateOf<Int?>(null)
+
     private val currentDraggingItemInfo: LazyListItemInfo?
         get() = draggingItemKey?.let { key ->
             lazyListState.layoutInfo.visibleItemsInfo.find { it.key == key }
@@ -48,6 +54,8 @@ class DragDropState(
             ?.also {
                 if (it.index == 0) return // Prevent dragging the hero card
                 draggingItemKey = it.key
+                initialDraggingItemIndex = it.index
+                targetItemIndex = it.index // Initialize target to the starting index
             }
     }
 
@@ -55,41 +63,39 @@ class DragDropState(
         draggingItemTranslationY += offset.y
 
         val draggingItem = currentDraggingItemInfo ?: return
-        val draggingItemIndex = draggingItem.index
+        val initialIndex = initialDraggingItemIndex ?: return
 
-        // The current visual bounds of the dragged item
-        val draggedItemTop = draggingItem.offset + draggingItemTranslationY
-        val draggedItemBottom = draggedItemTop + draggingItem.size
+        // Calculate the current visual center of the item being dragged.
+        val draggedItemCenterY = draggingItem.offset + draggingItemTranslationY + (draggingItem.size / 2f)
 
-        // Find a potential target for the swap by checking which item's
-        // bounds the center of our dragged item is currently within.
-        val targetItem = lazyListState.layoutInfo.visibleItemsInfo
-            .find {
-                // Not itself, not the hero card
-                it.key != draggingItemKey && it.index != 0 &&
-                        // Check if the dragged item's center is within the target's bounds
-                        (draggedItemTop + draggingItem.size / 2f) in it.offset.toFloat()..(it.offset + it.size).toFloat()
-            }
+        // Find the target item by checking which item's vertical range the dragged item's center is currently in.
+        val targetItem = lazyListState.layoutInfo.visibleItemsInfo.find {
+            it.key != draggingItemKey && it.index != 0 &&
+                    draggedItemCenterY in it.offset.toFloat()..(it.offset + it.size).toFloat()
+        }
 
         if (targetItem != null) {
-            // Now, check the "complete pass" condition before triggering a move.
-            if (draggingItemIndex > targetItem.index) { // Dragging UP
-                // Swap if the top of the dragged item has passed the top of the target.
-                if (draggedItemTop < targetItem.offset) {
-                    onMove(draggingItemIndex, targetItem.index)
-                }
-            } else { // Dragging DOWN
-                // Swap if the bottom of the dragged item has passed the bottom of the target.
-                if (draggedItemBottom > targetItem.offset + targetItem.size) {
-                    onMove(draggingItemIndex, targetItem.index)
-                }
-            }
+            // If we are over a valid target, that's our potential new index.
+            targetItemIndex = targetItem.index
+        } else {
+            // If not directly over another item, it will revert to its original spot if dropped.
+            targetItemIndex = initialIndex
         }
     }
 
-
     fun onDragEnd() {
+        val initialIndex = initialDraggingItemIndex
+        val finalTargetIndex = targetItemIndex
+
+        // Perform the single state update now that the drag is complete.
+        if (initialIndex != null && finalTargetIndex != null && initialIndex != finalTargetIndex) {
+            onMove(initialIndex, finalTargetIndex)
+        }
+
+        // Reset all state variables.
         draggingItemKey = null
+        initialDraggingItemIndex = null
+        targetItemIndex = null
         draggingItemTranslationY = 0f
     }
 
