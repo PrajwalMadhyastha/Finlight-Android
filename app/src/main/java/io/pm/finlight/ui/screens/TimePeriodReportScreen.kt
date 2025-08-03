@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TimePeriodReportScreen.kt
-// REASON: FIX - The `MonthlyConsistencyCalendarCard` is now passed the
-// `selectedMonth` state and the month navigation callbacks from the ViewModel.
-// This allows the card to display the correct, interactive monthly calendar
-// instead of the old mini-heatmap, fixing the UI bug.
+// REASON: FIX - The composable now accepts a `showPreviousMonth` boolean
+// parameter. This parameter is passed directly to the ViewModelFactory, enabling
+// it to create a ViewModel that is correctly initialized to the previous month's
+// data when navigated to from a monthly summary notification.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -50,10 +50,12 @@ fun TimePeriodReportScreen(
     navController: NavController,
     timePeriod: TimePeriod,
     transactionViewModel: TransactionViewModel,
-    initialDateMillis: Long? = null
+    initialDateMillis: Long? = null,
+    showPreviousMonth: Boolean = false // --- NEW: Add parameter
 ) {
     val application = LocalContext.current.applicationContext as Application
-    val factory = TimePeriodReportViewModelFactory(application, timePeriod, initialDateMillis)
+    // --- UPDATED: Pass the new parameter to the factory ---
+    val factory = TimePeriodReportViewModelFactory(application, timePeriod, initialDateMillis, showPreviousMonth)
     val viewModel: TimePeriodReportViewModel = viewModel(factory = factory)
 
     val selectedDate by viewModel.selectedDate.collectAsState()
