@@ -1,12 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/NotificationHelper.kt
-// REASON: FIX - All notifications now use the new, dedicated `ic_notification_logo`
-// for the small icon. This is a single-color, transparent vector required by
-// Android for correct rendering in the status bar, ensuring brand consistency.
-// FIX - Replaced all instances of `intent.setPackage()` with the correct
-// Kotlin property access syntax: `intent.apply { package = ... }`.
-// FIX - Replaced `paint.setTypeface()` with the correct Kotlin property
-// access syntax: `paint.typeface = ...`.
+// REASON: FIX - The deep link URI for the monthly summary notification now
+// includes a `showPreviousMonth=true` query parameter. This allows the destination
+// screen to correctly display the previous month's report when opened from the
+// notification, instead of defaulting to the current month.
 // =================================================================================
 package io.pm.finlight.utils // <-- UPDATED PACKAGE
 
@@ -437,6 +434,9 @@ object NotificationHelper {
             percentageChange > 0 -> "Spends up by $percentageChange% in $monthName"
             else -> "Spends down by ${abs(percentageChange)}% in $monthName"
         }
+        // --- UPDATED: Add showPreviousMonth=true to the deep link ---
+        val deepLinkUri = "$DEEP_LINK_URI_REPORT_BASE/${TimePeriod.MONTHLY}?showPreviousMonth=true"
+
         createEnhancedSummaryNotification(
             context,
             MainApplication.MONTHLY_SUMMARY_CHANNEL_ID,
@@ -444,7 +444,7 @@ object NotificationHelper {
             title,
             totalExpenses,
             topCategories,
-            "$DEEP_LINK_URI_REPORT_BASE/${TimePeriod.MONTHLY}"
+            deepLinkUri
         )
     }
 

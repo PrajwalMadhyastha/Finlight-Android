@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX - Removed the deep link handling logic from the SplashScreen's
-// LaunchedEffect. The NavHost now acts as the single source of truth for
-// automatically handling deep links from intents, which resolves the race
-// condition that caused the destination to be pushed onto the back stack twice.
+// REASON: FIX - The NavHost definition for the time period report screen has been
+// updated to accept a new optional boolean argument, `showPreviousMonth`. This
+// allows the deep link from the monthly report notification to correctly signal
+// that the screen should initialize to the previous month's data.
 // =================================================================================
 package io.pm.finlight
 
@@ -834,12 +834,13 @@ fun AppNavHost(
         }
 
         composable(
-            "time_period_report_screen/{timePeriod}?date={date}",
+            "time_period_report_screen/{timePeriod}?date={date}&showPreviousMonth={showPreviousMonth}",
             arguments = listOf(
                 navArgument("timePeriod") { type = NavType.EnumType(TimePeriod::class.java) },
-                navArgument("date") { type = NavType.LongType; defaultValue = -1L }
+                navArgument("date") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("showPreviousMonth") { type = NavType.BoolType; defaultValue = false }
             ),
-            deepLinks = listOf(navDeepLink { uriPattern = "app://finlight.pm.io/report/{timePeriod}?date={date}" }),
+            deepLinks = listOf(navDeepLink { uriPattern = "app://finlight.pm.io/report/{timePeriod}?date={date}&showPreviousMonth={showPreviousMonth}" }),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
@@ -852,12 +853,14 @@ fun AppNavHost(
                 backStackEntry.arguments?.getSerializable("timePeriod") as? TimePeriod
             }
             val date = backStackEntry.arguments?.getLong("date")
+            val showPreviousMonth = backStackEntry.arguments?.getBoolean("showPreviousMonth") ?: false
             if (timePeriod != null) {
                 TimePeriodReportScreen(
                     navController = navController,
                     timePeriod = timePeriod,
                     transactionViewModel = transactionViewModel,
-                    initialDateMillis = date
+                    initialDateMillis = date,
+                    showPreviousMonth = showPreviousMonth
                 )
             }
         }
