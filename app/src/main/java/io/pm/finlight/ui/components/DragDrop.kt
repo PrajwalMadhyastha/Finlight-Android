@@ -1,10 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/DragDrop.kt
-// REASON: REFACTOR - The drag-and-drop logic has been rewritten to be
-// stable and smooth. The dragged item now visually floats over the static list,
-// and the actual reordering of items only occurs once, when the drag gesture is
-// released. The swap threshold is now correctly set to when an item completely
-// passes an adjacent item, providing a predictable and intuitive experience.
+// REASON: REFACTOR - Implemented a live 'float and swap' drag-and-drop behavior.
+// The logic now triggers a swap when the center of the dragged item passes the
+// center of a target item. A translationY correction is applied post-swap to
+// ensure the dragged item remains perfectly aligned with the user's finger,
+// eliminating any visual 'jerk' or jumping and providing a smooth, animated
+// reordering experience.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -37,12 +38,6 @@ class DragDropState(
     var draggingItemTranslationY by mutableFloatStateOf(0f)
         private set
 
-    // The index of the item as it was at the start of the drag.
-    private var initialDraggingItemIndex by mutableStateOf<Int?>(null)
-
-    // The index where the item would be dropped if the gesture ended now.
-    private var targetItemIndex by mutableStateOf<Int?>(null)
-
     private val currentDraggingItemInfo: LazyListItemInfo?
         get() = draggingItemKey?.let { key ->
             lazyListState.layoutInfo.visibleItemsInfo.find { it.key == key }
@@ -54,8 +49,6 @@ class DragDropState(
             ?.also {
                 if (it.index == 0) return // Prevent dragging the hero card
                 draggingItemKey = it.key
-                initialDraggingItemIndex = it.index
-                targetItemIndex = it.index // Initialize target to the starting index
             }
     }
 
@@ -63,9 +56,9 @@ class DragDropState(
         draggingItemTranslationY += offset.y
 
         val draggingItem = currentDraggingItemInfo ?: return
-        val initialIndex = initialDraggingItemIndex ?: return
+        val draggingItemIndex = draggingItem.index
 
-        // Calculate the current visual center of the item being dragged.
+        // The current visual center of the item being dragged.
         val draggedItemCenterY = draggingItem.offset + draggingItemTranslationY + (draggingItem.size / 2f)
 
         // Find the target item by checking which item's vertical range the dragged item's center is currently in.
@@ -74,37 +67,24 @@ class DragDropState(
                     draggedItemCenterY in it.offset.toFloat()..(it.offset + it.size).toFloat()
         }
 
-        if (targetItem != null) {
-            // If we are over a valid target, that's our potential new index.
-            targetItemIndex = targetItem.index
-        } else {
-            // --- FIX: Handle dragging beyond the visible items ---
-            val isDraggingDown = draggingItemTranslationY > 0
-            val lastVisibleItem = lazyListState.layoutInfo.visibleItemsInfo.last()
+        if (targetItem != null && targetItem.index != draggingItemIndex) {
+            // A swap is needed.
+            // Calculate the offset difference between the two items' current positions.
+            val offsetDiff = targetItem.offset - draggingItem.offset
 
-            // If dragging down past the last item, target the last position.
-            if (isDraggingDown && draggedItemCenterY > lastVisibleItem.offset + lastVisibleItem.size) {
-                targetItemIndex = lazyListState.layoutInfo.totalItemsCount - 1
-            } else {
-                // Otherwise, it's not over a valid target, so it would revert to its original spot.
-                targetItemIndex = initialIndex
-            }
+            // Trigger the state update to reorder the list.
+            onMove(draggingItemIndex, targetItem.index)
+
+            // Immediately apply a correction to the translation.
+            // This counteracts the visual jump that would otherwise occur when the
+            // LazyColumn recomposes and moves the item's base position.
+            draggingItemTranslationY -= offsetDiff
         }
     }
 
     fun onDragEnd() {
-        val initialIndex = initialDraggingItemIndex
-        val finalTargetIndex = targetItemIndex
-
-        // Perform the single state update now that the drag is complete.
-        if (initialIndex != null && finalTargetIndex != null && initialIndex != finalTargetIndex) {
-            onMove(initialIndex, finalTargetIndex)
-        }
-
         // Reset all state variables.
         draggingItemKey = null
-        initialDraggingItemIndex = null
-        targetItemIndex = null
         draggingItemTranslationY = 0f
     }
 
