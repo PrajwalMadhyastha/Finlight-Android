@@ -1,3 +1,11 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/utils/SmsParser.kt
+// REASON: FIX - The regular expressions for parsing account and merchant
+// information have been updated. The ICICI account pattern now correctly handles
+// both "Acct" and "Acc" abbreviations. A new, more specific merchant pattern
+// has been added to correctly parse merchants from messages containing "Info"
+// and "Avl Bal" text, resolving a parsing failure for a common bank message format.
+// =================================================================================
 package io.pm.finlight.utils
 
 import android.util.Log
@@ -19,7 +27,6 @@ data class PotentialAccount(
 
 object SmsParser {
     private val AMOUNT_WITH_CURRENCY_REGEX = "(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- UPDATED: Added "purchase" as a standalone keyword ---
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|payment of|purchase of|purchase)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val ACCOUNT_PATTERNS =
@@ -29,11 +36,14 @@ object SmsParser {
             "spent from (Pluxee)\\s*(Meal Card wallet), card no\\.\\s*xx(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "on your (SBI) (Credit Card) ending with (\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "On (HDFC Bank) (Card) (\\d{4})".toRegex(RegexOption.IGNORE_CASE),
-            "(ICICI Bank) Acct XX(\\d{3,4}) debited".toRegex(RegexOption.IGNORE_CASE),
-            "Acct XX(\\d{3,4}) is credited.*-(ICICI Bank)".toRegex(RegexOption.IGNORE_CASE)
+            // --- FIX: Made the 't' in 'Acct' optional to match 'Acc' as well ---
+            "(ICICI Bank) Acc(?:t)? XX(\\d{3,4}) debited".toRegex(RegexOption.IGNORE_CASE),
+            "Acc(?:t)? XX(\\d{3,4}) is credited.*-(ICICI Bank)".toRegex(RegexOption.IGNORE_CASE)
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
+            // --- NEW: More specific pattern for "Info... Avl Bal" format ---
+            "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal|$)".toRegex(RegexOption.IGNORE_CASE),
             "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|$)".toRegex(RegexOption.IGNORE_CASE),
             "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on".toRegex(RegexOption.IGNORE_CASE),
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited".toRegex(RegexOption.IGNORE_CASE),
@@ -78,9 +88,9 @@ object SmsParser {
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[3].trim()}", accountType = match.groupValues[2].trim())
                     "On (HDFC Bank) (Card) (\\d{4})" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[3].trim()}", accountType = match.groupValues[2].trim())
-                    "(ICICI Bank) Acct XX(\\d{3,4}) debited" ->
+                    "(ICICI Bank) Acc(?:t)? XX(\\d{3,4}) debited" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[2].trim()}", accountType = "Savings Account")
-                    "Acct XX(\\d{3,4}) is credited.*-(ICICI Bank)" ->
+                    "Acc(?:t)? XX(\\d{3,4}) is credited.*-(ICICI Bank)" ->
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - xx${match.groupValues[1].trim()}", accountType = "Savings Account")
                     else -> null
                 }

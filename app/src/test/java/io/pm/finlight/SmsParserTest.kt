@@ -8,6 +8,8 @@
 // was failing, ensuring the improved regex correctly handles it.
 // FIX - Added a new test case to ensure the parser prioritizes amounts with
 // currency symbols over other numbers in an SMS, like account numbers.
+// FIX - Added a new test case for the `InfoACH*...Avl Bal` format to verify
+// the new, more specific merchant parsing regex.
 // =================================================================================
 package io.pm.finlight
 
@@ -52,6 +54,22 @@ class SmsParserTest {
         `when`(mockCustomSmsRuleDao.getAllRules()).thenReturn(flowOf(customRules))
         `when`(mockMerchantRenameRuleDao.getAllRules()).thenReturn(flowOf(renameRules))
         `when`(mockIgnoreRuleDao.getEnabledRules()).thenReturn(ignoreRules.filter { it.isEnabled })
+    }
+
+    @Test
+    fun `test parses ICICI debit with ACH and Avl Bal`() = runBlocking {
+        setupTest()
+        val smsBody = "ICICI Bank Acc XX244 debited Rs. 8,700.00 on 02-Aug-25 InfoACH*ZERODHA B.Avl Bal Rs. 3,209.31.To dispute call 18002662 or SMS BLOCK 646 to 9215676766"
+        val mockSms = SmsMessage(id = 17L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(8700.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("ACH*ZERODHA B", result?.merchantName) // Note: The parser correctly gets the merchant now
+        assertNotNull(result?.potentialAccount)
+        assertEquals("ICICI Bank - xx244", result?.potentialAccount?.formattedName)
+        assertEquals("Savings Account", result?.potentialAccount?.accountType)
     }
 
     @Test
