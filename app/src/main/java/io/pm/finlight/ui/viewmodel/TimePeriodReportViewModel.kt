@@ -4,6 +4,9 @@
 // The initialization logic for the `selectedDate` state now checks this flag.
 // If true, it sets the initial view to the previous month, ensuring that deep
 // links from monthly summary notifications show the correct report.
+// FIX - The spending chart logic for the Daily report has been corrected. It
+// now fetches and displays data for the relevant 24-hour period, consistent
+// with the rest of the screen, instead of incorrectly showing a 7-day summary.
 // =================================================================================
 package io.pm.finlight
 
@@ -27,20 +30,16 @@ class TimePeriodReportViewModel(
     private val settingsRepository: SettingsRepository,
     private val timePeriod: TimePeriod,
     initialDateMillis: Long?,
-    showPreviousMonth: Boolean // --- NEW: Add parameter
+    showPreviousMonth: Boolean
 ) : ViewModel() {
 
     private val _selectedDate = MutableStateFlow(
         Calendar.getInstance().apply {
-            // --- UPDATED: New initialization logic ---
             if (initialDateMillis != null && initialDateMillis != -1L) {
-                // Priority 1: A specific date was passed (e.g., from calendar click)
                 timeInMillis = initialDateMillis
             } else if (showPreviousMonth) {
-                // Priority 2: The notification flag was passed
                 add(Calendar.MONTH, -1)
             }
-            // Priority 3: Default to the current date (the initial state of the Calendar instance)
         }
     )
     val selectedDate: StateFlow<Calendar> = _selectedDate.asStateFlow()
@@ -90,7 +89,7 @@ class TimePeriodReportViewModel(
         when (timePeriod) {
             TimePeriod.DAILY -> {
                 val endCal = (calendar.clone() as Calendar)
-                val startCal = (calendar.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -6) }
+                val startCal = (calendar.clone() as Calendar).apply { add(Calendar.HOUR_OF_DAY, -24) }
 
                 transactionDao.getDailySpendingForDateRange(startCal.timeInMillis, endCal.timeInMillis).map { dailyTotals ->
                     if (dailyTotals.isEmpty()) return@map null
@@ -100,15 +99,10 @@ class TimePeriodReportViewModel(
                     val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
                     val fullDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-                    val totalsMap = dailyTotals.associateBy { it.date }
-
-                    for (i in 0..6) {
-                        val dayCal = (startCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, i) }
-                        val dateString = fullDateFormat.format(dayCal.time)
-
-                        val total = totalsMap[dateString]?.totalAmount?.toFloat() ?: 0f
-                        entries.add(BarEntry(i.toFloat(), total))
-                        labels.add(dayFormat.format(dayCal.time))
+                    dailyTotals.forEachIndexed { index, dailyTotal ->
+                        entries.add(BarEntry(index.toFloat(), dailyTotal.totalAmount.toFloat()))
+                        val date = fullDateFormat.parse(dailyTotal.date)
+                        labels.add(dayFormat.format(date!!))
                     }
 
                     val dataSet = BarDataSet(entries, "Daily Spending").apply {
