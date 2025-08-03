@@ -78,8 +78,17 @@ class DragDropState(
             // If we are over a valid target, that's our potential new index.
             targetItemIndex = targetItem.index
         } else {
-            // If not directly over another item, it will revert to its original spot if dropped.
-            targetItemIndex = initialIndex
+            // --- FIX: Handle dragging beyond the visible items ---
+            val isDraggingDown = draggingItemTranslationY > 0
+            val lastVisibleItem = lazyListState.layoutInfo.visibleItemsInfo.last()
+
+            // If dragging down past the last item, target the last position.
+            if (isDraggingDown && draggedItemCenterY > lastVisibleItem.offset + lastVisibleItem.size) {
+                targetItemIndex = lazyListState.layoutInfo.totalItemsCount - 1
+            } else {
+                // Otherwise, it's not over a valid target, so it would revert to its original spot.
+                targetItemIndex = initialIndex
+            }
         }
     }
 
