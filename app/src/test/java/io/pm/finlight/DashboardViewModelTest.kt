@@ -1,6 +1,13 @@
+// =================================================================================
+// FILE: ./app/src/test/java/io/pm/finlight/DashboardViewModelTest.kt
+// REASON: FIX(test) - Added a static initializer block (`companion object`) to
+// load the SQLCipher native libraries before any tests are run. This resolves
+// the UnsatisfiedLinkError that was causing the test class to fail initialization
+// in the Robolectric environment. Also, the setup() method has been fixed to
+// correctly mock all required dependencies before the ViewModel is instantiated.
+// =================================================================================
 package io.pm.finlight
 
-import android.app.Application
 import android.os.Build
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
@@ -14,6 +21,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import net.sqlcipher.database.SQLiteDatabase
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -51,6 +59,13 @@ class DashboardViewModelTest {
     private lateinit var viewModel: DashboardViewModel
 
     private val testDispatcher = UnconfinedTestDispatcher()
+
+    companion object {
+        // --- NEW: Static initializer to load SQLCipher native libraries for Robolectric ---
+        init {
+            SQLiteDatabase.loadLibs(ApplicationProvider.getApplicationContext())
+        }
+    }
 
     @Before
     fun setup() {
