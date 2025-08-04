@@ -1,3 +1,10 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/MainApplication.kt
+// REASON: FIX(security) - Added a static initializer block to explicitly load
+// the SQLCipher native libraries before any database operations occur. This
+// resolves the "file is not a database" runtime exception that happens when
+// Room attempts to open an encrypted database for the first time.
+// =================================================================================
 package io.pm.finlight
 
 import android.app.Application
@@ -5,11 +12,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import com.github.mikephil.charting.utils.Utils
+import net.sqlcipher.database.SQLiteDatabase
 
 class MainApplication : Application() {
     companion object {
         const val TRANSACTION_CHANNEL_ID = "transaction_channel"
-        // --- NEW: A dedicated channel for the new rich notifications ---
         const val RICH_TRANSACTION_CHANNEL_ID = "rich_transaction_channel"
         const val DAILY_REPORT_CHANNEL_ID = "daily_report_channel"
         const val SUMMARY_CHANNEL_ID = "summary_channel"
@@ -18,10 +25,12 @@ class MainApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // --- FIX: Load SQLCipher libraries before any database access ---
+        SQLiteDatabase.loadLibs(this)
+
         Utils.init(this)
 
         createTransactionNotificationChannel()
-        // --- NEW: Call the creation function for the new channel ---
         createRichTransactionNotificationChannel()
         createDailyReportNotificationChannel()
         createSummaryNotificationChannel()
@@ -43,7 +52,6 @@ class MainApplication : Application() {
         }
     }
 
-    // --- NEW: Function to create the rich transaction notification channel ---
     private fun createRichTransactionNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Detailed Transactions"
