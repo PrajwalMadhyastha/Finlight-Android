@@ -42,6 +42,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import net.sqlcipher.database.SupportFactory
+import io.pm.finlight.security.SecurityManager
 import java.util.Calendar
 
 @Database(
@@ -63,7 +64,7 @@ import java.util.Calendar
         RecurringPattern::class,
         SplitTransaction::class
     ],
-    version = 32, // --- UPDATED: Incremented version number
+    version = 33, // --- UPDATED: Incremented version number
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
