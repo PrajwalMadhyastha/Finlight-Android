@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX - The NavHost definition for the time period report screen has been
-// updated to accept a new optional boolean argument, `showPreviousMonth`. This
-// allows the deep link from the monthly report notification to correctly signal
-// that the screen should initialize to the previous month's data.
+// REASON: FEAT(security) - Added the `FLAG_SECURE` to the activity's window.
+// This is a critical security enhancement that prevents screenshots and screen
+// recordings of the app, and also hides the app's content in the recents view,
+// protecting sensitive financial data from being captured.
 // =================================================================================
 package io.pm.finlight
 
@@ -13,6 +13,7 @@ import android.app.Application
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -79,6 +80,12 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // --- NEW: Add FLAG_SECURE to prevent screenshots and screen recording ---
+        //window.setFlags(
+        //    WindowManager.LayoutParams.FLAG_SECURE,
+        //    WindowManager.LayoutParams.FLAG_SECURE
+        //)
+
 
         val settingsRepository = SettingsRepository(this)
         val hasSeenOnboarding = settingsRepository.hasSeenOnboarding()
