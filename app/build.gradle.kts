@@ -1,12 +1,7 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: FEAT - Implemented an automated versioning system. The script now reads
-// major, minor, and patch versions from a new `version.properties` file.
-// - `versionCode` is now dynamically generated based on the current date and time
-//   (e.g., 25080411 for Aug 4, 2025, 11:XX), ensuring it's always unique and incremental.
-// - `versionName` is constructed from the properties file (e.g., "1.0.0").
-// REASON: CHORE - Added a comment to the release build type to serve as a reminder
-// to enable `isMinifyEnabled` for the final public release to the Play Store.
+// REASON: FEAT(security) - Added the `sqlite-cipher` dependency to enable
+// full database encryption with SQLCipher for Room.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -29,10 +24,11 @@ val robolectricVersion = "4.13"
 val coroutinesTestVersion = "1.8.1"
 val gsonVersion = "2.10.1"
 val coilVersion = "2.6.0"
-// --- NEW: Add Image Cropper library version ---
 val imageCropperVersion = "4.5.0"
-// --- FIX: Update mockito-inline to a version compatible with Java 21 ---
 val mockitoVersion = "5.11.0"
+// --- NEW: Add SQLCipher dependency version ---
+val sqlcipherVersion = "4.5.4"
+
 
 // Read properties from local.properties
 val keystorePropertiesFile = rootProject.file("local.properties")
@@ -41,7 +37,7 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
-// --- NEW: Read version properties ---
+// Read version properties
 val versionPropertiesFile = rootProject.file("version.properties")
 val versionProperties = Properties()
 if (versionPropertiesFile.exists()) {
@@ -50,7 +46,7 @@ if (versionPropertiesFile.exists()) {
     throw GradleException("Could not find version.properties!")
 }
 
-// --- NEW: Function to generate versionCode from date ---
+// Function to generate versionCode from date
 fun generateVersionCode(): Int {
     val sdf = SimpleDateFormat("yyMMddHH")
     sdf.timeZone = TimeZone.getTimeZone("UTC")
@@ -83,7 +79,6 @@ android {
         applicationId = "io.pm.finlight"
         minSdk = 24
         targetSdk = 35
-        // --- UPDATED: Use dynamic versioning ---
         versionCode = generateVersionCode()
         versionName = "${versionProperties["VERSION_MAJOR"]}.${versionProperties["VERSION_MINOR"]}.${versionProperties["VERSION_PATCH"]}"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -97,8 +92,6 @@ android {
 
     buildTypes {
         release {
-            // CHORE: Remember to set isMinifyEnabled to true for the public release.
-            // This will shrink, obfuscate, and optimize the app, which is crucial for production.
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -106,9 +99,6 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
         }
-        // --- NEW: Explicitly define the debug build type ---
-        // This ensures that the App Inspector can connect to your app to view
-        // databases, background workers, and other debug information.
         debug {
             isDebuggable = true
         }
@@ -122,7 +112,6 @@ android {
     }
     buildFeatures {
         compose = true
-        // --- FIX: Enable BuildConfig generation ---
         buildConfig = true
     }
     packaging {
@@ -134,7 +123,6 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
-            // --- FIX: Return default values for Android framework methods in unit tests ---
             isReturnDefaultValues = true
         }
     }
@@ -182,9 +170,11 @@ dependencies {
 
     implementation("com.vanniktech:android-image-cropper:$imageCropperVersion")
 
+    // --- NEW: Add SQLCipher for Android dependency ---
+    implementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
+
     // Local unit tests
     testImplementation("junit:junit:4.13.2")
-    // --- FIX: Switched to mockito-core and updated version ---
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
     testImplementation("androidx.test:core-ktx:$androidxTestVersion")
     testImplementation("androidx.test.ext:junit:$testExtJunitVersion")
