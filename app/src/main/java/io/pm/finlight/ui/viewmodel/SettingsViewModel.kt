@@ -202,11 +202,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             if (originalName.equals(newName, ignoreCase = true)) {
                 db.merchantRenameRuleDao().deleteByOriginalName(originalName)
-                Log.d("SettingsViewModel", "Deleted rename rule for: '$originalName'")
             } else {
                 val rule = MerchantRenameRule(originalName = originalName, newName = newName)
                 db.merchantRenameRuleDao().insert(rule)
-                Log.d("SettingsViewModel", "Saved rename rule: '$originalName' -> '$newName'")
             }
         }
     }

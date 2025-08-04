@@ -108,7 +108,6 @@ fun TransactionDetailScreen(
     accountViewModel: AccountViewModel = viewModel(),
     onSaveRenameRule: (originalName: String, newName: String) -> Unit
 ) {
-    Log.d(TAG, "Composing TransactionDetailScreen for transactionId: $transactionId")
 
     val screenState by produceState<DetailScreenState>(initialValue = DetailScreenState.Loading, transactionId) {
         viewModel.findTransactionDetailsById(transactionId).collect { details ->
@@ -129,7 +128,6 @@ fun TransactionDetailScreen(
 
     LaunchedEffect(reparseResult?.value) {
         if (reparseResult?.value == true) {
-            Log.d("DetailScreen", "Reparse needed signal received for txn ID: $transactionId")
             viewModel.reparseTransactionFromSms(transactionId)
             navController.currentBackStackEntry?.savedStateHandle?.set("reparse_needed", false)
         }

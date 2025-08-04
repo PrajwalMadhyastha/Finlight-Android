@@ -27,7 +27,6 @@ class DailyReportWorker(
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d("DailyReportWorker", "Worker starting for daily report...")
                 val transactionDao = AppDatabase.getInstance(context).transactionDao()
 
                 // --- FIX: Calculate a true rolling 24-hour window from now ---
@@ -55,7 +54,6 @@ class DailyReportWorker(
                 NotificationHelper.showDailyReportNotification(context, currentPeriodExpenses, percentageChange, topCategories, endDate)
 
                 ReminderManager.scheduleDailyReport(context)
-                Log.d("DailyReportWorker", "Worker finished and rescheduled.")
                 Result.success()
             } catch (e: Exception) {
                 Log.e("DailyReportWorker", "Worker failed", e)

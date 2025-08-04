@@ -137,10 +137,8 @@ class RuleCreationViewModel(application: Application) : AndroidViewModel(applica
 
             // --- UPDATED: Check if we are editing or creating ---
             if (currentState.ruleIdToEdit != null) {
-                Log.d("RuleCreation", "Updating existing rule: $rule")
                 customSmsRuleDao.update(rule)
             } else {
-                Log.d("RuleCreation", "Saving new trigger-based rule: $rule")
                 customSmsRuleDao.insert(rule)
             }
             onComplete()
