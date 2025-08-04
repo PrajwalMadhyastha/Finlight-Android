@@ -201,11 +201,9 @@ object NotificationHelper {
         canvas.drawCircle(width / 2f, height / 2f, width / 2f, backgroundPaint)
 
         val iconKey = details.categoryIconKey
-        Log.d("NotificationHelper", "Creating icon for category: '${details.categoryName}', iconKey: '$iconKey'")
 
         if (iconKey != null && iconKey != "letter_default" && iconKey != "category") {
             val drawableResId = getFallbackDrawableRes(iconKey)
-            Log.d("NotificationHelper", "Mapped iconKey '$iconKey' to drawable resource ID: $drawableResId")
             val iconDrawable = ContextCompat.getDrawable(context, drawableResId)
 
             if (iconDrawable == null) {

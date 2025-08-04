@@ -70,7 +70,6 @@ class SmsReceiver : BroadcastReceiver() {
                         )
 
                         if (potentialTxn != null && !existingSmsHashes.contains(potentialTxn.sourceSmsHash)) {
-                            Log.d(tag, "New potential transaction found: $potentialTxn.")
 
                             val travelSettings = settingsRepository.getTravelModeSettings().first()
                             val homeCurrency = settingsRepository.getHomeCurrency().first()
@@ -81,23 +80,18 @@ class SmsReceiver : BroadcastReceiver() {
                                 when (potentialTxn.detectedCurrencyCode) {
                                     // Case 1: Foreign currency is detected
                                     travelSettings.currencyCode -> {
-                                        Log.d(tag, "Travel Mode: Foreign currency '${potentialTxn.detectedCurrencyCode}' detected. Auto-saving with conversion.")
                                         saveTransaction(context, potentialTxn, isForeign = true, travelSettings = travelSettings)
                                     }
                                     // Case 2: Home currency is detected
                                     homeCurrency -> {
-                                        Log.d(tag, "Travel Mode: Home currency '${potentialTxn.detectedCurrencyCode}' detected. Auto-saving without conversion.")
                                         saveTransaction(context, potentialTxn, isForeign = false, travelSettings = null)
                                     }
                                     // Case 3: Ambiguous, fall back to user prompt
                                     else -> {
-                                        Log.d(tag, "Travel Mode: Ambiguous currency. Showing clarification notification.")
                                         NotificationHelper.showTravelModeSmsNotification(context, potentialTxn, travelSettings)
                                     }
                                 }
                             } else {
-                                // Travel mode is off, proceed with normal auto-save.
-                                Log.d(tag, "Travel mode is inactive. Saving automatically.")
                                 saveTransaction(context, potentialTxn, isForeign = false, travelSettings = null)
                             }
                         }
@@ -168,7 +162,6 @@ class SmsReceiver : BroadcastReceiver() {
             }
 
             val newTransactionId = transactionDao.insert(transactionToSave)
-            Log.d(tag, "Transaction saved successfully with ID: $newTransactionId")
 
             if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
                 val workRequest = OneTimeWorkRequestBuilder<TransactionNotificationWorker>()

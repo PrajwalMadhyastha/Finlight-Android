@@ -26,7 +26,6 @@ class WeeklySummaryWorker(
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d("WeeklySummaryWorker", "Worker starting...")
                 val transactionDao = AppDatabase.getInstance(context).transactionDao()
 
                 // Date range for LAST 7 DAYS
@@ -52,7 +51,6 @@ class WeeklySummaryWorker(
                 NotificationHelper.showWeeklySummaryNotification(context, thisWeekExpenses, percentageChange, topCategories)
 
                 ReminderManager.scheduleWeeklySummary(context)
-                Log.d("WeeklySummaryWorker", "Worker finished and rescheduled.")
                 Result.success()
             } catch (e: Exception) {
                 Log.e("WeeklySummaryWorker", "Worker failed", e)

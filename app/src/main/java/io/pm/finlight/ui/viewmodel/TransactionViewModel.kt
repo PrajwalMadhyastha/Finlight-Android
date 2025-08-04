@@ -197,7 +197,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         )
         allCategories = categoryRepository.allCategories
         allTags = tagRepository.allTags.onEach {
-            Log.d(TAG, "allTags flow collected new data. Count: ${it.size}")
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -475,7 +474,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             val sms = getOriginalSmsMessage(sourceSmsId)
             _originalSmsText.value = sms?.body
-            Log.d(TAG, "Loaded SMS for ID $sourceSmsId. Found: ${sms != null}")
         }
     }
 
@@ -492,21 +490,18 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     fun reparseTransactionFromSms(transactionId: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             val logTag = "ReparseLogic"
-            Log.d(logTag, "--- Starting reparse for transactionId: $transactionId ---")
 
             val transaction = transactionRepository.getTransactionById(transactionId).first()
             if (transaction?.sourceSmsId == null) {
                 Log.w(logTag, "FAILURE: Transaction or sourceSmsId is null.")
                 return@launch
             }
-            Log.d(logTag, "Found transaction: $transaction")
 
             val smsMessage = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
             if (smsMessage == null) {
                 Log.w(logTag, "FAILURE: Could not find original SMS for sourceSmsId: ${transaction.sourceSmsId}")
                 return@launch
             }
-            Log.d(logTag, "Found original SMS: ${smsMessage.body}")
 
             // --- FIX: Fetch existing mappings before parsing ---
             val existingMappings = merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
@@ -519,39 +514,28 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 db.ignoreRuleDao(),
                 db.merchantCategoryMappingDao()
             )
-            Log.d(logTag, "SmsParser result: $potentialTxn")
 
             if (potentialTxn != null) {
                 if (potentialTxn.merchantName != null && potentialTxn.merchantName != transaction.description) {
-                    Log.d(logTag, "Updating description for txnId $transactionId from '${transaction.description}' to '${potentialTxn.merchantName}'")
                     transactionRepository.updateDescription(transactionId, potentialTxn.merchantName)
                 }
 
                 potentialTxn.potentialAccount?.let { parsedAccount ->
-                    Log.d(logTag, "Parsed account found: Name='${parsedAccount.formattedName}', Type='${parsedAccount.accountType}'")
                     val currentAccount = accountRepository.getAccountById(transaction.accountId).first()
-                    Log.d(logTag, "Current account in DB: Name='${currentAccount?.name}'")
 
                     if (currentAccount?.name?.equals(parsedAccount.formattedName, ignoreCase = true) == false) {
-                        Log.d(logTag, "Account names differ. Proceeding with find-or-create.")
 
                         var account = db.accountDao().findByName(parsedAccount.formattedName)
-                        Log.d(logTag, "Attempting to find existing account by name '${parsedAccount.formattedName}'. Found: ${account != null}")
 
                         if (account == null) {
-                            Log.d(logTag, "Account not found. Creating new one.")
                             val newAccount = Account(name = parsedAccount.formattedName, type = parsedAccount.accountType)
                             val newId = accountRepository.insert(newAccount)
-                            Log.d(logTag, "Inserted new account, got ID: $newId")
                             account = db.accountDao().getAccountById(newId.toInt()).first()
-                            Log.d(logTag, "Re-fetched new account from DB: $account")
                         }
 
                         if (account != null) {
-                            Log.d(logTag, "SUCCESS: Updating transaction $transactionId to use accountId ${account.id} ('${account.name}')")
                             transactionRepository.updateAccountId(transactionId, account.id)
                         } else {
-                            Log.e(logTag, "FAILURE: Failed to find or create the new account '${parsedAccount.formattedName}'.")
                         }
                     } else {
                         Log.d(logTag, "Account names are the same. No update needed.")
@@ -725,7 +709,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 categoryId = categoryId
             )
             merchantCategoryMappingRepository.insert(mapping)
-            Log.d(TAG, "Learned category mapping for '${transaction.originalDescription}' -> categoryId $categoryId")
         }
 
         val similar = transactionRepository.findSimilarTransactions(originalDescription, id)
@@ -755,12 +738,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun updateTagsForTransaction(transactionId: Int) = viewModelScope.launch {
-        Log.d(TAG, "updateTagsForTransaction: Saving tags for txn ID $transactionId. Tags: ${_selectedTags.value.map { it.name }}")
         transactionRepository.updateTagsForTransaction(transactionId, _selectedTags.value)
     }
 
     fun onTagSelected(tag: Tag) {
-        Log.d(TAG, "onTagSelected: Toggled tag '${tag.name}' (ID: ${tag.id})")
         _selectedTags.update { if (tag in it) it - tag else it + tag }
     }
 
@@ -867,7 +848,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                         categoryId = categoryId
                     )
                     merchantCategoryMappingRepository.insert(mapping)
-                    Log.d(TAG, "Saved learned category mapping: ${potentialTxn.merchantName} -> Category ID $categoryId")
                 }
 
                 true

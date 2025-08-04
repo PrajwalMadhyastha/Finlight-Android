@@ -25,18 +25,15 @@ class RecurringTransactionWorker(
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
-        Log.d("RecurringTxnWorker", "Worker starting to check for due recurring rules...")
         return withContext(Dispatchers.IO) {
             try {
                 val db = AppDatabase.getInstance(context)
                 val recurringDao = db.recurringTransactionDao()
 
                 val allRules = recurringDao.getAllRulesList()
-                Log.d("RecurringTxnWorker", "Found ${allRules.size} rules to check.")
 
                 allRules.forEach { rule ->
                     if (isDue(rule)) {
-                        Log.d("RecurringTxnWorker", "Rule '${rule.description}' is due. Sending notification.")
                         // --- NEW: Instead of creating a transaction, show a notification ---
                         val potentialTxn = PotentialTransaction(
                             sourceSmsId = rule.id.toLong(), // Re-using this field for the rule ID
@@ -53,7 +50,6 @@ class RecurringTransactionWorker(
 
                 // Reschedule for the next day
                 ReminderManager.scheduleRecurringTransactionWorker(context)
-                Log.d("RecurringTxnWorker", "Worker finished and rescheduled for tomorrow.")
                 Result.success()
             } catch (e: Exception) {
                 Log.e("RecurringTxnWorker", "Worker failed", e)
