@@ -1,11 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/NotificationHelper.kt
-// REASON: FIX - The deep link URI for the monthly summary notification now
-// includes a `showPreviousMonth=true` query parameter. This allows the destination
-// screen to correctly display the previous month's report when opened from the
-// notification, instead of defaulting to the current month.
+// REASON: FEATURE - Added a new `showAutoBackupNotification` function. This
+// creates and displays a system notification to inform the user that the
+// automatic backup has completed successfully.
 // =================================================================================
-package io.pm.finlight.utils // <-- UPDATED PACKAGE
+package io.pm.finlight.utils
 
 import android.Manifest
 import android.app.PendingIntent
@@ -41,6 +40,26 @@ object NotificationHelper {
     private const val DEEP_LINK_URI_APPROVE = "app://finlight.pm.io/approve_transaction_screen"
 
 
+    // --- NEW: Function to show a notification after a successful backup ---
+    fun showAutoBackupNotification(context: Context) {
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+
+        val builder = NotificationCompat.Builder(context, MainApplication.BACKUP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_logo)
+            .setContentTitle("Backup Complete")
+            .setContentText("Your Finlight data was successfully backed up.")
+            .setPriority(NotificationCompat.PRIORITY_LOW) // Low priority for background tasks
+            .setAutoCancel(true)
+
+        with(NotificationManagerCompat.from(context)) {
+            // Use a unique ID for this type of notification
+            notify(99, builder.build())
+        }
+    }
+
+
     fun showTravelModeSmsNotification(
         context: Context,
         potentialTxn: PotentialTransaction,
@@ -57,7 +76,6 @@ object NotificationHelper {
 
         val foreignTxn = potentialTxn.copy(isForeignCurrency = true)
         val foreignJson = URLEncoder.encode(Gson().toJson(foreignTxn), "UTF-8")
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val foreignIntent = Intent(Intent.ACTION_VIEW, "$DEEP_LINK_URI_APPROVE?potentialTxnJson=$foreignJson".toUri()).apply {
             `package` = context.packageName
         }
@@ -68,7 +86,6 @@ object NotificationHelper {
 
         val homeTxn = potentialTxn.copy(isForeignCurrency = false)
         val homeJson = URLEncoder.encode(Gson().toJson(homeTxn), "UTF-8")
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val homeIntent = Intent(Intent.ACTION_VIEW, "$DEEP_LINK_URI_APPROVE?potentialTxnJson=$homeJson".toUri()).apply {
             `package` = context.packageName
         }
@@ -102,7 +119,6 @@ object NotificationHelper {
             return
         }
 
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val intent = Intent(Intent.ACTION_VIEW, "$DEEP_LINK_URI_EDIT/${details.transaction.id}".toUri()).apply {
             `package` = context.packageName
         }
@@ -224,7 +240,6 @@ object NotificationHelper {
                 textSize = width * 0.5f
                 textAlign = Paint.Align.CENTER
                 isAntiAlias = true
-                // --- FIX: Use Kotlin property access syntax for 'typeface' ---
                 typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
             }
             val textY = (height / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
@@ -245,7 +260,6 @@ object NotificationHelper {
 
         val deepLinkUri = "$DEEP_LINK_URI_ADD_RECURRING?ruleId=${rule.id}".toUri()
 
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val intent = Intent(Intent.ACTION_VIEW, deepLinkUri).apply {
             `package` = context.packageName
         }
@@ -286,7 +300,6 @@ object NotificationHelper {
         val encodedJson = URLEncoder.encode(json, "UTF-8")
         val deepLinkUri = "$DEEP_LINK_URI_LINK_RECURRING/$encodedJson".toUri()
 
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val intent = Intent(Intent.ACTION_VIEW, deepLinkUri).apply {
             `package` = context.packageName
         }
@@ -329,7 +342,6 @@ object NotificationHelper {
         }
 
         val intent = Intent(Intent.ACTION_VIEW, deepLinkUri.toUri())
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         intent.`package` = context.packageName
 
         val pendingIntent: PendingIntent? = TaskStackBuilder.create(context).run {
@@ -432,7 +444,6 @@ object NotificationHelper {
             percentageChange > 0 -> "Spends up by $percentageChange% in $monthName"
             else -> "Spends down by ${abs(percentageChange)}% in $monthName"
         }
-        // --- UPDATED: Add showPreviousMonth=true to the deep link ---
         val deepLinkUri = "$DEEP_LINK_URI_REPORT_BASE/${TimePeriod.MONTHLY}?showPreviousMonth=true"
 
         createEnhancedSummaryNotification(
@@ -494,7 +505,6 @@ object NotificationHelper {
 
         val detailUri = "$DEEP_LINK_URI_EDIT/${transaction.id}".toUri()
 
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val intent = Intent(Intent.ACTION_VIEW, detailUri).apply {
             `package` = context.packageName
         }
