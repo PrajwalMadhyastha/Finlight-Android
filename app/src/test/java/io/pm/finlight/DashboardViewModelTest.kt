@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/DashboardViewModelTest.kt
-// REASON: FIX(test) - Moved the SQLCipher library loading logic from an `init`
-// block to a `@BeforeClass` annotated function. This ensures the native
-// libraries are loaded before Robolectric instantiates the MainApplication,
-// resolving the UnsatisfiedLinkError during test setup.
+// REASON: FIX(test) - Removed the manual SQLiteDatabase.loadLibs() call. This is
+// no longer necessary as the native library path is now configured globally for
+// all Robolectric tests via the new robolectric.properties file.
 // =================================================================================
 package io.pm.finlight
 
@@ -25,7 +24,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,15 +57,6 @@ class DashboardViewModelTest {
     private lateinit var viewModel: DashboardViewModel
 
     private val testDispatcher = UnconfinedTestDispatcher()
-
-    companion object {
-        // --- NEW: Use @BeforeClass to load libraries before the test class is even instantiated ---
-        @BeforeClass
-        @JvmStatic
-        fun setupClass() {
-            SQLiteDatabase.loadLibs(ApplicationProvider.getApplicationContext())
-        }
-    }
 
     @Before
     fun setup() {
