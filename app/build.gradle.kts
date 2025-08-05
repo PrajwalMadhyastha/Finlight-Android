@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: FEATURE - Added the Google API client for Drive. This dependency is
-// essential for the new automatic backup worker to authenticate and upload the
-// backup file to the user's Google Drive.
+// REASON: FIX - Excluded the transitive 'listenablefuture' dependency from
+// WorkManager. The classes in this module were conflicting with identical
+// classes included in the full Guava library, which is a dependency of the
+// Google API client, resolving the "Duplicate class" build error.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -28,7 +29,6 @@ val coilVersion = "2.6.0"
 val imageCropperVersion = "4.5.0"
 val mockitoVersion = "5.11.0"
 val sqlcipherVersion = "4.5.4"
-// --- NEW: Version for Google Drive API ---
 val googleApiVersion = "1.23.0"
 
 
@@ -174,7 +174,6 @@ dependencies {
 
     implementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
 
-    // --- NEW: Google Drive API client ---
     implementation("com.google.api-client:google-api-client-android:$googleApiVersion") {
         exclude(group = "org.apache.httpcomponents")
     }
@@ -210,5 +209,8 @@ dependencies {
 
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-    implementation("androidx.work:work-runtime-ktx:$workVersion")
+    // --- UPDATED: Exclude the conflicting module ---
+    implementation("androidx.work:work-runtime-ktx:$workVersion") {
+        exclude(group = "com.google.guava", module = "listenablefuture")
+    }
 }

@@ -21,8 +21,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.ManageSearch
+import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -190,7 +194,7 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                         SettingsActionItem(
                             text = "Manage Custom Parse Rules",
                             subtitle = "View or delete your SMS parsing rules",
-                            icon = Icons.Default.Rule,
+                            icon = Icons.AutoMirrored.Filled.Rule,
                             onClick = { navController.navigate("manage_parse_rules") },
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
@@ -204,7 +208,7 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                         SettingsToggleItem(
                             title = "Popup for Unknown Transactions",
                             subtitle = "Show notification for new merchants",
-                            icon = Icons.Default.HelpOutline,
+                            icon = Icons.AutoMirrored.Filled.HelpOutline,
                             checked = isUnknownTransactionPopupEnabled,
                             onCheckedChange = { settingsViewModel.setUnknownTransactionPopupEnabled(it) },
                         )
