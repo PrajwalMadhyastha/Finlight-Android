@@ -1,10 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainApplication.kt
-// REASON: FIX(test) - Removed the explicit SQLiteDatabase.loadLibs(this) call.
-// While this call was added to fix a runtime issue, it causes the Robolectric
-// test environment to fail during its setup phase. The library loading is now
-// handled within the test classes themselves, where the test environment is
-// properly configured.
+// REASON: FEATURE - Added a new notification channel for backup completion
+// alerts. This ensures that backup notifications can be managed separately by
+// the user in the system settings.
 // =================================================================================
 package io.pm.finlight
 
@@ -13,7 +11,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import com.github.mikephil.charting.utils.Utils
-import net.sqlcipher.database.SQLiteDatabase
 
 class MainApplication : Application() {
     companion object {
@@ -22,13 +19,12 @@ class MainApplication : Application() {
         const val DAILY_REPORT_CHANNEL_ID = "daily_report_channel"
         const val SUMMARY_CHANNEL_ID = "summary_channel"
         const val MONTHLY_SUMMARY_CHANNEL_ID = "monthly_summary_channel"
+        // --- NEW: Channel ID for backup notifications ---
+        const val BACKUP_CHANNEL_ID = "backup_channel"
     }
 
     override fun onCreate() {
         super.onCreate()
-        // The explicit call to loadLibs is removed from here.
-        // It's handled by the system on a real device, and we'll handle it
-        // manually in our Robolectric tests.
 
         Utils.init(this)
 
@@ -37,6 +33,24 @@ class MainApplication : Application() {
         createDailyReportNotificationChannel()
         createSummaryNotificationChannel()
         createMonthlySummaryNotificationChannel()
+        // --- NEW: Create the backup channel on app start ---
+        createBackupNotificationChannel()
+    }
+
+    // --- NEW: Function to create the backup notification channel ---
+    private fun createBackupNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "Data Backups"
+            val descriptionText = "Notifications for automatic data backup status."
+            val importance = NotificationManager.IMPORTANCE_LOW // Low importance for background tasks
+            val channel =
+                NotificationChannel(BACKUP_CHANNEL_ID, name, importance).apply {
+                    description = descriptionText
+                }
+            val notificationManager: NotificationManager =
+                getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
     }
 
     private fun createTransactionNotificationChannel() {
@@ -58,7 +72,7 @@ class MainApplication : Application() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Detailed Transactions"
             val descriptionText = "Richer, more detailed notifications for auto-saved transactions."
-            val importance = NotificationManager.IMPORTANCE_HIGH // Higher importance
+            val importance = NotificationManager.IMPORTANCE_HIGH
             val channel =
                 NotificationChannel(RICH_TRANSACTION_CHANNEL_ID, name, importance).apply {
                     description = descriptionText
