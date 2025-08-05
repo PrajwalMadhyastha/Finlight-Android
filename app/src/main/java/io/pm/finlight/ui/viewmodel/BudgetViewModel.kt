@@ -67,7 +67,7 @@ class BudgetViewModel(application: Application) : AndroidViewModel(application) 
         val budgetsSetInCurrentMonth = budgetRepository.getBudgetsForMonth(currentMonth, currentYear)
         availableCategoriesForNewBudget =
             combine(allCategories, budgetsSetInCurrentMonth) { categories, budgets ->
-                val budgetedCategoryNames = budgets.map { it.budget.categoryName }.toSet()
+                val budgetedCategoryNames = budgets.map { it.categoryName }.toSet()
                 categories.filter { category -> category.name !in budgetedCategoryNames }
             }
 
