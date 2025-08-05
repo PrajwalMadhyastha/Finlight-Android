@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: FIX(test) - Added a `testImplementation` dependency for SQLCipher.
-// This provides the native libraries required for the Robolectric test
-// environment to run unit tests against the encrypted database, resolving the
-// UnsatisfiedLinkError.
+// REASON: FEATURE - Added the Google API client for Drive. This dependency is
+// essential for the new automatic backup worker to authenticate and upload the
+// backup file to the user's Google Drive.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -29,6 +28,8 @@ val coilVersion = "2.6.0"
 val imageCropperVersion = "4.5.0"
 val mockitoVersion = "5.11.0"
 val sqlcipherVersion = "4.5.4"
+// --- NEW: Version for Google Drive API ---
+val googleApiVersion = "1.23.0"
 
 
 // Read properties from local.properties
@@ -173,6 +174,15 @@ dependencies {
 
     implementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
 
+    // --- NEW: Google Drive API client ---
+    implementation("com.google.api-client:google-api-client-android:$googleApiVersion") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+    implementation("com.google.apis:google-api-services-drive:v3-rev136-1.25.0") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+
+
     // Local unit tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
@@ -181,7 +191,6 @@ dependencies {
     testImplementation("org.robolectric:robolectric:$robolectricVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
-    // --- NEW: Add SQLCipher dependency for the test environment ---
     testImplementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
 
 
