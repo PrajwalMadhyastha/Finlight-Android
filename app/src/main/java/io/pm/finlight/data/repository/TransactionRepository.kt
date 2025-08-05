@@ -7,6 +7,7 @@
 package io.pm.finlight
 
 import android.util.Log
+import io.pm.finlight.data.model.MerchantPrediction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onEach
 

@@ -1,11 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/model/MerchantPrediction.kt
-// REASON: NEW FILE - This Data Transfer Object (DTO) is created to hold the
-// results of the new merchant search query. It combines the merchant name with
-// its most frequently associated category details, providing all necessary data
-// for the smart prediction UI in a single, clean object.
+// REASON: FIX - The package name has been corrected to match its file path.
+// This resolves the "Unresolved reference" build error in downstream files like
+// the DAO and Repository by making the DTO properly accessible.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.data.model
 
 /**
  * A data class to hold a predicted merchant and its associated category.

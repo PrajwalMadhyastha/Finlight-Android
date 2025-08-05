@@ -25,10 +25,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.pm.finlight.MerchantPrediction
 import io.pm.finlight.TransactionViewModel
+import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.delay
+import kotlin.collections.isNotEmpty
 
 @Composable
 fun MerchantPredictionSheet(
