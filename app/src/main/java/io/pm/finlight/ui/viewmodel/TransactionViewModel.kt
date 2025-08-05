@@ -1,10 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FEATURE - Added full support for multi-transaction deletion. This
-// includes a new StateFlow to manage the confirmation dialog's visibility and
-// functions to handle the delete action, confirmation, and cancellation. The
-// `onConfirmDeleteSelection` function calls the repository to perform the
-// batch deletion and then resets the UI state.
+// REASON: FEATURE - Added the core logic for the smart merchant prediction
+// feature. This includes a new debounced StateFlow (`merchantPredictions`) that
+// reacts to user input from a search query. The `onMerchantSearchQueryChanged`
+// function updates this query, triggering a real-time, performant search against
+// the user's transaction history to provide relevant suggestions.
 // =================================================================================
 package io.pm.finlight
 
@@ -22,6 +22,7 @@ import io.pm.finlight.utils.ShareImageGenerator
 import io.pm.finlight.utils.SmsParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -49,7 +50,7 @@ data class RetroUpdateSheetState(
     val isLoading: Boolean = true
 )
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class TransactionViewModel(application: Application) : AndroidViewModel(application) {
     private val transactionRepository: TransactionRepository
     val accountRepository: AccountRepository
@@ -88,7 +89,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private val _showShareSheet = MutableStateFlow(false)
     val showShareSheet: StateFlow<Boolean> = _showShareSheet.asStateFlow()
 
-    // --- NEW: State to manage the delete confirmation dialog ---
     private val _showDeleteConfirmation = MutableStateFlow(false)
     val showDeleteConfirmation: StateFlow<Boolean> = _showDeleteConfirmation.asStateFlow()
 
@@ -137,6 +137,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     val travelModeSettings: StateFlow<TravelModeSettings?>
 
+    // --- NEW: State and logic for merchant predictions ---
+    private val _merchantSearchQuery = MutableStateFlow("")
+    val merchantPredictions: StateFlow<List<MerchantPrediction>>
+
     init {
         transactionRepository = TransactionRepository(db.transactionDao())
         accountRepository = AccountRepository(db.accountDao())
@@ -148,6 +152,18 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao())
         merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
+
+        // --- NEW: Debounced search logic ---
+        merchantPredictions = _merchantSearchQuery
+            .debounce(300)
+            .flatMapLatest { query ->
+                if (query.length > 1) {
+                    transactionRepository.searchMerchants(query)
+                } else {
+                    flowOf(emptyList())
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
         travelModeSettings = settingsRepository.getTravelModeSettings()
@@ -246,6 +262,16 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    // --- NEW: Function to trigger a merchant search ---
+    fun onMerchantSearchQueryChanged(query: String) {
+        _merchantSearchQuery.value = query
+    }
+
+    // --- NEW: Function to clear the search results ---
+    fun clearMerchantSearch() {
+        _merchantSearchQuery.value = ""
+    }
+
     fun enterSelectionMode(initialTransactionId: Int) {
         _isSelectionModeActive.value = true
         _selectedTransactionIds.value = setOf(initialTransactionId)
@@ -266,7 +292,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         _selectedTransactionIds.value = emptySet()
     }
 
-    // --- NEW: Functions to manage the multi-delete workflow ---
     fun onDeleteSelectionClick() {
         _showDeleteConfirmation.value = true
     }
