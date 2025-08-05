@@ -1,8 +1,8 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/data/repository/TransactionRepository.kt
-// REASON: FIX - The `insertTransactionWithTags` function has been updated to
-// return the Long ID of the newly created transaction. This is required by the
-// CSV import logic to map old IDs to new ones and resolves a build error.
+// FILE: ./app/src/main/java/io/pm/finlight/TransactionRepository.kt
+// REASON: FEATURE - Added the `deleteByIds` function. This exposes the new batch
+// deletion capability from the DAO to the ViewModel, completing the data layer
+// implementation for the multi-delete feature.
 // =================================================================================
 package io.pm.finlight
 
@@ -11,6 +11,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onEach
 
 class TransactionRepository(private val transactionDao: TransactionDao) {
+
+    // --- NEW: Function to delete multiple transactions by their IDs ---
+    suspend fun deleteByIds(transactionIds: List<Int>) {
+        transactionDao.deleteByIds(transactionIds)
+    }
 
     fun getTransactionWithSplits(transactionId: Int): Flow<TransactionWithSplits?> {
         return transactionDao.getTransactionWithSplits(transactionId)

@@ -1,11 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FIX - The `reparseTransactionFromSms` function has been corrected to
-// fetch and provide the existing merchant mappings to the SmsParser. This
-// resolves a bug where re-parsing would fail because it lacked the necessary
-// context, making the "Fix Parser" feature fully operational.
-// FIX - Re-added the missing `updateTransactionExclusion` function, which was
-// causing an "Unresolved reference" compilation error in TransactionDetailScreen.
+// REASON: FEATURE - Added full support for multi-transaction deletion. This
+// includes a new StateFlow to manage the confirmation dialog's visibility and
+// functions to handle the delete action, confirmation, and cancellation. The
+// `onConfirmDeleteSelection` function calls the repository to perform the
+// batch deletion and then resets the UI state.
 // =================================================================================
 package io.pm.finlight
 
@@ -88,6 +87,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _showShareSheet = MutableStateFlow(false)
     val showShareSheet: StateFlow<Boolean> = _showShareSheet.asStateFlow()
+
+    // --- NEW: State to manage the delete confirmation dialog ---
+    private val _showDeleteConfirmation = MutableStateFlow(false)
+    val showDeleteConfirmation: StateFlow<Boolean> = _showDeleteConfirmation.asStateFlow()
 
     private val _shareableFields = MutableStateFlow(
         setOf(ShareableField.Date, ShareableField.Description, ShareableField.Amount, ShareableField.Category, ShareableField.Tags)
@@ -261,6 +264,26 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     fun clearSelectionMode() {
         _isSelectionModeActive.value = false
         _selectedTransactionIds.value = emptySet()
+    }
+
+    // --- NEW: Functions to manage the multi-delete workflow ---
+    fun onDeleteSelectionClick() {
+        _showDeleteConfirmation.value = true
+    }
+
+    fun onConfirmDeleteSelection() {
+        viewModelScope.launch {
+            val idsToDelete = _selectedTransactionIds.value.toList()
+            if (idsToDelete.isNotEmpty()) {
+                transactionRepository.deleteByIds(idsToDelete)
+            }
+            _showDeleteConfirmation.value = false
+            clearSelectionMode()
+        }
+    }
+
+    fun onCancelDeleteSelection() {
+        _showDeleteConfirmation.value = false
     }
 
     fun onShareClick() {
@@ -503,12 +526,11 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 return@launch
             }
 
-            // --- FIX: Fetch existing mappings before parsing ---
             val existingMappings = merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
 
             val potentialTxn = SmsParser.parse(
                 smsMessage,
-                existingMappings, // Pass the correct mappings
+                existingMappings,
                 db.customSmsRuleDao(),
                 db.merchantRenameRuleDao(),
                 db.ignoreRuleDao(),
