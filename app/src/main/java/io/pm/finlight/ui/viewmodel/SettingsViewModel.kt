@@ -1,10 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: FEATURE - The CSV import process now learns from the imported data.
-// The `commitCsvImport` function and its helpers now collect all unique
-// merchant-to-category relationships from the CSV file and save them as new
-// `MerchantCategoryMapping` rules. This allows the app's SMS parser to be
-// automatically trained by a user's historical data.
+// REASON: FEATURE - The ViewModel now exposes StateFlows for all auto-backup
+// settings (enabled, time, notifications) and provides functions to update them,
+// connecting the UI controls to the underlying repository.
 // =================================================================================
 package io.pm.finlight
 
@@ -120,6 +118,29 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             initialValue = AppTheme.SYSTEM_DEFAULT
         )
 
+    // --- NEW: StateFlows for auto-backup settings ---
+    val autoBackupEnabled: StateFlow<Boolean> =
+        settingsRepository.getAutoBackupEnabled().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
+    val autoBackupTime: StateFlow<Pair<Int, Int>> =
+        settingsRepository.getAutoBackupTime().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = Pair(2, 0)
+        )
+
+    val autoBackupNotificationEnabled: StateFlow<Boolean> =
+        settingsRepository.getAutoBackupNotificationEnabled().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
+
     init {
         smsScanStartDate =
             settingsRepository.getSmsScanStartDate()
@@ -129,6 +150,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     initialValue = 0L,
                 )
     }
+
+    // --- NEW: Functions to update auto-backup settings ---
+    fun setAutoBackupEnabled(enabled: Boolean) {
+        settingsRepository.saveAutoBackupEnabled(enabled)
+        if (enabled) ReminderManager.scheduleAutoBackup(context) else ReminderManager.cancelAutoBackup(context)
+    }
+
+    fun saveAutoBackupTime(hour: Int, minute: Int) {
+        settingsRepository.saveAutoBackupTime(hour, minute)
+        if (autoBackupEnabled.value) {
+            ReminderManager.scheduleAutoBackup(context)
+        }
+    }
+
+    fun setAutoBackupNotificationEnabled(enabled: Boolean) {
+        settingsRepository.saveAutoBackupNotificationEnabled(enabled)
+    }
+
 
     fun saveSelectedTheme(theme: AppTheme) {
         settingsRepository.saveSelectedTheme(theme)
@@ -295,7 +334,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
         val reviewableRows = mutableListOf<ReviewableRow>()
         var header = emptyList<String>()
-        var lineNumber = 0 // Start at 0 to account for header
+        var lineNumber = 0
 
         getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader()?.useLines { lines ->
             val lineIterator = lines.iterator()
@@ -305,7 +344,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             }
 
             while (lineIterator.hasNext()) {
-                lineNumber++ // This is now the actual line number in the file (starting from 2)
+                lineNumber++
                 val line = lineIterator.next()
                 val tokens = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)".toRegex()).map { it.trim().removeSurrounding("\"") }
                 reviewableRows.add(createReviewableRow(lineNumber + 1, tokens, accountsMap, categoriesMap))
@@ -325,18 +364,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         try {
-            dateFormat.parse(tokens[2]) // Date is now at index 2
+            dateFormat.parse(tokens[2])
         } catch (
             e: Exception,
         ) {
             return ReviewableRow(lineNumber, tokens, CsvRowStatus.INVALID_DATE, "Invalid date format.")
         }
 
-        val amount = tokens[4].toDoubleOrNull() // Amount is now at index 4
+        val amount = tokens[4].toDoubleOrNull()
         if (amount == null || amount <= 0) return ReviewableRow(lineNumber, tokens, CsvRowStatus.INVALID_AMOUNT, "Invalid amount.")
 
-        val categoryName = tokens[6] // Category is now at index 6
-        val accountName = tokens[7] // Account is now at index 7
+        val categoryName = tokens[6]
+        val accountName = tokens[7]
 
         val categoryExists = categories.containsKey(categoryName)
         val accountExists = accounts.containsKey(accountName)
@@ -398,7 +437,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             val rows = rowsToImport.map { it.rowData }
             val isFinlightExport = header.contains("Id") && header.contains("ParentId")
 
-            // --- NEW: Map to store learned merchant-category associations ---
             val learnedMappings = mutableMapOf<String, Int>()
 
             db.withTransaction {
@@ -408,7 +446,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     importGenericCsv(header, rows, learnedMappings)
                 }
 
-                // --- NEW: Batch insert all the learned mappings ---
                 if (learnedMappings.isNotEmpty()) {
                     val newMappings = learnedMappings.map { (merchant, categoryId) ->
                         MerchantCategoryMapping(parsedName = merchant, categoryId = categoryId)
@@ -425,11 +462,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         rows: List<List<String>>,
         learnedMappings: MutableMap<String, Int>
     ) {
-        val idMap = mutableMapOf<String, Long>() // Map CSV ID to new DB ID
+        val idMap = mutableMapOf<String, Long>()
         val parents = rows.filter { it[header.indexOf("ParentId")].isBlank() }
         val children = rows.filter { it[header.indexOf("ParentId")].isNotBlank() }
 
-        // Pass 1: Import parents and standard transactions
         for (row in parents) {
             val oldId = row[header.indexOf("Id")]
             val isSplit = row[header.indexOf("Category")] == "Split Transaction"
@@ -438,7 +474,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             idMap[oldId] = newId
         }
 
-        // Pass 2: Import child splits
         for (row in children) {
             val parentIdCsv = row[header.indexOf("ParentId")]
             val newParentId = idMap[parentIdCsv]?.toInt()
@@ -483,7 +518,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val category = if (isSplit) null else findOrCreateCategory(categoryName)
         val account = findOrCreateAccount(accountName)
 
-        // --- NEW: Populate the learned mappings map ---
         if (!isSplit && description.isNotBlank() && category != null) {
             learnedMappings[description] = category.id
         }
