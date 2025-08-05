@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FEAT(security) - Added the `FLAG_SECURE` to the activity's window.
-// This is a critical security enhancement that prevents screenshots and screen
-// recordings of the app, and also hides the app's content in the recents view,
-// protecting sensitive financial data from being captured.
+// REASON: FEATURE - Implemented the UI portion of the multi-delete feature.
+// - A "Delete" icon is now present in the top app bar during selection mode.
+// - An `AlertDialog` has been added to confirm the deletion of multiple items,
+//   triggered by the new state in the TransactionViewModel.
 // =================================================================================
 package io.pm.finlight
 
@@ -80,11 +80,10 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // --- NEW: Add FLAG_SECURE to prevent screenshots and screen recording ---
-        //window.setFlags(
-        //    WindowManager.LayoutParams.FLAG_SECURE,
-        //    WindowManager.LayoutParams.FLAG_SECURE
-        //)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
 
 
         val settingsRepository = SettingsRepository(this)
@@ -235,6 +234,7 @@ fun MainAppScreen() {
 
     val isSelectionMode by transactionViewModel.isSelectionModeActive.collectAsState()
     val selectedIdsCount by transactionViewModel.selectedTransactionIds.map { it.size }.collectAsState(initial = 0)
+    val showDeleteConfirmation by transactionViewModel.showDeleteConfirmation.collectAsState()
 
     val bottomNavItems = listOf(
         BottomNavItem.Dashboard,
@@ -313,6 +313,10 @@ fun MainAppScreen() {
                             }
                         },
                         actions = {
+                            // --- NEW: Add Delete button to the selection bar ---
+                            IconButton(onClick = { transactionViewModel.onDeleteSelectionClick() }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete")
+                            }
                             IconButton(onClick = { transactionViewModel.onShareClick() }) {
                                 Icon(Icons.Default.Share, contentDescription = "Share")
                             }
@@ -462,6 +466,28 @@ fun MainAppScreen() {
                     onAddNew = null
                 )
             }
+        }
+
+        // --- NEW: Confirmation dialog for multi-delete ---
+        if (showDeleteConfirmation) {
+            val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+            val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+
+            AlertDialog(
+                onDismissRequest = { transactionViewModel.onCancelDeleteSelection() },
+                title = { Text("Delete Transactions?") },
+                text = { Text("Are you sure you want to permanently delete the selected $selectedIdsCount transaction(s)? This action cannot be undone.") },
+                confirmButton = {
+                    Button(
+                        onClick = { transactionViewModel.onConfirmDeleteSelection() },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Delete") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { transactionViewModel.onCancelDeleteSelection() }) { Text("Cancel") }
+                },
+                containerColor = popupContainerColor
+            )
         }
     }
 }
@@ -992,9 +1018,6 @@ fun AppNavHost(
 
 @Composable
 fun SplashScreen(navController: NavHostController, activity: Activity) {
-    // --- FIX: This LaunchedEffect now ONLY handles the initial navigation. ---
-    // It no longer inspects the activity's intent for deep links.
-    // The NavHost is now solely responsible for this.
     LaunchedEffect(key1 = Unit) {
         navController.navigate(BottomNavItem.Dashboard.route) {
             popUpTo("splash_screen") { inclusive = true }
