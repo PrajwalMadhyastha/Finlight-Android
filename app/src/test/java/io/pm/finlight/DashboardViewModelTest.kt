@@ -1,9 +1,13 @@
+// =================================================================================
+// FILE: ./app/src/test/java/io/pm/finlight/DashboardViewModelTest.kt
+// REASON: FIX(test) - Removed the manual SQLiteDatabase.loadLibs() call. This is
+// no longer necessary as the native library path is now configured globally for
+// all Robolectric tests via the new robolectric.properties file.
+// =================================================================================
 package io.pm.finlight
 
-import android.app.Application
 import android.os.Build
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

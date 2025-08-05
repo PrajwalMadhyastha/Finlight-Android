@@ -1,7 +1,9 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: FEAT(security) - Added the `sqlite-cipher` dependency to enable
-// full database encryption with SQLCipher for Room.
+// REASON: FIX(test) - Added a `testImplementation` dependency for SQLCipher.
+// This provides the native libraries required for the Robolectric test
+// environment to run unit tests against the encrypted database, resolving the
+// UnsatisfiedLinkError.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -26,7 +28,6 @@ val gsonVersion = "2.10.1"
 val coilVersion = "2.6.0"
 val imageCropperVersion = "4.5.0"
 val mockitoVersion = "5.11.0"
-// --- NEW: Add SQLCipher dependency version ---
 val sqlcipherVersion = "4.5.4"
 
 
@@ -170,7 +171,6 @@ dependencies {
 
     implementation("com.vanniktech:android-image-cropper:$imageCropperVersion")
 
-    // --- NEW: Add SQLCipher for Android dependency ---
     implementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
 
     // Local unit tests
@@ -181,6 +181,9 @@ dependencies {
     testImplementation("org.robolectric:robolectric:$robolectricVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
+    // --- NEW: Add SQLCipher dependency for the test environment ---
+    testImplementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
+
 
     // Instrumented UI tests
     androidTestImplementation("androidx.tracing:tracing-ktx:$tracingVersion")
