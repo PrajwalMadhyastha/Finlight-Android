@@ -1,11 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: FIX - The `commitCsvImport` function signature has been changed from
-// accepting a Uri to accepting a List<ReviewableRow>. This resolves the
-// argument type mismatch error and makes the import logic more robust by
-// operating on the validated (and potentially modified) list of rows from the
-// UI, rather than re-reading the original file. The `generateValidationReport`
-// function is also updated to capture and store the CSV header.
+// REASON: FEATURE - The CSV import process now learns from the imported data.
+// The `commitCsvImport` function and its helpers now collect all unique
+// merchant-to-category relationships from the CSV file and save them as new
+// `MerchantCategoryMapping` rules. This allows the app's SMS parser to be
+// automatically trained by a user's historical data.
 // =================================================================================
 package io.pm.finlight
 
@@ -399,17 +398,33 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             val rows = rowsToImport.map { it.rowData }
             val isFinlightExport = header.contains("Id") && header.contains("ParentId")
 
+            // --- NEW: Map to store learned merchant-category associations ---
+            val learnedMappings = mutableMapOf<String, Int>()
+
             db.withTransaction {
                 if (isFinlightExport) {
-                    importFinlightCsv(header, rows)
+                    importFinlightCsv(header, rows, learnedMappings)
                 } else {
-                    importGenericCsv(header, rows)
+                    importGenericCsv(header, rows, learnedMappings)
+                }
+
+                // --- NEW: Batch insert all the learned mappings ---
+                if (learnedMappings.isNotEmpty()) {
+                    val newMappings = learnedMappings.map { (merchant, categoryId) ->
+                        MerchantCategoryMapping(parsedName = merchant, categoryId = categoryId)
+                    }
+                    db.merchantCategoryMappingDao().insertAll(newMappings)
+                    Log.d("CsvImport", "Learned and saved ${newMappings.size} new merchant-category mappings.")
                 }
             }
         }
     }
 
-    private suspend fun importFinlightCsv(header: List<String>, rows: List<List<String>>) {
+    private suspend fun importFinlightCsv(
+        header: List<String>,
+        rows: List<List<String>>,
+        learnedMappings: MutableMap<String, Int>
+    ) {
         val idMap = mutableMapOf<String, Long>() // Map CSV ID to new DB ID
         val parents = rows.filter { it[header.indexOf("ParentId")].isBlank() }
         val children = rows.filter { it[header.indexOf("ParentId")].isNotBlank() }
@@ -418,7 +433,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         for (row in parents) {
             val oldId = row[header.indexOf("Id")]
             val isSplit = row[header.indexOf("Category")] == "Split Transaction"
-            val transaction = createTransactionFromRow(row, header, isSplit = isSplit)
+            val transaction = createTransactionFromRow(row, header, isSplit = isSplit, learnedMappings = learnedMappings)
             val newId = transactionRepository.insertTransactionWithTags(transaction, getTagsFromRow(row, header))
             idMap[oldId] = newId
         }
@@ -436,14 +451,23 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private suspend fun importGenericCsv(header: List<String>, rows: List<List<String>>) {
+    private suspend fun importGenericCsv(
+        header: List<String>,
+        rows: List<List<String>>,
+        learnedMappings: MutableMap<String, Int>
+    ) {
         for (row in rows) {
-            val transaction = createTransactionFromRow(row, header, isSplit = false)
+            val transaction = createTransactionFromRow(row, header, isSplit = false, learnedMappings = learnedMappings)
             transactionRepository.insertTransactionWithTags(transaction, getTagsFromRow(row, header))
         }
     }
 
-    private suspend fun createTransactionFromRow(row: List<String>, header: List<String>, isSplit: Boolean): Transaction {
+    private suspend fun createTransactionFromRow(
+        row: List<String>,
+        header: List<String>,
+        isSplit: Boolean,
+        learnedMappings: MutableMap<String, Int>
+    ): Transaction {
         val h = header.associateWith { header.indexOf(it) }.withDefault { -1 }
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
@@ -458,6 +482,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
         val category = if (isSplit) null else findOrCreateCategory(categoryName)
         val account = findOrCreateAccount(accountName)
+
+        // --- NEW: Populate the learned mappings map ---
+        if (!isSplit && description.isNotBlank() && category != null) {
+            learnedMappings[description] = category.id
+        }
 
         return Transaction(
             date = date,
