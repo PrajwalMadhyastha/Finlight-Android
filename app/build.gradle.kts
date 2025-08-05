@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: FIX - Excluded the transitive 'listenablefuture' dependency from
-// WorkManager. The classes in this module were conflicting with identical
-// classes included in the full Guava library, which is a dependency of the
-// Google API client, resolving the "Duplicate class" build error.
+// REASON: FIX - Added a resolutionStrategy to force a single, Android-compatible
+// version of the Guava library across all configurations. This resolves the
+// "Duplicate class" build error caused by a version conflict between the
+// Google Drive API and WorkManager dependencies.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -130,11 +130,15 @@ android {
     }
 }
 
+// --- UPDATED: Added a resolution strategy to force a single version of Guava ---
 configurations.all {
     resolutionStrategy {
         force("androidx.core:core-ktx:$coreKtxVersion")
         force("androidx.core:core:$coreKtxVersion")
         force("androidx.tracing:tracing-ktx:$tracingVersion")
+        // This forces Gradle to use the Android-compatible version of Guava for all dependencies,
+        // resolving the conflict between WorkManager and the Google Drive API.
+        force("com.google.guava:guava:32.0.1-android")
     }
 }
 
@@ -209,8 +213,6 @@ dependencies {
 
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-    // --- UPDATED: Exclude the conflicting module ---
-    implementation("androidx.work:work-runtime-ktx:$workVersion") {
-        exclude(group = "com.google.guava", module = "listenablefuture")
-    }
+    // --- REVERTED: The exclude rule is no longer needed due to the resolutionStrategy ---
+    implementation("androidx.work:work-runtime-ktx:$workVersion")
 }
