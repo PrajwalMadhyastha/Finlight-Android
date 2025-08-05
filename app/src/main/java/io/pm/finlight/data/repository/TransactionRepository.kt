@@ -1,18 +1,23 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/TransactionRepository.kt
-// REASON: FEATURE - Added the `deleteByIds` function. This exposes the new batch
-// deletion capability from the DAO to the ViewModel, completing the data layer
-// implementation for the multi-delete feature.
+// FILE: ./app/src/main/java/io/pm/finlight/data/repository/TransactionRepository.kt
+// REASON: FEATURE - Added the `searchMerchants` function. This exposes the new
+// DAO query to the ViewModel, enabling it to fetch real-time merchant
+// predictions from the database.
 // =================================================================================
 package io.pm.finlight
 
 import android.util.Log
+import io.pm.finlight.data.model.MerchantPrediction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onEach
 
 class TransactionRepository(private val transactionDao: TransactionDao) {
 
-    // --- NEW: Function to delete multiple transactions by their IDs ---
+    // --- NEW: Function to search for merchant predictions ---
+    fun searchMerchants(query: String): Flow<List<MerchantPrediction>> {
+        return transactionDao.searchMerchants(query)
+    }
+
     suspend fun deleteByIds(transactionIds: List<Int>) {
         transactionDao.deleteByIds(transactionIds)
     }

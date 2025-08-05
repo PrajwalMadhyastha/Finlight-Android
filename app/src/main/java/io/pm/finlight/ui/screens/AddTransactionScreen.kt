@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: UX REFINEMENT - The description/merchant field is now editable in-place.
-// Tapping the description text now transforms it into a TextField directly on
-// the screen, instead of opening a separate bottom sheet, creating a more fluid
-// and intuitive editing experience.
+// REASON: FEATURE - Integrated the new `MerchantPredictionSheet`. Tapping the
+// description text now opens a bottom sheet that provides real-time, historical
+// suggestions for the merchant and its associated category, speeding up data
+// entry and improving consistency.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -49,7 +48,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,6 +75,7 @@ private sealed class ComposerSheet {
     object Account : ComposerSheet()
     object Tags : ComposerSheet()
     object Notes : ComposerSheet()
+    object Merchant : ComposerSheet() // --- NEW: Sheet for merchant prediction ---
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -123,9 +122,6 @@ fun AddTransactionScreen(
 
     var showCreateAccountDialog by remember { mutableStateOf(false) }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
-
-    // --- NEW: State to manage in-place editing of the description ---
-    var isEditingDescription by remember { mutableStateOf(false) }
 
     val isSaveEnabled = amount.isNotBlank() && description.isNotBlank() && selectedAccount != null && selectedCategory != null
     // endregion
@@ -225,9 +221,7 @@ fun AddTransactionScreen(
                 AmountComposer(
                     amount = amount,
                     description = description,
-                    onDescriptionChange = { description = it },
-                    isEditingDescription = isEditingDescription,
-                    onEditModeToggle = { isEditingDescription = it },
+                    onDescriptionClick = { activeSheet = ComposerSheet.Merchant },
                     isTravelMode = isTravelModeActive,
                     travelModeSettings = travelModeSettings
                 )
@@ -327,6 +321,22 @@ fun AddTransactionScreen(
                         activeSheet = null
                     }
                 )
+                is ComposerSheet.Merchant -> MerchantPredictionSheet(
+                    viewModel = viewModel,
+                    initialDescription = description,
+                    onPredictionSelected = { prediction ->
+                        description = prediction.description
+                        prediction.categoryId?.let { catId ->
+                            selectedCategory = categories.find { it.id == catId }
+                        }
+                        activeSheet = null
+                    },
+                    onManualSave = { newDescription ->
+                        description = newDescription
+                        activeSheet = null
+                    },
+                    onDismiss = { activeSheet = null }
+                )
                 null -> {}
             }
         }
@@ -425,9 +435,7 @@ private fun SpotlightBackground(color: Color) {
 private fun AmountComposer(
     amount: String,
     description: String,
-    onDescriptionChange: (String) -> Unit,
-    isEditingDescription: Boolean,
-    onEditModeToggle: (Boolean) -> Unit,
+    onDescriptionClick: () -> Unit,
     isTravelMode: Boolean,
     travelModeSettings: TravelModeSettings?
 ) {
@@ -436,63 +444,18 @@ private fun AmountComposer(
     } else {
         "₹" // Default to home currency symbol
     }
-    val focusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(isEditingDescription) {
-        if (isEditingDescription) {
-            focusRequester.requestFocus()
-        }
-    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AnimatedContent(
-            targetState = isEditingDescription,
-            transitionSpec = {
-                (fadeIn(animationSpec = tween(200)) with
-                        fadeOut(animationSpec = tween(200))).using(
-                    SizeTransform(clip = true)
-                )
-            }, label = "DescriptionEditAnimation"
-        ) { isEditing ->
-            if (isEditing) {
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = onDescriptionChange,
-                    label = { Text("Paid to...") },
-                    modifier = Modifier.focusRequester(focusRequester),
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Words,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = { onEditModeToggle(false) }
-                    ),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        cursorColor = MaterialTheme.colorScheme.primary,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                    )
-                )
-            } else {
-                Text(
-                    text = description.ifBlank { "Paid to..." },
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.clickable { onEditModeToggle(true) }
-                )
-            }
-        }
+        Text(
+            text = description.ifBlank { "Paid to..." },
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clickable(onClick = onDescriptionClick)
+        )
 
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -1,14 +1,13 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TransactionDetailScreen.kt
-// REASON: FEATURE - The Account, Category, Tag, and Retrospective Update bottom
-// sheets are now configured to open in a full-screen, edge-to-edge layout. This
-// provides a more immersive and user-friendly experience for selecting items
-// from potentially long lists.
+// REASON: FEATURE - Integrated the new `MerchantPredictionSheet`. Tapping the
+// description in the header now opens a bottom sheet that provides real-time,
+// historical suggestions for correcting the merchant and its associated category,
+// improving data consistency and editing speed.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
 import android.net.Uri
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -64,10 +63,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.gson.Gson
 import io.pm.finlight.*
-import io.pm.finlight.ui.components.CreateAccountDialog
-import io.pm.finlight.ui.components.CreateCategoryDialog
-import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.TimePickerDialog
+import io.pm.finlight.ui.components.*
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import kotlinx.coroutines.delay
@@ -84,12 +80,12 @@ import io.pm.finlight.utils.CurrencyHelper
 private const val TAG = "DetailScreenDebug"
 
 private sealed class SheetContent {
-    object Description : SheetContent()
     object Amount : SheetContent()
     object Notes : SheetContent()
     object Account : SheetContent()
     object Category : SheetContent()
     object Tags : SheetContent()
+    object Merchant : SheetContent() // --- NEW: Sheet for merchant prediction ---
 }
 
 private sealed interface DetailScreenState {
@@ -291,7 +287,7 @@ fun TransactionDetailScreen(
                                     isSplit = details.transaction.isSplit,
                                     onDescriptionClick = {
                                         if (!details.transaction.isSplit) {
-                                            activeSheetContent = SheetContent.Description
+                                            activeSheetContent = SheetContent.Merchant
                                         }
                                     },
                                     onAmountClick = {
@@ -1118,47 +1114,23 @@ private fun TransactionEditSheetContent(
     val transactionId = details.transaction.id
 
     when (sheetContent) {
-        is SheetContent.Description -> {
-            var saveForFuture by remember { mutableStateOf(false) }
-            EditTextFieldSheet(
-                title = "Edit Description",
-                initialValue = details.transaction.description,
-                onConfirm = { newDescription ->
-                    val originalNameForRule = details.transaction.originalDescription ?: details.transaction.description
-                    if (saveForFuture) {
-                        if (originalNameForRule.isNotBlank() && newDescription.isNotBlank()) {
-                            onSaveRenameRule(originalNameForRule, newDescription)
-                        }
+        is SheetContent.Merchant -> {
+            MerchantPredictionSheet(
+                viewModel = viewModel,
+                initialDescription = details.transaction.description,
+                onPredictionSelected = { prediction ->
+                    viewModel.updateTransactionDescription(transactionId, prediction.description)
+                    prediction.categoryId?.let { catId ->
+                        viewModel.updateTransactionCategory(transactionId, catId)
                     }
+                    onDismiss()
+                },
+                onManualSave = { newDescription ->
                     viewModel.updateTransactionDescription(transactionId, newDescription)
                     onDismiss()
                 },
                 onDismiss = onDismiss
-            ) {
-                val originalNameForRule = details.transaction.originalDescription ?: details.transaction.description
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { saveForFuture = !saveForFuture }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = saveForFuture,
-                        onCheckedChange = { saveForFuture = it },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = MaterialTheme.colorScheme.primary,
-                            uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            checkmarkColor = MaterialTheme.colorScheme.surface
-                        )
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Always rename '$originalNameForRule' to this",
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
+            )
         }
         is SheetContent.Amount -> {
             EditTextFieldSheet(
@@ -1315,9 +1287,7 @@ private fun AccountPickerItem(
 ) {
     val focusRequester = remember { FocusRequester() }
 
-    // When isEditing becomes true, this block replaces the standard ListItem
     if (isEditing) {
-        // Use a simple Row for the editing UI to avoid focus conflicts
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1341,13 +1311,10 @@ private fun AccountPickerItem(
                 Icon(Icons.Default.Close, contentDescription = "Cancel Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        // The LaunchedEffect is now keyed to Unit, so it runs exactly once when this
-        // composable enters the composition tree (i.e., when isEditing becomes true).
         LaunchedEffect(Unit) {
             focusRequester.requestFocus()
         }
     } else {
-        // This is the original display-only ListItem
         val colors = if (isCurrent) {
             ListItemDefaults.colors(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -1428,7 +1395,7 @@ private fun EditTextFieldSheet(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onDismiss) { Text("Cancel") } // Revert on cancel
+            TextButton(onClick = onDismiss) { Text("Cancel") }
             Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = {
                 onConfirm(text)
@@ -1436,9 +1403,8 @@ private fun EditTextFieldSheet(
         }
     }
 
-    // --- BUG FIX: Request focus inside a LaunchedEffect ---
     LaunchedEffect(Unit) {
-        delay(100) // Give UI time to draw
+        delay(100)
         focusRequester.requestFocus()
     }
 }
@@ -1493,7 +1459,7 @@ private fun CategoryPickerSheet(
                             .clip(RoundedCornerShape(12.dp))
                             .clickable(onClick = onAddNew)
                             .padding(vertical = 12.dp)
-                            .height(80.dp), // Match height of other items
+                            .height(80.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
