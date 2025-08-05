@@ -4,6 +4,8 @@
 // - A "Delete" icon is now present in the top app bar during selection mode.
 // - An `AlertDialog` has been added to confirm the deletion of multiple items,
 //   triggered by the new state in the TransactionViewModel.
+// FIX - Added the missing `isDark()` helper function to resolve a build error when
+// determining the dialog background color.
 // =================================================================================
 package io.pm.finlight
 
@@ -75,6 +77,9 @@ import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.flow.map
 import java.net.URLDecoder
 import java.util.concurrent.Executor
+
+// --- NEW: Helper function to determine if a color is 'dark' based on luminance. ---
+private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -313,7 +318,6 @@ fun MainAppScreen() {
                             }
                         },
                         actions = {
-                            // --- NEW: Add Delete button to the selection bar ---
                             IconButton(onClick = { transactionViewModel.onDeleteSelectionClick() }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Delete")
                             }
@@ -468,7 +472,6 @@ fun MainAppScreen() {
             }
         }
 
-        // --- NEW: Confirmation dialog for multi-delete ---
         if (showDeleteConfirmation) {
             val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
             val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
