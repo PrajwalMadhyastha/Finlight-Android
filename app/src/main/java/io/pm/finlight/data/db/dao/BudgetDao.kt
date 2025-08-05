@@ -1,9 +1,9 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/BudgetDao.kt
-// REASON: FEATURE (Splitting) - The queries for calculating spending against
-// budgets (`getBudgetsWithSpendingForMonth` and `getActualSpendingForCategory`)
-// have been rewritten. They now use a UNION ALL to combine non-split transactions
-// with child split items, ensuring budget calculations are accurate.
+// FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/BudgetDao.kt
+// REASON: FEATURE - The query for `getBudgetsWithSpendingForMonth` has been
+// rewritten to carry over the most recent budget for a category if one is not
+// set for the current month. A new `getBudgetsForMonth` query has also been
+// added to support this logic in the ViewModel.
 // =================================================================================
 package io.pm.finlight
 
@@ -12,23 +12,45 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface BudgetDao {
+    // --- NEW: Query to get budgets set ONLY for a specific month. ---
     @Query("SELECT * FROM budgets WHERE month = :month AND year = :year")
     fun getBudgetsForMonth(
         month: Int,
         year: Int,
     ): Flow<List<Budget>>
 
+    // --- UPDATED: This query now carries over the last known budget for each category. ---
     @Query(
         """
-        WITH AtomicExpenses AS (
-            -- 1. Regular, non-split transactions
+        WITH LatestBudgets AS (
+            SELECT
+                categoryName,
+                MAX(year * 100 + month) as lastBudgetPeriod
+            FROM budgets
+            WHERE (year * 100 + month) <= (:year * 100 + :month)
+            GROUP BY categoryName
+        ),
+        ActiveBudgets AS (
+            SELECT b.*
+            FROM budgets b
+            INNER JOIN LatestBudgets lb ON b.categoryName = lb.categoryName AND (b.year * 100 + b.month) = lb.lastBudgetPeriod
+        ),
+        AtomicExpenses AS (
             SELECT T.categoryId, T.amount FROM transactions AS T
             WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND strftime('%Y-%m', T.date / 1000, 'unixepoch', 'localtime') = :yearMonth AND T.isExcluded = 0
             UNION ALL
-            -- 2. Child items from split transactions
             SELECT S.categoryId, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'expense' AND strftime('%Y-%m', P.date / 1000, 'unixepoch', 'localtime') = :yearMonth AND P.isExcluded = 0
+        ),
+        TxSums AS (
+            SELECT
+                C.name as categoryName,
+                SUM(AE.amount) as totalSpent
+             FROM AtomicExpenses AS AE
+             JOIN categories AS C ON AE.categoryId = C.id
+             WHERE AE.categoryId IS NOT NULL
+             GROUP BY C.name
         )
         SELECT
             B.*,
@@ -36,18 +58,11 @@ interface BudgetDao {
             Cat.iconKey as iconKey,
             Cat.colorKey as colorKey
         FROM
-            budgets AS B
+            ActiveBudgets AS B
         LEFT JOIN
-            (SELECT
-                C.name as categoryName,
-                SUM(AE.amount) as totalSpent
-             FROM AtomicExpenses AS AE
-             JOIN categories AS C ON AE.categoryId = C.id
-             WHERE AE.categoryId IS NOT NULL
-             GROUP BY C.name) AS TxSums
-        ON B.categoryName = TxSums.categoryName
-        LEFT JOIN categories AS Cat ON B.categoryName = Cat.name
-        WHERE B.month = :month AND B.year = :year
+            TxSums ON B.categoryName = TxSums.categoryName
+        LEFT JOIN
+            categories AS Cat ON B.categoryName = Cat.name
     """
     )
     fun getBudgetsWithSpendingForMonth(yearMonth: String, month: Int, year: Int): Flow<List<BudgetWithSpending>>
