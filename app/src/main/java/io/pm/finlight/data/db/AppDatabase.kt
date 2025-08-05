@@ -1,3 +1,10 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
+// REASON: DB MIGRATION - Incremented database version to 33 and added
+// MIGRATION_32_33. This migration rebuilds the `ignore_rules` table with a
+// case-insensitive (COLLATE NOCASE) unique index on the `pattern` column,
+// preventing duplicate rules with different casing.
+// =================================================================================
 package io.pm.finlight.data.db
 
 import android.content.Context
@@ -397,10 +404,8 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // --- NEW: Migration to add `type` column and rename `phrase` to `pattern` ---
         val MIGRATION_31_32 = object : Migration(31, 32) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 1. Create a new table with the desired schema
                 db.execSQL("""
                     CREATE TABLE `ignore_rules_new` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
@@ -410,16 +415,34 @@ abstract class AppDatabase : RoomDatabase() {
                         `isDefault` INTEGER NOT NULL DEFAULT 0
                     )
                 """)
-                // 2. Copy data from the old table to the new one
                 db.execSQL("""
                     INSERT INTO `ignore_rules_new` (id, pattern, isEnabled, isDefault)
                     SELECT id, phrase, isEnabled, isDefault FROM `ignore_rules`
                 """)
-                // 3. Create the unique index on the new table
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ignore_rules_pattern` ON `ignore_rules_new` (`pattern`)")
-                // 4. Drop the old table
                 db.execSQL("DROP TABLE `ignore_rules`")
-                // 5. Rename the new table to the original name
+                db.execSQL("ALTER TABLE `ignore_rules_new` RENAME TO `ignore_rules`")
+            }
+        }
+
+        // --- NEW: Migration to make the ignore rule pattern index case-insensitive ---
+        val MIGRATION_32_33 = object : Migration(32, 33) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE `ignore_rules_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                        `type` TEXT NOT NULL DEFAULT 'BODY_PHRASE', 
+                        `pattern` TEXT NOT NULL COLLATE NOCASE, 
+                        `isEnabled` INTEGER NOT NULL DEFAULT 1, 
+                        `isDefault` INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ignore_rules_pattern_nocase` ON `ignore_rules_new` (`pattern`)")
+                db.execSQL("""
+                    INSERT OR IGNORE INTO `ignore_rules_new` (id, type, pattern, isEnabled, isDefault)
+                    SELECT id, type, pattern, isEnabled, isDefault FROM `ignore_rules`
+                """)
+                db.execSQL("DROP TABLE `ignore_rules`")
                 db.execSQL("ALTER TABLE `ignore_rules_new` RENAME TO `ignore_rules`")
             }
         }
@@ -427,18 +450,14 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                // --- NEW: Get the passphrase from the SecurityManager ---
                 val securityManager = SecurityManager(context)
                 val passphrase = securityManager.getPassphrase()
                 val factory = SupportFactory(passphrase)
 
                 val instance =
                     Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "finance_database")
-                        // --- NEW: Add the openHelperFactory for SQLCipher ---
                         .openHelperFactory(factory)
-                        // --- IMPORTANT: This will wipe the user's data on upgrade to enable encryption.
-                        // This is acceptable for a pre-release version but would require a proper
-                        // data migration strategy for a live app update.
+                        .addMigrations(MIGRATION_32_33) // --- UPDATED: Add the new migration
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))
                         .build()
