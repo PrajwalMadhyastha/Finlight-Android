@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: DB MIGRATION - Incremented database version to 33 and added
-// MIGRATION_32_33. This migration rebuilds the `ignore_rules` table with a
-// case-insensitive (COLLATE NOCASE) unique index on the `pattern` column,
-// preventing duplicate rules with different casing.
+// REASON: REFACTOR - Updated the database seeding logic to provide a cleaner
+// initial state for new users. Removed sample transactions, budgets, and all
+// accounts except for "Cash Spends".
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -50,7 +49,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import net.sqlcipher.database.SupportFactory
 import io.pm.finlight.security.SecurityManager
-import java.util.Calendar
 
 @Database(
     entities = [
@@ -71,7 +69,7 @@ import java.util.Calendar
         RecurringPattern::class,
         SplitTransaction::class
     ],
-    version = 33, // --- UPDATED: Incremented version number
+    version = 33,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -425,7 +423,6 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // --- NEW: Migration to make the ignore rule pattern index case-insensitive ---
         val MIGRATION_32_33 = object : Migration(32, 33) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -457,7 +454,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance =
                     Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "finance_database")
                         .openHelperFactory(factory)
-                        .addMigrations(MIGRATION_32_33) // --- UPDATED: Add the new migration
+                        .addMigrations(MIGRATION_32_33)
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))
                         .build()
@@ -481,82 +478,12 @@ abstract class AppDatabase : RoomDatabase() {
             suspend fun populateDatabase(db: AppDatabase) {
                 val accountDao = db.accountDao()
                 val categoryDao = db.categoryDao()
-                val transactionDao = db.transactionDao()
-                val budgetDao = db.budgetDao()
                 val ignoreRuleDao = db.ignoreRuleDao()
 
+                // --- UPDATED: Seed only the essential data ---
                 categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
                 ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
-
-                accountDao.insertAll(
-                    listOf(
-                        Account(id = 1, name = "Cash Spends", type = "Cash"),
-                        Account(id = 2, name = "SBI", type = "Savings"),
-                        Account(id = 3, name = "HDFC", type = "Credit Card"),
-                        Account(id = 4, name = "ICICI", type = "Savings"),
-                    ),
-                )
-
-                val calendar = Calendar.getInstance()
-                calendar.set(Calendar.DAY_OF_MONTH, 5)
-                val incomeDate = calendar.timeInMillis
-                calendar.set(Calendar.DAY_OF_MONTH, 10)
-                val expenseDate1 = calendar.timeInMillis
-                calendar.set(Calendar.DAY_OF_MONTH, 15)
-                val expenseDate2 = calendar.timeInMillis
-
-                transactionDao.insertAll(
-                    listOf(
-                        Transaction(
-                            description = "Monthly Salary",
-                            categoryId = 12, // "Salary"
-                            amount = 75000.0,
-                            date = incomeDate,
-                            accountId = 2, // SBI
-                            notes = "Paycheck",
-                            transactionType = "income",
-                        ),
-                        Transaction(
-                            description = "Grocery Shopping",
-                            categoryId = 6, // "Groceries"
-                            amount = 4500.0,
-                            date = expenseDate1,
-                            accountId = 3, // HDFC
-                            notes = "Weekly groceries",
-                            transactionType = "expense",
-                        ),
-                        Transaction(
-                            description = "Dinner with friends",
-                            categoryId = 4, // "Food & Drinks"
-                            amount = 1200.0,
-                            date = expenseDate2,
-                            accountId = 3, // HDFC
-                            notes = null,
-                            transactionType = "expense",
-                        )
-                    )
-                )
-
-                val month = calendar.get(Calendar.MONTH) + 1
-                val year = calendar.get(Calendar.YEAR)
-
-                budgetDao.insertAll(
-                    listOf(
-                        Budget(
-                            categoryName = "Groceries",
-                            amount = 10000.0,
-                            month = month,
-                            year = year
-                        ),
-                        Budget(
-                            categoryName = "Food & Drinks",
-                            amount = 5000.0,
-                            month = month,
-                            year = year
-                        ),
-                        Budget(categoryName = "Bills", amount = 2000.0, month = month, year = year),
-                    ),
-                )
+                accountDao.insert(Account(id = 1, name = "Cash Spends", type = "Cash"))
             }
         }
     }
