@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SettingsSubScreens.kt
-// REASON: UX REFINEMENT - The informational text within the `CsvInfoDialog` has
-// been updated to include the new "Tags" column. This ensures the user is
-// shown the correct, up-to-date format required for CSV imports, including
-// instructions on how to format multiple tags.
+// REASON: FEATURE - Added UI controls to the DataSettingsScreen for the new
+// automatic backup feature. Users can now enable/disable the backup, set the
+// time for the backup to run, and toggle completion notifications.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -22,8 +21,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.ManageSearch
+import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -191,7 +194,7 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                         SettingsActionItem(
                             text = "Manage Custom Parse Rules",
                             subtitle = "View or delete your SMS parsing rules",
-                            icon = Icons.Default.Rule,
+                            icon = Icons.AutoMirrored.Filled.Rule,
                             onClick = { navController.navigate("manage_parse_rules") },
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
@@ -205,7 +208,7 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                         SettingsToggleItem(
                             title = "Popup for Unknown Transactions",
                             subtitle = "Show notification for new merchants",
-                            icon = Icons.Default.HelpOutline,
+                            icon = Icons.AutoMirrored.Filled.HelpOutline,
                             checked = isUnknownTransactionPopupEnabled,
                             onCheckedChange = { settingsViewModel.setUnknownTransactionPopupEnabled(it) },
                         )
@@ -410,6 +413,13 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
     val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
+    // --- NEW: State for auto-backup settings ---
+    val isAutoBackupEnabled by settingsViewModel.autoBackupEnabled.collectAsState()
+    val isAutoBackupNotificationEnabled by settingsViewModel.autoBackupNotificationEnabled.collectAsState()
+    val autoBackupTime by settingsViewModel.autoBackupTime.collectAsState()
+    var showAutoBackupTimePicker by remember { mutableStateOf(false) }
+
+
     val jsonFileSaverLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json"),
         onResult = { uri ->
@@ -528,6 +538,30 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                             onCheckedChange = { settingsViewModel.setAppLockEnabled(it) },
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                        // --- NEW: Auto-backup settings ---
+                        SettingsToggleItem(
+                            title = "Automatic Daily Backup",
+                            subtitle = "Backup your data to Google Drive daily",
+                            icon = Icons.Default.CloudUpload,
+                            checked = isAutoBackupEnabled,
+                            onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) }
+                        )
+                        SettingsActionItem(
+                            text = "Backup Time",
+                            subtitle = "Current: ${String.format("%02d:%02d", autoBackupTime.first, autoBackupTime.second)}",
+                            icon = Icons.Default.Schedule,
+                            onClick = { showAutoBackupTimePicker = true },
+                            enabled = isAutoBackupEnabled
+                        )
+                        SettingsToggleItem(
+                            title = "Backup Notification",
+                            subtitle = "Notify when a backup is complete",
+                            icon = Icons.Default.Notifications,
+                            checked = isAutoBackupNotificationEnabled,
+                            onCheckedChange = { settingsViewModel.setAutoBackupNotificationEnabled(it) },
+                            enabled = isAutoBackupEnabled
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                         SettingsActionItem(
                             text = "Export Data (JSON)",
                             subtitle = "Create a full backup of all your data",
@@ -602,6 +636,36 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
             containerColor = popupContainerColor
         )
     }
+
+    // --- NEW: Time picker dialog for auto-backup ---
+    if (showAutoBackupTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = autoBackupTime.first,
+            initialMinute = autoBackupTime.second,
+            is24Hour = false
+        )
+        AlertDialog(
+            onDismissRequest = { showAutoBackupTimePicker = false },
+            title = { Text("Select Backup Time") },
+            text = {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    TimePicker(state = timePickerState)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        settingsViewModel.saveAutoBackupTime(timePickerState.hour, timePickerState.minute)
+                        showAutoBackupTimePicker = false
+                    }
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAutoBackupTimePicker = false }) { Text("Cancel") }
+            },
+            containerColor = popupContainerColor
+        )
+    }
 }
 
 @Composable
@@ -671,9 +735,8 @@ private fun CsvInfoDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Please ensure your CSV file has the following columns in this exact order:")
-                // --- UPDATED: Added "Tags" to the format string ---
                 Text(
-                    text = "Date,Description,Amount,Type,Category,Account,Notes,IsExcluded,Tags",
+                    text = "Id,ParentId,Date,Description,Amount,Type,Category,Account,Notes,IsExcluded,Tags",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.bodyMedium
@@ -681,7 +744,6 @@ private fun CsvInfoDialog(
                 Text("• Date format must be: yyyy-MM-dd HH:mm:ss")
                 Text("• Type must be 'income' or 'expense'.")
                 Text("• isExcluded must be 'true' or 'false'.")
-                // --- NEW: Added instruction for tags ---
                 Text("• Multiple tags should be separated by a pipe character (e.g., \"Work|Travel\").")
                 Spacer(Modifier.height(16.dp))
                 TextButton(onClick = onExportTemplate, modifier = Modifier.fillMaxWidth()) {

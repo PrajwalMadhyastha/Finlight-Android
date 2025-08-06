@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: FIX(test) - Added a `testImplementation` dependency for SQLCipher.
-// This provides the native libraries required for the Robolectric test
-// environment to run unit tests against the encrypted database, resolving the
-// UnsatisfiedLinkError.
+// REASON: FIX - Added a resolutionStrategy to force a single, Android-compatible
+// version of the Guava library across all configurations. This resolves the
+// "Duplicate class" build error caused by a version conflict between the
+// Google Drive API and WorkManager dependencies.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -29,6 +29,7 @@ val coilVersion = "2.6.0"
 val imageCropperVersion = "4.5.0"
 val mockitoVersion = "5.11.0"
 val sqlcipherVersion = "4.5.4"
+val googleApiVersion = "1.23.0"
 
 
 // Read properties from local.properties
@@ -129,11 +130,15 @@ android {
     }
 }
 
+// --- UPDATED: Added a resolution strategy to force a single version of Guava ---
 configurations.all {
     resolutionStrategy {
         force("androidx.core:core-ktx:$coreKtxVersion")
         force("androidx.core:core:$coreKtxVersion")
         force("androidx.tracing:tracing-ktx:$tracingVersion")
+        // This forces Gradle to use the Android-compatible version of Guava for all dependencies,
+        // resolving the conflict between WorkManager and the Google Drive API.
+        force("com.google.guava:guava:32.0.1-android")
     }
 }
 
@@ -173,6 +178,14 @@ dependencies {
 
     implementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
 
+    implementation("com.google.api-client:google-api-client-android:$googleApiVersion") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+    implementation("com.google.apis:google-api-services-drive:v3-rev136-1.25.0") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+
+
     // Local unit tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
@@ -181,7 +194,6 @@ dependencies {
     testImplementation("org.robolectric:robolectric:$robolectricVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
-    // --- NEW: Add SQLCipher dependency for the test environment ---
     testImplementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
 
 
@@ -201,5 +213,6 @@ dependencies {
 
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    // --- REVERTED: The exclude rule is no longer needed due to the resolutionStrategy ---
     implementation("androidx.work:work-runtime-ktx:$workVersion")
 }
