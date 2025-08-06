@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ReportsViewModel.kt
-// REASON: FIX - The logic for the yearly consistency heatmap has been corrected.
-// It now calculates a single "safe to spend" average based on the total budget
-// and days elapsed in the year so far. This ensures the daily cell colors
-// accurately reflect the yearly aggregate stats, fixing the discrepancy.
+// REASON: FIX - The logic for `generateConsistencyCalendarData` now handles the
+// edge case where a user has zero transactions. It checks for a null
+// `firstTransactionDate` and, if found, returns a list where all past days of
+// the year are correctly marked as NO_DATA, preventing them from being
+// misclassified as NO_SPEND.
 // =================================================================================
 package io.pm.finlight
 
@@ -193,10 +194,26 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
     private suspend fun generateConsistencyCalendarData(): List<CalendarDayStatus> = withContext(Dispatchers.IO) {
         val today = Calendar.getInstance()
         val year = today.get(Calendar.YEAR)
+
+        val firstTransactionDate = transactionRepository.getFirstTransactionDate().first()
+
+        // --- FIX: Handle case where there are no transactions at all ---
+        if (firstTransactionDate == null) {
+            val resultList = mutableListOf<CalendarDayStatus>()
+            val dayIterator = Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.DAY_OF_YEAR, 1)
+            }
+            while (!dayIterator.after(today)) {
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+                dayIterator.add(Calendar.DAY_OF_YEAR, 1)
+            }
+            return@withContext resultList
+        }
+
         val currentMonthIndex = today.get(Calendar.MONTH)
         val daysSoFar = today.get(Calendar.DAY_OF_YEAR)
 
-        // --- FIX: Calculate total budget for the year up to the current month ---
         var totalBudgetSoFar = 0f
         for (month in 0..currentMonthIndex) {
             totalBudgetSoFar += settingsRepository.getOverallBudgetForMonthBlocking(year, month + 1)
@@ -208,8 +225,7 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
         calendar.set(Calendar.DAY_OF_YEAR, 1)
         val startDate = calendar.timeInMillis
 
-        val firstTransactionDate = transactionRepository.getFirstTransactionDate().first()
-        val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
+        val firstDataCal = Calendar.getInstance().apply { timeInMillis = firstTransactionDate }
 
         val dailyTotals = transactionRepository.getDailySpendingForDateRange(startDate, endDate).first()
         val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
@@ -218,7 +234,7 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
         val dayIterator = Calendar.getInstance().apply { timeInMillis = startDate }
 
         while (!dayIterator.after(today)) {
-            if (firstDataCal != null && dayIterator.before(firstDataCal)) {
+            if (dayIterator.before(firstDataCal)) {
                 resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
                 dayIterator.add(Calendar.DAY_OF_YEAR, 1)
                 continue
@@ -227,7 +243,6 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
             val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", dayIterator.get(Calendar.YEAR), dayIterator.get(Calendar.MONTH) + 1, dayIterator.get(Calendar.DAY_OF_MONTH))
             val amountSpent = spendingMap[dateKey] ?: 0.0
 
-            // --- FIX: Use the consistent yearly average for status calculation ---
             val status = when {
                 amountSpent == 0.0 -> SpendingStatus.NO_SPEND
                 yearlySafeToSpend > 0 && amountSpent > yearlySafeToSpend -> SpendingStatus.OVER_LIMIT
