@@ -1,13 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/NotificationHelper.kt
-// REASON: FIX - Added a `getBackupNotificationBuilder` function to provide a
-// Notification object for the BackupWorker. This is required for the worker to
-// promote itself to a foreground service, ensuring reliable notification delivery.
+// REASON: FIX - Removed the `getBackupNotificationBuilder` function as the
+// worker will no longer run as a foreground service, resolving the runtime crash.
 // =================================================================================
 package io.pm.finlight.utils
 
 import android.Manifest
-import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -40,18 +38,6 @@ object NotificationHelper {
     private const val DEEP_LINK_URI_ADD_RECURRING = "app://finlight.pm.io/add_recurring_transaction"
     private const val DEEP_LINK_URI_APPROVE = "app://finlight.pm.io/approve_transaction_screen"
     const val BACKUP_NOTIFICATION_ID = 99
-
-
-    // --- NEW: Function to get a notification builder for the foreground service ---
-    fun getBackupNotificationBuilder(context: Context): Notification {
-        return NotificationCompat.Builder(context, MainApplication.BACKUP_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_logo)
-            .setContentTitle("Finlight Backup")
-            .setContentText("Automatic data backup is in progress...")
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true) // Makes it a foreground notification
-            .build()
-    }
 
 
     fun showAutoBackupNotification(context: Context) {

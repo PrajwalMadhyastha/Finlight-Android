@@ -1,15 +1,14 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/workers/BackupWorker.kt
-// REASON: FIX - The worker now runs as a foreground service by calling
-// `setForeground()`. This prevents the system from cancelling the worker
-// prematurely, ensuring the completion notification is reliably displayed.
+// REASON: FIX - Reverted the worker to a standard background worker by removing
+// the `setForeground()` call. This resolves the ForegroundServiceStartNotAllowedException
+// crash on recent Android versions.
 // =================================================================================
 package io.pm.finlight
 
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
-import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
@@ -23,13 +22,6 @@ class BackupWorker(
     override suspend fun doWork(): Result {
         val settingsRepository = SettingsRepository(context)
 
-        // --- NEW: Promote the worker to a foreground service ---
-        val foregroundInfo = ForegroundInfo(
-            NotificationHelper.BACKUP_NOTIFICATION_ID,
-            NotificationHelper.getBackupNotificationBuilder(context)
-        )
-        setForeground(foregroundInfo)
-
         return try {
             Log.d("BackupWorker", "Starting automatic backup...")
             // TODO: Implement Google Drive backup logic here.
@@ -38,7 +30,6 @@ class BackupWorker(
 
             val notificationsEnabled = settingsRepository.getAutoBackupNotificationEnabled().first()
             if (notificationsEnabled) {
-                // The foreground notification will be replaced by this one.
                 NotificationHelper.showAutoBackupNotification(context)
             }
 

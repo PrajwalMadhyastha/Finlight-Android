@@ -9,8 +9,7 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
-    <!-- NEW: Add Foreground Service permission for reliable background work -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- REMOVED: Foreground Service permission is no longer needed -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_SMS" />
