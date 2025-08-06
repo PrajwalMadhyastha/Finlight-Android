@@ -1,10 +1,9 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/SmsReceiver.kt
-// REASON: FEATURE - The receiver's logic is now significantly smarter. When
-// Travel Mode is active, it checks the `detectedCurrencyCode` from the parser.
-// If the currency matches the home or foreign currency, it auto-saves the
-// transaction with the correct conversion. It only falls back to showing the
-// user a clarification prompt if the currency is ambiguous.
+// FILE: ./app/src/main/java/io/pm/finlight/receiver/SmsReceiver.kt
+// REASON: FEATURE - The receiver now checks the new user preference before
+// enqueuing the `TransactionNotificationWorker`. This gives the user control
+// over whether they receive notifications for transactions that are captured
+// automatically from SMS messages.
 // =================================================================================
 package io.pm.finlight
 
@@ -114,6 +113,7 @@ class SmsReceiver : BroadcastReceiver() {
         val db = AppDatabase.getInstance(context)
         val accountDao = db.accountDao()
         val transactionDao = db.transactionDao()
+        val settingsRepository = SettingsRepository(context) // Instantiate repository
 
         val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
         val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
@@ -163,7 +163,9 @@ class SmsReceiver : BroadcastReceiver() {
 
             val newTransactionId = transactionDao.insert(transactionToSave)
 
-            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            // --- UPDATED: Check the user's preference before showing a notification ---
+            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED &&
+                settingsRepository.isAutoCaptureNotificationEnabledBlocking()) {
                 val workRequest = OneTimeWorkRequestBuilder<TransactionNotificationWorker>()
                     .setInputData(workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to newTransactionId.toInt()))
                     .build()

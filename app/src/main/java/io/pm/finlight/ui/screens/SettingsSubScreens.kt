@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SettingsSubScreens.kt
-// REASON: FEATURE - Added UI controls to the DataSettingsScreen for the new
-// automatic backup feature. Users can now enable/disable the backup, set the
-// time for the backup to run, and toggle completion notifications.
+// REASON: FEATURE - Added a new `SettingsToggleItem` to the
+// `NotificationSettingsScreen`. This UI control allows the user to enable or
+// disable notifications for transactions that are automatically captured from SMS
+// messages.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -269,6 +270,8 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
     var showWeeklyTimePicker by remember { mutableStateOf(false) }
     val monthlyReportTime by settingsViewModel.monthlyReportTime.collectAsState()
     var showMonthlyTimePicker by remember { mutableStateOf(false) }
+    // --- NEW: State for the new toggle ---
+    val isAutoCaptureNotificationEnabled by settingsViewModel.autoCaptureNotificationEnabled.collectAsState()
 
     val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -292,7 +295,20 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
             contentPadding = PaddingValues(16.dp),
         ) {
             item {
-                GlassPanel {
+                SettingsSection(title = "Transaction Notifications") {
+                    // --- NEW: Added toggle for auto-capture notifications ---
+                    SettingsToggleItem(
+                        title = "Auto-Captured Transactions",
+                        subtitle = "Notify when a transaction is saved from an SMS",
+                        icon = Icons.Default.Sms,
+                        checked = isAutoCaptureNotificationEnabled,
+                        onCheckedChange = { settingsViewModel.setAutoCaptureNotificationEnabled(it) }
+                    )
+                }
+            }
+            item {
+                Spacer(Modifier.height(16.dp))
+                SettingsSection(title = "Summaries & Reports") {
                     Column {
                         SettingsToggleItem(
                             title = "Daily Summary",
@@ -413,7 +429,6 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
     val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
-    // --- NEW: State for auto-backup settings ---
     val isAutoBackupEnabled by settingsViewModel.autoBackupEnabled.collectAsState()
     val isAutoBackupNotificationEnabled by settingsViewModel.autoBackupNotificationEnabled.collectAsState()
     val autoBackupTime by settingsViewModel.autoBackupTime.collectAsState()
@@ -637,7 +652,6 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
         )
     }
 
-    // --- NEW: Time picker dialog for auto-backup ---
     if (showAutoBackupTimePicker) {
         val timePickerState = rememberTimePickerState(
             initialHour = autoBackupTime.first,
@@ -665,6 +679,26 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
             },
             containerColor = popupContainerColor
         )
+    }
+}
+
+@Composable
+private fun SettingsSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
+        )
+        GlassPanel {
+            Column {
+                content()
+            }
+        }
     }
 }
 

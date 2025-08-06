@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: FEATURE - The ViewModel now exposes StateFlows for all auto-backup
-// settings (enabled, time, notifications) and provides functions to update them,
-// connecting the UI controls to the underlying repository.
+// REASON: FEATURE - The ViewModel now exposes a StateFlow for the new
+// auto-capture notification setting and provides a function to update its value,
+// connecting the UI toggle to the repository.
 // =================================================================================
 package io.pm.finlight
 
@@ -23,6 +23,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -84,10 +86,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             initialValue = true,
         )
 
+    // --- NEW: StateFlow for auto-capture notification setting ---
+    val autoCaptureNotificationEnabled: StateFlow<Boolean> =
+        settingsRepository.getAutoCaptureNotificationEnabled().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
     private val _potentialTransactions = MutableStateFlow<List<PotentialTransaction>>(emptyList())
     val potentialTransactions: StateFlow<List<PotentialTransaction>> = _potentialTransactions.asStateFlow()
 
-    private val _isScanning = MutableStateFlow(false)
+    private val _isScanning = MutableStateFlow<Boolean>(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
     val dailyReportTime: StateFlow<Pair<Int, Int>> =
@@ -118,7 +128,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             initialValue = AppTheme.SYSTEM_DEFAULT
         )
 
-    // --- NEW: StateFlows for auto-backup settings ---
     val autoBackupEnabled: StateFlow<Boolean> =
         settingsRepository.getAutoBackupEnabled().stateIn(
             scope = viewModelScope,
@@ -151,7 +160,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 )
     }
 
-    // --- NEW: Functions to update auto-backup settings ---
+    // --- NEW: Function to update auto-capture notification setting ---
+    fun setAutoCaptureNotificationEnabled(enabled: Boolean) {
+        settingsRepository.saveAutoCaptureNotificationEnabled(enabled)
+    }
+
     fun setAutoBackupEnabled(enabled: Boolean) {
         settingsRepository.saveAutoBackupEnabled(enabled)
         if (enabled) ReminderManager.scheduleAutoBackup(context) else ReminderManager.cancelAutoBackup(context)
