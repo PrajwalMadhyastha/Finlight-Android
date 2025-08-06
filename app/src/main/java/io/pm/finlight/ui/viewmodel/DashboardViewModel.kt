@@ -1,13 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/DashboardViewModel.kt
-// REASON: REFACTOR - Decoupled dashboard customization logic.
-// - Removed `isCustomizationMode`, `showAddCardSheet`, and related state, as this
-//   is now handled by a dedicated screen.
-// - Added `allCards` StateFlow to provide the full list of cards to the new
-//   customization screen.
-// - Added `toggleCardVisibility` function to handle showing/hiding cards from
-//   the new screen.
-// - `updateCardOrder` now saves the layout immediately.
+// REASON: FIX - The logic for `generateYearlyConsistencyData` now handles the
+// edge case where a user has zero transactions. It checks for a null
+// `firstTransactionDate` and, if found, returns a list where all past days of
+// the year are correctly marked as NO_DATA, preventing them from being
+// misclassified as NO_SPEND.
 // =================================================================================
 package io.pm.finlight
 
@@ -219,6 +216,23 @@ class DashboardViewModel(
     private suspend fun generateYearlyConsistencyData(): List<CalendarDayStatus> = withContext(Dispatchers.IO) {
         val today = Calendar.getInstance()
         val year = today.get(Calendar.YEAR)
+
+        val firstTransactionDate = transactionRepository.getFirstTransactionDate().first()
+
+        // --- FIX: Handle case where there are no transactions at all ---
+        if (firstTransactionDate == null) {
+            val resultList = mutableListOf<CalendarDayStatus>()
+            val dayIterator = Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.DAY_OF_YEAR, 1)
+            }
+            while (!dayIterator.after(today)) {
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+                dayIterator.add(Calendar.DAY_OF_YEAR, 1)
+            }
+            return@withContext resultList
+        }
+
         val currentMonthIndex = today.get(Calendar.MONTH)
         val daysSoFar = today.get(Calendar.DAY_OF_YEAR)
 
@@ -233,8 +247,7 @@ class DashboardViewModel(
         calendar.set(Calendar.DAY_OF_YEAR, 1)
         val startDate = calendar.timeInMillis
 
-        val firstTransactionDate = transactionRepository.getFirstTransactionDate().first()
-        val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
+        val firstDataCal = Calendar.getInstance().apply { timeInMillis = firstTransactionDate }
 
         val dailyTotals = transactionRepository.getDailySpendingForDateRange(startDate, endDate).first()
         val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
@@ -243,7 +256,7 @@ class DashboardViewModel(
         val dayIterator = Calendar.getInstance().apply { timeInMillis = startDate }
 
         while (!dayIterator.after(today)) {
-            if (firstDataCal != null && dayIterator.before(firstDataCal)) {
+            if (dayIterator.before(firstDataCal)) {
                 resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
                 dayIterator.add(Calendar.DAY_OF_YEAR, 1)
                 continue
