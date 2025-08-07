@@ -1,10 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/RuleCreationScreen.kt
-// REASON: MAJOR REFACTOR - The screen has been fully redesigned to align with the
-// "Project Aurora" vision. All standard Card components have been replaced
-// with GlassPanels. Buttons and text fields have been restyled for a cohesive,
-// modern look, and all text colors are now theme-aware to ensure high contrast
-// and legibility.
+// REASON: FEATURE - The save logic has been updated to support retrospective
+// parsing. When a rule is saved, it now sets a `start_retro_scan` flag on the
+// previous back stack entry. This signals the TransactionDetailScreen to
+// initiate a background scan of recent SMS messages using the newly created rule,
+// automatically fixing other similar, unparsed transactions.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -262,6 +262,12 @@ fun RuleCreationScreen(
                                 navController.previousBackStackEntry
                                     ?.savedStateHandle
                                     ?.set("reparse_needed", true)
+                                // --- NEW: Set the flag to trigger a retrospective scan ---
+                                if (!isEditMode) {
+                                    navController.previousBackStackEntry
+                                        ?.savedStateHandle
+                                        ?.set("start_retro_scan", true)
+                                }
                                 navController.popBackStack()
                             }
                         }
