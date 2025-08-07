@@ -157,22 +157,54 @@ class DashboardViewModel(
                     percentOfBudgetSpent > 1 -> listOf(
                         "You've gone over for $monthName.",
                         "Let's get back on track next month.",
-                        "Budget exceeded for the month."
+                        "Budget exceeded for the month.",
+                        "Whoops! Over budget this month.",
+                        "Time to pump the brakes!",
+                        "Too much spent this time.",
+                        "$monthName went over.",
+                        "Budget says 'ouch!' for $monthName.",
+                        "Time to tighten things up.",
+                        "This month went off-budget!"
                     ).random()
                     percentOfBudgetSpent > percentOfMonthPassed + 0.2 -> listOf(
                         "A little ahead of schedule.",
                         "Watch your spending for the rest of $monthName.",
-                        "Heads up: spending is a bit high."
+                        "Heads up: spending is a bit high.",
+                        "You’re burning through the budget a bit fast.",
+                        "Pacing ahead of plan.",
+                        "Try slowing down a bit.",
+                        "Spending’s moving fast.",
+                        "Budget’s feeling the heat.",
+                        "Easy does it.",
+                        "Still time left in $monthName.",
+                        "Might want to ease up.",
+                        "You're spending early."
                     ).random()
                     percentOfBudgetSpent < percentOfMonthPassed - 0.2 -> listOf(
                         "Well under budget so far!",
                         "You're saving more this month.",
-                        "Plenty of room in the budget."
+                        "Plenty of room in the budget.",
+                        "Nice! Under budget.",
+                        "Strong control this month.",
+                        "Spending’s staying low.",
+                        "Good pace so far!",
+                        "Budget’s in great shape.",
+                        "You’re ahead! Keep it up!",
+                        "Plenty left to use.",
+                        "Great saving streak!"
                     ).random()
                     else -> listOf(
                         "Looking good for $monthName!",
                         "Great job staying on budget!",
-                        "Your spending is right on track."
+                        "Your spending is right on track.",
+                        "All good so far.",
+                        "Tracking well!",
+                        "Nice and steady.",
+                        "You're on point.",
+                        "Smooth budget flow.",
+                        "No worries this month.",
+                        "Keep it going!",
+                        "Right where you should be."
                     ).random()
                 }
             }

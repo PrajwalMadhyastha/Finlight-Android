@@ -152,7 +152,14 @@ class DashboardViewModelTest {
         val possibleMessages = listOf(
             "You've gone over for ${viewModel.monthYear}.",
             "Let's get back on track next month.",
-            "Budget exceeded for the month."
+            "Budget exceeded for the month.",
+            "Whoops! Over budget this month.",
+            "Time to pump the brakes!",
+            "Too much spent this time.",
+            "${viewModel.monthYear} went over.",
+            "Budget says 'ouch!' for ${viewModel.monthYear}.",
+            "Time to tighten things up.",
+            "This month went off-budget!"
         )
         assertTrue(
             "Summary message should be one of the 'over budget' phrases.",
