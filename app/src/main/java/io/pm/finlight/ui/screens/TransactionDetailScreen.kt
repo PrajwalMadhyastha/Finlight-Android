@@ -1,11 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TransactionDetailScreen.kt
-// REASON: REFACTOR - The screen's navigation logic has been updated to support
-// the deferred retrospective update prompt. It now uses a `BackHandler` to call
-// the new `onAttemptToLeaveScreen` function in the ViewModel. This pauses
-// navigation if a prompt is needed. The logic for handling the prompt's result
-// (confirm/dismiss) has also been updated to correctly navigate back to the
-// previous screen after the action is complete.
+// REASON: FEATURE - The screen now observes the `start_retro_scan` flag from the
+// navigation back stack. When this flag is true (after a new rule is created),
+// it triggers the `rescanSmsWithNewRule` function in the SettingsViewModel and
+// displays a Toast to inform the user that the background scan has started.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -107,17 +105,22 @@ fun TransactionDetailScreen(
     accountViewModel: AccountViewModel = viewModel(),
     onSaveRenameRule: (originalName: String, newName: String) -> Unit
 ) {
-    // --- REFACTORED: Use a single StateFlow from the ViewModel for the transaction details ---
+    val context = LocalContext.current
+    val settingsViewModel: SettingsViewModel = viewModel(
+        factory = SettingsViewModelFactory(context.applicationContext as android.app.Application, viewModel)
+    )
+
     val detailsState by viewModel.findTransactionDetailsById(transactionId).collectAsState(initial = null)
     val details = detailsState
 
     val splits by viewModel.getSplitDetailsForTransaction(transactionId).collectAsState(initial = emptyList())
-    val reparseResult = navController.currentBackStackEntry?.savedStateHandle?.getLiveData<Boolean>("reparse_needed")?.observeAsState()
 
-    // --- NEW: Centralized back navigation logic ---
+    val reparseResult = navController.currentBackStackEntry?.savedStateHandle?.getLiveData<Boolean>("reparse_needed")?.observeAsState()
+    // --- NEW: Observe the retro scan flag ---
+    val retroScanResult = navController.currentBackStackEntry?.savedStateHandle?.getLiveData<Boolean>("start_retro_scan")?.observeAsState()
+
     val navigateBack: () -> Unit = { navController.popBackStack() }
 
-    // --- NEW: Back handler intercepts the back action to check for changes ---
     BackHandler {
         viewModel.onAttemptToLeaveScreen(onNavigationAllowed = navigateBack)
     }
@@ -126,6 +129,17 @@ fun TransactionDetailScreen(
         if (reparseResult?.value == true) {
             viewModel.reparseTransactionFromSms(transactionId)
             navController.currentBackStackEntry?.savedStateHandle?.set("reparse_needed", false)
+        }
+    }
+
+    // --- NEW: Trigger the retro scan when the flag is set ---
+    LaunchedEffect(retroScanResult?.value) {
+        if (retroScanResult?.value == true) {
+            Toast.makeText(context, "Applying new rule to recent messages...", Toast.LENGTH_SHORT).show()
+            settingsViewModel.rescanSmsWithNewRule { count ->
+                Toast.makeText(context, "Found and saved $count new transaction(s)!", Toast.LENGTH_LONG).show()
+            }
+            navController.currentBackStackEntry?.savedStateHandle?.set("start_retro_scan", false)
         }
     }
 
@@ -162,8 +176,6 @@ fun TransactionDetailScreen(
         }
     }
 
-    val context = LocalContext.current
-    // --- REFACTORED: Consolidate loading logic into a single LaunchedEffect ---
     LaunchedEffect(transactionId) {
         NotificationManagerCompat.from(context).cancel(transactionId)
         viewModel.loadTransactionForDetailScreen(transactionId)
@@ -197,7 +209,7 @@ fun TransactionDetailScreen(
             ModalBottomSheet(
                 onDismissRequest = {
                     viewModel.dismissRetroUpdateSheet()
-                    navigateBack() // Navigate back after dismissing
+                    navigateBack()
                 },
                 sheetState = retroSheetState,
                 windowInsets = WindowInsets(0),
@@ -210,11 +222,11 @@ fun TransactionDetailScreen(
                     onToggleSelectAll = viewModel::toggleRetroUpdateSelectAll,
                     onConfirm = {
                         viewModel.performBatchUpdate()
-                        navigateBack() // Navigate back after confirming
+                        navigateBack()
                     },
                     onDismiss = {
                         viewModel.dismissRetroUpdateSheet()
-                        navigateBack() // Navigate back after dismissing
+                        navigateBack()
                     }
                 )
             }
@@ -226,7 +238,6 @@ fun TransactionDetailScreen(
                     TopAppBar(
                         title = { Text(title) },
                         navigationIcon = {
-                            // --- UPDATED: Top bar back button also uses the new logic ---
                             IconButton(onClick = { viewModel.onAttemptToLeaveScreen(onNavigationAllowed = navigateBack) }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                             }
@@ -523,7 +534,7 @@ fun TransactionDetailScreen(
                                 onClick = {
                                     viewModel.deleteTransaction(details.transaction)
                                     showDeleteDialog = false
-                                    navigateBack() // Navigate back after deletion
+                                    navigateBack()
                                 },
                                 shape = CircleShape,
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -640,7 +651,7 @@ private fun SplitSummaryItem(details: SplitTransactionDetails) {
 
 @Composable
 private fun CurrencyConversionInfoCard(transaction: Transaction) {
-    val homeCurrencySymbol = "₹" // Assuming home is INR for now
+    val homeCurrencySymbol = "₹"
     val foreignCurrencySymbol = CurrencyHelper.getCurrencySymbol(transaction.currencyCode)
     val numberFormat = remember { NumberFormat.getNumberInstance(Locale("en", "IN")).apply { maximumFractionDigits = 2 } }
 
