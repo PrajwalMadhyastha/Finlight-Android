@@ -1,10 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FEATURE - Added the core logic for the smart merchant prediction
-// feature. This includes a new debounced StateFlow (`merchantPredictions`) that
-// reacts to user input from a search query. The `onMerchantSearchQueryChanged`
-// function updates this query, triggering a real-time, performant search against
-// the user's transaction history to provide relevant suggestions.
+// REASON: REFACTOR - The retrospective update logic has been deferred. Instead of
+// prompting the user immediately after an edit, the ViewModel now caches the
+// transaction's initial state. A new `onAttemptToLeaveScreen` function is called
+// when the user navigates back, which compares the initial and final states. If
+// changes are found and similar transactions exist, only then is the prompt shown.
+// This reduces user friction and allows for a single, consolidated prompt if both
+// the description and category are changed.
 // =================================================================================
 package io.pm.finlight
 
@@ -68,6 +70,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private val db = AppDatabase.getInstance(application)
     private var areTagsLoadedForCurrentTxn = false
     private var currentTxnIdForTags: Int? = null
+
+    // --- NEW: Caches the initial state of the transaction for comparison on exit ---
+    private var initialTransactionStateForRetroUpdate: Transaction? = null
 
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
     val selectedMonth: StateFlow<Calendar> = _selectedMonth.asStateFlow()
@@ -138,7 +143,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     val travelModeSettings: StateFlow<TravelModeSettings?>
 
-    // --- NEW: State and logic for merchant predictions ---
     private val _merchantSearchQuery = MutableStateFlow("")
     val merchantPredictions: StateFlow<List<MerchantPrediction>>
 
@@ -154,7 +158,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
 
-        // --- NEW: Debounced search logic ---
         merchantPredictions = _merchantSearchQuery
             .debounce(300)
             .flatMapLatest { query ->
@@ -263,12 +266,61 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // --- NEW: Function to trigger a merchant search ---
+    // --- NEW: Caches the initial transaction state and loads all related data for the detail screen ---
+    fun loadTransactionForDetailScreen(transactionId: Int) {
+        viewModelScope.launch {
+            initialTransactionStateForRetroUpdate = transactionRepository.getTransactionById(transactionId).first()
+            initialTransactionStateForRetroUpdate?.let {
+                loadTagsForTransaction(it.id)
+                loadImagesForTransaction(it.id)
+                loadOriginalSms(it.sourceSmsId)
+                loadVisitCount(it.originalDescription, it.description)
+            }
+        }
+    }
+
+    // --- NEW: Checks for changes on exit and triggers the retro update prompt if needed ---
+    fun onAttemptToLeaveScreen(onNavigationAllowed: () -> Unit) {
+        viewModelScope.launch {
+            val initial = initialTransactionStateForRetroUpdate ?: run {
+                onNavigationAllowed()
+                return@launch
+            }
+            val current = transactionRepository.getTransactionById(initial.id).first() ?: run {
+                onNavigationAllowed()
+                return@launch
+            }
+
+            val descriptionChanged = initial.description != current.description
+            val categoryChanged = initial.categoryId != current.categoryId
+
+            if (!descriptionChanged && !categoryChanged) {
+                onNavigationAllowed()
+                return@launch
+            }
+
+            val originalDescriptionForSearch = initial.originalDescription ?: initial.description
+            val similar = transactionRepository.findSimilarTransactions(originalDescriptionForSearch, initial.id)
+
+            if (similar.isNotEmpty()) {
+                _retroUpdateSheetState.value = RetroUpdateSheetState(
+                    originalDescription = originalDescriptionForSearch,
+                    newDescription = if (descriptionChanged) current.description else null,
+                    newCategoryId = if (categoryChanged) current.categoryId else null,
+                    similarTransactions = similar,
+                    selectedIds = similar.map { it.id }.toSet(),
+                    isLoading = false
+                )
+            } else {
+                onNavigationAllowed()
+            }
+        }
+    }
+
     fun onMerchantSearchQueryChanged(query: String) {
         _merchantSearchQuery.value = query
     }
 
-    // --- NEW: Function to clear the search results ---
     fun clearMerchantSearch() {
         _merchantSearchQuery.value = ""
     }
@@ -416,7 +468,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             }
     }
 
-    fun loadVisitCount(originalDescription: String?, fallbackDescription: String) {
+    private fun loadVisitCount(originalDescription: String?, fallbackDescription: String) {
         val descriptionToQuery = originalDescription ?: fallbackDescription
         viewModelScope.launch {
             transactionRepository.getTransactionCountForMerchant(descriptionToQuery).collect { count ->
@@ -515,7 +567,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     }
 
 
-    fun loadOriginalSms(sourceSmsId: Long?) {
+    private fun loadOriginalSms(sourceSmsId: Long?) {
         if (sourceSmsId == null) {
             _originalSmsText.value = null
             return
@@ -684,7 +736,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun loadImagesForTransaction(transactionId: Int) {
+    private fun loadImagesForTransaction(transactionId: Int) {
         viewModelScope.launch {
             transactionRepository.getImagesForTransaction(transactionId).collect {
                 _transactionImages.value = it
@@ -712,24 +764,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    // --- REFACTORED: No longer triggers the retro update sheet directly ---
     fun updateTransactionDescription(id: Int, newDescription: String) = viewModelScope.launch(Dispatchers.IO) {
         if (newDescription.isNotBlank()) {
-            val transaction = transactionRepository.getTransactionById(id).first() ?: return@launch
-            val originalDescription = transaction.originalDescription ?: transaction.description
-
             transactionRepository.updateDescription(id, newDescription)
-
-            val similar = transactionRepository.findSimilarTransactions(originalDescription, id)
-            if (similar.isNotEmpty()) {
-                _retroUpdateSheetState.value = RetroUpdateSheetState(
-                    originalDescription = originalDescription,
-                    newDescription = newDescription,
-                    newCategoryId = null,
-                    similarTransactions = similar,
-                    selectedIds = similar.map { it.id }.toSet(),
-                    isLoading = false
-                )
-            }
         }
     }
 
@@ -745,10 +783,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         transactionRepository.updateNotes(id, notes.takeIf { it.isNotBlank() })
     }
 
+    // --- REFACTORED: No longer triggers the retro update sheet directly ---
     fun updateTransactionCategory(id: Int, categoryId: Int?) = viewModelScope.launch(Dispatchers.IO) {
         val transaction = transactionRepository.getTransactionById(id).first() ?: return@launch
-        val originalDescription = transaction.originalDescription ?: transaction.description
-
         transactionRepository.updateCategoryId(id, categoryId)
 
         if (categoryId != null && transaction.sourceSmsId != null && !transaction.originalDescription.isNullOrBlank()) {
@@ -757,18 +794,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 categoryId = categoryId
             )
             merchantCategoryMappingRepository.insert(mapping)
-        }
-
-        val similar = transactionRepository.findSimilarTransactions(originalDescription, id)
-        if (similar.isNotEmpty()) {
-            _retroUpdateSheetState.value = RetroUpdateSheetState(
-                originalDescription = originalDescription,
-                newDescription = null,
-                newCategoryId = categoryId,
-                similarTransactions = similar,
-                selectedIds = similar.map { it.id }.toSet(),
-                isLoading = false
-            )
         }
     }
 
@@ -810,7 +835,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun loadTagsForTransaction(transactionId: Int) {
+    private fun loadTagsForTransaction(transactionId: Int) {
         if (currentTxnIdForTags == transactionId && areTagsLoadedForCurrentTxn) {
             return
         }
