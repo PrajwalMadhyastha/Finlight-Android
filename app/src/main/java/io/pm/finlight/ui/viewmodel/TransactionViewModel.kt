@@ -1,9 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FEATURE - Added the `autoSaveSmsTransaction` function. This provides a
-// streamlined method for other parts of the app, like the SettingsViewModel, to
-// silently save a transaction parsed from an SMS without user interaction. This
-// is a key component of the retrospective parsing feature.
+// REASON: REFACTOR - The retrospective update logic has been deferred. Instead of
+// prompting the user immediately after an edit, the ViewModel now caches the
+// transaction's initial state. A new `onAttemptToLeaveScreen` function is called
+// when the user navigates back, which compares the initial and final states. If
+// changes are found and similar transactions exist, only then is the prompt shown.
+// This reduces user friction and allows for a single, consolidated prompt if both
+// the description and category are changed.
 // =================================================================================
 package io.pm.finlight
 
@@ -68,6 +71,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private var areTagsLoadedForCurrentTxn = false
     private var currentTxnIdForTags: Int? = null
 
+    // --- NEW: Caches the initial state of the transaction for comparison on exit ---
     private var initialTransactionStateForRetroUpdate: Transaction? = null
 
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
@@ -92,7 +96,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     val showShareSheet: StateFlow<Boolean> = _showShareSheet.asStateFlow()
 
     private val _showDeleteConfirmation = MutableStateFlow(false)
-    _showDeleteConfirmation.asStateFlow()
+    val showDeleteConfirmation: StateFlow<Boolean> = _showDeleteConfirmation.asStateFlow()
 
     private val _shareableFields = MutableStateFlow(
         setOf(ShareableField.Date, ShareableField.Description, ShareableField.Amount, ShareableField.Category, ShareableField.Tags)
@@ -923,7 +927,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // --- NEW: A streamlined function for auto-saving transactions from background scans ---
     suspend fun autoSaveSmsTransaction(potentialTxn: PotentialTransaction): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -947,7 +950,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     originalDescription = potentialTxn.merchantName,
                     categoryId = potentialTxn.categoryId,
                     amount = potentialTxn.amount,
-                    date = potentialTxn.sourceSmsId, // Use the SMS timestamp for the transaction date
+                    date = potentialTxn.sourceSmsId,
                     accountId = account.id,
                     notes = null,
                     transactionType = potentialTxn.transactionType,
@@ -956,7 +959,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     source = "Auto-Captured"
                 )
 
-                transactionRepository.insertTransactionWithTags(transactionToSave, emptySet()) // No tags for auto-saved
+                transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
                 true
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to auto-save SMS transaction", e)
