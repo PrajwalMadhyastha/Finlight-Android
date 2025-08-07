@@ -3,7 +3,7 @@
 // REASON: REFACTOR - The parsing logic has been significantly hardened.
 // - The expense keyword regex is now more specific to reduce false positives from
 //   promotional messages (e.g., "purchase experience").
-// - New keywords ("debit instruction for", "tranx of") have been added to capture
+// - New keywords ("debit instruction for", "tranx of", "deducted for") have been added to capture
 //   previously missed transactions.
 // - A new high-priority regex for UPI payments improves merchant name extraction.
 // - Account parsing has been expanded to support new formats from Kotak and Union Bank.
@@ -29,12 +29,11 @@ data class PotentialAccount(
 
 object SmsParser {
     private val AMOUNT_WITH_CURRENCY_REGEX = "(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- UPDATED: Made keywords more specific and added new ones ---
-    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|payment of|purchase of|debit instruction for|tranx of)\\b".toRegex(RegexOption.IGNORE_CASE)
+    // --- UPDATED: Added "deducted for" to recognize more expense types ---
+    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|payment of|purchase of|debit instruction for|tranx of|deducted for)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val ACCOUNT_PATTERNS =
         listOf(
-            // --- NEW: Added patterns for Kotak and Union Bank ---
             "(?:from your|in your) (Kotak Bank) Ac X(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "in your (UNION BANK OF INDIA) A/C XX(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "(ICICI Bank) Account XX(\\d{3,4}) credited".toRegex(RegexOption.IGNORE_CASE),
@@ -47,7 +46,6 @@ object SmsParser {
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            // --- NEW: High-priority regex to cleanly parse UPI VPAs ---
             "credited to VPA\\s+([^@]+)@".toRegex(RegexOption.IGNORE_CASE),
             "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal|$)".toRegex(RegexOption.IGNORE_CASE),
             "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|$)".toRegex(RegexOption.IGNORE_CASE),
@@ -55,7 +53,7 @@ object SmsParser {
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited".toRegex(RegexOption.IGNORE_CASE),
             "UPI.*(?:to|\\bat\\b)\\s+([A-Za-z0-9\\s.&'()]+?)(?:\\s+on|\\s+Ref|$)".toRegex(RegexOption.IGNORE_CASE),
             "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)".toRegex(RegexOption.IGNORE_CASE),
-            "(?:\\bat\\b|to\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|$|\\s+was\\s+)".toRegex(RegexOption.IGNORE_CASE),
+            "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|$|\\s+was\\s+)".toRegex(RegexOption.IGNORE_CASE),
             "Info:?\\s*([A-Za-z0-9\\s.&'-]+?)(?:\\.|$)".toRegex(RegexOption.IGNORE_CASE)
         )
 
@@ -84,7 +82,6 @@ object SmsParser {
             val match = pattern.find(smsBody)
             if (match != null) {
                 return when (pattern.pattern) {
-                    // --- NEW: Logic to handle Kotak and Union Bank patterns ---
                     "(?:from your|in your) (Kotak Bank) Ac X(\\d{4})" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} - x${match.groupValues[2].trim()}", accountType = "Bank Account")
                     "in your (UNION BANK OF INDIA) A/C XX(\\d{4})" ->
