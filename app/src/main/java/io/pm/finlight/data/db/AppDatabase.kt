@@ -3,6 +3,8 @@
 // REASON: REFACTOR - Updated the database seeding logic to provide a cleaner
 // initial state for new users. Removed sample transactions, budgets, and all
 // accounts except for "Cash Spends".
+// FEATURE - Added new default ignore rules for investment, OTP, and feedback
+// messages to significantly reduce false positives from the SMS parser.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -92,6 +94,7 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        // --- UPDATED: Added new default ignore rules for common false positives ---
         private val DEFAULT_IGNORE_PHRASES = listOf(
             "invoice of",
             "payment of.*is successful",
@@ -102,8 +105,16 @@ abstract class AppDatabase : RoomDatabase() {
             "We have received",
             "has been initiated",
             "redemption",
-            "requested money from you"
-        ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) }
+            "requested money from you",
+            "Folio No.",
+            "NAV of",
+            "purchase experience",
+            "your OTP"
+        ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
+            "*SBIMF",
+            "*WKEFTT"
+        ).map { IgnoreRule(pattern = it, type = RuleType.SENDER, isDefault = true) }
+
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
