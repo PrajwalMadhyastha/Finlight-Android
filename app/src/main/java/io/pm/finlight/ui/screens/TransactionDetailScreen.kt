@@ -32,8 +32,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.CallSplit
+import androidx.compose.material.icons.automirrored.filled.MergeType
+import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.CallSplit
+import androidx.compose.material.icons.filled.MergeType
+import androidx.compose.material.icons.filled.Message
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -257,7 +263,7 @@ fun TransactionDetailScreen(
                                             showMenu = false
                                             viewModel.unsplitTransaction(details.transaction)
                                         },
-                                        leadingIcon = { Icon(Icons.Default.MergeType, contentDescription = "Un-split") }
+                                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Un-split") }
                                     )
                                 }
                                 DropdownMenuItem(
@@ -414,7 +420,7 @@ fun TransactionDetailScreen(
                                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                                         ) {
                                             Icon(
-                                                Icons.Default.Message,
+                                                Icons.AutoMirrored.Filled.Message,
                                                 contentDescription = "Original SMS",
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -716,7 +722,7 @@ private fun DynamicCategoryBackground(category: Category, isSplit: Boolean) {
     ) {
         if (isSplit) {
             Icon(
-                imageVector = Icons.Default.CallSplit,
+                imageVector = Icons.AutoMirrored.Filled.CallSplit,
                 contentDescription = "Split Transaction Background",
                 modifier = Modifier.size(250.dp),
                 tint = color.copy(alpha = 0.15f)
@@ -827,7 +833,7 @@ private fun TransactionSpotlightHeader(
                     )
                     if (details.transaction.isSplit) {
                         Icon(
-                            imageVector = Icons.Default.CallSplit,
+                            imageVector = Icons.AutoMirrored.Filled.CallSplit,
                             contentDescription = "Split Transaction",
                             tint = Color.White.copy(alpha = 0.8f),
                             modifier = Modifier.size(20.dp)
@@ -855,7 +861,7 @@ private fun TransactionSpotlightHeader(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f))
                 ) {
-                    val icon = if (isSplit) Icons.Default.Edit else Icons.Default.CallSplit
+                    val icon = if (isSplit) Icons.Default.Edit else Icons.AutoMirrored.Filled.CallSplit
                     val text = if (isSplit) "Edit Splits" else "Split Transaction"
                     Icon(icon, contentDescription = text, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))

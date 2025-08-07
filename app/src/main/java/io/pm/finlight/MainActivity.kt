@@ -1,11 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FEATURE - Implemented the UI portion of the multi-delete feature.
-// - A "Delete" icon is now present in the top app bar during selection mode.
-// - An `AlertDialog` has been added to confirm the deletion of multiple items,
-//   triggered by the new state in the TransactionViewModel.
-// FIX - Added the missing `isDark()` helper function to resolve a build error when
-// determining the dialog background color.
+// REASON: FIX - Corrected a runtime crash by providing the custom
+// SettingsViewModelFactory when instantiating the SettingsViewModel. This ensures
+// that the ViewModel is created with its required TransactionViewModel dependency.
 // =================================================================================
 package io.pm.finlight
 
@@ -78,7 +75,6 @@ import kotlinx.coroutines.flow.map
 import java.net.URLDecoder
 import java.util.concurrent.Executor
 
-// --- NEW: Helper function to determine if a color is 'dark' based on luminance. ---
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 class MainActivity : AppCompatActivity() {
@@ -95,7 +91,10 @@ class MainActivity : AppCompatActivity() {
         val hasSeenOnboarding = settingsRepository.hasSeenOnboarding()
 
         setContent {
-            val settingsViewModel: SettingsViewModel = viewModel()
+            val transactionViewModel: TransactionViewModel = viewModel()
+            val settingsViewModel: SettingsViewModel = viewModel(
+                factory = SettingsViewModelFactory(application, transactionViewModel)
+            )
             val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
 
             PersonalFinanceAppTheme(selectedTheme = selectedTheme) {
@@ -219,10 +218,12 @@ fun LockScreen(onUnlock: () -> Unit) {
 @Composable
 fun MainAppScreen() {
     val navController = rememberNavController()
+    val context = LocalContext.current.applicationContext as Application
 
-    val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModelFactory(LocalContext.current.applicationContext as Application))
-    val settingsViewModel: SettingsViewModel = viewModel()
+    val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModelFactory(context))
     val transactionViewModel: TransactionViewModel = viewModel()
+    // --- UPDATED: Use the custom factory to create the SettingsViewModel ---
+    val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context, transactionViewModel))
     val accountViewModel: AccountViewModel = viewModel()
     val categoryViewModel: CategoryViewModel = viewModel()
     val budgetViewModel: BudgetViewModel = viewModel()
