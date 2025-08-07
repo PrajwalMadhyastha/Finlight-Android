@@ -1,0 +1,6 @@
+# This file is used for release build signing configurations.
+# Copy this file to "local.properties" and fill in your details.
+keystore.path=path/to/your/keystore.jks
+keystore.password=your_keystore_password
+key.alias=your_key_alias
+key.password=your_key_password

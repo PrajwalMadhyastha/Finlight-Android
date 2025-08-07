@@ -1,10 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/DragDrop.kt
-// REASON: FIX - The drag-and-drop logic has been completely rewritten to be
-// stable and smooth. The logic now triggers a swap only when the dragged item's
-// edge crosses the center of a target item. This creates the desired "make
-// space" effect and prevents the item from incorrectly jumping to the top or
-// bottom of the list, ensuring a fluid and predictable reordering experience.
+// REASON: REFACTOR - Implemented a live 'float and swap' drag-and-drop behavior.
+// The logic now triggers a swap when the center of the dragged item passes the
+// center of a target item. A translationY correction is applied post-swap to
+// ensure the dragged item remains perfectly aligned with the user's finger,
+// eliminating any visual 'jerk' or jumping and providing a smooth, animated
+// reordering experience.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -34,20 +35,13 @@ class DragDropState(
     var draggingItemKey by mutableStateOf<Any?>(null)
         private set
 
-    private var draggingItemOffset by mutableFloatStateOf(0f)
+    var draggingItemTranslationY by mutableFloatStateOf(0f)
+        private set
 
-    val draggingItemIndex: Int?
+    private val currentDraggingItemInfo: LazyListItemInfo?
         get() = draggingItemKey?.let { key ->
-            lazyListState.layoutInfo.visibleItemsInfo.find { it.key == key }?.index
+            lazyListState.layoutInfo.visibleItemsInfo.find { it.key == key }
         }
-
-    private val currentDraggingItem: LazyListItemInfo?
-        get() = draggingItemIndex?.let {
-            lazyListState.layoutInfo.visibleItemsInfo.find { item -> item.index == it }
-        }
-
-    val draggingItemTranslationY: Float
-        get() = draggingItemOffset
 
     fun onDragStart(offset: Offset) {
         lazyListState.layoutInfo.visibleItemsInfo
@@ -59,42 +53,47 @@ class DragDropState(
     }
 
     fun onDrag(offset: Offset) {
-        draggingItemOffset += offset.y
+        draggingItemTranslationY += offset.y
 
-        val draggingIndex = draggingItemIndex ?: return
-        val draggingItem = currentDraggingItem ?: return
+        val draggingItem = currentDraggingItemInfo ?: return
+        val draggingItemIndex = draggingItem.index
 
-        // --- REWRITTEN SWAP LOGIC ---
-        val draggedItemTop = draggingItem.offset + draggingItemOffset
-        val draggedItemCenterY = draggedItemTop + (draggingItem.size / 2f)
+        // The current visual center of the item being dragged.
+        val draggedItemCenterY = draggingItem.offset + draggingItemTranslationY + (draggingItem.size / 2f)
 
-        // Find the item we are currently over
+        // Find the target item by checking which item's vertical range the dragged item's center is currently in.
         val targetItem = lazyListState.layoutInfo.visibleItemsInfo.find {
-            it.key != draggingItemKey && // Not dragging over itself
-                    draggedItemCenterY in it.offset.toFloat()..(it.offset + it.size).toFloat() &&
-                    it.index != 0 // And not over the hero card
+            it.key != draggingItemKey && it.index != 0 &&
+                    draggedItemCenterY in it.offset.toFloat()..(it.offset + it.size).toFloat()
         }
 
-        if (targetItem != null) {
-            // Check if we need to swap positions
-            if (draggingIndex != targetItem.index) {
-                onMove(draggingIndex, targetItem.index)
-            }
+        if (targetItem != null && targetItem.index != draggingItemIndex) {
+            // A swap is needed.
+            // Calculate the offset difference between the two items' current positions.
+            val offsetDiff = targetItem.offset - draggingItem.offset
+
+            // Trigger the state update to reorder the list.
+            onMove(draggingItemIndex, targetItem.index)
+
+            // Immediately apply a correction to the translation.
+            // This counteracts the visual jump that would otherwise occur when the
+            // LazyColumn recomposes and moves the item's base position.
+            draggingItemTranslationY -= offsetDiff
         }
     }
 
-
     fun onDragEnd() {
+        // Reset all state variables.
         draggingItemKey = null
-        draggingItemOffset = 0f
+        draggingItemTranslationY = 0f
     }
 
     fun checkForOverScroll(): Float {
-        val draggingItem = currentDraggingItem ?: return 0f
+        val draggingItem = currentDraggingItemInfo ?: return 0f
         val viewportStartOffset = lazyListState.layoutInfo.viewportStartOffset
         val viewportEndOffset = lazyListState.layoutInfo.viewportEndOffset
 
-        val itemTop = draggingItem.offset + draggingItemOffset
+        val itemTop = draggingItem.offset + draggingItemTranslationY
         val itemBottom = itemTop + draggingItem.size
 
         val scrollAmount = 40f

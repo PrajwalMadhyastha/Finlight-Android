@@ -1,9 +1,8 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/SettingsRepository.kt
-// REASON: FIX - Added backward compatibility for dashboard layout loading. The
-// `loadCardOrder` and `loadVisibleCards` functions now correctly map the old
-// "RECENT_ACTIVITY" enum name to the new "RECENT_TRANSACTIONS" name. This
-// prevents the card from disappearing for users with a previously saved layout.
+// FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
+// REASON: FEATURE - Added a new preference to control notifications for
+// auto-captured SMS transactions. Includes functions to get, save, and perform
+// a blocking read of this setting, which is required by the SmsReceiver.
 // =================================================================================
 package io.pm.finlight
 
@@ -59,7 +58,94 @@ class SettingsRepository(context: Context) {
         private const val KEY_SELECTED_THEME = "selected_app_theme"
         private const val KEY_HOME_CURRENCY = "home_currency_code"
         private const val KEY_TRAVEL_MODE_SETTINGS = "travel_mode_settings"
+        private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
+        private const val KEY_AUTO_BACKUP_HOUR = "auto_backup_hour"
+        private const val KEY_AUTO_BACKUP_MINUTE = "auto_backup_minute"
+        private const val KEY_AUTO_BACKUP_NOTIFICATION_ENABLED = "auto_backup_notification_enabled"
+        // --- NEW: Key for auto-capture notification setting ---
+        private const val KEY_AUTOCAPTURE_NOTIFICATION_ENABLED = "autocapture_notification_enabled"
     }
+
+    // --- NEW: Functions for auto-capture notification setting ---
+    fun saveAutoCaptureNotificationEnabled(isEnabled: Boolean) {
+        prefs.edit { putBoolean(KEY_AUTOCAPTURE_NOTIFICATION_ENABLED, isEnabled) }
+    }
+
+    fun getAutoCaptureNotificationEnabled(): Flow<Boolean> {
+        return callbackFlow {
+            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                if (key == KEY_AUTOCAPTURE_NOTIFICATION_ENABLED) {
+                    trySend(sp.getBoolean(key, true))
+                }
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(prefs.getBoolean(KEY_AUTOCAPTURE_NOTIFICATION_ENABLED, true)) // Enabled by default
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+    }
+
+    fun isAutoCaptureNotificationEnabledBlocking(): Boolean {
+        return prefs.getBoolean(KEY_AUTOCAPTURE_NOTIFICATION_ENABLED, true)
+    }
+
+
+    // --- Functions for auto-backup enabled state ---
+    fun saveAutoBackupEnabled(isEnabled: Boolean) {
+        prefs.edit { putBoolean(KEY_AUTO_BACKUP_ENABLED, isEnabled) }
+    }
+
+    fun getAutoBackupEnabled(): Flow<Boolean> {
+        return callbackFlow {
+            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                if (key == KEY_AUTO_BACKUP_ENABLED) {
+                    trySend(sp.getBoolean(key, true))
+                }
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(prefs.getBoolean(KEY_AUTO_BACKUP_ENABLED, true)) // Enabled by default
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+    }
+
+    // --- Functions for auto-backup notification enabled state ---
+    fun saveAutoBackupNotificationEnabled(isEnabled: Boolean) {
+        prefs.edit { putBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, isEnabled) }
+    }
+
+    fun getAutoBackupNotificationEnabled(): Flow<Boolean> {
+        return callbackFlow {
+            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                if (key == KEY_AUTO_BACKUP_NOTIFICATION_ENABLED) {
+                    trySend(sp.getBoolean(key, true))
+                }
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, true)) // Enabled by default
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+    }
+
+    // --- Functions for auto-backup time ---
+    fun saveAutoBackupTime(hour: Int, minute: Int) {
+        prefs.edit {
+            putInt(KEY_AUTO_BACKUP_HOUR, hour)
+            putInt(KEY_AUTO_BACKUP_MINUTE, minute)
+        }
+    }
+
+    fun getAutoBackupTime(): Flow<Pair<Int, Int>> {
+        return callbackFlow {
+            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                if (key == KEY_AUTO_BACKUP_HOUR || key == KEY_AUTO_BACKUP_MINUTE) {
+                    trySend(Pair(sp.getInt(KEY_AUTO_BACKUP_HOUR, 2), sp.getInt(KEY_AUTO_BACKUP_MINUTE, 0)))
+                }
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(Pair(prefs.getInt(KEY_AUTO_BACKUP_HOUR, 2), prefs.getInt(KEY_AUTO_BACKUP_MINUTE, 0))) // Default 2:00 AM
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+    }
+
 
     fun saveHomeCurrency(currencyCode: String) {
         prefs.edit {

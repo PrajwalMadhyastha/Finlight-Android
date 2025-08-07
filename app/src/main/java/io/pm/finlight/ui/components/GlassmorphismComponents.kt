@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/GlassmorphismComponents.kt
-// REASON: REFACTOR - Renamed `AuroraRecentActivityCard` to
-// `AuroraRecentTransactionsCard` to align with the updated `DashboardCardType`
-// enum and improve code consistency.
+// REASON: UX REFINEMENT - The `BudgetWatchCard` is now fully clickable. A
+// `clickable` modifier has been added to its root `GlassPanel`, allowing users
+// to tap anywhere on the card to navigate directly to the budget management screen.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -356,7 +356,9 @@ fun BudgetWatchCard(
     budgetStatus: List<BudgetWithSpending>,
     navController: NavController
 ) {
-    GlassPanel {
+    GlassPanel(
+        modifier = Modifier.clickable { navController.navigate("budget_screen") }
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

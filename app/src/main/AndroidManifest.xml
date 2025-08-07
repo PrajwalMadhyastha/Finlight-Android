@@ -9,6 +9,8 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
+    <!-- REMOVED: Foreground Service permission is no longer needed -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />

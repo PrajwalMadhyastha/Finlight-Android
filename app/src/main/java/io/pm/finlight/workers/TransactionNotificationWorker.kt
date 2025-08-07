@@ -63,7 +63,6 @@ class TransactionNotificationWorker(
                     visitCount = visitCount
                 )
 
-                Log.d("TransactionNotificationWorker", "Successfully created rich notification for transaction id: $transactionId")
                 Result.success()
             } catch (e: Exception) {
                 Log.e("TransactionNotificationWorker", "Worker failed for transaction id: $transactionId", e)

@@ -38,7 +38,6 @@ class RecurringPatternWorker(
     }
 
     override suspend fun doWork(): Result {
-        Log.d("RecurringPatternWorker", "Worker starting...")
         return withContext(Dispatchers.IO) {
             try {
                 // 1. Fetch recent transactions that have an SMS signature.
@@ -84,7 +83,6 @@ class RecurringPatternWorker(
 
                 // 4. Reschedule the worker for the next run.
                 ReminderManager.scheduleRecurringPatternWorker(context)
-                Log.d("RecurringPatternWorker", "Worker finished successfully.")
                 Result.success()
             } catch (e: Exception) {
                 Log.e("RecurringPatternWorker", "Worker failed", e)
@@ -134,6 +132,5 @@ class RecurringPatternWorker(
 
         // Clean up the pattern from the analysis table to prevent re-detection
         patternDao.deleteBySignature(pattern.smsSignature)
-        Log.d("RecurringPatternWorker", "Created a new '$interval' rule for '${pattern.description}' and sent notification.")
     }
 }

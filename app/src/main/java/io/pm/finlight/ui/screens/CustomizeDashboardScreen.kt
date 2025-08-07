@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/CustomizeDashboardScreen.kt
-// REASON: FIX - The `graphicsLayer` modifier now correctly applies the translation
-// from the rewritten DragDropState. This change, combined with the new state
-// logic, ensures a smooth and stable drag-and-drop experience without any
-// visual jumping or glitches.
+// REASON: REFACTOR - The screen now uses the rewritten "float and swap"
+// DragDropState. The `graphicsLayer` modifier correctly applies the translation,
+// and the `shadow` elevation is animated to visually "lift" the card being
+// dragged. This ensures a smooth, stable, and intuitive reordering experience.
 // =================================================================================
 package io.pm.finlight.ui.screens
 

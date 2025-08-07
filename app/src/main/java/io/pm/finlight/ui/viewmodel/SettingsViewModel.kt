@@ -1,11 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: FIX - The `commitCsvImport` function signature has been changed from
-// accepting a Uri to accepting a List<ReviewableRow>. This resolves the
-// argument type mismatch error and makes the import logic more robust by
-// operating on the validated (and potentially modified) list of rows from the
-// UI, rather than re-reading the original file. The `generateValidationReport`
-// function is also updated to capture and store the CSV header.
+// REASON: FEATURE - Added the `rescanSmsWithNewRule` function. This function is
+// triggered after a user creates a new parsing rule. It scans recent SMS
+// messages and, for any that now parse successfully, it calls the new
+// `autoSaveSmsTransaction` function in the TransactionViewModel to silently
+// import them, retrospectively fixing similar unparsed transactions.
 // =================================================================================
 package io.pm.finlight
 
@@ -35,7 +34,11 @@ sealed class ScanResult {
 }
 
 
-class SettingsViewModel(application: Application) : AndroidViewModel(application) {
+class SettingsViewModel(
+    application: Application,
+    // --- NEW: Add TransactionViewModel as a dependency ---
+    private val transactionViewModel: TransactionViewModel
+) : AndroidViewModel(application) {
     private val settingsRepository = SettingsRepository(application)
     private val db = AppDatabase.getInstance(application)
     private val transactionRepository = TransactionRepository(db.transactionDao())
@@ -87,10 +90,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             initialValue = true,
         )
 
+    val autoCaptureNotificationEnabled: StateFlow<Boolean> =
+        settingsRepository.getAutoCaptureNotificationEnabled().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
     private val _potentialTransactions = MutableStateFlow<List<PotentialTransaction>>(emptyList())
     val potentialTransactions: StateFlow<List<PotentialTransaction>> = _potentialTransactions.asStateFlow()
 
-    private val _isScanning = MutableStateFlow(false)
+    private val _isScanning = MutableStateFlow<Boolean>(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
     val dailyReportTime: StateFlow<Pair<Int, Int>> =
@@ -121,6 +131,28 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             initialValue = AppTheme.SYSTEM_DEFAULT
         )
 
+    val autoBackupEnabled: StateFlow<Boolean> =
+        settingsRepository.getAutoBackupEnabled().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
+    val autoBackupTime: StateFlow<Pair<Int, Int>> =
+        settingsRepository.getAutoBackupTime().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = Pair(2, 0)
+        )
+
+    val autoBackupNotificationEnabled: StateFlow<Boolean> =
+        settingsRepository.getAutoBackupNotificationEnabled().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
+
     init {
         smsScanStartDate =
             settingsRepository.getSmsScanStartDate()
@@ -130,6 +162,83 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     initialValue = 0L,
                 )
     }
+
+    // --- NEW: Scans recent SMS and auto-saves any newly parsed transactions ---
+    fun rescanSmsWithNewRule(onComplete: (Int) -> Unit) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            onComplete(0)
+            return
+        }
+
+        viewModelScope.launch {
+            _isScanning.value = true
+            var newTransactionsFound = 0
+            try {
+                // Scan last 30 days
+                val startDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -30) }.timeInMillis
+                val rawMessages = withContext(Dispatchers.IO) {
+                    SmsRepository(context).fetchAllSms(startDate)
+                }
+
+                val existingMappings = withContext(Dispatchers.IO) {
+                    merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
+                }
+                val existingSmsHashes = withContext(Dispatchers.IO) {
+                    transactionRepository.getAllSmsHashes().first().toSet()
+                }
+
+                val parsedList = withContext(Dispatchers.Default) {
+                    rawMessages.mapNotNull { sms ->
+                        SmsParser.parse(
+                            sms,
+                            existingMappings,
+                            db.customSmsRuleDao(),
+                            db.merchantRenameRuleDao(),
+                            db.ignoreRuleDao(),
+                            db.merchantCategoryMappingDao()
+                        )
+                    }
+                }
+
+                val newPotentialTransactions = parsedList.filter { potential ->
+                    !existingSmsHashes.contains(potential.sourceSmsHash)
+                }
+
+                for (potentialTxn in newPotentialTransactions) {
+                    val success = transactionViewModel.autoSaveSmsTransaction(potentialTxn)
+                    if (success) {
+                        newTransactionsFound++
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Error during retro SMS scan", e)
+            } finally {
+                _isScanning.value = false
+                onComplete(newTransactionsFound)
+            }
+        }
+    }
+
+    fun setAutoCaptureNotificationEnabled(enabled: Boolean) {
+        settingsRepository.saveAutoCaptureNotificationEnabled(enabled)
+    }
+
+    fun setAutoBackupEnabled(enabled: Boolean) {
+        settingsRepository.saveAutoBackupEnabled(enabled)
+        if (enabled) ReminderManager.scheduleAutoBackup(context) else ReminderManager.cancelAutoBackup(context)
+    }
+
+    fun saveAutoBackupTime(hour: Int, minute: Int) {
+        settingsRepository.saveAutoBackupTime(hour, minute)
+        if (autoBackupEnabled.value) {
+            ReminderManager.scheduleAutoBackup(context)
+        }
+    }
+
+    fun setAutoBackupNotificationEnabled(enabled: Boolean) {
+        settingsRepository.saveAutoBackupNotificationEnabled(enabled)
+    }
+
 
     fun saveSelectedTheme(theme: AppTheme) {
         settingsRepository.saveSelectedTheme(theme)
@@ -202,11 +311,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             if (originalName.equals(newName, ignoreCase = true)) {
                 db.merchantRenameRuleDao().deleteByOriginalName(originalName)
-                Log.d("SettingsViewModel", "Deleted rename rule for: '$originalName'")
             } else {
                 val rule = MerchantRenameRule(originalName = originalName, newName = newName)
                 db.merchantRenameRuleDao().insert(rule)
-                Log.d("SettingsViewModel", "Saved rename rule: '$originalName' -> '$newName'")
             }
         }
     }
@@ -298,7 +405,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
         val reviewableRows = mutableListOf<ReviewableRow>()
         var header = emptyList<String>()
-        var lineNumber = 0 // Start at 0 to account for header
+        var lineNumber = 0
 
         getApplication<Application>().contentResolver.openInputStream(uri)?.bufferedReader()?.useLines { lines ->
             val lineIterator = lines.iterator()
@@ -308,7 +415,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             }
 
             while (lineIterator.hasNext()) {
-                lineNumber++ // This is now the actual line number in the file (starting from 2)
+                lineNumber++
                 val line = lineIterator.next()
                 val tokens = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)".toRegex()).map { it.trim().removeSurrounding("\"") }
                 reviewableRows.add(createReviewableRow(lineNumber + 1, tokens, accountsMap, categoriesMap))
@@ -328,18 +435,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         try {
-            dateFormat.parse(tokens[2]) // Date is now at index 2
+            dateFormat.parse(tokens[2])
         } catch (
             e: Exception,
         ) {
             return ReviewableRow(lineNumber, tokens, CsvRowStatus.INVALID_DATE, "Invalid date format.")
         }
 
-        val amount = tokens[4].toDoubleOrNull() // Amount is now at index 4
+        val amount = tokens[4].toDoubleOrNull()
         if (amount == null || amount <= 0) return ReviewableRow(lineNumber, tokens, CsvRowStatus.INVALID_AMOUNT, "Invalid amount.")
 
-        val categoryName = tokens[6] // Category is now at index 6
-        val accountName = tokens[7] // Account is now at index 7
+        val categoryName = tokens[6]
+        val accountName = tokens[7]
 
         val categoryExists = categories.containsKey(categoryName)
         val accountExists = accounts.containsKey(accountName)
@@ -401,31 +508,43 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             val rows = rowsToImport.map { it.rowData }
             val isFinlightExport = header.contains("Id") && header.contains("ParentId")
 
+            val learnedMappings = mutableMapOf<String, Int>()
+
             db.withTransaction {
                 if (isFinlightExport) {
-                    importFinlightCsv(header, rows)
+                    importFinlightCsv(header, rows, learnedMappings)
                 } else {
-                    importGenericCsv(header, rows)
+                    importGenericCsv(header, rows, learnedMappings)
+                }
+
+                if (learnedMappings.isNotEmpty()) {
+                    val newMappings = learnedMappings.map { (merchant, categoryId) ->
+                        MerchantCategoryMapping(parsedName = merchant, categoryId = categoryId)
+                    }
+                    db.merchantCategoryMappingDao().insertAll(newMappings)
+                    Log.d("CsvImport", "Learned and saved ${newMappings.size} new merchant-category mappings.")
                 }
             }
         }
     }
 
-    private suspend fun importFinlightCsv(header: List<String>, rows: List<List<String>>) {
-        val idMap = mutableMapOf<String, Long>() // Map CSV ID to new DB ID
+    private suspend fun importFinlightCsv(
+        header: List<String>,
+        rows: List<List<String>>,
+        learnedMappings: MutableMap<String, Int>
+    ) {
+        val idMap = mutableMapOf<String, Long>()
         val parents = rows.filter { it[header.indexOf("ParentId")].isBlank() }
         val children = rows.filter { it[header.indexOf("ParentId")].isNotBlank() }
 
-        // Pass 1: Import parents and standard transactions
         for (row in parents) {
             val oldId = row[header.indexOf("Id")]
             val isSplit = row[header.indexOf("Category")] == "Split Transaction"
-            val transaction = createTransactionFromRow(row, header, isSplit = isSplit)
+            val transaction = createTransactionFromRow(row, header, isSplit = isSplit, learnedMappings = learnedMappings)
             val newId = transactionRepository.insertTransactionWithTags(transaction, getTagsFromRow(row, header))
             idMap[oldId] = newId
         }
 
-        // Pass 2: Import child splits
         for (row in children) {
             val parentIdCsv = row[header.indexOf("ParentId")]
             val newParentId = idMap[parentIdCsv]?.toInt()
@@ -438,14 +557,23 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private suspend fun importGenericCsv(header: List<String>, rows: List<List<String>>) {
+    private suspend fun importGenericCsv(
+        header: List<String>,
+        rows: List<List<String>>,
+        learnedMappings: MutableMap<String, Int>
+    ) {
         for (row in rows) {
-            val transaction = createTransactionFromRow(row, header, isSplit = false)
+            val transaction = createTransactionFromRow(row, header, isSplit = false, learnedMappings = learnedMappings)
             transactionRepository.insertTransactionWithTags(transaction, getTagsFromRow(row, header))
         }
     }
 
-    private suspend fun createTransactionFromRow(row: List<String>, header: List<String>, isSplit: Boolean): Transaction {
+    private suspend fun createTransactionFromRow(
+        row: List<String>,
+        header: List<String>,
+        isSplit: Boolean,
+        learnedMappings: MutableMap<String, Int>
+    ): Transaction {
         val h = header.associateWith { header.indexOf(it) }.withDefault { -1 }
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
@@ -460,6 +588,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
         val category = if (isSplit) null else findOrCreateCategory(categoryName)
         val account = findOrCreateAccount(accountName)
+
+        if (!isSplit && description.isNotBlank() && category != null) {
+            learnedMappings[description] = category.id
+        }
 
         return Transaction(
             date = date,

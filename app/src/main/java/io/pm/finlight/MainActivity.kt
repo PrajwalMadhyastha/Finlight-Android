@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX - Removed the deep link handling logic from the SplashScreen's
-// LaunchedEffect. The NavHost now acts as the single source of truth for
-// automatically handling deep links from intents, which resolves the race
-// condition that caused the destination to be pushed onto the back stack twice.
+// REASON: FIX - Corrected a runtime crash by providing the custom
+// SettingsViewModelFactory when instantiating the SettingsViewModel. This ensures
+// that the ViewModel is created with its required TransactionViewModel dependency.
 // =================================================================================
 package io.pm.finlight
 
@@ -13,6 +12,7 @@ import android.app.Application
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -75,16 +75,26 @@ import kotlinx.coroutines.flow.map
 import java.net.URLDecoder
 import java.util.concurrent.Executor
 
+private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
+
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
+
 
         val settingsRepository = SettingsRepository(this)
         val hasSeenOnboarding = settingsRepository.hasSeenOnboarding()
 
         setContent {
-            val settingsViewModel: SettingsViewModel = viewModel()
+            val transactionViewModel: TransactionViewModel = viewModel()
+            val settingsViewModel: SettingsViewModel = viewModel(
+                factory = SettingsViewModelFactory(application, transactionViewModel)
+            )
             val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
 
             PersonalFinanceAppTheme(selectedTheme = selectedTheme) {
@@ -208,10 +218,12 @@ fun LockScreen(onUnlock: () -> Unit) {
 @Composable
 fun MainAppScreen() {
     val navController = rememberNavController()
+    val context = LocalContext.current.applicationContext as Application
 
-    val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModelFactory(LocalContext.current.applicationContext as Application))
-    val settingsViewModel: SettingsViewModel = viewModel()
+    val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModelFactory(context))
     val transactionViewModel: TransactionViewModel = viewModel()
+    // --- UPDATED: Use the custom factory to create the SettingsViewModel ---
+    val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context, transactionViewModel))
     val accountViewModel: AccountViewModel = viewModel()
     val categoryViewModel: CategoryViewModel = viewModel()
     val budgetViewModel: BudgetViewModel = viewModel()
@@ -228,6 +240,7 @@ fun MainAppScreen() {
 
     val isSelectionMode by transactionViewModel.isSelectionModeActive.collectAsState()
     val selectedIdsCount by transactionViewModel.selectedTransactionIds.map { it.size }.collectAsState(initial = 0)
+    val showDeleteConfirmation by transactionViewModel.showDeleteConfirmation.collectAsState()
 
     val bottomNavItems = listOf(
         BottomNavItem.Dashboard,
@@ -306,6 +319,9 @@ fun MainAppScreen() {
                             }
                         },
                         actions = {
+                            IconButton(onClick = { transactionViewModel.onDeleteSelectionClick() }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete")
+                            }
                             IconButton(onClick = { transactionViewModel.onShareClick() }) {
                                 Icon(Icons.Default.Share, contentDescription = "Share")
                             }
@@ -455,6 +471,27 @@ fun MainAppScreen() {
                     onAddNew = null
                 )
             }
+        }
+
+        if (showDeleteConfirmation) {
+            val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+            val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+
+            AlertDialog(
+                onDismissRequest = { transactionViewModel.onCancelDeleteSelection() },
+                title = { Text("Delete Transactions?") },
+                text = { Text("Are you sure you want to permanently delete the selected $selectedIdsCount transaction(s)? This action cannot be undone.") },
+                confirmButton = {
+                    Button(
+                        onClick = { transactionViewModel.onConfirmDeleteSelection() },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Delete") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { transactionViewModel.onCancelDeleteSelection() }) { Text("Cancel") }
+                },
+                containerColor = popupContainerColor
+            )
         }
     }
 }
@@ -834,12 +871,13 @@ fun AppNavHost(
         }
 
         composable(
-            "time_period_report_screen/{timePeriod}?date={date}",
+            "time_period_report_screen/{timePeriod}?date={date}&showPreviousMonth={showPreviousMonth}",
             arguments = listOf(
                 navArgument("timePeriod") { type = NavType.EnumType(TimePeriod::class.java) },
-                navArgument("date") { type = NavType.LongType; defaultValue = -1L }
+                navArgument("date") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("showPreviousMonth") { type = NavType.BoolType; defaultValue = false }
             ),
-            deepLinks = listOf(navDeepLink { uriPattern = "app://finlight.pm.io/report/{timePeriod}?date={date}" }),
+            deepLinks = listOf(navDeepLink { uriPattern = "app://finlight.pm.io/report/{timePeriod}?date={date}&showPreviousMonth={showPreviousMonth}" }),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
@@ -852,12 +890,14 @@ fun AppNavHost(
                 backStackEntry.arguments?.getSerializable("timePeriod") as? TimePeriod
             }
             val date = backStackEntry.arguments?.getLong("date")
+            val showPreviousMonth = backStackEntry.arguments?.getBoolean("showPreviousMonth") ?: false
             if (timePeriod != null) {
                 TimePeriodReportScreen(
                     navController = navController,
                     timePeriod = timePeriod,
                     transactionViewModel = transactionViewModel,
-                    initialDateMillis = date
+                    initialDateMillis = date,
+                    showPreviousMonth = showPreviousMonth
                 )
             }
         }
@@ -982,9 +1022,6 @@ fun AppNavHost(
 
 @Composable
 fun SplashScreen(navController: NavHostController, activity: Activity) {
-    // --- FIX: This LaunchedEffect now ONLY handles the initial navigation. ---
-    // It no longer inspects the activity's intent for deep links.
-    // The NavHost is now solely responsible for this.
     LaunchedEffect(key1 = Unit) {
         navController.navigate(BottomNavItem.Dashboard.route) {
             popUpTo("splash_screen") { inclusive = true }

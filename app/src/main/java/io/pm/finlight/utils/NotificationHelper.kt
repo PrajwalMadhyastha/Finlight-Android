@@ -1,14 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/NotificationHelper.kt
-// REASON: FIX - All notifications now use the new, dedicated `ic_notification_logo`
-// for the small icon. This is a single-color, transparent vector required by
-// Android for correct rendering in the status bar, ensuring brand consistency.
-// FIX - Replaced all instances of `intent.setPackage()` with the correct
-// Kotlin property access syntax: `intent.apply { package = ... }`.
-// FIX - Replaced `paint.setTypeface()` with the correct Kotlin property
-// access syntax: `paint.typeface = ...`.
+// REASON: FIX - Removed the `getBackupNotificationBuilder` function as the
+// worker will no longer run as a foreground service, resolving the runtime crash.
 // =================================================================================
-package io.pm.finlight.utils // <-- UPDATED PACKAGE
+package io.pm.finlight.utils
 
 import android.Manifest
 import android.app.PendingIntent
@@ -42,6 +37,25 @@ object NotificationHelper {
     private const val DEEP_LINK_URI_LINK_RECURRING = "app://finlight.pm.io/link_recurring"
     private const val DEEP_LINK_URI_ADD_RECURRING = "app://finlight.pm.io/add_recurring_transaction"
     private const val DEEP_LINK_URI_APPROVE = "app://finlight.pm.io/approve_transaction_screen"
+    const val BACKUP_NOTIFICATION_ID = 99
+
+
+    fun showAutoBackupNotification(context: Context) {
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+
+        val builder = NotificationCompat.Builder(context, MainApplication.BACKUP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_logo)
+            .setContentTitle("Backup Complete")
+            .setContentText("Your Finlight data was successfully backed up.")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setAutoCancel(true)
+
+        with(NotificationManagerCompat.from(context)) {
+            notify(BACKUP_NOTIFICATION_ID, builder.build())
+        }
+    }
 
 
     fun showTravelModeSmsNotification(
@@ -60,7 +74,6 @@ object NotificationHelper {
 
         val foreignTxn = potentialTxn.copy(isForeignCurrency = true)
         val foreignJson = URLEncoder.encode(Gson().toJson(foreignTxn), "UTF-8")
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val foreignIntent = Intent(Intent.ACTION_VIEW, "$DEEP_LINK_URI_APPROVE?potentialTxnJson=$foreignJson".toUri()).apply {
             `package` = context.packageName
         }
@@ -71,7 +84,6 @@ object NotificationHelper {
 
         val homeTxn = potentialTxn.copy(isForeignCurrency = false)
         val homeJson = URLEncoder.encode(Gson().toJson(homeTxn), "UTF-8")
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val homeIntent = Intent(Intent.ACTION_VIEW, "$DEEP_LINK_URI_APPROVE?potentialTxnJson=$homeJson".toUri()).apply {
             `package` = context.packageName
         }
@@ -105,7 +117,6 @@ object NotificationHelper {
             return
         }
 
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val intent = Intent(Intent.ACTION_VIEW, "$DEEP_LINK_URI_EDIT/${details.transaction.id}".toUri()).apply {
             `package` = context.packageName
         }
@@ -204,11 +215,9 @@ object NotificationHelper {
         canvas.drawCircle(width / 2f, height / 2f, width / 2f, backgroundPaint)
 
         val iconKey = details.categoryIconKey
-        Log.d("NotificationHelper", "Creating icon for category: '${details.categoryName}', iconKey: '$iconKey'")
 
         if (iconKey != null && iconKey != "letter_default" && iconKey != "category") {
             val drawableResId = getFallbackDrawableRes(iconKey)
-            Log.d("NotificationHelper", "Mapped iconKey '$iconKey' to drawable resource ID: $drawableResId")
             val iconDrawable = ContextCompat.getDrawable(context, drawableResId)
 
             if (iconDrawable == null) {
@@ -229,7 +238,6 @@ object NotificationHelper {
                 textSize = width * 0.5f
                 textAlign = Paint.Align.CENTER
                 isAntiAlias = true
-                // --- FIX: Use Kotlin property access syntax for 'typeface' ---
                 typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
             }
             val textY = (height / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
@@ -250,7 +258,6 @@ object NotificationHelper {
 
         val deepLinkUri = "$DEEP_LINK_URI_ADD_RECURRING?ruleId=${rule.id}".toUri()
 
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val intent = Intent(Intent.ACTION_VIEW, deepLinkUri).apply {
             `package` = context.packageName
         }
@@ -291,7 +298,6 @@ object NotificationHelper {
         val encodedJson = URLEncoder.encode(json, "UTF-8")
         val deepLinkUri = "$DEEP_LINK_URI_LINK_RECURRING/$encodedJson".toUri()
 
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val intent = Intent(Intent.ACTION_VIEW, deepLinkUri).apply {
             `package` = context.packageName
         }
@@ -334,7 +340,6 @@ object NotificationHelper {
         }
 
         val intent = Intent(Intent.ACTION_VIEW, deepLinkUri.toUri())
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         intent.`package` = context.packageName
 
         val pendingIntent: PendingIntent? = TaskStackBuilder.create(context).run {
@@ -437,6 +442,8 @@ object NotificationHelper {
             percentageChange > 0 -> "Spends up by $percentageChange% in $monthName"
             else -> "Spends down by ${abs(percentageChange)}% in $monthName"
         }
+        val deepLinkUri = "$DEEP_LINK_URI_REPORT_BASE/${TimePeriod.MONTHLY}?showPreviousMonth=true"
+
         createEnhancedSummaryNotification(
             context,
             MainApplication.MONTHLY_SUMMARY_CHANNEL_ID,
@@ -444,7 +451,7 @@ object NotificationHelper {
             title,
             totalExpenses,
             topCategories,
-            "$DEEP_LINK_URI_REPORT_BASE/${TimePeriod.MONTHLY}"
+            deepLinkUri
         )
     }
 
@@ -496,7 +503,6 @@ object NotificationHelper {
 
         val detailUri = "$DEEP_LINK_URI_EDIT/${transaction.id}".toUri()
 
-        // --- FIX: Use Kotlin property access syntax for 'package' ---
         val intent = Intent(Intent.ACTION_VIEW, detailUri).apply {
             `package` = context.packageName
         }

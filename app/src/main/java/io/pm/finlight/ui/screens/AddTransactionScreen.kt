@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FEATURE - The Account and Tag picker bottom sheets are now configured
-// to open in a full-screen, edge-to-edge layout. This provides a more immersive
-// and user-friendly experience for selecting items from potentially long lists.
+// REASON: FEATURE - Integrated the new `MerchantPredictionSheet`. Tapping the
+// description text now opens a bottom sheet that provides real-time, historical
+// suggestions for the merchant and its associated category, speeding up data
+// entry and improving consistency.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -73,8 +74,8 @@ private sealed class ComposerSheet {
     object Category : ComposerSheet()
     object Account : ComposerSheet()
     object Tags : ComposerSheet()
-    object Description : ComposerSheet()
     object Notes : ComposerSheet()
+    object Merchant : ComposerSheet() // --- NEW: Sheet for merchant prediction ---
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -220,7 +221,7 @@ fun AddTransactionScreen(
                 AmountComposer(
                     amount = amount,
                     description = description,
-                    onDescriptionClick = { activeSheet = ComposerSheet.Description },
+                    onDescriptionClick = { activeSheet = ComposerSheet.Merchant },
                     isTravelMode = isTravelModeActive,
                     travelModeSettings = travelModeSettings
                 )
@@ -312,14 +313,6 @@ fun AddTransactionScreen(
                     onAddNewTag = viewModel::addTagOnTheGo,
                     onConfirm = { activeSheet = null }
                 )
-                is ComposerSheet.Description -> TextInputSheet(
-                    title = "Paid to",
-                    initialValue = description,
-                    onConfirm = {
-                        description = it
-                        activeSheet = null
-                    }
-                )
                 is ComposerSheet.Notes -> TextInputSheet(
                     title = "Add Notes",
                     initialValue = notes,
@@ -327,6 +320,22 @@ fun AddTransactionScreen(
                         notes = it
                         activeSheet = null
                     }
+                )
+                is ComposerSheet.Merchant -> MerchantPredictionSheet(
+                    viewModel = viewModel,
+                    initialDescription = description,
+                    onPredictionSelected = { prediction ->
+                        description = prediction.description
+                        prediction.categoryId?.let { catId ->
+                            selectedCategory = categories.find { it.id == catId }
+                        }
+                        activeSheet = null
+                    },
+                    onManualSave = { newDescription ->
+                        description = newDescription
+                        activeSheet = null
+                    },
+                    onDismiss = { activeSheet = null }
                 )
                 null -> {}
             }
@@ -421,6 +430,7 @@ private fun SpotlightBackground(color: Color) {
     }
 }
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 private fun AmountComposer(
     amount: String,
@@ -437,15 +447,16 @@ private fun AmountComposer(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onDescriptionClick)
     ) {
         Text(
             text = description.ifBlank { "Paid to..." },
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clickable(onClick = onDescriptionClick)
         )
+
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

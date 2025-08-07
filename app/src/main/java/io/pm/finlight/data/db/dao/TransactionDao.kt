@@ -1,18 +1,37 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionDao.kt
-// REASON: FEATURE - Added new queries to support the drilldown screens:
-// - getTransactionsForCategoryName: Fetches all transactions for a specific category in a date range.
-// - getTransactionsForMerchantName: Fetches all transactions for a specific merchant in a date range.
-// - getMonthlySpendingForCategory: Gets historical monthly spending for a single category.
-// - getMonthlySpendingForMerchant: Gets historical monthly spending for a single merchant.
+// REASON: FIX - Added the necessary import for the MerchantPrediction DTO. This
+// validates the `searchMerchants` function signature and is a key part of
+// resolving the "Unresolved reference" build error.
 // =================================================================================
 package io.pm.finlight
 
 import androidx.room.*
+import io.pm.finlight.data.model.MerchantPrediction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TransactionDao {
+
+    @Query("""
+        SELECT
+            T.description,
+            T.categoryId,
+            C.name as categoryName,
+            C.iconKey as categoryIconKey,
+            C.colorKey as categoryColorKey
+        FROM transactions AS T
+        LEFT JOIN categories AS C ON T.categoryId = C.id
+        WHERE (LOWER(T.description) LIKE '%' || LOWER(:query) || '%' OR LOWER(T.originalDescription) LIKE '%' || LOWER(:query) || '%')
+          AND T.description != ''
+        GROUP BY LOWER(T.description), T.categoryId
+        ORDER BY MAX(T.date) DESC
+        LIMIT 10
+    """)
+    fun searchMerchants(query: String): Flow<List<MerchantPrediction>>
+
+    @Query("DELETE FROM transactions WHERE id IN (:transactionIds)")
+    suspend fun deleteByIds(transactionIds: List<Int>)
 
     @Query("SELECT * FROM transactions WHERE id = :transactionId")
     fun getTransactionWithSplits(transactionId: Int): Flow<TransactionWithSplits?>
@@ -177,7 +196,6 @@ interface TransactionDao {
     """)
     fun getSpendingByMerchantForMonth(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?): Flow<List<MerchantSpendingSummary>>
 
-    // --- NEW: Query for category drilldown transaction list ---
     @Query("""
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey
         FROM transactions AS T
@@ -188,7 +206,6 @@ interface TransactionDao {
     """)
     fun getTransactionsForCategoryName(categoryName: String, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
 
-    // --- NEW: Query for merchant drilldown transaction list ---
     @Query("""
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey
         FROM transactions AS T
@@ -199,7 +216,6 @@ interface TransactionDao {
     """)
     fun getTransactionsForMerchantName(merchantName: String, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
 
-    // --- NEW: Query for category drilldown monthly trend chart ---
     @Query("""
         WITH AtomicExpenses AS (
             SELECT P.date, S.amount FROM split_transactions AS S
@@ -221,7 +237,6 @@ interface TransactionDao {
     """)
     fun getMonthlySpendingForCategory(categoryName: String, startDate: Long, endDate: Long): Flow<List<PeriodTotal>>
 
-    // --- NEW: Query for merchant drilldown monthly trend chart ---
     @Query("""
         WITH AtomicExpenses AS (
             SELECT P.date, S.amount FROM split_transactions AS S

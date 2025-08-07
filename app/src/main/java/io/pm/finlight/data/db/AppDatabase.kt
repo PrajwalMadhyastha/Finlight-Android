@@ -1,3 +1,11 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
+// REASON: REFACTOR - Updated the database seeding logic to provide a cleaner
+// initial state for new users. Removed sample transactions, budgets, and all
+// accounts except for "Cash Spends".
+// FEATURE - Added new default ignore rules for investment, OTP, and feedback
+// messages to significantly reduce false positives from the SMS parser.
+// =================================================================================
 package io.pm.finlight.data.db
 
 import android.content.Context
@@ -41,7 +49,8 @@ import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.util.Calendar
+import net.sqlcipher.database.SupportFactory
+import io.pm.finlight.security.SecurityManager
 
 @Database(
     entities = [
@@ -62,7 +71,7 @@ import java.util.Calendar
         RecurringPattern::class,
         SplitTransaction::class
     ],
-    version = 32, // --- UPDATED: Incremented version number
+    version = 33,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -85,6 +94,7 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        // --- UPDATED: Added new default ignore rules for common false positives ---
         private val DEFAULT_IGNORE_PHRASES = listOf(
             "invoice of",
             "payment of.*is successful",
@@ -95,8 +105,16 @@ abstract class AppDatabase : RoomDatabase() {
             "We have received",
             "has been initiated",
             "redemption",
-            "requested money from you"
-        ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) }
+            "requested money from you",
+            "Folio No.",
+            "NAV of",
+            "purchase experience",
+            "your OTP"
+        ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
+            "*SBIMF",
+            "*WKEFTT"
+        ).map { IgnoreRule(pattern = it, type = RuleType.SENDER, isDefault = true) }
+
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -395,10 +413,8 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // --- NEW: Migration to add `type` column and rename `phrase` to `pattern` ---
         val MIGRATION_31_32 = object : Migration(31, 32) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 1. Create a new table with the desired schema
                 db.execSQL("""
                     CREATE TABLE `ignore_rules_new` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
@@ -408,16 +424,33 @@ abstract class AppDatabase : RoomDatabase() {
                         `isDefault` INTEGER NOT NULL DEFAULT 0
                     )
                 """)
-                // 2. Copy data from the old table to the new one
                 db.execSQL("""
                     INSERT INTO `ignore_rules_new` (id, pattern, isEnabled, isDefault)
                     SELECT id, phrase, isEnabled, isDefault FROM `ignore_rules`
                 """)
-                // 3. Create the unique index on the new table
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ignore_rules_pattern` ON `ignore_rules_new` (`pattern`)")
-                // 4. Drop the old table
                 db.execSQL("DROP TABLE `ignore_rules`")
-                // 5. Rename the new table to the original name
+                db.execSQL("ALTER TABLE `ignore_rules_new` RENAME TO `ignore_rules`")
+            }
+        }
+
+        val MIGRATION_32_33 = object : Migration(32, 33) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE `ignore_rules_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                        `type` TEXT NOT NULL DEFAULT 'BODY_PHRASE', 
+                        `pattern` TEXT NOT NULL COLLATE NOCASE, 
+                        `isEnabled` INTEGER NOT NULL DEFAULT 1, 
+                        `isDefault` INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ignore_rules_pattern_nocase` ON `ignore_rules_new` (`pattern`)")
+                db.execSQL("""
+                    INSERT OR IGNORE INTO `ignore_rules_new` (id, type, pattern, isEnabled, isDefault)
+                    SELECT id, type, pattern, isEnabled, isDefault FROM `ignore_rules`
+                """)
+                db.execSQL("DROP TABLE `ignore_rules`")
                 db.execSQL("ALTER TABLE `ignore_rules_new` RENAME TO `ignore_rules`")
             }
         }
@@ -425,9 +458,15 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
+                val securityManager = SecurityManager(context)
+                val passphrase = securityManager.getPassphrase()
+                val factory = SupportFactory(passphrase)
+
                 val instance =
                     Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "finance_database")
-                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32)
+                        .openHelperFactory(factory)
+                        .addMigrations(MIGRATION_32_33)
+                        .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))
                         .build()
                 INSTANCE = instance
@@ -450,82 +489,12 @@ abstract class AppDatabase : RoomDatabase() {
             suspend fun populateDatabase(db: AppDatabase) {
                 val accountDao = db.accountDao()
                 val categoryDao = db.categoryDao()
-                val transactionDao = db.transactionDao()
-                val budgetDao = db.budgetDao()
                 val ignoreRuleDao = db.ignoreRuleDao()
 
+                // --- UPDATED: Seed only the essential data ---
                 categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
                 ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
-
-                accountDao.insertAll(
-                    listOf(
-                        Account(id = 1, name = "Cash Spends", type = "Cash"),
-                        Account(id = 2, name = "SBI", type = "Savings"),
-                        Account(id = 3, name = "HDFC", type = "Credit Card"),
-                        Account(id = 4, name = "ICICI", type = "Savings"),
-                    ),
-                )
-
-                val calendar = Calendar.getInstance()
-                calendar.set(Calendar.DAY_OF_MONTH, 5)
-                val incomeDate = calendar.timeInMillis
-                calendar.set(Calendar.DAY_OF_MONTH, 10)
-                val expenseDate1 = calendar.timeInMillis
-                calendar.set(Calendar.DAY_OF_MONTH, 15)
-                val expenseDate2 = calendar.timeInMillis
-
-                transactionDao.insertAll(
-                    listOf(
-                        Transaction(
-                            description = "Monthly Salary",
-                            categoryId = 12, // "Salary"
-                            amount = 75000.0,
-                            date = incomeDate,
-                            accountId = 2, // SBI
-                            notes = "Paycheck",
-                            transactionType = "income",
-                        ),
-                        Transaction(
-                            description = "Grocery Shopping",
-                            categoryId = 6, // "Groceries"
-                            amount = 4500.0,
-                            date = expenseDate1,
-                            accountId = 3, // HDFC
-                            notes = "Weekly groceries",
-                            transactionType = "expense",
-                        ),
-                        Transaction(
-                            description = "Dinner with friends",
-                            categoryId = 4, // "Food & Drinks"
-                            amount = 1200.0,
-                            date = expenseDate2,
-                            accountId = 3, // HDFC
-                            notes = null,
-                            transactionType = "expense",
-                        )
-                    )
-                )
-
-                val month = calendar.get(Calendar.MONTH) + 1
-                val year = calendar.get(Calendar.YEAR)
-
-                budgetDao.insertAll(
-                    listOf(
-                        Budget(
-                            categoryName = "Groceries",
-                            amount = 10000.0,
-                            month = month,
-                            year = year
-                        ),
-                        Budget(
-                            categoryName = "Food & Drinks",
-                            amount = 5000.0,
-                            month = month,
-                            year = year
-                        ),
-                        Budget(categoryName = "Bills", amount = 2000.0, month = month, year = year),
-                    ),
-                )
+                accountDao.insert(Account(id = 1, name = "Cash Spends", type = "Cash"))
             }
         }
     }

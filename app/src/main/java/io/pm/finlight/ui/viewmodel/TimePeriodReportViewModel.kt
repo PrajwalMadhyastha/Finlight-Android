@@ -1,9 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TimePeriodReportViewModel.kt
-// REASON: FIX - The `generateMonthConsistencyData` function now fetches the date
-// of the first-ever transaction. It marks any days in the calendar before this
-// date as NO_DATA, ensuring the heatmap stats accurately reflect the user's
-// actual transaction history.
+// REASON: FIX - The ViewModel now accepts a `showPreviousMonth` boolean flag.
+// The initialization logic for the `selectedDate` state now checks this flag.
+// If true, it sets the initial view to the previous month, ensuring that deep
+// links from monthly summary notifications show the correct report.
+// FIX - The spending chart logic for the Daily report has been corrected. It
+// now fetches and displays data for the relevant 24-hour period, consistent
+// with the rest of the screen, instead of incorrectly showing a 7-day summary.
 // =================================================================================
 package io.pm.finlight
 
@@ -24,15 +27,18 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimePeriodReportViewModel(
     private val transactionDao: TransactionDao,
-    private val settingsRepository: SettingsRepository, // --- NEW: Add dependency
+    private val settingsRepository: SettingsRepository,
     private val timePeriod: TimePeriod,
-    initialDateMillis: Long?
+    initialDateMillis: Long?,
+    showPreviousMonth: Boolean
 ) : ViewModel() {
 
     private val _selectedDate = MutableStateFlow(
         Calendar.getInstance().apply {
             if (initialDateMillis != null && initialDateMillis != -1L) {
                 timeInMillis = initialDateMillis
+            } else if (showPreviousMonth) {
+                add(Calendar.MONTH, -1)
             }
         }
     )
@@ -83,7 +89,7 @@ class TimePeriodReportViewModel(
         when (timePeriod) {
             TimePeriod.DAILY -> {
                 val endCal = (calendar.clone() as Calendar)
-                val startCal = (calendar.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -6) }
+                val startCal = (calendar.clone() as Calendar).apply { add(Calendar.HOUR_OF_DAY, -24) }
 
                 transactionDao.getDailySpendingForDateRange(startCal.timeInMillis, endCal.timeInMillis).map { dailyTotals ->
                     if (dailyTotals.isEmpty()) return@map null
@@ -93,15 +99,10 @@ class TimePeriodReportViewModel(
                     val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
                     val fullDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-                    val totalsMap = dailyTotals.associateBy { it.date }
-
-                    for (i in 0..6) {
-                        val dayCal = (startCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, i) }
-                        val dateString = fullDateFormat.format(dayCal.time)
-
-                        val total = totalsMap[dateString]?.totalAmount?.toFloat() ?: 0f
-                        entries.add(BarEntry(i.toFloat(), total))
-                        labels.add(dayFormat.format(dayCal.time))
+                    dailyTotals.forEachIndexed { index, dailyTotal ->
+                        entries.add(BarEntry(index.toFloat(), dailyTotal.totalAmount.toFloat()))
+                        val date = fullDateFormat.parse(dailyTotal.date)
+                        labels.add(dayFormat.format(date!!))
                     }
 
                     val dataSet = BarDataSet(entries, "Daily Spending").apply {
@@ -185,14 +186,12 @@ class TimePeriodReportViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    // --- NEW: Flow for monthly consistency data ---
     val monthlyConsistencyData: StateFlow<List<CalendarDayStatus>> = _selectedDate.flatMapLatest { calendar ->
         flow {
             emit(generateMonthConsistencyData(calendar))
         }.flowOn(Dispatchers.Default)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // --- NEW: Flow for consistency stats ---
     val consistencyStats: StateFlow<ConsistencyStats> = monthlyConsistencyData.map { data ->
         val goodDays = data.count { it.status == SpendingStatus.WITHIN_LIMIT }
         val badDays = data.count { it.status == SpendingStatus.OVER_LIMIT }
@@ -237,7 +236,6 @@ class TimePeriodReportViewModel(
         when (timePeriod) {
             TimePeriod.DAILY -> startCal.add(Calendar.HOUR_OF_DAY, -24)
             TimePeriod.WEEKLY -> startCal.add(Calendar.DAY_OF_YEAR, -7)
-            // --- FIX: Use the start and end of the calendar month ---
             TimePeriod.MONTHLY -> {
                 startCal.set(Calendar.DAY_OF_MONTH, 1)
                 startCal.set(Calendar.HOUR_OF_DAY, 0)
@@ -256,7 +254,6 @@ class TimePeriodReportViewModel(
         return Pair(startCal.timeInMillis, endCal.timeInMillis)
     }
 
-    // --- NEW: Function to generate consistency data for a specific month ---
     private suspend fun generateMonthConsistencyData(calendar: Calendar): List<CalendarDayStatus> = withContext(Dispatchers.IO) {
         val year = calendar.get(Calendar.YEAR)
         val month = calendar.get(Calendar.MONTH) + 1
@@ -270,7 +267,6 @@ class TimePeriodReportViewModel(
             set(Calendar.HOUR_OF_DAY, 23)
         }
 
-        // --- UPDATED: Fetch first transaction date ---
         val firstTransactionDate = transactionDao.getFirstTransactionDate().first()
         val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
 
@@ -287,7 +283,6 @@ class TimePeriodReportViewModel(
         for (i in 1..daysInMonth) {
             dayIterator.set(Calendar.DAY_OF_MONTH, i)
 
-            // --- UPDATED: Check if day is before first transaction ---
             if (firstDataCal != null && dayIterator.before(firstDataCal)) {
                 resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
                 continue

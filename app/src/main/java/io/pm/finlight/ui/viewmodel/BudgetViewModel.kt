@@ -1,7 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/BudgetViewModel.kt
-// REASON: FIX - The unused `getCurrentMonthYearString` function has been removed
-// to resolve the "UnusedSymbol" warning.
+// REASON: FEATURE - The logic for `availableCategoriesForNewBudget` has been
+// updated. It now correctly identifies categories that do not have a budget set
+// for the current month, allowing users to override a carried-over budget by
+// creating a new one.
 // =================================================================================
 package io.pm.finlight
 
@@ -42,8 +44,6 @@ class BudgetViewModel(application: Application) : AndroidViewModel(application) 
 
         val yearMonthString = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
 
-        // --- FIX: Corrected the method name from getBudgetsWithSpendingForMonth to getBudgetsForMonthWithSpending ---
-        // This resolves the compilation error.
         budgetsForCurrentMonth = budgetRepository.getBudgetsForMonthWithSpending(yearMonthString, currentMonth, currentYear)
             .stateIn(
                 scope = viewModelScope,
@@ -61,9 +61,13 @@ class BudgetViewModel(application: Application) : AndroidViewModel(application) 
                     initialValue = 0f,
                 )
 
+        // --- UPDATED: This logic now correctly determines which categories can have a NEW budget ---
+        // It checks against budgets set specifically for the current month, allowing users
+        // to override a carried-over budget.
+        val budgetsSetInCurrentMonth = budgetRepository.getBudgetsForMonth(currentMonth, currentYear)
         availableCategoriesForNewBudget =
-            combine(allCategories, budgetsForCurrentMonth) { categories, budgets ->
-                val budgetedCategoryNames = budgets.map { it.budget.categoryName }.toSet()
+            combine(allCategories, budgetsSetInCurrentMonth) { categories, budgets ->
+                val budgetedCategoryNames = budgets.map { it.categoryName }.toSet()
                 categories.filter { category -> category.name !in budgetedCategoryNames }
             }
 

@@ -25,7 +25,6 @@ class MonthlySummaryWorker(
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d("MonthlySummaryWorker", "Worker starting...")
                 val transactionDao = AppDatabase.getInstance(context).transactionDao()
 
                 // --- Date range for LAST MONTH ---
@@ -53,7 +52,6 @@ class MonthlySummaryWorker(
                 NotificationHelper.showMonthlySummaryNotification(context, lastMonthCalendar, lastMonthExpenses, percentageChange, topCategories)
 
                 ReminderManager.scheduleMonthlySummary(context)
-                Log.d("MonthlySummaryWorker", "Worker finished and rescheduled.")
                 Result.success()
             } catch (e: Exception) {
                 Log.e("MonthlySummaryWorker", "Worker failed", e)

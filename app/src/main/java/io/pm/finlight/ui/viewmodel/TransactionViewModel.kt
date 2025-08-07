@@ -1,11 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FIX - The `reparseTransactionFromSms` function has been corrected to
-// fetch and provide the existing merchant mappings to the SmsParser. This
-// resolves a bug where re-parsing would fail because it lacked the necessary
-// context, making the "Fix Parser" feature fully operational.
-// FIX - Re-added the missing `updateTransactionExclusion` function, which was
-// causing an "Unresolved reference" compilation error in TransactionDetailScreen.
+// REASON: REFACTOR - The retrospective update logic has been deferred. Instead of
+// prompting the user immediately after an edit, the ViewModel now caches the
+// transaction's initial state. A new `onAttemptToLeaveScreen` function is called
+// when the user navigates back, which compares the initial and final states. If
+// changes are found and similar transactions exist, only then is the prompt shown.
+// This reduces user friction and allows for a single, consolidated prompt if both
+// the description and category are changed.
 // =================================================================================
 package io.pm.finlight
 
@@ -17,12 +18,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.ShareImageGenerator
 import io.pm.finlight.utils.SmsParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,7 +53,7 @@ data class RetroUpdateSheetState(
     val isLoading: Boolean = true
 )
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class TransactionViewModel(application: Application) : AndroidViewModel(application) {
     private val transactionRepository: TransactionRepository
     val accountRepository: AccountRepository
@@ -67,6 +70,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private val db = AppDatabase.getInstance(application)
     private var areTagsLoadedForCurrentTxn = false
     private var currentTxnIdForTags: Int? = null
+
+    // --- NEW: Caches the initial state of the transaction for comparison on exit ---
+    private var initialTransactionStateForRetroUpdate: Transaction? = null
 
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
     val selectedMonth: StateFlow<Calendar> = _selectedMonth.asStateFlow()
@@ -88,6 +94,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _showShareSheet = MutableStateFlow(false)
     val showShareSheet: StateFlow<Boolean> = _showShareSheet.asStateFlow()
+
+    private val _showDeleteConfirmation = MutableStateFlow(false)
+    val showDeleteConfirmation: StateFlow<Boolean> = _showDeleteConfirmation.asStateFlow()
 
     private val _shareableFields = MutableStateFlow(
         setOf(ShareableField.Date, ShareableField.Description, ShareableField.Amount, ShareableField.Category, ShareableField.Tags)
@@ -134,6 +143,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     val travelModeSettings: StateFlow<TravelModeSettings?>
 
+    private val _merchantSearchQuery = MutableStateFlow("")
+    val merchantPredictions: StateFlow<List<MerchantPrediction>>
+
     init {
         transactionRepository = TransactionRepository(db.transactionDao())
         accountRepository = AccountRepository(db.accountDao())
@@ -145,6 +157,17 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao())
         merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
+
+        merchantPredictions = _merchantSearchQuery
+            .debounce(300)
+            .flatMapLatest { query ->
+                if (query.length > 1) {
+                    transactionRepository.searchMerchants(query)
+                } else {
+                    flowOf(emptyList())
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
         travelModeSettings = settingsRepository.getTravelModeSettings()
@@ -197,7 +220,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         )
         allCategories = categoryRepository.allCategories
         allTags = tagRepository.allTags.onEach {
-            Log.d(TAG, "allTags flow collected new data. Count: ${it.size}")
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -244,6 +266,63 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun loadTransactionForDetailScreen(transactionId: Int) {
+        viewModelScope.launch {
+            initialTransactionStateForRetroUpdate = transactionRepository.getTransactionById(transactionId).first()
+            initialTransactionStateForRetroUpdate?.let {
+                loadTagsForTransaction(it.id)
+                loadImagesForTransaction(it.id)
+                loadOriginalSms(it.sourceSmsId)
+                loadVisitCount(it.originalDescription, it.description)
+            }
+        }
+    }
+
+    fun onAttemptToLeaveScreen(onNavigationAllowed: () -> Unit) {
+        viewModelScope.launch {
+            val initial = initialTransactionStateForRetroUpdate ?: run {
+                onNavigationAllowed()
+                return@launch
+            }
+            val current = transactionRepository.getTransactionById(initial.id).first() ?: run {
+                onNavigationAllowed()
+                return@launch
+            }
+
+            val descriptionChanged = initial.description != current.description
+            val categoryChanged = initial.categoryId != current.categoryId
+
+            if (!descriptionChanged && !categoryChanged) {
+                onNavigationAllowed()
+                return@launch
+            }
+
+            val originalDescriptionForSearch = initial.originalDescription ?: initial.description
+            val similar = transactionRepository.findSimilarTransactions(originalDescriptionForSearch, initial.id)
+
+            if (similar.isNotEmpty()) {
+                _retroUpdateSheetState.value = RetroUpdateSheetState(
+                    originalDescription = originalDescriptionForSearch,
+                    newDescription = if (descriptionChanged) current.description else null,
+                    newCategoryId = if (categoryChanged) current.categoryId else null,
+                    similarTransactions = similar,
+                    selectedIds = similar.map { it.id }.toSet(),
+                    isLoading = false
+                )
+            } else {
+                onNavigationAllowed()
+            }
+        }
+    }
+
+    fun onMerchantSearchQueryChanged(query: String) {
+        _merchantSearchQuery.value = query
+    }
+
+    fun clearMerchantSearch() {
+        _merchantSearchQuery.value = ""
+    }
+
     fun enterSelectionMode(initialTransactionId: Int) {
         _isSelectionModeActive.value = true
         _selectedTransactionIds.value = setOf(initialTransactionId)
@@ -262,6 +341,25 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     fun clearSelectionMode() {
         _isSelectionModeActive.value = false
         _selectedTransactionIds.value = emptySet()
+    }
+
+    fun onDeleteSelectionClick() {
+        _showDeleteConfirmation.value = true
+    }
+
+    fun onConfirmDeleteSelection() {
+        viewModelScope.launch {
+            val idsToDelete = _selectedTransactionIds.value.toList()
+            if (idsToDelete.isNotEmpty()) {
+                transactionRepository.deleteByIds(idsToDelete)
+            }
+            _showDeleteConfirmation.value = false
+            clearSelectionMode()
+        }
+    }
+
+    fun onCancelDeleteSelection() {
+        _showDeleteConfirmation.value = false
     }
 
     fun onShareClick() {
@@ -368,7 +466,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             }
     }
 
-    fun loadVisitCount(originalDescription: String?, fallbackDescription: String) {
+    private fun loadVisitCount(originalDescription: String?, fallbackDescription: String) {
         val descriptionToQuery = originalDescription ?: fallbackDescription
         viewModelScope.launch {
             transactionRepository.getTransactionCountForMerchant(descriptionToQuery).collect { count ->
@@ -467,7 +565,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     }
 
 
-    fun loadOriginalSms(sourceSmsId: Long?) {
+    private fun loadOriginalSms(sourceSmsId: Long?) {
         if (sourceSmsId == null) {
             _originalSmsText.value = null
             return
@@ -475,7 +573,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             val sms = getOriginalSmsMessage(sourceSmsId)
             _originalSmsText.value = sms?.body
-            Log.d(TAG, "Loaded SMS for ID $sourceSmsId. Found: ${sms != null}")
         }
     }
 
@@ -492,66 +589,51 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     fun reparseTransactionFromSms(transactionId: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             val logTag = "ReparseLogic"
-            Log.d(logTag, "--- Starting reparse for transactionId: $transactionId ---")
 
             val transaction = transactionRepository.getTransactionById(transactionId).first()
             if (transaction?.sourceSmsId == null) {
                 Log.w(logTag, "FAILURE: Transaction or sourceSmsId is null.")
                 return@launch
             }
-            Log.d(logTag, "Found transaction: $transaction")
 
             val smsMessage = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
             if (smsMessage == null) {
                 Log.w(logTag, "FAILURE: Could not find original SMS for sourceSmsId: ${transaction.sourceSmsId}")
                 return@launch
             }
-            Log.d(logTag, "Found original SMS: ${smsMessage.body}")
 
-            // --- FIX: Fetch existing mappings before parsing ---
             val existingMappings = merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
 
             val potentialTxn = SmsParser.parse(
                 smsMessage,
-                existingMappings, // Pass the correct mappings
+                existingMappings,
                 db.customSmsRuleDao(),
                 db.merchantRenameRuleDao(),
                 db.ignoreRuleDao(),
                 db.merchantCategoryMappingDao()
             )
-            Log.d(logTag, "SmsParser result: $potentialTxn")
 
             if (potentialTxn != null) {
                 if (potentialTxn.merchantName != null && potentialTxn.merchantName != transaction.description) {
-                    Log.d(logTag, "Updating description for txnId $transactionId from '${transaction.description}' to '${potentialTxn.merchantName}'")
                     transactionRepository.updateDescription(transactionId, potentialTxn.merchantName)
                 }
 
                 potentialTxn.potentialAccount?.let { parsedAccount ->
-                    Log.d(logTag, "Parsed account found: Name='${parsedAccount.formattedName}', Type='${parsedAccount.accountType}'")
                     val currentAccount = accountRepository.getAccountById(transaction.accountId).first()
-                    Log.d(logTag, "Current account in DB: Name='${currentAccount?.name}'")
 
                     if (currentAccount?.name?.equals(parsedAccount.formattedName, ignoreCase = true) == false) {
-                        Log.d(logTag, "Account names differ. Proceeding with find-or-create.")
 
                         var account = db.accountDao().findByName(parsedAccount.formattedName)
-                        Log.d(logTag, "Attempting to find existing account by name '${parsedAccount.formattedName}'. Found: ${account != null}")
 
                         if (account == null) {
-                            Log.d(logTag, "Account not found. Creating new one.")
                             val newAccount = Account(name = parsedAccount.formattedName, type = parsedAccount.accountType)
                             val newId = accountRepository.insert(newAccount)
-                            Log.d(logTag, "Inserted new account, got ID: $newId")
                             account = db.accountDao().getAccountById(newId.toInt()).first()
-                            Log.d(logTag, "Re-fetched new account from DB: $account")
                         }
 
                         if (account != null) {
-                            Log.d(logTag, "SUCCESS: Updating transaction $transactionId to use accountId ${account.id} ('${account.name}')")
                             transactionRepository.updateAccountId(transactionId, account.id)
                         } else {
-                            Log.e(logTag, "FAILURE: Failed to find or create the new account '${parsedAccount.formattedName}'.")
                         }
                     } else {
                         Log.d(logTag, "Account names are the same. No update needed.")
@@ -652,7 +734,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun loadImagesForTransaction(transactionId: Int) {
+    private fun loadImagesForTransaction(transactionId: Int) {
         viewModelScope.launch {
             transactionRepository.getImagesForTransaction(transactionId).collect {
                 _transactionImages.value = it
@@ -682,22 +764,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     fun updateTransactionDescription(id: Int, newDescription: String) = viewModelScope.launch(Dispatchers.IO) {
         if (newDescription.isNotBlank()) {
-            val transaction = transactionRepository.getTransactionById(id).first() ?: return@launch
-            val originalDescription = transaction.originalDescription ?: transaction.description
-
             transactionRepository.updateDescription(id, newDescription)
-
-            val similar = transactionRepository.findSimilarTransactions(originalDescription, id)
-            if (similar.isNotEmpty()) {
-                _retroUpdateSheetState.value = RetroUpdateSheetState(
-                    originalDescription = originalDescription,
-                    newDescription = newDescription,
-                    newCategoryId = null,
-                    similarTransactions = similar,
-                    selectedIds = similar.map { it.id }.toSet(),
-                    isLoading = false
-                )
-            }
         }
     }
 
@@ -715,8 +782,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     fun updateTransactionCategory(id: Int, categoryId: Int?) = viewModelScope.launch(Dispatchers.IO) {
         val transaction = transactionRepository.getTransactionById(id).first() ?: return@launch
-        val originalDescription = transaction.originalDescription ?: transaction.description
-
         transactionRepository.updateCategoryId(id, categoryId)
 
         if (categoryId != null && transaction.sourceSmsId != null && !transaction.originalDescription.isNullOrBlank()) {
@@ -725,19 +790,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 categoryId = categoryId
             )
             merchantCategoryMappingRepository.insert(mapping)
-            Log.d(TAG, "Learned category mapping for '${transaction.originalDescription}' -> categoryId $categoryId")
-        }
-
-        val similar = transactionRepository.findSimilarTransactions(originalDescription, id)
-        if (similar.isNotEmpty()) {
-            _retroUpdateSheetState.value = RetroUpdateSheetState(
-                originalDescription = originalDescription,
-                newDescription = null,
-                newCategoryId = categoryId,
-                similarTransactions = similar,
-                selectedIds = similar.map { it.id }.toSet(),
-                isLoading = false
-            )
         }
     }
 
@@ -755,12 +807,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun updateTagsForTransaction(transactionId: Int) = viewModelScope.launch {
-        Log.d(TAG, "updateTagsForTransaction: Saving tags for txn ID $transactionId. Tags: ${_selectedTags.value.map { it.name }}")
         transactionRepository.updateTagsForTransaction(transactionId, _selectedTags.value)
     }
 
     fun onTagSelected(tag: Tag) {
-        Log.d(TAG, "onTagSelected: Toggled tag '${tag.name}' (ID: ${tag.id})")
         _selectedTags.update { if (tag in it) it - tag else it + tag }
     }
 
@@ -781,7 +831,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun loadTagsForTransaction(transactionId: Int) {
+    private fun loadTagsForTransaction(transactionId: Int) {
         if (currentTxnIdForTags == transactionId && areTagsLoadedForCurrentTxn) {
             return
         }
@@ -867,12 +917,52 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                         categoryId = categoryId
                     )
                     merchantCategoryMappingRepository.insert(mapping)
-                    Log.d(TAG, "Saved learned category mapping: ${potentialTxn.merchantName} -> Category ID $categoryId")
                 }
 
                 true
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to approve SMS transaction", e)
+                false
+            }
+        }
+    }
+
+    suspend fun autoSaveSmsTransaction(potentialTxn: PotentialTransaction): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
+                val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
+
+                var account = db.accountDao().findByName(accountName)
+                if (account == null) {
+                    val newAccount = Account(name = accountName, type = accountType)
+                    accountRepository.insert(newAccount)
+                    account = db.accountDao().findByName(accountName)
+                }
+
+                if (account == null) {
+                    Log.e(TAG, "Auto-save failed: Could not find or create account '$accountName'")
+                    return@withContext false
+                }
+
+                val transactionToSave = Transaction(
+                    description = potentialTxn.merchantName ?: "Unknown Merchant",
+                    originalDescription = potentialTxn.merchantName,
+                    categoryId = potentialTxn.categoryId,
+                    amount = potentialTxn.amount,
+                    date = potentialTxn.sourceSmsId,
+                    accountId = account.id,
+                    notes = null,
+                    transactionType = potentialTxn.transactionType,
+                    sourceSmsId = potentialTxn.sourceSmsId,
+                    sourceSmsHash = potentialTxn.sourceSmsHash,
+                    source = "Auto-Captured"
+                )
+
+                transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to auto-save SMS transaction", e)
                 false
             }
         }

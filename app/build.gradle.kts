@@ -1,11 +1,15 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: FIX - Re-enabled the generation of the BuildConfig file by adding
-// `buildConfig = true` to the `buildFeatures` block. This resolves the
-// "Unresolved reference: BuildConfig" error that was causing the build to fail.
+// REASON: FIX - Added a resolutionStrategy to force a single, Android-compatible
+// version of the Guava library across all configurations. This resolves the
+// "Duplicate class" build error caused by a version conflict between the
+// Google Drive API and WorkManager dependencies.
 // =================================================================================
 import java.io.FileInputStream
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Properties
+import java.util.TimeZone
 
 // It's good practice to define versions in one place.
 val roomVersion = "2.6.1"
@@ -22,10 +26,10 @@ val robolectricVersion = "4.13"
 val coroutinesTestVersion = "1.8.1"
 val gsonVersion = "2.10.1"
 val coilVersion = "2.6.0"
-// --- NEW: Add Image Cropper library version ---
 val imageCropperVersion = "4.5.0"
-// --- FIX: Update mockito-inline to a version compatible with Java 21 ---
 val mockitoVersion = "5.11.0"
+val sqlcipherVersion = "4.5.4"
+val googleApiVersion = "1.23.0"
 
 
 // Read properties from local.properties
@@ -33,6 +37,22 @@ val keystorePropertiesFile = rootProject.file("local.properties")
 val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+// Read version properties
+val versionPropertiesFile = rootProject.file("version.properties")
+val versionProperties = Properties()
+if (versionPropertiesFile.exists()) {
+    versionProperties.load(FileInputStream(versionPropertiesFile))
+} else {
+    throw GradleException("Could not find version.properties!")
+}
+
+// Function to generate versionCode from date
+fun generateVersionCode(): Int {
+    val sdf = SimpleDateFormat("yyMMddHH")
+    sdf.timeZone = TimeZone.getTimeZone("UTC")
+    return sdf.format(Date()).toInt()
 }
 
 plugins {
@@ -61,8 +81,8 @@ android {
         applicationId = "io.pm.finlight"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = generateVersionCode()
+        versionName = "${versionProperties["VERSION_MAJOR"]}.${versionProperties["VERSION_MINOR"]}.${versionProperties["VERSION_PATCH"]}"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -81,9 +101,6 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
         }
-        // --- NEW: Explicitly define the debug build type ---
-        // This ensures that the App Inspector can connect to your app to view
-        // databases, background workers, and other debug information.
         debug {
             isDebuggable = true
         }
@@ -97,7 +114,6 @@ android {
     }
     buildFeatures {
         compose = true
-        // --- FIX: Enable BuildConfig generation ---
         buildConfig = true
     }
     packaging {
@@ -109,17 +125,20 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
-            // --- FIX: Return default values for Android framework methods in unit tests ---
             isReturnDefaultValues = true
         }
     }
 }
 
+// --- UPDATED: Added a resolution strategy to force a single version of Guava ---
 configurations.all {
     resolutionStrategy {
         force("androidx.core:core-ktx:$coreKtxVersion")
         force("androidx.core:core:$coreKtxVersion")
         force("androidx.tracing:tracing-ktx:$tracingVersion")
+        // This forces Gradle to use the Android-compatible version of Guava for all dependencies,
+        // resolving the conflict between WorkManager and the Google Drive API.
+        force("com.google.guava:guava:32.0.1-android")
     }
 }
 
@@ -157,15 +176,26 @@ dependencies {
 
     implementation("com.vanniktech:android-image-cropper:$imageCropperVersion")
 
+    implementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
+
+    implementation("com.google.api-client:google-api-client-android:$googleApiVersion") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+    implementation("com.google.apis:google-api-services-drive:v3-rev136-1.25.0") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+
+
     // Local unit tests
     testImplementation("junit:junit:4.13.2")
-    // --- FIX: Switched to mockito-core and updated version ---
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
     testImplementation("androidx.test:core-ktx:$androidxTestVersion")
     testImplementation("androidx.test.ext:junit:$testExtJunitVersion")
     testImplementation("org.robolectric:robolectric:$robolectricVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
+    testImplementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
+
 
     // Instrumented UI tests
     androidTestImplementation("androidx.tracing:tracing-ktx:$tracingVersion")
@@ -183,5 +213,6 @@ dependencies {
 
     implementation("androidx.biometric:biometric:1.2.0-alpha05")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    // --- REVERTED: The exclude rule is no longer needed due to the resolutionStrategy ---
     implementation("androidx.work:work-runtime-ktx:$workVersion")
 }
