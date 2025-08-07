@@ -1,9 +1,9 @@
 name: Android CI
 
-# This workflow runs on any pull request that targets the 'develop' branch
+# This workflow runs on any pull request that targets the 'develop' and 'main' branches
 on:
   pull_request:
-    branches: [ "develop" ]
+    branches: [ "develop", "main" ]
 
 jobs:
   build-and-test:
