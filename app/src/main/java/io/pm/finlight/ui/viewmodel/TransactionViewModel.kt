@@ -1,12 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: REFACTOR - The retrospective update logic has been deferred. Instead of
-// prompting the user immediately after an edit, the ViewModel now caches the
-// transaction's initial state. A new `onAttemptToLeaveScreen` function is called
-// when the user navigates back, which compares the initial and final states. If
-// changes are found and similar transactions exist, only then is the prompt shown.
-// This reduces user friction and allows for a single, consolidated prompt if both
-// the description and category are changed.
+// REASON: FEATURE - Added the `autoSaveSmsTransaction` function. This provides a
+// streamlined method for other parts of the app, like the SettingsViewModel, to
+// silently save a transaction parsed from an SMS without user interaction. This
+// is a key component of the retrospective parsing feature.
 // =================================================================================
 package io.pm.finlight
 
@@ -71,7 +68,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private var areTagsLoadedForCurrentTxn = false
     private var currentTxnIdForTags: Int? = null
 
-    // --- NEW: Caches the initial state of the transaction for comparison on exit ---
     private var initialTransactionStateForRetroUpdate: Transaction? = null
 
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
@@ -96,7 +92,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     val showShareSheet: StateFlow<Boolean> = _showShareSheet.asStateFlow()
 
     private val _showDeleteConfirmation = MutableStateFlow(false)
-    val showDeleteConfirmation: StateFlow<Boolean> = _showDeleteConfirmation.asStateFlow()
+    _showDeleteConfirmation.asStateFlow()
 
     private val _shareableFields = MutableStateFlow(
         setOf(ShareableField.Date, ShareableField.Description, ShareableField.Amount, ShareableField.Category, ShareableField.Tags)
@@ -266,7 +262,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // --- NEW: Caches the initial transaction state and loads all related data for the detail screen ---
     fun loadTransactionForDetailScreen(transactionId: Int) {
         viewModelScope.launch {
             initialTransactionStateForRetroUpdate = transactionRepository.getTransactionById(transactionId).first()
@@ -279,7 +274,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // --- NEW: Checks for changes on exit and triggers the retro update prompt if needed ---
     fun onAttemptToLeaveScreen(onNavigationAllowed: () -> Unit) {
         viewModelScope.launch {
             val initial = initialTransactionStateForRetroUpdate ?: run {
@@ -764,7 +758,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // --- REFACTORED: No longer triggers the retro update sheet directly ---
     fun updateTransactionDescription(id: Int, newDescription: String) = viewModelScope.launch(Dispatchers.IO) {
         if (newDescription.isNotBlank()) {
             transactionRepository.updateDescription(id, newDescription)
@@ -783,7 +776,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         transactionRepository.updateNotes(id, notes.takeIf { it.isNotBlank() })
     }
 
-    // --- REFACTORED: No longer triggers the retro update sheet directly ---
     fun updateTransactionCategory(id: Int, categoryId: Int?) = viewModelScope.launch(Dispatchers.IO) {
         val transaction = transactionRepository.getTransactionById(id).first() ?: return@launch
         transactionRepository.updateCategoryId(id, categoryId)
@@ -926,6 +918,48 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 true
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to approve SMS transaction", e)
+                false
+            }
+        }
+    }
+
+    // --- NEW: A streamlined function for auto-saving transactions from background scans ---
+    suspend fun autoSaveSmsTransaction(potentialTxn: PotentialTransaction): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
+                val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
+
+                var account = db.accountDao().findByName(accountName)
+                if (account == null) {
+                    val newAccount = Account(name = accountName, type = accountType)
+                    accountRepository.insert(newAccount)
+                    account = db.accountDao().findByName(accountName)
+                }
+
+                if (account == null) {
+                    Log.e(TAG, "Auto-save failed: Could not find or create account '$accountName'")
+                    return@withContext false
+                }
+
+                val transactionToSave = Transaction(
+                    description = potentialTxn.merchantName ?: "Unknown Merchant",
+                    originalDescription = potentialTxn.merchantName,
+                    categoryId = potentialTxn.categoryId,
+                    amount = potentialTxn.amount,
+                    date = potentialTxn.sourceSmsId, // Use the SMS timestamp for the transaction date
+                    accountId = account.id,
+                    notes = null,
+                    transactionType = potentialTxn.transactionType,
+                    sourceSmsId = potentialTxn.sourceSmsId,
+                    sourceSmsHash = potentialTxn.sourceSmsHash,
+                    source = "Auto-Captured"
+                )
+
+                transactionRepository.insertTransactionWithTags(transactionToSave, emptySet()) // No tags for auto-saved
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to auto-save SMS transaction", e)
                 false
             }
         }
