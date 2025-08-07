@@ -1,8 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: FEATURE - The ViewModel now exposes a StateFlow for the new
-// auto-capture notification setting and provides a function to update its value,
-// connecting the UI toggle to the repository.
+// REASON: FEATURE - Added the `rescanSmsWithNewRule` function. This function is
+// triggered after a user creates a new parsing rule. It scans recent SMS
+// messages and, for any that now parse successfully, it calls the new
+// `autoSaveSmsTransaction` function in the TransactionViewModel to silently
+// import them, retrospectively fixing similar unparsed transactions.
 // =================================================================================
 package io.pm.finlight
 
@@ -34,7 +36,11 @@ sealed class ScanResult {
 }
 
 
-class SettingsViewModel(application: Application) : AndroidViewModel(application) {
+class SettingsViewModel(
+    application: Application,
+    // --- NEW: Add TransactionViewModel as a dependency ---
+    private val transactionViewModel: TransactionViewModel
+) : AndroidViewModel(application) {
     private val settingsRepository = SettingsRepository(application)
     private val db = AppDatabase.getInstance(application)
     private val transactionRepository = TransactionRepository(db.transactionDao())
@@ -86,7 +92,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             initialValue = true,
         )
 
-    // --- NEW: StateFlow for auto-capture notification setting ---
     val autoCaptureNotificationEnabled: StateFlow<Boolean> =
         settingsRepository.getAutoCaptureNotificationEnabled().stateIn(
             scope = viewModelScope,
@@ -160,7 +165,62 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 )
     }
 
-    // --- NEW: Function to update auto-capture notification setting ---
+    // --- NEW: Scans recent SMS and auto-saves any newly parsed transactions ---
+    fun rescanSmsWithNewRule(onComplete: (Int) -> Unit) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            onComplete(0)
+            return
+        }
+
+        viewModelScope.launch {
+            _isScanning.value = true
+            var newTransactionsFound = 0
+            try {
+                // Scan last 30 days
+                val startDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -30) }.timeInMillis
+                val rawMessages = withContext(Dispatchers.IO) {
+                    SmsRepository(context).fetchAllSms(startDate)
+                }
+
+                val existingMappings = withContext(Dispatchers.IO) {
+                    merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
+                }
+                val existingSmsHashes = withContext(Dispatchers.IO) {
+                    transactionRepository.getAllSmsHashes().first().toSet()
+                }
+
+                val parsedList = withContext(Dispatchers.Default) {
+                    rawMessages.mapNotNull { sms ->
+                        SmsParser.parse(
+                            sms,
+                            existingMappings,
+                            db.customSmsRuleDao(),
+                            db.merchantRenameRuleDao(),
+                            db.ignoreRuleDao(),
+                            db.merchantCategoryMappingDao()
+                        )
+                    }
+                }
+
+                val newPotentialTransactions = parsedList.filter { potential ->
+                    !existingSmsHashes.contains(potential.sourceSmsHash)
+                }
+
+                for (potentialTxn in newPotentialTransactions) {
+                    val success = transactionViewModel.autoSaveSmsTransaction(potentialTxn)
+                    if (success) {
+                        newTransactionsFound++
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Error during retro SMS scan", e)
+            } finally {
+                _isScanning.value = false
+                onComplete(newTransactionsFound)
+            }
+        }
+    }
+
     fun setAutoCaptureNotificationEnabled(enabled: Boolean) {
         settingsRepository.saveAutoCaptureNotificationEnabled(enabled)
     }
