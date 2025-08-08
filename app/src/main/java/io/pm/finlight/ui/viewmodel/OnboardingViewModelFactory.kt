@@ -1,5 +1,9 @@
 // FILE: app/src/main/java/io/pm/finlight/OnboardingViewModelFactory.kt
-
+// =================================================================================
+// REASON: FIX - The factory now passes the application context to the
+// OnboardingViewModel, which is required for the new, more reliable currency
+// detection logic that uses the TelephonyManager.
+// =================================================================================
 package io.pm.finlight
 
 import android.app.Application
@@ -14,13 +18,12 @@ class OnboardingViewModelFactory(private val application: Application) : ViewMod
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(OnboardingViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
-            // --- UPDATED: AccountRepository is no longer needed for onboarding ---
             val categoryRepository = CategoryRepository(db.categoryDao())
             val settingsRepository = SettingsRepository(application)
 
             @Suppress("UNCHECKED_CAST")
-            // --- UPDATED: Pass only the required dependencies ---
-            return OnboardingViewModel(categoryRepository, settingsRepository) as T
+            // --- UPDATED: Pass the application context to the ViewModel ---
+            return OnboardingViewModel(application, categoryRepository, settingsRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
