@@ -57,6 +57,22 @@ class SmsParserTest {
     }
 
     @Test
+    fun `test parses HDFC UPI sent message`() = runBlocking {
+        setupTest()
+        val smsBody = "Sent Rs.11.00\nFrom HDFC Bank A/C *1243\nTo Raju\nOn 07/08/25\nRef 558523453508\nNot You?\nCall 18002586161/SMS BLOCK UPI to 7308080808"
+        val mockSms = SmsMessage(id = 18L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(11.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("Raju", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank - *1243", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
     fun `test parses ICICI debit with ACH and Avl Bal`() = runBlocking {
         setupTest()
         val smsBody = "ICICI Bank Acc XX244 debited Rs. 8,700.00 on 02-Aug-25 InfoACH*ZERODHA B.Avl Bal Rs. 3,209.31.To dispute call 18002662 or SMS BLOCK 646 to 9215676766"
