@@ -1,15 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/SmsParserTest.kt
-// REASON: FEATURE - Added new unit tests to verify the currency detection logic.
-// The tests now cover scenarios where an SMS contains a foreign currency code
-// (MYR), the home currency code (INR), or the home currency symbol (Rs),
-// ensuring the parser correctly extracts both the amount and the currency.
-// FIX - Added a new test case for the specific ICICI debit message format that
-// was failing, ensuring the improved regex correctly handles it.
-// FIX - Added a new test case to ensure the parser prioritizes amounts with
-// currency symbols over other numbers in an SMS, like account numbers.
-// FIX - Added a new test case for the `InfoACH*...Avl Bal` format to verify
-// the new, more specific merchant parsing regex.
+// REASON: This file is provided for reference. No changes were made here; the
+// fixes in SmsParser.kt are what allow these tests to pass.
 // =================================================================================
 package io.pm.finlight
 

@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/SmsParser.kt
-// REASON: FEATURE - Final enhancements from large-scale analysis. Added keywords
-// to correctly parse transaction reversals and Sodexo card loading as income.
-// Added new account patterns for HDFC Credit Card formats.
+// REASON: FIX - Corrected the expense keyword regex. Removed the overly broad
+// keyword "On" which was causing income messages to be misclassified as expenses.
+// Re-added the "purchase of" keyword to correctly capture those transactions.
+// This resolves multiple unit test failures.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -25,13 +26,11 @@ data class PotentialAccount(
 
 object SmsParser {
     private val AMOUNT_WITH_CURRENCY_REGEX = "(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- UPDATED: Add "On" to handle "On HDFC Bank CREDIT Card" format ---
-    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|On)\\b".toRegex(RegexOption.IGNORE_CASE)
-    // --- UPDATED: Add keywords for reversals, failures, and card loading ---
+    // --- UPDATED: Removed "On" and re-added "purchase of" ---
+    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val ACCOUNT_PATTERNS =
         listOf(
-            // --- NEW: Added patterns for HDFC Credit Card and Sodexo loading ---
             "On (HDFC Bank) (CREDIT Card) xx(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (Sodexo Card) has been successfully loaded".toRegex(RegexOption.IGNORE_CASE),
             "spent on (IndusInd Card) XX(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
