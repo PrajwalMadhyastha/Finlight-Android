@@ -1,8 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX - Corrected a runtime crash by providing the custom
-// SettingsViewModelFactory when instantiating the SettingsViewModel. This ensures
-// that the ViewModel is created with its required TransactionViewModel dependency.
+// REASON: FEATURE - Added a new route for the `account_mapping_screen` to the
+// NavHost. This enables navigation to the new pre-processing step for SMS imports.
 // =================================================================================
 package io.pm.finlight
 
@@ -222,7 +221,6 @@ fun MainAppScreen() {
 
     val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModelFactory(context))
     val transactionViewModel: TransactionViewModel = viewModel()
-    // --- UPDATED: Use the custom factory to create the SettingsViewModel ---
     val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context, transactionViewModel))
     val accountViewModel: AccountViewModel = viewModel()
     val categoryViewModel: CategoryViewModel = viewModel()
@@ -271,7 +269,8 @@ fun MainAppScreen() {
         "split_transaction",
         "category_detail",
         "merchant_detail",
-        "customize_dashboard"
+        "customize_dashboard",
+        "account_mapping_screen"
     )
 
     val currentTitle = if (showBottomBar) {
@@ -517,6 +516,13 @@ fun AppNavHost(
         startDestination = "splash_screen",
         modifier = modifier
     ) {
+        composable("account_mapping_screen") {
+            AccountMappingScreen(
+                navController = navController,
+                settingsViewModel = settingsViewModel,
+                accountViewModel = accountViewModel
+            )
+        }
         composable(
             "customize_dashboard",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
