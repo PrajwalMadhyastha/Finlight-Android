@@ -1,3 +1,9 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/ui/NavItems.kt
+// REASON: FEATURE - Added a new screen title mapping for the
+// `account_mapping_screen` route. This ensures the top app bar displays the
+// correct title when the user is on the new account mapping screen.
+// =================================================================================
 package io.pm.finlight.ui
 
 import androidx.compose.material.icons.Icons
@@ -53,6 +59,6 @@ val screenTitles = mapOf(
     "add_edit_goal/{goalId}" to "Edit Savings Goal",
     "category_detail/{categoryName}/{month}/{year}" to "Category Details",
     "merchant_detail/{merchantName}/{month}/{year}" to "Merchant Details",
-    // --- NEW: Title for the new customization screen ---
-    "customize_dashboard" to "Customize Dashboard"
+    "customize_dashboard" to "Customize Dashboard",
+    "account_mapping_screen" to "Map New Accounts"
 )
