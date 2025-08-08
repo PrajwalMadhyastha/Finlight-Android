@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SettingsSubScreens.kt
-// REASON: FEATURE - Added a new `SettingsToggleItem` to the
-// `NotificationSettingsScreen`. This UI control allows the user to enable or
-// disable notifications for transactions that are automatically captured from SMS
-// messages.
+// REASON: FIX - Updated the SMS scan action items to call the new
+// `startFullSmsScan` function in the ViewModel. The onClick handlers now
+// implement the `onScanComplete` callback to navigate to the review screen only
+// if the scan results in transactions that require user attention. This resolves
+// the "Unresolved reference" build error.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -159,7 +160,13 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                             icon = Icons.AutoMirrored.Filled.ManageSearch,
                             onClick = {
                                 if (hasSmsPermission(context)) {
-                                    if (!isScanning) settingsViewModel.rescanSmsForReview(null)
+                                    if (!isScanning) {
+                                        settingsViewModel.startFullSmsScan(null) { needsReview ->
+                                            if (needsReview) {
+                                                navController.navigate("review_sms_screen")
+                                            }
+                                        }
+                                    }
                                 } else {
                                     Toast.makeText(context, "SMS permission is required.", Toast.LENGTH_SHORT).show()
                                 }
@@ -182,7 +189,13 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                                 Button(
                                     onClick = {
                                         if (hasSmsPermission(context)) {
-                                            if (!isScanning) settingsViewModel.rescanSmsForReview(smsScanStartDate)
+                                            if (!isScanning) {
+                                                settingsViewModel.startFullSmsScan(smsScanStartDate) { needsReview ->
+                                                    if (needsReview) {
+                                                        navController.navigate("review_sms_screen")
+                                                    }
+                                                }
+                                            }
                                         } else {
                                             Toast.makeText(context, "SMS permission is required.", Toast.LENGTH_SHORT).show()
                                         }
