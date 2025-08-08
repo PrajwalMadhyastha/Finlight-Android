@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/SettingsViewModel.kt
-// REASON: FEATURE - Added the `applyLearningAndAutoImport` function. After a
-// user categorizes a transaction, this function re-evaluates the remaining
-// transactions in the review queue. It auto-imports any that now have a category
-// based on the user's recent action, streamlining the bulk import process.
+// REASON: FEATURE - Reworked the SMS scanning logic to be more aggressive and
+// user-friendly. The scan now auto-imports any transaction where an amount and
+// type can be parsed, defaulting to "Unknown Account" or "Unknown Merchant" if
+// those details cannot be found. The review screen is no longer used for this
+// flow, drastically reducing user friction on bulk imports.
 // =================================================================================
 package io.pm.finlight
 
@@ -269,17 +270,15 @@ class SettingsViewModel(
         settingsRepository.saveSelectedTheme(theme)
     }
 
-    fun startFullSmsScan(startDate: Long?, onScanComplete: (needsReview: Boolean) -> Unit) {
+    fun runSmsScan(startDate: Long?) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(context, "SMS Read permission is required for this feature.", Toast.LENGTH_LONG).show()
-            onScanComplete(false)
             return
         }
 
         viewModelScope.launch {
             _isScanning.value = true
-            var autoImportedCount = 0
-            var needsReviewCount = 0
+            var importedCount = 0
             try {
                 val rawMessages = withContext(Dispatchers.IO) {
                     SmsRepository(context).fetchAllSms(startDate)
@@ -312,17 +311,14 @@ class SettingsViewModel(
                     !existingSmsHashes.contains(potential.sourceSmsHash)
                 }
 
-                val (autoImportList, reviewList) = newPotentialTransactions.partition { it.categoryId != null }
-
-                for (potentialTxn in autoImportList) {
+                for (potentialTxn in newPotentialTransactions) {
                     val success = transactionViewModel.autoSaveSmsTransaction(potentialTxn)
                     if (success) {
-                        autoImportedCount++
+                        importedCount++
                     }
                 }
 
-                _potentialTransactions.value = reviewList
-                needsReviewCount = reviewList.size
+                _potentialTransactions.value = emptyList()
 
             } catch (e: Exception) {
                 Log.e("SettingsViewModel", "Error during SMS scan for review", e)
@@ -332,15 +328,13 @@ class SettingsViewModel(
             } finally {
                 _isScanning.value = false
                 withContext(Dispatchers.Main) {
-                    val message = when {
-                        autoImportedCount > 0 && needsReviewCount > 0 -> "Auto-imported $autoImportedCount transactions. $needsReviewCount need review."
-                        autoImportedCount > 0 -> "Successfully auto-imported $autoImportedCount transactions."
-                        needsReviewCount > 0 -> "$needsReviewCount transactions need your review."
-                        else -> "No new transactions found."
+                    val message = if (importedCount > 0) {
+                        "Successfully imported $importedCount new transactions."
+                    } else {
+                        "No new transactions found."
                     }
                     Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                 }
-                onScanComplete(needsReviewCount > 0)
             }
         }
     }
