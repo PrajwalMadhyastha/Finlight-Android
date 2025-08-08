@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/SettingsViewModel.kt
-// REASON: FEATURE - Implemented the new "Account Mapping" pre-processing step.
-// The scan logic now identifies unique SMS senders that couldn't be mapped to an
-// existing account. It exposes this list to the UI. A new `finalizeImport`
-// function has been added to take the user's mappings and apply them before
-// saving the transactions, drastically improving import accuracy.
+// REASON: FIX - The `finalizeImport` logic has been corrected to prioritize
+// account information parsed directly from an SMS over the general, user-provided
+// sender-to-account mapping. This prevents correctly parsed transactions from
+// being incorrectly reassigned during the import finalization step.
 // =================================================================================
 package io.pm.finlight
 
@@ -308,16 +307,23 @@ class SettingsViewModel(
                 val newDbMappings = mutableListOf<MerchantMapping>()
 
                 for (txn in transactionsToProcess) {
-                    val accountId = userMappings[txn.smsSender]
-                    if (accountId != null) {
-                        val account = accountRepository.getAccountById(accountId).first()
+                    val userMappedAccountId = userMappings[txn.smsSender]
+
+                    if (txn.potentialAccount != null) {
+                        // This transaction was parsed successfully. Import it as is.
+                        val success = transactionViewModel.autoSaveSmsTransaction(txn)
+                        if (success) importedCount++
+                    } else if (userMappedAccountId != null) {
+                        // This transaction was unparsed, but the user provided a mapping.
+                        val account = accountRepository.getAccountById(userMappedAccountId).first()
                         if (account != null) {
                             val success = transactionViewModel.autoSaveSmsTransaction(
                                 txn.copy(potentialAccount = io.pm.finlight.utils.PotentialAccount(account.name, account.type))
                             )
                             if (success) importedCount++
                         }
-                    } else if (txn.potentialAccount != null) {
+                    } else {
+                        // This transaction was unparsed, and the user did not provide a mapping.
                         val success = transactionViewModel.autoSaveSmsTransaction(txn)
                         if (success) importedCount++
                     }
