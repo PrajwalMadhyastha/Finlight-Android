@@ -1,12 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: REFACTOR - The retrospective update logic has been deferred. Instead of
-// prompting the user immediately after an edit, the ViewModel now caches the
-// transaction's initial state. A new `onAttemptToLeaveScreen` function is called
-// when the user navigates back, which compares the initial and final states. If
-// changes are found and similar transactions exist, only then is the prompt shown.
-// This reduces user friction and allows for a single, consolidated prompt if both
-// the description and category are changed.
+// REASON: FIX - The `autoSaveSmsTransaction` and `approveSmsTransaction`
+// functions have been corrected to use the `date` field from the
+// PotentialTransaction object instead of the `sourceSmsId` or current system
+// time. This ensures that all imported transactions reflect their original SMS
+// timestamp, fixing the "1970" date bug.
 // =================================================================================
 package io.pm.finlight
 
@@ -71,7 +69,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private var areTagsLoadedForCurrentTxn = false
     private var currentTxnIdForTags: Int? = null
 
-    // --- NEW: Caches the initial state of the transaction for comparison on exit ---
     private var initialTransactionStateForRetroUpdate: Transaction? = null
 
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
@@ -882,7 +879,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                         originalDescription = potentialTxn.merchantName,
                         categoryId = categoryId,
                         amount = potentialTxn.amount * travelSettings.conversionRate,
-                        date = System.currentTimeMillis(),
+                        date = potentialTxn.date,
                         accountId = account.id,
                         notes = notes,
                         transactionType = potentialTxn.transactionType,
@@ -899,7 +896,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                         originalDescription = potentialTxn.merchantName,
                         categoryId = categoryId,
                         amount = potentialTxn.amount,
-                        date = System.currentTimeMillis(),
+                        date = potentialTxn.date,
                         accountId = account.id,
                         notes = notes,
                         transactionType = potentialTxn.transactionType,
@@ -950,7 +947,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     originalDescription = potentialTxn.merchantName,
                     categoryId = potentialTxn.categoryId,
                     amount = potentialTxn.amount,
-                    date = potentialTxn.sourceSmsId,
+                    date = potentialTxn.date,
                     accountId = account.id,
                     notes = null,
                     transactionType = potentialTxn.transactionType,

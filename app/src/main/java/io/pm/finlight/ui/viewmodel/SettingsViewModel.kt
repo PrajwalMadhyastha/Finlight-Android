@@ -1,10 +1,10 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: FEATURE - Added the `rescanSmsWithNewRule` function. This function is
-// triggered after a user creates a new parsing rule. It scans recent SMS
-// messages and, for any that now parse successfully, it calls the new
-// `autoSaveSmsTransaction` function in the TransactionViewModel to silently
-// import them, retrospectively fixing similar unparsed transactions.
+// FILE: ./app/src/main/java/io/pm/finlight/SettingsViewModel.kt
+// REASON: REFACTOR - The SMS import logic has been significantly improved. It now
+// separates parsed transactions into two groups: those with a successfully
+// parsed account, which are auto-imported immediately, and those without, which
+// are presented to the user in the new account mapping screen. This provides a
+// much faster and more efficient bulk import experience.
 // =================================================================================
 package io.pm.finlight
 
@@ -13,6 +13,7 @@ import android.app.Application
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,6 +23,8 @@ import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.ReminderManager
 import io.pm.finlight.utils.SmsParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,10 +36,14 @@ sealed class ScanResult {
     object Error : ScanResult()
 }
 
+data class SenderToMap(
+    val sender: String,
+    val sampleMerchant: String,
+    val transactionCount: Int
+)
 
 class SettingsViewModel(
     application: Application,
-    // --- NEW: Add TransactionViewModel as a dependency ---
     private val transactionViewModel: TransactionViewModel
 ) : AndroidViewModel(application) {
     private val settingsRepository = SettingsRepository(application)
@@ -103,6 +110,9 @@ class SettingsViewModel(
     private val _isScanning = MutableStateFlow<Boolean>(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    private val _sendersToMap = MutableStateFlow<List<SenderToMap>>(emptyList())
+    val sendersToMap: StateFlow<List<SenderToMap>> = _sendersToMap.asStateFlow()
+
     val dailyReportTime: StateFlow<Pair<Int, Int>> =
         settingsRepository.getDailyReportTime().stateIn(
             scope = viewModelScope,
@@ -163,7 +173,27 @@ class SettingsViewModel(
                 )
     }
 
-    // --- NEW: Scans recent SMS and auto-saves any newly parsed transactions ---
+    suspend fun applyLearningAndAutoImport(mapping: MerchantCategoryMapping): Int {
+        var autoImportedCount = 0
+        val remainingForReview = mutableListOf<PotentialTransaction>()
+
+        val currentList = _potentialTransactions.value
+
+        for (txn in currentList) {
+            if (txn.merchantName != null && txn.merchantName.equals(mapping.parsedName, ignoreCase = true)) {
+                val success = transactionViewModel.autoSaveSmsTransaction(txn.copy(categoryId = mapping.categoryId))
+                if (success) {
+                    autoImportedCount++
+                }
+            } else {
+                remainingForReview.add(txn)
+            }
+        }
+
+        _potentialTransactions.value = remainingForReview
+        return autoImportedCount
+    }
+
     fun rescanSmsWithNewRule(onComplete: (Int) -> Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             onComplete(0)
@@ -174,7 +204,6 @@ class SettingsViewModel(
             _isScanning.value = true
             var newTransactionsFound = 0
             try {
-                // Scan last 30 days
                 val startDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -30) }.timeInMillis
                 val rawMessages = withContext(Dispatchers.IO) {
                     SmsRepository(context).fetchAllSms(startDate)
@@ -188,16 +217,18 @@ class SettingsViewModel(
                 }
 
                 val parsedList = withContext(Dispatchers.Default) {
-                    rawMessages.mapNotNull { sms ->
-                        SmsParser.parse(
-                            sms,
-                            existingMappings,
-                            db.customSmsRuleDao(),
-                            db.merchantRenameRuleDao(),
-                            db.ignoreRuleDao(),
-                            db.merchantCategoryMappingDao()
-                        )
-                    }
+                    rawMessages.map { sms ->
+                        async {
+                            SmsParser.parse(
+                                sms,
+                                existingMappings,
+                                db.customSmsRuleDao(),
+                                db.merchantRenameRuleDao(),
+                                db.ignoreRuleDao(),
+                                db.merchantCategoryMappingDao()
+                            )
+                        }
+                    }.awaitAll().filterNotNull()
                 }
 
                 val newPotentialTransactions = parsedList.filter { potential ->
@@ -218,6 +249,111 @@ class SettingsViewModel(
             }
         }
     }
+
+    fun startSmsScanAndIdentifyMappings(startDate: Long?, onComplete: (mappingNeeded: Boolean) -> Unit) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(context, "SMS Read permission is required.", Toast.LENGTH_LONG).show()
+            onComplete(false)
+            return
+        }
+
+        viewModelScope.launch {
+            _isScanning.value = true
+            var autoImportedCount = 0
+            try {
+                val rawMessages = withContext(Dispatchers.IO) { SmsRepository(context).fetchAllSms(startDate) }
+                val existingMappings = withContext(Dispatchers.IO) { merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName }) }
+                val existingSmsHashes = withContext(Dispatchers.IO) { transactionRepository.getAllSmsHashes().first().toSet() }
+
+                val parsedList = withContext(Dispatchers.Default) {
+                    rawMessages.map { sms ->
+                        async {
+                            SmsParser.parse(sms, existingMappings, db.customSmsRuleDao(), db.merchantRenameRuleDao(), db.ignoreRuleDao(), db.merchantCategoryMappingDao())
+                        }
+                    }.awaitAll().filterNotNull()
+                }
+
+                val newPotentialTransactions = parsedList.filter { !existingSmsHashes.contains(it.sourceSmsHash) }
+
+                val (parsedWithAccount, needsMapping) = newPotentialTransactions.partition { it.potentialAccount != null }
+
+                for (txn in parsedWithAccount) {
+                    if (transactionViewModel.autoSaveSmsTransaction(txn)) {
+                        autoImportedCount++
+                    }
+                }
+
+                if (needsMapping.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        val message = if (autoImportedCount > 0) "Successfully imported $autoImportedCount new transactions." else "No new transactions found."
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    }
+                    onComplete(false)
+                } else {
+                    _potentialTransactions.value = needsMapping
+                    val groupedBySender = needsMapping.groupBy { it.smsSender }
+                    _sendersToMap.value = groupedBySender.map { (sender, txns) ->
+                        SenderToMap(
+                            sender = sender,
+                            sampleMerchant = txns.first().merchantName ?: "Unknown",
+                            transactionCount = txns.size
+                        )
+                    }
+                    onComplete(true)
+                }
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Error during SMS scan", e)
+                withContext(Dispatchers.Main) { Toast.makeText(context, "An error occurred during scan.", Toast.LENGTH_LONG).show() }
+            } finally {
+                _isScanning.value = false
+            }
+        }
+    }
+
+    fun finalizeImport(userMappings: Map<String, Int>) {
+        viewModelScope.launch {
+            _isScanning.value = true
+            var importedCount = 0
+            try {
+                val transactionsToProcess = _potentialTransactions.value
+                val newDbMappings = mutableListOf<MerchantMapping>()
+
+                for (txn in transactionsToProcess) {
+                    val userMappedAccountId = userMappings[txn.smsSender]
+                    val transactionToSave = if (userMappedAccountId != null) {
+                        val account = accountRepository.getAccountById(userMappedAccountId).first()
+                        if (account != null) {
+                            newDbMappings.add(MerchantMapping(smsSender = txn.smsSender, merchantName = account.name))
+                            txn.copy(potentialAccount = io.pm.finlight.utils.PotentialAccount(account.name, account.type))
+                        } else {
+                            txn
+                        }
+                    } else {
+                        txn
+                    }
+
+                    if (transactionViewModel.autoSaveSmsTransaction(transactionToSave)) {
+                        importedCount++
+                    }
+                }
+
+                if (newDbMappings.isNotEmpty()) {
+                    db.merchantMappingDao().insertAll(newDbMappings)
+                }
+
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Error during final import", e)
+            } finally {
+                _isScanning.value = false
+                _potentialTransactions.value = emptyList()
+                _sendersToMap.value = emptyList()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Import complete! $importedCount transactions were added.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
 
     fun setAutoCaptureNotificationEnabled(enabled: Boolean) {
         settingsRepository.saveAutoCaptureNotificationEnabled(enabled)
@@ -242,52 +378,6 @@ class SettingsViewModel(
 
     fun saveSelectedTheme(theme: AppTheme) {
         settingsRepository.saveSelectedTheme(theme)
-    }
-
-    fun rescanSmsForReview(startDate: Long?) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
-            return
-        }
-
-        viewModelScope.launch {
-            _isScanning.value = true
-            try {
-                val rawMessages = withContext(Dispatchers.IO) {
-                    SmsRepository(context).fetchAllSms(startDate)
-                }
-
-                val existingMappings = withContext(Dispatchers.IO) {
-                    merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
-                }
-
-                val existingSmsHashes = withContext(Dispatchers.IO) {
-                    transactionRepository.getAllSmsHashes().first().toSet()
-                }
-
-                val parsedList = withContext(Dispatchers.Default) {
-                    rawMessages.mapNotNull { sms ->
-                        SmsParser.parse(
-                            sms,
-                            existingMappings,
-                            db.customSmsRuleDao(),
-                            db.merchantRenameRuleDao(),
-                            db.ignoreRuleDao(),
-                            db.merchantCategoryMappingDao()
-                        )
-                    }
-                }
-
-                val newPotentialTransactions = parsedList.filter { potential ->
-                    !existingSmsHashes.contains(potential.sourceSmsHash)
-                }
-
-                _potentialTransactions.value = newPotentialTransactions
-            } catch (e: Exception) {
-                Log.e("SettingsViewModel", "Error during SMS scan for review", e)
-            } finally {
-                _isScanning.value = false
-            }
-        }
     }
 
     fun dismissPotentialTransaction(transaction: PotentialTransaction) {

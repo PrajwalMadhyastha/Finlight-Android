@@ -1,15 +1,13 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsWorkflowScreens.kt
-// REASON: FEATURE - The Category and Tag picker bottom sheets on the approval
-// screen are now configured to open in a full-screen, edge-to-edge layout.
-// This provides a more immersive and user-friendly experience for selecting
-// items from potentially long lists.
-// FIX - The travel mode notification is now correctly dismissed as soon as the
-// user taps an action and navigates to the approval screen, instead of waiting
-// until the transaction is saved.
+// REASON: FEATURE - The save logic in `ApproveTransactionScreen` now triggers the
+// new `applyLearningAndAutoImport` function in the ViewModel. This applies the
+// user's categorization to other pending transactions in the review queue,
+// auto-importing them and displaying a Toast with the result.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.navigation.NavController
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
@@ -234,7 +231,6 @@ fun ApproveTransactionScreen(
 
     val isSaveEnabled = description.isNotBlank() && selectedCategory != null
 
-    // --- FIX: Cancel the notification as soon as the screen is displayed ---
     LaunchedEffect(key1 = potentialTxn.sourceSmsId) {
         NotificationManagerCompat.from(context).cancel(potentialTxn.sourceSmsId.toInt())
     }
@@ -411,11 +407,20 @@ fun ApproveTransactionScreen(
                                     potentialTxn.merchantName?.let { originalName ->
                                         settingsViewModel.saveMerchantRenameRule(originalName, description)
                                     }
-                                    navController.navigate("dashboard") {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            inclusive = true
+
+                                    // --- NEW: Apply learning to other pending transactions ---
+                                    if (potentialTxn.merchantName != null && selectedCategory != null) {
+                                        val mapping = MerchantCategoryMapping(
+                                            parsedName = potentialTxn.merchantName,
+                                            categoryId = selectedCategory!!.id
+                                        )
+                                        val autoImportedCount = settingsViewModel.applyLearningAndAutoImport(mapping)
+                                        if (autoImportedCount > 0) {
+                                            Toast.makeText(context, "Auto-saved $autoImportedCount similar transaction(s)!", Toast.LENGTH_LONG).show()
                                         }
                                     }
+
+                                    navController.popBackStack()
                                 }
                             }
                         },
