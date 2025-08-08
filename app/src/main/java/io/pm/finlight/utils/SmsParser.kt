@@ -1,12 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/SmsParser.kt
-// REASON: REFACTOR - The parsing logic has been significantly hardened.
-// - The expense keyword regex is now more specific to reduce false positives from
-//   promotional messages (e.g., "purchase experience").
-// - New keywords ("debit instruction for", "tranx of", "deducted for") have been added to capture
-//   previously missed transactions.
-// - A new high-priority regex for UPI payments improves merchant name extraction.
-// - Account parsing has been expanded to support new formats from Kotak and Union Bank.
+// REASON: FIX - The parser now correctly populates the new `date` field in the
+// PotentialTransaction object with the timestamp from the original SMS message.
+// This is a key step in fixing the "1970" date bug for imported transactions.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -29,7 +25,6 @@ data class PotentialAccount(
 
 object SmsParser {
     private val AMOUNT_WITH_CURRENCY_REGEX = "(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- UPDATED: Added "deducted for" to recognize more expense types ---
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|payment of|purchase of|debit instruction for|tranx of|deducted for)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val ACCOUNT_PATTERNS =
@@ -275,7 +270,8 @@ object SmsParser {
             sourceSmsHash = smsHash,
             categoryId = learnedCategoryId,
             smsSignature = smsSignature,
-            detectedCurrencyCode = detectedCurrency
+            detectedCurrencyCode = detectedCurrency,
+            date = sms.date
         )
     }
 
