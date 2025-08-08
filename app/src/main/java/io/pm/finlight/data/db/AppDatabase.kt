@@ -109,7 +109,12 @@ abstract class AppDatabase : RoomDatabase() {
             "Folio No.",
             "NAV of",
             "purchase experience",
-            "your OTP"
+            "your OTP",
+            "recharge of.*is successful",
+            "thanks for the payment of",
+            "premium due",
+            "bill is generated",
+            "missed call alert"
         ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
             "*SBIMF",
             "*WKEFTT"

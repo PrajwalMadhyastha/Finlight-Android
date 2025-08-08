@@ -3,6 +3,8 @@
 // REASON: FIX - The parser now correctly populates the new `date` field in the
 // PotentialTransaction object with the timestamp from the original SMS message.
 // This is a key step in fixing the "1970" date bug for imported transactions.
+// FEATURE - Added new keywords and patterns to recognize ATM withdrawals and
+// additional bank debit formats, increasing transaction capture accuracy.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -25,12 +27,14 @@ data class PotentialAccount(
 
 object SmsParser {
     private val AMOUNT_WITH_CURRENCY_REGEX = "(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- UPDATED: Added "sent" as a standalone expense keyword ---
-    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|payment of|purchase of|debit instruction for|tranx of|deducted for|sent to|sent)\\b".toRegex(RegexOption.IGNORE_CASE)
+    // --- UPDATED: Added "withdrawn" and "DEBIT with amount" and removed "payment of", "purchase of" ---
+    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val ACCOUNT_PATTERNS =
         listOf(
-            // --- NEW: Added pattern for "From HDFC Bank A/C *1243" format ---
+            // --- NEW: Added patterns for Canara Bank and Dept. of Posts Bank ---
+            "in your a/c no\\. XXXXXXXX(\\d{4}).*-(CANARA BANK)".toRegex(RegexOption.IGNORE_CASE),
+            "Account No\\. XXXXXX(\\d{4}) DEBIT".toRegex(RegexOption.IGNORE_CASE),
             "From (HDFC Bank) A/C \\*(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "(?:from your|in your) (Kotak Bank) Ac X(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "in your (UNION BANK OF INDIA) A/C XX(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -80,6 +84,10 @@ object SmsParser {
             val match = pattern.find(smsBody)
             if (match != null) {
                 return when (pattern.pattern) {
+                    "in your a/c no\\. XXXXXXXX(\\d{4}).*-(CANARA BANK)" ->
+                        PotentialAccount(formattedName = "${match.groupValues[2].trim()} - xx${match.groupValues[1].trim()}", accountType = "Bank Account")
+                    "Account No\\. XXXXXX(\\d{4}) DEBIT" ->
+                        PotentialAccount(formattedName = "Bank Account - xx${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "From (HDFC Bank) A/C \\*(\\d{4})" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} - *${match.groupValues[2].trim()}", accountType = "Bank Account")
                     "(?:from your|in your) (Kotak Bank) Ac X(\\d{4})" ->
