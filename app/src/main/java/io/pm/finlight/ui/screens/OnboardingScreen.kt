@@ -2,6 +2,8 @@
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/OnboardingScreen.kt
 // REASON: REFACTOR - Combined OnboardingPages.kt into this file to resolve an
 // 'Unresolved reference' compilation error and improve code cohesion.
+// FIX - Added Modifier.navigationBarsPadding() to the OnboardingBottomBar to
+// prevent it from overlapping with the system navigation bar on edge-to-edge displays.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -110,6 +112,7 @@ fun OnboardingBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding() // --- FIX: Added navigationBarsPadding ---
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
