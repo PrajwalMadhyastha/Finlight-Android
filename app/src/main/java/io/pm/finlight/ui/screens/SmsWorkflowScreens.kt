@@ -1,12 +1,13 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsWorkflowScreens.kt
-// REASON: REFACTOR - The navigation logic after approving a transaction has been
-// corrected. Instead of navigating to the dashboard, the app now pops the back
-// stack. This returns the user to the review screen to continue processing the
-// remaining transactions, creating a much smoother bulk-import workflow.
+// REASON: FEATURE - The save logic in `ApproveTransactionScreen` now triggers the
+// new `applyLearningAndAutoImport` function in the ViewModel. This applies the
+// user's categorization to other pending transactions in the review queue,
+// auto-importing them and displaying a Toast with the result.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -406,7 +407,19 @@ fun ApproveTransactionScreen(
                                     potentialTxn.merchantName?.let { originalName ->
                                         settingsViewModel.saveMerchantRenameRule(originalName, description)
                                     }
-                                    // --- FIX: Navigate back to the review screen ---
+
+                                    // --- NEW: Apply learning to other pending transactions ---
+                                    if (potentialTxn.merchantName != null && selectedCategory != null) {
+                                        val mapping = MerchantCategoryMapping(
+                                            parsedName = potentialTxn.merchantName,
+                                            categoryId = selectedCategory!!.id
+                                        )
+                                        val autoImportedCount = settingsViewModel.applyLearningAndAutoImport(mapping)
+                                        if (autoImportedCount > 0) {
+                                            Toast.makeText(context, "Auto-saved $autoImportedCount similar transaction(s)!", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+
                                     navController.popBackStack()
                                 }
                             }

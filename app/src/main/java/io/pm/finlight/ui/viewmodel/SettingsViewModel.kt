@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/SettingsViewModel.kt
-// REASON: FEATURE - Reworked the SMS scanning feature. The ViewModel now
-// differentiates between parsed transactions with a known category and those
-// without. Transactions with a category are now automatically imported, while
-// only those needing categorization are sent to the review screen. This aligns
-// with the new, more efficient user workflow for bulk imports.
+// REASON: FEATURE - Added the `applyLearningAndAutoImport` function. After a
+// user categorizes a transaction, this function re-evaluates the remaining
+// transactions in the review queue. It auto-imports any that now have a category
+// based on the user's recent action, streamlining the bulk import process.
 // =================================================================================
 package io.pm.finlight
 
@@ -163,6 +162,29 @@ class SettingsViewModel(
                     started = SharingStarted.WhileSubscribed(5000),
                     initialValue = 0L,
                 )
+    }
+
+    suspend fun applyLearningAndAutoImport(mapping: MerchantCategoryMapping): Int {
+        var autoImportedCount = 0
+        val remainingForReview = mutableListOf<PotentialTransaction>()
+
+        val currentList = _potentialTransactions.value
+
+        for (txn in currentList) {
+            if (txn.merchantName != null && txn.merchantName.equals(mapping.parsedName, ignoreCase = true)) {
+                // This transaction matches the one just categorized. Auto-import it.
+                val success = transactionViewModel.autoSaveSmsTransaction(txn.copy(categoryId = mapping.categoryId))
+                if (success) {
+                    autoImportedCount++
+                }
+            } else {
+                // This one doesn't match, keep it for the next review pass.
+                remainingForReview.add(txn)
+            }
+        }
+
+        _potentialTransactions.value = remainingForReview
+        return autoImportedCount
     }
 
     fun rescanSmsWithNewRule(onComplete: (Int) -> Unit) {
