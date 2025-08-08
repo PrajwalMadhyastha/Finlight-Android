@@ -25,8 +25,8 @@ data class PotentialAccount(
 
 object SmsParser {
     private val AMOUNT_WITH_CURRENCY_REGEX = "(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|payment of|purchase of|debit instruction for|tranx of|deducted for)\\b".toRegex(RegexOption.IGNORE_CASE)
-    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of)\\b".toRegex(RegexOption.IGNORE_CASE)
+    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|payment of|purchase of|debit instruction for|tranx of|deducted for|sent to)\\b".toRegex(RegexOption.IGNORE_CASE)
+    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val ACCOUNT_PATTERNS =
         listOf(
             "(?:from your|in your) (Kotak Bank) Ac X(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
