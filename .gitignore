@@ -1,9 +1,12 @@
 # Gradle
 .gradle/
 build/
+release/
 
 # Local configuration
 local.properties
+
+.kotlin
 
 # Android Studio
 .idea/

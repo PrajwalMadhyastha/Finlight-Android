@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/PotentialTransaction.kt
-// REASON: FEATURE - Added a new nullable `detectedCurrencyCode` field. This will
-// be populated by the SmsParser if it can confidently identify a currency code
-// (e.g., "INR", "MYR") next to the amount in an SMS, forming the basis for the
-// new smart currency detection feature.
+// REASON: FIX - Added a `date` field to the data class. This is essential to
+// carry the original timestamp from the parsed SMS all the way to the final
+// transaction record, fixing the "1970" date bug. A default value is provided
+// for backward compatibility.
 // =================================================================================
 package io.pm.finlight
 
@@ -22,6 +22,7 @@ import io.pm.finlight.utils.PotentialAccount
  * @param smsSignature A stable hash of the SMS body used for pattern detection.
  * @param isForeignCurrency A flag passed from the notification to indicate user's currency choice.
  * @param detectedCurrencyCode The currency code (e.g., "INR", "USD") found in the SMS.
+ * @param date The timestamp of the original SMS message.
  */
 data class PotentialTransaction(
     val sourceSmsId: Long,
@@ -35,6 +36,6 @@ data class PotentialTransaction(
     val categoryId: Int? = null,
     val smsSignature: String? = null,
     val isForeignCurrency: Boolean? = null,
-    // --- NEW: Field to store the currency code found in the SMS ---
-    val detectedCurrencyCode: String? = null
+    val detectedCurrencyCode: String? = null,
+    val date: Long = System.currentTimeMillis()
 )

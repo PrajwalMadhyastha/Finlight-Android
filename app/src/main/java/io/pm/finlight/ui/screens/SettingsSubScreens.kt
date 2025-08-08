@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SettingsSubScreens.kt
-// REASON: FEATURE - Added a new `SettingsToggleItem` to the
-// `NotificationSettingsScreen`. This UI control allows the user to enable or
-// disable notifications for transactions that are automatically captured from SMS
-// messages.
+// REASON: FIX - Updated the SMS scan action items to call the new
+// `startSmsScanAndIdentifyMappings` function in the ViewModel. The onClick handlers now
+// implement the `onScanComplete` callback to navigate to the new account mapping
+// screen if the scan results in transactions that require user attention. This
+// resolves the "Unresolved reference" build error.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -158,10 +159,12 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                             subtitle = "Scan all messages to find transactions",
                             icon = Icons.AutoMirrored.Filled.ManageSearch,
                             onClick = {
-                                if (hasSmsPermission(context)) {
-                                    if (!isScanning) settingsViewModel.rescanSmsForReview(null)
-                                } else {
-                                    Toast.makeText(context, "SMS permission is required.", Toast.LENGTH_SHORT).show()
+                                if (!isScanning) {
+                                    settingsViewModel.startSmsScanAndIdentifyMappings(null) { mappingNeeded ->
+                                        if (mappingNeeded) {
+                                            navController.navigate("account_mapping_screen")
+                                        }
+                                    }
                                 }
                             },
                         )
@@ -181,10 +184,12 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                             trailingContent = {
                                 Button(
                                     onClick = {
-                                        if (hasSmsPermission(context)) {
-                                            if (!isScanning) settingsViewModel.rescanSmsForReview(smsScanStartDate)
-                                        } else {
-                                            Toast.makeText(context, "SMS permission is required.", Toast.LENGTH_SHORT).show()
+                                        if (!isScanning) {
+                                            settingsViewModel.startSmsScanAndIdentifyMappings(smsScanStartDate) { mappingNeeded ->
+                                                if (mappingNeeded) {
+                                                    navController.navigate("account_mapping_screen")
+                                                }
+                                            }
                                         }
                                     },
                                     enabled = !isScanning
@@ -270,7 +275,6 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
     var showWeeklyTimePicker by remember { mutableStateOf(false) }
     val monthlyReportTime by settingsViewModel.monthlyReportTime.collectAsState()
     var showMonthlyTimePicker by remember { mutableStateOf(false) }
-    // --- NEW: State for the new toggle ---
     val isAutoCaptureNotificationEnabled by settingsViewModel.autoCaptureNotificationEnabled.collectAsState()
 
     val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
@@ -296,7 +300,6 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
         ) {
             item {
                 SettingsSection(title = "Transaction Notifications") {
-                    // --- NEW: Added toggle for auto-capture notifications ---
                     SettingsToggleItem(
                         title = "Auto-Captured Transactions",
                         subtitle = "Notify when a transaction is saved from an SMS",
@@ -553,7 +556,6 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                             onCheckedChange = { settingsViewModel.setAppLockEnabled(it) },
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        // --- NEW: Auto-backup settings ---
                         SettingsToggleItem(
                             title = "Automatic Daily Backup",
                             subtitle = "Backup your data to Google Drive daily",

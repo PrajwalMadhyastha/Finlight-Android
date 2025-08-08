@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/RecurringTransactionWorker.kt
-// REASON: REFACTOR - The worker's core logic has been completely overhauled.
-// Instead of creating a new transaction, it now calls a new function in
-// NotificationHelper to show a notification for each due rule. This aligns
-// with the new user-driven workflow. The isDue function is updated to be more
-// robust, checking for missed runs.
+// REASON: FIX - The PotentialTransaction object created by the worker is now
+// correctly initialized with the current system timestamp. This ensures it is
+// compatible with the updated data class structure and prevents potential
+// date-related bugs in the linking/approval screens.
 // =================================================================================
 package io.pm.finlight
 
@@ -34,21 +33,20 @@ class RecurringTransactionWorker(
 
                 allRules.forEach { rule ->
                     if (isDue(rule)) {
-                        // --- NEW: Instead of creating a transaction, show a notification ---
                         val potentialTxn = PotentialTransaction(
-                            sourceSmsId = rule.id.toLong(), // Re-using this field for the rule ID
+                            sourceSmsId = rule.id.toLong(),
                             smsSender = "Recurring Rule",
                             amount = rule.amount,
                             transactionType = rule.transactionType,
                             merchantName = rule.description,
                             originalMessage = "Recurring payment for ${rule.description}",
-                            sourceSmsHash = "recurring_${rule.id}"
+                            sourceSmsHash = "recurring_${rule.id}",
+                            date = System.currentTimeMillis() // Use current time for due transactions
                         )
                         NotificationHelper.showRecurringTransactionDueNotification(context, potentialTxn)
                     }
                 }
 
-                // Reschedule for the next day
                 ReminderManager.scheduleRecurringTransactionWorker(context)
                 Result.success()
             } catch (e: Exception) {
@@ -58,19 +56,14 @@ class RecurringTransactionWorker(
         }
     }
 
-    /**
-     * Determines if a recurring transaction rule is due to be executed today.
-     */
     private fun isDue(rule: RecurringTransaction): Boolean {
         val today = Calendar.getInstance()
         val ruleStartCal = Calendar.getInstance().apply { timeInMillis = rule.startDate }
 
-        // If the rule's start date is in the future, it's not due yet.
         if (today.before(ruleStartCal)) {
             return false
         }
 
-        // If the rule has never run, it's due.
         if (rule.lastRunDate == null) {
             return true
         }
@@ -83,7 +76,6 @@ class RecurringTransactionWorker(
                 "Monthly" -> add(Calendar.MONTH, 1)
                 "Yearly" -> add(Calendar.YEAR, 1)
             }
-            // Set to beginning of the day for consistent comparison
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
@@ -97,8 +89,6 @@ class RecurringTransactionWorker(
             set(Calendar.MILLISECOND, 0)
         }
 
-        // Check if today is on or after the calculated next due date.
-        // We use 'on or after' to catch up on any missed runs (e.g., if the device was off).
         return !todayStartOfDay.before(nextDueDate)
     }
 }
