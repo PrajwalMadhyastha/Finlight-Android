@@ -1,9 +1,6 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: REFACTOR - Updated the database seeding logic to provide a cleaner
-// initial state for new users. Removed sample transactions, budgets, and all
-// accounts except for "Cash Spends".
-// FEATURE - Added new default ignore rules for investment, OTP, and feedback
+// REASON: FEATURE - Added new default ignore rules for investment, OTP, and feedback
 // messages to significantly reduce false positives from the SMS parser.
 // =================================================================================
 package io.pm.finlight.data.db
@@ -114,10 +111,21 @@ abstract class AppDatabase : RoomDatabase() {
             "thanks for the payment of",
             "premium due",
             "bill is generated",
-            "missed call alert"
+            "missed call alert",
+            "pre-approved",
+            "offer",
+            "limit",
+            "due on",
+            "statement for",
+            "KYC",
+            "cheque book",
+            "is approved",
+            "congratulations",
+            "eligible for"
         ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
             "*SBIMF",
-            "*WKEFTT"
+            "*WKEFTT",
+            "*BSNL"
         ).map { IgnoreRule(pattern = it, type = RuleType.SENDER, isDefault = true) }
 
 
