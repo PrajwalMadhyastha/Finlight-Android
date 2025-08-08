@@ -1,15 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/SmsParserTest.kt
-// REASON: FEATURE - Added new unit tests to verify the currency detection logic.
-// The tests now cover scenarios where an SMS contains a foreign currency code
-// (MYR), the home currency code (INR), or the home currency symbol (Rs),
-// ensuring the parser correctly extracts both the amount and the currency.
-// FIX - Added a new test case for the specific ICICI debit message format that
-// was failing, ensuring the improved regex correctly handles it.
-// FIX - Added a new test case to ensure the parser prioritizes amounts with
-// currency symbols over other numbers in an SMS, like account numbers.
-// FIX - Added a new test case for the `InfoACH*...Avl Bal` format to verify
-// the new, more specific merchant parsing regex.
+// REASON: FEATURE - Added a comprehensive suite of new test cases to validate
+// the parser's ability to handle transaction reversals, Sodexo card loading,
+// new credit card formats, and various types of transactional noise, creating a
+// robust baseline for future development.
 // =================================================================================
 package io.pm.finlight
 
@@ -350,5 +344,77 @@ class SmsParserTest {
         val mockSms = SmsMessage(id = 9L, sender = "VM-NBHOOD", body = smsBody, date = System.currentTimeMillis())
         val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
         assertNull("Parser should ignore messages with user-defined phrases", result)
+    }
+
+    // --- NEW TEST CASES ---
+
+    @Test
+    fun `test parses transaction reversal as income`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer, your ICICI Bank Account XXX508 has been credited with Rs 208.42 on 03-Sep-22 as reversal of transaction with UPI: 224679541058."
+        val mockSms = SmsMessage(id = 101L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNotNull(result)
+        assertEquals(208.42, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("reversal of transaction", result?.merchantName)
+    }
+
+    @Test
+    fun `test parses Sodexo card loading as income`() = runBlocking {
+        setupTest()
+        val smsBody = "Your Sodexo Card has been successfully loaded with Rs.1250 towards Meal Card A/c on 15:00,15 Dec."
+        val mockSms = SmsMessage(id = 102L, sender = "VM-SODEXO", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNotNull(result)
+        assertEquals(1250.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("Sodexo Card", result?.potentialAccount?.formattedName)
+    }
+
+    @Test
+    fun `test parses new HDFC Credit Card format`() = runBlocking {
+        setupTest()
+        val smsBody = "You've spent Rs.349 On HDFC Bank CREDIT Card xx1335 At RAZ*StickON..."
+        val mockSms = SmsMessage(id = 103L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNotNull(result)
+        assertEquals(349.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("RAZ*StickON", result?.merchantName)
+        assertEquals("HDFC Bank CREDIT Card - xx1335", result?.potentialAccount?.formattedName)
+    }
+
+    @Test
+    fun `test ignores Paytm Wallet payment`() = runBlocking {
+        setupTest(ignoreRules = listOf(IgnoreRule(pattern = "from Paytm Balance", isDefault = true, isEnabled = true)))
+        val smsBody = "Paid Rs.1559 to Reliance Jio from Paytm Balance. Updated Balance: Paytm Wallet- Rs 0."
+        val mockSms = SmsMessage(id = 104L, sender = "VM-Paytm", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNull("Parser should ignore payments from Paytm Balance", result)
+    }
+
+    @Test
+    fun `test ignores declined transaction`() = runBlocking {
+        setupTest(ignoreRules = listOf(IgnoreRule(pattern = "is declined", isDefault = true, isEnabled = true)))
+        val smsBody = "Your transaction on HDFC Bank card for 245.00 at AMAZON is declined due to wrong input of ExpiryDate or CVV."
+        val mockSms = SmsMessage(id = 105L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNull("Parser should ignore declined transactions", result)
+    }
+
+    @Test
+    fun `test ignores AutoPay mandate setup`() = runBlocking {
+        setupTest(ignoreRules = listOf(IgnoreRule(pattern = "AutoPay (E-mandate) Active", isDefault = true, isEnabled = true)))
+        val smsBody = "AutoPay (E-mandate) Active! Merchant: YouTube... On HDFC Bank Credit Card xx1335"
+        val mockSms = SmsMessage(id = 106L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNull("Parser should ignore AutoPay setup confirmations", result)
     }
 }
