@@ -1,12 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsWorkflowScreens.kt
-// REASON: FEATURE - The Category and Tag picker bottom sheets on the approval
-// screen are now configured to open in a full-screen, edge-to-edge layout.
-// This provides a more immersive and user-friendly experience for selecting
-// items from potentially long lists.
-// FIX - The travel mode notification is now correctly dismissed as soon as the
-// user taps an action and navigates to the approval screen, instead of waiting
-// until the transaction is saved.
+// REASON: REFACTOR - The navigation logic after approving a transaction has been
+// corrected. Instead of navigating to the dashboard, the app now pops the back
+// stack. This returns the user to the review screen to continue processing the
+// remaining transactions, creating a much smoother bulk-import workflow.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -42,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.navigation.NavController
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
@@ -234,7 +230,6 @@ fun ApproveTransactionScreen(
 
     val isSaveEnabled = description.isNotBlank() && selectedCategory != null
 
-    // --- FIX: Cancel the notification as soon as the screen is displayed ---
     LaunchedEffect(key1 = potentialTxn.sourceSmsId) {
         NotificationManagerCompat.from(context).cancel(potentialTxn.sourceSmsId.toInt())
     }
@@ -411,11 +406,8 @@ fun ApproveTransactionScreen(
                                     potentialTxn.merchantName?.let { originalName ->
                                         settingsViewModel.saveMerchantRenameRule(originalName, description)
                                     }
-                                    navController.navigate("dashboard") {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            inclusive = true
-                                        }
-                                    }
+                                    // --- FIX: Navigate back to the review screen ---
+                                    navController.popBackStack()
                                 }
                             }
                         },
