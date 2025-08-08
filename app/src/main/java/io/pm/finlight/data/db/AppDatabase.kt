@@ -1,7 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: FEATURE - Added new default ignore rules for investment, OTP, and feedback
-// messages to significantly reduce false positives from the SMS parser.
+// REASON: FEATURE - Added an extensive new set of default ignore rules for SIP
+// confirmations, bill reminders, and e-commerce notifications to significantly
+// reduce false positives from the SMS parser.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -93,39 +94,30 @@ abstract class AppDatabase : RoomDatabase() {
 
         // --- UPDATED: Added new default ignore rules for common false positives ---
         private val DEFAULT_IGNORE_PHRASES = listOf(
-            "invoice of",
-            "payment of.*is successful",
-            "has been credited to",
-            "payment of.*has been received towards",
-            "credited to your.*card",
-            "Payment of.*has been received on your.*Credit Card",
-            "We have received",
-            "has been initiated",
-            "redemption",
-            "requested money from you",
-            "Folio No.",
-            "NAV of",
-            "purchase experience",
-            "your OTP",
-            "recharge of.*is successful",
-            "thanks for the payment of",
-            "premium due",
-            "bill is generated",
-            "missed call alert",
-            "pre-approved",
-            "offer",
-            "limit",
-            "due on",
-            "statement for",
-            "KYC",
-            "cheque book",
-            "is approved",
-            "congratulations",
-            "eligible for"
+            // Existing Rules
+            "invoice of", "payment of.*is successful", "has been credited to",
+            "payment of.*has been received towards", "credited to your.*card",
+            "Payment of.*has been received on your.*Credit Card", "We have received",
+            "has been initiated", "redemption", "requested money from you", "Folio No.",
+            "NAV of", "purchase experience", "your OTP", "recharge of.*is successful",
+            "thanks for the payment of", "premium due", "bill is generated", "missed call alert",
+            "pre-approved", "offer", "limit", "due on", "statement for", "KYC", "cheque book",
+            "is approved", "congratulations", "eligible for",
+
+            // --- NEW SUGGESTIONS from 12k dump ---
+            "SIP Purchase", "towards your SIP", "EMI Alert", "due by",
+            "has requested money from you", "order.*has been delivered", "shipped",
+            "Arriving today", "out for delivery"
+
         ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
-            "*SBIMF",
-            "*WKEFTT",
-            "*BSNL"
+            // Existing Rules
+            "*SBIMF", "*WKEFTT", "*BSNL",
+
+            // --- NEW SUGGESTIONS from 12k dump ---
+            "*HDFCMF", "*AXISMF", "*KOTAKM", "*QNTAMC", "*NIMFND",
+            "*MYNTRA", "*FLPKRT", "*AMAZON", "*SWIGGY", "*ZOMATO",
+            "*BLUDRT", "*EKARTL", "*DLHVRY", "*XPBEES"
+
         ).map { IgnoreRule(pattern = it, type = RuleType.SENDER, isDefault = true) }
 
 

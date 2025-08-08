@@ -1,7 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/SmsParser.kt
-// REASON: FEATURE - Added new keywords and patterns to recognize ATM withdrawals and
-// additional bank debit formats, increasing transaction capture accuracy.
+// REASON: FEATURE - Added new keywords and patterns to recognize refunds, salary
+// credits, and additional debit/bank formats based on analysis of a large
+// real-world dataset, increasing transaction capture accuracy.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -24,12 +25,16 @@ data class PotentialAccount(
 
 object SmsParser {
     private val AMOUNT_WITH_CURRENCY_REGEX = "(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- UPDATED: Added "withdrawn" and "tranx of" ---
-    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount)\\b".toRegex(RegexOption.IGNORE_CASE)
-    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added)\\b".toRegex(RegexOption.IGNORE_CASE)
+    // --- UPDATED: Added "spent on" ---
+    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on)\\b".toRegex(RegexOption.IGNORE_CASE)
+    // --- UPDATED: Added "refund of" and "credited with salary of" ---
+    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val ACCOUNT_PATTERNS =
         listOf(
-            // --- NEW: Added patterns for Canara Bank and Dept. of Posts Bank ---
+            // --- NEW: Added patterns for IndusInd Bank and new ICICI formats ---
+            "spent on (IndusInd Card) XX(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "(?:credited to your|on your) (ICICI Bank Credit Card) XX(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "your (ICICI Bank Account) XX(\\d{4}) has been credited with".toRegex(RegexOption.IGNORE_CASE),
             "in your a/c no\\. XXXXXXXX(\\d{4}).*-(CANARA BANK)".toRegex(RegexOption.IGNORE_CASE),
             "a/c no\\. XXXXXXXX(\\d{4}) debited.*(Dept of Posts)".toRegex(RegexOption.IGNORE_CASE),
             "Account No\\. XXXXXX(\\d{4}) DEBIT".toRegex(RegexOption.IGNORE_CASE),
@@ -82,6 +87,12 @@ object SmsParser {
             val match = pattern.find(smsBody)
             if (match != null) {
                 return when (pattern.pattern) {
+                    "spent on (IndusInd Card) XX(\\d{4})" ->
+                        PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[2].trim()}", accountType = "Credit Card")
+                    "(?:credited to your|on your) (ICICI Bank Credit Card) XX(\\d{4})" ->
+                        PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[2].trim()}", accountType = "Credit Card")
+                    "your (ICICI Bank Account) XX(\\d{4}) has been credited with" ->
+                        PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[2].trim()}", accountType = "Bank Account")
                     "in your a/c no\\. XXXXXXXX(\\d{4}).*-(CANARA BANK)" ->
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - xx${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "a/c no\\. XXXXXXXX(\\d{4}) debited.*(Dept of Posts)" ->
