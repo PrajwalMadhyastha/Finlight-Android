@@ -112,7 +112,7 @@ abstract class AppDatabase : RoomDatabase() {
             // --- NEW: Rules to fix parsing issues ---
             "Unit Allotment", "Mutual Fund", "has been delivered"
 
-        ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASES, isDefault = true) } + listOf(
+        ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
             // Existing Senders
             "*SBIMF", "*WKEFTT", "*BSNL", "*HDFCMF", "*AXISMF", "*KOTAKM", "*QNTAMC", "*NIMFND",
             "*MYNTRA", "*FLPKRT", "*AMAZON", "*SWIGGY", "*ZOMATO", "*BLUDRT", "*EKARTL",

@@ -421,8 +421,8 @@ class SmsParserTest {
     @Test
     fun `test ignores Navi Mutual Fund update`() = runBlocking {
         val ignoreRules = listOf(
-            IgnoreRule(pattern = "Mutual Fund", type = RuleType.BODY_PHRASES, isDefault = true, isEnabled = true),
-            IgnoreRule(pattern = "Unit Allotment", type = RuleType.BODY_PHRASES, isDefault = true, isEnabled = true)
+            IgnoreRule(pattern = "Mutual Fund", type = RuleType.BODY_PHRASE, isDefault = true, isEnabled = true),
+            IgnoreRule(pattern = "Unit Allotment", type = RuleType.BODY_PHRASE, isDefault = true, isEnabled = true)
         )
         setupTest(ignoreRules = ignoreRules)
         val smsBody = "Unit Allotment Update:Your request for purchase of Rs.15,498.23 in Navi Liquid Fund GDG has been processed at applicable NAV. The units will be alloted in 1-2 working days. For further queries, please visit the Navi app. Navi Mutual Fund"
@@ -450,7 +450,7 @@ class SmsParserTest {
     fun `test ignores Delhivery delivery confirmation`() = runBlocking {
         val ignoreRules = listOf(
             IgnoreRule(pattern = "*Delhivery", type = RuleType.SENDER, isDefault = true, isEnabled = true),
-            IgnoreRule(pattern = "has been delivered", type = RuleType.BODY_PHRASES, isDefault = true, isEnabled = true)
+            IgnoreRule(pattern = "has been delivered", type = RuleType.BODY_PHRASE, isDefault = true, isEnabled = true)
         )
         setupTest(ignoreRules = ignoreRules)
         val smsBody = "Your SBI Card has been delivered through Delhivery and received by MS Rani Reference No EV25170653359 - Delhivery"
