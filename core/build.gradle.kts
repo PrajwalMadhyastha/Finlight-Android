@@ -9,10 +9,14 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-// FIX: Add this block to align the Kotlin compiler's JVM target
-// with the Java compiler, resolving the build error.
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
     }
+}
+
+// Add a dependency on Room's common library, which contains the annotations.
+// Using 'api' makes these annotations visible to the 'app' module's compiler.
+dependencies {
+    api("androidx.room:room-common:2.6.1")
 }

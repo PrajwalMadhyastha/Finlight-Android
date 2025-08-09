@@ -2,6 +2,7 @@ package io.pm.finlight
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import androidx.room.Index
 
 /**
  * This is a "join table" to create a many-to-many relationship
@@ -10,6 +11,7 @@ import androidx.room.ForeignKey
 @Entity(
     tableName = "transaction_tag_cross_ref",
     primaryKeys = ["transactionId", "tagId"],
+    indices = [Index(value = ["tagId"])], // --- FIX: Added the missing index ---
     foreignKeys = [
         ForeignKey(
             entity = Transaction::class,

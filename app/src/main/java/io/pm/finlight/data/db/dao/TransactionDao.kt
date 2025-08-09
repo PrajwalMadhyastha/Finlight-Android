@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionDao.kt
-// REASON: FIX - Added the necessary import for the MerchantPrediction DTO. This
-// validates the `searchMerchants` function signature and is a key part of
-// resolving the "Unresolved reference" build error.
+// REASON: FIX - Added @Transaction annotations to queries returning relational
+// data to ensure atomicity. Fixed a CURSOR_MISMATCH warning by aliasing a
+// column name in a query to match the data class property.
 // =================================================================================
 package io.pm.finlight
 
@@ -33,6 +33,7 @@ interface TransactionDao {
     @Query("DELETE FROM transactions WHERE id IN (:transactionIds)")
     suspend fun deleteByIds(transactionIds: List<Int>)
 
+    @Transaction // --- FIX: Add @Transaction for relational query ---
     @Query("SELECT * FROM transactions WHERE id = :transactionId")
     fun getTransactionWithSplits(transactionId: Int): Flow<TransactionWithSplits?>
 
@@ -69,7 +70,7 @@ interface TransactionDao {
             JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
         )
-        SELECT C.name as categoryName, SUM(AE.amount) as totalAmount, C.iconKey as iconKey, C.colorKey as categoryColorKey
+        SELECT C.name as categoryName, SUM(AE.amount) as totalAmount, C.iconKey as iconKey, C.colorKey as colorKey
         FROM AtomicExpenses AS AE
         JOIN categories AS C ON AE.categoryId = C.id
         WHERE AE.categoryId IS NOT NULL
@@ -90,7 +91,7 @@ interface TransactionDao {
             JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
         )
-        SELECT C.name as categoryName, SUM(AE.amount) as totalAmount, C.iconKey as iconKey, C.colorKey as categoryColorKey
+        SELECT C.name as categoryName, SUM(AE.amount) as totalAmount, C.iconKey as iconKey, C.colorKey as colorKey
         FROM AtomicExpenses AS AE
         JOIN categories AS C ON AE.categoryId = C.id
         WHERE AE.categoryId IS NOT NULL
@@ -105,6 +106,7 @@ interface TransactionDao {
     @Query("UPDATE transactions SET isExcluded = :isExcluded WHERE id = :id")
     suspend fun updateExclusionStatus(id: Int, isExcluded: Boolean)
 
+    @Transaction // --- FIX: Add @Transaction for relational query ---
     @Query(
         """
         SELECT
@@ -125,6 +127,7 @@ interface TransactionDao {
     )
     fun getAllTransactions(): Flow<List<TransactionDetails>>
 
+    @Transaction // --- FIX: Add @Transaction for relational query ---
     @Query("""
         WITH AtomicIncomes AS (
             SELECT T.*
@@ -196,6 +199,7 @@ interface TransactionDao {
     """)
     fun getSpendingByMerchantForMonth(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?): Flow<List<MerchantSpendingSummary>>
 
+    @Transaction // --- FIX: Add @Transaction for relational query ---
     @Query("""
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey
         FROM transactions AS T
@@ -206,6 +210,7 @@ interface TransactionDao {
     """)
     fun getTransactionsForCategoryName(categoryName: String, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
 
+    @Transaction // --- FIX: Add @Transaction for relational query ---
     @Query("""
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey
         FROM transactions AS T
@@ -286,6 +291,7 @@ interface TransactionDao {
     suspend fun updateDate(id: Int, date: Long)
 
 
+    @Transaction // --- FIX: Add @Transaction for relational query ---
     @Query(
         """
         SELECT
@@ -306,6 +312,7 @@ interface TransactionDao {
     fun getTransactionDetailsById(id: Int): Flow<TransactionDetails?>
 
 
+    @Transaction // --- FIX: Add @Transaction for relational query ---
     @Query(
         """
         SELECT
@@ -330,6 +337,7 @@ interface TransactionDao {
     @Query("SELECT sourceSmsHash FROM transactions WHERE sourceSmsHash IS NOT NULL")
     fun getAllSmsHashes(): Flow<List<String>>
 
+    @Transaction // --- FIX: Add @Transaction for relational query ---
     @Query(
         """
         SELECT
@@ -360,6 +368,7 @@ interface TransactionDao {
         categoryId: Int?
     ): Flow<List<TransactionDetails>>
 
+    @Transaction // --- FIX: Add @Transaction for relational query ---
     @Query(
         """
         SELECT t.*, a.name as accountName, c.name as categoryName, c.iconKey as categoryIconKey, c.colorKey as categoryColorKey
@@ -504,6 +513,7 @@ interface TransactionDao {
     @Query("DELETE FROM transaction_tag_cross_ref WHERE transactionId = :transactionId")
     suspend fun clearTagsForTransaction(transactionId: Int)
 
+    @Transaction // --- FIX: Add @Transaction for relational query ---
     @Query("SELECT T.* FROM tags T INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.tagId WHERE TTCR.transactionId = :transactionId")
     fun getTagsForTransaction(transactionId: Int): Flow<List<Tag>>
 
@@ -615,6 +625,7 @@ interface TransactionDao {
     @Query("UPDATE transactions SET description = :newDescription WHERE id IN (:ids)")
     suspend fun updateDescriptionForIds(ids: List<Int>, newDescription: String)
 
+    @Transaction // --- FIX: Add @Transaction for relational query ---
     @Query("""
         SELECT t.*, a.name as accountName, c.name as categoryName, c.iconKey as categoryIconKey, c.colorKey as categoryColorKey
         FROM transactions t
