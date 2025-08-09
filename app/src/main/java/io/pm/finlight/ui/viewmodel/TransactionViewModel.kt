@@ -20,7 +20,6 @@ import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.ShareImageGenerator
-import io.pm.finlight.utils.SmsParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
