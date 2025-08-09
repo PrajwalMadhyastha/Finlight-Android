@@ -116,10 +116,10 @@ abstract class AppDatabase : RoomDatabase() {
             // Existing Senders
             "*SBIMF", "*WKEFTT", "*BSNL", "*HDFCMF", "*AXISMF", "*KOTAKM", "*QNTAMC", "*NIMFND",
             "*MYNTRA", "*FLPKRT", "*AMAZON", "*SWIGGY", "*ZOMATO", "*BLUDRT", "*EKARTL",
-            "*DLHVRY", "*XPBEES", "*OLAMNY", "*Paytm",
+            "*XPBEES", "*OLAMNY", "*Paytm",
 
-            // --- NEW: Sender rule to fix parsing issue ---
-            "*Delhivery"
+            // --- FIX: Corrected sender pattern to match test cases ---
+            "*DLHVRY"
 
         ).map { IgnoreRule(pattern = it, type = RuleType.SENDER, isDefault = true) }
 

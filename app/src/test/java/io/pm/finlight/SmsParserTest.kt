@@ -449,7 +449,7 @@ class SmsParserTest {
     @Test
     fun `test ignores Delhivery delivery confirmation`() = runBlocking {
         val ignoreRules = listOf(
-            IgnoreRule(pattern = "*Delhivery", type = RuleType.SENDER, isDefault = true, isEnabled = true),
+            IgnoreRule(pattern = "*DLHVRY", type = RuleType.SENDER, isDefault = true, isEnabled = true),
             IgnoreRule(pattern = "has been delivered", type = RuleType.BODY_PHRASE, isDefault = true, isEnabled = true)
         )
         setupTest(ignoreRules = ignoreRules)
@@ -463,7 +463,7 @@ class SmsParserTest {
     @Test
     fun `test ignores Delhivery delivery attempt notification`() = runBlocking {
         val ignoreRules = listOf(
-            IgnoreRule(pattern = "*Delhivery", type = RuleType.SENDER, isDefault = true, isEnabled = true)
+            IgnoreRule(pattern = "*DLHVRY", type = RuleType.SENDER, isDefault = true, isEnabled = true)
         )
         setupTest(ignoreRules = ignoreRules)
         val smsBody = "Your SBI Card sent via Delhivery Reference No EV25170653359 will be attempted today. Pls provide this Delivery Authentication Code 3832 - Delhivery"
