@@ -1,29 +1,15 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/utils/SmsParser.kt
-// REASON: FIX - Corrected keyword priority and merchant regex to resolve all
-// unit test failures. The parser now correctly handles ambiguous debit/credit
-// messages and trims trailing punctuation from merchant names.
-// =================================================================================
-package io.pm.finlight.utils
+package io.pm.finlight
 
-import android.util.Log
-import io.pm.finlight.CustomSmsRuleDao
-import io.pm.finlight.IgnoreRuleDao
-import io.pm.finlight.MerchantCategoryMappingDao
-import io.pm.finlight.MerchantRenameRuleDao
-import io.pm.finlight.RuleType
-import kotlinx.coroutines.flow.first
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 
-data class PotentialAccount(
-    val formattedName: String,
-    val accountType: String,
-)
-
+/**
+ * A pure Kotlin object for parsing financial transaction details from SMS messages.
+ * It is completely decoupled from the Android framework and relies on provider
+ * interfaces to fetch necessary rules and mappings.
+ */
 object SmsParser {
     private val AMOUNT_WITH_CURRENCY_REGEX = "(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- FIX: Re-added "sent" keyword to fix regression. Specific non-transactional "sent" messages are handled by ignore rules. ---
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val ACCOUNT_PATTERNS =
@@ -47,7 +33,6 @@ object SmsParser {
             "(ICICI Bank) Acc(?:t)? XX(\\d{3,4}) debited".toRegex(RegexOption.IGNORE_CASE),
             "Acc(?:t)? XX(\\d{3,4}) is credited.*-(ICICI Bank)".toRegex(RegexOption.IGNORE_CASE)
         )
-    // --- FIX: Reordered patterns to prioritize specific keywords like 'Info:' over generic ones like 'on' ---
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
             "as (reversal of transaction)".toRegex(RegexOption.IGNORE_CASE),
@@ -139,36 +124,32 @@ object SmsParser {
     suspend fun parse(
         sms: SmsMessage,
         mappings: Map<String, String>,
-        customSmsRuleDao: CustomSmsRuleDao,
-        merchantRenameRuleDao: MerchantRenameRuleDao,
-        ignoreRuleDao: IgnoreRuleDao,
-        merchantCategoryMappingDao: MerchantCategoryMappingDao
+        customSmsRuleProvider: CustomSmsRuleProvider,
+        merchantRenameRuleProvider: MerchantRenameRuleProvider,
+        ignoreRuleProvider: IgnoreRuleProvider,
+        merchantCategoryMappingProvider: MerchantCategoryMappingProvider
     ): PotentialTransaction? {
-        Log.d("SmsParser", "--- Parsing SMS from: ${sms.sender} ---")
-
-        val allIgnoreRules = ignoreRuleDao.getEnabledRules()
+        val allIgnoreRules = ignoreRuleProvider.getEnabledRules()
         val senderIgnoreRules = allIgnoreRules.filter { it.type == RuleType.SENDER }
         val bodyIgnoreRules = allIgnoreRules.filter { it.type == RuleType.BODY_PHRASE }
 
         for (rule in senderIgnoreRules) {
             try {
                 if (wildcardToRegex(rule.pattern).matches(sms.sender)) {
-                    Log.d("SmsParser", "Message sender '${sms.sender}' matches ignore pattern '${rule.pattern}'. Ignoring.")
                     return null
                 }
             } catch (e: PatternSyntaxException) {
-                Log.e("SmsParser", "Invalid regex from sender pattern: '${rule.pattern}'", e)
+                // Ignore invalid regex patterns in rules
             }
         }
 
         for (rule in bodyIgnoreRules) {
             try {
                 if (rule.pattern.toRegex(RegexOption.IGNORE_CASE).containsMatchIn(sms.body)) {
-                    Log.d("SmsParser", "Message body contains ignore phrase '${rule.pattern}'. Ignoring.")
                     return null
                 }
             } catch (e: PatternSyntaxException) {
-                Log.e("SmsParser", "Invalid regex in body phrase: '${rule.pattern}'", e)
+                // Ignore invalid regex in body phrase
             }
         }
 
@@ -177,15 +158,12 @@ object SmsParser {
         var extractedAccount: PotentialAccount? = null
         var detectedCurrency: String? = null
 
-        val allRules = customSmsRuleDao.getAllRules().first()
-        val renameRules = merchantRenameRuleDao.getAllRules().first().associateBy({ it.originalName }, { it.newName })
-        Log.d("SmsParser", "Found ${allRules.size} custom rules and ${renameRules.size} rename rules.")
+        val allRules = customSmsRuleProvider.getAllRules()
+        val renameRules = merchantRenameRuleProvider.getAllRules().associateBy({ it.originalName }, { it.newName })
 
 
         for (rule in allRules) {
             if (sms.body.contains(rule.triggerPhrase, ignoreCase = true)) {
-                Log.d("SmsParser", "SUCCESS: Found matching trigger phrase '${rule.triggerPhrase}' for rule ID ${rule.id}.")
-
                 rule.merchantRegex?.let { regexStr ->
                     try {
                         val match = regexStr.toRegex().find(sms.body)
@@ -215,10 +193,9 @@ object SmsParser {
                         if (match != null && match.groupValues.size > 1) {
                             val accountName = match.groupValues[1].trim()
                             extractedAccount = PotentialAccount(formattedName = accountName, accountType = "Custom")
-                            Log.d("SmsParser", "Extracted Account: '$accountName' using custom rule.")
                         }
                     } catch (e: PatternSyntaxException) {
-                        Log.e("SmsParser", "Invalid account regex for rule ID ${rule.id}", e)
+                        // Log error if needed
                     }
                 }
                 break
@@ -268,17 +245,12 @@ object SmsParser {
         }
 
         if (merchantName != null && renameRules.containsKey(merchantName)) {
-            val originalName = merchantName
             merchantName = renameRules[merchantName]
-            Log.d("SmsParser", "Applied rename rule: '$originalName' -> '$merchantName'")
         }
 
         var learnedCategoryId: Int? = null
         if (merchantName != null) {
-            learnedCategoryId = merchantCategoryMappingDao.getCategoryIdForMerchant(merchantName)
-            if (learnedCategoryId != null) {
-                Log.d("SmsParser", "Found learned category ID $learnedCategoryId for merchant '$merchantName'")
-            }
+            learnedCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(merchantName)
         }
 
         val potentialAccount = extractedAccount ?: parseAccount(sms.body, sms.sender)
