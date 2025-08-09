@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/receiver/SmsReceiver.kt
-// REASON: FEATURE - The receiver now checks the new user preference before
-// enqueuing the `TransactionNotificationWorker`. This gives the user control
-// over whether they receive notifications for transactions that are captured
-// automatically from SMS messages.
+// REASON: REFACTOR - Updated to use the decoupled SmsParser from the 'core'
+// module. It now instantiates and passes data provider implementations
+// (which wrap the DAOs) to the parser, adhering to the new architecture.
 // =================================================================================
 package io.pm.finlight
 
@@ -19,8 +18,6 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.utils.NotificationHelper
-import io.pm.finlight.utils.SmsParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -50,22 +47,29 @@ class SmsReceiver : BroadcastReceiver() {
                         val db = AppDatabase.getInstance(context)
                         val settingsRepository = SettingsRepository(context)
                         val transactionDao = db.transactionDao()
-                        val accountDao = db.accountDao()
                         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
-                        val merchantCategoryMappingDao = db.merchantCategoryMappingDao()
-                        val ignoreRuleDao = db.ignoreRuleDao()
 
                         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
                         val existingSmsHashes = transactionDao.getAllSmsHashes().first().toSet()
 
                         val smsMessage = SmsMessage(id = smsId, sender = sender, body = fullBody, date = smsId)
+
+                        // --- REFACTOR: Use the decoupled SmsParser from the core module ---
                         val potentialTxn = SmsParser.parse(
                             sms = smsMessage,
                             mappings = existingMappings,
-                            customSmsRuleDao = db.customSmsRuleDao(),
-                            merchantRenameRuleDao = db.merchantRenameRuleDao(),
-                            ignoreRuleDao = ignoreRuleDao,
-                            merchantCategoryMappingDao = merchantCategoryMappingDao
+                            customSmsRuleProvider = object : CustomSmsRuleProvider {
+                                override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
+                            },
+                            merchantRenameRuleProvider = object : MerchantRenameRuleProvider {
+                                override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+                            },
+                            ignoreRuleProvider = object : IgnoreRuleProvider {
+                                override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
+                            },
+                            merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
+                                override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+                            }
                         )
 
                         if (potentialTxn != null && !existingSmsHashes.contains(potentialTxn.sourceSmsHash)) {
@@ -77,15 +81,12 @@ class SmsReceiver : BroadcastReceiver() {
 
                             if (isTravelModeActive && travelSettings != null) {
                                 when (potentialTxn.detectedCurrencyCode) {
-                                    // Case 1: Foreign currency is detected
                                     travelSettings.currencyCode -> {
                                         saveTransaction(context, potentialTxn, isForeign = true, travelSettings = travelSettings)
                                     }
-                                    // Case 2: Home currency is detected
                                     homeCurrency -> {
                                         saveTransaction(context, potentialTxn, isForeign = false, travelSettings = null)
                                     }
-                                    // Case 3: Ambiguous, fall back to user prompt
                                     else -> {
                                         NotificationHelper.showTravelModeSmsNotification(context, potentialTxn, travelSettings)
                                     }
@@ -113,7 +114,7 @@ class SmsReceiver : BroadcastReceiver() {
         val db = AppDatabase.getInstance(context)
         val accountDao = db.accountDao()
         val transactionDao = db.transactionDao()
-        val settingsRepository = SettingsRepository(context) // Instantiate repository
+        val settingsRepository = SettingsRepository(context)
 
         val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
         val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
@@ -163,7 +164,6 @@ class SmsReceiver : BroadcastReceiver() {
 
             val newTransactionId = transactionDao.insert(transactionToSave)
 
-            // --- UPDATED: Check the user's preference before showing a notification ---
             if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED &&
                 settingsRepository.isAutoCaptureNotificationEnabledBlocking()) {
                 val workRequest = OneTimeWorkRequestBuilder<TransactionNotificationWorker>()
