@@ -1,0 +1,4 @@
+Paste your anonymized SMS messages here, one per line.
+Example: Sent Rs.11.00 From HDFC Bank A/C 1243 To Raju On 07/08/25 Ref 558523453508
+Example: ICICI Bank Acc XX244 debited Rs. 8,700.00 on 02-Aug-25 InfoACHZERODHA B.Avl Bal Rs. 3,209.31.
+Example: Your Sodexo Card has been successfully loaded with Rs.1250 towards Meal Card A/c on 15:00,15 Dec.
