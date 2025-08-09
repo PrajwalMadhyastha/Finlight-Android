@@ -1,14 +1,16 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/TransactionDao.kt
-// REASON: FIX - Corrected the import for the @Transaction annotation to point
-// to androidx.room.Transaction, resolving multiple build errors.
+// FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
+// REASON: FIX - Corrected a build error caused by a name collision between the
+// `Transaction` entity and the `@Transaction` annotation. The ambiguous import
+// has been removed, and the annotation is now fully qualified (`@androidx.room.Transaction`)
+// to resolve the conflict.
 // =================================================================================
 package io.pm.finlight
 
 import androidx.room.*
 import io.pm.finlight.data.model.MerchantPrediction
 import kotlinx.coroutines.flow.Flow
-import androidx.room.Transaction
+// Removed the ambiguous import: import androidx.room.Transaction
 
 @Dao
 interface TransactionDao {
@@ -33,7 +35,7 @@ interface TransactionDao {
     @Query("DELETE FROM transactions WHERE id IN (:transactionIds)")
     suspend fun deleteByIds(transactionIds: List<Int>)
 
-    @Transaction
+    @androidx.room.Transaction
     @Query("SELECT * FROM transactions WHERE id = :transactionId")
     fun getTransactionWithSplits(transactionId: Int): Flow<TransactionWithSplits?>
 
@@ -106,7 +108,7 @@ interface TransactionDao {
     @Query("UPDATE transactions SET isExcluded = :isExcluded WHERE id = :id")
     suspend fun updateExclusionStatus(id: Int, isExcluded: Boolean)
 
-    @Transaction
+    @androidx.room.Transaction
     @Query(
         """
         SELECT
@@ -127,7 +129,7 @@ interface TransactionDao {
     )
     fun getAllTransactions(): Flow<List<TransactionDetails>>
 
-    @Transaction
+    @androidx.room.Transaction
     @Query("""
         WITH AtomicIncomes AS (
             SELECT T.*
@@ -199,7 +201,7 @@ interface TransactionDao {
     """)
     fun getSpendingByMerchantForMonth(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?): Flow<List<MerchantSpendingSummary>>
 
-    @Transaction
+    @androidx.room.Transaction
     @Query("""
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey
         FROM transactions AS T
@@ -210,7 +212,7 @@ interface TransactionDao {
     """)
     fun getTransactionsForCategoryName(categoryName: String, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
 
-    @Transaction
+    @androidx.room.Transaction
     @Query("""
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey
         FROM transactions AS T
@@ -291,7 +293,7 @@ interface TransactionDao {
     suspend fun updateDate(id: Int, date: Long)
 
 
-    @Transaction
+    @androidx.room.Transaction
     @Query(
         """
         SELECT
@@ -312,7 +314,7 @@ interface TransactionDao {
     fun getTransactionDetailsById(id: Int): Flow<TransactionDetails?>
 
 
-    @Transaction
+    @androidx.room.Transaction
     @Query(
         """
         SELECT
@@ -337,7 +339,7 @@ interface TransactionDao {
     @Query("SELECT sourceSmsHash FROM transactions WHERE sourceSmsHash IS NOT NULL")
     fun getAllSmsHashes(): Flow<List<String>>
 
-    @Transaction
+    @androidx.room.Transaction
     @Query(
         """
         SELECT
@@ -368,7 +370,7 @@ interface TransactionDao {
         categoryId: Int?
     ): Flow<List<TransactionDetails>>
 
-    @Transaction
+    @androidx.room.Transaction
     @Query(
         """
         SELECT t.*, a.name as accountName, c.name as categoryName, c.iconKey as categoryIconKey, c.colorKey as categoryColorKey
@@ -513,7 +515,7 @@ interface TransactionDao {
     @Query("DELETE FROM transaction_tag_cross_ref WHERE transactionId = :transactionId")
     suspend fun clearTagsForTransaction(transactionId: Int)
 
-    @Transaction
+    @androidx.room.Transaction
     @Query("SELECT T.* FROM tags T INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.tagId WHERE TTCR.transactionId = :transactionId")
     fun getTagsForTransaction(transactionId: Int): Flow<List<Tag>>
 
@@ -625,7 +627,7 @@ interface TransactionDao {
     @Query("UPDATE transactions SET description = :newDescription WHERE id IN (:ids)")
     suspend fun updateDescriptionForIds(ids: List<Int>, newDescription: String)
 
-    @Transaction
+    @androidx.room.Transaction
     @Query("""
         SELECT t.*, a.name as accountName, c.name as categoryName, c.iconKey as categoryIconKey, c.colorKey as categoryColorKey
         FROM transactions t
