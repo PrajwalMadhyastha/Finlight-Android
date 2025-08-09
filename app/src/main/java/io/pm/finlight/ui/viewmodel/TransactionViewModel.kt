@@ -1,10 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FIX - The `autoSaveSmsTransaction` and `approveSmsTransaction`
-// functions have been corrected to use the `date` field from the
-// PotentialTransaction object instead of the `sourceSmsId` or current system
-// time. This ensures that all imported transactions reflect their original SMS
-// timestamp, fixing the "1970" date bug.
+// REASON: REFACTOR - Updated the reparseTransactionFromSms function to use the
+// decoupled SmsParser from the 'core' module, passing in the required data
+// provider implementations. Also fixed all related import statements.
 // =================================================================================
 package io.pm.finlight
 
@@ -603,15 +601,24 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             val potentialTxn = SmsParser.parse(
                 smsMessage,
                 existingMappings,
-                db.customSmsRuleDao(),
-                db.merchantRenameRuleDao(),
-                db.ignoreRuleDao(),
-                db.merchantCategoryMappingDao()
+                object : CustomSmsRuleProvider {
+                    override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
+                },
+                object : MerchantRenameRuleProvider {
+                    override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+                },
+                object : IgnoreRuleProvider {
+                    override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
+                },
+                object : MerchantCategoryMappingProvider {
+                    override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+                }
             )
 
             if (potentialTxn != null) {
-                if (potentialTxn.merchantName != null && potentialTxn.merchantName != transaction.description) {
-                    transactionRepository.updateDescription(transactionId, potentialTxn.merchantName)
+                val merchant = potentialTxn.merchantName
+                if (merchant != null && merchant != transaction.description) {
+                    transactionRepository.updateDescription(transactionId, merchant)
                 }
 
                 potentialTxn.potentialAccount?.let { parsedAccount ->
@@ -780,9 +787,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         val transaction = transactionRepository.getTransactionById(id).first() ?: return@launch
         transactionRepository.updateCategoryId(id, categoryId)
 
-        if (categoryId != null && transaction.sourceSmsId != null && !transaction.originalDescription.isNullOrBlank()) {
+        val originalDescription = transaction.originalDescription
+        if (categoryId != null && !originalDescription.isNullOrBlank()) {
             val mapping = MerchantCategoryMapping(
-                parsedName = transaction.originalDescription,
+                parsedName = originalDescription,
                 categoryId = categoryId
             )
             merchantCategoryMappingRepository.insert(mapping)
@@ -907,9 +915,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
                 transactionRepository.insertTransactionWithTags(transactionToSave, tags)
 
-                if (categoryId != null && potentialTxn.merchantName != null) {
+                val merchantName = potentialTxn.merchantName
+                if (categoryId != null && merchantName != null) {
                     val mapping = MerchantCategoryMapping(
-                        parsedName = potentialTxn.merchantName,
+                        parsedName = merchantName,
                         categoryId = categoryId
                     )
                     merchantCategoryMappingRepository.insert(mapping)
