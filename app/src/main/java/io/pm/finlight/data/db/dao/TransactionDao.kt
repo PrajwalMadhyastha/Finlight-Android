@@ -8,6 +8,7 @@ package io.pm.finlight
 import androidx.room.*
 import io.pm.finlight.data.model.MerchantPrediction
 import kotlinx.coroutines.flow.Flow
+import androidx.room.Transaction
 
 @Dao
 interface TransactionDao {
