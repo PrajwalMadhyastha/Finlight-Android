@@ -346,8 +346,6 @@ class SmsParserTest {
         assertNull("Parser should ignore messages with user-defined phrases", result)
     }
 
-    // --- NEW TEST CASES ---
-
     @Test
     fun `test parses transaction reversal as income`() = runBlocking {
         setupTest()
@@ -416,5 +414,62 @@ class SmsParserTest {
         val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
 
         assertNull("Parser should ignore AutoPay setup confirmations", result)
+    }
+
+    // --- NEW TESTS FOR THE REPORTED ISSUES ---
+
+    @Test
+    fun `test ignores Navi Mutual Fund update`() = runBlocking {
+        val ignoreRules = listOf(
+            IgnoreRule(pattern = "Mutual Fund", type = RuleType.BODY_PHRASE, isDefault = true, isEnabled = true),
+            IgnoreRule(pattern = "Unit Allotment", type = RuleType.BODY_PHRASE, isDefault = true, isEnabled = true)
+        )
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Unit Allotment Update:Your request for purchase of Rs.15,498.23 in Navi Liquid Fund GDG has been processed at applicable NAV. The units will be alloted in 1-2 working days. For further queries, please visit the Navi app. Navi Mutual Fund"
+        val mockSms = SmsMessage(id = 201L, sender = "VM-NAVI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNull("Parser should ignore mutual fund allotment updates", result)
+    }
+
+    @Test
+    fun `test correctly parses ICICI card spend with Avl Limit`() = runBlocking {
+        // NOTE: We are NOT passing any ignore rules here to simulate the fix (removing "limit")
+        setupTest()
+        val smsBody = "INR 658.00 spent using ICICI Bank Card XX2031 on 09-Aug-25 on IND*Amazon. Avl Limit: INR 3,94,975.53. If not you, call 1800 2662/SMS BLOCK 1001 to 921567676"
+        val mockSms = SmsMessage(id = 202L, sender = "QP-ICIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNotNull("Parser should NOT ignore a valid transaction with 'Avl Limit'", result)
+        assertEquals(658.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("IND*Amazon", result?.merchantName)
+    }
+
+    @Test
+    fun `test ignores Delhivery delivery confirmation`() = runBlocking {
+        val ignoreRules = listOf(
+            IgnoreRule(pattern = "*DLHVRY", type = RuleType.SENDER, isDefault = true, isEnabled = true),
+            IgnoreRule(pattern = "has been delivered", type = RuleType.BODY_PHRASE, isDefault = true, isEnabled = true)
+        )
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Your SBI Card has been delivered through Delhivery and received by MS Rani Reference No EV25170653359 - Delhivery"
+        val mockSms = SmsMessage(id = 203L, sender = "VM-DLHVRY", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNull("Parser should ignore delivery confirmations", result)
+    }
+
+    @Test
+    fun `test ignores Delhivery delivery attempt notification`() = runBlocking {
+        val ignoreRules = listOf(
+            IgnoreRule(pattern = "*DLHVRY", type = RuleType.SENDER, isDefault = true, isEnabled = true)
+        )
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Your SBI Card sent via Delhivery Reference No EV25170653359 will be attempted today. Pls provide this Delivery Authentication Code 3832 - Delhivery"
+        val mockSms = SmsMessage(id = 204L, sender = "AM-DLHVRY", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, mockCustomSmsRuleDao, mockMerchantRenameRuleDao, mockIgnoreRuleDao, mockMerchantCategoryMappingDao)
+
+        assertNull("Parser should ignore delivery attempt notifications", result)
     }
 }

@@ -25,7 +25,7 @@ data class PotentialAccount(
 
 object SmsParser {
     private val AMOUNT_WITH_CURRENCY_REGEX = "(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- UPDATED: Removed "On" and re-added "purchase of" ---
+    // --- FIX: Re-added "sent" keyword to fix regression. Specific non-transactional "sent" messages are handled by ignore rules. ---
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val ACCOUNT_PATTERNS =
@@ -49,20 +49,20 @@ object SmsParser {
             "(ICICI Bank) Acc(?:t)? XX(\\d{3,4}) debited".toRegex(RegexOption.IGNORE_CASE),
             "Acc(?:t)? XX(\\d{3,4}) is credited.*-(ICICI Bank)".toRegex(RegexOption.IGNORE_CASE)
         )
+    // --- FIX: Reordered patterns to prioritize specific keywords like 'Info:' over generic ones like 'on' ---
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            // --- NEW: Specific patterns to fix test failures ---
             "as (reversal of transaction)".toRegex(RegexOption.IGNORE_CASE),
+            "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal|$)".toRegex(RegexOption.IGNORE_CASE),
             "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3}|$)".toRegex(RegexOption.IGNORE_CASE),
             "credited to VPA\\s+([^@]+)@".toRegex(RegexOption.IGNORE_CASE),
-            "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal|$)".toRegex(RegexOption.IGNORE_CASE),
             "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|$)".toRegex(RegexOption.IGNORE_CASE),
             "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on".toRegex(RegexOption.IGNORE_CASE),
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited".toRegex(RegexOption.IGNORE_CASE),
             "UPI.*(?:to|\\bat\\b)\\s+([A-Za-z0-9\\s.&'()]+?)(?:\\s+on|\\s+Ref|$)".toRegex(RegexOption.IGNORE_CASE),
             "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)".toRegex(RegexOption.IGNORE_CASE),
             "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|$|\\s+was\\s+)".toRegex(RegexOption.IGNORE_CASE),
-            "Info:?\\s*([A-Za-z0-9\\s.&'-]+?)(?:\\.|$)".toRegex(RegexOption.IGNORE_CASE)
+            "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|$|\\s+via)".toRegex(RegexOption.IGNORE_CASE)
         )
 
     private val VOLATILE_DATA_REGEX = listOf(

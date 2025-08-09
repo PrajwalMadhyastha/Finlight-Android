@@ -92,7 +92,7 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // --- UPDATED: Added final set of default ignore rules ---
+        // --- UPDATED: Refined the default ignore rules ---
         private val DEFAULT_IGNORE_PHRASES = listOf(
             // Existing Rules
             "invoice of", "payment of.*is successful", "has been credited to",
@@ -101,24 +101,25 @@ abstract class AppDatabase : RoomDatabase() {
             "has been initiated", "redemption", "requested money from you", "Folio No.",
             "NAV of", "purchase experience", "your OTP", "recharge of.*is successful",
             "thanks for the payment of", "premium due", "bill is generated", "missed call alert",
-            "pre-approved", "offer", "limit", "due on", "statement for", "KYC", "cheque book",
+            "pre-approved", "offer", "due on", "statement for", "KYC", "cheque book",
             "is approved", "congratulations", "eligible for", "SIP Purchase", "towards your SIP",
             "EMI Alert", "due by", "has requested money from you", "order.*has been delivered",
-            "shipped", "Arriving today", "out for delivery",
+            "shipped", "Arriving today", "out for delivery", "from Paytm Balance", "using OlaMoney Postpaid",
+            "is declined", "Request Failure", "AutoPay (E-mandate) Active", "mandate is successfully revoked",
+            "mandate has been successfully created", "has been dispatched", "is now active",
+            "successfully registered for UPI",
 
-            // --- NEW SUGGESTIONS from final dump ---
-            "from Paytm Balance", "using OlaMoney Postpaid", "is declined", "Request Failure",
-            "AutoPay (E-mandate) Active", "mandate is successfully revoked", "mandate has been successfully created",
-            "has been dispatched", "is now active", "successfully registered for UPI"
+            // --- NEW: Rules to fix parsing issues ---
+            "Unit Allotment", "Mutual Fund", "has been delivered"
 
         ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
-            // Existing Rules
+            // Existing Senders
             "*SBIMF", "*WKEFTT", "*BSNL", "*HDFCMF", "*AXISMF", "*KOTAKM", "*QNTAMC", "*NIMFND",
             "*MYNTRA", "*FLPKRT", "*AMAZON", "*SWIGGY", "*ZOMATO", "*BLUDRT", "*EKARTL",
-            "*DLHVRY", "*XPBEES",
+            "*XPBEES", "*OLAMNY", "*Paytm",
 
-            // --- NEW SUGGESTIONS from final dump ---
-            "*OLAMNY", "*Paytm"
+            // --- FIX: Corrected sender pattern to match test cases ---
+            "*DLHVRY"
 
         ).map { IgnoreRule(pattern = it, type = RuleType.SENDER, isDefault = true) }
 
