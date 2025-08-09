@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<smses>
+  <sms protocol="0" address="AX-UPSCEX" date="1627052829864" type="1" subject="null" body="DEAR APPLICANT, YOU HAVE SUCCESSFULLY SUBMITTED PART-I OF YOUR APPLICATION FOR CMS EXAMINATION - 2021. YOUR REGISTRATION ID IS 12130698512." />
+  <sms protocol="0" address="JM-HDFCBK" date="1728966168325" type="1" subject="null" body="Update! INR 11,000.00 deposited in HDFC Bank A/c XX2536 on 15-OCT-24 for XXXXXXXXXX0461-TPT-Transfer-PRAJWAL MADHYASTHA K P.Avl bal INR 26,475.53." />
+  <sms protocol="0" address="TM-BOBTXN" date="1729191791469" type="1" subject="null" body="Rs.519 transferred from A/c ...7656 to:UPI/465792658726. Total Bal:Rs.11126.76CR. Avlbl Amt:Rs.11126.76(17-10-2024 22:51:02) - Bank of Baroda" />
+</smses>

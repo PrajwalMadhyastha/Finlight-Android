@@ -1,23 +1,24 @@
 // =================================================================================
 // FILE: ./analyzer/src/main/kotlin/SmsAnalysisTool.kt
-// REASON: NEW FILE - This is the main entry point for our command-line SMS
-// analysis tool. It implements the full Phase 2 logic: reading an SMS dump,
-// using the shared SmsParser from the ':core' module, classifying results
-// (Parsed, Ignored with reason), and generating timestamped .txt and .csv
-// reports with detailed statistics.
+// REASON: REFACTOR - The script has been completely updated to parse the provided
+// XML dump file format instead of a plain text file. It now uses an XML parser
+// to iterate through each '<sms>' node and extract the 'body', 'address', and
+// 'date' attributes for analysis.
 // =================================================================================
 package io.pm.finlight.analyzer
-import io.pm.finlight.*
+
 import com.github.doyaaaaaken.kotlincsv.dsl.csvWriter
+import io.pm.finlight.*
 import kotlinx.coroutines.runBlocking
+import nl.adaptivity.xmlutil.serialization.XML
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import kotlin.system.measureTimeMillis
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 
 // --- Mock Providers for the Parser ---
-// These allow the core SmsParser to run without needing a real Android database.
-// For the analyzer, we only need the default ignore rules.
 object MockCustomSmsRuleProvider : CustomSmsRuleProvider {
     override suspend fun getAllRules(): List<CustomSmsRule> = emptyList()
 }
@@ -27,7 +28,6 @@ object MockMerchantRenameRuleProvider : MerchantRenameRuleProvider {
 }
 
 object MockIgnoreRuleProvider : IgnoreRuleProvider {
-    // The analyzer will use the default, hardcoded ignore rules from the core module.
     override suspend fun getEnabledRules(): List<IgnoreRule> = DEFAULT_IGNORE_PHRASES
 }
 
@@ -35,15 +35,30 @@ object MockMerchantCategoryMappingProvider : MerchantCategoryMappingProvider {
     override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = null
 }
 
+// --- Data classes for XML Deserialization ---
+@Serializable
+@kotlinx.serialization.Xml(name = "sms")
+data class SmsEntry(
+    val address: String,
+    val body: String,
+    val date: Long
+)
+
+@Serializable
+@kotlinx.serialization.Xml(name = "smses")
+data class SmsDump(
+    val sms: List<SmsEntry>
+)
+
 /**
  * The main entry point for the SMS analysis command-line tool.
  */
 fun main() = runBlocking {
-    println("Starting Finlight SMS Analysis...")
+    println("Starting Finlight SMS Analysis (XML Mode)...")
 
     val executionTime = measureTimeMillis {
         // --- Configuration ---
-        val inputFileName = "analyzer/src/main/resources/sms_dump.txt"
+        val inputFileName = "analyzer/src/main/resources/sms_dump.xml"
         val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(Date())
         val outputReportFileName = "analysis_report_$timestamp.txt"
         val outputCsvFileName = "ignored_messages_$timestamp.csv"
@@ -52,33 +67,40 @@ fun main() = runBlocking {
         val inputFile = File(inputFileName)
         if (!inputFile.exists()) {
             println("ERROR: Input file not found at '$inputFileName'")
-            println("Please create the file and populate it with SMS messages, one per line.")
-            // Create a placeholder file to guide the user
             inputFile.parentFile.mkdirs()
-            inputFile.writeText("Paste your SMS messages here, one per line.\nExample: Sent Rs.100 to John Doe from account 1234.")
+            inputFile.writeText("""
+                <?xml version='1.0' encoding='utf-8'?>
+                <smses>
+                  <sms protocol="0" address="AX-UPSCEX" date="1627052829864" type="1" subject="null" body="Sample SMS body text here."/>
+                </smses>
+            """.trimIndent())
             println("A placeholder file has been created for you.")
             return@runBlocking
         }
 
-        val allMessages = inputFile.readLines().filter { it.isNotBlank() }
-        val parsedTransactions = mutableListOf<Pair<String, PotentialTransaction>>()
-        val ignoredMessages = mutableListOf<Pair<String, String>>()
+        val xml = XML {
+            unknownChildHandler = { _, _, _, _, _ -> } // Ignore unknown attributes
+        }
+        val smsDumpText = inputFile.readText()
+        val smsDump = xml.decodeFromString<SmsDump>(smsDumpText)
+        val allMessages = smsDump.sms
+
+        val parsedTransactions = mutableListOf<Pair<SmsEntry, PotentialTransaction>>()
+        val ignoredMessages = mutableListOf<Pair<SmsEntry, String>>()
         val ignoredForCsv = mutableListOf<List<String>>()
 
         println("Analyzing ${allMessages.size} messages from '$inputFileName'...")
 
-        allMessages.forEachIndexed { index, smsBody ->
-            // Create a mock SmsMessage object for the parser.
-            val mockSms = SmsMessage(id = index.toLong(), sender = "UNKNOWN", body = smsBody, date = System.currentTimeMillis())
+        allMessages.forEachIndexed { index, smsEntry ->
+            val mockSms = SmsMessage(id = index.toLong(), sender = smsEntry.address, body = smsEntry.body, date = smsEntry.date)
 
-            // Use the enhanced parser which returns a sealed class result.
             when (val result = SmsParser.parseWithReason(mockSms, emptyMap(), MockCustomSmsRuleProvider, MockMerchantRenameRuleProvider, MockIgnoreRuleProvider, MockMerchantCategoryMappingProvider)) {
                 is ParseResult.Success -> {
-                    parsedTransactions.add(smsBody to result.transaction)
+                    parsedTransactions.add(smsEntry to result.transaction)
                 }
                 is ParseResult.Ignored -> {
-                    ignoredMessages.add(smsBody to result.reason)
-                    ignoredForCsv.add(listOf(mockSms.sender, smsBody, result.reason))
+                    ignoredMessages.add(smsEntry to result.reason)
+                    ignoredForCsv.add(listOf(smsEntry.address, smsEntry.body, result.reason))
                 }
             }
         }
@@ -99,8 +121,8 @@ fun main() = runBlocking {
 private fun generateTextReport(
     fileName: String,
     totalCount: Int,
-    parsed: List<Pair<String, PotentialTransaction>>,
-    ignored: List<Pair<String, String>>
+    parsed: List<Pair<SmsEntry, PotentialTransaction>>,
+    ignored: List<Pair<SmsEntry, String>>
 ) {
     val parsedCount = parsed.size
     val ignoredCount = ignored.size
@@ -128,7 +150,7 @@ private fun generateTextReport(
         out.println("========================================")
         parsed.forEach { (original, txn) ->
             out.println("----------------------------------------")
-            out.println("SMS: $original")
+            out.println("SMS: ${original.body}")
             out.println("  -> Amount: ${txn.amount}, Type: ${txn.transactionType}, Merchant: ${txn.merchantName}, Account: ${txn.potentialAccount?.formattedName ?: "N/A"}")
         }
         out.println()
@@ -138,7 +160,7 @@ private fun generateTextReport(
         out.println("========================================")
         ignored.forEach { (original, reason) ->
             out.println("----------------------------------------")
-            out.println("SMS: $original")
+            out.println("SMS: ${original.body}")
             out.println("  -> Reason: $reason")
         }
     }
