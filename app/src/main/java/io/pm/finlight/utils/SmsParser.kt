@@ -11,9 +11,7 @@ import io.pm.finlight.CustomSmsRuleDao
 import io.pm.finlight.IgnoreRuleDao
 import io.pm.finlight.MerchantCategoryMappingDao
 import io.pm.finlight.MerchantRenameRuleDao
-import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.RuleType
-import io.pm.finlight.SmsMessage
 import kotlinx.coroutines.flow.first
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException

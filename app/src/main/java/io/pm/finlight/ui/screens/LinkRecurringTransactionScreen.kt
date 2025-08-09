@@ -31,7 +31,6 @@ import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.LinkTransactionViewModel
 import io.pm.finlight.LinkTransactionViewModelFactory
-import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.Transaction
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark

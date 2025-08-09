@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/IgnoreRule.kt
-// REASON: REFACTOR - The index on the 'pattern' column has been updated with
-// `collate = NOCASE`. This makes the uniqueness constraint case-insensitive at
-// the database level, preventing duplicate rules like "OTP" and "otp".
-// =================================================================================
 package io.pm.finlight
 
 import androidx.room.ColumnInfo
