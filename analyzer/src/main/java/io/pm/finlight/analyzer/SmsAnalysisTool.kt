@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./analyzer/src/main/kotlin/SmsAnalysisTool.kt
-// REASON: REFACTOR - The script has been completely updated to parse the provided
-// XML dump file format instead of a plain text file. It now uses an XML parser
-// to iterate through each '<sms>' node and extract the 'body', 'address', and
-// 'date' attributes for analysis.
+// REASON: FIX - Corrected build errors related to XML parsing. Replaced the
+// incorrect annotations with '@XmlSerialName' and updated the XML parser
+// configuration to correctly ignore unknown attributes, resolving all
+// unresolved reference and type mismatch errors.
 // =================================================================================
 package io.pm.finlight.analyzer
 
@@ -16,7 +16,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import kotlin.system.measureTimeMillis
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
+import nl.adaptivity.xmlutil.serialization.XmlSerialName
 
 // --- Mock Providers for the Parser ---
 object MockCustomSmsRuleProvider : CustomSmsRuleProvider {
@@ -37,7 +37,7 @@ object MockMerchantCategoryMappingProvider : MerchantCategoryMappingProvider {
 
 // --- Data classes for XML Deserialization ---
 @Serializable
-@kotlinx.serialization.Xml(name = "sms")
+@XmlSerialName("sms")
 data class SmsEntry(
     val address: String,
     val body: String,
@@ -45,7 +45,7 @@ data class SmsEntry(
 )
 
 @Serializable
-@kotlinx.serialization.Xml(name = "smses")
+@XmlSerialName("smses")
 data class SmsDump(
     val sms: List<SmsEntry>
 )
@@ -79,7 +79,7 @@ fun main() = runBlocking {
         }
 
         val xml = XML {
-            unknownChildHandler = { _, _, _, _, _ -> } // Ignore unknown attributes
+            ignoreUnknownChildren = true
         }
         val smsDumpText = inputFile.readText()
         val smsDump = xml.decodeFromString<SmsDump>(smsDumpText)
