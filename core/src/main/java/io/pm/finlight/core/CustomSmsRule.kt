@@ -1,18 +1,8 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/CustomSmsRule.kt
-// REASON: FEATURE - Added a new `sourceSmsBody` column. This will store the
-// original SMS text that the rule was created from, which is a necessary
-// foundation for the upcoming "Edit Rule" feature.
-// =================================================================================
 package io.pm.finlight
 
-import androidx.room.Entity
-import androidx.room.Index
-import androidx.room.PrimaryKey
-
 /**
- * Represents a user-defined parsing rule that is independent of the SMS sender.
- * The rule is activated when its 'triggerPhrase' is found within an SMS body.
+ * Represents a user-defined parsing rule.
+ * This is a plain data class, free of Android/Room annotations.
  *
  * @param id The unique identifier for the rule.
  * @param triggerPhrase A stable, unique piece of text from an SMS that identifies
@@ -26,12 +16,7 @@ import androidx.room.PrimaryKey
  * @param priority The execution priority. Higher numbers are checked first.
  * @param sourceSmsBody The original SMS text this rule was created from.
  */
-@Entity(
-    tableName = "custom_sms_rules",
-    indices = [Index(value = ["triggerPhrase"], unique = true)]
-)
 data class CustomSmsRule(
-    @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val triggerPhrase: String,
     val merchantRegex: String?,

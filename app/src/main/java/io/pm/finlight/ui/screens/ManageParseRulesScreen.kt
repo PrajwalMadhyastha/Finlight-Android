@@ -30,7 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import io.pm.finlight.CustomSmsRule
 import io.pm.finlight.ManageParseRulesViewModel
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
