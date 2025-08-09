@@ -18,3 +18,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Finlight" // Or your actual project name
 include(":app")
+include(":core")
