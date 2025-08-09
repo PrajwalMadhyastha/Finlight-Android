@@ -7,15 +7,16 @@
 // =================================================================================
 
 plugins {
-    // FIX: Removed the explicit version to inherit it from the project settings,
-    // resolving the version conflict build error.
     kotlin("jvm")
     application
 }
 
-repositories {
-    mavenCentral()
-}
+// FIX: Removed the 'repositories' block. Repository configuration is managed
+// centrally by the root settings.gradle.kts file, and defining it here
+// caused a build error.
+// repositories {
+//     mavenCentral()
+// }
 
 dependencies {
     // Dependency on the shared core logic module
