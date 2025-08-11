@@ -143,7 +143,8 @@ configurations.all {
 
 dependencies {
     // --- NEW: Add dependency on the core module ---
-    implementation(project(":core"))
+    testImplementation(project(":core"))
+    implementation(project(mapOf("path" to ":core")))
 
     implementation("androidx.core:core-ktx:$coreKtxVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
