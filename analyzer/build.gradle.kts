@@ -8,6 +8,14 @@ plugins {
     application
 }
 
+// --- FIX: Add this block to enforce Java 17 compatibility ---
+// This ensures the Java compiler for this module targets the same JVM version
+// as the rest of the Android project, resolving the inconsistency.
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
 dependencies {
     // Standard Kotlin libraries
     implementation(kotlin("stdlib"))
@@ -15,7 +23,7 @@ dependencies {
     // Dependency on the shared 'core' module to access the SmsParser.
     implementation(project(":core"))
 
-    // --- UPDATED: Switched from XML to the more robust JSON serialization library ---
+    // Use the robust JSON serialization library.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 }
 
@@ -26,6 +34,7 @@ application {
 
 tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
+        // Ensure Kotlin also targets JVM 17 for consistency.
         jvmTarget.set(JvmTarget.JVM_17)
     }
 }
