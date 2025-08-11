@@ -25,3 +25,7 @@ captures/
 generated/
 project_context.txt
 tree.txt
+
+# --- ADDED: Ignore generated analysis reports ---
+# This will prevent any CSV files in the project root from being tracked.
+*.csv
