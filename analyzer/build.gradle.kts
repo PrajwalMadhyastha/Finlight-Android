@@ -3,12 +3,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    // Apply the Kotlin JVM plugin using the conventional ID.
-    // This is a more standard declaration and resolves the dependency lookup issue.
     id("org.jetbrains.kotlin.jvm")
-    // Apply the Kotlin serialization plugin to enable the XML parser.
     kotlin("plugin.serialization")
-    // Apply the application plugin to make this module runnable.
     application
 }
 
@@ -19,9 +15,8 @@ dependencies {
     // Dependency on the shared 'core' module to access the SmsParser.
     implementation(project(":core"))
 
-    // Add the Kotlinx Serialization library for XML.
-    // This provides the necessary classes for XML parsing, including the Xml format builder.
-    implementation("io.github.pdvrieze.xmlutil:serialization:0.86.3")
+    // --- UPDATED: Switched from XML to the more robust JSON serialization library ---
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 }
 
 application {
@@ -31,6 +26,6 @@ application {
 
 tasks.withType<KotlinCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_21)
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
