@@ -1,32 +1,36 @@
-// =================================================================================
-// FILE: ./analyzer/build.gradle.kts
-// REASON: REFACTOR - Added the 'kotlinx-serialization-xml' dependency to enable
-// parsing of the XML SMS dump file.
-// =================================================================================
+// build.gradle.kts for the :analyzer module
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm")
+    // Apply the Kotlin JVM plugin using the conventional ID.
+    // This is a more standard declaration and resolves the dependency lookup issue.
+    id("org.jetbrains.kotlin.jvm")
+    // Apply the Kotlin serialization plugin to enable the XML parser.
+    kotlin("plugin.serialization")
+    // Apply the application plugin to make this module runnable.
     application
 }
 
 dependencies {
-    // Dependency on the shared core logic module
-    implementation(project(":core"))
-
-    // Standard Kotlin library
+    // Standard Kotlin libraries
     implementation(kotlin("stdlib"))
 
-    // Coroutines for any async operations if needed in the future
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    // Dependency on the shared 'core' module to access the SmsParser.
+    implementation(project(":core"))
 
-    // CSV writing library to generate structured reports
-    implementation("com.github.doyaaaaaken:kotlin-csv-jvm:1.9.3")
-
-    // XML parsing library
+    // Add the Kotlinx Serialization library for XML.
+    // This provides the necessary classes for XML parsing, including the Xml format builder.
     implementation("io.github.pdvrieze.xmlutil:serialization:0.86.3")
 }
 
 application {
-    // Define the entry point of our command-line application
+    // Define the main class for the runnable application.
     mainClass.set("io.pm.finlight.analyzer.SmsAnalysisToolKt")
+}
+
+tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
+    }
 }

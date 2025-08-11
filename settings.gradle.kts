@@ -14,6 +14,7 @@ dependencyResolutionManagement {
         mavenCentral()
         // --- NEW: Add JitPack repository ---
         maven { url = uri("https://jitpack.io") }
+        maven { url = uri("https://central.sonatype.com/repository/maven-snapshots/") }
     }
 }
 rootProject.name = "Finlight" // Or your actual project name

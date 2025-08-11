@@ -1,179 +1,152 @@
-// =================================================================================
-// FILE: ./analyzer/src/main/kotlin/SmsAnalysisTool.kt
-// REASON: FIX - Corrected build errors related to XML parsing. Replaced the
-// incorrect annotations with '@XmlSerialName' and updated the XML parser
-// configuration to correctly ignore unknown attributes, resolving all
-// unresolved reference and type mismatch errors.
-// =================================================================================
 package io.pm.finlight.analyzer
 
-import com.github.doyaaaaaken.kotlincsv.dsl.csvWriter
-import io.pm.finlight.*
-import kotlinx.coroutines.runBlocking
-import nl.adaptivity.xmlutil.serialization.XML
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import kotlin.system.measureTimeMillis
+import io.pm.finlight.CustomSmsRule
+import io.pm.finlight.CustomSmsRuleProvider
+import io.pm.finlight.DEFAULT_IGNORE_PHRASES
+import io.pm.finlight.IgnoreRule
+import io.pm.finlight.IgnoreRuleProvider
+import io.pm.finlight.MerchantCategoryMappingProvider
+import io.pm.finlight.MerchantRenameRule
+import io.pm.finlight.MerchantRenameRuleProvider
+import io.pm.finlight.ParseResult
+import io.pm.finlight.SmsMessage
+import io.pm.finlight.SmsParser
+import io.pm.finlight.core.*
 import kotlinx.serialization.Serializable
+import nl.adaptivity.xmlutil.serialization.XML
+import nl.adaptivity.xmlutil.serialization.XmlElement
 import nl.adaptivity.xmlutil.serialization.XmlSerialName
+import java.io.File
 
-// --- Mock Providers for the Parser ---
-object MockCustomSmsRuleProvider : CustomSmsRuleProvider {
-    override suspend fun getAllRules(): List<CustomSmsRule> = emptyList()
-}
+// =================================================================================
+// Data classes for XML Deserialization
+// These classes model the structure of the sms_dump.xml file.
+// =================================================================================
 
-object MockMerchantRenameRuleProvider : MerchantRenameRuleProvider {
-    override suspend fun getAllRules(): List<MerchantRenameRule> = emptyList()
-}
-
-object MockIgnoreRuleProvider : IgnoreRuleProvider {
-    override suspend fun getEnabledRules(): List<IgnoreRule> = DEFAULT_IGNORE_PHRASES
-}
-
-object MockMerchantCategoryMappingProvider : MerchantCategoryMappingProvider {
-    override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = null
-}
-
-// --- Data classes for XML Deserialization ---
 @Serializable
 @XmlSerialName("sms")
-data class SmsEntry(
+data class Sms(
+    val protocol: String,
     val address: String,
+    val date: String,
+    val type: String,
+    val subject: String?,
     val body: String,
-    val date: Long
+    @XmlElement(true)
+    val toa: String?,
+    @XmlElement(true)
+    val sc_toa: String?,
+    @XmlElement(true)
+    val service_center: String?,
+    val read: String,
+    val status: String,
+    val locked: String,
+    val date_sent: String,
+    val readable_date: String,
+    val contact_name: String
 )
 
 @Serializable
 @XmlSerialName("smses")
-data class SmsDump(
-    val sms: List<SmsEntry>
+data class Smses(
+    val count: Int,
+    @XmlElement(true)
+    val sms: List<Sms>
 )
 
+// =================================================================================
+// Main Analysis Tool
+// =================================================================================
+
 /**
- * The main entry point for the SMS analysis command-line tool.
+ * A standalone command-line tool to analyze a dump of SMS messages and test
+ * the accuracy of the SmsParser.
  */
-fun main() = runBlocking {
-    println("Starting Finlight SMS Analysis (XML Mode)...")
+suspend fun main() {
+    println("Starting Finlight SMS Parser Analysis...")
 
-    val executionTime = measureTimeMillis {
-        // --- Configuration ---
-        val inputFileName = "analyzer/src/main/resources/sms_dump.xml"
-        val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(Date())
-        val outputReportFileName = "analysis_report_$timestamp.txt"
-        val outputCsvFileName = "ignored_messages_$timestamp.csv"
+    val xml = XML {
+        ignoreUnknownChildren()
+    }
 
-        // --- Data Processing ---
-        val inputFile = File(inputFileName)
-        if (!inputFile.exists()) {
-            println("ERROR: Input file not found at '$inputFileName'")
-            inputFile.parentFile.mkdirs()
-            inputFile.writeText("""
-                <?xml version='1.0' encoding='utf-8'?>
-                <smses>
-                  <sms protocol="0" address="AX-UPSCEX" date="1627052829864" type="1" subject="null" body="Sample SMS body text here."/>
-                </smses>
-            """.trimIndent())
-            println("A placeholder file has been created for you.")
-            return@runBlocking
-        }
+    val inputFile = File("sms_dump.xml")
+    if (!inputFile.exists()) {
+        println("Error: sms_dump.xml not found in the project root directory.")
+        return
+    }
 
-        val xml = XML {
-            ignoreUnknownChildren = true
-        }
-        val smsDumpText = inputFile.readText()
-        val smsDump = xml.decodeFromString<SmsDump>(smsDumpText)
-        val allMessages = smsDump.sms
+    println("Found sms_dump.xml. Reading and parsing file...")
 
-        val parsedTransactions = mutableListOf<Pair<SmsEntry, PotentialTransaction>>()
-        val ignoredMessages = mutableListOf<Pair<SmsEntry, String>>()
-        val ignoredForCsv = mutableListOf<List<String>>()
+    val smses: Smses = xml.decodeFromReader(inputFile.reader())
 
-        println("Analyzing ${allMessages.size} messages from '$inputFileName'...")
+    println("Successfully parsed ${smses.count} messages from XML.")
+    println("--------------------------------------------------")
 
-        allMessages.forEachIndexed { index, smsEntry ->
-            val mockSms = SmsMessage(id = index.toLong(), sender = smsEntry.address, body = smsEntry.body, date = smsEntry.date)
+    var parsedCount = 0
+    var ignoredCount = 0
+    val ignoredReasons = mutableMapOf<String, Int>()
 
-            when (val result = SmsParser.parseWithReason(mockSms, emptyMap(), MockCustomSmsRuleProvider, MockMerchantRenameRuleProvider, MockIgnoreRuleProvider, MockMerchantCategoryMappingProvider)) {
-                is ParseResult.Success -> {
-                    parsedTransactions.add(smsEntry to result.transaction)
-                }
-                is ParseResult.Ignored -> {
-                    ignoredMessages.add(smsEntry to result.reason)
-                    ignoredForCsv.add(listOf(smsEntry.address, smsEntry.body, result.reason))
-                }
+    // Mock providers since we are not running on Android and have no access to Room DB.
+    // This allows the core SmsParser to run in a pure JVM environment.
+    val mockCustomRuleProvider = object : CustomSmsRuleProvider {
+        override suspend fun getAllRules(): List<CustomSmsRule> = emptyList()
+    }
+    val mockRenameRuleProvider = object : MerchantRenameRuleProvider {
+        override suspend fun getAllRules(): List<MerchantRenameRule> = emptyList()
+    }
+    val mockIgnoreRuleProvider = object : IgnoreRuleProvider {
+        override suspend fun getEnabledRules(): List<IgnoreRule> = DEFAULT_IGNORE_PHRASES
+    }
+    val mockCategoryMappingProvider = object : MerchantCategoryMappingProvider {
+        override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = null
+    }
+
+    // Analyze each message
+    smses.sms.forEach { sms ->
+        val smsMessage = SmsMessage(
+            id = sms.date.toLongOrNull() ?: 0L,
+            sender = sms.address,
+            body = sms.body,
+            date = sms.date.toLongOrNull() ?: 0L
+        )
+
+        val result = SmsParser.parse(
+            sms = smsMessage,
+            mappings = emptyMap(), // No pre-existing mappings for this test
+            customSmsRuleProvider = mockCustomRuleProvider,
+            merchantRenameRuleProvider = mockRenameRuleProvider,
+            ignoreRuleProvider = mockIgnoreRuleProvider,
+            merchantCategoryMappingProvider = mockCategoryMappingProvider
+        )
+
+        when (result) {
+            is ParseResult.Success -> {
+                parsedCount++
+                println("[SUCCESS] Parsed: ${result.transaction.merchantName} - ${result.transaction.amount}")
+            }
+            is ParseResult.Ignored -> {
+                ignoredCount++
+                val reason = result.reason
+                ignoredReasons[reason] = (ignoredReasons[reason] ?: 0) + 1
+            }
+            null -> {
+                // This case is for when the parser simply doesn't find a match,
+                // which is different from being explicitly ignored.
+                ignoredCount++
+                val reason = "No financial pattern found"
+                ignoredReasons[reason] = (ignoredReasons[reason] ?: 0) + 1
             }
         }
-
-        println("Analysis complete. Generating reports...")
-
-        // --- Report Generation ---
-        generateTextReport(outputReportFileName, allMessages.size, parsedTransactions, ignoredMessages)
-        generateCsvReport(outputCsvFileName, ignoredForCsv)
     }
 
-    println("Analysis finished in ${executionTime / 1000.0} seconds.")
-}
-
-/**
- * Generates the detailed, human-readable text report.
- */
-private fun generateTextReport(
-    fileName: String,
-    totalCount: Int,
-    parsed: List<Pair<SmsEntry, PotentialTransaction>>,
-    ignored: List<Pair<SmsEntry, String>>
-) {
-    val parsedCount = parsed.size
-    val ignoredCount = ignored.size
-    val parsedPercent = if (totalCount > 0) (parsedCount.toDouble() / totalCount * 100) else 0.0
-
-    File(fileName).printWriter().use { out ->
-        out.println("========================================")
-        out.println(" Finlight SMS Parser Analysis Report")
-        out.println("========================================")
-        out.println("Generated on: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date())}")
-        out.println()
-
-        out.println("--- Summary ---")
-        out.println("Total Messages Analyzed: $totalCount")
-        out.println("Successfully Parsed: $parsedCount (${"%.2f".format(parsedPercent)}%)")
-        out.println("Ignored as Noise: $ignoredCount")
-        out.println()
-        out.println("--- Metrics (Manual Entry for Improvement Tracking) ---")
-        out.println("False Negatives Found (Should have been parsed): __")
-        out.println("False Positives Found (Parsed incorrectly): __")
-        out.println()
-
-        out.println("========================================")
-        out.println(" Parsed Transactions ($parsedCount)")
-        out.println("========================================")
-        parsed.forEach { (original, txn) ->
-            out.println("----------------------------------------")
-            out.println("SMS: ${original.body}")
-            out.println("  -> Amount: ${txn.amount}, Type: ${txn.transactionType}, Merchant: ${txn.merchantName}, Account: ${txn.potentialAccount?.formattedName ?: "N/A"}")
-        }
-        out.println()
-
-        out.println("========================================")
-        out.println(" Ignored Messages ($ignoredCount)")
-        out.println("========================================")
-        ignored.forEach { (original, reason) ->
-            out.println("----------------------------------------")
-            out.println("SMS: ${original.body}")
-            out.println("  -> Reason: $reason")
-        }
+    // Print the final report
+    println("\n================ ANALYSIS COMPLETE ================")
+    println("Total Messages Analyzed: ${smses.count}")
+    println("Successfully Parsed: $parsedCount")
+    println("Ignored / Not Parsed: $ignoredCount")
+    println("\n--- Ignored Reasons Breakdown ---")
+    ignoredReasons.entries.sortedByDescending { it.value }.forEach { (reason, count) ->
+        println("${reason.padEnd(40, ' ')}: $count")
     }
-    println("Text report generated: '$fileName'")
-}
-
-/**
- * Generates a CSV file of ignored messages for easy sorting and filtering.
- */
-private fun generateCsvReport(fileName: String, data: List<List<String>>) {
-    csvWriter().open(fileName) {
-        writeRow("Sender", "Body", "ReasonForIgnore")
-        writeRows(data)
-    }
-    println("CSV report for ignored messages generated: '$fileName'")
+    println("================================================")
 }
