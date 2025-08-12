@@ -9,6 +9,16 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
+    <!--
+    // =================================================================================
+    // PERMISSIONS: Foreground Service
+    // REASON: Required to run the BackupWorker as a foreground service. This
+    // ensures the OS does not kill the critical backup process to save battery.
+    // The 'dataSync' type is specified for modern Android versions.
+    // =================================================================================
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -31,6 +41,18 @@
         android:theme="@style/Theme.PersonalFinanceApp"
         tools:targetApi="33"
         android:enableOnBackInvokedCallback="true">
+
+        <!--
+        // =================================================================================
+        // SERVICE: SystemForegroundService
+        // REASON: Declares the foreground service type for the BackupWorker. This is
+        // required for apps targeting Android 14 (API 34) and above.
+        // =================================================================================
+        -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
 
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
@@ -73,13 +95,6 @@
             </intent-filter>
         </receiver>
 
-        <!--
-        // =================================================================================
-        // RECEIVER: AlarmReceiver
-        // REASON: Registers the new receiver to handle exact alarms. It's not
-        // exported, meaning only our app can send it broadcasts, which is secure.
-        // =================================================================================
-        -->
         <receiver
             android:name=".receiver.AlarmReceiver"
             android:enabled="true"
