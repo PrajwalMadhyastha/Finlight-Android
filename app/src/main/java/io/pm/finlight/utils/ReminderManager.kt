@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/ReminderManager.kt
-// REASON: FEATURE - Added functions to schedule and cancel the new automatic
-// backup worker. This allows the app to manage the background backup job based
-// on user settings.
+// REASON: REFACTOR - Added a new public `rescheduleAllWork` function. This
+// centralizes the logic for re-scheduling all background tasks, which is
+// essential for the BootReceiver to correctly re-initialize all workers after
+// a device restart.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -26,11 +27,38 @@ object ReminderManager {
     private const val MONTHLY_SUMMARY_WORK_TAG = "monthly_summary_work"
     private const val RECURRING_TRANSACTION_WORK_TAG = "recurring_transaction_work"
     private const val RECURRING_PATTERN_WORK_TAG = "recurring_pattern_work"
-    // --- NEW: A unique tag for the backup worker ---
     private const val AUTO_BACKUP_WORK_TAG = "auto_backup_work"
 
 
-    // --- NEW: Function to schedule the backup worker ---
+    /**
+     * Re-schedules all background workers based on their current settings.
+     * This is intended to be called after a device reboot to ensure all
+     * scheduled tasks persist.
+     */
+    fun rescheduleAllWork(context: Context) {
+        Log.d("ReminderManager", "Rescheduling all background work...")
+        val settings = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
+
+        // Reschedule reports and backups only if they are enabled
+        if (settings.getBoolean("daily_report_enabled", false)) {
+            scheduleDailyReport(context)
+        }
+        if (settings.getBoolean("weekly_summary_enabled", true)) {
+            scheduleWeeklySummary(context)
+        }
+        if (settings.getBoolean("monthly_summary_enabled", true)) {
+            scheduleMonthlySummary(context)
+        }
+        if (settings.getBoolean("auto_backup_enabled", true)) {
+            scheduleAutoBackup(context)
+        }
+
+        // These workers don't have user-facing toggles, so they should always be rescheduled
+        scheduleRecurringTransactionWorker(context)
+        scheduleRecurringPatternWorker(context)
+    }
+
+
     fun scheduleAutoBackup(context: Context) {
         val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
         val hour = prefs.getInt("auto_backup_hour", 2) // Default to 2 AM
@@ -60,7 +88,6 @@ object ReminderManager {
         Log.d("ReminderManager", "Auto backup scheduled for ${nextRun.time}")
     }
 
-    // --- NEW: Function to cancel the backup worker ---
     fun cancelAutoBackup(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(AUTO_BACKUP_WORK_TAG)
         Log.d("ReminderManager", "Auto backup cancelled.")
