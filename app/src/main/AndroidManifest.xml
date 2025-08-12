@@ -9,7 +9,15 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
-    <!-- REMOVED: Foreground Service permission is no longer needed -->
+    <!--
+    // =================================================================================
+    // PERMISSION: SCHEDULE_EXACT_ALARM
+    // REASON: This is required for Phase 2. The AlarmManager needs this permission
+    // on newer Android versions to set precise, time-critical alarms that can
+    // wake the device from a low-power state to deliver timely report notifications.
+    // =================================================================================
+    -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_SMS" />
