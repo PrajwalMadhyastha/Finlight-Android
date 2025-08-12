@@ -1,9 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TransactionDetailScreen.kt
-// REASON: FEATURE - The screen now observes the `start_retro_scan` flag from the
-// navigation back stack. When this flag is true (after a new rule is created),
-// it triggers the `rescanSmsWithNewRule` function in the SettingsViewModel and
-// displays a Toast to inform the user that the background scan has started.
+// REASON: FIX - The date and time pickers now update a local state variable
+// immediately, providing instant visual feedback to the user. The final date is
+// only saved to the database after both the date and time have been selected,
+// fixing a bug where date changes appeared to be lost until the time was also confirmed.
+// FIX - The DatePickerDialog and the AlertDialog wrapping the TimePicker now have
+// an explicit container color to prevent them from being overly transparent.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -37,9 +39,6 @@ import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.CallSplit
-import androidx.compose.material.icons.filled.MergeType
-import androidx.compose.material.icons.filled.Message
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -101,6 +100,7 @@ private sealed interface DetailScreenState {
     object Exit : DetailScreenState
 }
 
+private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -122,7 +122,6 @@ fun TransactionDetailScreen(
     val splits by viewModel.getSplitDetailsForTransaction(transactionId).collectAsState(initial = emptyList())
 
     val reparseResult = navController.currentBackStackEntry?.savedStateHandle?.getLiveData<Boolean>("reparse_needed")?.observeAsState()
-    // --- NEW: Observe the retro scan flag ---
     val retroScanResult = navController.currentBackStackEntry?.savedStateHandle?.getLiveData<Boolean>("start_retro_scan")?.observeAsState()
 
     val navigateBack: () -> Unit = { navController.popBackStack() }
@@ -138,7 +137,6 @@ fun TransactionDetailScreen(
         }
     }
 
-    // --- NEW: Trigger the retro scan when the flag is set ---
     LaunchedEffect(retroScanResult?.value) {
         if (retroScanResult?.value == true) {
             Toast.makeText(context, "Applying new rule to recent messages...", Toast.LENGTH_SHORT).show()
@@ -204,7 +202,11 @@ fun TransactionDetailScreen(
             "income" -> "Credit transaction"
             else -> "Transaction Details"
         }
-        val calendar = remember { Calendar.getInstance().apply { timeInMillis = details.transaction.date } }
+        // --- FIX: Use a local mutable state for the calendar to provide instant UI feedback ---
+        var selectedDateTime by remember(details) {
+            mutableStateOf(Calendar.getInstance().apply { timeInMillis = details.transaction.date })
+        }
+
 
         fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
         val isThemeDark = MaterialTheme.colorScheme.background.isDark()
@@ -290,6 +292,8 @@ fun TransactionDetailScreen(
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             TransactionSpotlightHeader(
                                 details = details,
+                                // --- FIX: Pass the local state to the header ---
+                                displayDate = selectedDateTime.time,
                                 visitCount = visitCount,
                                 isSplit = details.transaction.isSplit,
                                 onDescriptionClick = {
@@ -502,31 +506,49 @@ fun TransactionDetailScreen(
                 }
 
                 if (showDatePicker) {
-                    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = calendar.timeInMillis)
+                    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedDateTime.timeInMillis)
                     DatePickerDialog(
                         onDismissRequest = { showDatePicker = false },
                         confirmButton = {
                             TextButton(onClick = {
                                 datePickerState.selectedDateMillis?.let {
-                                    calendar.timeInMillis = it
+                                    // --- FIX: Update local state immediately ---
+                                    selectedDateTime = Calendar.getInstance().apply { timeInMillis = it }
                                 }
                                 showDatePicker = false
                                 showTimePicker = true
                             }) { Text("OK") }
-                        }
+                        },
+                        dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
+                        // --- FIX: Add explicit container color ---
+                        colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
                     ) { DatePicker(state = datePickerState) }
                 }
                 if (showTimePicker) {
-                    val timePickerState = rememberTimePickerState(initialHour = calendar.get(Calendar.HOUR_OF_DAY), initialMinute = calendar.get(Calendar.MINUTE))
-                    TimePickerDialog(
+                    val timePickerState = rememberTimePickerState(initialHour = selectedDateTime.get(Calendar.HOUR_OF_DAY), initialMinute = selectedDateTime.get(Calendar.MINUTE))
+                    // --- FIX: Wrap TimePicker in an AlertDialog with explicit color ---
+                    AlertDialog(
                         onDismissRequest = { showTimePicker = false },
-                        onConfirm = {
-                            calendar.set(Calendar.HOUR_OF_DAY, timePickerState.hour)
-                            calendar.set(Calendar.MINUTE, timePickerState.minute)
-                            viewModel.updateTransactionDate(transactionId, calendar.timeInMillis)
-                            showTimePicker = false
-                        }
-                    ) { TimePicker(state = timePickerState) }
+                        containerColor = popupContainerColor,
+                        title = { Text("Select Time") },
+                        text = {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                TimePicker(state = timePickerState)
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                val finalDateTime = (selectedDateTime.clone() as Calendar).apply {
+                                    set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                                    set(Calendar.MINUTE, timePickerState.minute)
+                                }
+                                selectedDateTime = finalDateTime
+                                viewModel.updateTransactionDate(transactionId, finalDateTime.timeInMillis)
+                                showTimePicker = false
+                            }) { Text("OK") }
+                        },
+                        dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("Cancel") } }
+                    )
                 }
 
                 if (showDeleteDialog) {
@@ -742,6 +764,7 @@ private fun DynamicCategoryBackground(category: Category, isSplit: Boolean) {
 @Composable
 private fun TransactionSpotlightHeader(
     details: TransactionDetails,
+    displayDate: Date,
     visitCount: Int,
     isSplit: Boolean,
     onDescriptionClick: () -> Unit,
@@ -877,7 +900,8 @@ private fun TransactionSpotlightHeader(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = dateFormatter.format(Date(details.transaction.date)),
+                        // --- FIX: Use the local displayDate state ---
+                        text = dateFormatter.format(displayDate),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.8f),
                         modifier = Modifier.clickable(onClick = onDateTimeClick)

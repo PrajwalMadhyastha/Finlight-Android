@@ -4,6 +4,8 @@
 // description text now opens a bottom sheet that provides real-time, historical
 // suggestions for the merchant and its associated category, speeding up data
 // entry and improving consistency.
+// FIX - The DatePickerDialog and the AlertDialog wrapping the TimePicker now have
+// an explicit container color to prevent them from being overly transparent.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -49,6 +51,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,7 +78,7 @@ private sealed class ComposerSheet {
     object Account : ComposerSheet()
     object Tags : ComposerSheet()
     object Notes : ComposerSheet()
-    object Merchant : ComposerSheet() // --- NEW: Sheet for merchant prediction ---
+    object Merchant : ComposerSheet()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -280,12 +283,15 @@ fun AddTransactionScreen(
     }
 
     // region Modals and Dialogs
+    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+
     if (activeSheet != null) {
         ModalBottomSheet(
             onDismissRequest = { activeSheet = null },
             sheetState = sheetState,
             windowInsets = WindowInsets(0),
-            containerColor = if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight
+            containerColor = popupContainerColor
         ) {
             when (val sheet = activeSheet) {
                 is ComposerSheet.Account -> PickerSheet(
@@ -358,7 +364,8 @@ fun AddTransactionScreen(
                     showTimePicker = true
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
         ) { DatePicker(state = datePickerState) }
     }
 
@@ -367,14 +374,24 @@ fun AddTransactionScreen(
             initialHour = selectedDateTime.get(Calendar.HOUR_OF_DAY),
             initialMinute = selectedDateTime.get(Calendar.MINUTE)
         )
-        TimePickerDialog(
+        AlertDialog(
             onDismissRequest = { showTimePicker = false },
-            onConfirm = {
-                selectedDateTime.set(Calendar.HOUR_OF_DAY, timePickerState.hour)
-                selectedDateTime.set(Calendar.MINUTE, timePickerState.minute)
-                showTimePicker = false
-            }
-        ) { TimePicker(state = timePickerState) }
+            containerColor = popupContainerColor,
+            title = { Text("Select Time") },
+            text = {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    TimePicker(state = timePickerState)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    selectedDateTime.set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                    selectedDateTime.set(Calendar.MINUTE, timePickerState.minute)
+                    showTimePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("Cancel") } }
+        )
     }
 
     if (showCreateAccountDialog) {
