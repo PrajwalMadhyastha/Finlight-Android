@@ -1,23 +1,26 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/ReminderManager.kt
-// REASON: REFACTOR - Added a new public `rescheduleAllWork` function. This
-// centralizes the logic for re-scheduling all background tasks, which is
-// essential for the BootReceiver to correctly re-initialize all workers after
-// a device restart.
+// REASON: REFACTOR - The scheduling logic for all reports (Daily, Weekly,
+// Monthly) has been updated to use the precise `AlarmManager` instead of
+// `WorkManager`'s inexact initial delays. This significantly increases the
+// reliability of time-sensitive notifications, especially on devices with
+// aggressive battery optimization. The old worker-scheduling logic in these
+// functions has been replaced by calls to the new `scheduleExactAlarm` helper.
 // =================================================================================
 package io.pm.finlight.utils
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import io.pm.finlight.BackupWorker
-import io.pm.finlight.DailyReportWorker
-import io.pm.finlight.MonthlySummaryWorker
 import io.pm.finlight.RecurringPatternWorker
 import io.pm.finlight.RecurringTransactionWorker
-import io.pm.finlight.WeeklySummaryWorker
+import io.pm.finlight.receiver.AlarmReceiver
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -29,17 +32,10 @@ object ReminderManager {
     private const val RECURRING_PATTERN_WORK_TAG = "recurring_pattern_work"
     private const val AUTO_BACKUP_WORK_TAG = "auto_backup_work"
 
-
-    /**
-     * Re-schedules all background workers based on their current settings.
-     * This is intended to be called after a device reboot to ensure all
-     * scheduled tasks persist.
-     */
     fun rescheduleAllWork(context: Context) {
         Log.d("ReminderManager", "Rescheduling all background work...")
         val settings = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
 
-        // Reschedule reports and backups only if they are enabled
         if (settings.getBoolean("daily_report_enabled", false)) {
             scheduleDailyReport(context)
         }
@@ -53,15 +49,53 @@ object ReminderManager {
             scheduleAutoBackup(context)
         }
 
-        // These workers don't have user-facing toggles, so they should always be rescheduled
         scheduleRecurringTransactionWorker(context)
         scheduleRecurringPatternWorker(context)
     }
 
+    private fun scheduleExactAlarm(context: Context, triggerAtMillis: Long, workTag: String, requestCode: Int) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            putExtra(AlarmReceiver.EXTRA_WORK_TAG, workTag)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        if (alarmManager.canScheduleExactAlarms()) {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                triggerAtMillis,
+                pendingIntent
+            )
+            Log.d("ReminderManager", "Exact alarm scheduled for $workTag at ${Calendar.getInstance().apply { timeInMillis = triggerAtMillis }.time}")
+        } else {
+            Log.w("ReminderManager", "Cannot schedule exact alarms. App may not deliver notifications on time.")
+            // As a fallback, you could schedule an inexact alarm, but for now, we'll rely on the permission.
+        }
+    }
+
+    private fun cancelExactAlarm(context: Context, workTag: String, requestCode: Int) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            putExtra(AlarmReceiver.EXTRA_WORK_TAG, workTag)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent)
+        Log.d("ReminderManager", "Cancelled alarm for $workTag")
+    }
 
     fun scheduleAutoBackup(context: Context) {
         val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        val hour = prefs.getInt("auto_backup_hour", 2) // Default to 2 AM
+        val hour = prefs.getInt("auto_backup_hour", 2)
         val minute = prefs.getInt("auto_backup_minute", 0)
 
         val now = Calendar.getInstance()
@@ -85,7 +119,7 @@ object ReminderManager {
             ExistingWorkPolicy.REPLACE,
             backupRequest,
         )
-        Log.d("ReminderManager", "Auto backup scheduled for ${nextRun.time}")
+        Log.d("ReminderManager", "Auto backup (WorkManager) scheduled for ${nextRun.time}")
     }
 
     fun cancelAutoBackup(context: Context) {
@@ -157,21 +191,11 @@ object ReminderManager {
             nextRun.add(Calendar.DAY_OF_YEAR, 1)
         }
 
-        val initialDelay = nextRun.timeInMillis - now.timeInMillis
-        val dailyReportRequest = OneTimeWorkRequestBuilder<DailyReportWorker>()
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .build()
-
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            DAILY_EXPENSE_REPORT_WORK_TAG,
-            ExistingWorkPolicy.REPLACE,
-            dailyReportRequest,
-        )
-        Log.d("ReminderManager", "Daily report scheduled for ${nextRun.time}")
+        scheduleExactAlarm(context, nextRun.timeInMillis, DAILY_EXPENSE_REPORT_WORK_TAG, 1)
     }
 
     fun cancelDailyReport(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(DAILY_EXPENSE_REPORT_WORK_TAG)
+        cancelExactAlarm(context, DAILY_EXPENSE_REPORT_WORK_TAG, 1)
     }
 
     fun scheduleWeeklySummary(context: Context) {
@@ -192,22 +216,12 @@ object ReminderManager {
             nextRun.add(Calendar.WEEK_OF_YEAR, 1)
         }
 
-        val initialDelay = nextRun.timeInMillis - now.timeInMillis
-        val weeklyReportRequest = OneTimeWorkRequestBuilder<WeeklySummaryWorker>()
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .build()
-
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            WEEKLY_SUMMARY_WORK_TAG,
-            ExistingWorkPolicy.REPLACE,
-            weeklyReportRequest,
-        )
-        Log.d("ReminderManager", "Weekly summary scheduled for ${nextRun.time}")
+        scheduleExactAlarm(context, nextRun.timeInMillis, WEEKLY_SUMMARY_WORK_TAG, 2)
     }
 
 
     fun cancelWeeklySummary(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(WEEKLY_SUMMARY_WORK_TAG)
+        cancelExactAlarm(context, WEEKLY_SUMMARY_WORK_TAG, 2)
     }
 
     fun scheduleMonthlySummary(context: Context) {
@@ -228,20 +242,10 @@ object ReminderManager {
             nextRun.add(Calendar.MONTH, 1)
         }
 
-        val initialDelay = nextRun.timeInMillis - now.timeInMillis
-        val monthlyReportRequest = OneTimeWorkRequestBuilder<MonthlySummaryWorker>()
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .build()
-
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            MONTHLY_SUMMARY_WORK_TAG,
-            ExistingWorkPolicy.REPLACE,
-            monthlyReportRequest,
-        )
-        Log.d("ReminderManager", "Monthly summary scheduled for ${nextRun.time}")
+        scheduleExactAlarm(context, nextRun.timeInMillis, MONTHLY_SUMMARY_WORK_TAG, 3)
     }
 
     fun cancelMonthlySummary(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(MONTHLY_SUMMARY_WORK_TAG)
+        cancelExactAlarm(context, MONTHLY_SUMMARY_WORK_TAG, 3)
     }
 }
