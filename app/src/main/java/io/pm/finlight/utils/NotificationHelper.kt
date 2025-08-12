@@ -1,7 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/NotificationHelper.kt
-// REASON: FIX - Removed the `getBackupNotificationBuilder` function as the
-// worker will no longer run as a foreground service, resolving the runtime crash.
+// REASON: FEATURE - Added `getBackupNotificationBuilder` to create the persistent
+// notification required for the BackupWorker's foreground service.
+// REFACTOR - The `showAutoBackupNotification` function has been removed, as the
+// worker will now manage its own completion notification.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -40,21 +42,19 @@ object NotificationHelper {
     const val BACKUP_NOTIFICATION_ID = 99
 
 
-    fun showAutoBackupNotification(context: Context) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            return
-        }
-
-        val builder = NotificationCompat.Builder(context, MainApplication.BACKUP_CHANNEL_ID)
+    /**
+     * Creates a notification builder for the backup foreground service.
+     * This notification is non-dismissible and informs the user that a background
+     * task is running.
+     */
+    fun getBackupNotificationBuilder(context: Context): NotificationCompat.Builder {
+        return NotificationCompat.Builder(context, MainApplication.BACKUP_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_logo)
-            .setContentTitle("Backup Complete")
-            .setContentText("Your Finlight data was successfully backed up.")
+            .setContentTitle("Finlight Backup")
+            .setContentText("Backing up your data to Google Drive...")
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setAutoCancel(true)
-
-        with(NotificationManagerCompat.from(context)) {
-            notify(BACKUP_NOTIFICATION_ID, builder.build())
-        }
+            .setOngoing(true) // Makes the notification non-dismissible
+            .setProgress(0, 0, true) // Indeterminate progress bar
     }
 
 
