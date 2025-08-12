@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: REFACTOR - Updated the reparseTransactionFromSms function to use the
-// decoupled SmsParser from the 'core' module, passing in the required data
-// provider implementations. Also fixed all related import statements.
+// REASON: FIX - The logic for the `monthlySummaries` flow has been updated.
+// Instead of being limited to the current year, it now fetches the date of the
+// first transaction and dynamically generates the month scroller from that
+// historical point up to the present day, allowing users to view all their data.
 // =================================================================================
 package io.pm.finlight
 
@@ -220,37 +221,33 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             initialValue = emptyList()
         )
 
-        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
-        val startOfYear = Calendar.getInstance().apply {
-            set(Calendar.YEAR, currentYear)
-            set(Calendar.MONTH, Calendar.JANUARY)
-            set(Calendar.DAY_OF_MONTH, 1)
-        }.timeInMillis
+        // --- UPDATED: Dynamic month scroller logic ---
+        monthlySummaries = transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
+            val startDate = firstTransactionDate ?: System.currentTimeMillis()
 
-        monthlySummaries = transactionRepository.getMonthlyTrends(startOfYear)
-            .map { trends ->
-                val dateFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-                val monthMap = trends.filter {
-                    (dateFormat.parse(it.monthYear) ?: Date()).let { date ->
-                        val cal = Calendar.getInstance().apply { time = date }
-                        cal.get(Calendar.YEAR) == currentYear
+            transactionRepository.getMonthlyTrends(startDate)
+                .map { trends ->
+                    val dateFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                    val monthMap = trends.associate {
+                        val cal = Calendar.getInstance().apply { time = dateFormat.parse(it.monthYear) ?: Date() }
+                        (cal.get(Calendar.YEAR) * 100 + cal.get(Calendar.MONTH)) to it.totalExpenses
                     }
-                }.associate {
-                    val cal = Calendar.getInstance().apply { time = dateFormat.parse(it.monthYear) ?: Date() }
-                    (cal.get(Calendar.YEAR) * 100 + cal.get(Calendar.MONTH)) to it.totalExpenses
-                }
 
-                (0..11).map { monthIndex ->
-                    val cal = Calendar.getInstance().apply {
-                        set(Calendar.YEAR, currentYear)
-                        set(Calendar.MONTH, monthIndex)
+                    val monthList = mutableListOf<MonthlySummaryItem>()
+                    val startCal = Calendar.getInstance().apply { timeInMillis = startDate }
+                    startCal.set(Calendar.DAY_OF_MONTH, 1)
+                    val endCal = Calendar.getInstance()
+
+                    while (startCal.before(endCal) || (startCal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && startCal.get(Calendar.MONTH) == endCal.get(Calendar.MONTH))) {
+                        val key = startCal.get(Calendar.YEAR) * 100 + startCal.get(Calendar.MONTH)
+                        val spent = monthMap[key] ?: 0.0
+                        monthList.add(MonthlySummaryItem(calendar = startCal.clone() as Calendar, totalSpent = spent))
+                        startCal.add(Calendar.MONTH, 1)
                     }
-                    val key = cal.get(Calendar.YEAR) * 100 + cal.get(Calendar.MONTH)
-                    val spent = monthMap[key] ?: 0.0
-                    MonthlySummaryItem(calendar = cal, totalSpent = spent)
+                    monthList.reversed()
                 }
-            }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
 
         overallMonthlyBudget = _selectedMonth.flatMapLatest { settingsRepository.getOverallBudgetForMonth(it.get(Calendar.YEAR), it.get(Calendar.MONTH) + 1) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
         amountRemaining = combine(overallMonthlyBudget, monthlyExpenses) { budget, expenses -> budget - expenses.toFloat() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
