@@ -9,7 +9,12 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
-    <!-- REMOVED: Foreground Service permission is no longer needed -->
+    <!--
+    // =================================================================================
+    // REVERT: Removed Foreground Service and Exact Alarm permissions as they are
+    // no longer needed for the simplified, more resilient WorkManager-based approach.
+    // =================================================================================
+    -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_SMS" />
@@ -31,15 +36,6 @@
         android:theme="@style/Theme.PersonalFinanceApp"
         tools:targetApi="33"
         android:enableOnBackInvokedCallback="true">
-
-        <!--
-        // =================================================================================
-        // BACKUP CONFIGURATION:
-        // android:allowBackup="true" -> Enables the app to participate in the backup/restore infrastructure.
-        // android:dataExtractionRules="@xml/data_extraction_rules" -> Points to our custom rules file.
-        // android:fullBackupContent="true" -> Required for apps targeting API 31+ to enable Auto Backup.
-        // =================================================================================
-        -->
 
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"

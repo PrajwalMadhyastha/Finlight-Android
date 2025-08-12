@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/workers/BackupWorker.kt
-// REASON: FIX - Reverted the worker to a standard background worker by removing
+// REASON: REVERT - Reverted the worker to a standard background worker by removing
 // the `setForeground()` call. This resolves the ForegroundServiceStartNotAllowedException
-// crash on recent Android versions.
+// crash on recent Android versions and favors a more resilient, if less punctual,
+// execution strategy.
 // =================================================================================
 package io.pm.finlight
 
