@@ -78,7 +78,7 @@ android {
     defaultConfig {
         applicationId = "io.pm.finlight"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 34
         versionCode = generateVersionCode()
         versionName = "${versionProperties["VERSION_MAJOR"]}.${versionProperties["VERSION_MINOR"]}.${versionProperties["VERSION_PATCH"]}"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -143,8 +143,8 @@ configurations.all {
 
 dependencies {
     // --- NEW: Add dependency on the core module ---
+    implementation(project(":core"))
     testImplementation(project(":core"))
-    implementation(project(mapOf("path" to ":core")))
 
     implementation("androidx.core:core-ktx:$coreKtxVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
