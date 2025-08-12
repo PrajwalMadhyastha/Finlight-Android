@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/CustomSmsRule.kt
-// REASON: FEATURE - Added a new `sourceSmsBody` column. This will store the
-// original SMS text that the rule was created from, which is a necessary
-// foundation for the upcoming "Edit Rule" feature.
-// =================================================================================
 package io.pm.finlight
 
 import androidx.room.Entity

@@ -1,9 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsWorkflowScreens.kt
-// REASON: FEATURE - The save logic in `ApproveTransactionScreen` now triggers the
-// new `applyLearningAndAutoImport` function in the ViewModel. This applies the
-// user's categorization to other pending transactions in the review queue,
-// auto-importing them and displaying a Toast with the result.
+// REASON: REFACTOR - Updated all import statements to reference data models
+// like PotentialTransaction from the new 'core' module.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -404,14 +402,14 @@ fun ApproveTransactionScreen(
                                 )
                                 if (success) {
                                     settingsViewModel.onTransactionApproved(potentialTxn.sourceSmsId)
-                                    potentialTxn.merchantName?.let { originalName ->
-                                        settingsViewModel.saveMerchantRenameRule(originalName, description)
+                                    val merchantName = potentialTxn.merchantName
+                                    if (merchantName != null) {
+                                        settingsViewModel.saveMerchantRenameRule(merchantName, description)
                                     }
 
-                                    // --- NEW: Apply learning to other pending transactions ---
-                                    if (potentialTxn.merchantName != null && selectedCategory != null) {
+                                    if (merchantName != null && selectedCategory != null) {
                                         val mapping = MerchantCategoryMapping(
-                                            parsedName = potentialTxn.merchantName,
+                                            parsedName = merchantName,
                                             categoryId = selectedCategory!!.id
                                         )
                                         val autoImportedCount = settingsViewModel.applyLearningAndAutoImport(mapping)

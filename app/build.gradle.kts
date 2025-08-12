@@ -1,9 +1,7 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: FIX - Added a resolutionStrategy to force a single, Android-compatible
-// version of the Guava library across all configurations. This resolves the
-// "Duplicate class" build error caused by a version conflict between the
-// Google Drive API and WorkManager dependencies.
+// REASON: REFACTOR - Added a dependency on the new 'core' module to make the
+// shared parsing logic available to the main application.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -80,7 +78,7 @@ android {
     defaultConfig {
         applicationId = "io.pm.finlight"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 34
         versionCode = generateVersionCode()
         versionName = "${versionProperties["VERSION_MAJOR"]}.${versionProperties["VERSION_MINOR"]}.${versionProperties["VERSION_PATCH"]}"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -144,6 +142,10 @@ configurations.all {
 }
 
 dependencies {
+    // --- NEW: Add dependency on the core module ---
+    implementation(project(":core"))
+    testImplementation(project(":core"))
+
     implementation("androidx.core:core-ktx:$coreKtxVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
     implementation("androidx.activity:activity-compose:$activityComposeVersion")

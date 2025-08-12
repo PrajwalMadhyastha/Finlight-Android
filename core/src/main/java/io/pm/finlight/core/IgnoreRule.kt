@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/IgnoreRule.kt
-// REASON: REFACTOR - The index on the 'pattern' column has been updated with
-// `collate = NOCASE`. This makes the uniqueness constraint case-insensitive at
-// the database level, preventing duplicate rules like "OTP" and "otp".
-// =================================================================================
 package io.pm.finlight
 
 import androidx.room.ColumnInfo
@@ -30,14 +24,12 @@ enum class RuleType {
  */
 @Entity(
     tableName = "ignore_rules",
-    // --- UPDATED: Ensure the unique index on 'pattern' is case-insensitive ---
     indices = [Index(value = ["pattern"], unique = true, name = "index_ignore_rules_pattern_nocase")]
 )
 data class IgnoreRule(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val type: RuleType = RuleType.BODY_PHRASE,
-    // --- UPDATED: Added COLLATE NOCASE to the column definition for robustness ---
     @ColumnInfo(name = "pattern", collate = ColumnInfo.NOCASE)
     val pattern: String,
     var isEnabled: Boolean = true,
