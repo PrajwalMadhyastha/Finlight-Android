@@ -6,6 +6,7 @@
 // entry and improving consistency.
 // FIX - The DatePickerDialog and the AlertDialog wrapping the TimePicker now have
 // an explicit container color to prevent them from being overly transparent.
+// FIX - Added the missing isDark() helper function to resolve a build error.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -80,6 +81,9 @@ private sealed class ComposerSheet {
     object Notes : ComposerSheet()
     object Merchant : ComposerSheet()
 }
+
+// --- FIX: Add the missing helper function ---
+private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
