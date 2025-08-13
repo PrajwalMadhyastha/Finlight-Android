@@ -1,13 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/SmsParserTest.kt
-// REASON: FIX - This test file has been updated to align with the refactored
-// SmsParser, which now resides in the :core module and depends on Provider
-// interfaces instead of concrete DAOs.
-// - All import statements have been updated to point to the correct packages.
-// - All calls to SmsParser.parse now pass anonymous implementations of the
-//   Provider interfaces, which in turn use the mocked DAOs. This resolves
-//   all compilation errors.
-// =================================================================================
 package io.pm.finlight
 
 import kotlinx.coroutines.flow.first
@@ -74,6 +64,51 @@ class SmsParserTest {
         `when`(mockMerchantRenameRuleDao.getAllRules()).thenReturn(flowOf(renameRules))
         `when`(mockIgnoreRuleDao.getEnabledRules()).thenReturn(ignoreRules.filter { it.isEnabled })
     }
+
+    // =================================================================================
+    // NEW TEST CASES FOR PARSER INCONSISTENCIES
+    // =================================================================================
+
+    @Test
+    fun `test ignores Navi Mutual Fund unit allotment message`() = runBlocking {
+        // This is an investment update, not a transactional expense.
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Unit Allotment Update: Your request for purchase of Rs.6,496.18 in Navi Liquid Fund GDG has been processed at applicable NAV. The units will be alloted in 1-2 working days.For further queries, please visit the Navi app.Navi Mutual Fund"
+        val mockSms = SmsMessage(id = 201L, sender = "VM-NAVI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNull("Parser should ignore mutual fund allotment messages", result)
+    }
+
+    @Test
+    fun `test ignores SBI Credit Card e-statement notification`() = runBlocking {
+        // This is a bill summary, not a real-time transaction.
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "E-statement of SBI Credit Card ending XX76 dated 09/08/2025 has been mailed. If not received, SMS ENRS to 5676791. Total Amt Due Rs 8153; Min Amt Due Rs 200; Payable by 29/08/2025. Click https://sbicard.com/quickpaynet to pay your bill"
+        val mockSms = SmsMessage(id = 202L, sender = "DM-SBICRD", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNull("Parser should ignore e-statement notifications", result)
+    }
+
+    @Test
+    fun `test ignores Orient Exchange order received confirmation`() = runBlocking {
+        // The word 'received' is for an order, not money. The numbers are phone numbers.
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Your order is received at our Bangalore - Basavangudi branch. Feel free to contact at 080-26677118/080-26677113 for any clarification. Orient Exchange"
+        val mockSms = SmsMessage(id = 203L, sender = "VM-ORIENT", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNull("Parser should ignore non-financial 'order received' messages", result)
+    }
+
+
+    // =================================================================================
+    // EXISTING PASSING TEST CASES
+    // =================================================================================
 
     @Test
     fun `test parses HDFC UPI sent message`() = runBlocking {
@@ -370,8 +405,6 @@ class SmsParserTest {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Parser should ignore messages with user-defined phrases", result)
     }
-
-    // --- NEW TEST CASES ---
 
     @Test
     fun `test parses transaction reversal as income`() = runBlocking {
