@@ -21,8 +21,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "successfully registered for UPI", "Unit Allotment", "Mutual Fund", "E-statement of",
     "order is received",
 
-    // NEW: Rules from latest batch of failed transactions
-    // --- UPDATED: Made the rule more flexible to catch variations ---
+    // Rules from previous batch of failed transactions
     "added/modified.*payee", // Catches HDFC payee notifications
     "recharge of.*successfully credited", // Catches Airtel recharge confirmations
     "policy.*successfully converted", // Catches insurance policy updates
@@ -31,7 +30,18 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Delivery Authentication Code", // Catches delivery notifications with codes
     "Voucher Code for", // Catches gift card and voucher code messages
     "Application No.*received", // Catches application/scheme confirmations
-    "off per carat" // Catches promotional messages with monetary-like offers
+    "off per carat", // Catches promotional messages with monetary-like offers
+
+    // --- NEW: Rules for the latest batch of non-financial messages ---
+    "booking ID.*is confirmed", // Catches flight/trip confirmations
+    "is Credited on your wallet account", // Catches promotional wallet credit messages
+    "has been delivered", // Catches delivery confirmations (e.g., Welcome Kits, cards)
+    "Spam", // Catches messages explicitly marked as spam
+    "NEFT from Ac", // Catches informational NEFT transfer messages
+    "NEFT of Rs.*credited to Beneficiary", // Catches informational NEFT credit messages
+    "Refund of Rs.*has been processed", // Catches refund processing notifications
+    "FLAT.*OFF on purchase", // Catches promotional discount offers
+    "get FLAT.*OFF" // Catches promotional birthday/special offers
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
