@@ -1,10 +1,3 @@
-// =================================================================================
-// FILE: ./core/src/main/kotlin/io/pm/finlight/SmsParser.kt
-// REASON: REFACTOR - Merged the user's advanced parsing logic (detailed regex
-// for accounts, merchants, and signatures) with the new structure that returns
-// a `ParseResult` sealed class. This combines superior accuracy with the
-// enhanced debugging capabilities needed for the analyzer tool.
-// =================================================================================
 package io.pm.finlight
 
 import java.util.regex.Pattern
@@ -17,8 +10,8 @@ sealed class ParseResult {
 }
 
 object SmsParser {
-    // --- Regex patterns from user's advanced parser ---
-    private val AMOUNT_WITH_CURRENCY_REGEX = "(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
+    // --- UPDATED: Reordered regex to be specific-first, and enhanced to capture currency codes without spaces (e.g., "15000INR") ---
+    private val AMOUNT_WITH_CURRENCY_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val ACCOUNT_PATTERNS =
@@ -44,6 +37,8 @@ object SmsParser {
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
+            // --- NEW: Added a pattern to capture merchants following the word "by" ---
+            "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal|$)".toRegex(RegexOption.IGNORE_CASE),
             "as (reversal of transaction)".toRegex(RegexOption.IGNORE_CASE),
             "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal|$)".toRegex(RegexOption.IGNORE_CASE),
             "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3}|$)".toRegex(RegexOption.IGNORE_CASE),
@@ -139,9 +134,11 @@ object SmsParser {
         if (extractedAmount == null) {
             val allAmountMatches = AMOUNT_WITH_CURRENCY_REGEX.findAll(sms.body).toList()
             val matchWithCurrency = allAmountMatches.firstOrNull {
-                val currencyPart1 = it.groups[1]?.value?.ifEmpty { null }
-                val currencyPart2 = it.groups[4]?.value?.ifEmpty { null }
-                currencyPart1 != null || currencyPart2 != null
+                // --- FIX: Check the correct group (group 2) for the no-space currency pattern ---
+                val currencyPart1 = it.groups[2]?.value?.ifEmpty { null } // no-space currency
+                val currencyPart2 = it.groups[3]?.value?.ifEmpty { null } // currency before
+                val currencyPart3 = it.groups[6]?.value?.ifEmpty { null } // currency after
+                currencyPart1 != null || currencyPart2 != null || currencyPart3 != null
             }
             val bestMatch = matchWithCurrency ?: allAmountMatches.firstOrNull()
 
@@ -169,7 +166,9 @@ object SmsParser {
                 if (match != null) {
                     val potentialName = match.groups[1]?.value?.replace("_", " ")?.replace(Regex("\\s+"), " ")?.trim()?.trimEnd('.')
                     if (!potentialName.isNullOrBlank() && !potentialName.contains("call", ignoreCase = true)) {
-                        if (potentialName.startsWith("NEFT", ignoreCase = true) || !potentialName.matches(Regex(".*\\d{6,}.*"))) {
+                        // --- FIX: Refined filter to reject only purely numeric reference numbers, allowing alphanumeric UPI IDs ---
+                        val isLikelyRefNumber = potentialName.matches(Regex("^\\d{8,}$")) && !potentialName.startsWith("NEFT", ignoreCase = true)
+                        if (!isLikelyRefNumber) {
                             merchantName = potentialName
                             break
                         }
@@ -271,10 +270,11 @@ object SmsParser {
         return escaped.toRegex(RegexOption.IGNORE_CASE)
     }
 
+    // --- UPDATED: This helper now checks the new capture groups from the reordered amount regex ---
     private fun parseAmountAndCurrency(matchResult: MatchResult): Pair<Double?, String?> {
         val groups = matchResult.groupValues
-        val amount = (groups[2].ifEmpty { groups[3] }).replace(",", "").toDoubleOrNull()
-        var currency = (groups[1].ifEmpty { groups[4] }).uppercase()
+        val amount = (groups[1].ifEmpty { groups[4].ifEmpty { groups[5] } }).replace(",", "").toDoubleOrNull()
+        var currency = (groups[2].ifEmpty { groups[3].ifEmpty { groups[6] } }).uppercase()
         if (currency == "RS") currency = "INR"
         return Pair(amount, currency.ifEmpty { null })
     }

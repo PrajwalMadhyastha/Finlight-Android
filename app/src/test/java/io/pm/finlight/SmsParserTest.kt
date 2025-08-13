@@ -66,6 +66,49 @@ class SmsParserTest {
     }
 
     // =================================================================================
+    // NEW TEST CASES FOR PARSING ACCURACY
+    // =================================================================================
+
+    @Test
+    fun `test parses amount correctly when currency code is attached`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear 919480XXX, your wallet A/c is successfully Credited with 15000INR on 11-11-2024 13:34:40. Check now - http://Kx10.in/FICGXU/ePh6Rv Finance Guru"
+        val mockSms = SmsMessage(id = 401L, sender = "VM-FINGRU", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals("Parser should prioritize the amount attached to a currency code", 15000.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("Finance Guru", result?.merchantName)
+    }
+
+    @Test
+    fun `test parses merchant correctly from UPI credit message with 'by'`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs.1600 Credited to A/c ...7656 thru UPI/069871591309 by 9686714029_axl. Total Bal:Rs.33438.48CR. Avlbl Amt:Rs.33438.48(18-11-2024 08:02:26) - Bank of Baroda"
+        val mockSms = SmsMessage(id = 402L, sender = "VM-BOB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(1600.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("9686714029 axl", result?.merchantName) // Note: underscore is replaced with space
+    }
+
+    @Test
+    fun `test parses merchant correctly from NEFT credit message with 'by'`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs.6327 Credited to A/c ...7656 thru NEFT UTR RBI3532499914098 by AIIMS JODHPUR. Total Bal:Rs.7092.4CR. Avlbl Amt:Rs.7092.4(17-12-2024 17:22:45) - Bank of Baroda"
+        val mockSms = SmsMessage(id = 403L, sender = "VM-BOB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(6327.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("AIIMS JODHPUR", result?.merchantName)
+    }
+
+    // =================================================================================
     // NEW TEST CASES FOR BATCH 2 OF PARSER INCONSISTENCIES
     // =================================================================================
 
