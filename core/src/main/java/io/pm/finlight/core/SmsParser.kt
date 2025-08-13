@@ -12,7 +12,8 @@ sealed class ParseResult {
 object SmsParser {
     // --- UPDATED: Reordered regex to be specific-first, and enhanced to capture currency codes without spaces (e.g., "15000INR") ---
     private val AMOUNT_WITH_CURRENCY_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of)\\b".toRegex(RegexOption.IGNORE_CASE)
+    // --- UPDATED: Added "transferred from" to the expense keywords ---
+    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val ACCOUNT_PATTERNS =
         listOf(
@@ -33,10 +34,14 @@ object SmsParser {
             "on your (SBI) (Credit Card) ending with (\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "On (HDFC Bank) (Card) (\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "(ICICI Bank) Acc(?:t)? XX(\\d{3,4}) debited".toRegex(RegexOption.IGNORE_CASE),
-            "Acc(?:t)? XX(\\d{3,4}) is credited.*-(ICICI Bank)".toRegex(RegexOption.IGNORE_CASE)
+            "Acc(?:t)? XX(\\d{3,4}) is credited.*-(ICICI Bank)".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Pattern for Bank of Baroda transfers ---
+            "A/c \\.{3}(\\d{4}).*-\\s*(Bank of Baroda)".toRegex(RegexOption.IGNORE_CASE)
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
+            // --- NEW: More specific pattern for UPI transfers with a colon ---
+            "to:UPI/([\\d.]+)".toRegex(RegexOption.IGNORE_CASE),
             "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal|$)".toRegex(RegexOption.IGNORE_CASE),
             "as (reversal of transaction)".toRegex(RegexOption.IGNORE_CASE),
             "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal|$)".toRegex(RegexOption.IGNORE_CASE),
@@ -262,6 +267,9 @@ object SmsParser {
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[2].trim()}", accountType = "Savings Account")
                     "Acc(?:t)? XX(\\d{3,4}) is credited.*-(ICICI Bank)" ->
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - xx${match.groupValues[1].trim()}", accountType = "Savings Account")
+                    // --- NEW: Handler for the Bank of Baroda pattern ---
+                    "A/c \\.{3}(\\d{4}).*-\\s*(Bank of Baroda)" ->
+                        PotentialAccount(formattedName = "${match.groupValues[2].trim()} - ...${match.groupValues[1].trim()}", accountType = "Bank Account")
                     else -> null
                 }
             }

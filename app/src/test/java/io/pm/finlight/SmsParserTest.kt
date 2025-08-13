@@ -605,4 +605,21 @@ class SmsParserTest {
 
         assertNull("Parser should ignore AutoPay setup confirmations", result)
     }
+
+    // --- NEW TEST CASE FOR THE FAILING TRANSACTION ---
+    @Test
+    fun `test parses Bank of Baroda UPI transfer message`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs.1656 transferred from A/c ...7656 to:UPI/429269093079. Total Bal:Rs.6114.76CR. Avlbl Amt:Rs.6114.76(18-10-2024 22:52:46) - Bank of Baroda"
+        val mockSms = SmsMessage(id = 501L, sender = "CP-BOBTXN", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(1656.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("UPI/429269093079", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("Bank of Baroda - ...7656", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }
