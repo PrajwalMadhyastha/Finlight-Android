@@ -37,7 +37,6 @@ object SmsParser {
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            // --- NEW: Added a pattern to capture merchants following the word "by" ---
             "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal|$)".toRegex(RegexOption.IGNORE_CASE),
             "as (reversal of transaction)".toRegex(RegexOption.IGNORE_CASE),
             "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal|$)".toRegex(RegexOption.IGNORE_CASE),
@@ -49,7 +48,9 @@ object SmsParser {
             "UPI.*(?:to|\\bat\\b)\\s+([A-Za-z0-9\\s.&'()]+?)(?:\\s+on|\\s+Ref|$)".toRegex(RegexOption.IGNORE_CASE),
             "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)".toRegex(RegexOption.IGNORE_CASE),
             "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|$|\\s+was\\s+)".toRegex(RegexOption.IGNORE_CASE),
-            "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|$|\\s+via)".toRegex(RegexOption.IGNORE_CASE)
+            "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|$|\\s+via)".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Fallback pattern for merchants at the end of the string after a hyphen ---
+            "\\s-\\s(?:.*?)\\s([A-Za-z ]+)$".toRegex(RegexOption.IGNORE_CASE)
         )
 
     private val VOLATILE_DATA_REGEX = listOf(
@@ -134,7 +135,6 @@ object SmsParser {
         if (extractedAmount == null) {
             val allAmountMatches = AMOUNT_WITH_CURRENCY_REGEX.findAll(sms.body).toList()
             val matchWithCurrency = allAmountMatches.firstOrNull {
-                // --- FIX: Check the correct group (group 2) for the no-space currency pattern ---
                 val currencyPart1 = it.groups[2]?.value?.ifEmpty { null } // no-space currency
                 val currencyPart2 = it.groups[3]?.value?.ifEmpty { null } // currency before
                 val currencyPart3 = it.groups[6]?.value?.ifEmpty { null } // currency after
@@ -166,8 +166,12 @@ object SmsParser {
                 if (match != null) {
                     val potentialName = match.groups[1]?.value?.replace("_", " ")?.replace(Regex("\\s+"), " ")?.trim()?.trimEnd('.')
                     if (!potentialName.isNullOrBlank() && !potentialName.contains("call", ignoreCase = true)) {
-                        // --- FIX: Refined filter to reject only purely numeric reference numbers, allowing alphanumeric UPI IDs ---
-                        val isLikelyRefNumber = potentialName.matches(Regex("^\\d{8,}$")) && !potentialName.startsWith("NEFT", ignoreCase = true)
+                        // --- FIX: A more robust filter for reference numbers ---
+                        val containsLetters = potentialName.any { it.isLetter() }
+                        val containsDigits = potentialName.any { it.isDigit() }
+                        // A likely ref number is long, contains digits, but contains NO letters.
+                        val isLikelyRefNumber = potentialName.length >= 8 && containsDigits && !containsLetters && !potentialName.startsWith("NEFT", ignoreCase = true)
+
                         if (!isLikelyRefNumber) {
                             merchantName = potentialName
                             break
