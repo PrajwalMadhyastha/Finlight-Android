@@ -36,7 +36,6 @@ object SmsParser {
             "(ICICI Bank) Acc(?:t)? XX(\\d{3,4}) debited".toRegex(RegexOption.IGNORE_CASE),
             "Acc(?:t)? XX(\\d{3,4}) is credited.*-(ICICI Bank)".toRegex(RegexOption.IGNORE_CASE),
             "A/c \\.{3}(\\d{4}).*-\\s*(Bank of Baroda)".toRegex(RegexOption.IGNORE_CASE),
-            // --- NEW: Patterns for new account formats ---
             "in (HDFC Bank A/c XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "from (A/C XXXXXX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "on (HDFC Bank Card x\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -44,23 +43,40 @@ object SmsParser {
             "to (HDFC Bank A/c xx\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/c XX\\d{4}) has been debited".toRegex(RegexOption.IGNORE_CASE)
         )
+    // =================================================================================
+    // REASON: FIX - Reordered and refined the merchant regex patterns to fix parsing regressions.
+    // 1. Prioritized highly specific patterns (like '; [merchant] credited') to prevent them
+    //    from being superseded by more generic patterns.
+    // 2. Made terminators on patterns (like 'at [merchant] on') stricter by removing the
+    //    'end of string' ($) alternative. This prevents them from being too "greedy" and
+    //    capturing extra text.
+    // 3. Removed the most generic fallback pattern which was incorrectly matching non-merchant
+    //    text at the end of messages (e.g., "dispute").
+    // =================================================================================
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            "to:(UPI/[\\d/]+)".toRegex(RegexOption.IGNORE_CASE),
-            "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal|$)".toRegex(RegexOption.IGNORE_CASE),
-            "as (reversal of transaction)".toRegex(RegexOption.IGNORE_CASE),
-            "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal|$)".toRegex(RegexOption.IGNORE_CASE),
-            "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3}|$)".toRegex(RegexOption.IGNORE_CASE),
-            "credited to VPA\\s+([^@]+)@".toRegex(RegexOption.IGNORE_CASE),
-            "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|$)".toRegex(RegexOption.IGNORE_CASE),
-            "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on".toRegex(RegexOption.IGNORE_CASE),
-            ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited".toRegex(RegexOption.IGNORE_CASE),
-            "UPI.*(?:to|\\bat\\b)\\s+([A-Za-z0-9\\s.&'()]+?)(?:\\s+on|\\s+Ref|$)".toRegex(RegexOption.IGNORE_CASE),
-            "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)".toRegex(RegexOption.IGNORE_CASE),
-            "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|$|\\s+was\\s+)".toRegex(RegexOption.IGNORE_CASE),
-            "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|$|\\s+via)".toRegex(RegexOption.IGNORE_CASE),
-            "\\s-\\s(?:.*?)\\s([A-Za-z ]+)$".toRegex(RegexOption.IGNORE_CASE)
-        )
+            // Patterns with strong, unique keywords first. Non-greedy `+?` is crucial.
+            // FIX: Prioritized this pattern to correctly capture merchants before the word "credited".
+            ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited",
+            "to:(UPI/[\\d/]+)",
+            "as (reversal of transaction)",
+            "credited to VPA\\s+([^@]+)@",
+            "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)", // UPI IDs or emails
+
+            // Patterns with keywords like 'at', 'by', 'from', but with stricter terminators.
+            // FIX: Removed `|$` from terminators to prevent greedy matching until the end of the string.
+            "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3})",
+            "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal)",
+            "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'@-]+?)(?:\\.|\\s*\\()",
+            "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on",
+
+            // More general patterns, also with stricter terminators.
+            "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal)",
+            "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|\\s+was\\s+)",
+            "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|\\s+via)",
+            "for\\s+(?:[A-Z0-9]+-)?([A-Za-z0-9\\s.-]+?)(?:\\.Avl bal|\\.)"
+            // REMOVED: The overly generic pattern `\\s-\\s(?:.*?)\\s([A-Za-z ]+)$` which was causing incorrect matches.
+        ).map { it.toRegex(RegexOption.IGNORE_CASE) }
 
     private val VOLATILE_DATA_REGEX = listOf(
         "\\b(?:rs|inr)[\\s.]*\\d[\\d,.]*".toRegex(RegexOption.IGNORE_CASE), // Amounts (e.g., Rs. 1,234.56)
@@ -271,7 +287,6 @@ object SmsParser {
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - xx${match.groupValues[1].trim()}", accountType = "Savings Account")
                     "A/c \\.{3}(\\d{4}).*-\\s*(Bank of Baroda)" ->
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - ...${match.groupValues[1].trim()}", accountType = "Bank Account")
-                    // --- NEW: Handlers for new account patterns ---
                     "in (HDFC Bank A/c XX\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "from (A/C XXXXXX\\d{4})" ->
