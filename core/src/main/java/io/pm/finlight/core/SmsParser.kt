@@ -40,8 +40,8 @@ object SmsParser {
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            // --- NEW: More specific pattern for UPI transfers with a colon ---
-            "to:UPI/([\\d.]+)".toRegex(RegexOption.IGNORE_CASE),
+            // --- FIX: Corrected the capture group to include "UPI/" ---
+            "to:(UPI/[\\d/]+)".toRegex(RegexOption.IGNORE_CASE),
             "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal|$)".toRegex(RegexOption.IGNORE_CASE),
             "as (reversal of transaction)".toRegex(RegexOption.IGNORE_CASE),
             "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal|$)".toRegex(RegexOption.IGNORE_CASE),
