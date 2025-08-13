@@ -1,10 +1,8 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/SettingsViewModel.kt
-// REASON: REFACTOR - The SMS import logic has been significantly improved. It now
-// separates parsed transactions into two groups: those with a successfully
-// parsed account, which are auto-imported immediately, and those without, which
-// are presented to the user in the new account mapping screen. This provides a
-// much faster and more efficient bulk import experience.
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
+// REASON: REFACTOR - Updated to use the decoupled SmsParser from the 'core'
+// module. All calls to the parser now pass data provider implementations that
+// wrap the DAOs, aligning with the new architecture.
 // =================================================================================
 package io.pm.finlight
 
@@ -21,7 +19,6 @@ import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.ReminderManager
-import io.pm.finlight.utils.SmsParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -222,10 +219,18 @@ class SettingsViewModel(
                             SmsParser.parse(
                                 sms,
                                 existingMappings,
-                                db.customSmsRuleDao(),
-                                db.merchantRenameRuleDao(),
-                                db.ignoreRuleDao(),
-                                db.merchantCategoryMappingDao()
+                                object : CustomSmsRuleProvider {
+                                    override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
+                                },
+                                object : MerchantRenameRuleProvider {
+                                    override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+                                },
+                                object : IgnoreRuleProvider {
+                                    override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
+                                },
+                                object : MerchantCategoryMappingProvider {
+                                    override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+                                }
                             )
                         }
                     }.awaitAll().filterNotNull()
@@ -268,7 +273,22 @@ class SettingsViewModel(
                 val parsedList = withContext(Dispatchers.Default) {
                     rawMessages.map { sms ->
                         async {
-                            SmsParser.parse(sms, existingMappings, db.customSmsRuleDao(), db.merchantRenameRuleDao(), db.ignoreRuleDao(), db.merchantCategoryMappingDao())
+                            SmsParser.parse(
+                                sms,
+                                existingMappings,
+                                object : CustomSmsRuleProvider {
+                                    override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
+                                },
+                                object : MerchantRenameRuleProvider {
+                                    override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+                                },
+                                object : IgnoreRuleProvider {
+                                    override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
+                                },
+                                object : MerchantCategoryMappingProvider {
+                                    override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+                                }
+                            )
                         }
                     }.awaitAll().filterNotNull()
                 }
@@ -324,7 +344,7 @@ class SettingsViewModel(
                         val account = accountRepository.getAccountById(userMappedAccountId).first()
                         if (account != null) {
                             newDbMappings.add(MerchantMapping(smsSender = txn.smsSender, merchantName = account.name))
-                            txn.copy(potentialAccount = io.pm.finlight.utils.PotentialAccount(account.name, account.type))
+                            txn.copy(potentialAccount = PotentialAccount(account.name, account.type))
                         } else {
                             txn
                         }

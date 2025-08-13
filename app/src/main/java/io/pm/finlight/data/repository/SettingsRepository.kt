@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
-// REASON: FEATURE - Added a new preference to control notifications for
-// auto-captured SMS transactions. Includes functions to get, save, and perform
-// a blocking read of this setting, which is required by the SmsReceiver.
+// REASON: UX REFINEMENT - The default value for the auto-backup notification
+// has been changed from `true` to `false`. Backups will now be silent by
+// default, and users can opt-in to receive completion notifications.
 // =================================================================================
 package io.pm.finlight
 
@@ -62,11 +62,9 @@ class SettingsRepository(context: Context) {
         private const val KEY_AUTO_BACKUP_HOUR = "auto_backup_hour"
         private const val KEY_AUTO_BACKUP_MINUTE = "auto_backup_minute"
         private const val KEY_AUTO_BACKUP_NOTIFICATION_ENABLED = "auto_backup_notification_enabled"
-        // --- NEW: Key for auto-capture notification setting ---
         private const val KEY_AUTOCAPTURE_NOTIFICATION_ENABLED = "autocapture_notification_enabled"
     }
 
-    // --- NEW: Functions for auto-capture notification setting ---
     fun saveAutoCaptureNotificationEnabled(isEnabled: Boolean) {
         prefs.edit { putBoolean(KEY_AUTOCAPTURE_NOTIFICATION_ENABLED, isEnabled) }
     }
@@ -79,7 +77,7 @@ class SettingsRepository(context: Context) {
                 }
             }
             prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_AUTOCAPTURE_NOTIFICATION_ENABLED, true)) // Enabled by default
+            trySend(prefs.getBoolean(KEY_AUTOCAPTURE_NOTIFICATION_ENABLED, true))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
@@ -89,7 +87,6 @@ class SettingsRepository(context: Context) {
     }
 
 
-    // --- Functions for auto-backup enabled state ---
     fun saveAutoBackupEnabled(isEnabled: Boolean) {
         prefs.edit { putBoolean(KEY_AUTO_BACKUP_ENABLED, isEnabled) }
     }
@@ -102,12 +99,11 @@ class SettingsRepository(context: Context) {
                 }
             }
             prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_AUTO_BACKUP_ENABLED, true)) // Enabled by default
+            trySend(prefs.getBoolean(KEY_AUTO_BACKUP_ENABLED, true))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
 
-    // --- Functions for auto-backup notification enabled state ---
     fun saveAutoBackupNotificationEnabled(isEnabled: Boolean) {
         prefs.edit { putBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, isEnabled) }
     }
@@ -116,16 +112,15 @@ class SettingsRepository(context: Context) {
         return callbackFlow {
             val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
                 if (key == KEY_AUTO_BACKUP_NOTIFICATION_ENABLED) {
-                    trySend(sp.getBoolean(key, true))
+                    trySend(sp.getBoolean(key, false)) // --- UPDATED: Default to false ---
                 }
             }
             prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, true)) // Enabled by default
+            trySend(prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, false)) // --- UPDATED: Default to false ---
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
 
-    // --- Functions for auto-backup time ---
     fun saveAutoBackupTime(hour: Int, minute: Int) {
         prefs.edit {
             putInt(KEY_AUTO_BACKUP_HOUR, hour)
@@ -141,7 +136,7 @@ class SettingsRepository(context: Context) {
                 }
             }
             prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(Pair(prefs.getInt(KEY_AUTO_BACKUP_HOUR, 2), prefs.getInt(KEY_AUTO_BACKUP_MINUTE, 0))) // Default 2:00 AM
+            trySend(Pair(prefs.getInt(KEY_AUTO_BACKUP_HOUR, 2), prefs.getInt(KEY_AUTO_BACKUP_MINUTE, 0)))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }

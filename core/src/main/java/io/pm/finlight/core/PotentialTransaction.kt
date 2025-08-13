@@ -1,13 +1,4 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/PotentialTransaction.kt
-// REASON: FIX - Added a `date` field to the data class. This is essential to
-// carry the original timestamp from the parsed SMS all the way to the final
-// transaction record, fixing the "1970" date bug. A default value is provided
-// for backward compatibility.
-// =================================================================================
 package io.pm.finlight
-
-import io.pm.finlight.utils.PotentialAccount
 
 /**
  * A data class to hold the structured information extracted from an SMS message.

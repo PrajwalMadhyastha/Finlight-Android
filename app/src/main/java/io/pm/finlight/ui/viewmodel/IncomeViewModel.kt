@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/IncomeViewModel.kt
 // REASON: FIX - The logic for the `monthlySummaries` flow has been updated.
-// Instead of showing a rolling 12-month view, it now correctly displays all
-// 12 months of the current calendar year, restoring the original, preferred
-// behavior for the month scroller component.
+// Instead of being limited to the current year, it now fetches the date of the
+// first transaction and dynamically generates the month scroller from that
+// historical point up to the present day, allowing users to view all their data.
 // =================================================================================
 package io.pm.finlight
 
@@ -70,37 +70,33 @@ class IncomeViewModel(application: Application) : AndroidViewModel(application) 
         )
         allCategories = categoryRepository.allCategories
 
-        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
-        val startOfYear = Calendar.getInstance().apply {
-            set(Calendar.YEAR, currentYear)
-            set(Calendar.MONTH, Calendar.JANUARY)
-            set(Calendar.DAY_OF_MONTH, 1)
-        }.timeInMillis
+        // --- UPDATED: Dynamic month scroller logic ---
+        monthlySummaries = transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
+            val startDate = firstTransactionDate ?: System.currentTimeMillis()
 
-        monthlySummaries = transactionRepository.getMonthlyTrends(startOfYear)
-            .map { trends ->
-                val dateFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-                val monthMap = trends.filter {
-                    (dateFormat.parse(it.monthYear) ?: Date()).let { date ->
-                        val cal = Calendar.getInstance().apply { time = date }
-                        cal.get(Calendar.YEAR) == currentYear
+            transactionRepository.getMonthlyTrends(startDate)
+                .map { trends ->
+                    val dateFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                    val monthMap = trends.associate {
+                        val cal = Calendar.getInstance().apply { time = dateFormat.parse(it.monthYear) ?: Date() }
+                        (cal.get(Calendar.YEAR) * 100 + cal.get(Calendar.MONTH)) to it.totalIncome
                     }
-                }.associate {
-                    val cal = Calendar.getInstance().apply { time = dateFormat.parse(it.monthYear) ?: Date() }
-                    (cal.get(Calendar.YEAR) * 100 + cal.get(Calendar.MONTH)) to it.totalIncome
-                }
 
-                (0..11).map { monthIndex ->
-                    val cal = Calendar.getInstance().apply {
-                        set(Calendar.YEAR, currentYear)
-                        set(Calendar.MONTH, monthIndex)
+                    val monthList = mutableListOf<MonthlySummaryItem>()
+                    val startCal = Calendar.getInstance().apply { timeInMillis = startDate }
+                    startCal.set(Calendar.DAY_OF_MONTH, 1)
+                    val endCal = Calendar.getInstance()
+
+                    while (startCal.before(endCal) || (startCal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && startCal.get(Calendar.MONTH) == endCal.get(Calendar.MONTH))) {
+                        val key = startCal.get(Calendar.YEAR) * 100 + startCal.get(Calendar.MONTH)
+                        val income = monthMap[key] ?: 0.0
+                        // Note: Using 'totalSpent' field in MonthlySummaryItem for consistency, but it holds income here.
+                        monthList.add(MonthlySummaryItem(calendar = startCal.clone() as Calendar, totalSpent = income))
+                        startCal.add(Calendar.MONTH, 1)
                     }
-                    val key = cal.get(Calendar.YEAR) * 100 + cal.get(Calendar.MONTH)
-                    val income = monthMap[key] ?: 0.0
-                    MonthlySummaryItem(calendar = cal, totalSpent = income)
+                    monthList.reversed()
                 }
-            }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     }
 
     fun setSelectedMonth(calendar: Calendar) {

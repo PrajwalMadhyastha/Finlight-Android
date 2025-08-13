@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/DashboardViewModel.kt
-// REASON: FIX - The logic for `generateYearlyConsistencyData` now handles the
-// edge case where a user has zero transactions. It checks for a null
-// `firstTransactionDate` and, if found, returns a list where all past days of
-// the year are correctly marked as NO_DATA, preventing them from being
-// misclassified as NO_SPEND.
+// REASON: FIX - The `yearlyConsistencyData` flow is now reactive. It combines
+// a flow of all monthly budgets with the transaction data. This ensures that
+// whenever a budget is changed in the settings, this flow automatically
+// re-calculates the consistency heatmap, fixing the stale data bug on the dashboard.
 // =================================================================================
 package io.pm.finlight
 
@@ -231,8 +230,32 @@ class DashboardViewModel(
                     initialValue = emptyList(),
                 )
 
-        yearlyConsistencyData = flow {
-            emit(generateYearlyConsistencyData())
+        // --- UPDATED: Make consistency data reactive to budget changes ---
+        val today = Calendar.getInstance()
+        val year = today.get(Calendar.YEAR)
+        val currentMonthIndex = today.get(Calendar.MONTH)
+
+        // Create a list of flows, one for each month's budget up to the current month.
+        val monthlyBudgetFlows = (0..currentMonthIndex).map { month ->
+            settingsRepository.getOverallBudgetForMonth(year, month + 1)
+        }
+
+        // Combine all monthly budget flows into a single flow that emits a list of budgets.
+        val totalBudgetSoFarFlow = combine(monthlyBudgetFlows) { budgets ->
+            budgets.sum()
+        }
+
+        // Combine the total budget flow with the transaction data flow.
+        yearlyConsistencyData = combine(
+            totalBudgetSoFarFlow,
+            transactionRepository.getDailySpendingForDateRange(
+                Calendar.getInstance().apply { set(Calendar.DAY_OF_YEAR, 1) }.timeInMillis,
+                today.timeInMillis
+            ),
+            transactionRepository.getFirstTransactionDate()
+        ) { totalBudget, dailyTotals, firstTransactionDate ->
+            // Pass the reactive budget to the generation function.
+            generateYearlyConsistencyData(totalBudget, dailyTotals, firstTransactionDate)
         }.flowOn(Dispatchers.Default)
             .stateIn(
                 scope = viewModelScope,
@@ -245,17 +268,18 @@ class DashboardViewModel(
         _summaryRefreshTrigger.value = System.currentTimeMillis()
     }
 
-    private suspend fun generateYearlyConsistencyData(): List<CalendarDayStatus> = withContext(Dispatchers.IO) {
+    // --- UPDATED: Function now accepts budget as a parameter ---
+    private suspend fun generateYearlyConsistencyData(
+        totalBudgetSoFar: Float,
+        dailyTotals: List<DailyTotal>,
+        firstTransactionDate: Long?
+    ): List<CalendarDayStatus> = withContext(Dispatchers.IO) {
         val today = Calendar.getInstance()
-        val year = today.get(Calendar.YEAR)
 
-        val firstTransactionDate = transactionRepository.getFirstTransactionDate().first()
-
-        // --- FIX: Handle case where there are no transactions at all ---
         if (firstTransactionDate == null) {
             val resultList = mutableListOf<CalendarDayStatus>()
             val dayIterator = Calendar.getInstance().apply {
-                set(Calendar.YEAR, year)
+                set(Calendar.YEAR, today.get(Calendar.YEAR))
                 set(Calendar.DAY_OF_YEAR, 1)
             }
             while (!dayIterator.after(today)) {
@@ -265,27 +289,17 @@ class DashboardViewModel(
             return@withContext resultList
         }
 
-        val currentMonthIndex = today.get(Calendar.MONTH)
         val daysSoFar = today.get(Calendar.DAY_OF_YEAR)
-
-        var totalBudgetSoFar = 0f
-        for (month in 0..currentMonthIndex) {
-            totalBudgetSoFar += settingsRepository.getOverallBudgetForMonthBlocking(year, month + 1)
-        }
         val yearlySafeToSpend = if (totalBudgetSoFar > 0 && daysSoFar > 0) (totalBudgetSoFar / daysSoFar).toDouble() else 0.0
 
-        val calendar = Calendar.getInstance()
-        val endDate = calendar.timeInMillis
-        calendar.set(Calendar.DAY_OF_YEAR, 1)
-        val startDate = calendar.timeInMillis
-
         val firstDataCal = Calendar.getInstance().apply { timeInMillis = firstTransactionDate }
-
-        val dailyTotals = transactionRepository.getDailySpendingForDateRange(startDate, endDate).first()
         val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
 
         val resultList = mutableListOf<CalendarDayStatus>()
-        val dayIterator = Calendar.getInstance().apply { timeInMillis = startDate }
+        val dayIterator = Calendar.getInstance().apply {
+            set(Calendar.YEAR, today.get(Calendar.YEAR))
+            set(Calendar.DAY_OF_YEAR, 1)
+        }
 
         while (!dayIterator.after(today)) {
             if (dayIterator.before(firstDataCal)) {

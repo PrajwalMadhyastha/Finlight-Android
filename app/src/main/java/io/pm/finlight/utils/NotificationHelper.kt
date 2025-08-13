@@ -1,7 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/NotificationHelper.kt
-// REASON: FIX - Removed the `getBackupNotificationBuilder` function as the
-// worker will no longer run as a foreground service, resolving the runtime crash.
+// REASON: REVERT - The `getBackupNotificationBuilder` has been removed. A simple
+// `showAutoBackupNotification` function has been re-added to show a completion
+// notification, as the backup worker will no longer run as a foreground service.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -30,6 +31,7 @@ import java.text.NumberFormat
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.abs
+import androidx.core.graphics.createBitmap
 
 object NotificationHelper {
     private const val DEEP_LINK_URI_EDIT = "app://finlight.pm.io/transaction_detail"
@@ -202,7 +204,7 @@ object NotificationHelper {
     private fun createCategoryIconBitmap(context: Context, details: TransactionDetails): Bitmap {
         val width = 128
         val height = (width * 1.2).toInt()
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(width, height)
         val canvas = Canvas(bitmap)
 
         val colorKey = details.categoryColorKey ?: "gray_light"

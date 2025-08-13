@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: FEATURE - Added final set of default ignore rules for payment wallets,
-// failed transactions, and mandate confirmations to achieve production-grade
-// noise filtering in the SMS parser.
+// REASON: REFACTOR - The hardcoded DEFAULT_IGNORE_PHRASES list has been removed
+// and is now imported from the new 'core' module. This decouples the parsing
+// rules from the Android database implementation.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -12,36 +12,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import io.pm.finlight.Account
-import io.pm.finlight.Budget
-import io.pm.finlight.BudgetDao
-import io.pm.finlight.Category
-import io.pm.finlight.CategoryDao
-import io.pm.finlight.CustomSmsRule
-import io.pm.finlight.CustomSmsRuleDao
-import io.pm.finlight.Goal
-import io.pm.finlight.GoalDao
-import io.pm.finlight.IgnoreRule
-import io.pm.finlight.IgnoreRuleDao
-import io.pm.finlight.MerchantCategoryMapping
-import io.pm.finlight.MerchantCategoryMappingDao
-import io.pm.finlight.MerchantMapping
-import io.pm.finlight.MerchantMappingDao
-import io.pm.finlight.MerchantRenameRule
-import io.pm.finlight.MerchantRenameRuleDao
-import io.pm.finlight.RecurringPattern
-import io.pm.finlight.RecurringPatternDao
-import io.pm.finlight.RecurringTransaction
-import io.pm.finlight.RecurringTransactionDao
-import io.pm.finlight.RuleType
-import io.pm.finlight.SplitTransaction
-import io.pm.finlight.SplitTransactionDao
-import io.pm.finlight.Tag
-import io.pm.finlight.TagDao
-import io.pm.finlight.Transaction
-import io.pm.finlight.TransactionDao
-import io.pm.finlight.TransactionImage
-import io.pm.finlight.TransactionTagCrossRef
+import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.AccountDao
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.CoroutineScope
@@ -91,37 +62,6 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
-
-        // --- UPDATED: Added final set of default ignore rules ---
-        private val DEFAULT_IGNORE_PHRASES = listOf(
-            // Existing Rules
-            "invoice of", "payment of.*is successful", "has been credited to",
-            "payment of.*has been received towards", "credited to your.*card",
-            "Payment of.*has been received on your.*Credit Card", "We have received",
-            "has been initiated", "redemption", "requested money from you", "Folio No.",
-            "NAV of", "purchase experience", "your OTP", "recharge of.*is successful",
-            "thanks for the payment of", "premium due", "bill is generated", "missed call alert",
-            "pre-approved", "offer", "limit", "due on", "statement for", "KYC", "cheque book",
-            "is approved", "congratulations", "eligible for", "SIP Purchase", "towards your SIP",
-            "EMI Alert", "due by", "has requested money from you", "order.*has been delivered",
-            "shipped", "Arriving today", "out for delivery",
-
-            // --- NEW SUGGESTIONS from final dump ---
-            "from Paytm Balance", "using OlaMoney Postpaid", "is declined", "Request Failure",
-            "AutoPay (E-mandate) Active", "mandate is successfully revoked", "mandate has been successfully created",
-            "has been dispatched", "is now active", "successfully registered for UPI"
-
-        ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
-            // Existing Rules
-            "*SBIMF", "*WKEFTT", "*BSNL", "*HDFCMF", "*AXISMF", "*KOTAKM", "*QNTAMC", "*NIMFND",
-            "*MYNTRA", "*FLPKRT", "*AMAZON", "*SWIGGY", "*ZOMATO", "*BLUDRT", "*EKARTL",
-            "*DLHVRY", "*XPBEES",
-
-            // --- NEW SUGGESTIONS from final dump ---
-            "*OLAMNY", "*Paytm"
-
-        ).map { IgnoreRule(pattern = it, type = RuleType.SENDER, isDefault = true) }
-
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
