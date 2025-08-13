@@ -116,7 +116,8 @@ class SmsParserTest {
     fun `test ignores HDFC payee modification alert`() = runBlocking {
         val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
         setupTest(ignoreRules = ignoreRules)
-        val smsBody = "Alert! You've added/modified payee Prajju Hdfc with A/c XX6705 Via HDFC Bank Online Banking. Not you?Call 18002586161"
+        // --- UPDATED: Use the more realistic SMS body that was failing ---
+        val smsBody = "You've added/modified a payee Prajwal Madhyastha K P with A/c XX8207 via HDFC Bank Online Banking. Not you?Call 18002586161"
         val mockSms = SmsMessage(id = 301L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Parser should ignore payee modification alerts", result)

@@ -22,7 +22,8 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "order is received",
 
     // NEW: Rules from latest batch of failed transactions
-    "added/modified payee", // Catches HDFC payee notifications
+    // --- UPDATED: Made the rule more flexible to catch variations ---
+    "added/modified.*payee", // Catches HDFC payee notifications
     "recharge of.*successfully credited", // Catches Airtel recharge confirmations
     "policy.*successfully converted", // Catches insurance policy updates
     "payment of.*has failed", // Catches failed payment notifications
