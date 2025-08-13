@@ -20,8 +20,12 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "mandate has been successfully created", "has been dispatched", "is now active",
     "successfully registered for UPI",
 
-    // NEW: Rules to fix parsing issues
-    "Unit Allotment", "Mutual Fund", "has been delivered"
+    // NEW: Rules to fix parsing issues from user feedback
+    "Unit Allotment", // Catches Navi Mutual Fund and similar investment updates
+    "Mutual Fund", // A broader rule for investment-related messages
+    "has been delivered", // More generic rule for e-commerce delivery confirmations
+    "E-statement of", // Catches SBI and other e-statement notifications
+    "order is received" // Catches Orient Exchange and other order confirmations
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
