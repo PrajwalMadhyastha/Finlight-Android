@@ -835,7 +835,7 @@ class SmsParserTest {
         assertNotNull(result)
         assertEquals(15000.0, result?.amount)
         assertEquals("expense", result?.transactionType)
-        assertEquals("My hdfc HDFC0005075-SBI", result?.merchantName)
+        assertEquals("My hdfc HDFC0005075", result?.merchantName)
         assertNotNull(result?.potentialAccount)
         assertEquals("A/c XX9258", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)

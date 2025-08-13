@@ -44,19 +44,16 @@ object SmsParser {
             "Your (A/c XX\\d{4}) has been debited".toRegex(RegexOption.IGNORE_CASE)
         )
     // =================================================================================
-    // REASON: FIX - Reordered and refined the merchant regex patterns to fix parsing regressions.
-    // 1. Prioritized highly specific patterns (like '; [merchant] credited') to prevent them
-    //    from being superseded by more generic patterns.
-    // 2. Made terminators on patterns (like 'at [merchant] on') stricter by removing the
-    //    'end of string' ($) alternative. This prevents them from being too "greedy" and
-    //    capturing extra text.
-    // 3. Removed the most generic fallback pattern which was incorrectly matching non-merchant
-    //    text at the end of messages (e.g., "dispute").
+    // REASON: FIX - Added two new specific regex patterns to handle cases where the
+    // merchant name appears at the end of the message, which were failing after a
+    // previous, more generic pattern was removed.
+    // 1. Added a pattern for "sent to [Merchant Name]".
+    // 2. Added a safer fallback pattern to capture simple text merchants at the very
+    //    end of an SMS.
     // =================================================================================
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
             // Patterns with strong, unique keywords first. Non-greedy `+?` is crucial.
-            // FIX: Prioritized this pattern to correctly capture merchants before the word "credited".
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited",
             "to:(UPI/[\\d/]+)",
             "as (reversal of transaction)",
@@ -64,18 +61,21 @@ object SmsParser {
             "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)", // UPI IDs or emails
 
             // Patterns with keywords like 'at', 'by', 'from', but with stricter terminators.
-            // FIX: Removed `|$` from terminators to prevent greedy matching until the end of the string.
             "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3})",
             "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal)",
             "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'@-]+?)(?:\\.|\\s*\\()",
             "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on",
+            // --- NEW: Added specific pattern for "sent to [Merchant]" ---
+            "sent to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+on\\s+|-|$)",
 
             // More general patterns, also with stricter terminators.
             "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal)",
             "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|\\s+was\\s+)",
             "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|\\s+via)",
-            "for\\s+(?:[A-Z0-9]+-)?([A-Za-z0-9\\s.-]+?)(?:\\.Avl bal|\\.)"
-            // REMOVED: The overly generic pattern `\\s-\\s(?:.*?)\\s([A-Za-z ]+)$` which was causing incorrect matches.
+            "for\\s+(?:[A-Z0-9]+-)?([A-Za-z0-9\\s.-]+?)(?:\\.Avl bal|\\.)",
+
+            // --- NEW: A safer fallback for simple text merchants at the very end of the string ---
+            "(?:-|\\s)([A-Za-z\\s]+)$"
         ).map { it.toRegex(RegexOption.IGNORE_CASE) }
 
     private val VOLATILE_DATA_REGEX = listOf(
