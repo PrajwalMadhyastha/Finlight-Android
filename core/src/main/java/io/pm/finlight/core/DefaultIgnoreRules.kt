@@ -18,14 +18,19 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "shipped", "Arriving today", "out for delivery", "from Paytm Balance", "using OlaMoney Postpaid",
     "is declined", "Request Failure", "AutoPay (E-mandate) Active", "mandate is successfully revoked",
     "mandate has been successfully created", "has been dispatched", "is now active",
-    "successfully registered for UPI",
+    "successfully registered for UPI", "Unit Allotment", "Mutual Fund", "E-statement of",
+    "order is received",
 
-    // NEW: Rules to fix parsing issues from user feedback
-    "Unit Allotment", // Catches Navi Mutual Fund and similar investment updates
-    "Mutual Fund", // A broader rule for investment-related messages
-    "has been delivered", // More generic rule for e-commerce delivery confirmations
-    "E-statement of", // Catches SBI and other e-statement notifications
-    "order is received" // Catches Orient Exchange and other order confirmations
+    // NEW: Rules from latest batch of failed transactions
+    "added/modified payee", // Catches HDFC payee notifications
+    "recharge of.*successfully credited", // Catches Airtel recharge confirmations
+    "policy.*successfully converted", // Catches insurance policy updates
+    "payment of.*has failed", // Catches failed payment notifications
+    "bonus points", // Catches loyalty program updates
+    "Delivery Authentication Code", // Catches delivery notifications with codes
+    "Voucher Code for", // Catches gift card and voucher code messages
+    "Application No.*received", // Catches application/scheme confirmations
+    "off per carat" // Catches promotional messages with monetary-like offers
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
