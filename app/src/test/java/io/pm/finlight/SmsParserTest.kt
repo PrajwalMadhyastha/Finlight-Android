@@ -724,4 +724,120 @@ class SmsParserTest {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Should ignore payee modification without 'a'", result)
     }
+
+    // =================================================================================
+    // NEW TEST CASES FOR IMPROVED ACCOUNT PARSING
+    // =================================================================================
+
+    @Test
+    fun `test parses HDFC deposit with 'in' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Update! INR 11,000.00 deposited in HDFC Bank A/c XX2536 on 15-OCT-24 for XXXXXXXXXX0461-TPT-Transfer-PRAJWAL MADHYASTHA K P.Avl bal INR 26,475.53. Cheque deposits in A/C are subject to clearing"
+        val mockSms = SmsMessage(id = 701L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(11000.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("TPT-Transfer-PRAJWAL MADHYASTHA K P", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank A/c XX2536", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses BOB debit with 'from' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs 918.00 debited from A/C XXXXXX9130 and credited to user12@apl UPI Ref:466970233165. Not you? Call 18005700 -BOB"
+        val mockSms = SmsMessage(id = 702L, sender = "VM-BOB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(918.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("user12@apl", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("A/C XXXXXX9130", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses HDFC card spend with 'on' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs.6175 spent on HDFC Bank Card x2477 at ..SUDARSHAN FAMILY_ on 2024-11-13:17:18:38.Not U? To Block & Reissue Call 18002586161/SMS BLOCK CC 2477 to8216821344"
+        val mockSms = SmsMessage(id = 703L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(6175.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("SUDARSHAN FAMILY", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank Card x2477", result?.potentialAccount?.formattedName)
+        assertEquals("Card", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses HDFC multiline sent message with 'From' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Sent Rs.30.00\nFrom HDFC Bank A/C x2536\nTo Sukrith pharma\nOn 06/12/24\nRef 434117067801\nNot You?\nCall 18002586161/SMS BLOCK UPI to8216821344"
+        val mockSms = SmsMessage(id = 704L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(30.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("Sukrith pharma", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank A/C x2536", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses HDFC credit alert with 'to' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Credit Alert!\nRs.2.00 credited to HDFC Bank A/c xx2536 on 07-12-24 from VPA user34@axisbank (UPI 526830463424)"
+        val mockSms = SmsMessage(id = 705L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(2.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("VPA user34@axisbank", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank A/c xx2536", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses HDFC NEFT deposit with 'in' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Update! INR 30,000.00 deposited in HDFC Bank A/c XX2536 on 15-FEB-25 for NEFT Cr-SBIN0007631-Kavyashree Bhat-My hdfc-SBINN52025021511431836.Avl bal INR 55,727.04. Cheque deposits in A/C are subject to clearing"
+        val mockSms = SmsMessage(id = 706L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(30000.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("NEFT Cr-SBIN0007631-Kavyashree Bhat-My hdfc-SBINN52025021511431836", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank A/c XX2536", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses SBI debit with 'Your A_c' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer, Your A/c XX9258 has been debited with INR 15,000.00 on 19/02/2025 towards NEFT with UTR SBIN125050589474 sent to My hdfc HDFC0005075-SBI"
+        val mockSms = SmsMessage(id = 707L, sender = "VM-SBINEF", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(15000.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("My hdfc HDFC0005075-SBI", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("A/c XX9258", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }

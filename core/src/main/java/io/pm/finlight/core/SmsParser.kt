@@ -35,12 +35,17 @@ object SmsParser {
             "On (HDFC Bank) (Card) (\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "(ICICI Bank) Acc(?:t)? XX(\\d{3,4}) debited".toRegex(RegexOption.IGNORE_CASE),
             "Acc(?:t)? XX(\\d{3,4}) is credited.*-(ICICI Bank)".toRegex(RegexOption.IGNORE_CASE),
-            // --- NEW: Pattern for Bank of Baroda transfers ---
-            "A/c \\.{3}(\\d{4}).*-\\s*(Bank of Baroda)".toRegex(RegexOption.IGNORE_CASE)
+            "A/c \\.{3}(\\d{4}).*-\\s*(Bank of Baroda)".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Patterns for new account formats ---
+            "in (HDFC Bank A/c XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "from (A/C XXXXXX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "on (HDFC Bank Card x\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "From (HDFC Bank A/C x\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "to (HDFC Bank A/c xx\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "Your (A/c XX\\d{4}) has been debited".toRegex(RegexOption.IGNORE_CASE)
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            // --- FIX: Corrected the capture group to include "UPI/" ---
             "to:(UPI/[\\d/]+)".toRegex(RegexOption.IGNORE_CASE),
             "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal|$)".toRegex(RegexOption.IGNORE_CASE),
             "as (reversal of transaction)".toRegex(RegexOption.IGNORE_CASE),
@@ -54,7 +59,6 @@ object SmsParser {
             "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)".toRegex(RegexOption.IGNORE_CASE),
             "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|$|\\s+was\\s+)".toRegex(RegexOption.IGNORE_CASE),
             "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|$|\\s+via)".toRegex(RegexOption.IGNORE_CASE),
-            // --- NEW: Fallback pattern for merchants at the end of the string after a hyphen ---
             "\\s-\\s(?:.*?)\\s([A-Za-z ]+)$".toRegex(RegexOption.IGNORE_CASE)
         )
 
@@ -171,10 +175,8 @@ object SmsParser {
                 if (match != null) {
                     val potentialName = match.groups[1]?.value?.replace("_", " ")?.replace(Regex("\\s+"), " ")?.trim()?.trimEnd('.')
                     if (!potentialName.isNullOrBlank() && !potentialName.contains("call", ignoreCase = true)) {
-                        // --- FIX: A more robust filter for reference numbers ---
                         val containsLetters = potentialName.any { it.isLetter() }
                         val containsDigits = potentialName.any { it.isDigit() }
-                        // A likely ref number is long, contains digits, but contains NO letters.
                         val isLikelyRefNumber = potentialName.length >= 8 && containsDigits && !containsLetters && !potentialName.startsWith("NEFT", ignoreCase = true)
 
                         if (!isLikelyRefNumber) {
@@ -267,9 +269,21 @@ object SmsParser {
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[2].trim()}", accountType = "Savings Account")
                     "Acc(?:t)? XX(\\d{3,4}) is credited.*-(ICICI Bank)" ->
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - xx${match.groupValues[1].trim()}", accountType = "Savings Account")
-                    // --- NEW: Handler for the Bank of Baroda pattern ---
                     "A/c \\.{3}(\\d{4}).*-\\s*(Bank of Baroda)" ->
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - ...${match.groupValues[1].trim()}", accountType = "Bank Account")
+                    // --- NEW: Handlers for new account patterns ---
+                    "in (HDFC Bank A/c XX\\d{4})" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "from (A/C XXXXXX\\d{4})" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "on (HDFC Bank Card x\\d{4})" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Card")
+                    "From (HDFC Bank A/C x\\d{4})" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "to (HDFC Bank A/c xx\\d{4})" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "Your (A/c XX\\d{4}) has been debited" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     else -> null
                 }
             }
@@ -282,7 +296,6 @@ object SmsParser {
         return escaped.toRegex(RegexOption.IGNORE_CASE)
     }
 
-    // --- UPDATED: This helper now checks the new capture groups from the reordered amount regex ---
     private fun parseAmountAndCurrency(matchResult: MatchResult): Pair<Double?, String?> {
         val groups = matchResult.groupValues
         val amount = (groups[1].ifEmpty { groups[4].ifEmpty { groups[5] } }).replace(",", "").toDoubleOrNull()
