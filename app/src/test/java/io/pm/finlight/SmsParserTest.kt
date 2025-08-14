@@ -1053,4 +1053,69 @@ class SmsParserTest {
         assertNotNull(result?.potentialAccount)
         assertEquals("Canara Bank - A/c XXX810", result?.potentialAccount?.formattedName)
     }
+
+    // --- NEW: Test cases for incorrectly parsed non-financial messages ---
+
+    @Test
+    fun `test ignores Jio activation message`() = runBlocking {
+        setupTest()
+        val smsBody = "Your number0151027867 will be activated on Jio network by 6:00 AM. Once your existing SIM stops working, please insert the Jio SIM in SIM slot 1 of your smartphone and do Tele-verification by dialling 1977. To know your device settings, please refer to earlier settings SMS sent by us or click https://youtu.be/o18LboDi1ho\nIf you are an eSIM user, use the QR code to download and install the eSIM profile on your device before Tele-verification. You can also set eSIM profile manually by referring to the SMS sent to your number when eSIM request was given.\nPrepaid users, need to do a recharge after activation to start using Jio services. To recharge, click www.jio.com/rechargenow or Visit the nearest Jio retailer after activation of your number. For details of exciting recharge plans, call 1991 from your Jio SIM after activation or 18008900000 from any number. Please note, Tele-verification is not required for Jio Corporate connections."
+        val mockSms = SmsMessage(id = 1L, sender = "JK-JioSvc", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore Jio activation messages", result)
+    }
+
+    @Test
+    fun `test ignores Bank of Baroda informational message`() = runBlocking {
+        setupTest()
+        val smsBody = "Funds credited in your account by NEFT/RTGS with VIJB0001040 received from L+T CONSTRUCTION EQUIPMENT LIMITED. Please advise your remitter to use new IFSC only-BARB0VJDASC(Fifth digit is ZER0) Team Bank of Baroda"
+        val mockSms = SmsMessage(id = 2L, sender = "VD-BOBSMS", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore informational IFSC messages", result)
+    }
+
+    @Test
+    fun `test ignores SBI Life premium payment message`() = runBlocking {
+        setupTest()
+        val smsBody = "Thank you for premium payment of Rs.100000. on 06-11-2021 for Policy 1H461419008 through State Bank. Receipt will be sent shortly-SBI Life."
+        val mockSms = SmsMessage(id = 3L, sender = "JM-SBLIFE", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore SBI Life premium messages", result)
+    }
+
+    @Test
+    fun `test ignores DICGCI insurance claim message`() = runBlocking {
+        setupTest()
+        val smsBody = "Insurance claim u/s 18A of DICGC Act received from S G Raghvendra CBL. Submit willingness, alternate bank AC or Adhaar details to bank for payment"
+        val mockSms = SmsMessage(id = 4L, sender = "JD-DICGCI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore DICGCI claim messages", result)
+    }
+
+    @Test
+    fun `test ignores MyGovt RT-PCR sample message`() = runBlocking {
+        setupTest()
+        val smsBody = "RT-PCR sample collected for MANJULA PRAVEEN (Id:2952525386749) SRF ID 2952525695921  on Jan 18 2022 12:06PM. Please save for future reference. You are advised to isolate yourself till the sample is tested and test report is provided by the Lab. https://covid19cc.nic.in/PDFService/Specimenfefform.aspx?formid=Ukx%2bYrhm8Hq2EzLtOF%2fpWg%3d%3d Your Sample has been sent to Sagar Hospital, Jayanagar, Bangalore"
+        val mockSms = SmsMessage(id = 5L, sender = "VM-MYGOVT", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore RT-PCR sample messages", result)
+    }
+
+    @Test
+    fun `test ignores IndiaFirst premium debit notification`() = runBlocking {
+        setupTest()
+        val smsBody = "Renewal premium of Rs.330 for Pradhan Mantri Jeevan Jyoti Bima Yojana will be debited from your account. Pls maintain sufficient balance in a/c 74370100011143 for auto-debit.IFL"
+        val mockSms = SmsMessage(id = 6L, sender = "BP-IndiaF", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore future debit notifications", result)
+    }
+
+    @Test
+    fun `test ignores SBI OTP message`() = runBlocking {
+        setupTest()
+        val smsBody = "OTP for online purchase of Rs. 8140.50 at AMAZON thru State Bank Debit Card 6074*****17 is 512192. Do not share this with anyone."
+        val mockSms = SmsMessage(id = 7L, sender = "BZ-SBIOTP", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore OTP messages", result)
+    }
 }

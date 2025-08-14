@@ -7,7 +7,6 @@ package io.pm.finlight
 val DEFAULT_IGNORE_PHRASES = listOf(
     // Existing Rules
     "invoice of", "payment of.*is successful",
-    // --- FIX: Made the "credited to" rule more specific to avoid false positives ---
     "credited to Beneficiary",
     "payment of.*has been received towards", "credited to your.*card",
     "Payment of.*has been received on your.*Credit Card", "We have received",
@@ -22,43 +21,47 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "mandate has been successfully created", "has been dispatched", "is now active",
     "successfully registered for UPI", "Unit Allotment", "Mutual Fund", "E-statement of",
     "order is received",
+    "added/modified.*payee",
+    "recharge of.*successfully credited",
+    "policy.*successfully converted",
+    "payment of.*has failed",
+    "bonus points",
+    "Delivery Authentication Code",
+    "Voucher Code for",
+    "Application No.*received",
+    "off per carat",
+    "booking ID.*is confirmed",
+    "is Credited on your wallet account",
+    "has been delivered",
+    "Spam",
+    "NEFT from Ac",
+    "NEFT of Rs.*credited to Beneficiary",
+    "Refund of Rs.*has been processed",
+    "FLAT.*OFF on purchase",
+    "get FLAT.*OFF",
+    "Money Deposited~",
+    "worth points credited",
 
-    // Rules from previous batch of failed transactions
-    "added/modified.*payee", // Catches HDFC payee notifications
-    "recharge of.*successfully credited", // Catches Airtel recharge confirmations
-    "policy.*successfully converted", // Catches insurance policy updates
-    "payment of.*has failed", // Catches failed payment notifications
-    "bonus points", // Catches loyalty program updates
-    "Delivery Authentication Code", // Catches delivery notifications with codes
-    "Voucher Code for", // Catches gift card and voucher code messages
-    "Application No.*received", // Catches application/scheme confirmations
-    "off per carat", // Catches promotional messages with monetary-like offers
-
-    // Rules for the latest batch of non-financial messages
-    "booking ID.*is confirmed", // Catches flight/trip confirmations
-    "is Credited on your wallet account", // Catches promotional wallet credit messages
-    "has been delivered", // Catches delivery confirmations (e.g., Welcome Kits, cards)
-    "Spam", // Catches messages explicitly marked as spam
-    "NEFT from Ac", // Catches informational NEFT transfer messages
-    "NEFT of Rs.*credited to Beneficiary", // Catches informational NEFT credit messages
-    "Refund of Rs.*has been processed", // Catches refund processing notifications
-    "FLAT.*OFF on purchase", // Catches promotional discount offers
-    "get FLAT.*OFF", // Catches promotional birthday/special offers
-
-    // =================================================================================
-    // REASON: FEATURE - Added new ignore rules for non-transactional messages
-    // identified in the latest batch of failing SMS.
-    // =================================================================================
-    "Money Deposited~", // Catches RTGS informational messages
-    "worth points credited" // Catches promotional points/rewards messages
+    // --- NEW: Rules for incorrectly parsed non-financial messages ---
+    "will be activated on Jio network",
+    "advise your remitter to use new IFSC",
+    "Receipt will be sent shortly",
+    "Insurance claim u/s",
+    "RT-PCR sample collected",
+    "will be debited from your account",
+    "OTP for online purchase"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
     "*SBIMF", "*WKEFTT", "*BSNL", "*HDFCMF", "*AXISMF", "*KOTAKM", "*QNTAMC", "*NIMFND",
     "*MYNTRA", "*FLPKRT", "*AMAZON", "*SWIGGY", "*ZOMATO", "*BLUDRT", "*EKARTL",
     "*XPBEES", "*OLAMNY", "*Paytm",
+    "*DLHVRY",
 
-    // FIX: Corrected sender pattern to match test cases
-    "*DLHVRY"
+    // --- NEW: Senders for incorrectly parsed non-financial messages ---
+    "*JioSvc",
+    "*SBLIFE",
+    "*DICGCI",
+    "*MYGOVT"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.SENDER, isDefault = true) }
