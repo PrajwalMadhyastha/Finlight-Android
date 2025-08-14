@@ -1219,4 +1219,42 @@ class SmsParserTest {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Parser should ignore My11Circle promotional messages", result)
     }
+
+    // --- NEW: Test cases for the four informational messages identified ---
+
+    @Test
+    fun `test ignores SBIL renewal premium notice`() = runBlocking {
+        setupTest()
+        val smsBody = "Thank you for the  payment made on 05-NOV-2023 for Rs 100000 against renewal premium of SBIL policy No 1H461419008 Amt. will be credited subject to realization."
+        val mockSms = SmsMessage(id = 2001L, sender = "XX-SBILIF", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore SBIL premium notices", result)
+    }
+
+    @Test
+    fun `test ignores Bank of Baroda email added confirmation`() = runBlocking {
+        setupTest()
+        val smsBody = "We confirm you that Email Id user285@GMAIL.COM has been added in CUST_ID XXXXX3858 w.e.f 18-01-2024 18:17:29 at your request.-Bank of Baroda"
+        val mockSms = SmsMessage(id = 2002L, sender = "XX-BOB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore email added confirmations", result)
+    }
+
+    @Test
+    fun `test ignores Jio eSIM activation instructions`() = runBlocking {
+        setupTest()
+        val smsBody = "To activate your eSIM for Jio Number9656315416, Please follow the below-mentioned steps..." // Truncated for brevity
+        val mockSms = SmsMessage(id = 2003L, sender = "XX-JIO", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore eSIM activation instructions", result)
+    }
+
+    @Test
+    fun `test ignores Godrej real estate advertisement`() = runBlocking {
+        setupTest()
+        val smsBody = "Received-Rera-Approval & Allotments-Underway Your-2,3&4BHK frm-1.28Cr Add-Godrej Woodscapes, Whitefield-Bangalore Appointment- https://wa.link/godrej-woodscapes"
+        val mockSms = SmsMessage(id = 2004L, sender = "XX-GODREJ", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore real estate ads", result)
+    }
 }

@@ -49,6 +49,12 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "will be debited from your account",
     "OTP for online purchase",
 
+    // --- NEW: Rules for recently found informational messages ---
+    "renewal premium",
+    "Email Id.*has been added",
+    "activate your eSIM",
+    "BHK frm",
+
     // --- NEW: Rules for the latest batch of non-financial messages ---
     "Lok Adalat Notice",
     "FD.*opened", "FD.*closed", "Fixed Deposit", "Recurring Deposit", "RD.*closed", "RD.*opened",
