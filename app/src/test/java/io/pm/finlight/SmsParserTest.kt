@@ -991,7 +991,7 @@ class SmsParserTest {
         assertEquals(20000.0, result?.amount)
         assertEquals("income", result?.transactionType)
         assertEquals("Cash Deposit", result?.merchantName)
-        assertEquals("account XXX810", result?.potentialAccount?.formattedName)
+        assertEquals("Canara Bank - account XXX810", result?.potentialAccount?.formattedName)
     }
 
     @Test

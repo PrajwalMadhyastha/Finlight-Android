@@ -324,16 +324,15 @@ object SmsParser {
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "your (A/c X\\d+)-debited" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
-                    // --- FIX: This logic now reconstructs the string to normalize spacing ---
                     "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+CREDIT" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].replace(Regex("\\s+"), " ")} ${match.groupValues[2]}", accountType = "Bank Account")
+                    // --- FIX: Add the "Canara Bank - " prefix to the formatted name ---
                     "CREDITED to your (account XXX\\d+)\\s" ->
-                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                        PotentialAccount(formattedName = "Canara Bank - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "Your (A/C XXXXX\\d+)\\s+has\\s+credit" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "Your (A/C XXXXX\\d+) has a debit" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
-                    // --- NEW: Added patterns for Canara Bank and a more generic SBI pattern ---
                     "CREDITED to your (A/c XXX\\d+)\\s" ->
                         PotentialAccount(formattedName = "Canara Bank - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "Your (A/C XXXXX\\d+)\\s+has\\s+a\\s+(?:credit|debit)" ->
