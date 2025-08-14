@@ -18,7 +18,8 @@ object SmsParser {
     // =================================================================================
     private val AMOUNT_WITH_CURRENCY_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of)\\b".toRegex(RegexOption.IGNORE_CASE)
-    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account)\\b".toRegex(RegexOption.IGNORE_CASE)
+    // --- FIX: Added "has a credit" and "has been CREDITED to your" to capture new income formats ---
+    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     private val ACCOUNT_PATTERNS =
         listOf(
@@ -58,7 +59,10 @@ object SmsParser {
             "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+CREDIT".toRegex(RegexOption.IGNORE_CASE),
             "CREDITED to your (account XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+)\\s+has\\s+credit".toRegex(RegexOption.IGNORE_CASE),
-            "Your (A/C XXXXX\\d+) has a debit".toRegex(RegexOption.IGNORE_CASE)
+            "Your (A/C XXXXX\\d+) has a debit".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Added patterns for Canara Bank and a more generic SBI pattern ---
+            "CREDITED to your (A/c XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
+            "Your (A/C XXXXX\\d+)\\s+has\\s+a\\s+(?:credit|debit)".toRegex(RegexOption.IGNORE_CASE)
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
@@ -329,6 +333,12 @@ object SmsParser {
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "Your (A/C XXXXX\\d+) has a debit" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    // --- NEW: Added patterns for Canara Bank and a more generic SBI pattern ---
+                    "CREDITED to your (A/c XXX\\d+)\\s" ->
+                        PotentialAccount(formattedName = "Canara Bank - ${match.groupValues[1].trim()}", accountType = "Bank Account")
+                    "Your (A/C XXXXX\\d+)\\s+has\\s+a\\s+(?:credit|debit)" ->
+                        PotentialAccount(formattedName = "SBI - ${match.groupValues[1].trim()}", accountType = "Bank Account")
+
                     else -> null
                 }
             }

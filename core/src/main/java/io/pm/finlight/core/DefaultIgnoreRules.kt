@@ -6,7 +6,9 @@ package io.pm.finlight
  */
 val DEFAULT_IGNORE_PHRASES = listOf(
     // Existing Rules
-    "invoice of", "payment of.*is successful", "has been credited to",
+    "invoice of", "payment of.*is successful",
+    // --- FIX: Made the "credited to" rule more specific to avoid false positives ---
+    "credited to Beneficiary",
     "payment of.*has been received towards", "credited to your.*card",
     "Payment of.*has been received on your.*Credit Card", "We have received",
     "has been initiated", "redemption", "requested money from you", "Folio No.",
