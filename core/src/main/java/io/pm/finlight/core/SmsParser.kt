@@ -11,18 +11,21 @@ sealed class ParseResult {
 
 object SmsParser {
     // =================================================================================
-    // REASON: FIX - The amount regex now uses a negative lookahead `(?![a-zA-Z])`
-    // instead of a word boundary `\b`. This correctly parses amounts where the
-    // currency symbol is immediately followed by a digit (e.g., "Rs300.0"),
-    // fixing the SBI debit parsing failure.
+    // REASON: FIX - The amount regex has been refined.
+    // 1. It now accepts a colon as a separator (e.g., "Rs:147.5").
+    // 2. The generic number matching part now uses negative lookarounds `(?<![a-zA-Z])`
+    //    and `(?![a-zA-Z])` to prevent it from greedily matching numbers that are
+    //    part of account numbers (e.g., the '763' in 'X0763').
     // =================================================================================
-    private val AMOUNT_WITH_CURRENCY_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
+    private val AMOUNT_WITH_CURRENCY_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .:]*)?(?<![a-zA-Z])([\\d,]+\\.?\\d*)(?![a-zA-Z])|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of)\\b".toRegex(RegexOption.IGNORE_CASE)
-    // --- FIX: Added "has a credit" and "has been CREDITED to your" to capture new income formats ---
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     private val ACCOUNT_PATTERNS =
         listOf(
+            // --- NEW: Added patterns for Union Bank and a more generic SBI/other bank format ---
+            "(SB A/c \\*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "(A/C X\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "On (HDFC Bank) (CREDIT Card) xx(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (Sodexo Card) has been successfully loaded".toRegex(RegexOption.IGNORE_CASE),
             "spent on (IndusInd Card) XX(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -55,17 +58,17 @@ object SmsParser {
             "Your (A/C XXXXX\\d+) Credited".toRegex(RegexOption.IGNORE_CASE),
             "frm (A/cX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
             "your (A/c X\\d+)-debited".toRegex(RegexOption.IGNORE_CASE),
-            // --- FIX: This regex now captures parts separately to handle variable spacing ---
             "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+CREDIT".toRegex(RegexOption.IGNORE_CASE),
             "CREDITED to your (account XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+)\\s+has\\s+credit".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+) has a debit".toRegex(RegexOption.IGNORE_CASE),
-            // --- NEW: Added patterns for Canara Bank and a more generic SBI pattern ---
             "CREDITED to your (A/c XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+)\\s+has\\s+a\\s+(?:credit|debit)".toRegex(RegexOption.IGNORE_CASE)
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
+            // --- NEW: Added a high-priority, specific pattern for "trf to" to fix merchant parsing ---
+            "trf to ([^Refno]+?)(?:\\s*Refno)",
             "towards\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|Total Avail)",
             "(?:Rs|INR)?\\s*[\\d,.]+\\s+([A-Za-z0-9@]+)\\s+UPI\\s+frm",
             "has credit for\\s+([A-Za-z0-9\\s]+?)\\s+of",
@@ -90,7 +93,7 @@ object SmsParser {
         ).map { it.toRegex(RegexOption.IGNORE_CASE) }
 
     private val VOLATILE_DATA_REGEX = listOf(
-        "\\b(?:rs|inr)[\\s.]*\\d[\\d,.]*".toRegex(RegexOption.IGNORE_CASE), // Amounts (e.g., Rs. 1,234.56)
+        "\\b(?:rs|inr)[\\s.:]*\\d[\\d,.]*".toRegex(RegexOption.IGNORE_CASE), // Amounts (e.g., Rs. 1,234.56 or Rs:123)
         "\\d{1,2}[-/]\\d{1,2}[-/]\\d{2,4}".toRegex(), // Dates (e.g., 31-12-2024)
         "\\d{1,2}-\\w{3}-\\d{2,4}".toRegex(RegexOption.IGNORE_CASE), // Dates (e.g., 31-Dec-2024)
         "\\d{2,}:\\d{2,}(?::\\d{2,})?".toRegex(), // Times (e.g., 14:30:55)
@@ -260,6 +263,12 @@ object SmsParser {
             val match = pattern.find(smsBody)
             if (match != null) {
                 return when (pattern.pattern) {
+                    // --- NEW: Handle the new account patterns ---
+                    "(SB A/c \\*\\d{4})" ->
+                        PotentialAccount(formattedName = "Union Bank of India - ${match.groupValues[1].trim()}", accountType = "Bank Account")
+                    "(A/C X\\d{4})" ->
+                        PotentialAccount(formattedName = "SBI - ${match.groupValues[1].trim()}", accountType = "Bank Account")
+
                     "On (HDFC Bank) (CREDIT Card) xx(\\d{4})" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} ${match.groupValues[2].trim()} - xx${match.groupValues[3].trim()}", accountType = "Credit Card")
                     "Your (Sodexo Card) has been successfully loaded" ->
@@ -326,7 +335,6 @@ object SmsParser {
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+CREDIT" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].replace(Regex("\\s+"), " ")} ${match.groupValues[2]}", accountType = "Bank Account")
-                    // --- FIX: Add the "Canara Bank - " prefix to the formatted name ---
                     "CREDITED to your (account XXX\\d+)\\s" ->
                         PotentialAccount(formattedName = "Canara Bank - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "Your (A/C XXXXX\\d+)\\s+has\\s+credit" ->

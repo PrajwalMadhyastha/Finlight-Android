@@ -1257,4 +1257,38 @@ class SmsParserTest {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Parser should ignore real estate ads", result)
     }
+
+    // --- NEW: Test cases for the two failing SMS messages ---
+
+    @Test
+    fun `test parses Union Bank debit with colon and captures account`() = runBlocking {
+        setupTest()
+        val smsBody = "Your SB A/c *3618 Debited for Rs:147.5 on 16-11-2021 16:45:07 by Transfer Avl Bal Rs:21949.7 -Union Bank of India"
+        val mockSms = SmsMessage(id = 3001L, sender = "XX-UBOI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals("Amount should be 147.5", 147.5, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("Transfer", result?.merchantName)
+        assertNotNull("Potential account should not be null", result?.potentialAccount)
+        assertEquals("Union Bank of India - SB A/c *3618", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses SBI UPI debit without currency symbol and captures all fields`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear UPI user A/C X0763 debited by 185.0 on date 09Dec24 trf to KAGGIS CAKES AND Refno 434416868357. If not u? call9169070230. -SBI"
+        val mockSms = SmsMessage(id = 3002L, sender = "XX-SBI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals("Amount should be 185.0", 185.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("KAGGIS CAKES AND", result?.merchantName)
+        assertNotNull("Potential account should not be null", result?.potentialAccount)
+        assertEquals("SBI - A/C X0763", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }
