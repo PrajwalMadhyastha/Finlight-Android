@@ -22,9 +22,10 @@ object SmsParser {
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     // =================================================================================
-    // REASON: FIX - Added new, specific patterns to correctly parse account details
-    // from previously failing Union Bank and SBI SMS formats. The patterns are
-    // carefully ordered to avoid disrupting existing logic.
+    // REASON: FIX - Updated several account patterns to be more flexible. They now
+    // match on either "credited" or "debited" (or a neutral verb), allowing a
+    // single regex to correctly parse both income and expense transactions for
+    // Canara Bank, Dept of Posts, and Union Bank, resolving the reported issues.
     // =================================================================================
     private val ACCOUNT_PATTERNS =
         listOf(
@@ -32,10 +33,15 @@ object SmsParser {
             "credited to your (Acc No\\. XXXXX\\d+).*-(SBI)".toRegex(RegexOption.IGNORE_CASE),
             "(Ac XXXXXXXX\\d+).*-(PNB)".toRegex(RegexOption.IGNORE_CASE),
             "withdrawn at.*?from\\s+(A/cX\\d+)".toRegex(RegexOption.IGNORE_CASE),
-            "credited to your (A/c No XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
-            "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+DEBIT".toRegex(RegexOption.IGNORE_CASE),
+            // --- UPDATED: Made this pattern neutral to "DEBITED" or "CREDITED" ---
+            "(?:DEBITED|CREDITED) to your (account XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
+            // --- UPDATED: Made this pattern neutral to "DEBIT" or "CREDIT" and flexible on account number format ---
+            "(Account\\s+No\\.\\s+X+\\d+)\\s+(?:DEBIT|CREDIT)".toRegex(RegexOption.IGNORE_CASE),
+            // --- UPDATED: Made this pattern neutral to "Debited" or "Credited" ---
+            "(SB A/c \\*\\d{4}) (?:Debited|Credited) for".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Added specific pattern for L&T credit message ---
+            "credited to your (A/c No XX\\d{4}) on".toRegex(RegexOption.IGNORE_CASE),
             // --- Existing Patterns ---
-            "(SB A/c \\*\\d{4}) Debited for".toRegex(RegexOption.IGNORE_CASE),
             "A/C X(\\d{4}) debited by".toRegex(RegexOption.IGNORE_CASE),
             "On (HDFC Bank) (CREDIT Card) xx(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (Sodexo Card) has been successfully loaded".toRegex(RegexOption.IGNORE_CASE),
@@ -69,7 +75,6 @@ object SmsParser {
             "Your (A/C XXXXX\\d+) Credited".toRegex(RegexOption.IGNORE_CASE),
             "frm (A/cX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
             "your (A/c X\\d+)-debited".toRegex(RegexOption.IGNORE_CASE),
-            "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+CREDIT".toRegex(RegexOption.IGNORE_CASE),
             "CREDITED to your (account XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+)\\s+has\\s+credit".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+) has a debit".toRegex(RegexOption.IGNORE_CASE),
@@ -90,12 +95,14 @@ object SmsParser {
             // --- NEW: Specific patterns to fix regressions ---
             "(?:http|https|www)[^\\s]+\\s+(.*)$",
             "(?:withdrawn at)\\s+([A-Za-z0-9\\s*.'-]+?)(?:\\s+from)",
-            "sent to\\s+(.*?)-SBI",
+            // --- FIX: Made the 'sent to' pattern more specific to avoid capturing too much ---
+            "sent to\\s+([A-Za-z0-9\\s.&'-]+?)(?:-SBI|$)",
             "(Payment) of Rs",
             "has credit for\\s+(.*?)\\s+of Rs",
             "has a credit by Transfer of.*?by\\s+([A-Za-z0-9\\s]+?)(?:\\.|\\s+Avl Bal)",
             // High-specificity patterns first
-            "debited for.*?towards\\s+([A-Za-z0-9\\s.&'-]+?)(?: for your|\\.)",
+            // --- FIX: Made the 'towards' pattern less greedy with more terminators ---
+            "towards\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\s+for your|\\.|\\s*Total Avail|$)",
             "(?:Rs|INR)?\\s*[\\d,.]+\\s+([A-Za-z0-9@]+)\\s+UPI\\s+frm",
             "trf to ([A-Za-z0-9\\s.&'-]+?)(?: Refno|\\.)",
             "transfer(?:red)? to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\s*\\.\\s*Avl Balance)",
@@ -320,12 +327,16 @@ object SmsParser {
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "withdrawn at.*?from\\s+(A/cX\\d+)" ->
                         PotentialAccount(formattedName = "SBI - ${match.groupValues[1].trim()}", accountType = "Bank Account")
-                    "credited to your (A/c No XX\\d{4})" ->
+                    // --- UPDATED: Handle debit/credit ---
+                    "(?:DEBITED|CREDITED) to your (account XXX\\d+)\\s" ->
+                        PotentialAccount(formattedName = "Canara Bank - ${match.groupValues[1].trim()}", accountType = "Bank Account")
+                    "(Account\\s+No\\.\\s+X+\\d+)\\s+(?:DEBIT|CREDIT)" ->
+                        PotentialAccount(formattedName = match.groupValues[1].replace(Regex("\\s+"), " ").trim(), accountType = "Bank Account")
+                    "(SB A/c \\*\\d{4}) (?:Debited|Credited) for" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
-                    "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+DEBIT" ->
-                        PotentialAccount(formattedName = "${match.groupValues[1].replace(Regex("\\s+"), " ")} ${match.groupValues[2]}", accountType = "Bank Account")
-                    "(SB A/c \\*\\d{4}) Debited for" ->
+                    "credited to your (A/c No XX\\d{4}) on" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    // --- Existing Patterns ---
                     "A/C X(\\d{4}) debited by" ->
                         PotentialAccount(formattedName = "A/C X${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "On (HDFC Bank) (CREDIT Card) xx(\\d{4})" ->
@@ -392,8 +403,6 @@ object SmsParser {
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "your (A/c X\\d+)-debited" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
-                    "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+CREDIT" ->
-                        PotentialAccount(formattedName = "${match.groupValues[1].replace(Regex("\\s+"), " ")} ${match.groupValues[2]}", accountType = "Bank Account")
                     "CREDITED to your (account XXX\\d+)\\s" ->
                         PotentialAccount(formattedName = "Canara Bank - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "Your (A/C XXXXX\\d+)\\s+has\\s+credit" ->
