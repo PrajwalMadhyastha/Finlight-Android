@@ -65,184 +65,6 @@ class SmsParserTest {
         `when`(mockIgnoreRuleDao.getEnabledRules()).thenReturn(ignoreRules.filter { it.isEnabled })
     }
 
-    // =================================================================================
-    // NEW TEST CASES FOR PARSING ACCURACY
-    // =================================================================================
-
-    @Test
-    fun `test parses amount correctly when currency code is attached`() = runBlocking {
-        setupTest()
-        val smsBody = "Dear 919480XXX, your wallet A/c is successfully Credited with 15000INR on 11-11-2024 13:34:40. Check now - http://Kx10.in/FICGXU/ePh6Rv Finance Guru"
-        val mockSms = SmsMessage(id = 401L, sender = "VM-FINGRU", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-
-        assertNotNull(result)
-        assertEquals("Parser should prioritize the amount attached to a currency code", 15000.0, result?.amount)
-        assertEquals("income", result?.transactionType)
-        assertEquals("Finance Guru", result?.merchantName)
-    }
-
-    @Test
-    fun `test parses merchant correctly from UPI credit message with 'by'`() = runBlocking {
-        setupTest()
-        val smsBody = "Rs.1600 Credited to A/c ...7656 thru UPI/069871591309 by 9686714029_axl. Total Bal:Rs.33438.48CR. Avlbl Amt:Rs.33438.48(18-11-2024 08:02:26) - Bank of Baroda"
-        val mockSms = SmsMessage(id = 402L, sender = "VM-BOB", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-
-        assertNotNull(result)
-        assertEquals(1600.0, result?.amount)
-        assertEquals("income", result?.transactionType)
-        assertEquals("9686714029 axl", result?.merchantName) // Note: underscore is replaced with space
-    }
-
-    @Test
-    fun `test parses merchant correctly from NEFT credit message with 'by'`() = runBlocking {
-        setupTest()
-        val smsBody = "Rs.6327 Credited to A/c ...7656 thru NEFT UTR RBI3532499914098 by AIIMS JODHPUR. Total Bal:Rs.7092.4CR. Avlbl Amt:Rs.7092.4(17-12-2024 17:22:45) - Bank of Baroda"
-        val mockSms = SmsMessage(id = 403L, sender = "VM-BOB", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-
-        assertNotNull(result)
-        assertEquals(6327.0, result?.amount)
-        assertEquals("income", result?.transactionType)
-        assertEquals("AIIMS JODHPUR", result?.merchantName)
-    }
-
-    // =================================================================================
-    // NEW TEST CASES FOR BATCH 2 OF PARSER INCONSISTENCIES
-    // =================================================================================
-
-    @Test
-    fun `test ignores HDFC payee modification alert`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        // --- UPDATED: Use the more realistic SMS body that was failing ---
-        val smsBody = "You've added/modified a payee Prajwal Madhyastha K P with A/c XX8207 via HDFC Bank Online Banking. Not you?Call 18002586161"
-        val mockSms = SmsMessage(id = 301L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore payee modification alerts", result)
-    }
-
-    @Test
-    fun `test ignores Airtel recharge credited confirmation`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        val smsBody = "Hi, recharge of Rs. 859 successfully credited to your Airtel number7793484112, also the validity has been extended till 03-05-2025."
-        val mockSms = SmsMessage(id = 302L, sender = "VM-AIRTEL", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore recharge credited confirmations", result)
-    }
-
-    @Test
-    fun `test ignores insurance policy conversion alert`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        val smsBody = "Your Axis Max Life Insurance Limited policy 174171785 successfully converted & added to eIA 8100144160103. Check Bima Central app.bimacentral.in for more details. -Bima Central -CAMS Insurance Repository"
-        val mockSms = SmsMessage(id = 303L, sender = "CP-BIMACN", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore insurance policy conversion alerts", result)
-    }
-
-    @Test
-    fun `test ignores failed payment notification`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        val smsBody = "Hi, Payment of Rs. 33.0 has failed for your Airtel Mobile7793484112. Any amount, if debited will be refunded to your source account within a day. Please keep order ID 7328718104265809920 for reference."
-        val mockSms = SmsMessage(id = 304L, sender = "VM-AIRTEL", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore failed payment notifications", result)
-    }
-
-    @Test
-    fun `test ignores bonus points notification`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        val smsBody = "WE'VE ADDED 501 BONUS POINTS! The Levi's Blue Jean celebration is here. Redeem your 601.0 points at your nearest Levi's store or on Levi.in before 27/5 *T&C"
-        val mockSms = SmsMessage(id = 305L, sender = "TX-LEVIS", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore bonus points notifications", result)
-    }
-
-    @Test
-    fun `test ignores Delhivery authentication code message`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        val smsBody = "Your SBI Card sent via Delhivery Reference No EV25170653359 will be attempted today. Pls provide this Delivery Authentication Code 3832 - Delhivery"
-        val mockSms = SmsMessage(id = 306L, sender = "VM-DliVry", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore delivery authentication code messages", result)
-    }
-
-    @Test
-    fun `test ignores Amazon gift card voucher code message`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        val smsBody = "Dear SimplyCLICK Cardholder, e-code of your Amazon.in Gift Card is given below. Visit amazon.in/addgiftcard to add the e-code to your Amazon Pay Balance before claim date given below.Voucher Code for Rs.500 is G9OUF-C1I65-B33R2 to be added by 27/11/2025. Valid for 12 months from the date of adding the e-code.TnC Apply."
-        val mockSms = SmsMessage(id = 307L, sender = "DM-SBICRD", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore gift card voucher code messages", result)
-    }
-
-    @Test
-    fun `test ignores Gruha Jyoti scheme application message`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        val smsBody = "Your Application No. GJ005S250467224 for Gruha Jyoti Scheme received & sent to your ESCOM for Processing. For quarries please dial 1912 From-Seva Sindhu"
-        val mockSms = SmsMessage(id = 308L, sender = "IM-SEVSIN", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore scheme application messages", result)
-    }
-
-    @Test
-    fun `test ignores Bhima promotional message`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        val smsBody = "Step into the magic of Bhima Brilliance Diamond Jewellery Festival, from 7th to 27th July 2025. Treat yourself with Flat Rs.7,000 off per carat of dazzling diamonds. And that's not all. Get free gold or silver jewellery worth upto Rs.2,00,000 on purchase of diamond jewellery. For more details, call us on 18001219076 or click https://vm.ltd/BHIMAJ/Y-UKm7 to know more. T&C apply."
-        val mockSms = SmsMessage(id = 309L, sender = "VM-BHIMAJ", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore promotional messages with monetary offers", result)
-    }
-
-
-    // =================================================================================
-    // PREVIOUSLY ADDED TEST CASES
-    // =================================================================================
-
-    @Test
-    fun `test ignores Navi Mutual Fund unit allotment message`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        val smsBody = "Unit Allotment Update: Your request for purchase of Rs.6,496.18 in Navi Liquid Fund GDG has been processed at applicable NAV. The units will be alloted in 1-2 working days.For further queries, please visit the Navi app.Navi Mutual Fund"
-        val mockSms = SmsMessage(id = 201L, sender = "VM-NAVI", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore mutual fund allotment messages", result)
-    }
-
-    @Test
-    fun `test ignores SBI Credit Card e-statement notification`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        val smsBody = "E-statement of SBI Credit Card ending XX76 dated 09/08/2025 has been mailed. If not received, SMS ENRS to 5676791. Total Amt Due Rs 8153; Min Amt Due Rs 200; Payable by 29/08/2025. Click https://sbicard.com/quickpaynet to pay your bill"
-        val mockSms = SmsMessage(id = 202L, sender = "DM-SBICRD", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore e-statement notifications", result)
-    }
-
-    @Test
-    fun `test ignores Orient Exchange order received confirmation`() = runBlocking {
-        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
-        setupTest(ignoreRules = ignoreRules)
-        val smsBody = "Your order is received at our Bangalore - Basavangudi branch. Feel free to contact at 080-26677118/080-26677113 for any clarification. Orient Exchange"
-        val mockSms = SmsMessage(id = 203L, sender = "VM-ORIENT", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-        assertNull("Parser should ignore non-financial 'order received' messages", result)
-    }
-
-
-    // =================================================================================
-    // EXISTING PASSING TEST CASES
-    // =================================================================================
-
     @Test
     fun `test parses HDFC UPI sent message`() = runBlocking {
         setupTest()
@@ -623,7 +445,174 @@ class SmsParserTest {
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
 
-    // --- NEW: Test cases for the latest batch of non-financial messages ---
+    // =================================================================================
+    // NEW TEST CASES FOR PARSING ACCURACY
+    // =================================================================================
+
+    @Test
+    fun `test parses amount correctly when currency code is attached`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear 919480XXX, your wallet A/c is successfully Credited with 15000INR on 11-11-2024 13:34:40. Check now - http://Kx10.in/FICGXU/ePh6Rv Finance Guru"
+        val mockSms = SmsMessage(id = 401L, sender = "VM-FINGRU", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals("Parser should prioritize the amount attached to a currency code", 15000.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("Finance Guru", result?.merchantName)
+    }
+
+    @Test
+    fun `test parses merchant correctly from UPI credit message with 'by'`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs.1600 Credited to A/c ...7656 thru UPI/069871591309 by 9686714029_axl. Total Bal:Rs.33438.48CR. Avlbl Amt:Rs.33438.48(18-11-2024 08:02:26) - Bank of Baroda"
+        val mockSms = SmsMessage(id = 402L, sender = "VM-BOB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(1600.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("9686714029 axl", result?.merchantName) // Note: underscore is replaced with space
+    }
+
+    @Test
+    fun `test parses merchant correctly from NEFT credit message with 'by'`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs.6327 Credited to A/c ...7656 thru NEFT UTR RBI3532499914098 by AIIMS JODHPUR. Total Bal:Rs.7092.4CR. Avlbl Amt:Rs.7092.4(17-12-2024 17:22:45) - Bank of Baroda"
+        val mockSms = SmsMessage(id = 403L, sender = "VM-BOB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(6327.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("AIIMS JODHPUR", result?.merchantName)
+    }
+
+    // =================================================================================
+    // NEW TEST CASES FOR BATCH 2 OF PARSER INCONSISTENCIES
+    // =================================================================================
+
+    @Test
+    fun `test ignores HDFC payee modification alert`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        // --- UPDATED: Use the more realistic SMS body that was failing ---
+        val smsBody = "You've added/modified a payee Prajwal Madhyastha K P with A/c XX8207 via HDFC Bank Online Banking. Not you?Call 18002586161"
+        val mockSms = SmsMessage(id = 301L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore payee modification alerts", result)
+    }
+
+    @Test
+    fun `test ignores Airtel recharge credited confirmation`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Hi, recharge of Rs. 859 successfully credited to your Airtel number7793484112, also the validity has been extended till 03-05-2025."
+        val mockSms = SmsMessage(id = 302L, sender = "VM-AIRTEL", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore recharge credited confirmations", result)
+    }
+
+    @Test
+    fun `test ignores insurance policy conversion alert`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Your Axis Max Life Insurance Limited policy 174171785 successfully converted & added to eIA 8100144160103. Check Bima Central app.bimacentral.in for more details. -Bima Central -CAMS Insurance Repository"
+        val mockSms = SmsMessage(id = 303L, sender = "CP-BIMACN", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore insurance policy conversion alerts", result)
+    }
+
+    @Test
+    fun `test ignores failed payment notification`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Hi, Payment of Rs. 33.0 has failed for your Airtel Mobile7793484112. Any amount, if debited will be refunded to your source account within a day. Please keep order ID 7328718104265809920 for reference."
+        val mockSms = SmsMessage(id = 304L, sender = "VM-AIRTEL", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore failed payment notifications", result)
+    }
+
+    @Test
+    fun `test ignores bonus points notification`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "WE'VE ADDED 501 BONUS POINTS! The Levi's Blue Jean celebration is here. Redeem your 601.0 points at your nearest Levi's store or on Levi.in before 27/5 *T&C"
+        val mockSms = SmsMessage(id = 305L, sender = "TX-LEVIS", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore bonus points notifications", result)
+    }
+
+    @Test
+    fun `test ignores Delhivery authentication code message`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Your SBI Card sent via Delhivery Reference No EV25170653359 will be attempted today. Pls provide this Delivery Authentication Code 3832 - Delhivery"
+        val mockSms = SmsMessage(id = 306L, sender = "VM-DliVry", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore delivery authentication code messages", result)
+    }
+
+    @Test
+    fun `test ignores Amazon gift card voucher code message`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Dear SimplyCLICK Cardholder, e-code of your Amazon.in Gift Card is given below. Visit amazon.in/addgiftcard to add the e-code to your Amazon Pay Balance before claim date given below.Voucher Code for Rs.500 is G9OUF-C1I65-B33R2 to be added by 27/11/2025. Valid for 12 months from the date of adding the e-code.TnC Apply."
+        val mockSms = SmsMessage(id = 307L, sender = "DM-SBICRD", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore gift card voucher code messages", result)
+    }
+
+    @Test
+    fun `test ignores Gruha Jyoti scheme application message`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Your Application No. GJ005S250467224 for Gruha Jyoti Scheme received & sent to your ESCOM for Processing. For quarries please dial 1912 From-Seva Sindhu"
+        val mockSms = SmsMessage(id = 308L, sender = "IM-SEVSIN", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore scheme application messages", result)
+    }
+
+    @Test
+    fun `test ignores Bhima promotional message`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Step into the magic of Bhima Brilliance Diamond Jewellery Festival, from 7th to 27th July 2025. Treat yourself with Flat Rs.7,000 off per carat of dazzling diamonds. And that's not all. Get free gold or silver jewellery worth upto Rs.2,00,000 on purchase of diamond jewellery. For more details, call us on 18001219076 or click https://vm.ltd/BHIMAJ/Y-UKm7 to know more. T&C apply."
+        val mockSms = SmsMessage(id = 309L, sender = "VM-BHIMAJ", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore promotional messages with monetary offers", result)
+    }
+
+
+    @Test
+    fun `test ignores Navi Mutual Fund unit allotment message`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Unit Allotment Update: Your request for purchase of Rs.6,496.18 in Navi Liquid Fund GDG has been processed at applicable NAV. The units will be alloted in 1-2 working days.For further queries, please visit the Navi app.Navi Mutual Fund"
+        val mockSms = SmsMessage(id = 201L, sender = "VM-NAVI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore mutual fund allotment messages", result)
+    }
+
+    @Test
+    fun `test ignores SBI Credit Card e-statement notification`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "E-statement of SBI Credit Card ending XX76 dated 09/08/2025 has been mailed. If not received, SMS ENRS to 5676791. Total Amt Due Rs 8153; Min Amt Due Rs 200; Payable by 29/08/2025. Click https://sbicard.com/quickpaynet to pay your bill"
+        val mockSms = SmsMessage(id = 202L, sender = "DM-SBICRD", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore e-statement notifications", result)
+    }
+
+    @Test
+    fun `test ignores Orient Exchange order received confirmation`() = runBlocking {
+        val ignoreRules = DEFAULT_IGNORE_PHRASES.filter { it.isEnabled }
+        setupTest(ignoreRules = ignoreRules)
+        val smsBody = "Your order is received at our Bangalore - Basavangudi branch. Feel free to contact at 080-26677118/080-26677113 for any clarification. Orient Exchange"
+        val mockSms = SmsMessage(id = 203L, sender = "VM-ORIENT", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore non-financial 'order received' messages", result)
+    }
 
     @Test
     fun `test ignores MakeMyTrip booking confirmation`() = runBlocking {
@@ -724,10 +713,6 @@ class SmsParserTest {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Should ignore payee modification without 'a'", result)
     }
-
-    // =================================================================================
-    // NEW TEST CASES FOR IMPROVED ACCOUNT PARSING
-    // =================================================================================
 
     @Test
     fun `test parses HDFC deposit with 'in' keyword`() = runBlocking {
@@ -839,5 +824,97 @@ class SmsParserTest {
         assertNotNull(result?.potentialAccount)
         assertEquals("A/c XX9258", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    // =================================================================================
+    // NEW TEST CASES FOR ACCOUNT PARSING
+    // =================================================================================
+
+    @Test
+    fun `test parses HDFC income with 'in your' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Money Received - INR 1.00 in your HDFC Bank A/c xx2536 on 17-12-24 by A/c linked to mobile no xx4455 (IMPS Ref No. 435202444399) Avl bal: INR 14,565.00"
+        val mockSms = SmsMessage(id = 801L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals("income", result?.transactionType)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank A/c xx2536", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses HDFC multiline expense with 'sent from' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "IMPS INR 10.00\nsent from HDFC Bank A/c XX2536 on 14-04-25\nTo A/c xxxxxxx8305\nRef-510419375047\nNot you?Call 18002586161/SMS BLOCK OB to8216821344"
+        val mockSms = SmsMessage(id = 802L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals("expense", result?.transactionType)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank A/c XX2536", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses HDFC expense with 'debited from' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs. 2.00 debited from HDFC Bank A/c **6982 on 17-12 to A/c **3377 (UPI Ref No 435221138842).\nNot You? Call 18002586161 or SMS BLOCK UPI to8216821344"
+        val mockSms = SmsMessage(id = 803L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals("expense", result?.transactionType)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank A/c **6982", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses SBI Credit Card without the word 'with'`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs.2.00 spent on your SBI Credit Card ending 8260 at SWIGGY LIMITED on 04/06/25. Trxn. not done by you? Report at https://sbicard.com/Dispute"
+        val mockSms = SmsMessage(id = 804L, sender = "DM-SBICRD", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals("expense", result?.transactionType)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("SBI Credit Card 8260", result?.potentialAccount?.formattedName)
+        assertEquals("Credit Card", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses SBI income with 'Your A_C' format`() = runBlocking {
+        setupTest()
+        val smsBody = "Your A/C XXXXX650077 Credited INR 1,41,453.00 on 15/07/25 -Deposit by transfer from ESIC MODEL HOSP. RJJ. Avl Bal INR 3,89,969.28-SBI"
+        val mockSms = SmsMessage(id = 805L, sender = "VM-SBINEF", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals("income", result?.transactionType)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("A/C XXXXX650077", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test ignores RTGS informational message`() = runBlocking {
+        setupTest(ignoreRules = DEFAULT_IGNORE_PHRASES)
+        val smsBody = "RTGS Money Deposited~INR 3,00,000.00~To Nithyananda Bhat~Txn No: HDFCR52025041560739217~On 15-04-2025 at 07:52:07~-HDFC Bank"
+        val mockSms = SmsMessage(id = 806L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull(result)
+    }
+
+    @Test
+    fun `test ignores Trends Footwear points message`() = runBlocking {
+        setupTest(ignoreRules = DEFAULT_IGNORE_PHRASES)
+        val smsBody = "Rs500 worth points credited in ur AC Use code TRFWSWEJXF3107 by 20Jul to redeem on Rs1250 user152@TRENDS FOOTWEAR Visit@ https://vil.ltd/TRNDFW/c/stlcjul T&C"
+        val mockSms = SmsMessage(id = 807L, sender = "VM-TRENDS", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull(result)
     }
 }
