@@ -65,7 +65,8 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "cheques sent to you",
     "added you as a family member",
     "Watch.*on JioTV",
-    "My11Circle"
+    "My11Circle",
+    "Insurance Provider"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
@@ -77,6 +78,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "*SBLIFE",
     "*DICGCI",
     "*MYGOVT",
+    "*EPFOHO",
 
     // --- NEW: Senders for the latest batch of non-financial messages ---
     "*LOKADL",

@@ -927,17 +927,17 @@ class SmsParserTest {
 
     @Test
     fun `test parses SBI UPI expense with 'frm' keyword`() = runBlocking {
-            setupTest()
-            val smsBody = "Rs200.0 user27@SBI UPI frm A/cX0763 on 04Jun21 RefNo 115563968049. If not done by u, fwd this SMS to0680397940/Call9169070230 or 09449112211 to block UPI"
-            val mockSms = SmsMessage(id = 901L, sender = "BX-SBIUPI", body = smsBody, date = System.currentTimeMillis())
-            val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        setupTest()
+        val smsBody = "Rs200.0 user27@SBI UPI frm A/cX0763 on 04Jun21 RefNo 115563968049. If not done by u, fwd this SMS to0680397940/Call9169070230 or 09449112211 to block UPI"
+        val mockSms = SmsMessage(id = 901L, sender = "BX-SBIUPI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
 
-            assertNotNull(result)
-            assertEquals(200.0, result?.amount)
-            assertEquals("expense", result?.transactionType)
-            assertEquals("user27@SBI", result?.merchantName)
-            assertEquals("A/cX0763", result?.potentialAccount?.formattedName)
-        }
+        assertNotNull(result)
+        assertEquals(200.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("user27@SBI", result?.merchantName)
+        assertEquals("A/cX0763", result?.potentialAccount?.formattedName)
+    }
 
     @Test
     fun `test parses SBI salary credit with 'has credit' keyword`() = runBlocking {
@@ -1289,6 +1289,58 @@ class SmsParserTest {
         assertEquals("KAGGIS CAKES AND", result?.merchantName)
         assertNotNull("Account info should be parsed", result?.potentialAccount)
         assertEquals("A/C X0763", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    // =================================================================================
+    // NEW TEST CASES FOR THIS SESSION
+    // =================================================================================
+
+    @Test
+    fun `test parses Union Bank credit and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Your SB A/c **23618 is Credited for Rs.1743 on 31-01-2021 03:42:47 by Transfer. Avl Bal Rs:5811.3 -Union Bank of India DOWNLOAD U MB HTTP://ONELINK.TO/BUYHR7"
+        val mockSms = SmsMessage(id = 1L, sender = "AM-UBOI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(1743.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("Transfer", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("SB A/c **23618", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses SBI Debit Card AMC and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer, Your A/C ending with 9515 has been debited for INR 147.5 on 21-06-21 towards annual maintenance charges for your SBI Debit Card ending with 9417"
+        val mockSms = SmsMessage(id = 2L, sender = "VM-SBICRD", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(147.5, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("annual maintenance charges", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("SBI Debit Card ending with 9417", result?.potentialAccount?.formattedName)
+        assertEquals("Debit Card", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses SBI transfer and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Your A/C XXXXX293201 Debited INR 27,750.00 on 30/06/21 -Transferred to Mr. Praveen Kumar K. Avl Balance INR 15,00,000.00-SBI"
+        val mockSms = SmsMessage(id = 3L, sender = "VM-SBINEF", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(27750.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("Mr. Praveen Kumar K", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("A/C XXXXX293201", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
 }
