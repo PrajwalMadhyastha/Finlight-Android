@@ -18,7 +18,7 @@ object SmsParser {
     // resolves parsing failures for several SBI and Canara Bank messages.
     // =================================================================================
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of)\\b".toRegex(RegexOption.IGNORE_CASE)
-    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount)\\b".toRegex(RegexOption.IGNORE_CASE)
+    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account)\\b".toRegex(RegexOption.IGNORE_CASE)
     // =================================================================================
     // REASON: FIX - Added several new, more flexible regex patterns to correctly
     // parse account details from various SBI, Dept. of Posts, and Canara Bank
@@ -65,6 +65,12 @@ object SmsParser {
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
+            // --- NEW PATTERNS AT THE TOP FOR PRIORITY ---
+            "towards\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|Total Avail)",
+            "(?:Rs|INR)?\\s*[\\d,.]+\\s+([A-Za-z0-9@]+)\\s+UPI\\s+frm",
+            "has credit for\\s+([A-Za-z0-9\\s]+?)\\s+of",
+            "debited by\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)",
+            // --- EXISTING PATTERNS BELOW ---
             "by transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|-)",
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited",
             "to:(UPI/[\\d/]+)",
