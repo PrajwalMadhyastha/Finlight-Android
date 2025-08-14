@@ -41,15 +41,25 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "get FLAT.*OFF",
     "Money Deposited~",
     "worth points credited",
-
-    // --- NEW: Rules for incorrectly parsed non-financial messages ---
     "will be activated on Jio network",
     "advise your remitter to use new IFSC",
     "Receipt will be sent shortly",
     "Insurance claim u/s",
     "RT-PCR sample collected",
     "will be debited from your account",
-    "OTP for online purchase"
+    "OTP for online purchase",
+
+    // --- NEW: Rules for the latest batch of non-financial messages ---
+    "Lok Adalat Notice",
+    "FD.*opened", "FD.*closed", "Fixed Deposit", "Recurring Deposit", "RD.*closed", "RD.*opened",
+    "will be unavailable",
+    "worth Rs.1000 & above",
+    "medical records",
+    "Article No:",
+    "cheques sent to you",
+    "added you as a family member",
+    "Watch.*on JioTV",
+    "My11Circle"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
@@ -57,11 +67,19 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "*MYNTRA", "*FLPKRT", "*AMAZON", "*SWIGGY", "*ZOMATO", "*BLUDRT", "*EKARTL",
     "*XPBEES", "*OLAMNY", "*Paytm",
     "*DLHVRY",
-
-    // --- NEW: Senders for incorrectly parsed non-financial messages ---
-    "*JioSvc",
+    "*Jio",
     "*SBLIFE",
     "*DICGCI",
-    "*MYGOVT"
+    "*MYGOVT",
+
+    // --- NEW: Senders for the latest batch of non-financial messages ---
+    "*LOKADL",
+    "*PORTER",
+    "*APOLLO",
+    "*JIOHH",
+    "*IndPst",
+    "*PRACTO",
+    "*JIOCIN",
+    "*MY11CE"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.SENDER, isDefault = true) }

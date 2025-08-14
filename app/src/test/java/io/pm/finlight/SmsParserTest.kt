@@ -1118,4 +1118,105 @@ class SmsParserTest {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Parser should ignore OTP messages", result)
     }
+
+    // --- NEW: Test cases for the latest batch of non-financial messages ---
+
+    @Test
+    fun `test ignores Lok Adalat Notice`() = runBlocking {
+        setupTest()
+        val smsBody = "This is a Lok Adalat Notice issued by District Legal Services Authority, Bengaluru Urban http://122.185.94.100:3000/lokadalt/notification?regno=KA04P4631&noticeno=508412.  You are called upon to pay the fine amount of Rs. 500  for the traffic violation against vehicle Reg. No: KA04P4631.  The fine shall be deposited via online or offline mode as mentioned in the notice to avoid legal action From DLSA and Bangalore Traffic Police"
+        val mockSms = SmsMessage(id = 1001L, sender = "VM-LOKADL", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore Lok Adalat notices", result)
+    }
+
+    @Test
+    fun `test ignores Fixed Deposit closure message`() = runBlocking {
+        setupTest()
+        val smsBody = "Your FD  a/c XXXXX7047 is closed on 05.12.2022 and proceeds are credited to a/c XXXXX5945 .Contact branch immediately, if not requested by you. -IndianBank"
+        val mockSms = SmsMessage(id = 1002L, sender = "BT-INDBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore FD closure messages", result)
+    }
+
+    @Test
+    fun `test ignores Porter wallet credit message`() = runBlocking {
+        setupTest()
+        val smsBody = "Hi, PORTER has credited Rs.200 (Code: FIRST50) in your wallet for 1st truck order! Send parcel using bike at Rs.30 @ weurl.co/bqHMj9"
+        val mockSms = SmsMessage(id = 1003L, sender = "TX-PORTER", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore Porter promotional wallet credits", result)
+    }
+
+    @Test
+    fun `test ignores bob World maintenance message`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer: bob World will be unavailable frm 11:30PM on 07-01-23 to 06:30AM on 08-01-23 for a System Upgrade. Pl use Net Banking or UPI for urgent txn-BOB"
+        val mockSms = SmsMessage(id = 1004L, sender = "VD-BOBSMS", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore system maintenance messages", result)
+    }
+
+    @Test
+    fun `test ignores Apollo Pharmacy promotional message`() = runBlocking {
+        setupTest()
+        val smsBody = "Get Free Stainless Steel Water Bottle on purchase of Medicine plus Apollo brands worth Rs.1000 & above. Visit your nearest Apollo Pharmacy klr.pw/V4HJTc *T&C"
+        val mockSms = SmsMessage(id = 1005L, sender = "VM-APOLLO", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore Apollo promotional messages", result)
+    }
+
+    @Test
+    fun `test ignores JioHealthHub informational message`() = runBlocking {
+        setupTest()
+        val smsBody = "More than 36 million medical records have been added to Health Locker by our users. Go digital. Try Health Locker on JioHealthHub."
+        val mockSms = SmsMessage(id = 1006L, sender = "VM-JIOHH", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore JioHealthHub informational messages", result)
+    }
+
+    @Test
+    fun `test ignores India Post delivery message`() = runBlocking {
+        setupTest()
+        val smsBody = "Article No:JB955870859IN received @ Bengaluru NSH on 23/03/2023 20:08:32.Track @ www.indiapost.gov.in"
+        val mockSms = SmsMessage(id = 1007L, sender = "AD-IndPst", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore India Post delivery messages", result)
+    }
+
+    @Test
+    fun `test ignores Canara Bank cheque book delivery message`() = runBlocking {
+        setupTest()
+        val smsBody = "Personalised cheques sent to you vide INDIA POST Ref No JB955207542IN and you will receive the same shortly. If not received within 7 days please contact Your Canara Bank Branch. -Canara Bank"
+        val mockSms = SmsMessage(id = 1008L, sender = "AD-CANBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore cheque book delivery messages", result)
+    }
+
+    @Test
+    fun `test ignores Practo family member message`() = runBlocking {
+        setupTest()
+        val smsBody = "Prajwal Madhyastha K P has added you as a family member on their Marsh - KPMG Health plan 2022. Download the practo app to avail its benefits. prac.to/get-plus\n- Practo"
+        val mockSms = SmsMessage(id = 1009L, sender = "VM-PRACTO", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore Practo informational messages", result)
+    }
+
+    @Test
+    fun `test ignores JioTV promotional message`() = runBlocking {
+        setupTest()
+        val smsBody = "Get super-charged with great laughs!\nWatch Siddharth Malhotra & Ajay Devgn starrer Thank God on JioTV\nhttps://bit.ly/SMSJioTV4"
+        val mockSms = SmsMessage(id = 1010L, sender = "QP-JIOCIN", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore JioTV promotional messages", result)
+    }
+
+    @Test
+    fun `test ignores My11Circle promotional message`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear ,\nRs.5000 Bonus to be credited on My11Circle.\nBLR vs UPE\nPrize Pool - 12,07,00,000 (12.07Cr)\nEntry Fees - Rs.49\nClick - http://1kx.in/TNpHVV"
+        val mockSms = SmsMessage(id = 1011L, sender = "VM-MY11CE", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore My11Circle promotional messages", result)
+    }
 }
