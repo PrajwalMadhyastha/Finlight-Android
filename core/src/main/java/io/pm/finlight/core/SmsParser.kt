@@ -11,21 +11,20 @@ sealed class ParseResult {
 
 object SmsParser {
     // =================================================================================
-    // REASON: FIX - The amount regex has been refined.
-    // 1. It now accepts a colon as a separator (e.g., "Rs:147.5").
-    // 2. The generic number matching part now uses negative lookarounds `(?<![a-zA-Z])`
-    //    and `(?![a-zA-Z])` to prevent it from greedily matching numbers that are
-    //    part of account numbers (e.g., the '763' in 'X0763').
+    // REASON: FIX - The high-confidence amount regex is now more robust. It includes
+    // more keywords (like 'debited by') and also captures an optional currency code.
+    // The parsing logic now correctly uses this captured currency instead of defaulting
+    // to INR, fixing regressions with foreign currency transactions.
     // =================================================================================
-    private val AMOUNT_WITH_CURRENCY_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .:]*)?(?<![a-zA-Z])([\\d,]+\\.?\\d*)(?![a-zA-Z])|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
+    private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
+    private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     private val ACCOUNT_PATTERNS =
         listOf(
-            // --- NEW: Added patterns for Union Bank and a more generic SBI/other bank format ---
-            "(SB A/c \\*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
-            "(A/C X\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "(SB A/c \\*\\d{4}) Debited for".toRegex(RegexOption.IGNORE_CASE),
+            "A/C X(\\d{4}) debited by".toRegex(RegexOption.IGNORE_CASE),
             "On (HDFC Bank) (CREDIT Card) xx(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (Sodexo Card) has been successfully loaded".toRegex(RegexOption.IGNORE_CASE),
             "spent on (IndusInd Card) XX(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -65,35 +64,45 @@ object SmsParser {
             "CREDITED to your (A/c XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+)\\s+has\\s+a\\s+(?:credit|debit)".toRegex(RegexOption.IGNORE_CASE)
         )
+    // --- FIX: Reordered patterns to prioritize keywords like 'by' and 'at' over the generic fallback. ---
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            // --- NEW: Added a high-priority, specific pattern for "trf to" to fix merchant parsing ---
-            "trf to ([^Refno]+?)(?:\\s*Refno)",
+            // High-specificity patterns first
+            "(?:Rs|INR)?\\s*[\\d,.]+\\s+([A-Za-z0-9@]+)\\s+UPI\\s+frm", // FIX: Prioritized this for SBI UPI format
+            "trf to ([A-Za-z0-9\\s.&'-]+?)(?: Refno|\\.)", // For "trf to KAGGIS CAKES AND Refno"
+            "transfer to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)", // For "transfer to PERUMAL C Ref No"
+            "by transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|-)", // For "by transfer from ESIC MODEL HOSP"
+            "credited to your A/c.* by ([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s*Total bal)", // For Canara bank credit
+            "credited to your account.* towards ([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s*Total Avail)", // For Canara bank credit
+            "credited to.* from VPA\\s+([A-Za-z0-9\\s@.-]+?)(?:\\s*\\()", // For HDFC VPA credit
+            "sent from.* To A/c ([A-Za-z0-9\\s*.'-]+?)(?:\\s*Ref-)", // For HDFC IMPS
+            "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)", // UPI IDs or emails first
+            "to:(UPI/[\\d/]+)", // Specific UPI format
+
+            // Medium-specificity patterns
+            "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3})", // For "At MERCHANT."
+            "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on", // For "at ..MERCHANT_ on"
+            "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal|\\s+Avl Bal)", // General 'by'
             "towards\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|Total Avail)",
-            "(?:Rs|INR)?\\s*[\\d,.]+\\s+([A-Za-z0-9@]+)\\s+UPI\\s+frm",
             "has credit for\\s+([A-Za-z0-9\\s]+?)\\s+of",
-            "transfer to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)",
-            "debited by\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)",
-            "by transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|-)",
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited",
-            "to:(UPI/[\\d/]+)",
             "as (reversal of transaction)",
-            "credited to VPA\\s+([^@]+)@",
-            "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)", // UPI IDs or emails
-            "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3})",
-            "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal)",
             "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'@-]+?)(?:\\.|\\s*\\()",
-            "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on",
             "sent to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+on\\s+|-|$)",
             "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal)",
             "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|\\s+was\\s+)",
             "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|\\s+via)",
             "for\\s+(?:[A-Z0-9]+-)?([A-Za-z0-9\\s.-]+?)(?:\\.Avl bal|\\.)",
+
+            // Lower-specificity patterns
+            "debited by\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)",
+
+            // Fallback
             "(?:-|\\s)([A-Za-z\\s]+)$"
         ).map { it.toRegex(RegexOption.IGNORE_CASE) }
 
     private val VOLATILE_DATA_REGEX = listOf(
-        "\\b(?:rs|inr)[\\s.:]*\\d[\\d,.]*".toRegex(RegexOption.IGNORE_CASE), // Amounts (e.g., Rs. 1,234.56 or Rs:123)
+        "\\b(?:rs|inr)[\\s.]*\\d[\\d,.]*".toRegex(RegexOption.IGNORE_CASE), // Amounts (e.g., Rs. 1,234.56)
         "\\d{1,2}[-/]\\d{1,2}[-/]\\d{2,4}".toRegex(), // Dates (e.g., 31-12-2024)
         "\\d{1,2}-\\w{3}-\\d{2,4}".toRegex(RegexOption.IGNORE_CASE), // Dates (e.g., 31-Dec-2024)
         "\\d{2,}:\\d{2,}(?::\\d{2,})?".toRegex(), // Times (e.g., 14:30:55)
@@ -171,22 +180,38 @@ object SmsParser {
             }
         }
 
+        // --- REFACTORED: Two-pass amount parsing ---
         if (extractedAmount == null) {
-            val allAmountMatches = AMOUNT_WITH_CURRENCY_REGEX.findAll(sms.body).toList()
-            val matchWithCurrency = allAmountMatches.firstOrNull {
-                val currencyPart1 = it.groups[2]?.value?.ifEmpty { null } // no-space currency
-                val currencyPart2 = it.groups[3]?.value?.ifEmpty { null } // currency before
-                val currencyPart3 = it.groups[6]?.value?.ifEmpty { null } // currency after
-                currencyPart1 != null || currencyPart2 != null || currencyPart3 != null
-            }
-            val bestMatch = matchWithCurrency ?: allAmountMatches.firstOrNull()
+            // Pass 1: High-confidence regex
+            val highConfidenceMatch = AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX.find(sms.body)
+            if (highConfidenceMatch != null) {
+                val currencyStr = highConfidenceMatch.groupValues[1].ifEmpty { null }
+                val amountStr = highConfidenceMatch.groupValues[2].ifEmpty { highConfidenceMatch.groupValues[3] }
+                extractedAmount = amountStr.replace(",", "").toDoubleOrNull()
+                detectedCurrency = if (currencyStr != null) {
+                    if (currencyStr.equals("RS", ignoreCase = true)) "INR" else currencyStr.uppercase()
+                } else {
+                    "INR"
+                }
+            } else {
+                // Pass 2: Fallback regex if the first pass fails
+                val allAmountMatches = FALLBACK_AMOUNT_REGEX.findAll(sms.body).toList()
+                val matchWithCurrency = allAmountMatches.firstOrNull {
+                    val currencyPart1 = it.groups[2]?.value?.ifEmpty { null }
+                    val currencyPart2 = it.groups[3]?.value?.ifEmpty { null }
+                    val currencyPart3 = it.groups[6]?.value?.ifEmpty { null }
+                    currencyPart1 != null || currencyPart2 != null || currencyPart3 != null
+                }
+                val bestMatch = matchWithCurrency ?: allAmountMatches.firstOrNull()
 
-            if (bestMatch != null) {
-                val (amount, currency) = parseAmountAndCurrency(bestMatch)
-                extractedAmount = amount
-                detectedCurrency = currency
+                if (bestMatch != null) {
+                    val (amount, currency) = parseAmountAndCurrency(bestMatch)
+                    extractedAmount = amount
+                    detectedCurrency = currency
+                }
             }
         }
+
 
         val amount = extractedAmount ?: return ParseResult.Ignored("No amount found")
 
@@ -263,12 +288,10 @@ object SmsParser {
             val match = pattern.find(smsBody)
             if (match != null) {
                 return when (pattern.pattern) {
-                    // --- NEW: Handle the new account patterns ---
-                    "(SB A/c \\*\\d{4})" ->
-                        PotentialAccount(formattedName = "Union Bank of India - ${match.groupValues[1].trim()}", accountType = "Bank Account")
-                    "(A/C X\\d{4})" ->
-                        PotentialAccount(formattedName = "SBI - ${match.groupValues[1].trim()}", accountType = "Bank Account")
-
+                    "(SB A/c \\*\\d{4}) Debited for" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "A/C X(\\d{4}) debited by" ->
+                        PotentialAccount(formattedName = "A/C X${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "On (HDFC Bank) (CREDIT Card) xx(\\d{4})" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} ${match.groupValues[2].trim()} - xx${match.groupValues[3].trim()}", accountType = "Credit Card")
                     "Your (Sodexo Card) has been successfully loaded" ->
