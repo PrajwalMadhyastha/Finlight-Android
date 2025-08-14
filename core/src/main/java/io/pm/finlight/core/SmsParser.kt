@@ -58,9 +58,10 @@ object SmsParser {
             "Your (A/C XXXXX\\d+) Credited".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW PATTERNS ---
             "frm (A/cX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
-            "your (A/c X\\d+)-debited".toRegex(RegexOption.IGNORE_CASE),
-            "(Account No\\. XXXXXX\\d+) CREDIT".toRegex(RegexOption.IGNORE_CASE),
+            "your (A/c X\\d+)-debited\\b".toRegex(RegexOption.IGNORE_CASE),
+            "(Account\\s+No\\.\\s+XXXXXX\\d+)\\s+CREDIT".toRegex(RegexOption.IGNORE_CASE),
             "CREDITED to your (account XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
+            "Your (A/C XXXXX\\d+)\\s+has\\s+credit".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+) has a debit".toRegex(RegexOption.IGNORE_CASE)
         )
     private val MERCHANT_REGEX_PATTERNS =
@@ -69,6 +70,7 @@ object SmsParser {
             "towards\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|Total Avail)",
             "(?:Rs|INR)?\\s*[\\d,.]+\\s+([A-Za-z0-9@]+)\\s+UPI\\s+frm",
             "has credit for\\s+([A-Za-z0-9\\s]+?)\\s+of",
+            "transfer to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)",
             "debited by\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)",
             // --- EXISTING PATTERNS BELOW ---
             "by transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|-)",
@@ -323,11 +325,13 @@ object SmsParser {
                     // --- NEW PATTERNS ---
                     "frm (A/cX\\d+)\\s" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
-                    "your (A/c X\\d+)-debited" ->
+                    "your (A/c X\\d+)-debited\\b" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
-                    "(Account No\\. XXXXXX\\d+) CREDIT" ->
-                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "(Account\\s+No\\.\\s+XXXXXX\\d+)\\s+CREDIT" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim().replace(Regex("\\s+"), " "), accountType = "Bank Account")
                     "CREDITED to your (account XXX\\d+)\\s" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "Your (A/C XXXXX\\d+)\\s+has\\s+credit" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "Your (A/C XXXXX\\d+) has a debit" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
