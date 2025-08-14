@@ -11,35 +11,34 @@ import java.util.Locale
 
 // =================================================================================
 // Data classes for JSON Deserialization
-// UPDATED: These classes are now more flexible and can handle the format
-// from the online XML-to-JSON converter.
+// REASON: The data classes have been updated with @SerialName annotations to
+// flexibly handle the JSON output from the `yq` tool, which prefixes
+// attributes with "+@". This makes the analyzer more robust.
 // =================================================================================
 
 @Serializable
 data class SmsDump(
-    @SerialName("smses")
     val smses: SmsesContainer
 )
 
 @Serializable
 data class SmsesContainer(
-    @SerialName("_count")
+    @SerialName("+@count")
     val count: String,
-    @SerialName("sms")
     val sms: List<Sms>
 )
 
 @Serializable
 data class Sms(
-    @SerialName("_address")
+    @SerialName("+@address")
     val address: String,
-    @SerialName("_date")
+    @SerialName("+@date")
     val date: String,
-    @SerialName("_body")
+    @SerialName("+@body")
     val body: String,
-    @SerialName("_readable_date")
+    @SerialName("+@readable_date")
     val readable_date: String,
-    @SerialName("_contact_name")
+    @SerialName("+@contact_name")
     val contact_name: String
 )
 
@@ -89,7 +88,7 @@ suspend fun main() {
 
     println("Found sms_dump.json. Reading and parsing file...")
 
-    // --- UPDATED: Deserialize using the new flexible data structure ---
+    // --- UPDATED: Deserialization now works with the flexible data classes ---
     val smsDump: SmsDump = json.decodeFromString(inputFile.readText())
     val smsList = smsDump.smses.sms
     val totalSmsCount = smsDump.smses.count.toIntOrNull() ?: smsList.size
