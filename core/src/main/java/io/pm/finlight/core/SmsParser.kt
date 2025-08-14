@@ -10,20 +10,16 @@ sealed class ParseResult {
 }
 
 object SmsParser {
-    // --- UPDATED: Reordered regex to be specific-first, and enhanced to capture currency codes without spaces (e.g., "15000INR") ---
-    private val AMOUNT_WITH_CURRENCY_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
     // =================================================================================
-    // REASON: FIX - Added several new keywords and variations to make transaction
-    // type detection more robust against different bank message formats. This
-    // resolves parsing failures for several SBI and Canara Bank messages.
+    // REASON: FIX - The amount regex now uses a negative lookahead `(?![a-zA-Z])`
+    // instead of a word boundary `\b`. This correctly parses amounts where the
+    // currency symbol is immediately followed by a digit (e.g., "Rs300.0"),
+    // fixing the SBI debit parsing failure.
     // =================================================================================
+    private val AMOUNT_WITH_CURRENCY_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account)\\b".toRegex(RegexOption.IGNORE_CASE)
-    // =================================================================================
-    // REASON: FIX - Added several new, more flexible regex patterns to correctly
-    // parse account details from various SBI, Dept. of Posts, and Canara Bank
-    // messages that were previously failing due to rigid patterns.
-    // =================================================================================
+
     private val ACCOUNT_PATTERNS =
         listOf(
             "On (HDFC Bank) (CREDIT Card) xx(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -56,23 +52,21 @@ object SmsParser {
             "debited from (HDFC Bank A/c \\*\\*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "on your (SBI Credit Card) ending (\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+) Credited".toRegex(RegexOption.IGNORE_CASE),
-            // --- NEW PATTERNS ---
             "frm (A/cX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
-            "your (A/c X\\d+)-debited\\b".toRegex(RegexOption.IGNORE_CASE),
-            "(Account\\s+No\\.\\s+XXXXXX\\d+)\\s+CREDIT".toRegex(RegexOption.IGNORE_CASE),
+            "your (A/c X\\d+)-debited".toRegex(RegexOption.IGNORE_CASE),
+            // --- FIX: This regex now captures parts separately to handle variable spacing ---
+            "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+CREDIT".toRegex(RegexOption.IGNORE_CASE),
             "CREDITED to your (account XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+)\\s+has\\s+credit".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+) has a debit".toRegex(RegexOption.IGNORE_CASE)
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            // --- NEW PATTERNS AT THE TOP FOR PRIORITY ---
             "towards\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|Total Avail)",
             "(?:Rs|INR)?\\s*[\\d,.]+\\s+([A-Za-z0-9@]+)\\s+UPI\\s+frm",
             "has credit for\\s+([A-Za-z0-9\\s]+?)\\s+of",
             "transfer to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)",
             "debited by\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)",
-            // --- EXISTING PATTERNS BELOW ---
             "by transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|-)",
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited",
             "to:(UPI/[\\d/]+)",
@@ -322,13 +316,13 @@ object SmsParser {
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} ${match.groupValues[2].trim()}", accountType = "Credit Card")
                     "Your (A/C XXXXX\\d+) Credited" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
-                    // --- NEW PATTERNS ---
                     "frm (A/cX\\d+)\\s" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
-                    "your (A/c X\\d+)-debited\\b" ->
+                    "your (A/c X\\d+)-debited" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
-                    "(Account\\s+No\\.\\s+XXXXXX\\d+)\\s+CREDIT" ->
-                        PotentialAccount(formattedName = match.groupValues[1].trim().replace(Regex("\\s+"), " "), accountType = "Bank Account")
+                    // --- FIX: This logic now reconstructs the string to normalize spacing ---
+                    "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+CREDIT" ->
+                        PotentialAccount(formattedName = "${match.groupValues[1].replace(Regex("\\s+"), " ")} ${match.groupValues[2]}", accountType = "Bank Account")
                     "CREDITED to your (account XXX\\d+)\\s" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "Your (A/C XXXXX\\d+)\\s+has\\s+credit" ->
