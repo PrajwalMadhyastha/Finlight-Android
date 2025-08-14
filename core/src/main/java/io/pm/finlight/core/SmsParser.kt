@@ -28,6 +28,10 @@ object SmsParser {
     // =================================================================================
     private val ACCOUNT_PATTERNS =
         listOf(
+            // --- NEW: Patterns for newly identified formats ---
+            "credited to your (A/c No XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+DEBIT".toRegex(RegexOption.IGNORE_CASE),
+            // --- Existing Patterns ---
             "(SB A/c \\*\\d{4}) Debited for".toRegex(RegexOption.IGNORE_CASE),
             "A/C X(\\d{4}) debited by".toRegex(RegexOption.IGNORE_CASE),
             "On (HDFC Bank) (CREDIT Card) xx(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -37,7 +41,7 @@ object SmsParser {
             "your (ICICI Bank Account) XX(\\d{4}) has been credited with".toRegex(RegexOption.IGNORE_CASE),
             "in your a/c no\\. XXXXXXXX(\\d{4}).*-(CANARA BANK)".toRegex(RegexOption.IGNORE_CASE),
             "a/c no\\. XXXXXXXX(\\d{4}) debited.*(Dept of Posts)".toRegex(RegexOption.IGNORE_CASE),
-            "Account No\\. XXXXXX(\\d{4}) DEBIT".toRegex(RegexOption.IGNORE_CASE),
+            "Account No\\. XXXXXX(\\d{4}) CREDIT".toRegex(RegexOption.IGNORE_CASE),
             "From (HDFC Bank) A/C \\*(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "(?:from your|in your) (Kotak Bank) Ac X(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "in your (UNION BANK OF INDIA) A/C XX(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -80,12 +84,17 @@ object SmsParser {
     // =================================================================================
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
+            // --- NEW: Specific patterns to fix regressions ---
+            "has credit for\\s+(.*?)\\s+of Rs",
+            "has a credit by Transfer of.*?by\\s+([A-Za-z0-9\\s]+?)(?:\\.|\\s+Avl Bal)",
             // High-specificity patterns first
-            "debited for.*?towards\\s+([A-Za-z0-9\\s.&'-]+?)(?: for your|\\.)", // NEW: Highly specific pattern for AMC
+            "debited for.*?towards\\s+([A-Za-z0-9\\s.&'-]+?)(?: for your|\\.)",
             "(?:Rs|INR)?\\s*[\\d,.]+\\s+([A-Za-z0-9@]+)\\s+UPI\\s+frm",
             "trf to ([A-Za-z0-9\\s.&'-]+?)(?: Refno|\\.)",
-            "transfer(?:red)? to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\s*\\.\\s*Avl Balance)", // FIX: Handle "Transferred"
+            "transfer(?:red)? to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\s*\\.\\s*Avl Balance)",
             "by transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|-)",
+            // --- FIX: Made this pattern less greedy by removing the end-of-string anchor '$' ---
+            "by\\s+([A-Za-z0-9_\\s.&'-]+?)(?:,|\\s+INFO:|\\.|\\s+Total Bal|\\s+Avl Bal)",
             "credited to your A/c.* by ([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s*Total bal)",
             "credited to your account.* towards ([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s*Total Avail)",
             "credited to.* from VPA\\s+([A-Za-z0-9\\s@.-]+?)(?:\\s*\\()",
@@ -96,8 +105,6 @@ object SmsParser {
             // Medium-specificity patterns
             "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3})",
             "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on",
-            "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal|\\s+Avl Bal)",
-            "has credit for\\s+([A-Za-z0-9\\s]+?)\\s+of",
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited",
             "as (reversal of transaction)",
             "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'@-]+?)(?:\\.|\\s*\\()",
@@ -301,6 +308,10 @@ object SmsParser {
             val match = pattern.find(smsBody)
             if (match != null) {
                 return when (pattern.pattern) {
+                    "credited to your (A/c No XX\\d{4})" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+DEBIT" ->
+                        PotentialAccount(formattedName = "${match.groupValues[1].replace(Regex("\\s+"), " ")} ${match.groupValues[2]}", accountType = "Bank Account")
                     "(SB A/c \\*\\d{4}) Debited for" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "A/C X(\\d{4}) debited by" ->
@@ -319,7 +330,7 @@ object SmsParser {
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - xx${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "a/c no\\. XXXXXXXX(\\d{4}) debited.*(Dept of Posts)" ->
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - xx${match.groupValues[1].trim()}", accountType = "Bank Account")
-                    "Account No\\. XXXXXX(\\d{4}) DEBIT" ->
+                    "Account No\\. XXXXXX(\\d{4}) CREDIT" ->
                         PotentialAccount(formattedName = "Bank Account - xx${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "From (HDFC Bank) A/C \\*(\\d{4})" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} - *${match.groupValues[2].trim()}", accountType = "Bank Account")

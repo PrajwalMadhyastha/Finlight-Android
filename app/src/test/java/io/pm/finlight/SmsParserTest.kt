@@ -1343,4 +1343,47 @@ class SmsParserTest {
         assertEquals("A/C XXXXX293201", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
+
+    // --- NEW: Test cases for the three specific failing messages ---
+
+    @Test
+    fun `test parses L and T construction credit and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer, INR 8,204.00 credited to your A/c No XX0763 on 27/10/2021 through NEFT with UTR KKBK213009046241 by L AND T CONSTRUCTION EQUIPMENT LIMITED, INFO: 76108PRAVEEN KUMAR K L-SBI"
+        val mockSms = SmsMessage(id = 10L, sender = "AX-KOTAKB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(8204.00, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("L AND T CONSTRUCTION EQUIPMENT LIMITED", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("A/c No XX0763", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test ignores 'Received with thanks' receipt message`() = runBlocking {
+        setupTest() // Uses the updated default ignore rules
+        val smsBody = "Received with thanks Rs 600 /- by receipt number RA2021-22/00000576.If found incorrect write to us user77@gmail.com or Whats App to6919864999"
+        val mockSms = SmsMessage(id = 11L, sender = "IX-Update", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore the receipt confirmation", result)
+    }
+
+    @Test
+    fun `test parses DEBIT with amount message and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Account  No. XXXXXX5755 DEBIT with amount Rs. 15000.00 on 15-07-2022. Balance: Rs.80173.00. [S11997812]"
+        val mockSms = SmsMessage(id = 12L, sender = "BH-DOPBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(15000.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertNull("Merchant should be null as it's not present", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("Account No. XXXXXX5755", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }

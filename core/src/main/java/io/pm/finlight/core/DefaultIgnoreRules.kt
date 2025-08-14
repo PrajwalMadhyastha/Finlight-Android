@@ -49,13 +49,13 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "will be debited from your account",
     "OTP for online purchase",
 
-    // --- NEW: Rules for recently found informational messages ---
+    // Rules for recently found informational messages
     "renewal premium",
     "Email Id.*has been added",
     "activate your eSIM",
     "BHK frm",
 
-    // --- NEW: Rules for the latest batch of non-financial messages ---
+    // Rules for the latest batch of non-financial messages
     "Lok Adalat Notice",
     "FD.*opened", "FD.*closed", "Fixed Deposit", "Recurring Deposit", "RD.*closed", "RD.*opened",
     "will be unavailable",
@@ -66,7 +66,10 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "added you as a family member",
     "Watch.*on JioTV",
     "My11Circle",
-    "Insurance Provider"
+    "Insurance Provider",
+
+    // --- NEW: Rule to ignore generic receipt confirmations ---
+    "Received with thanks.*by receipt number"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
@@ -80,7 +83,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "*MYGOVT",
     "*EPFOHO",
 
-    // --- NEW: Senders for the latest batch of non-financial messages ---
+    // Senders for the latest batch of non-financial messages
     "*LOKADL",
     "*PORTER",
     "*APOLLO",
