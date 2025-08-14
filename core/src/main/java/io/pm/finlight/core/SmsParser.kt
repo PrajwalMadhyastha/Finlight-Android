@@ -12,13 +12,17 @@ sealed class ParseResult {
 object SmsParser {
     // --- UPDATED: Reordered regex to be specific-first, and enhanced to capture currency codes without spaces (e.g., "15000INR") ---
     private val AMOUNT_WITH_CURRENCY_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- UPDATED: Added "transferred from" to the expense keywords ---
-    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from)\\b".toRegex(RegexOption.IGNORE_CASE)
-    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with)\\b".toRegex(RegexOption.IGNORE_CASE)
     // =================================================================================
-    // REASON: FIX - The regex for "Your A/C XXXXX..." has been made more flexible
-    // by changing `\\d{5}` to `\\d+`. This allows it to match SBI account numbers
-    // with more or fewer than 5 trailing digits, fixing the parsing failure.
+    // REASON: FIX - Added several new keywords and variations to make transaction
+    // type detection more robust against different bank message formats. This
+    // resolves parsing failures for several SBI and Canara Bank messages.
+    // =================================================================================
+    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of)\\b".toRegex(RegexOption.IGNORE_CASE)
+    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount)\\b".toRegex(RegexOption.IGNORE_CASE)
+    // =================================================================================
+    // REASON: FIX - Added several new, more flexible regex patterns to correctly
+    // parse account details from various SBI, Dept. of Posts, and Canara Bank
+    // messages that were previously failing due to rigid patterns.
     // =================================================================================
     private val ACCOUNT_PATTERNS =
         listOf(
@@ -51,39 +55,31 @@ object SmsParser {
             "sent from (HDFC Bank A/c XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "debited from (HDFC Bank A/c \\*\\*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "on your (SBI Credit Card) ending (\\d{4})".toRegex(RegexOption.IGNORE_CASE),
-            // --- FIX: Changed `\d{5}` to `\d+` to make it more flexible ---
-            "Your (A/C XXXXX\\d+) Credited".toRegex(RegexOption.IGNORE_CASE)
+            "Your (A/C XXXXX\\d+) Credited".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW PATTERNS ---
+            "frm (A/cX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
+            "your (A/c X\\d+)-debited".toRegex(RegexOption.IGNORE_CASE),
+            "(Account No\\. XXXXXX\\d+) CREDIT".toRegex(RegexOption.IGNORE_CASE),
+            "CREDITED to your (account XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
+            "Your (A/C XXXXX\\d+) has a debit".toRegex(RegexOption.IGNORE_CASE)
         )
-    // =================================================================================
-    // REASON: FIX - Added a new, specific regex to handle merchants from messages
-    // containing "by transfer from". Placing this high in the list ensures it is
-    // checked before more generic patterns, improving accuracy.
-    // =================================================================================
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            // --- NEW: Specific pattern for transfer credits ---
             "by transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|-)",
-            // Patterns with strong, unique keywords first. Non-greedy `+?` is crucial.
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited",
             "to:(UPI/[\\d/]+)",
             "as (reversal of transaction)",
             "credited to VPA\\s+([^@]+)@",
             "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)", // UPI IDs or emails
-
-            // Patterns with keywords like 'at', 'by', 'from', but with stricter terminators.
             "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3})",
             "by\\s+([A-Za-z0-9_\\s.]+?)(?:\\.|\\s+Total Bal)",
             "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'@-]+?)(?:\\.|\\s*\\()",
             "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on",
             "sent to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+on\\s+|-|$)",
-
-            // More general patterns, also with stricter terminators.
             "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal)",
             "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|\\s+was\\s+)",
             "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|\\s+via)",
             "for\\s+(?:[A-Z0-9]+-)?([A-Za-z0-9\\s.-]+?)(?:\\.Avl bal|\\.)",
-
-            // A safer fallback for simple text merchants at the very end of the string
             "(?:-|\\s)([A-Za-z\\s]+)$"
         ).map { it.toRegex(RegexOption.IGNORE_CASE) }
 
@@ -317,6 +313,17 @@ object SmsParser {
                     "on your (SBI Credit Card) ending (\\d{4})" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} ${match.groupValues[2].trim()}", accountType = "Credit Card")
                     "Your (A/C XXXXX\\d+) Credited" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    // --- NEW PATTERNS ---
+                    "frm (A/cX\\d+)\\s" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "your (A/c X\\d+)-debited" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "(Account No\\. XXXXXX\\d+) CREDIT" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "CREDITED to your (account XXX\\d+)\\s" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "Your (A/C XXXXX\\d+) has a debit" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     else -> null
                 }

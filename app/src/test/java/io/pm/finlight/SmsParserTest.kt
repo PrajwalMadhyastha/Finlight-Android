@@ -886,20 +886,17 @@ class SmsParserTest {
         assertEquals("Credit Card", result?.potentialAccount?.accountType)
     }
 
-    // =================================================================================
-    // FIX: Updated assertions for the failing test case.
-    // =================================================================================
     @Test
     fun `test parses SBI income with 'Your A_C' format`() = runBlocking {
         setupTest()
-        val smsBody = "Your A/C XXXXX650077 Credited INR 1,41,453.00 on 15/07/25 -Deposit by transfer from ESIC MODEL HOSP. RJJ. Avl Bal INR 3,89,969.28-SBI"
+        val smsBody = "Your A/C XXXXX650077 Credited INR 1,41,453.00 on 15/07/25 -Deposit by transfer from ESIC MODEL HOSP. Avl Bal INR 3,89,969.28-SBI"
         val mockSms = SmsMessage(id = 805L, sender = "VM-SBINEF", body = smsBody, date = System.currentTimeMillis())
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
 
         assertNotNull(result)
         assertEquals("income", result?.transactionType)
         assertEquals(141453.00, result?.amount)
-        assertEquals("ESIC MODEL HOSP", result?.merchantName) // Corrected merchant name
+        assertEquals("ESIC MODEL HOSP", result?.merchantName)
         assertNotNull(result?.potentialAccount)
         assertEquals("A/C XXXXX650077", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
@@ -921,5 +918,91 @@ class SmsParserTest {
         val mockSms = SmsMessage(id = 807L, sender = "VM-TRENDS", body = smsBody, date = System.currentTimeMillis())
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull(result)
+    }
+
+    // =================================================================================
+    // NEW TEST CASES FOR UNCAPTURED TRANSACTIONS
+    // =================================================================================
+
+    @Test
+    fun `test parses SBI UPI expense with 'frm' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs200.0 user27@SBI UPI frm A/cX0763 on 04Jun21 RefNo 115563968049. If not done by u, fwd this SMS to0680397940/Call9169070230 or 09449112211 to block UPI"
+        val mockSms = SmsMessage(id = 901L, sender = "BX-SBIUPI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(200.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("user27@SBI", result?.merchantName)
+        assertEquals("A/cX0763", result?.potentialAccount?.formattedName)
+    }
+
+    @Test
+    fun `test parses SBI salary credit with 'has credit' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Your A/C XXXXX436715 has credit for BY SALARY of Rs 1,161.00 on 16/11/21. Avl Bal Rs 0,87,695.52.-SBI"
+        val mockSms = SmsMessage(id = 902L, sender = "BP-CBSSBI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(1161.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("BY SALARY", result?.merchantName)
+        assertEquals("A/C XXXXX436715", result?.potentialAccount?.formattedName)
+    }
+
+    @Test
+    fun `test parses SBI debit with 'debited by' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear SBI User, your A/c X0763-debited by Rs300.0 on 13Apr22 transfer to PERUMAL C Ref No 210321346095. If not done by u, fwd this SMS to0680397940/Call9169070230 or 09449112211 to block UPI -SBI"
+        val mockSms = SmsMessage(id = 903L, sender = "BP-SBIUPI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(300.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("PERUMAL C", result?.merchantName)
+        assertEquals("A/c X0763", result?.potentialAccount?.formattedName)
+    }
+
+    @Test
+    fun `test parses Dept of Posts credit with 'CREDIT with amount' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Account  No. XXXXXX5755 CREDIT with amount Rs. 5700.00 on 30-12-2022. Balance: Rs.216023.00. [ S3256155]"
+        val mockSms = SmsMessage(id = 904L, sender = "BH-DOPBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(5700.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("Account No. XXXXXX5755", result?.potentialAccount?.formattedName)
+    }
+
+    @Test
+    fun `test parses Canara Bank credit with 'CREDITED to your account' format`() = runBlocking {
+        setupTest()
+        val smsBody = "An amount of INR 20,000.00 has been CREDITED to your account XXX810 on 03/05/2023 towards Cash Deposit. Total Avail.bal INR 1,12,210.00. - Canara Bank"
+        val mockSms = SmsMessage(id = 905L, sender = "AD-CANBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(20000.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("Cash Deposit", result?.merchantName)
+        assertEquals("account XXX810", result?.potentialAccount?.formattedName)
+    }
+
+    @Test
+    fun `test parses SBI debit with 'has a debit by transfer' keyword`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer, Your A/C XXXXX436715 has a debit by transfer of Rs 147.50 on 19/06/23. Avl Bal Rs 3,58,354.26.-SBI"
+        val mockSms = SmsMessage(id = 906L, sender = "BW-CBSSBI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull(result)
+        assertEquals(147.50, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("A/C XXXXX436715", result?.potentialAccount?.formattedName)
     }
 }
