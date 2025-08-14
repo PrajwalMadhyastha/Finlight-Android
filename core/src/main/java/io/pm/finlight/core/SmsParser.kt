@@ -29,6 +29,9 @@ object SmsParser {
     private val ACCOUNT_PATTERNS =
         listOf(
             // --- NEW: Patterns for newly identified formats ---
+            "credited to your (Acc No\\. XXXXX\\d+).*-(SBI)".toRegex(RegexOption.IGNORE_CASE),
+            "(Ac XXXXXXXX\\d+).*-(PNB)".toRegex(RegexOption.IGNORE_CASE),
+            "withdrawn at.*?from\\s+(A/cX\\d+)".toRegex(RegexOption.IGNORE_CASE),
             "credited to your (A/c No XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+DEBIT".toRegex(RegexOption.IGNORE_CASE),
             // --- Existing Patterns ---
@@ -85,6 +88,10 @@ object SmsParser {
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
             // --- NEW: Specific patterns to fix regressions ---
+            "(?:http|https|www)[^\\s]+\\s+(.*)$",
+            "(?:withdrawn at)\\s+([A-Za-z0-9\\s*.'-]+?)(?:\\s+from)",
+            "sent to\\s+(.*?)-SBI",
+            "(Payment) of Rs",
             "has credit for\\s+(.*?)\\s+of Rs",
             "has a credit by Transfer of.*?by\\s+([A-Za-z0-9\\s]+?)(?:\\.|\\s+Avl Bal)",
             // High-specificity patterns first
@@ -108,17 +115,15 @@ object SmsParser {
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited",
             "as (reversal of transaction)",
             "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'@-]+?)(?:\\.|\\s*\\()",
-            "sent to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+on\\s+|-|$)",
+            "sent to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+on\\s+|\\s+|-|$)",
             "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal)",
             "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|\\s+was\\s+)",
             "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|\\s+via)",
             "for\\s+(?:[A-Z0-9]+-)?([A-Za-z0-9\\s.-]+?)(?:\\.Avl bal|\\.)",
 
             // Lower-specificity patterns
-            "debited by\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)",
+            "debited by\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)"
 
-            // Fallback
-            "(?:-|\\s)([A-Za-z\\s]+)$"
         ).map { it.toRegex(RegexOption.IGNORE_CASE) }
 
     private val VOLATILE_DATA_REGEX = listOf(
@@ -308,6 +313,13 @@ object SmsParser {
             val match = pattern.find(smsBody)
             if (match != null) {
                 return when (pattern.pattern) {
+                    // --- NEW: Handle new account formats ---
+                    "credited to your (Acc No\\. XXXXX\\d+).*-(SBI)" ->
+                        PotentialAccount(formattedName = "${match.groupValues[2].trim()} - ${match.groupValues[1].trim()}", accountType = "Bank Account")
+                    "(Ac XXXXXXXX\\d+).*-(PNB)" ->
+                        PotentialAccount(formattedName = "${match.groupValues[2].trim()} - ${match.groupValues[1].trim()}", accountType = "Bank Account")
+                    "withdrawn at.*?from\\s+(A/cX\\d+)" ->
+                        PotentialAccount(formattedName = "SBI - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "credited to your (A/c No XX\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "(Account\\s+No\\.)\\s+(XXXXXX\\d+)\\s+DEBIT" ->
@@ -392,7 +404,7 @@ object SmsParser {
                         PotentialAccount(formattedName = "Canara Bank - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "Your (A/C XXXXX\\d+)\\s+has\\s+a\\s+(?:credit|debit)" ->
                         PotentialAccount(formattedName = "SBI - ${match.groupValues[1].trim()}", accountType = "Bank Account")
-                    // --- NEW: Handle new account formats ---
+                    // --- NEW: Specific patterns for failing transactions ---
                     "Your (SB A/c \\*\\*\\d+) is Credited for" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "for your (SBI Debit Card ending with \\d{4})" ->

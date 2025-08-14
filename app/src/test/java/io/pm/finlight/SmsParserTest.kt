@@ -1386,4 +1386,54 @@ class SmsParserTest {
         assertEquals("Account No. XXXXXX5755", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
+
+    // --- NEW: Test cases for this session's failing messages ---
+
+    @Test
+    fun `test parses PNB credit and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Ac XXXXXXXX00007271 Credited with Rs.200000.00 , 28-11-2022 09:52:52. Aval Bal Rs.241439.80 CR. Helpline 18001802222.Register for e-statement,if not done.-PNB"
+        val mockSms = SmsMessage(id = 1L, sender = "IM-PNB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(200000.00, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertNull("Merchant should be null", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("PNB - Ac XXXXXXXX00007271", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses SBI credit with Acc No and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer, Payment of Rs. 3,710.00 credited to your Acc No. XXXXX769515 on 27/03/25-SBI"
+        val mockSms = SmsMessage(id = 2L, sender = "DM-SBICRD", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(3710.00, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("Payment", result?.merchantName) // Fallback merchant
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("SBI - Acc No. XXXXX769515", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses SBI ATM withdrawal and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear SBI Customer, Rs.20000 withdrawn at SBI ATM S1BD011351004 from A/cX0763 on 07Aug25 Transaction Number 9661. Available Balance Rs.134906.16. If not withdrawn by you, forward this SMS to3158773679 / call9169070230 or 09449112211 to block your card. Call 18001234 if cash not received."
+        val mockSms = SmsMessage(id = 3L, sender = "DM-SBITXN", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(20000.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("SBI ATM S1BD011351004", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("SBI - A/cX0763", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }
