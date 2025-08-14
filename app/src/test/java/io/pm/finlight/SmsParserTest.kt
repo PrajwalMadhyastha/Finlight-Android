@@ -886,6 +886,9 @@ class SmsParserTest {
         assertEquals("Credit Card", result?.potentialAccount?.accountType)
     }
 
+    // =================================================================================
+    // FIX: Updated assertions for the failing test case.
+    // =================================================================================
     @Test
     fun `test parses SBI income with 'Your A_C' format`() = runBlocking {
         setupTest()
@@ -895,6 +898,8 @@ class SmsParserTest {
 
         assertNotNull(result)
         assertEquals("income", result?.transactionType)
+        assertEquals(141453.00, result?.amount)
+        assertEquals("ESIC MODEL HOSP", result?.merchantName) // Corrected merchant name
         assertNotNull(result?.potentialAccount)
         assertEquals("A/C XXXXX650077", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)

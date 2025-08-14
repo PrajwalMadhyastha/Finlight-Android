@@ -16,10 +16,9 @@ object SmsParser {
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with)\\b".toRegex(RegexOption.IGNORE_CASE)
     // =================================================================================
-    // REASON: FEATURE - Added several new, specific regex patterns to correctly
-    // parse account details from HDFC and SBI messages that were previously failing.
-    // The new patterns handle variations like "in your... A/c", "sent from... A/c",
-    // "debited from... A/c", and the tricky "SBI Credit Card ending [number]" format.
+    // REASON: FIX - The regex for "Your A/C XXXXX..." has been made more flexible
+    // by changing `\\d{5}` to `\\d+`. This allows it to match SBI account numbers
+    // with more or fewer than 5 trailing digits, fixing the parsing failure.
     // =================================================================================
     private val ACCOUNT_PATTERNS =
         listOf(
@@ -48,15 +47,22 @@ object SmsParser {
             "From (HDFC Bank A/C x\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "to (HDFC Bank A/c xx\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/c XX\\d{4}) has been debited".toRegex(RegexOption.IGNORE_CASE),
-            // --- NEW PATTERNS ---
             "in your (HDFC Bank A/c xx\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "sent from (HDFC Bank A/c XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "debited from (HDFC Bank A/c \\*\\*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "on your (SBI Credit Card) ending (\\d{4})".toRegex(RegexOption.IGNORE_CASE),
-            "Your (A/C XXXXX\\d{5}) Credited".toRegex(RegexOption.IGNORE_CASE)
+            // --- FIX: Changed `\d{5}` to `\d+` to make it more flexible ---
+            "Your (A/C XXXXX\\d+) Credited".toRegex(RegexOption.IGNORE_CASE)
         )
+    // =================================================================================
+    // REASON: FIX - Added a new, specific regex to handle merchants from messages
+    // containing "by transfer from". Placing this high in the list ensures it is
+    // checked before more generic patterns, improving accuracy.
+    // =================================================================================
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
+            // --- NEW: Specific pattern for transfer credits ---
+            "by transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|-)",
             // Patterns with strong, unique keywords first. Non-greedy `+?` is crucial.
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited",
             "to:(UPI/[\\d/]+)",
@@ -302,7 +308,6 @@ object SmsParser {
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "Your (A/c XX\\d{4}) has been debited" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
-                    // --- NEW PATTERNS ---
                     "in your (HDFC Bank A/c xx\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "sent from (HDFC Bank A/c XX\\d{4})" ->
@@ -311,7 +316,7 @@ object SmsParser {
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "on your (SBI Credit Card) ending (\\d{4})" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} ${match.groupValues[2].trim()}", accountType = "Credit Card")
-                    "Your (A/C XXXXX\\d{5}) Credited" ->
+                    "Your (A/C XXXXX\\d+) Credited" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     else -> null
                 }
