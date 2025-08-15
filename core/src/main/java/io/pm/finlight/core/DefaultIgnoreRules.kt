@@ -80,7 +80,11 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Voluntary Contribution.*credited to PRAN",
     "registered in Cash Equity",
     "PAYMENT OF.*RECEIVED TOWARDS YOUR CREDIT CARD",
-    "Complaint not responded to by your bank/NBFC/e-wallet"
+    "Complaint not responded to by your bank/NBFC/e-wallet",
+    "cashless claim.*Medi Assist",
+    "Tata Play.*deactivated",
+    "Simpl bill payment",
+    "Delivered.*Card"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders

@@ -975,4 +975,39 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         assertNull("Should ignore Units against Voluntary Contribution messages", result)
     }
 
+    @Test
+    fun `test ignores delivered by DELHIVERY message`() = runBlocking {
+        setupTest()
+        val smsBody = "Delivered: Card- ATM / Debit Renewal for ICICI Bank Account XX9709 is delivered by DELHIVERY on 24-NOV-22 & received by PRAJWAL MADHYASTHA K P."
+        val mockSms = SmsMessage(id = 12L, sender = "AD-ICICIB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore delivered by DELHIVERY messages", result)
+    }
+
+    @Test
+    fun `test ignores has been deactivated message`() = runBlocking {
+        setupTest()
+        val smsBody = "Tata Play ID2299081965 has been deactivated.\nMonthly charges Rs.260\nClick bit.ly/TPRech to recharge now\n\nIf unable to recharge, give a missed call on 08061999999 from your registered mobile number and get 3 days balance. This Balance will be debited on 4th day.\n\nPlease ignore, if already recharged."
+        val mockSms = SmsMessage(id = 13L, sender = "AX-TPPLAY", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore has been deactivated messages", result)
+    }
+
+    @Test
+    fun `test ignores Simpl bill payment message`() = runBlocking {
+        setupTest()
+        val smsBody = "Thanks! Your Simpl bill payment was a success :)\n--\nRs.305.35 has been received.\n--\nSimpl Pay"
+        val mockSms = SmsMessage(id = 14L, sender = "BP-SmplPL", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore Simpl bill payment messages", result)
+    }
+
+    @Test
+    fun `test ignores cashless claim message`() = runBlocking {
+        setupTest()
+        val smsBody = "Bharath Nursing Home has received INR 24728 towards your cashless claim no. 32978128 under policy no. 12100034230400000009 from The New India Assurance Co. Ltd with UTR no. AXISCN0275262045 and your balance sum insured is INR 375272. Team Medi Assist"
+        val mockSms = SmsMessage(id = 15L, sender = "TX-MASIST", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore cashless claim messages", result)
+    }
 }
