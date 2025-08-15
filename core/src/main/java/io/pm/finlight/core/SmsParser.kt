@@ -93,8 +93,17 @@ object SmsParser {
             "for your (SBI Debit Card ending with \\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+) Debited".toRegex(RegexOption.IGNORE_CASE)
         )
+    // =================================================================================
+    // REASON: FIX - Added three new, specific merchant patterns for HDFC Bank to
+    // correctly parse the merchant/payee from NEFT, IMPS, and credit card
+    // credit messages, resolving the failing test cases.
+    // =================================================================================
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
+            // --- NEW: Specific patterns for HDFC Bank ---
+            "for (NEFT transaction)".toRegex(RegexOption.IGNORE_CASE),
+            "To (A/c [\\w\\s]+) IMPS".toRegex(RegexOption.IGNORE_CASE),
+            "from ([A-Z\\s]+ IND) on".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Specific pattern to handle 'towards' keyword ---
             "(?:towards)\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s+Total Avail)".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Added pattern for HDFC recurring payment ---
