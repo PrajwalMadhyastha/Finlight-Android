@@ -1065,4 +1065,23 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Should ignore invoice sent notifications", result)
     }
+
+    // --- NEW: Tests for informational receipts and requests ---
+    @Test
+    fun `test ignores MoRTH receipt notification`() = runBlocking {
+        setupTest()
+        val smsBody = "Payment Received. Your Receipt No:ES/6644609 and Bank Reference Number:2506092552735. MoRTH."
+        val mockSms = SmsMessage(id = 107L, sender = "VM-MoRTH", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore MoRTH receipt notifications", result)
+    }
+
+    @Test
+    fun `test ignores HDFC address change request`() = runBlocking {
+        setupTest()
+        val smsBody = "Request Received! Address Change request in HDFC Bank SR#CA699084A0AA Check our other Instant Online Services: [https://hdfcbk.io/HDFCBK/v/jynaQl](https://hdfcbk.io/HDFCBK/v/jynaQl)"
+        val mockSms = SmsMessage(id = 108L, sender = "VM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore address change request confirmations", result)
+    }
 }

@@ -95,7 +95,9 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "E-stmt for",
     "has requested money",
     "booking is confirmed",
-    "invoice sent"
+    "invoice sent",
+    "Payment Received. Your Receipt No",
+    "Request Received!"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
