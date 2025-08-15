@@ -871,4 +871,60 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Parser should ignore OTP messages", result)
     }
+
+    // --- NEW: Tests for the latest batch of incorrectly parsed messages ---
+
+    @Test
+    fun `test ignores Samsung order confirmation`() = runBlocking {
+        setupTest()
+        val smsBody = "Order Confirmed: Thank you for placing your order with Samsung Shop. The details of Order ID 12107357889 have been sent to your registered email id. View your order details here http://1kx.in/XRscQ24ApYZ . - Samsung Shop"
+        val mockSms = SmsMessage(id = 1L, sender = "VM-SAMSNG", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore order confirmations with Order IDs", result)
+    }
+
+    @Test
+    fun `test ignores NSDL insurance policy credit`() = runBlocking {
+        setupTest()
+        val smsBody = "Insurance Policy 113992994 is credited to your e Insurance Account 1000070456279 with NSDL NIR. Login at https://nir.ndml.in to check the policy."
+        val mockSms = SmsMessage(id = 2L, sender = "VM-NSDL", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore non-monetary 'e Insurance Account' credits", result)
+    }
+
+    @Test
+    fun `test ignores VFS visa application receipt`() = runBlocking {
+        setupTest()
+        val smsBody = "The processed visa application for GWF ref no. GWF069802268 was received at the UK Visa Application Centre on Jul 03, 2023. If a courier service was purchased from VFS, your processed visa application will be delivered to the chosen address. If not, your documents can be collected during the designated passport collection times. - VFS Global"
+        val mockSms = SmsMessage(id = 3L, sender = "VM-VFSGLO", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore VFS visa application messages", result)
+    }
+
+    @Test
+    fun `test ignores Lenskart refund with missing amount`() = runBlocking {
+        setupTest()
+        val smsBody = "Action needed for your Vincent Chase Polarized Sunglasses of order #4415082357. Exchange product or get refund of Rs at lnskt.co/E0ZgPPkY . Ignore if done"
+        val mockSms = SmsMessage(id = 4L, sender = "VM-LNSKRT", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore 'refund of Rs at' when no amount is present", result)
+    }
+
+    @Test
+    fun `test ignores Cashify get paid message`() = runBlocking {
+        setupTest()
+        val smsBody = "Hi! Tell us how you'd like to get paid for order MPMAF14822604. Choose from UPI, vouchers & more. For a quick transfer, update details NOW cashi.fi/7b461502 - Cashify"
+        val mockSms = SmsMessage(id = 5L, sender = "VM-CASHFY", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore 'how you'd like to get paid' messages", result)
+    }
+
+    @Test
+    fun `test ignores CDSL shares credit message`() = runBlocking {
+        setupTest()
+        val smsBody = "CDSL:CREDITED IN A/C *14644861 SHARES OF ITC HOTELS LIMITED TOWARDS SCHEME OF ARRANGEMENT ON 13/01/2025.CONTACT YOUR DP FOR MORE INFORMATION."
+        val mockSms = SmsMessage(id = 6L, sender = "VM-CDSL", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore non-monetary 'SHARES OF' credits", result)
+    }
 }

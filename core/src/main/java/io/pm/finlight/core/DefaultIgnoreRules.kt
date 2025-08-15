@@ -68,9 +68,15 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "My11Circle",
     "Insurance Provider",
     "NeuCoin.*", "TataNeu",
+    "Received with thanks.*by receipt number",
 
-    // --- NEW: Rule to ignore generic receipt confirmations ---
-    "Received with thanks.*by receipt number"
+    // --- NEW: Rules for incorrectly parsed informational messages ---
+    "Order ID.*have been sent",
+    "Insurance Policy.*is credited to your e Insurance Account",
+    "processed visa application for GWF ref no",
+    "get refund of Rs at",
+    "how you'd like to get paid for order",
+    "SHARES OF.*TOWARDS SCHEME OF ARRANGEMENT"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
