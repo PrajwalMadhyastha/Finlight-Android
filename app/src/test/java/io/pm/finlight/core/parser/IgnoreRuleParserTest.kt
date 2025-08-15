@@ -1099,4 +1099,19 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Parser should ignore UPI mandate requests", result)
     }
+
+    @Test
+    fun `test ignores HDFC future debit alert`() = runBlocking {
+        setupTest()
+        val smsBody = "Alert: INR.1950.00 will be debited on 27/06/2025 from HDFC Bank Card 4433 for Google Play - Content Purchase Services ID:Xr61pEDASo Act:https://hdfcbk.io/HDFCBK/a/1410ENb"
+        val mockSms = SmsMessage(
+            id = 9008L,
+            sender = "VM-HDFCBK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNull("Parser should ignore future-dated debit alerts", result)
+    }
 }

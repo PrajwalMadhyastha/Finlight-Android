@@ -22,11 +22,17 @@ object SmsParser {
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     // =================================================================================
-    // REASON: FIX - Added a new pattern for Axis Bank cards using the "Card no."
-    // format to correctly capture account details from these messages.
+    // REASON: FIX - Added new patterns and updated existing ones for HDFC Bank
+    // to correctly parse account details from several new message formats,
+    // including NEFT debits, multi-line IMPS transfers, and credit card credits.
     // =================================================================================
     private val ACCOUNT_PATTERNS =
         listOf(
+            // --- NEW: Added patterns for HDFC Bank ---
+            "debited from (A/c X*\\d{4}) for NEFT".toRegex(RegexOption.IGNORE_CASE),
+            "credited on your (credit card ending \\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            // --- UPDATED: Made HDFC 'From' pattern more flexible ---
+            "From (HDFC Bank A/[Cc] X*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Added pattern for Axis Bank "Card no." format ---
             "spent Card no\\. (XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Added specific pattern for SBI Debit message ---
@@ -69,7 +75,6 @@ object SmsParser {
             "in (HDFC Bank A/c XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "from (A/C XXXXXX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "on (HDFC Bank Card x\\d{4})".toRegex(RegexOption.IGNORE_CASE),
-            "From (HDFC Bank A/C x\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "to (HDFC Bank A/c xx\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/c XX\\d{4}) has been debited".toRegex(RegexOption.IGNORE_CASE),
             "in your (HDFC Bank A/c xx\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -88,10 +93,6 @@ object SmsParser {
             "for your (SBI Debit Card ending with \\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+) Debited".toRegex(RegexOption.IGNORE_CASE)
         )
-    // =================================================================================
-    // REASON: FIX - Added a new pattern to extract the merchant name from a
-    // specific Axis Bank message format where it appears after the timestamp.
-    // =================================================================================
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
             // --- NEW: Specific pattern to handle 'towards' keyword ---
@@ -328,6 +329,13 @@ object SmsParser {
             val match = pattern.find(smsBody)
             if (match != null) {
                 return when (pattern.pattern) {
+                    // --- NEW: Handle HDFC formats ---
+                    "debited from (A/c X*\\d{4}) for NEFT" ->
+                        PotentialAccount(formattedName = "HDFC Bank - ${match.groupValues[1].trim()}", accountType = "Bank Account")
+                    "credited on your (credit card ending \\d{4})" ->
+                        PotentialAccount(formattedName = "HDFC Bank Card - ${match.groupValues[1].trim()}", accountType = "Credit Card")
+                    "From (HDFC Bank A/[Cc] X*\\d{4})" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     // --- NEW: Handle new account formats ---
                     "spent Card no\\. (XX\\d{4})" ->
                         PotentialAccount(formattedName = "Axis Bank Card - ${match.groupValues[1].trim()}", accountType = "Card")
@@ -399,8 +407,6 @@ object SmsParser {
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "on (HDFC Bank Card x\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Card")
-                    "From (HDFC Bank A/C x\\d{4})" ->
-                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "to (HDFC Bank A/c xx\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "Your (A/c XX\\d{4}) has been debited" ->

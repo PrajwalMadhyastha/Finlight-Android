@@ -257,4 +257,67 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
         assertEquals("HDFC Bank Card x4433", result?.potentialAccount?.formattedName)
         assertEquals("Card", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses HDFC NEFT debit and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer, Rs.180,000.00 is debited from A/c XXXX5733 for NEFT transaction via HDFC Bank NetBanking. Call 18002586161 if txn not done by you"
+        val mockSms = SmsMessage(
+            id = 9005L,
+            sender = "VM-HDFCBK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(180000.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("NEFT transaction", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank - A/c XXXX5733", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses HDFC IMPS transfer and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Money Sent-INR 15,000.00 From HDFC Bank A/c XX5733 on 28-10-23 To A/c xxxxxxxx9709 IMPS Ref-330120320348 Avl bal:INR 5,132.30 Not you?Call 18002586161"
+        val mockSms = SmsMessage(
+            id = 9006L,
+            sender = "VM-HDFCBK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(15000.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("A/c xxxxxxxx9709", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank A/c XX5733", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses HDFC credit card credit and account`() = runBlocking {
+        setupTest()
+        val smsBody = "HDFC Bank Cardmember, Rs 3300 has been credited on your credit card ending 4433 from AIRTEL Gurgaon IND on 02/JUN/2024. Ask Eva for details, http://hdfcbk.io/k/DUvfEq5n5ex"
+        val mockSms = SmsMessage(
+            id = 9007L,
+            sender = "VM-HDFCBK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(3300.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("AIRTEL Gurgaon IND", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank Card - credit card ending 4433", result?.potentialAccount?.formattedName)
+        assertEquals("Credit Card", result?.potentialAccount?.accountType)
+    }
 }

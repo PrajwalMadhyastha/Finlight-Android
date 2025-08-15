@@ -103,7 +103,8 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "invoice sent",
     "Payment Received. Your Receipt No",
     "Request Received!",
-    "Airtel Xstream.*renewal"
+    "Airtel Xstream.*renewal",
+    "will be debited",
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
