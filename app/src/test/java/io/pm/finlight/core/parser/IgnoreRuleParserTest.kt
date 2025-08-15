@@ -1114,4 +1114,13 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
 
         assertNull("Parser should ignore future-dated debit alerts", result)
     }
+
+    @Test
+    fun `test ignores informational NEFT credit to beneficiary`() = runBlocking {
+        setupTest()
+        val smsBody = "ICICI BANK NEFT Transaction with reference number 480800675 for Rs. 5000.00 has been credited to the beneficiary account on 02-09-2022 at 08:38:47"
+        val mockSms = SmsMessage(id = 7L, sender = "VK-ICIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore informational NEFT credit messages", result)
+    }
 }

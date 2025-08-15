@@ -180,4 +180,34 @@ class IciciSmsParserTest : BaseSmsParserTest() {
         assertEquals("ICICI Bank Card XX8011", result?.potentialAccount?.formattedName)
         assertEquals("Card", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses ICICI Card spend with 'spent using' format`() = runBlocking {
+        setupTest()
+        val smsBody = "INR 782.00 spent using ICICI Bank Card XX1001 on 29-Jul-25 on IND*Amazon.in -. Avl Limit: INR 4,94,835.00. If not you, call 1800 2662/SMS BLOCK 1001 to4082711530."
+        val mockSms = SmsMessage(id = 5L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(782.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("IND*Amazon.in", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("ICICI Bank Card XX1001", result?.potentialAccount?.formattedName)
+        assertEquals("Card", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses ICICI AutoPay debit`() = runBlocking {
+        setupTest()
+        val smsBody = "Your account has been successfully debited with Rs 149.00 on 17-Sep-22 towards NETFLIX COM for Upi Mandate AutoPay, RRN 226086352702-ICICI Bank."
+        val mockSms = SmsMessage(id = 6L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(149.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("NETFLIX COM", result?.merchantName)
+        assertEquals(null, result?.potentialAccount) // No account info in this message
+    }
 }

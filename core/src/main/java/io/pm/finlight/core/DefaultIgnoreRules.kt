@@ -77,6 +77,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Insurance Provider",
     "NeuCoin.*", "TataNeu",
     "Received with thanks.*by receipt number",
+    "credited to the beneficiary account",
 
     // Rules for incorrectly parsed informational messages
     "Order ID.*have been sent",

@@ -18,7 +18,7 @@ object SmsParser {
     // =================================================================================
     private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN)\\b".toRegex(RegexOption.IGNORE_CASE)
+    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     // =================================================================================
@@ -55,6 +55,8 @@ object SmsParser {
             "your (ICICI Bank Account X*\\d{3,4}) has been credited".toRegex(RegexOption.IGNORE_CASE),
             "(ICICI Bank Account X*\\d{3,4}) is debited with".toRegex(RegexOption.IGNORE_CASE),
             "spent on (ICICI Bank Card XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Added pattern for new ICICI Card format ---
+            "spent using (ICICI Bank Card XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             // --- Existing Patterns ---
             "A/C X(\\d{4}) debited by".toRegex(RegexOption.IGNORE_CASE),
             "On (HDFC Bank) (CREDIT Card) xx(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -112,6 +114,9 @@ object SmsParser {
             "(?:towards)\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s+Total Avail)".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Added pattern for HDFC recurring payment ---
             "without OTP/PIN.*?At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on)".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Added patterns for new ICICI formats ---
+            "on\\s+([A-Z]+\\*[A-Za-z]+\\.[a-z]+)\\s+-".toRegex(RegexOption.IGNORE_CASE),
+            "towards\\s+([A-Z\\s]+?)\\s+for".toRegex(RegexOption.IGNORE_CASE),
             // --- Existing patterns ---
             "(?:http|https|www)[^\\s]+\\s+(.*)$".toRegex(RegexOption.IGNORE_CASE),
             "(?:withdrawn at)\\s+([A-Za-z0-9\\s*.'-]+?)(?:\\s+from)".toRegex(RegexOption.IGNORE_CASE),
@@ -379,6 +384,8 @@ object SmsParser {
                     "(ICICI Bank Account X*\\d{3,4}) is debited with" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "spent on (ICICI Bank Card XX\\d{4})" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Card")
+                    "spent using (ICICI Bank Card XX\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Card")
                     // --- Existing Patterns ---
                     "A/C X(\\d{4}) debited by" ->
