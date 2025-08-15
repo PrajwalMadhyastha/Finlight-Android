@@ -72,11 +72,15 @@ val DEFAULT_IGNORE_PHRASES = listOf(
 
     // --- NEW: Rules for incorrectly parsed informational messages ---
     "Order ID.*have been sent",
-    "Insurance Policy.*is credited to your e Insurance Account",
-    "processed visa application for GWF ref no",
-    "get refund of Rs at",
-    "how you'd like to get paid for order",
-    "SHARES OF.*TOWARDS SCHEME OF ARRANGEMENT"
+    "Insurance Policy.*is",
+    "processed visa application",
+    "get refund of",
+    "get paid for order",
+    "SHARES OF.*TOWARDS SCHEME",
+    "Voluntary Contribution.*credited to PRAN",
+    "registered in Cash Equity",
+    "PAYMENT OF.*RECEIVED TOWARDS YOUR CREDIT CARD",
+    "Complaint not responded to by your bank/NBFC/e-wallet"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders

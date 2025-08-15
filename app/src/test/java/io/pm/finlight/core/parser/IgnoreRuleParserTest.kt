@@ -927,4 +927,52 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Should ignore non-monetary 'SHARES OF' credits", result)
     }
+
+    // --- NEW: Tests for the second batch of non-financial messages ---
+
+    @Test
+    fun `test ignores Protean NSDL PRAN contribution message`() = runBlocking {
+        setupTest()
+        val smsBody = "NSDL e-Gov is now Protean. Click https://bit.ly/3BFr8M2 Units against Voluntary Contribution Rs.5,000.00 credited to PRAN XX1084 at NAV-02/09/22 -Protean"
+        val mockSms = SmsMessage(id = 7L, sender = "VM-Protean", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore PRAN contribution messages", result)
+    }
+
+    @Test
+    fun `test ignores NSE cash equity registration message`() = runBlocking {
+        setupTest()
+        val smsBody = "CTMXXXXX4F registered in Cash Equity segment with broker PAYTM MONEY LTD. with Unique Client Code (UCC)BZ714284 . As per SEBI norms, NSE will start sending SMS/Email alert to you about transactions in your account. If SMS is wrongly sent to you reply by typing Y to 561614 or write to user29@nse.co.in -National Stock Exchange."
+        val mockSms = SmsMessage(id = 8L, sender = "VM-NSE", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore NSE registration messages", result)
+    }
+
+    @Test
+    fun `test ignores HDFC credit card payment received message`() = runBlocking {
+        setupTest()
+        val smsBody = "DEAR HDFCBANK CARDMEMBER, PAYMENT OF Rs. 1.00 RECEIVED TOWARDS YOUR CREDIT CARD ENDING 1335 THROUGH NEFT or RTGS ON 22-10-2022.YOUR AVAILABLE LIMIT IS RS. 410306.98"
+        val mockSms = SmsMessage(id = 9L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore credit card payment received confirmations", result)
+    }
+
+    @Test
+    fun `test ignores RBI Ombudsman informational message`() = runBlocking {
+        setupTest()
+        val smsBody = "Complaint not responded to by your bank/NBFC/e-wallet for 30 days/not satisfied with the reply received? Approach RBI Ombudsman at https://cms.rbi.org.in. -RBI"
+        val mockSms = SmsMessage(id = 10L, sender = "VM-RBI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore RBI informational messages", result)
+    }
+
+    @Test
+    fun `test ignores Units against Voluntary Contribution message`() = runBlocking {
+        setupTest()
+        val smsBody = "Units against Voluntary Contribution Rs.5,000.00 credited to PRAN XX1084 at NAV-02/11/22.Contribute (D-remit) using UPI.Info-https://bit.ly/3TiEKFJ -Protean"
+        val mockSms = SmsMessage(id = 11L, sender = "TM-PTNNPS", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore Units against Voluntary Contribution messages", result)
+    }
+
 }
