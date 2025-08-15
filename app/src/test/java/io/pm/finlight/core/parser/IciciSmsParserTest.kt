@@ -116,4 +116,68 @@ class IciciSmsParserTest : BaseSmsParserTest() {
         assertEquals("ICICI Bank - xx823", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses ICICI ACH credit and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer, your ICICI Bank Account XX508 has been credited with INR 328.00 on 30-Aug-22. Info:ACH*RELIANCEINDUSTRIES*000000000002. The Available Balance is INR 42,744.71."
+        val mockSms = SmsMessage(id = 1L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(328.00, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("ACH*RELIANCEINDUSTRIES*000000000002", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("ICICI Bank Account XX508", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses ICICI UPI reversal and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer, your ICICI Bank Account XXX508 has been credited with Rs 50.00 on 27-Sep-22 as reversal of transaction with UPI: 227040664818."
+        val mockSms = SmsMessage(id = 2L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(50.00, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("reversal of transaction", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("ICICI Bank Account XXX508", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses ICICI NEFT debit and account`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer, ICICI Bank Account XX508 is debited with INR 5,000.00 on 02-OCT-22. Info: BIL*NEFT*0005. The Available Balance is INR 9,981.28. Call 18002662 for dispute or SMS BLOCK 646 to4082711530"
+        val mockSms = SmsMessage(id = 3L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(5000.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("BIL*NEFT*0005", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("ICICI Bank Account XX508", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses ICICI Card spend and account`() = runBlocking {
+        setupTest()
+        val smsBody = "INR 7,502.00 spent on ICICI Bank Card XX8011 on 31-Aug-22 at Amazon. Avl Lmt: INR 2,51,545.65. To dispute,call 18002662/SMS BLOCK 8011 to4082711530"
+        val mockSms = SmsMessage(id = 4L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(7502.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("Amazon", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("ICICI Bank Card XX8011", result?.potentialAccount?.formattedName)
+        assertEquals("Card", result?.potentialAccount?.accountType)
+    }
 }
