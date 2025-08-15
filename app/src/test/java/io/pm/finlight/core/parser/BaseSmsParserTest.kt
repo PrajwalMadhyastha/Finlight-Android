@@ -5,8 +5,20 @@
 // SmsParserTest. All new, refactored test classes will inherit from this to
 // avoid code duplication and simplify maintenance.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.core.parser
 
+import io.pm.finlight.CustomSmsRule
+import io.pm.finlight.CustomSmsRuleDao
+import io.pm.finlight.CustomSmsRuleProvider
+import io.pm.finlight.DEFAULT_IGNORE_PHRASES
+import io.pm.finlight.IgnoreRule
+import io.pm.finlight.IgnoreRuleDao
+import io.pm.finlight.IgnoreRuleProvider
+import io.pm.finlight.MerchantCategoryMappingDao
+import io.pm.finlight.MerchantCategoryMappingProvider
+import io.pm.finlight.MerchantRenameRule
+import io.pm.finlight.MerchantRenameRuleDao
+import io.pm.finlight.MerchantRenameRuleProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Before

@@ -5,7 +5,7 @@
 // user-configurable logic.
 // FIX: Added a placeholder test to resolve the "No runnable methods" build error.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.core.parser
 
 import org.junit.Assert.assertTrue
 import org.junit.Test
