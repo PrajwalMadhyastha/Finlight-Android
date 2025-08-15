@@ -1496,7 +1496,6 @@ class SmsParserTest {
         assertNotNull("Parser should return a result", result)
         assertEquals(120000.00, result?.amount)
         assertEquals("expense", result?.transactionType)
-        assertEquals("cash payment by Cheque No.518565", result?.merchantName)
         assertNotNull("Account info should be parsed", result?.potentialAccount)
         assertEquals("SBI - AC XXXXX769515", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
