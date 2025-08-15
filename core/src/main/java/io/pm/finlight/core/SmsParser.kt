@@ -18,7 +18,7 @@ object SmsParser {
     // =================================================================================
     private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of)\\b".toRegex(RegexOption.IGNORE_CASE)
+    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     // =================================================================================
@@ -43,6 +43,8 @@ object SmsParser {
             "(SB A/c \\*\\d{4}) (?:Debited|Credited) for".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Added specific pattern for L&T credit message ---
             "credited to your (A/c No XX\\d{4}) on".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Added pattern for HDFC recurring payment ---
+            "(HDFC Bank Card x\\d{4}) At".toRegex(RegexOption.IGNORE_CASE),
             // --- Existing Patterns ---
             "A/C X(\\d{4}) debited by".toRegex(RegexOption.IGNORE_CASE),
             "On (HDFC Bank) (CREDIT Card) xx(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -95,6 +97,8 @@ object SmsParser {
         listOf(
             // --- NEW: Specific pattern to handle 'towards' keyword ---
             "(?:towards)\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s+Total Avail)".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Added pattern for HDFC recurring payment ---
+            "without OTP/PIN.*?At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on)".toRegex(RegexOption.IGNORE_CASE),
             // --- Existing patterns ---
             "(?:http|https|www)[^\\s]+\\s+(.*)$".toRegex(RegexOption.IGNORE_CASE),
             "(?:withdrawn at)\\s+([A-Za-z0-9\\s*.'-]+?)(?:\\s+from)".toRegex(RegexOption.IGNORE_CASE),
@@ -343,6 +347,8 @@ object SmsParser {
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "credited to your (A/c No XX\\d{4}) on" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "(HDFC Bank Card x\\d{4}) At" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Card")
                     // --- Existing Patterns ---
                     "A/C X(\\d{4}) debited by" ->
                         PotentialAccount(formattedName = "A/C X${match.groupValues[1].trim()}", accountType = "Bank Account")

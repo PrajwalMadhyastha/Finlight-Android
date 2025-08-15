@@ -236,4 +236,25 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
         assertEquals("HDFC Bank A/c **6982", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses HDFC recurring payment without OTP`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs.199 without OTP/PIN HDFC Bank Card x4433 At NETFLIX On 2024-07-05:23:03:33.Not U? Block&Reissue:Call 18002586161/SMS BLOCK CC 4433 to2015121976"
+        val mockSms = SmsMessage(
+            id = 9001L,
+            sender = "AM-HDFCBK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(199.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("NETFLIX", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank Card x4433", result?.potentialAccount?.formattedName)
+        assertEquals("Card", result?.potentialAccount?.accountType)
+    }
 }
