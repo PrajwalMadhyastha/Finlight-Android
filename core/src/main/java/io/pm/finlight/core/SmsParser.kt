@@ -88,6 +88,10 @@ object SmsParser {
             "for your (SBI Debit Card ending with \\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+) Debited".toRegex(RegexOption.IGNORE_CASE)
         )
+    // =================================================================================
+    // REASON: FIX - Added a new pattern to extract the merchant name from a
+    // specific Axis Bank message format where it appears after the timestamp.
+    // =================================================================================
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
             // --- NEW: Specific pattern to handle 'towards' keyword ---
@@ -119,6 +123,8 @@ object SmsParser {
             "to:(UPI/[\\d/]+)".toRegex(RegexOption.IGNORE_CASE),
 
             // Medium-specificity patterns
+            // --- NEW: Pattern for Axis Bank card spend ---
+            "\\d{2}-\\d{2}-\\d{2,4}\\s+\\d{2}:\\d{2}:\\d{2}\\s+([A-Za-z0-9\\s.&'-]+?)\\s+Avl Lmt".toRegex(RegexOption.IGNORE_CASE),
             "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3})".toRegex(RegexOption.IGNORE_CASE),
             "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on".toRegex(RegexOption.IGNORE_CASE),
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited".toRegex(RegexOption.IGNORE_CASE),
