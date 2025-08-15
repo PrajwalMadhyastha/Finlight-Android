@@ -316,4 +316,20 @@ class SbiSmsParserTest : BaseSmsParserTest() {
         assertEquals("SBI Credit Card 8260", result?.potentialAccount?.formattedName)
         assertEquals("Credit Card", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses SBI UPI credit with no merchant`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear SBI UPI User, ur A/cX9709 credited by Rs519 on 03Dec23 by  (Ref no 333785625735)"
+        val mockSms = SmsMessage(id = 9L, sender = "DM-SBIUPI", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(519.00, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals(null, result?.merchantName) // No merchant name present
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("SBI - A/cX9709", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }

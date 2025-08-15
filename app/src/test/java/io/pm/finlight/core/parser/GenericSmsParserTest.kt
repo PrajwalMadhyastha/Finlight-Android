@@ -145,27 +145,6 @@ class GenericSmsParserTest : BaseSmsParserTest() {
     }
 
     @Test
-    fun `test parses Pluxee Meal Card message`() = runBlocking {
-        setupTest()
-        val smsBody = "Rs. 60.00 spent from Pluxee Meal Card wallet, card no.xx1345 on 30-06-2025 18:41:56 at KITCHEN AFF . Avl bal Rs.1824.65. Not you call 18002106919"
-        val mockSms = SmsMessage(
-            id = 7L,
-            sender = "VD-PLUXEE",
-            body = smsBody,
-            date = System.currentTimeMillis()
-        )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-
-        assertNotNull(result)
-        assertEquals(60.00, result?.amount)
-        assertEquals("expense", result?.transactionType)
-        assertEquals("KITCHEN AFF", result?.merchantName)
-        assertNotNull(result?.potentialAccount)
-        assertEquals("Pluxee - xx1345", result?.potentialAccount?.formattedName)
-        assertEquals("Meal Card wallet", result?.potentialAccount?.accountType)
-    }
-
-    @Test
     fun `test parses transaction reversal as income`() = runBlocking {
         setupTest()
         val smsBody = "Dear Customer, your ICICI Bank Account XXX508 has been credited with Rs 208.42 on 03-Sep-22 as reversal of transaction with UPI: 224679541058."

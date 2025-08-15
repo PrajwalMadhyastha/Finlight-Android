@@ -200,14 +200,30 @@ class IciciSmsParserTest : BaseSmsParserTest() {
     @Test
     fun `test parses ICICI AutoPay debit`() = runBlocking {
         setupTest()
-        val smsBody = "Your account has been successfully debited with Rs 149.00 on 17-Sep-22 towards NETFLIX COM for Upi Mandate AutoPay, RRN 226086352702-ICICI Bank."
+        val smsBody = "Your account has been successfully debited with Rs 149.00 on 17-Sep-22 towards JioHotstar for Autopay AutoPay, RRN 506941017769-ICICI Bank."
         val mockSms = SmsMessage(id = 6L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(149.00, result?.amount)
         assertEquals("expense", result?.transactionType)
-        assertEquals("NETFLIX COM", result?.merchantName)
+        assertEquals("JioHotstar", result?.merchantName)
         assertEquals(null, result?.potentialAccount) // No account info in this message
+    }
+
+    @Test
+    fun `test parses ICICI IMPS credit with mobile number`() = runBlocking {
+        setupTest()
+        val smsBody = "ICICI Bank Account XX508 is credited with Rs 1,800.00 on 07-Jan-25 by Account linked to mobile number XXXXX00000. IMPS Ref. no. 500713512538."
+        val mockSms = SmsMessage(id = 8L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(1800.00, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("Account linked to mobile number XXXXX00000", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("ICICI Bank Account XX508", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
 }
