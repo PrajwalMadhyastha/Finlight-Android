@@ -29,6 +29,8 @@ object SmsParser {
     // =================================================================================
     private val ACCOUNT_PATTERNS =
         listOf(
+            // --- NEW: Added specific pattern for SBI Debit message ---
+            "Your (AC XXXXX\\d+) Debited".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Patterns for newly identified formats ---
             "credited to your (Acc No\\. XXXXX\\d+).*-(SBI)".toRegex(RegexOption.IGNORE_CASE),
             "(Ac XXXXXXXX\\d+).*-(PNB)".toRegex(RegexOption.IGNORE_CASE),
@@ -75,7 +77,6 @@ object SmsParser {
             "Your (A/C XXXXX\\d+) Credited".toRegex(RegexOption.IGNORE_CASE),
             "frm (A/cX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
             "your (A/c X\\d+)-debited".toRegex(RegexOption.IGNORE_CASE),
-            "CREDITED to your (account XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+)\\s+has\\s+credit".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+) has a debit".toRegex(RegexOption.IGNORE_CASE),
             "CREDITED to your (A/c XXX\\d+)\\s".toRegex(RegexOption.IGNORE_CASE),
@@ -92,46 +93,48 @@ object SmsParser {
     // =================================================================================
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            // --- NEW: Specific patterns to fix regressions ---
-            "(?:http|https|www)[^\\s]+\\s+(.*)$",
-            "(?:withdrawn at)\\s+([A-Za-z0-9\\s*.'-]+?)(?:\\s+from)",
+            // --- NEW: Specific pattern to handle 'towards' keyword ---
+            "(?:towards)\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s+Total Avail)".toRegex(RegexOption.IGNORE_CASE),
+            // --- Existing patterns ---
+            "(?:http|https|www)[^\\s]+\\s+(.*)$".toRegex(RegexOption.IGNORE_CASE),
+            "(?:withdrawn at)\\s+([A-Za-z0-9\\s*.'-]+?)(?:\\s+from)".toRegex(RegexOption.IGNORE_CASE),
             // --- FIX: Made the 'sent to' pattern more specific to avoid capturing too much ---
-            "sent to\\s+([A-Za-z0-9\\s.&'-]+?)(?:-SBI|$)",
-            "(Payment) of Rs",
-            "has credit for\\s+(.*?)\\s+of Rs",
-            "has a credit by Transfer of.*?by\\s+([A-Za-z0-9\\s]+?)(?:\\.|\\s+Avl Bal)",
-            // High-specificity patterns first
-            // --- FIX: Made the 'towards' pattern less greedy with more terminators ---
-            "towards\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\s+for your|\\.|\\s*Total Avail|$)",
-            "(?:Rs|INR)?\\s*[\\d,.]+\\s+([A-Za-z0-9@]+)\\s+UPI\\s+frm",
-            "trf to ([A-Za-z0-9\\s.&'-]+?)(?: Refno|\\.)",
-            "transfer(?:red)? to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\s*\\.\\s*Avl Balance)",
-            "by transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|-)",
+            "sent to\\s+([A-Za-z0-9\\s.&'-]+?)(?:-SBI|$)".toRegex(RegexOption.IGNORE_CASE),
+            "(Payment) of Rs".toRegex(RegexOption.IGNORE_CASE),
+            "has credit for\\s+(.*?)\\s+of Rs".toRegex(RegexOption.IGNORE_CASE),
+            "has a credit by Transfer of.*?by\\s+([A-Za-z0-9\\s]+?)(?:\\.|\\s+Avl Bal)".toRegex(RegexOption.IGNORE_CASE),
+            // --- FIX: Replaced the single problematic 'towards' pattern with two more specific ones ---
+            "towards\\s+(.+?)(?:\\. Avl Bal|-SBI)".toRegex(RegexOption.IGNORE_CASE),
+            "towards\\s+(.+?)(?:\\s+for your)".toRegex(RegexOption.IGNORE_CASE),
+            "(?:Rs|INR)?\\s*[\\d,.]+\\s+([A-Za-z0-9@]+)\\s+UPI\\s+frm".toRegex(RegexOption.IGNORE_CASE),
+            "trf to ([A-Za-z0-9\\s.&'-]+?)(?: Refno|\\.)".toRegex(RegexOption.IGNORE_CASE),
+            "transfer(?:red)? to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\s*\\.\\s*Avl Balance)".toRegex(RegexOption.IGNORE_CASE),
+            "by transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.|-)".toRegex(RegexOption.IGNORE_CASE),
             // --- FIX: Made this pattern less greedy by removing the end-of-string anchor '$' ---
-            "by\\s+([A-Za-z0-9_\\s.&'-]+?)(?:,|\\s+INFO:|\\.|\\s+Total Bal|\\s+Avl Bal)",
-            "credited to your A/c.* by ([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s*Total bal)",
-            "credited to your account.* towards ([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s*Total Avail)",
-            "credited to.* from VPA\\s+([A-Za-z0-9\\s@.-]+?)(?:\\s*\\()",
-            "sent from.* To A/c ([A-Za-z0-9\\s*.'-]+?)(?:\\s*Ref-)",
-            "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)",
-            "to:(UPI/[\\d/]+)",
+            "by\\s+([A-Za-z0-9_\\s.&'-]+?)(?:,|\\s+INFO:|\\.|\\s+Total Bal|\\s+Avl Bal)".toRegex(RegexOption.IGNORE_CASE),
+            "credited to your A/c.* by ([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s*Total bal)".toRegex(RegexOption.IGNORE_CASE),
+            "credited to your account.* towards ([A-Za-z0-9\\s.&'-]+?)(?:\\.|\\s*Total Avail)".toRegex(RegexOption.IGNORE_CASE),
+            "credited to.* from VPA\\s+([A-Za-z0-9\\s@.-]+?)(?:\\s*\\()".toRegex(RegexOption.IGNORE_CASE),
+            "sent from.* To A/c ([A-Za-z0-9\\s*.'-]+?)(?:\\s*Ref-)".toRegex(RegexOption.IGNORE_CASE),
+            "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)".toRegex(RegexOption.IGNORE_CASE),
+            "to:(UPI/[\\d/]+)".toRegex(RegexOption.IGNORE_CASE),
 
             // Medium-specificity patterns
-            "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3})",
-            "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on",
-            ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited",
-            "as (reversal of transaction)",
-            "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'@-]+?)(?:\\.|\\s*\\()",
-            "sent to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+on\\s+|\\s+|-|$)",
-            "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal)",
-            "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|\\s+was\\s+)",
-            "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|\\s+via)",
-            "for\\s+(?:[A-Z0-9]+-)?([A-Za-z0-9\\s.-]+?)(?:\\.Avl bal|\\.)",
+            "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3})".toRegex(RegexOption.IGNORE_CASE),
+            "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on".toRegex(RegexOption.IGNORE_CASE),
+            ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited".toRegex(RegexOption.IGNORE_CASE),
+            "as (reversal of transaction)".toRegex(RegexOption.IGNORE_CASE),
+            "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'@-]+?)(?:\\.|\\s*\\()".toRegex(RegexOption.IGNORE_CASE),
+            "sent to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+on\\s+|\\s+|-|$)".toRegex(RegexOption.IGNORE_CASE),
+            "(?:Info|Desc):?\\s*([A-Za-z0-9\\s*.'-]+?)(?:\\.|Avl Bal)".toRegex(RegexOption.IGNORE_CASE),
+            "(?:\\bat\\b|to\\s+|deducted for your\\s+)([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|\\s+for\\s+|\\.|\\s+was\\s+)".toRegex(RegexOption.IGNORE_CASE),
+            "on\\s+([A-Za-z0-9*.'_ ]+?)(?:\\.|\\s+Avl Bal|\\s+via)".toRegex(RegexOption.IGNORE_CASE),
+            "for\\s+(?:[A-Z0-9]+-)?([A-Za-z0-9\\s.-]+?)(?:\\.Avl bal|\\.)".toRegex(RegexOption.IGNORE_CASE),
 
             // Lower-specificity patterns
-            "debited by\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)"
+            "debited by\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+Ref No|\\.)".toRegex(RegexOption.IGNORE_CASE)
 
-        ).map { it.toRegex(RegexOption.IGNORE_CASE) }
+        )
 
     private val VOLATILE_DATA_REGEX = listOf(
         "\\b(?:rs|inr)[\\s.]*\\d[\\d,.]*".toRegex(RegexOption.IGNORE_CASE), // Amounts (e.g., Rs. 1,234.56)
@@ -321,17 +324,21 @@ object SmsParser {
             if (match != null) {
                 return when (pattern.pattern) {
                     // --- NEW: Handle new account formats ---
+                    "Your (AC XXXXX\\d+) Debited" ->
+                        PotentialAccount(formattedName = "SBI - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "credited to your (Acc No\\. XXXXX\\d+).*-(SBI)" ->
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "(Ac XXXXXXXX\\d+).*-(PNB)" ->
                         PotentialAccount(formattedName = "${match.groupValues[2].trim()} - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "withdrawn at.*?from\\s+(A/cX\\d+)" ->
                         PotentialAccount(formattedName = "SBI - ${match.groupValues[1].trim()}", accountType = "Bank Account")
-                    // --- UPDATED: Handle debit/credit ---
+                    // --- UPDATED: Made this pattern neutral to "DEBITED" or "CREDITED" ---
                     "(?:DEBITED|CREDITED) to your (account XXX\\d+)\\s" ->
                         PotentialAccount(formattedName = "Canara Bank - ${match.groupValues[1].trim()}", accountType = "Bank Account")
+                    // --- UPDATED: Made this pattern neutral to "DEBIT" or "CREDIT" and flexible on account number format ---
                     "(Account\\s+No\\.\\s+X+\\d+)\\s+(?:DEBIT|CREDIT)" ->
-                        PotentialAccount(formattedName = match.groupValues[1].replace(Regex("\\s+"), " ").trim(), accountType = "Bank Account")
+                        PotentialAccount(formattedName = match.groupValues[1].replace(Regex("[\\s\\u00A0]+"), " ").trim(), accountType = "Bank Account")
+                    // --- UPDATED: Made this pattern neutral to "Debited" or "Credited" ---
                     "(SB A/c \\*\\d{4}) (?:Debited|Credited) for" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "credited to your (A/c No XX\\d{4}) on" ->

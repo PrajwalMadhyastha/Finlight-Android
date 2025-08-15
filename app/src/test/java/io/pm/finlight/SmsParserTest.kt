@@ -1484,4 +1484,21 @@ class SmsParserTest {
         assertEquals("SB A/c *3618", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
+
+    // --- NEW: Test case for the latest failing SBI Debit message ---
+    @Test
+    fun `test parses SBI debit with Towards cash payment`() = runBlocking {
+        setupTest()
+        val smsBody = "Your AC XXXXX769515 Debited INR 1,20,000.00 on 22/01/25 -Towards cash payment by Cheque No.518565. Avl Bal INR 40,675.45-SBI"
+        val mockSms = SmsMessage(id = 4L, sender = "VM-SBIBNK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should return a result", result)
+        assertEquals(120000.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("cash payment by Cheque No.518565", result?.merchantName)
+        assertNotNull("Account info should be parsed", result?.potentialAccount)
+        assertEquals("SBI - AC XXXXX769515", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }

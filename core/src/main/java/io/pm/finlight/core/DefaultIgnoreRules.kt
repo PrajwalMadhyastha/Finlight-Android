@@ -67,6 +67,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Watch.*on JioTV",
     "My11Circle",
     "Insurance Provider",
+    "NeuCoin.*", "TataNeu",
 
     // --- NEW: Rule to ignore generic receipt confirmations ---
     "Received with thanks.*by receipt number"
@@ -81,7 +82,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "*SBLIFE",
     "*DICGCI",
     "*MYGOVT",
-    "*EPFOHO",
+    "*EPFOHO", "*UIICHO",
 
     // Senders for the latest batch of non-financial messages
     "*LOKADL",
@@ -91,6 +92,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "*IndPst",
     "*PRACTO",
     "*JIOCIN",
-    "*MY11CE"
+    "*MY11CE",
+    "MYTNEU"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.SENDER, isDefault = true) }
