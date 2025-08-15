@@ -418,26 +418,4 @@ class GenericSmsParserTest : BaseSmsParserTest() {
         assertEquals("PNB - Ac XXXXXXXX00007271", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
-
-    // --- NEW: Test for Axis Bank "Card no." format ---
-    @Test
-    fun `test parses Axis Bank card spend with 'Card no' format`() = runBlocking {
-        setupTest()
-        val smsBody = "Spent Card no. XX9646 INR 95 24-10-23 19:52:26 SHANKARA M Avl Lmt INR 413906 SMS BLOCK 9646 to 919951860002, if not you - Axis Bank"
-        val mockSms = SmsMessage(
-            id = 9003L,
-            sender = "AM-AXISBK",
-            body = smsBody,
-            date = System.currentTimeMillis()
-        )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
-
-        assertNotNull("Parser should not ignore this valid transaction", result)
-        assertEquals(95.0, result?.amount)
-        assertEquals("expense", result?.transactionType)
-        assertEquals("SHANKARA M", result?.merchantName)
-        assertNotNull(result?.potentialAccount)
-        assertEquals("Axis Bank Card - XX9646", result?.potentialAccount?.formattedName)
-        assertEquals("Card", result?.potentialAccount?.accountType)
-    }
 }

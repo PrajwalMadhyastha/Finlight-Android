@@ -206,6 +206,9 @@ object SmsParser {
         ignoreRuleProvider: IgnoreRuleProvider,
         merchantCategoryMappingProvider: MerchantCategoryMappingProvider
     ): ParseResult {
+        // --- NEW: Normalize the SMS body to handle multi-line messages ---
+        val normalizedBody = sms.body.replace(Regex("\\s+"), " ").trim()
+
         val allIgnoreRules = ignoreRuleProvider.getEnabledRules()
         val senderIgnoreRules = allIgnoreRules.filter { it.type == RuleType.SENDER }
         val bodyIgnoreRules = allIgnoreRules.filter { it.type == RuleType.BODY_PHRASE }
@@ -222,7 +225,7 @@ object SmsParser {
 
         for (rule in bodyIgnoreRules) {
             try {
-                if (rule.pattern.toRegex(RegexOption.IGNORE_CASE).containsMatchIn(sms.body)) {
+                if (rule.pattern.toRegex(RegexOption.IGNORE_CASE).containsMatchIn(normalizedBody)) {
                     return ParseResult.Ignored("Body contains ignore phrase: '${rule.pattern}'")
                 }
             } catch (e: PatternSyntaxException) {
@@ -240,7 +243,7 @@ object SmsParser {
 
         // Custom rule processing (if any)
         for (rule in allRules) {
-            if (sms.body.contains(rule.triggerPhrase, ignoreCase = true)) {
+            if (normalizedBody.contains(rule.triggerPhrase, ignoreCase = true)) {
                 // ... (custom rule logic can be expanded here if needed)
                 break
             }
@@ -249,7 +252,7 @@ object SmsParser {
         // --- REFACTORED: Two-pass amount parsing ---
         if (extractedAmount == null) {
             // Pass 1: High-confidence regex
-            val highConfidenceMatch = AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX.find(sms.body)
+            val highConfidenceMatch = AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX.find(normalizedBody)
             if (highConfidenceMatch != null) {
                 val currencyStr = highConfidenceMatch.groupValues[1].ifEmpty { null }
                 val amountStr = highConfidenceMatch.groupValues[2].ifEmpty { highConfidenceMatch.groupValues[3] }
@@ -261,7 +264,7 @@ object SmsParser {
                 }
             } else {
                 // Pass 2: Fallback regex if the first pass fails
-                val allAmountMatches = FALLBACK_AMOUNT_REGEX.findAll(sms.body).toList()
+                val allAmountMatches = FALLBACK_AMOUNT_REGEX.findAll(normalizedBody).toList()
                 val matchWithCurrency = allAmountMatches.firstOrNull {
                     val currencyPart1 = it.groups[2]?.value?.ifEmpty { null }
                     val currencyPart2 = it.groups[3]?.value?.ifEmpty { null }
@@ -283,8 +286,8 @@ object SmsParser {
 
         val transactionType =
             when {
-                EXPENSE_KEYWORDS_REGEX.containsMatchIn(sms.body) -> "expense"
-                INCOME_KEYWORDS_REGEX.containsMatchIn(sms.body) -> "income"
+                EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody) -> "expense"
+                INCOME_KEYWORDS_REGEX.containsMatchIn(normalizedBody) -> "income"
                 else -> return ParseResult.Ignored("Could not determine transaction type (debit/credit)")
             }
 
@@ -292,7 +295,7 @@ object SmsParser {
 
         if (merchantName == null) {
             for (pattern in MERCHANT_REGEX_PATTERNS) {
-                val match = pattern.find(sms.body)
+                val match = pattern.find(normalizedBody)
                 if (match != null) {
                     val potentialName = match.groups[1]?.value?.replace("_", " ")?.replace(Regex("\\s+"), " ")?.trim()?.trimEnd('.')
                     if (!potentialName.isNullOrBlank() && !potentialName.contains("call", ignoreCase = true)) {
@@ -318,11 +321,10 @@ object SmsParser {
             learnedCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(merchantName)
         }
 
-        val potentialAccount = extractedAccount ?: parseAccount(sms.body, sms.sender)
+        val potentialAccount = extractedAccount ?: parseAccount(normalizedBody, sms.sender)
         val normalizedSender = sms.sender.filter { it.isDigit() }.takeLast(10)
-        val normalizedBody = sms.body.trim().replace(Regex("\\s+"), " ")
         val smsHash = (normalizedSender + normalizedBody).hashCode().toString()
-        val smsSignature = generateSmsSignature(sms.body)
+        val smsSignature = generateSmsSignature(normalizedBody)
 
         val transaction = PotentialTransaction(
             sourceSmsId = sms.id,
@@ -330,7 +332,7 @@ object SmsParser {
             amount = amount,
             transactionType = transactionType,
             merchantName = merchantName,
-            originalMessage = sms.body,
+            originalMessage = sms.body, // Store original message with newlines
             potentialAccount = potentialAccount,
             sourceSmsHash = smsHash,
             categoryId = learnedCategoryId,
