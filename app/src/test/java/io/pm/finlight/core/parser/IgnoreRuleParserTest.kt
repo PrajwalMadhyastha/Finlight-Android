@@ -426,7 +426,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
     @Test
     fun `test ignores informational NEFT sent message`() = runBlocking {
         setupTest(ignoreRules = DEFAULT_IGNORE_PHRASES)
-        val smsBody = "NEFT from Ac X3377 for Rs.10,000.00 with UTR SBIN525080708724 dt 21.03.25 to My hdf Ac X6982 with HDFC0005075 sent from YONO. If not done by you fwd this SMS to3711961089 or call9113274461 - SBI."
+        val smsBody = "NEFT from Ac X3377 for Rs.10,000.00 with UTR SBIN525080708724 dt 21.03.25 to My hdfc Ac X6982 with HDFC0005075 sent from YONO. If not done by you fwd this SMS to3711961089 or call9113274461 - SBI."
         val mockSms = SmsMessage(
             id = 605L,
             sender = "VM-SBINEF",
@@ -1083,5 +1083,20 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val mockSms = SmsMessage(id = 108L, sender = "VM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Should ignore address change request confirmations", result)
+    }
+
+    // --- NEW: Test for Axis Bank UPI mandate request ---
+    @Test
+    fun `test ignores Axis Bank UPI mandate request`() = runBlocking {
+        setupTest()
+        val smsBody = "You have received UPI mandate collect request from NETFLIX COM for INR 149.00. Log into Axis Pay app to authorize - Axis Bank"
+        val mockSms = SmsMessage(
+            id = 9004L,
+            sender = "AM-AXISBK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Parser should ignore UPI mandate requests", result)
     }
 }

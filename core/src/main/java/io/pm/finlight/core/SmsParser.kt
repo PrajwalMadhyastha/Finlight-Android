@@ -22,13 +22,13 @@ object SmsParser {
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     // =================================================================================
-    // REASON: FIX - Updated several account patterns to be more flexible. They now
-    // match on either "credited" or "debited" (or a neutral verb), allowing a
-    // single regex to correctly parse both income and expense transactions for
-    // Canara Bank, Dept of Posts, and Union Bank, resolving the reported issues.
+    // REASON: FIX - Added a new pattern for Axis Bank cards using the "Card no."
+    // format to correctly capture account details from these messages.
     // =================================================================================
     private val ACCOUNT_PATTERNS =
         listOf(
+            // --- NEW: Added pattern for Axis Bank "Card no." format ---
+            "spent Card no\\. (XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Added specific pattern for SBI Debit message ---
             "Your (AC XXXXX\\d+) Debited".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Patterns for newly identified formats ---
@@ -88,11 +88,6 @@ object SmsParser {
             "for your (SBI Debit Card ending with \\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "Your (A/C XXXXX\\d+) Debited".toRegex(RegexOption.IGNORE_CASE)
         )
-    // =================================================================================
-    // REASON: FIX - Refined merchant regex patterns to prevent incorrect captures.
-    // Added a specific pattern for "towards..." and made the "Transferred to..."
-    // pattern less greedy to fix two failing test cases.
-    // =================================================================================
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
             // --- NEW: Specific pattern to handle 'towards' keyword ---
@@ -328,6 +323,8 @@ object SmsParser {
             if (match != null) {
                 return when (pattern.pattern) {
                     // --- NEW: Handle new account formats ---
+                    "spent Card no\\. (XX\\d{4})" ->
+                        PotentialAccount(formattedName = "Axis Bank Card - ${match.groupValues[1].trim()}", accountType = "Card")
                     "Your (AC XXXXX\\d+) Debited" ->
                         PotentialAccount(formattedName = "SBI - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "credited to your (Acc No\\. XXXXX\\d+).*-(SBI)" ->

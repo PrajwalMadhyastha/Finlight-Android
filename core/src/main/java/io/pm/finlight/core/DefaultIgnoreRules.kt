@@ -55,6 +55,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Thank you for applying",
     "facing some technical issues",
     "Total Due.*Min Due",
+    "UPI mandate collect request",
 
     // Rules for recently found informational messages
     "renewal premium",
