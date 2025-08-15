@@ -1,5 +1,8 @@
 package io.pm.finlight
 
+import io.pm.finlight.IgnoreRule
+import io.pm.finlight.RuleType
+
 /**
  * A decoupled, standalone list of default SMS ignore rules for the application.
  * This allows the core parsing logic to be independent of the Android database implementation.
@@ -70,7 +73,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "NeuCoin.*", "TataNeu",
     "Received with thanks.*by receipt number",
 
-    // --- NEW: Rules for incorrectly parsed informational messages ---
+    // Rules for incorrectly parsed informational messages
     "Order ID.*have been sent",
     "Insurance Policy.*is",
     "processed visa application",
@@ -84,7 +87,15 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "cashless claim.*Medi Assist",
     "Tata Play.*deactivated",
     "Simpl bill payment",
-    "Delivered.*Card"
+    "Delivered.*Card",
+
+    // --- NEW: Rules for latest batch of non-transactional messages ---
+    "Dispatched: Credit Card",
+    "payment of.*has been received on",
+    "E-stmt for",
+    "has requested money",
+    "booking is confirmed",
+    "invoice sent"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
