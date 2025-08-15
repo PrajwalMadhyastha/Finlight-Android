@@ -39,7 +39,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Spam",
     "NEFT from Ac",
     "NEFT of Rs.*credited to Beneficiary",
-    "Refund of Rs.*has been processed",
+    "Refund of Rs.*processed",
     "FLAT.*OFF on purchase",
     "get FLAT.*OFF",
     "Money Deposited~",
@@ -51,6 +51,10 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "RT-PCR sample collected",
     "will be debited from your account",
     "OTP for online purchase",
+    "UPI mandate collect",
+    "Thank you for applying",
+    "facing some technical issues",
+    "Total Due.*Min Due",
 
     // Rules for recently found informational messages
     "renewal premium",
@@ -97,7 +101,8 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "booking is confirmed",
     "invoice sent",
     "Payment Received. Your Receipt No",
-    "Request Received!"
+    "Request Received!",
+    "Airtel Xstream.*renewal"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
@@ -105,11 +110,11 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "*MYNTRA", "*FLPKRT", "*AMAZON", "*SWIGGY", "*ZOMATO", "*BLUDRT", "*EKARTL",
     "*XPBEES", "*OLAMNY", "*Paytm",
     "*DLHVRY",
-    "*Jio",
+    "*Jio*", "*AIR*", "*MAX*", "*NES*",
     "*SBLIFE",
     "*DICGCI",
     "*MYGOVT",
-    "*EPFOHO", "*UIICHO",
+    "*EPFOHO", "*UIICHO", "*RMATIC", "*TPPLAY",
 
     // Senders for the latest batch of non-financial messages
     "*LOKADL",
