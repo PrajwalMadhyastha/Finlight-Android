@@ -20,7 +20,7 @@ object SmsParser {
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
     // --- UPDATED: Changed 'Deducted' to 'Deducted!?' to handle optional punctuation. ---
     private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with)\\b".toRegex(RegexOption.IGNORE_CASE)
-    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for)\\b".toRegex(RegexOption.IGNORE_CASE)
+    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     // =================================================================================
     // REASON: FIX - Added new patterns and updated existing ones for HDFC Bank
@@ -33,6 +33,7 @@ object SmsParser {
             "debited from (A/c X*\\d{4}) for NEFT".toRegex(RegexOption.IGNORE_CASE),
             "credited on your (credit card ending \\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "from your (HDFC Bank A/c XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "on (HDFC Bank Prepaid Card \\d{4})".toRegex(RegexOption.IGNORE_CASE),
             // --- UPDATED: Made HDFC 'From' pattern more flexible ---
             "From (HDFC Bank A/[Cc] X*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Added pattern for Axis Bank "Card no." format ---
@@ -56,6 +57,7 @@ object SmsParser {
             // --- UPDATED: Made ICICI patterns more flexible by changing XX to X* ---
             "your (ICICI Bank Account X*\\d{3,4}) has been credited".toRegex(RegexOption.IGNORE_CASE),
             "(ICICI Bank Account X*\\d{3,4}) is credited with".toRegex(RegexOption.IGNORE_CASE),
+            "credited your (ICICI Bank Account XX\\d{3,4}) with".toRegex(RegexOption.IGNORE_CASE),
             "(ICICI Bank Account X*\\d{3,4}) is debited with".toRegex(RegexOption.IGNORE_CASE),
             "spent on (ICICI Bank Card XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "spent using (ICICI Bank Card XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -381,6 +383,8 @@ object SmsParser {
                         PotentialAccount(formattedName = "HDFC Bank Card - ${match.groupValues[1].trim()}", accountType = "Credit Card")
                     "from your (HDFC Bank A/c XX\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "on (HDFC Bank Prepaid Card \\d{4})" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Prepaid Card")
                     "From (HDFC Bank A/[Cc] X*\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     // --- NEW: Handle new account formats ---
@@ -411,6 +415,8 @@ object SmsParser {
                     "your (ICICI Bank Account X*\\d{3,4}) has been credited" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "(ICICI Bank Account X*\\d{3,4}) is credited with" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    "credited your (ICICI Bank Account XX\\d{3,4}) with" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "(ICICI Bank Account X*\\d{3,4}) is debited with" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")

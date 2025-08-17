@@ -341,4 +341,25 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
         assertEquals("HDFC Bank A/c XX1736", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses HDFC Prepaid Card spend`() = runBlocking {
+        setupTest()
+        val smsBody = "Paid: INR 100 on HDFC Bank Prepaid Card 2742 at PAY*SWIGGY on 13-MAY-25 01:05 PM. Not You?To Block Call 18002586161/Overseas +912261606160/SMS 2742 to0491418049"
+        val mockSms = SmsMessage(
+            id = 9013L,
+            sender = "VM-HDFCBK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(100.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("PAY*SWIGGY", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank Prepaid Card 2742", result?.potentialAccount?.formattedName)
+        assertEquals("Prepaid Card", result?.potentialAccount?.accountType)
+    }
 }
