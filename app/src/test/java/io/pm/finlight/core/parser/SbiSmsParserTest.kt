@@ -332,4 +332,25 @@ class SbiSmsParserTest : BaseSmsParserTest() {
         assertEquals("SBI - A/cX9709", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses SBI credit with account at start and bank at end`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear SBI User, your A/c X6710-credited by Rs.6226 on 27Apr25 transfer from VARSHA R Ref No 797385760274 -SBI"
+        val mockSms = SmsMessage(
+            id = 9012L,
+            sender = "DM-SBI",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(6226.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("VARSHA R", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("SBI - A/c X6710", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }

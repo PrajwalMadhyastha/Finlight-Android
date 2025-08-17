@@ -59,10 +59,13 @@ object SmsParser {
             "(ICICI Bank Account X*\\d{3,4}) is debited with".toRegex(RegexOption.IGNORE_CASE),
             "spent on (ICICI Bank Card XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "spent using (ICICI Bank Card XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "credited to (ICICI Bank Credit Card XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "(Account XX\\d{3,4}) has been debited.*-(ICICI Bank)".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Added patterns for new message formats ---
             "from (Meal Card Wallet linked to your Pluxee Card xx\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "ur (A/cX\\d{4}) credited by".toRegex(RegexOption.IGNORE_CASE),
             "linked to (Credit Card XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "your (A/c X\\d{4})-credited.*-(SBI)".toRegex(RegexOption.IGNORE_CASE),
             // --- Existing Patterns ---
             "A/C X(\\d{4}) debited by".toRegex(RegexOption.IGNORE_CASE),
             "On (HDFC Bank) (CREDIT Card) xx(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -112,6 +115,10 @@ object SmsParser {
     // =================================================================================
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
+            // --- NEW: Added high-priority patterns to fix recent failures ---
+            "^([A-Z0-9*\\s]+) refund of".toRegex(RegexOption.IGNORE_CASE),
+            "towards\\s+(.+?)(?:\\. UPI Ref| for Autopay)".toRegex(RegexOption.IGNORE_CASE),
+            "transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\s+Ref No|$)".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Specific patterns for HDFC Bank ---
             "for (NEFT transaction)".toRegex(RegexOption.IGNORE_CASE),
             "To (A/c [\\w\\s]+) IMPS".toRegex(RegexOption.IGNORE_CASE),
@@ -411,6 +418,10 @@ object SmsParser {
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Card")
                     "spent using (ICICI Bank Card XX\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Card")
+                    "credited to (ICICI Bank Credit Card XX\\d{4})" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Credit Card")
+                    "(Account XX\\d{3,4}) has been debited.*-(ICICI Bank)" ->
+                        PotentialAccount(formattedName = "${match.groupValues[2].trim()} - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     // --- NEW: Added patterns for new message formats ---
                     "from (Meal Card Wallet linked to your Pluxee Card xx\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Meal Card")
@@ -418,6 +429,8 @@ object SmsParser {
                         PotentialAccount(formattedName = "SBI - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "linked to (Credit Card XX\\d{4})" ->
                         PotentialAccount(formattedName = "Indusind Bank - ${match.groupValues[1].trim()}", accountType = "Credit Card")
+                    "your (A/c X\\d{4})-credited.*-(SBI)" ->
+                        PotentialAccount(formattedName = "${match.groupValues[2].trim()} - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     // --- Existing Patterns ---
                     "A/C X(\\d{4}) debited by" ->
                         PotentialAccount(formattedName = "A/C X${match.groupValues[1].trim()}", accountType = "Bank Account")

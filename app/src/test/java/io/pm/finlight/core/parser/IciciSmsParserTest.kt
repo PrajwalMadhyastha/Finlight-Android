@@ -226,4 +226,46 @@ class IciciSmsParserTest : BaseSmsParserTest() {
         assertEquals("ICICI Bank Account XX508", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses ICICI credit card refund without 'your'`() = runBlocking {
+        setupTest()
+        val smsBody = "IND*AMAZON refund of Rs 372 credited to ICICI Bank Credit Card XX2001 on 25-JUN-24. Revised total due Rs 0, minimum due Rs 0"
+        val mockSms = SmsMessage(
+            id = 9010L,
+            sender = "DM-ICIBNK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(372.0, result?.amount)
+        assertEquals("income", result?.transactionType)
+        assertEquals("IND*AMAZON", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("ICICI Bank Credit Card XX2001", result?.potentialAccount?.formattedName)
+        assertEquals("Credit Card", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses ICICI debit with account at start and bank at end`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear Customer, Account XX898 has been debited for Rs 15.00 on 22-Dec-24, towards linked user635@axisbank. UPI Ref. no. 310902003574-ICICI Bank."
+        val mockSms = SmsMessage(
+            id = 9011L,
+            sender = "DM-ICIBNK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(15.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("linked user635@axisbank", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("ICICI Bank - Account XX898", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }
