@@ -18,7 +18,8 @@ object SmsParser {
     // =================================================================================
     private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from)\\b".toRegex(RegexOption.IGNORE_CASE)
+    // --- UPDATED: Changed 'Deducted' to 'Deducted!?' to handle optional punctuation. ---
+    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with)\\b".toRegex(RegexOption.IGNORE_CASE)
     private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     // =================================================================================
@@ -31,6 +32,7 @@ object SmsParser {
             // --- NEW: Added patterns for HDFC Bank ---
             "debited from (A/c X*\\d{4}) for NEFT".toRegex(RegexOption.IGNORE_CASE),
             "credited on your (credit card ending \\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "from your (HDFC Bank A/c XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             // --- UPDATED: Made HDFC 'From' pattern more flexible ---
             "From (HDFC Bank A/[Cc] X*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Added pattern for Axis Bank "Card no." format ---
@@ -60,6 +62,7 @@ object SmsParser {
             // --- NEW: Added patterns for new message formats ---
             "from (Meal Card Wallet linked to your Pluxee Card xx\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "ur (A/cX\\d{4}) credited by".toRegex(RegexOption.IGNORE_CASE),
+            "linked to (Credit Card XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             // --- Existing Patterns ---
             "A/C X(\\d{4}) debited by".toRegex(RegexOption.IGNORE_CASE),
             "On (HDFC Bank) (CREDIT Card) xx(\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -122,6 +125,8 @@ object SmsParser {
             "towards\\s+([A-Z\\s]+?)\\s+for".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Added pattern for new message formats ---
             "by (Account linked to mobile number XXXXX\\d{5})".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Added specific pattern for 'by VPA' to fix greedy matching ---
+            "by VPA\\s+([A-Za-z0-9@.-]+)".toRegex(RegexOption.IGNORE_CASE),
             // --- Existing patterns ---
             "(?:http|https|www)[^\\s]+\\s+(.*)$".toRegex(RegexOption.IGNORE_CASE),
             "(?:withdrawn at)\\s+([A-Za-z0-9\\s*.'-]+?)(?:\\s+from)".toRegex(RegexOption.IGNORE_CASE),
@@ -367,6 +372,8 @@ object SmsParser {
                         PotentialAccount(formattedName = "HDFC Bank - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "credited on your (credit card ending \\d{4})" ->
                         PotentialAccount(formattedName = "HDFC Bank Card - ${match.groupValues[1].trim()}", accountType = "Credit Card")
+                    "from your (HDFC Bank A/c XX\\d{4})" ->
+                        PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "From (HDFC Bank A/[Cc] X*\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     // --- NEW: Handle new account formats ---
@@ -409,6 +416,8 @@ object SmsParser {
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Meal Card")
                     "ur (A/cX\\d{4}) credited by" ->
                         PotentialAccount(formattedName = "SBI - ${match.groupValues[1].trim()}", accountType = "Bank Account")
+                    "linked to (Credit Card XX\\d{4})" ->
+                        PotentialAccount(formattedName = "Indusind Bank - ${match.groupValues[1].trim()}", accountType = "Credit Card")
                     // --- Existing Patterns ---
                     "A/C X(\\d{4}) debited by" ->
                         PotentialAccount(formattedName = "A/C X${match.groupValues[1].trim()}", accountType = "Bank Account")

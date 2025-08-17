@@ -320,4 +320,25 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
         assertEquals("HDFC Bank Card - credit card ending 4433", result?.potentialAccount?.formattedName)
         assertEquals("Credit Card", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses HDFC NEFT with 'Amt Deducted'`() = runBlocking {
+        setupTest()
+        val smsBody = "Amt Deducted! Rs.100000 from your HDFC Bank A/c XX1736 for NEFT transaction via HDFC Bank Online Banking Not you?Call 18002586161/SMS BLOCK OB to0491418049"
+        val mockSms = SmsMessage(
+            id = 9008L,
+            sender = "VM-HDFCBK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(100000.0, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("NEFT transaction", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank A/c XX1736", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }
