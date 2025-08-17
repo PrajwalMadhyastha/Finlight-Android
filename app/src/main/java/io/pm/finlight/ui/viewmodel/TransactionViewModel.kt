@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FIX - The logic for the `monthlySummaries` flow has been updated.
-// Instead of being limited to the current year, it now fetches the date of the
-// first transaction and dynamically generates the month scroller from that
-// historical point up to the present day, allowing users to view all their data.
+// REASON: FIX - The `updateTransactionDescription` function now correctly creates
+// a persistent MerchantRenameRule when a transaction's description is manually
+// edited. This ensures that the parser can learn and apply the same renaming
+// logic to future, similar transactions.
 // =================================================================================
 package io.pm.finlight
 
@@ -221,7 +221,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             initialValue = emptyList()
         )
 
-        // --- UPDATED: Dynamic month scroller logic ---
         monthlySummaries = transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
             val startDate = firstTransactionDate ?: System.currentTimeMillis()
 
@@ -762,11 +761,22 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    // --- UPDATED: This function now also creates a MerchantRenameRule ---
     fun updateTransactionDescription(id: Int, newDescription: String) = viewModelScope.launch(Dispatchers.IO) {
         if (newDescription.isNotBlank()) {
+            val transaction = transactionRepository.getTransactionById(id).firstOrNull()
+            if (transaction != null) {
+                val original = transaction.originalDescription ?: transaction.description
+                // Only create a rule if the new description is different from the original parsed name.
+                if (original.isNotBlank() && !original.equals(newDescription, ignoreCase = true)) {
+                    val rule = MerchantRenameRule(originalName = original, newName = newDescription)
+                    merchantRenameRuleRepository.insert(rule)
+                }
+            }
             transactionRepository.updateDescription(id, newDescription)
         }
     }
+
 
     fun updateTransactionAmount(id: Int, amountStr: String) = viewModelScope.launch {
         amountStr.toDoubleOrNull()?.let {
