@@ -146,6 +146,12 @@ object SmsParser {
             "to\\s+([a-zA-Z0-9.\\-_]+@[a-zA-Z0-9]+)".toRegex(RegexOption.IGNORE_CASE),
             "to:(UPI/[\\d/]+)".toRegex(RegexOption.IGNORE_CASE),
 
+            // =================================================================================
+            // FIX: Added a specific pattern for Pluxee/Sodexo messages to correctly
+            // extract the merchant name before the more generic "at" patterns.
+            // =================================================================================
+            "at\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.\\s+Txn no)".toRegex(RegexOption.IGNORE_CASE),
+
             // Medium-specificity patterns
             // --- NEW: Pattern for Axis Bank card spend ---
             "\\d{2}-\\d{2}-\\d{2,4}\\s+\\d{2}:\\d{2}:\\d{2}\\s+([A-Za-z0-9\\s.&'-]+?)\\s+Avl Lmt".toRegex(RegexOption.IGNORE_CASE),
