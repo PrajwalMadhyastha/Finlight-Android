@@ -32,7 +32,7 @@ object SmsParser {
             // --- NEW: Added patterns for HDFC Bank ---
             "debited from (A/c X*\\d{4}) for NEFT".toRegex(RegexOption.IGNORE_CASE),
             "credited on your (credit card ending \\d{4})".toRegex(RegexOption.IGNORE_CASE),
-            "from your (HDFC Bank A/c XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            "from your (HDFC Bank A/c X*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "on (HDFC Bank Prepaid Card \\d{4})".toRegex(RegexOption.IGNORE_CASE),
             // --- UPDATED: Made HDFC 'From' pattern more flexible ---
             "From (HDFC Bank A/[Cc] X*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -121,6 +121,8 @@ object SmsParser {
             "^([A-Z0-9*\\s]+) refund of".toRegex(RegexOption.IGNORE_CASE),
             "towards\\s+(.+?)(?:\\. UPI Ref| for Autopay)".toRegex(RegexOption.IGNORE_CASE),
             "transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\s+Ref No|$)".toRegex(RegexOption.IGNORE_CASE),
+            "towards\\s+(annual maintenance charges)\\s+for".toRegex(RegexOption.IGNORE_CASE),
+            "sent to\\s+(.+?)-SBI".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Specific patterns for HDFC Bank ---
             "for (NEFT transaction)".toRegex(RegexOption.IGNORE_CASE),
             "To (A/c [\\w\\s]+) IMPS".toRegex(RegexOption.IGNORE_CASE),
@@ -381,7 +383,7 @@ object SmsParser {
                         PotentialAccount(formattedName = "HDFC Bank - ${match.groupValues[1].trim()}", accountType = "Bank Account")
                     "credited on your (credit card ending \\d{4})" ->
                         PotentialAccount(formattedName = "HDFC Bank Card - ${match.groupValues[1].trim()}", accountType = "Credit Card")
-                    "from your (HDFC Bank A/c XX\\d{4})" ->
+                    "from your (HDFC Bank A/c X*\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
                     "on (HDFC Bank Prepaid Card \\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Prepaid Card")
