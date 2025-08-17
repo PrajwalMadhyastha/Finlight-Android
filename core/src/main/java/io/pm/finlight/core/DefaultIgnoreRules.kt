@@ -106,6 +106,12 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Request Received!",
     "Airtel Xstream.*renewal",
     "will be debited",
+    "Your request.* is received",
+    "personal loan",
+    "Withdrawal request",
+    "Withdrawal of.*credited to bank account", "PNR-", "added your A/c", "Welcome Bonus", "credited to your NPS",
+    "Card.*has been activated", "Order Cancelled", "Dispatched.*Courier", "Return Picked Up", "EMI Received",
+    "CIBIL report", "Namma Metro card recharge", "Rummy",
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
@@ -118,6 +124,9 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "*DICGCI",
     "*MYGOVT",
     "*EPFOHO", "*UIICHO", "*RMATIC", "*TPPLAY",
+    "*JERUMY", "*LODSHR", "*JEERMY", "*ADHAAR", "*IPRCTO", "*IRSMSa", "*LFSSTL*", "*BNCEWR", "*HGLOYL", "*CARSEL", "*RummyC",
+    "*OLACAB", "*AQALEN", "*ZEPTON", "*FSTCRY", "*ACTGRP", "*INYKAA", "*PTECOM", "*NSEIPO", "*LNKART", "*GMSCLK", "*NIGAME", "*NIRAGA",
+    "*SOCIAI", "*FINSAB", "*JGLRMM", "*SxCIAL", "*CARTFT", "*AZORTE",
 
     // Senders for the latest batch of non-financial messages
     "*LOKADL",
