@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./core/src/main/java/io/pm/finlight/core/SmsParser.kt
-// REASON: FIX - The parser's logic has been reordered. It now checks for a
-// learned category mapping based on the original parsed merchant name *before*
-// it applies any rename rules. This ensures that category learning, which is
-// tied to the original name, is not broken by the renaming process.
+// REASON: FIX - Corrected the merchant regex for SBI Card reversals. The pattern
+// now correctly identifies the merchant name between the "at" keyword and the
+// opening parenthesis of the "(UPI Ref No.)" block, resolving the parsing error.
 // =================================================================================
 package io.pm.finlight
 
@@ -93,6 +92,8 @@ object SmsParser {
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
+            // --- NEW: Added a more specific pattern for SBI Card reversals ---
+            "at\\s+(.*?)\\s+\\(UPI Ref No".toRegex(RegexOption.IGNORE_CASE),
             "^([A-Z0-9*\\s]+) refund of".toRegex(RegexOption.IGNORE_CASE),
             "towards\\s+(.+?)(?:\\. UPI Ref| for Autopay)".toRegex(RegexOption.IGNORE_CASE),
             "transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\s+Ref No|$)".toRegex(RegexOption.IGNORE_CASE),
@@ -477,9 +478,9 @@ object SmsParser {
 
     private fun parseAmountAndCurrency(matchResult: MatchResult): Pair<Double?, String?> {
         val groups = matchResult.groupValues
-        val amount = (groups[1].ifEmpty { groups[4].ifEmpty { groups[5] } }).replace(",", "").toDoubleOrNull()
+        val amount = (groups[1].ifEmpty { groups[4].ifEmpty { groups[5] } }).replace(",", "")
+            .toDoubleOrNull()
         var currency = (groups[2].ifEmpty { groups[3].ifEmpty { groups[6] } }).uppercase()
         if (currency == "RS") currency = "INR"
         return Pair(amount, currency.ifEmpty { null })
-    }
-}
+    }}

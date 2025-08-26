@@ -1,3 +1,10 @@
+// =================================================================================
+// FILE: ./core/src/main/java/io/pm/finlight/core/DefaultIgnoreRules.kt
+// REASON: FIX - Replaced the overly broad "credited to your.*card" rule with the
+// more specific "NEFT money transfer.*has been credited to". This prevents the
+// parser from incorrectly ignoring valid credit card reversal/refund messages
+// while still filtering out informational NEFT confirmations.
+// =================================================================================
 package io.pm.finlight
 
 import io.pm.finlight.IgnoreRule
@@ -11,7 +18,8 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     // Existing Rules
     "invoice of", "payment of.*is successful",
     "credited to Beneficiary",
-    "payment of.*has been received towards", "credited to your.*card",
+    "payment of.*has been received towards", // This correctly handles bill payments
+    "NEFT money transfer.*has been credited to", // This is more specific and safer
     "Payment of.*has been received on your.*Credit Card", "We have received",
     "has been initiated", "redemption", "requested money from you", "Folio No.",
     "NAV of", "purchase experience", "your OTP", "recharge of.*is successful",
@@ -112,6 +120,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Withdrawal of.*credited to bank account", "PNR-", "added your A/c", "Welcome Bonus", "credited to your NPS",
     "Card.*has been activated", "Order Cancelled", "Dispatched.*Courier", "Return Picked Up", "EMI Received",
     "CIBIL report", "Namma Metro card recharge", "Rummy", "Gujjadi Swarna",
+    "Contribution of.*has been received", // --- NEW: For passbook/PF/NPS updates
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
