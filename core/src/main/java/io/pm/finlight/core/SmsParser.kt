@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./core/src/main/java/io/pm/finlight/core/SmsParser.kt
 // REASON: FIX - Changed the visibility of several helper properties and functions
-// (e.g., EXPENSE_KEYWORDS_REGEX, parseAccount) from `private` to `internal`.
-// This makes them accessible to other modules within the project, such as the
-// :app module, resolving the "Cannot access" build errors in SmsReceiver and
-// TransactionViewModel.
+// (e.g., EXPENSE_KEYWORDS_REGEX, parseAccount) from `internal` to `public`. This
+// makes them accessible across modules, resolving the "Cannot access" build
+// errors in SmsReceiver.
 // =================================================================================
 package io.pm.finlight
 
@@ -20,8 +19,8 @@ sealed class ParseResult {
 object SmsParser {
     private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    internal val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with)\\b".toRegex(RegexOption.IGNORE_CASE)
-    internal val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
+    val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with)\\b".toRegex(RegexOption.IGNORE_CASE)
+    val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     private val ACCOUNT_PATTERNS =
         listOf(
@@ -319,7 +318,7 @@ object SmsParser {
         return ParseResult.Success(transaction)
     }
 
-    internal fun generateSmsSignature(body: String): String {
+    fun generateSmsSignature(body: String): String {
         var signature = body.lowercase()
         VOLATILE_DATA_REGEX.forEach { regex ->
             signature = regex.replace(signature, "")
@@ -327,7 +326,7 @@ object SmsParser {
         return signature.replace(Regex("\\s+"), " ").trim().hashCode().toString()
     }
 
-    internal fun parseAccount(smsBody: String, sender: String): PotentialAccount? {
+    fun parseAccount(smsBody: String, sender: String): PotentialAccount? {
         for (pattern in ACCOUNT_PATTERNS) {
             val match = pattern.find(smsBody)
             if (match != null) {
