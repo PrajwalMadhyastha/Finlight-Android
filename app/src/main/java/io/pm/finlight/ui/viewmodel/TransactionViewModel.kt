@@ -1,11 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FEATURE - The ViewModel now implements the learning part of the
-// heuristic engine. The `updateTransactionDescription` function has been enhanced.
-// When a user corrects a merchant name from a parsed SMS, it now calls a new
-// `createAndStoreTemplate` helper function. This function generates and saves
-// a structural template of the original SMS, enabling the parser to learn from
-// user actions.
+// REASON: FIX - Corrected a compilation error in the `createAndStoreTemplate`
+// function. The logic for finding the amount string in the SMS body was using
+// an incorrect lambda with `find()`. This has been fixed by using `findAll()` to
+// get all matches and then applying a `find` operation on the resulting
+// collection, which is the correct syntax.
 // =================================================================================
 package io.pm.finlight
 
@@ -63,6 +62,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private val merchantCategoryMappingRepository: MerchantCategoryMappingRepository
     private val merchantMappingRepository: MerchantMappingRepository
     private val splitTransactionRepository: SplitTransactionRepository
+    private val smsParseTemplateDao: SmsParseTemplateDao
     private val context = application
 
     private val db = AppDatabase.getInstance(application)
@@ -154,6 +154,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao())
         merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
+        smsParseTemplateDao = db.smsParseTemplateDao()
 
         merchantPredictions = _merchantSearchQuery
             .debounce(300)
@@ -763,18 +764,15 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // --- UPDATED: This function now also creates a Heuristic Template ---
     fun updateTransactionDescription(id: Int, newDescription: String) = viewModelScope.launch(Dispatchers.IO) {
         if (newDescription.isNotBlank()) {
             val transaction = transactionRepository.getTransactionById(id).firstOrNull()
             if (transaction != null) {
                 val original = transaction.originalDescription ?: transaction.description
-                // Only create a rule if the new description is different from the original parsed name.
                 if (original.isNotBlank() && !original.equals(newDescription, ignoreCase = true)) {
                     val rule = MerchantRenameRule(originalName = original, newName = newDescription)
                     merchantRenameRuleRepository.insert(rule)
 
-                    // --- NEW HEURISTIC LEARNING LOGIC ---
                     if (transaction.sourceSmsId != null && transaction.originalDescription != null) {
                         val originalSms = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
                         if (originalSms != null) {
@@ -787,14 +785,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // --- NEW HELPER FUNCTION IN TransactionViewModel ---
     private suspend fun createAndStoreTemplate(smsBody: String, transaction: Transaction) {
         val originalMerchant = transaction.originalDescription ?: return
-        // Use originalAmount if available (for travel mode), otherwise fall back to home currency amount
         val amountToFind = transaction.originalAmount ?: transaction.amount
 
-        // Find the exact string for the amount in the SMS body. This is tricky.
-        // We'll have to search for various formats.
         val amountRegex = "([\\d,]+\\.?\\d*)".toRegex()
         val allNumericValuesInSms = amountRegex.findAll(smsBody).mapNotNull { it.value.replace(",", "").toDoubleOrNull() }.toList()
         val matchingAmountValue = allNumericValuesInSms.find { it == amountToFind }
@@ -804,8 +798,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             return
         }
 
-        // Now find the string representation of that amount in the body
-        val amountStr = amountRegex.find(smsBody) {
+        // --- FIX: Corrected lambda syntax for finding the match result ---
+        val amountStr = amountRegex.findAll(smsBody).find {
             it.value.replace(",", "").toDoubleOrNull() == matchingAmountValue
         }?.value ?: return
 
@@ -817,8 +811,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             return
         }
 
-        // Create a signature by replacing all digits and normalizing whitespace.
-        // This provides a good balance of specificity and flexibility.
         val signature = smsBody.replace(Regex("\\d"), "").replace(Regex("\\s+"), " ").trim()
 
         val template = SmsParseTemplate(
@@ -830,7 +822,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             originalAmountEndIndex = amountIndex + amountStr.length
         )
 
-        db.smsParseTemplateDao().insert(template)
+        smsParseTemplateDao.insert(template)
         Log.d(TAG, "Successfully created and stored a new SMS parse template.")
     }
 
