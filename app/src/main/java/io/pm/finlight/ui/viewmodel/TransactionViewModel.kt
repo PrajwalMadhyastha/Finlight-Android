@@ -1,9 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FIX - The `updateTransactionDescription` function now correctly creates
-// a persistent MerchantRenameRule when a transaction's description is manually
-// edited. This ensures that the parser can learn and apply the same renaming
-// logic to future, similar transactions.
+// REASON: FEATURE - The ViewModel now implements the learning part of the
+// heuristic engine. The `updateTransactionDescription` function has been enhanced.
+// When a user corrects a merchant name from a parsed SMS, it now calls a new
+// `createAndStoreTemplate` helper function. This function generates and saves
+// a structural template of the original SMS, enabling the parser to learn from
+// user actions.
 // =================================================================================
 package io.pm.finlight
 
@@ -761,7 +763,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // --- UPDATED: This function now also creates a MerchantRenameRule ---
+    // --- UPDATED: This function now also creates a Heuristic Template ---
     fun updateTransactionDescription(id: Int, newDescription: String) = viewModelScope.launch(Dispatchers.IO) {
         if (newDescription.isNotBlank()) {
             val transaction = transactionRepository.getTransactionById(id).firstOrNull()
@@ -771,10 +773,65 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 if (original.isNotBlank() && !original.equals(newDescription, ignoreCase = true)) {
                     val rule = MerchantRenameRule(originalName = original, newName = newDescription)
                     merchantRenameRuleRepository.insert(rule)
+
+                    // --- NEW HEURISTIC LEARNING LOGIC ---
+                    if (transaction.sourceSmsId != null && transaction.originalDescription != null) {
+                        val originalSms = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
+                        if (originalSms != null) {
+                            createAndStoreTemplate(originalSms.body, transaction)
+                        }
+                    }
                 }
             }
             transactionRepository.updateDescription(id, newDescription)
         }
+    }
+
+    // --- NEW HELPER FUNCTION IN TransactionViewModel ---
+    private suspend fun createAndStoreTemplate(smsBody: String, transaction: Transaction) {
+        val originalMerchant = transaction.originalDescription ?: return
+        // Use originalAmount if available (for travel mode), otherwise fall back to home currency amount
+        val amountToFind = transaction.originalAmount ?: transaction.amount
+
+        // Find the exact string for the amount in the SMS body. This is tricky.
+        // We'll have to search for various formats.
+        val amountRegex = "([\\d,]+\\.?\\d*)".toRegex()
+        val allNumericValuesInSms = amountRegex.findAll(smsBody).mapNotNull { it.value.replace(",", "").toDoubleOrNull() }.toList()
+        val matchingAmountValue = allNumericValuesInSms.find { it == amountToFind }
+
+        if (matchingAmountValue == null) {
+            Log.w(TAG, "Could not find the exact amount '$amountToFind' in the SMS body to create a template.")
+            return
+        }
+
+        // Now find the string representation of that amount in the body
+        val amountStr = amountRegex.find(smsBody) {
+            it.value.replace(",", "").toDoubleOrNull() == matchingAmountValue
+        }?.value ?: return
+
+        val merchantIndex = smsBody.indexOf(originalMerchant)
+        val amountIndex = smsBody.indexOf(amountStr)
+
+        if (merchantIndex == -1 || amountIndex == -1) {
+            Log.w(TAG, "Could not find merchant or amount index in SMS body for template creation.")
+            return
+        }
+
+        // Create a signature by replacing all digits and normalizing whitespace.
+        // This provides a good balance of specificity and flexibility.
+        val signature = smsBody.replace(Regex("\\d"), "").replace(Regex("\\s+"), " ").trim()
+
+        val template = SmsParseTemplate(
+            templateSignature = signature,
+            originalSmsBody = smsBody,
+            originalMerchantStartIndex = merchantIndex,
+            originalMerchantEndIndex = merchantIndex + originalMerchant.length,
+            originalAmountStartIndex = amountIndex,
+            originalAmountEndIndex = amountIndex + amountStr.length
+        )
+
+        db.smsParseTemplateDao().insert(template)
+        Log.d(TAG, "Successfully created and stored a new SMS parse template.")
     }
 
 
