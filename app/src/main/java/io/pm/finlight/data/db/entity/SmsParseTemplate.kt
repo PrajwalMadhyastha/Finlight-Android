@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/entity/SmsParseTemplate.kt
-// REASON: NEW FILE - This entity stores learned SMS patterns. When a user
-// corrects a parsed transaction, a template is created from the original SMS,
-// storing the structure and location of key data points. This allows the new
-// heuristic engine to parse similar, previously unknown SMS formats.
+// REASON: FIX - Removed the redundant `index = true` property from the
+// `templateSignature` ColumnInfo. The index is already explicitly defined in the
+// @Entity annotation, and having both was causing a KSP build error due to a
+// duplicate index name.
 // =================================================================================
 package io.pm.finlight
 
@@ -34,7 +34,8 @@ import androidx.room.PrimaryKey
 data class SmsParseTemplate(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
-    @ColumnInfo(index = true)
+    // --- FIX: Removed `index = true` as it's redundant with the @Entity index ---
+    @ColumnInfo
     val templateSignature: String,
     val originalSmsBody: String,
     val originalMerchantStartIndex: Int,
