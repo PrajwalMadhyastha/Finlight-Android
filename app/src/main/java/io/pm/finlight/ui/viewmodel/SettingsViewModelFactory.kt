@@ -1,8 +1,8 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/SettingsViewModelFactory.kt
-// REASON: FEATURE - The factory has been updated to accept a TransactionViewModel
-// instance. This dependency is now required by the SettingsViewModel to delegate
-// the auto-saving of transactions during a retrospective SMS scan.
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModelFactory.kt
+// REASON: NEW FILE - This factory is required to instantiate the SmsDebugViewModel
+// with its new TransactionViewModel dependency, which is needed to auto-import
+// transactions after a new rule is created.
 // =================================================================================
 package io.pm.finlight
 
@@ -10,16 +10,14 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 
-class SettingsViewModelFactory(
+class SmsDebugViewModelFactory(
     private val application: Application,
-    // --- NEW: Accept TransactionViewModel as a dependency ---
     private val transactionViewModel: TransactionViewModel
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
+        if (modelClass.isAssignableFrom(SmsDebugViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            // --- UPDATED: Pass the TransactionViewModel to the SettingsViewModel ---
-            return SettingsViewModel(application, transactionViewModel) as T
+            return SmsDebugViewModel(application, transactionViewModel) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

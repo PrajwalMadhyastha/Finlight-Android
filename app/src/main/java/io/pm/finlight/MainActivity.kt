@@ -1,7 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FEATURE - Added a new route for the `sms_debug_screen` to the
-// NavHost. This enables navigation to the new SMS Parsing Debugger tool.
+// REASON: FEATURE - The NavHost entry for the `sms_debug_screen` has been updated
+// to pass the `transactionViewModel`. This is required so the debug screen's
+// ViewModel can save transactions after a new rule is created.
 // =================================================================================
 package io.pm.finlight
 
@@ -271,7 +272,7 @@ fun MainAppScreen() {
         "merchant_detail",
         "customize_dashboard",
         "account_mapping_screen",
-        "sms_debug_screen" // --- NEW: Add new screen to the list ---
+        "sms_debug_screen"
     )
 
     val currentTitle = if (showBottomBar) {
@@ -517,7 +518,6 @@ fun AppNavHost(
         startDestination = "splash_screen",
         modifier = modifier
     ) {
-        // --- NEW: Route for the SMS Debugger Screen ---
         composable(
             "sms_debug_screen",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
@@ -525,7 +525,10 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) {
-            SmsDebugScreen(navController = navController)
+            SmsDebugScreen(
+                navController = navController,
+                transactionViewModel = transactionViewModel
+            )
         }
         composable("account_mapping_screen") {
             AccountMappingScreen(

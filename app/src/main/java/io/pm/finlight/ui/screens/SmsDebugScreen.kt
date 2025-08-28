@@ -1,12 +1,13 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsDebugScreen.kt
-// REASON: FEATURE - The screen now observes the navigation back stack for a
-// "reparse_needed" flag. When this flag is received (after a user creates a
-// new rule), it triggers the ViewModel to refresh the SMS analysis, providing
-// immediate feedback that the new rule is working.
+// REASON: FEATURE - The screen now observes the navigation back stack for the
+// `auto_import_after_rule_creation` flag. When this is received, it calls the
+// ViewModel's new `runAutoImportAndRefresh` function to automatically save newly
+// parsable transactions and refresh the UI.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
+import android.app.Application
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -31,21 +33,23 @@ import java.net.URLEncoder
 @Composable
 fun SmsDebugScreen(
     navController: NavController,
-    viewModel: SmsDebugViewModel = viewModel()
+    transactionViewModel: TransactionViewModel // Passed from NavHost
 ) {
+    val application = LocalContext.current.applicationContext as Application
+    val factory = SmsDebugViewModelFactory(application, transactionViewModel)
+    val viewModel: SmsDebugViewModel = viewModel(factory = factory)
+
     val uiState by viewModel.uiState.collectAsState()
 
-    // --- NEW: Observe the back stack for the reparse signal ---
-    val reparseResult = navController.currentBackStackEntry
+    val autoImportResult = navController.currentBackStackEntry
         ?.savedStateHandle
-        ?.getLiveData<Boolean>("reparse_needed")
+        ?.getLiveData<Boolean>("auto_import_after_rule_creation")
         ?.observeAsState()
 
-    LaunchedEffect(reparseResult?.value) {
-        if (reparseResult?.value == true) {
-            viewModel.refreshScan() // Re-run the scan
-            // Reset the flag to prevent re-triggering
-            navController.currentBackStackEntry?.savedStateHandle?.set("reparse_needed", false)
+    LaunchedEffect(autoImportResult?.value) {
+        if (autoImportResult?.value == true) {
+            viewModel.runAutoImportAndRefresh()
+            navController.currentBackStackEntry?.savedStateHandle?.set("auto_import_after_rule_creation", false)
         }
     }
 
