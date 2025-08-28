@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsDebugScreen.kt
-// REASON: NEW FILE - This screen provides the UI for the SMS Parsing Debugger.
-// It displays a list of recent SMS messages and their parsing status (Parsed,
-// Ignored, Not Parsed). For failed messages, it provides a button to navigate
-// to the Rule Creation screen.
+// REASON: FEATURE - The screen now observes the navigation back stack for a
+// "reparse_needed" flag. When this flag is received (after a user creates a
+// new rule), it triggers the ViewModel to refresh the SMS analysis, providing
+// immediate feedback that the new rule is working.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -33,6 +34,20 @@ fun SmsDebugScreen(
     viewModel: SmsDebugViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // --- NEW: Observe the back stack for the reparse signal ---
+    val reparseResult = navController.currentBackStackEntry
+        ?.savedStateHandle
+        ?.getLiveData<Boolean>("reparse_needed")
+        ?.observeAsState()
+
+    LaunchedEffect(reparseResult?.value) {
+        if (reparseResult?.value == true) {
+            viewModel.refreshScan() // Re-run the scan
+            // Reset the flag to prevent re-triggering
+            navController.currentBackStackEntry?.savedStateHandle?.set("reparse_needed", false)
+        }
+    }
 
     Scaffold(
         topBar = {

@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModel.kt
-// REASON: NEW FILE - This ViewModel powers the new SMS Parsing Debugger screen.
-// It fetches the last 100 SMS messages, runs each through the enhanced parser,
-// and exposes a list of detailed results (SmsDebugResult) to the UI.
+// REASON: FEATURE - The `startSmsScan` function has been renamed to `refreshScan`
+// and made public. This allows the UI to trigger an on-demand refresh of the
+// SMS analysis after a new parsing rule has been created.
 // =================================================================================
 package io.pm.finlight
 
@@ -52,10 +52,10 @@ class SmsDebugViewModel(application: Application) : AndroidViewModel(application
     }
 
     init {
-        startSmsScan()
+        refreshScan()
     }
 
-    private fun startSmsScan() {
+    fun refreshScan() {
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true) }
 
