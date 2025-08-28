@@ -1,16 +1,16 @@
 // =================================================================================
 // FILE: ./core/src/main/java/io/pm/finlight/core/SmsParser.kt
-// REASON: FEATURE - The parser has been refactored to return a detailed
-// ParseResult sealed class instead of a nullable PotentialTransaction. This
-// provides specific reasons for ignored messages or parsing failures, which is
-// essential for the new SMS Debugger tool.
+// REASON: FIX - The custom rule evaluation logic has been fully implemented. The
+// parser now correctly applies the specific regex patterns from a user-created
+// rule to extract the transaction details, instead of incorrectly falling back
+// to the generic parser. This ensures custom rules work as expected.
 // =================================================================================
 package io.pm.finlight
 
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 
-// --- NEW: Sealed Class for detailed parse results ---
+// --- Sealed Class for detailed parse results ---
 sealed class ParseResult {
     data class Success(val transaction: PotentialTransaction) : ParseResult()
     data class Ignored(val reason: String) : ParseResult()
@@ -211,51 +211,97 @@ object SmsParser {
             }
         }
 
-        var extractedMerchant: String? = null
-        var extractedAmount: Double? = null
-        var extractedAccount: PotentialAccount? = null
-        var detectedCurrency: String? = null
-
         val allRules = customSmsRuleProvider.getAllRules()
         val renameRules = merchantRenameRuleProvider.getAllRules().associateBy({ it.originalName.lowercase() }, { it.newName })
 
-        // Custom rule processing (if any)
+        // --- UPDATED: Fully implemented custom rule processing ---
         for (rule in allRules) {
             if (normalizedBody.contains(rule.triggerPhrase, ignoreCase = true)) {
-                // ... (custom rule logic can be expanded here if needed)
-                break
+                var customMerchant: String? = null
+                var customAmount: Double? = null
+                var customAccountStr: String? = null
+
+                rule.amountRegex?.let { regex ->
+                    try {
+                        val match = regex.toRegex(RegexOption.IGNORE_CASE).find(normalizedBody)
+                        match?.groups?.get(1)?.value?.let {
+                            customAmount = it.replace(",", "").toDoubleOrNull()
+                        }
+                    } catch (e: PatternSyntaxException) { /* Ignore invalid regex */ }
+                }
+
+                if (customAmount == null) continue
+
+                rule.merchantRegex?.let { regex ->
+                    try {
+                        val match = regex.toRegex(RegexOption.IGNORE_CASE).find(normalizedBody)
+                        customMerchant = match?.groups?.get(1)?.value?.trim()
+                    } catch (e: PatternSyntaxException) { /* Ignore invalid regex */ }
+                }
+
+                rule.accountRegex?.let { regex ->
+                    try {
+                        val match = regex.toRegex(RegexOption.IGNORE_CASE).find(normalizedBody)
+                        customAccountStr = match?.groups?.get(1)?.value?.trim()
+                    } catch (e: PatternSyntaxException) { /* Ignore invalid regex */ }
+                }
+
+                val transactionType = when {
+                    EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody) -> "expense"
+                    INCOME_KEYWORDS_REGEX.containsMatchIn(normalizedBody) -> "income"
+                    else -> "expense"
+                }
+
+                val potentialAccount = if (customAccountStr != null) PotentialAccount(customAccountStr!!, "Unknown") else parseAccount(normalizedBody, sms.sender)
+                val smsHash = (sms.sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
+                val smsSignature = generateSmsSignature(normalizedBody)
+
+                val transaction = PotentialTransaction(
+                    sourceSmsId = sms.id,
+                    smsSender = sms.sender,
+                    amount = customAmount!!,
+                    transactionType = transactionType,
+                    merchantName = customMerchant,
+                    originalMessage = sms.body,
+                    potentialAccount = potentialAccount,
+                    sourceSmsHash = smsHash,
+                    smsSignature = smsSignature,
+                    date = sms.date
+                )
+                return ParseResult.Success(transaction)
             }
         }
 
-        if (extractedAmount == null) {
-            val highConfidenceMatch = AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX.find(normalizedBody)
-            if (highConfidenceMatch != null) {
-                val currencyStr = highConfidenceMatch.groupValues[1].ifEmpty { null }
-                val amountStr = highConfidenceMatch.groupValues[2].ifEmpty { highConfidenceMatch.groupValues[3] }
-                extractedAmount = amountStr.replace(",", "").toDoubleOrNull()
-                detectedCurrency = if (currencyStr != null) {
-                    if (currencyStr.equals("RS", ignoreCase = true)) "INR" else currencyStr.uppercase()
-                } else {
-                    "INR"
-                }
+        // --- Generic parsing logic (fallback) ---
+        var extractedAmount: Double? = null
+        var detectedCurrency: String? = null
+
+        val highConfidenceMatch = AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX.find(normalizedBody)
+        if (highConfidenceMatch != null) {
+            val currencyStr = highConfidenceMatch.groupValues[1].ifEmpty { null }
+            val amountStr = highConfidenceMatch.groupValues[2].ifEmpty { highConfidenceMatch.groupValues[3] }
+            extractedAmount = amountStr.replace(",", "").toDoubleOrNull()
+            detectedCurrency = if (currencyStr != null) {
+                if (currencyStr.equals("RS", ignoreCase = true)) "INR" else currencyStr.uppercase()
             } else {
-                val allAmountMatches = FALLBACK_AMOUNT_REGEX.findAll(normalizedBody).toList()
-                val matchWithCurrency = allAmountMatches.firstOrNull {
-                    val currencyPart1 = it.groups[2]?.value?.ifEmpty { null }
-                    val currencyPart2 = it.groups[3]?.value?.ifEmpty { null }
-                    val currencyPart3 = it.groups[6]?.value?.ifEmpty { null }
-                    currencyPart1 != null || currencyPart2 != null || currencyPart3 != null
-                }
-                val bestMatch = matchWithCurrency ?: allAmountMatches.firstOrNull()
+                "INR"
+            }
+        } else {
+            val allAmountMatches = FALLBACK_AMOUNT_REGEX.findAll(normalizedBody).toList()
+            val matchWithCurrency = allAmountMatches.firstOrNull {
+                val currencyPart1 = it.groups[2]?.value?.ifEmpty { null }
+                val currencyPart2 = it.groups[3]?.value?.ifEmpty { null }
+                val currencyPart3 = it.groups[6]?.value?.ifEmpty { null }
+                currencyPart1 != null || currencyPart2 != null || currencyPart3 != null
+            }
+            val bestMatch = matchWithCurrency ?: allAmountMatches.firstOrNull()
 
-                if (bestMatch != null) {
-                    val (amount, currency) = parseAmountAndCurrency(bestMatch)
-                    extractedAmount = amount
-                    detectedCurrency = currency
-                }
+            if (bestMatch != null) {
+                val (amount, currency) = parseAmountAndCurrency(bestMatch)
+                extractedAmount = amount
+                detectedCurrency = currency
             }
         }
-
 
         val amount = extractedAmount ?: return ParseResult.NotParsed("No amount found")
 
@@ -266,7 +312,7 @@ object SmsParser {
                 else -> return ParseResult.NotParsed("Could not determine transaction type (debit/credit)")
             }
 
-        var merchantName = extractedMerchant ?: mappings[sms.sender]
+        var merchantName = mappings[sms.sender]
 
         if (merchantName == null) {
             for (pattern in MERCHANT_REGEX_PATTERNS) {
@@ -297,7 +343,7 @@ object SmsParser {
             merchantName = renameRules[merchantName.lowercase()]
         }
 
-        val potentialAccount = extractedAccount ?: parseAccount(normalizedBody, sms.sender)
+        val potentialAccount = parseAccount(normalizedBody, sms.sender)
         val normalizedSender = sms.sender.filter { it.isDigit() }.takeLast(10)
         val smsHash = (normalizedSender + normalizedBody).hashCode().toString()
         val smsSignature = generateSmsSignature(normalizedBody)
