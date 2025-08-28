@@ -1,14 +1,14 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AccountDetailScreen.kt
-// REASON: MAJOR REFACTOR - This screen has been completely redesigned to align
-// with the "Project Aurora" vision. The standard Card header has been replaced
-// with a more dynamic GlassPanel header that prominently features the bank's
-// logo and balance. The transaction list items have also been converted to
-// GlassPanels, ensuring a cohesive, modern, and high-contrast user experience.
+// REASON: FEATURE - The transaction items within the account detail view are
+// now clickable. A `clickable` modifier has been added to each item, which
+// navigates the user to the corresponding `TransactionDetailScreen`, improving
+// the app's interactivity and user flow.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,13 +26,13 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.Account
 import io.pm.finlight.AccountViewModel
-import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
 import io.pm.finlight.ui.theme.IncomeGreenLight
+import io.pm.finlight.utils.BankLogoHelper
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -71,7 +71,13 @@ fun AccountDetailScreen(
                 )
             }
             items(transactions, key = { it.transaction.id }) { details ->
-                AccountDetailTransactionItem(transactionDetails = details)
+                // --- UPDATED: Pass the navigation logic to the item ---
+                AccountDetailTransactionItem(
+                    transactionDetails = details,
+                    onClick = {
+                        navController.navigate("transaction_detail/${details.transaction.id}")
+                    }
+                )
             }
         } else {
             item {
@@ -133,12 +139,20 @@ private fun AccountDetailHeader(account: Account, balance: Double) {
 }
 
 @Composable
-private fun AccountDetailTransactionItem(transactionDetails: TransactionDetails) {
+private fun AccountDetailTransactionItem(
+    transactionDetails: TransactionDetails,
+    onClick: () -> Unit // --- NEW: Accept an onClick lambda ---
+) {
     val contentAlpha = if (transactionDetails.transaction.isExcluded) 0.5f else 1f
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     val dateFormatter = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
 
-    GlassPanel(modifier = Modifier.fillMaxWidth()) {
+    // --- UPDATED: Apply the clickable modifier to the GlassPanel ---
+    GlassPanel(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
         Row(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
