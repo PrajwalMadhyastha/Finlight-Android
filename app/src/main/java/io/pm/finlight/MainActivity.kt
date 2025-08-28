@@ -1,8 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FEATURE - The NavHost entry for the `sms_debug_screen` has been updated
-// to pass the `transactionViewModel`. This is required so the debug screen's
-// ViewModel can save transactions after a new rule is created.
+// REASON: FIX - Added specific imports for the ViewModel factories to resolve
+// the "Unresolved reference" build errors caused by package name mismatches.
 // =================================================================================
 package io.pm.finlight
 
@@ -70,6 +69,7 @@ import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.ui.theme.PersonalFinanceAppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.flow.map
 import java.net.URLDecoder

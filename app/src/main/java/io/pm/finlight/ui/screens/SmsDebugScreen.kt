@@ -27,6 +27,7 @@ import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.viewmodel.SmsDebugViewModelFactory
 import java.net.URLEncoder
 
 @OptIn(ExperimentalMaterial3Api::class)
