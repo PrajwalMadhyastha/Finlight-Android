@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModel.kt
-// REASON: FEATURE - The ViewModel now accepts a TransactionViewModel dependency
-// to save transactions. A new `runAutoImportAndRefresh` function has been added.
-// This function re-scans messages, identifies any that are newly parsable,
-// auto-imports them, and then refreshes the UI state.
+// REASON: FEATURE - Added a filter to the SMS Debugger. The ViewModel now
+// manages a filter state (All or Problematic) and exposes a derived StateFlow
+// of filtered results, defaulting to show only ignored or unparsed messages.
 // =================================================================================
 package io.pm.finlight
 
@@ -13,10 +12,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -26,10 +22,16 @@ data class SmsDebugResult(
     val parseResult: ParseResult
 )
 
+// --- NEW: Enum to represent the filter state ---
+enum class SmsDebugFilter {
+    ALL, PROBLEMATIC
+}
+
 // UI state for the screen
 data class SmsDebugUiState(
     val isLoading: Boolean = true,
-    val debugResults: List<SmsDebugResult> = emptyList()
+    val debugResults: List<SmsDebugResult> = emptyList(),
+    val selectedFilter: SmsDebugFilter = SmsDebugFilter.PROBLEMATIC
 )
 
 class SmsDebugViewModel(
@@ -39,6 +41,20 @@ class SmsDebugViewModel(
 
     private val _uiState = MutableStateFlow(SmsDebugUiState())
     val uiState = _uiState.asStateFlow()
+
+    // --- NEW: A derived flow that filters the results based on the selected filter ---
+    val filteredDebugResults: StateFlow<List<SmsDebugResult>> = _uiState
+        .map { state ->
+            if (state.selectedFilter == SmsDebugFilter.ALL) {
+                state.debugResults
+            } else {
+                state.debugResults.filter {
+                    it.parseResult is ParseResult.Ignored || it.parseResult is ParseResult.NotParsed
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
 
     private val smsRepository = SmsRepository(application)
     private val db = AppDatabase.getInstance(application)
@@ -84,6 +100,11 @@ class SmsDebugViewModel(
         }
     }
 
+    // --- NEW: Function to update the filter state ---
+    fun setFilter(filter: SmsDebugFilter) {
+        _uiState.update { it.copy(selectedFilter = filter) }
+    }
+
     fun runAutoImportAndRefresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
@@ -113,7 +134,6 @@ class SmsDebugViewModel(
 
                 val originalResult = originalResults.find { it.smsMessage.id == sms.id }?.parseResult
                 if ((originalResult is ParseResult.Ignored || originalResult is ParseResult.NotParsed) && newParseResult is ParseResult.Success) {
-                    // Also check if it's already been imported by another means
                     if (newParseResult.transaction.sourceSmsHash !in existingSmsHashes) {
                         transactionsToImport.add(newParseResult.transaction)
                     }

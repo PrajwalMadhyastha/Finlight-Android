@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsDebugScreen.kt
-// REASON: FEATURE - The screen now observes the navigation back stack for the
-// `auto_import_after_rule_creation` flag. When this is received, it calls the
-// ViewModel's new `runAutoImportAndRefresh` function to automatically save newly
-// parsable transactions and refresh the UI.
+// REASON: FEATURE - Added a SingleChoiceSegmentedButtonRow to allow the user
+// to filter the list between "All" messages and only "Problematic" ones. The
+// LazyColumn now observes the new filtered list from the ViewModel.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -34,13 +33,14 @@ import java.net.URLEncoder
 @Composable
 fun SmsDebugScreen(
     navController: NavController,
-    transactionViewModel: TransactionViewModel // Passed from NavHost
+    transactionViewModel: TransactionViewModel
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = SmsDebugViewModelFactory(application, transactionViewModel)
     val viewModel: SmsDebugViewModel = viewModel(factory = factory)
 
     val uiState by viewModel.uiState.collectAsState()
+    val filteredResults by viewModel.filteredDebugResults.collectAsState()
 
     val autoImportResult = navController.currentBackStackEntry
         ?.savedStateHandle
@@ -79,14 +79,37 @@ fun SmsDebugScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    Text(
-                        "Showing the last 100 SMS messages received.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = uiState.selectedFilter == SmsDebugFilter.PROBLEMATIC,
+                            onClick = { viewModel.setFilter(SmsDebugFilter.PROBLEMATIC) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        ) {
+                            Text("Problematic")
+                        }
+                        SegmentedButton(
+                            selected = uiState.selectedFilter == SmsDebugFilter.ALL,
+                            onClick = { viewModel.setFilter(SmsDebugFilter.ALL) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        ) {
+                            Text("All")
+                        }
+                    }
                 }
-                items(uiState.debugResults, key = { it.smsMessage.id }) { result ->
-                    SmsDebugItem(result = result, navController = navController)
+
+                if (filteredResults.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
+                            Text(
+                                "No problematic messages found in the last 100 SMS.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    items(filteredResults, key = { it.smsMessage.id }) { result ->
+                        SmsDebugItem(result = result, navController = navController)
+                    }
                 }
             }
         }
