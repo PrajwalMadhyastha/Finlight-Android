@@ -1,7 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FEATURE - Added a new route for the `account_mapping_screen` to the
-// NavHost. This enables navigation to the new pre-processing step for SMS imports.
+// REASON: FIX - Added specific imports for the ViewModel factories to resolve
+// the "Unresolved reference" build errors caused by package name mismatches.
 // =================================================================================
 package io.pm.finlight
 
@@ -69,6 +69,7 @@ import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.ui.theme.PersonalFinanceAppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.flow.map
 import java.net.URLDecoder
@@ -270,7 +271,8 @@ fun MainAppScreen() {
         "category_detail",
         "merchant_detail",
         "customize_dashboard",
-        "account_mapping_screen"
+        "account_mapping_screen",
+        "sms_debug_screen"
     )
 
     val currentTitle = if (showBottomBar) {
@@ -516,6 +518,18 @@ fun AppNavHost(
         startDestination = "splash_screen",
         modifier = modifier
     ) {
+        composable(
+            "sms_debug_screen",
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+        ) {
+            SmsDebugScreen(
+                navController = navController,
+                transactionViewModel = transactionViewModel
+            )
+        }
         composable("account_mapping_screen") {
             AccountMappingScreen(
                 navController = navController,
