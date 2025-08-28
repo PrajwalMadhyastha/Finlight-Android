@@ -1,7 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FEATURE - Added a new route for the `account_mapping_screen` to the
-// NavHost. This enables navigation to the new pre-processing step for SMS imports.
+// REASON: FEATURE - Added a new route for the `sms_debug_screen` to the
+// NavHost. This enables navigation to the new SMS Parsing Debugger tool.
 // =================================================================================
 package io.pm.finlight
 
@@ -270,7 +270,8 @@ fun MainAppScreen() {
         "category_detail",
         "merchant_detail",
         "customize_dashboard",
-        "account_mapping_screen"
+        "account_mapping_screen",
+        "sms_debug_screen" // --- NEW: Add new screen to the list ---
     )
 
     val currentTitle = if (showBottomBar) {
@@ -516,6 +517,16 @@ fun AppNavHost(
         startDestination = "splash_screen",
         modifier = modifier
     ) {
+        // --- NEW: Route for the SMS Debugger Screen ---
+        composable(
+            "sms_debug_screen",
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+        ) {
+            SmsDebugScreen(navController = navController)
+        }
         composable("account_mapping_screen") {
             AccountMappingScreen(
                 navController = navController,

@@ -1,10 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SettingsSubScreens.kt
-// REASON: FIX - Updated the SMS scan action items to call the new
-// `startSmsScanAndIdentifyMappings` function in the ViewModel. The onClick handlers now
-// implement the `onScanComplete` callback to navigate to the new account mapping
-// screen if the scan results in transactions that require user attention. This
-// resolves the "Unresolved reference" build error.
+// REASON: FEATURE - Added a new "Debug SMS Parsing" SettingsActionItem to the
+// AutomationSettingsScreen. This provides the user with a clear entry point to
+// the new SMS debugger tool.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -209,6 +207,14 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                             subtitle = "Add or remove phrases to ignore",
                             icon = Icons.Default.Block,
                             onClick = { navController.navigate("manage_ignore_rules") },
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                        // --- NEW: Entry point for the SMS Debugger ---
+                        SettingsActionItem(
+                            text = "Debug SMS Parsing",
+                            subtitle = "See why recent messages were parsed or ignored",
+                            icon = Icons.Default.BugReport,
+                            onClick = { navController.navigate("sms_debug_screen") }
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                         SettingsToggleItem(
