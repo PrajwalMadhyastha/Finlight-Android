@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsDebugScreen.kt
-// REASON: FEATURE - Added a SingleChoiceSegmentedButtonRow to allow the user
-// to filter the list between "All" messages and only "Problematic" ones. The
-// LazyColumn now observes the new filtered list from the ViewModel.
+// REASON: FEATURE - Added a "Load More" button to the bottom of the list. This
+// allows the user to progressively increase the number of recent SMS messages
+// being analyzed, from 100 to 200, and so on.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -68,7 +68,7 @@ fun SmsDebugScreen(
         },
         containerColor = MaterialTheme.colorScheme.surface
     ) { innerPadding ->
-        if (uiState.isLoading) {
+        if (uiState.isLoading && uiState.debugResults.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -97,11 +97,19 @@ fun SmsDebugScreen(
                     }
                 }
 
+                item {
+                    Text(
+                        "Showing the last ${uiState.loadCount} SMS messages received.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 if (filteredResults.isEmpty()) {
                     item {
                         Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
                             Text(
-                                "No problematic messages found in the last 100 SMS.",
+                                "No problematic messages found in the last ${uiState.loadCount} SMS.",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -109,6 +117,21 @@ fun SmsDebugScreen(
                 } else {
                     items(filteredResults, key = { it.smsMessage.id }) { result ->
                         SmsDebugItem(result = result, navController = navController)
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { viewModel.loadMore() },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !uiState.isLoading
+                    ) {
+                        if (uiState.isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text("Load More")
+                        }
                     }
                 }
             }

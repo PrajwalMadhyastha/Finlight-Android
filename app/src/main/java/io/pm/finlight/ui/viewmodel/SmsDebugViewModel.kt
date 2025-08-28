@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModel.kt
-// REASON: FEATURE - Added a filter to the SMS Debugger. The ViewModel now
-// manages a filter state (All or Problematic) and exposes a derived StateFlow
-// of filtered results, defaulting to show only ignored or unparsed messages.
+// REASON: FEATURE - Added logic to support progressive loading. The ViewModel
+// now tracks the number of messages to load and includes a `loadMore` function
+// to fetch and parse the next batch of SMS messages on demand.
 // =================================================================================
 package io.pm.finlight
 
@@ -22,7 +22,7 @@ data class SmsDebugResult(
     val parseResult: ParseResult
 )
 
-// --- NEW: Enum to represent the filter state ---
+// Enum to represent the filter state
 enum class SmsDebugFilter {
     ALL, PROBLEMATIC
 }
@@ -31,7 +31,8 @@ enum class SmsDebugFilter {
 data class SmsDebugUiState(
     val isLoading: Boolean = true,
     val debugResults: List<SmsDebugResult> = emptyList(),
-    val selectedFilter: SmsDebugFilter = SmsDebugFilter.PROBLEMATIC
+    val selectedFilter: SmsDebugFilter = SmsDebugFilter.PROBLEMATIC,
+    val loadCount: Int = 100 // --- NEW: Track how many messages are loaded
 )
 
 class SmsDebugViewModel(
@@ -42,7 +43,6 @@ class SmsDebugViewModel(
     private val _uiState = MutableStateFlow(SmsDebugUiState())
     val uiState = _uiState.asStateFlow()
 
-    // --- NEW: A derived flow that filters the results based on the selected filter ---
     val filteredDebugResults: StateFlow<List<SmsDebugResult>> = _uiState
         .map { state ->
             if (state.selectedFilter == SmsDebugFilter.ALL) {
@@ -81,7 +81,8 @@ class SmsDebugViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true) }
 
-            val recentSms = smsRepository.fetchAllSms(null).take(100)
+            val currentLimit = _uiState.value.loadCount
+            val recentSms = smsRepository.fetchAllSms(null).take(currentLimit)
             val results = mutableListOf<SmsDebugResult>()
 
             for (sms in recentSms) {
@@ -100,18 +101,25 @@ class SmsDebugViewModel(
         }
     }
 
-    // --- NEW: Function to update the filter state ---
     fun setFilter(filter: SmsDebugFilter) {
         _uiState.update { it.copy(selectedFilter = filter) }
+    }
+
+    // --- NEW: Function to load the next batch of messages ---
+    fun loadMore() {
+        val newCount = _uiState.value.loadCount + 100
+        _uiState.update { it.copy(loadCount = newCount) }
+        refreshScan()
     }
 
     fun runAutoImportAndRefresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val originalResults = _uiState.value.debugResults
+            val currentLimit = _uiState.value.loadCount
 
             // Re-scan to get the new state
-            val recentSms = withContext(Dispatchers.IO) { smsRepository.fetchAllSms(null).take(100) }
+            val recentSms = withContext(Dispatchers.IO) { smsRepository.fetchAllSms(null).take(currentLimit) }
             val newResults = mutableListOf<SmsDebugResult>()
             val transactionsToImport = mutableListOf<PotentialTransaction>()
 
