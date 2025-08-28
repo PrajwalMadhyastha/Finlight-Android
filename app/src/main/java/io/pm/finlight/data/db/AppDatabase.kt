@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: REFACTOR - The hardcoded DEFAULT_IGNORE_PHRASES list has been removed
-// and is now imported from the new 'core' module. This decouples the parsing
-// rules from the Android database implementation.
+// REASON: FEATURE - The database version has been incremented to 34. The new
+// `SmsParseTemplate` entity and its corresponding DAO have been added. A new
+// migration (33 to 34) has been implemented to create the `sms_parse_templates`
+// table, which is essential for the new heuristic learning feature.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -14,12 +15,12 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.AccountDao
+import io.pm.finlight.security.SecurityManager
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import net.sqlcipher.database.SupportFactory
-import io.pm.finlight.security.SecurityManager
 
 @Database(
     entities = [
@@ -38,9 +39,10 @@ import io.pm.finlight.security.SecurityManager
         IgnoreRule::class,
         Goal::class,
         RecurringPattern::class,
-        SplitTransaction::class
+        SplitTransaction::class,
+        SmsParseTemplate::class // --- NEW: Add the new entity ---
     ],
-    version = 33,
+    version = 34, // --- UPDATED: Incremented version ---
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -58,11 +60,13 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun goalDao(): GoalDao
     abstract fun recurringPatternDao(): RecurringPatternDao
     abstract fun splitTransactionDao(): SplitTransactionDao
+    abstract fun smsParseTemplateDao(): SmsParseTemplateDao // --- NEW: Add the new DAO ---
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        // --- All existing migrations (1-2 through 32-33) remain here ---
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN transactionType TEXT NOT NULL DEFAULT 'expense'")
@@ -402,6 +406,23 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // --- NEW: Migration for the new table ---
+        val MIGRATION_33_34 = object : Migration(33, 34) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `sms_parse_templates` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                        `templateSignature` TEXT NOT NULL, 
+                        `originalSmsBody` TEXT NOT NULL, 
+                        `originalMerchantStartIndex` INTEGER NOT NULL, 
+                        `originalMerchantEndIndex` INTEGER NOT NULL, 
+                        `originalAmountStartIndex` INTEGER NOT NULL, 
+                        `originalAmountEndIndex` INTEGER NOT NULL
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sms_parse_templates_templateSignature` ON `sms_parse_templates` (`templateSignature`)")
+            }
+        }
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -412,7 +433,17 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance =
                     Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "finance_database")
                         .openHelperFactory(factory)
-                        .addMigrations(MIGRATION_32_33)
+                        .addMigrations(
+                            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+                            MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+                            MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+                            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
+                            MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
+                            MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+                            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29,
+                            MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
+                            MIGRATION_33_34 // --- NEW: Add migration to the builder ---
+                        )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))
                         .build()
@@ -438,7 +469,6 @@ abstract class AppDatabase : RoomDatabase() {
                 val categoryDao = db.categoryDao()
                 val ignoreRuleDao = db.ignoreRuleDao()
 
-                // --- UPDATED: Seed only the essential data ---
                 categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
                 ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
                 accountDao.insert(Account(id = 1, name = "Cash Spends", type = "Cash"))

@@ -1,8 +1,10 @@
 // =================================================================================
 // FILE: ./core/src/main/java/io/pm/finlight/core/SmsParser.kt
-// REASON: FIX - Corrected the merchant regex for SBI Card reversals. The pattern
-// now correctly identifies the merchant name between the "at" keyword and the
-// opening parenthesis of the "(UPI Ref No.)" block, resolving the parsing error.
+// REASON: FIX - The `EXPENSE_KEYWORDS_REGEX` has been updated to include the word
+// "debit", allowing it to correctly identify new SMS formats. A new merchant
+// regex has also been added to correctly extract merchant names from phrases
+// like "...at 'Merchant Name' from...". This makes the initial parsing more
+// robust and enables the heuristic engine to learn from these new formats.
 // =================================================================================
 package io.pm.finlight
 
@@ -18,8 +20,9 @@ sealed class ParseResult {
 object SmsParser {
     private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    private val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with)\\b".toRegex(RegexOption.IGNORE_CASE)
-    private val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
+    // --- UPDATED: Added "debit" to the list of expense keywords ---
+    val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with|debit of)\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
+    val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     private val ACCOUNT_PATTERNS =
         listOf(
@@ -92,7 +95,8 @@ object SmsParser {
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            // --- NEW: Added a more specific pattern for SBI Card reversals ---
+            // --- NEW: Added pattern for "at '...' from" format ---
+            "at\\s+'([^']+)'\\s+from".toRegex(RegexOption.IGNORE_CASE),
             "at\\s+(.*?)\\s+\\(UPI Ref No".toRegex(RegexOption.IGNORE_CASE),
             "^([A-Z0-9*\\s]+) refund of".toRegex(RegexOption.IGNORE_CASE),
             "towards\\s+(.+?)(?:\\. UPI Ref| for Autopay)".toRegex(RegexOption.IGNORE_CASE),
@@ -318,7 +322,7 @@ object SmsParser {
         return ParseResult.Success(transaction)
     }
 
-    private fun generateSmsSignature(body: String): String {
+    fun generateSmsSignature(body: String): String {
         var signature = body.lowercase()
         VOLATILE_DATA_REGEX.forEach { regex ->
             signature = regex.replace(signature, "")
@@ -326,7 +330,7 @@ object SmsParser {
         return signature.replace(Regex("\\s+"), " ").trim().hashCode().toString()
     }
 
-    private fun parseAccount(smsBody: String, sender: String): PotentialAccount? {
+    fun parseAccount(smsBody: String, sender: String): PotentialAccount? {
         for (pattern in ACCOUNT_PATTERNS) {
             val match = pattern.find(smsBody)
             if (match != null) {
