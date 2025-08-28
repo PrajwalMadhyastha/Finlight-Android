@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FIX - The logic for the `monthlySummaries` flow has been updated.
-// Instead of being limited to the current year, it now fetches the date of the
-// first transaction and dynamically generates the month scroller from that
-// historical point up to the present day, allowing users to view all their data.
+// REASON: FIX - Corrected a compilation error in the `createAndStoreTemplate`
+// function. The logic for finding the amount string in the SMS body was using
+// an incorrect lambda with `find()`. This has been fixed by using `findAll()` to
+// get all matches and then applying a `find` operation on the resulting
+// collection, which is the correct syntax.
 // =================================================================================
 package io.pm.finlight
 
@@ -61,6 +62,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private val merchantCategoryMappingRepository: MerchantCategoryMappingRepository
     private val merchantMappingRepository: MerchantMappingRepository
     private val splitTransactionRepository: SplitTransactionRepository
+    private val smsParseTemplateDao: SmsParseTemplateDao
     private val context = application
 
     private val db = AppDatabase.getInstance(application)
@@ -152,6 +154,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao())
         merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
+        smsParseTemplateDao = db.smsParseTemplateDao()
 
         merchantPredictions = _merchantSearchQuery
             .debounce(300)
@@ -221,7 +224,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             initialValue = emptyList()
         )
 
-        // --- UPDATED: Dynamic month scroller logic ---
         monthlySummaries = transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
             val startDate = firstTransactionDate ?: System.currentTimeMillis()
 
@@ -764,9 +766,66 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     fun updateTransactionDescription(id: Int, newDescription: String) = viewModelScope.launch(Dispatchers.IO) {
         if (newDescription.isNotBlank()) {
+            val transaction = transactionRepository.getTransactionById(id).firstOrNull()
+            if (transaction != null) {
+                val original = transaction.originalDescription ?: transaction.description
+                if (original.isNotBlank() && !original.equals(newDescription, ignoreCase = true)) {
+                    val rule = MerchantRenameRule(originalName = original, newName = newDescription)
+                    merchantRenameRuleRepository.insert(rule)
+
+                    if (transaction.sourceSmsId != null && transaction.originalDescription != null) {
+                        val originalSms = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
+                        if (originalSms != null) {
+                            createAndStoreTemplate(originalSms.body, transaction)
+                        }
+                    }
+                }
+            }
             transactionRepository.updateDescription(id, newDescription)
         }
     }
+
+    private suspend fun createAndStoreTemplate(smsBody: String, transaction: Transaction) {
+        val originalMerchant = transaction.originalDescription ?: return
+        val amountToFind = transaction.originalAmount ?: transaction.amount
+
+        val amountRegex = "([\\d,]+\\.?\\d*)".toRegex()
+        val allNumericValuesInSms = amountRegex.findAll(smsBody).mapNotNull { it.value.replace(",", "").toDoubleOrNull() }.toList()
+        val matchingAmountValue = allNumericValuesInSms.find { it == amountToFind }
+
+        if (matchingAmountValue == null) {
+            Log.w(TAG, "Could not find the exact amount '$amountToFind' in the SMS body to create a template.")
+            return
+        }
+
+        // --- FIX: Corrected lambda syntax for finding the match result ---
+        val amountStr = amountRegex.findAll(smsBody).find {
+            it.value.replace(",", "").toDoubleOrNull() == matchingAmountValue
+        }?.value ?: return
+
+        val merchantIndex = smsBody.indexOf(originalMerchant)
+        val amountIndex = smsBody.indexOf(amountStr)
+
+        if (merchantIndex == -1 || amountIndex == -1) {
+            Log.w(TAG, "Could not find merchant or amount index in SMS body for template creation.")
+            return
+        }
+
+        val signature = smsBody.replace(Regex("\\d"), "").replace(Regex("\\s+"), " ").trim()
+
+        val template = SmsParseTemplate(
+            templateSignature = signature,
+            originalSmsBody = smsBody,
+            originalMerchantStartIndex = merchantIndex,
+            originalMerchantEndIndex = merchantIndex + originalMerchant.length,
+            originalAmountStartIndex = amountIndex,
+            originalAmountEndIndex = amountIndex + amountStr.length
+        )
+
+        smsParseTemplateDao.insert(template)
+        Log.d(TAG, "Successfully created and stored a new SMS parse template.")
+    }
+
 
     fun updateTransactionAmount(id: Int, amountStr: String) = viewModelScope.launch {
         amountStr.toDoubleOrNull()?.let {

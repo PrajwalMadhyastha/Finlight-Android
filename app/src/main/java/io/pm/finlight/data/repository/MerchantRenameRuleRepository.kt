@@ -1,7 +1,8 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/MerchantRenameRuleRepository.kt
-// REASON: FIX - The unused `getAllRules` function has been removed to resolve
-// the "UnusedSymbol" warning, cleaning up the repository's public API.
+// FILE: ./app/src/main/java/io/pm/finlight/data/repository/MerchantRenameRuleRepository.kt
+// REASON: FIX - Re-added the `insert` function. This function is required by the
+// TransactionViewModel to save new merchant rename rules and was accidentally
+// removed, causing a build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -21,5 +22,13 @@ class MerchantRenameRuleRepository(private val dao: MerchantRenameRuleDao) {
         return dao.getAllRules().map { rules ->
             rules.associate { it.originalName to it.newName }
         }
+    }
+
+    /**
+     * Inserts a new or updated rename rule into the database.
+     * @param rule The rule to be saved.
+     */
+    suspend fun insert(rule: MerchantRenameRule) {
+        dao.insert(rule)
     }
 }

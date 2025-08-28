@@ -1,6 +1,7 @@
 package io.pm.finlight.analyzer
 
 import io.pm.finlight.*
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -10,32 +11,35 @@ import java.util.Locale
 
 // =================================================================================
 // Data classes for JSON Deserialization
-// These classes now model the structure of a sms_dump.json file.
+// REASON: The data classes have been updated with @SerialName annotations to
+// flexibly handle the JSON output from the `yq` tool, which prefixes
+// attributes with "+@". This makes the analyzer more robust.
 // =================================================================================
 
 @Serializable
-data class Sms(
-    val protocol: String,
-    val address: String,
-    val date: String,
-    val type: String,
-    val subject: String?,
-    val body: String,
-    val toa: String?,
-    val sc_toa: String?,
-    val service_center: String?,
-    val read: String,
-    val status: String,
-    val locked: String,
-    val date_sent: String,
-    val readable_date: String,
-    val contact_name: String
+data class SmsDump(
+    val smses: SmsesContainer
 )
 
 @Serializable
-data class Smses(
-    val count: Int,
+data class SmsesContainer(
+    @SerialName("+@count")
+    val count: String,
     val sms: List<Sms>
+)
+
+@Serializable
+data class Sms(
+    @SerialName("+@address")
+    val address: String,
+    @SerialName("+@date")
+    val date: String,
+    @SerialName("+@body")
+    val body: String,
+    @SerialName("+@readable_date")
+    val readable_date: String,
+    @SerialName("+@contact_name")
+    val contact_name: String
 )
 
 // =================================================================================
@@ -71,7 +75,6 @@ data class IgnoredMessageRecord(
 suspend fun main() {
     println("Starting Finlight SMS Parser Analysis...")
 
-    // --- UPDATED: Configure the JSON parser ---
     val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -85,9 +88,13 @@ suspend fun main() {
 
     println("Found sms_dump.json. Reading and parsing file...")
 
-    val smses: Smses = json.decodeFromString(inputFile.readText())
+    // --- UPDATED: Deserialization now works with the flexible data classes ---
+    val smsDump: SmsDump = json.decodeFromString(inputFile.readText())
+    val smsList = smsDump.smses.sms
+    val totalSmsCount = smsDump.smses.count.toIntOrNull() ?: smsList.size
 
-    println("Successfully parsed ${smses.count} messages from JSON.")
+
+    println("Successfully parsed $totalSmsCount messages from JSON.")
     println("--------------------------------------------------")
 
     val parsedTransactions = mutableListOf<ParsedTransactionRecord>()
@@ -106,7 +113,7 @@ suspend fun main() {
         override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = null
     }
 
-    smses.sms.forEach { sms ->
+    smsList.forEach { sms ->
         val smsMessage = SmsMessage(
             id = sms.date.toLongOrNull() ?: 0L,
             sender = sms.address,
@@ -156,7 +163,7 @@ suspend fun main() {
     generateCsvReport("ignored_messages.csv", ignoredMessages)
 
     // --- Print Console Summary ---
-    printSummary(smses.count, parsedTransactions.size, ignoredMessages)
+    printSummary(totalSmsCount, parsedTransactions.size, ignoredMessages)
 }
 
 /**
