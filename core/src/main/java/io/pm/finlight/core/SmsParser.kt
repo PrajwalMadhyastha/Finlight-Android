@@ -1,27 +1,26 @@
 // =================================================================================
 // FILE: ./core/src/main/java/io/pm/finlight/core/SmsParser.kt
-// REASON: FIX - The `EXPENSE_KEYWORDS_REGEX` has been updated to include the word
-// "debit", allowing it to correctly identify new SMS formats. A new merchant
-// regex has also been added to correctly extract merchant names from phrases
-// like "...at 'Merchant Name' from...". This makes the initial parsing more
-// robust and enables the heuristic engine to learn from these new formats.
+// REASON: FEATURE - The parser has been refactored to return a detailed
+// ParseResult sealed class instead of a nullable PotentialTransaction. This
+// provides specific reasons for ignored messages or parsing failures, which is
+// essential for the new SMS Debugger tool.
 // =================================================================================
 package io.pm.finlight
 
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 
-// --- Sealed Class for Parse Result ---
+// --- NEW: Sealed Class for detailed parse results ---
 sealed class ParseResult {
     data class Success(val transaction: PotentialTransaction) : ParseResult()
     data class Ignored(val reason: String) : ParseResult()
+    data class NotParsed(val reason: String) : ParseResult()
 }
 
 object SmsParser {
     private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- UPDATED: Added "debit" to the list of expense keywords ---
-    val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with|debit of)\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
+    val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with|debit of|debit)\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
     val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     private val ACCOUNT_PATTERNS =
@@ -95,14 +94,13 @@ object SmsParser {
         )
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
-            // --- NEW: Added pattern for "at '...' from" format ---
             "at\\s+'([^']+)'\\s+from".toRegex(RegexOption.IGNORE_CASE),
             "at\\s+(.*?)\\s+\\(UPI Ref No".toRegex(RegexOption.IGNORE_CASE),
             "^([A-Z0-9*\\s]+) refund of".toRegex(RegexOption.IGNORE_CASE),
             "towards\\s+(.+?)(?:\\. UPI Ref| for Autopay)".toRegex(RegexOption.IGNORE_CASE),
             "transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\s+Ref No|$)".toRegex(RegexOption.IGNORE_CASE),
             "towards\\s+(annual maintenance charges)\\s+for".toRegex(RegexOption.IGNORE_CASE),
-            "sent to\\s+(.+?)-SBI".toRegex(RegexOption.IGNORE_CASE),
+            "sent to\\s+(.+?)(?:-SBI)".toRegex(RegexOption.IGNORE_CASE),
             "for (NEFT transaction)".toRegex(RegexOption.IGNORE_CASE),
             "To (A/c [\\w\\s]+) IMPS".toRegex(RegexOption.IGNORE_CASE),
             "from ([A-Z\\s]+ IND) on".toRegex(RegexOption.IGNORE_CASE),
@@ -172,6 +170,7 @@ object SmsParser {
         return when (val result = parseWithReason(sms, mappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)) {
             is ParseResult.Success -> result.transaction
             is ParseResult.Ignored -> null
+            is ParseResult.NotParsed -> null
         }
     }
 
@@ -258,13 +257,13 @@ object SmsParser {
         }
 
 
-        val amount = extractedAmount ?: return ParseResult.Ignored("No amount found")
+        val amount = extractedAmount ?: return ParseResult.NotParsed("No amount found")
 
         val transactionType =
             when {
                 EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody) -> "expense"
                 INCOME_KEYWORDS_REGEX.containsMatchIn(normalizedBody) -> "income"
-                else -> return ParseResult.Ignored("Could not determine transaction type (debit/credit)")
+                else -> return ParseResult.NotParsed("Could not determine transaction type (debit/credit)")
             }
 
         var merchantName = extractedMerchant ?: mappings[sms.sender]
@@ -288,14 +287,12 @@ object SmsParser {
             }
         }
 
-        // --- FIX: Perform category lookup BEFORE renaming the merchant ---
         val originalMerchantName = merchantName
         var learnedCategoryId: Int? = null
         if (originalMerchantName != null) {
             learnedCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(originalMerchantName)
         }
 
-        // --- Now, apply rename rules for display purposes ---
         if (merchantName != null && renameRules.containsKey(merchantName.lowercase())) {
             merchantName = renameRules[merchantName.lowercase()]
         }
@@ -487,4 +484,5 @@ object SmsParser {
         var currency = (groups[2].ifEmpty { groups[3].ifEmpty { groups[6] } }).uppercase()
         if (currency == "RS") currency = "INR"
         return Pair(amount, currency.ifEmpty { null })
-    }}
+    }
+}
