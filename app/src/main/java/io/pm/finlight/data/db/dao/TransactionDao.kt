@@ -442,7 +442,7 @@ interface TransactionDao {
           AND (:accountId IS NULL OR AE.accountId = :accountId)
           AND (:categoryId IS NULL OR AE.categoryId = :categoryId)
         GROUP BY C.name
-        ORDER BY totalAmount ASC
+        ORDER BY totalAmount DESC
     """
     )
     fun getSpendingByCategoryForMonth(
