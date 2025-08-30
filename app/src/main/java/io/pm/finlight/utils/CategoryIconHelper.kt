@@ -59,6 +59,19 @@ object CategoryIconHelper {
         "deep_purple_light" to Color(0xFFB39DDB),
         "yellow_light" to Color(0xFFFFF59D),
         "gray_light" to Color(0xFFE0E0E0),
+        // --- NEW: Expanded Palette ---
+        "lime_light" to Color(0xFFE6EE9C),
+        "amber_light" to Color(0xFFFFE082),
+        "deep_orange_light" to Color(0xFFFFAB91),
+        "blue_grey_light" to Color(0xFFB0BEC5),
+        "light_green_light" to Color(0xFFC5E1A5),
+        "light_blue_light" to Color(0xFF81D4FA),
+        "pink_accent_light" to Color(0xFFF8BBD0),
+        "teal_accent_light" to Color(0xFFA7FFEB),
+        "purple_accent_light" to Color(0xFFE1BEE7),
+        "orange_accent_light" to Color(0xFFFFD180),
+        "yellow_accent_light" to Color(0xFFFFFF8D),
+        "cyan_accent_light" to Color(0xFF84FFFF)
     )
 
     private val categoryBackgrounds = mapOf(
