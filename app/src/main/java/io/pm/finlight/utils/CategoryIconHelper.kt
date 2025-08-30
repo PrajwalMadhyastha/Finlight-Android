@@ -212,7 +212,7 @@ object CategoryIconHelper {
             "pets" to Icons.Default.Pets,
             "fastfood" to Icons.Default.Fastfood,
             "directions_car" to Icons.Default.DirectionsCar,
-            "category" to Icons.Default.Category,
+            //"category" to Icons.Default.Category,
             "work" to Icons.Default.Work,
             "redo" to Icons.AutoMirrored.Filled.Redo,
             "add_card" to Icons.Default.AddCard,

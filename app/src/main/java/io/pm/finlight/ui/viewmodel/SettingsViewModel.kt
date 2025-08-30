@@ -19,6 +19,7 @@ import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -755,8 +756,12 @@ class SettingsViewModel(
     private suspend fun findOrCreateCategory(name: String): Category {
         var category = categoryRepository.allCategories.first().find { it.name.equals(name, ignoreCase = true) }
         if (category == null) {
-            val newId = categoryRepository.insert(Category(name = name))
-            category = Category(id = newId.toInt(), name = name)
+            // --- FIX: When creating a new category, explicitly set the iconKey to "letter_default" ---
+            val usedColorKeys = categoryRepository.allCategories.first().map { it.colorKey }
+            val colorKey = CategoryIconHelper.getNextAvailableColor(usedColorKeys)
+            val newCategory = Category(name = name, iconKey = "letter_default", colorKey = colorKey)
+            val newId = categoryRepository.insert(newCategory)
+            category = newCategory.copy(id = newId.toInt())
         }
         return category
     }

@@ -1,15 +1,17 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/SearchViewModel.kt
-// REASON: FEATURE - The ViewModel now accepts an `initialDateMillis` parameter.
-// In its `init` block, it checks for this date and, if present, automatically
-// sets the start and end date filters to span that single day. This allows the
-// UI to display pre-filtered search results when navigated to from the calendar.
+// REASON: FIX - The ViewModel has been refactored to be fully reactive. It now
+// uses a `flatMapLatest` operator on the UI state flow. This directly calls the
+// new Flow-based DAO method, ensuring that `searchResults` is a "live" stream
+// that automatically updates whenever the search criteria or the underlying
+// transaction data changes, thus fixing the stale data bug.
 // =================================================================================
 package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.dao.AccountDao
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -27,22 +29,53 @@ data class SearchUiState(
     val hasSearched: Boolean = false,
 )
 
-@OptIn(FlowPreview::class)
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class SearchViewModel(
     private val transactionDao: TransactionDao,
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
     private val initialCategoryId: Int?,
-    private val initialDateMillis: Long? // --- NEW: Accept initial date
+    private val initialDateMillis: Long?
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
-    private val _searchResults = MutableStateFlow<List<TransactionDetails>>(emptyList())
-    val searchResults: StateFlow<List<TransactionDetails>> = _searchResults.asStateFlow()
+    val searchResults: StateFlow<List<TransactionDetails>> = uiState
+        .debounce(300L) // Debounce user input for performance
+        .flatMapLatest { state ->
+            val filtersAreActive = state.selectedAccount != null ||
+                    state.selectedCategory != null ||
+                    state.transactionType != "All" ||
+                    state.startDate != null ||
+                    state.endDate != null
+
+            val shouldSearch = state.keyword.isNotBlank() || filtersAreActive
+            // We can update the `hasSearched` flag directly within the flow
+            _uiState.update { it.copy(hasSearched = shouldSearch) }
+
+            if (shouldSearch) {
+                // Call the new reactive DAO function
+                transactionDao.searchTransactions(
+                    keyword = state.keyword,
+                    accountId = state.selectedAccount?.id,
+                    categoryId = state.selectedCategory?.id,
+                    transactionType = if (state.transactionType.equals("All", ignoreCase = true)) null else state.transactionType.lowercase(),
+                    startDate = state.startDate,
+                    endDate = state.endDate
+                )
+            } else {
+                // If there are no search criteria, return a Flow with an empty list
+                flowOf(emptyList())
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
     init {
-        // Load initial filter options
+        // Load initial filter options (accounts and categories)
         viewModelScope.launch {
             accountDao.getAllAccounts().collect { accounts ->
                 _uiState.update { it.copy(accounts = accounts) }
@@ -60,7 +93,7 @@ class SearchViewModel(
             }
         }
 
-        // --- NEW: Pre-select date range if an initial date was passed ---
+        // Pre-select date range if an initial date was passed from another screen
         if (initialDateMillis != null && initialDateMillis != -1L) {
             val cal = Calendar.getInstance().apply { timeInMillis = initialDateMillis }
             cal.set(Calendar.HOUR_OF_DAY, 0)
@@ -74,36 +107,6 @@ class SearchViewModel(
             val end = cal.timeInMillis
 
             onDateChange(start, end)
-        }
-
-
-        // Reactive search logic
-        viewModelScope.launch {
-            uiState
-                .debounce(300L)
-                .collectLatest { state ->
-                    val filtersAreActive = state.selectedAccount != null ||
-                            state.selectedCategory != null ||
-                            state.transactionType != "All" ||
-                            state.startDate != null ||
-                            state.endDate != null
-
-                    if (state.keyword.isNotBlank() || filtersAreActive) {
-                        _uiState.update { it.copy(hasSearched = true) }
-                        val results = transactionDao.searchTransactions(
-                            keyword = state.keyword,
-                            accountId = state.selectedAccount?.id,
-                            categoryId = state.selectedCategory?.id,
-                            transactionType = if (state.transactionType.equals("All", ignoreCase = true)) null else state.transactionType.lowercase(),
-                            startDate = state.startDate,
-                            endDate = state.endDate
-                        )
-                        _searchResults.value = results
-                    } else {
-                        _searchResults.value = emptyList()
-                        _uiState.update { it.copy(hasSearched = false) }
-                    }
-                }
         }
     }
 

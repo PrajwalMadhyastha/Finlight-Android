@@ -70,6 +70,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Email Id.*has been added",
     "activate your eSIM",
     "BHK frm",
+    "shares of.*towards bonus",
 
     // Rules for the latest batch of non-financial messages
     "Lok Adalat Notice",

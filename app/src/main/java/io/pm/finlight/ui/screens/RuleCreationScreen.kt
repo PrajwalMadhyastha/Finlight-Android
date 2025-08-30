@@ -1,10 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/RuleCreationScreen.kt
-// REASON: FEATURE - The save logic has been updated to support retrospective
-// parsing. When a rule is saved, it now sets a `start_retro_scan` flag on the
-// previous back stack entry. This signals the TransactionDetailScreen to
-// initiate a background scan of recent SMS messages using the newly created rule,
-// automatically fixing other similar, unparsed transactions.
+// REASON: FEATURE - The save logic now sets an `auto_import_after_rule_creation`
+// flag on the previous back stack entry. This signals the SMS Debugger screen to
+// automatically import any transactions that are now parsable with the new rule.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -259,15 +257,14 @@ fun RuleCreationScreen(
                     onClick = {
                         scope.launch {
                             viewModel.saveRule(textFieldValue.text) {
+                                // This flag is for the TransactionDetailScreen
                                 navController.previousBackStackEntry
                                     ?.savedStateHandle
                                     ?.set("reparse_needed", true)
-                                // --- NEW: Set the flag to trigger a retrospective scan ---
-                                if (!isEditMode) {
-                                    navController.previousBackStackEntry
-                                        ?.savedStateHandle
-                                        ?.set("start_retro_scan", true)
-                                }
+                                // This new flag is for the SmsDebugScreen
+                                navController.previousBackStackEntry
+                                    ?.savedStateHandle
+                                    ?.set("auto_import_after_rule_creation", true)
                                 navController.popBackStack()
                             }
                         }

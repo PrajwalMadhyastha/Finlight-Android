@@ -1080,4 +1080,13 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
         assertNull("Should ignore passbook contribution updates", result)
     }
+
+    @Test
+    fun `test ignores share bonus allotment message`() = runBlocking {
+        setupTest() // Uses the updated default rules
+        val smsBody = "CDSL:CREDITED IN A/C *14123123  SHARES OF HDFC BANK LIMITED TOWARDS BONUS ALLOTMENT ON 29/08/2025.CONTACT YOUR DP FOR MORE INFORMATION."
+        val mockSms = SmsMessage(id = 9998L, sender = "XX-SOMEO", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        assertNull("Should ignore share bonus allotment", result)
+    }
 }
