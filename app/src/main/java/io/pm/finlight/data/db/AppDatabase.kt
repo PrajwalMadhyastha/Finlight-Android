@@ -482,13 +482,19 @@ abstract class AppDatabase : RoomDatabase() {
             private suspend fun repairCategoryIcons(db: AppDatabase) {
                 val categoryDao = db.categoryDao()
                 val allCategories = categoryDao.getAllCategories().first()
+                val usedColorKeys = allCategories.map { it.colorKey }.toMutableList()
 
                 val categoriesToFix = allCategories.filter { it.iconKey == "category" }
 
                 if (categoriesToFix.isNotEmpty()) {
                     Log.d("DatabaseCallback", "Found ${categoriesToFix.size} categories with legacy icons. Repairing...")
                     val fixedCategories = categoriesToFix.map {
-                        it.copy(iconKey = "letter_default")
+                        val nextColor = CategoryIconHelper.getNextAvailableColor(usedColorKeys)
+                        usedColorKeys.add(nextColor) // Add the newly assigned color to the list for the next iteration
+                        it.copy(
+                            iconKey = "letter_default",
+                            colorKey = nextColor
+                        )
                     }
                     categoryDao.updateAll(fixedCategories)
                     Log.d("DatabaseCallback", "Successfully repaired ${fixedCategories.size} category icons.")
