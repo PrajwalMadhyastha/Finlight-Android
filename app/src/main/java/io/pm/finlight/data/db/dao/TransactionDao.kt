@@ -642,12 +642,12 @@ interface TransactionDao {
             (:endDate IS NULL OR t.date <= :endDate)
         ORDER BY t.date DESC
     """)
-    suspend fun searchTransactions(
+    fun searchTransactions(
         keyword: String,
         accountId: Int?,
         categoryId: Int?,
         transactionType: String?,
         startDate: Long?,
         endDate: Long?,
-    ): List<TransactionDetails>
+    ): Flow<List<TransactionDetails>>
 }
