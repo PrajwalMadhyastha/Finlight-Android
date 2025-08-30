@@ -8,6 +8,7 @@
 package io.pm.finlight.data.db
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -19,6 +20,7 @@ import io.pm.finlight.security.SecurityManager
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import net.sqlcipher.database.SupportFactory
 
@@ -462,6 +464,9 @@ abstract class AppDatabase : RoomDatabase() {
 
             override fun onOpen(db: SupportSQLiteDatabase) {
                 super.onOpen(db)
+                CoroutineScope(Dispatchers.IO).launch {
+                    repairCategoryIcons(getInstance(context))
+                }
             }
 
             suspend fun populateDatabase(db: AppDatabase) {
@@ -472,6 +477,28 @@ abstract class AppDatabase : RoomDatabase() {
                 categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
                 ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
                 accountDao.insert(Account(id = 1, name = "Cash Spends", type = "Cash"))
+            }
+
+            private suspend fun repairCategoryIcons(db: AppDatabase) {
+                val categoryDao = db.categoryDao()
+                val allCategories = categoryDao.getAllCategories().first()
+                val usedColorKeys = allCategories.map { it.colorKey }.toMutableList()
+
+                val categoriesToFix = allCategories.filter { it.iconKey == "category" }
+
+                if (categoriesToFix.isNotEmpty()) {
+                    Log.d("DatabaseCallback", "Found ${categoriesToFix.size} categories with legacy icons. Repairing...")
+                    val fixedCategories = categoriesToFix.map {
+                        val nextColor = CategoryIconHelper.getNextAvailableColor(usedColorKeys)
+                        usedColorKeys.add(nextColor) // Add the newly assigned color to the list for the next iteration
+                        it.copy(
+                            iconKey = "letter_default",
+                            colorKey = nextColor
+                        )
+                    }
+                    categoryDao.updateAll(fixedCategories)
+                    Log.d("DatabaseCallback", "Successfully repaired ${fixedCategories.size} category icons.")
+                }
             }
         }
     }
