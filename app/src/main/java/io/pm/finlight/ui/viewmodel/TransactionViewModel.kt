@@ -459,8 +459,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             }
     }
 
-    private fun loadVisitCount(originalDescription: String?, fallbackDescription: String) {
-        val descriptionToQuery = originalDescription ?: fallbackDescription
+    private fun loadVisitCount(originalDescription: String?, currentDescription: String) { // Renamed for clarity
+        val descriptionToQuery = currentDescription // Always use the current description
         viewModelScope.launch {
             transactionRepository.getTransactionCountForMerchant(descriptionToQuery).collect { count ->
                 _visitCount.value = count
