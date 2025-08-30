@@ -1,8 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: REFACTOR - Updated to use the decoupled SmsParser from the 'core'
-// module. All calls to the parser now pass data provider implementations that
-// wrap the DAOs, aligning with the new architecture.
+// REASON: FEATURE - The CSV import logic has been enhanced to assign unique
+// colors to newly created categories. The `commitCsvImport` function now maintains
+// a stateful list of used colors throughout the import batch, ensuring that
+// each new category receives the next available color from the palette,
+// mirroring the behavior of manual category creation.
 // =================================================================================
 package io.pm.finlight
 
@@ -18,8 +20,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.theme.AppTheme
-import io.pm.finlight.utils.ReminderManager
 import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -620,12 +622,14 @@ class SettingsViewModel(
             val isFinlightExport = header.contains("Id") && header.contains("ParentId")
 
             val learnedMappings = mutableMapOf<String, Int>()
+            val allCategories = db.categoryDao().getAllCategories().first()
+            val usedColorKeys = allCategories.mapNotNull { it.colorKey }.toMutableList()
 
             db.withTransaction {
                 if (isFinlightExport) {
-                    importFinlightCsv(header, rows, learnedMappings)
+                    importFinlightCsv(header, rows, learnedMappings, usedColorKeys)
                 } else {
-                    importGenericCsv(header, rows, learnedMappings)
+                    importGenericCsv(header, rows, learnedMappings, usedColorKeys)
                 }
 
                 if (learnedMappings.isNotEmpty()) {
@@ -642,7 +646,8 @@ class SettingsViewModel(
     private suspend fun importFinlightCsv(
         header: List<String>,
         rows: List<List<String>>,
-        learnedMappings: MutableMap<String, Int>
+        learnedMappings: MutableMap<String, Int>,
+        usedColorKeys: MutableList<String>
     ) {
         val idMap = mutableMapOf<String, Long>()
         val parents = rows.filter { it[header.indexOf("ParentId")].isBlank() }
@@ -651,7 +656,7 @@ class SettingsViewModel(
         for (row in parents) {
             val oldId = row[header.indexOf("Id")]
             val isSplit = row[header.indexOf("Category")] == "Split Transaction"
-            val transaction = createTransactionFromRow(row, header, isSplit = isSplit, learnedMappings = learnedMappings)
+            val transaction = createTransactionFromRow(row, header, isSplit = isSplit, learnedMappings = learnedMappings, usedColorKeys = usedColorKeys)
             val newId = transactionRepository.insertTransactionWithTags(transaction, getTagsFromRow(row, header))
             idMap[oldId] = newId
         }
@@ -663,7 +668,7 @@ class SettingsViewModel(
                 Log.w("CsvImport", "Could not find parent for split row: $row")
                 continue
             }
-            val split = createSplitFromRow(row, header, newParentId)
+            val split = createSplitFromRow(row, header, newParentId, usedColorKeys)
             splitTransactionDao.insertAll(listOf(split))
         }
     }
@@ -671,10 +676,11 @@ class SettingsViewModel(
     private suspend fun importGenericCsv(
         header: List<String>,
         rows: List<List<String>>,
-        learnedMappings: MutableMap<String, Int>
+        learnedMappings: MutableMap<String, Int>,
+        usedColorKeys: MutableList<String>
     ) {
         for (row in rows) {
-            val transaction = createTransactionFromRow(row, header, isSplit = false, learnedMappings = learnedMappings)
+            val transaction = createTransactionFromRow(row, header, isSplit = false, learnedMappings = learnedMappings, usedColorKeys = usedColorKeys)
             transactionRepository.insertTransactionWithTags(transaction, getTagsFromRow(row, header))
         }
     }
@@ -683,7 +689,8 @@ class SettingsViewModel(
         row: List<String>,
         header: List<String>,
         isSplit: Boolean,
-        learnedMappings: MutableMap<String, Int>
+        learnedMappings: MutableMap<String, Int>,
+        usedColorKeys: MutableList<String>
     ): Transaction {
         val h = header.associateWith { header.indexOf(it) }.withDefault { -1 }
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
@@ -697,7 +704,7 @@ class SettingsViewModel(
         val notes = row.getOrNull(h.getValue("Notes"))
         val isExcluded = row.getOrNull(h.getValue("IsExcluded")).toBoolean()
 
-        val category = if (isSplit) null else findOrCreateCategory(categoryName)
+        val category = if (isSplit) null else findOrCreateCategory(categoryName, usedColorKeys)
         val account = findOrCreateAccount(accountName)
 
         if (!isSplit && description.isNotBlank() && category != null) {
@@ -718,14 +725,14 @@ class SettingsViewModel(
         )
     }
 
-    private suspend fun createSplitFromRow(row: List<String>, header: List<String>, parentId: Int): SplitTransaction {
+    private suspend fun createSplitFromRow(row: List<String>, header: List<String>, parentId: Int, usedColorKeys: MutableList<String>): SplitTransaction {
         val h = header.associateWith { header.indexOf(it) }.withDefault { -1 }
 
         val amount = row[h.getValue("Amount")].toDouble()
         val categoryName = row[h.getValue("Category")]
         val notes = row.getOrNull(h.getValue("Notes"))
 
-        val category = findOrCreateCategory(categoryName)
+        val category = findOrCreateCategory(categoryName, usedColorKeys)
 
         return SplitTransaction(
             parentTransactionId = parentId,
@@ -753,15 +760,13 @@ class SettingsViewModel(
         return tagsToAssociate
     }
 
-    private suspend fun findOrCreateCategory(name: String): Category {
+    private suspend fun findOrCreateCategory(name: String, usedColorKeys: MutableList<String>): Category {
         var category = categoryRepository.allCategories.first().find { it.name.equals(name, ignoreCase = true) }
         if (category == null) {
-            // --- FIX: When creating a new category, explicitly set the iconKey to "letter_default" ---
-            val usedColorKeys = categoryRepository.allCategories.first().map { it.colorKey }
-            val colorKey = CategoryIconHelper.getNextAvailableColor(usedColorKeys)
-            val newCategory = Category(name = name, iconKey = "letter_default", colorKey = colorKey)
-            val newId = categoryRepository.insert(newCategory)
-            category = newCategory.copy(id = newId.toInt())
+            val nextColor = CategoryIconHelper.getNextAvailableColor(usedColorKeys)
+            usedColorKeys.add(nextColor)
+            val newId = categoryRepository.insert(Category(name = name, iconKey = "letter_default", colorKey = nextColor))
+            category = Category(id = newId.toInt(), name = name, iconKey = "letter_default", colorKey = nextColor)
         }
         return category
     }
