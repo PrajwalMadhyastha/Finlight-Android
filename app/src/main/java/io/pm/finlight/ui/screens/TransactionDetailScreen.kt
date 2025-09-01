@@ -1,11 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TransactionDetailScreen.kt
-// REASON: FIX - The date and time pickers now update a local state variable
-// immediately, providing instant visual feedback to the user. The final date is
-// only saved to the database after both the date and time have been selected,
-// fixing a bug where date changes appeared to be lost until the time was also confirmed.
-// FIX - The DatePickerDialog and the AlertDialog wrapping the TimePicker now have
-// an explicit container color to prevent them from being overly transparent.
+// REASON: REFACTOR - The category selection grid (CategoryPickerSheet) now uses the
+// new, reusable CategorySelectionGrid composable. This ensures a consistent, compact
+// layout and centralizes the grid's UI logic.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -25,9 +22,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -1442,7 +1436,7 @@ private fun EditTextFieldSheet(
 }
 
 @Composable
-private fun CategoryPickerSheet(
+internal fun CategoryPickerSheet(
     title: String,
     items: List<Category>,
     onItemSelected: (Category) -> Unit,
@@ -1456,60 +1450,12 @@ private fun CategoryPickerSheet(
             modifier = Modifier.padding(16.dp),
             color = MaterialTheme.colorScheme.onSurface
         )
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 100.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(items) { category ->
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            onItemSelected(category)
-                        }
-                        .padding(vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    CategoryIconDisplay(category)
-                    Text(
-                        category.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-            if (onAddNew != null) {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable(onClick = onAddNew)
-                            .padding(vertical = 12.dp)
-                            .height(80.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            Icons.Default.AddCircleOutline,
-                            contentDescription = "Create New",
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "New",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-        }
+        // --- UPDATED: Replaced the LazyVerticalGrid with the new reusable component ---
+        CategorySelectionGrid(
+            categories = items,
+            onCategorySelected = onItemSelected,
+            onAddNew = onAddNew
+        )
         Spacer(Modifier.height(16.dp))
     }
 }

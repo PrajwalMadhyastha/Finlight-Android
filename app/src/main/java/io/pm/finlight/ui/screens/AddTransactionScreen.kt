@@ -1,12 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FEATURE - Integrated the new `MerchantPredictionSheet`. Tapping the
-// description text now opens a bottom sheet that provides real-time, historical
-// suggestions for the merchant and its associated category, speeding up data
-// entry and improving consistency.
-// FIX - The DatePickerDialog and the AlertDialog wrapping the TimePicker now have
-// an explicit container color to prevent them from being overly transparent.
-// FIX - Added the missing isDark() helper function to resolve a build error.
+// REASON: FIX - Re-added the 'itemContent' parameter to the PickerSheet
+// composable. This was accidentally removed during the previous refactoring and
+// is still required by the Account picker, fixing the build error.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -52,11 +48,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -297,7 +291,7 @@ fun AddTransactionScreen(
             windowInsets = WindowInsets(0),
             containerColor = popupContainerColor
         ) {
-            when (val sheet = activeSheet) {
+            when (activeSheet) {
                 is ComposerSheet.Account -> PickerSheet(
                     title = "Select Account",
                     items = accounts,
@@ -312,9 +306,7 @@ fun AddTransactionScreen(
                     items = categories,
                     onItemSelected = { selectedCategory = it; activeSheet = null },
                     onAddNew = { showCreateCategoryDialog = true; activeSheet = null },
-                    itemContent = { category ->
-                        CategoryPickerItem(category)
-                    }
+                    itemContent = {} // Not used for categories, but required by signature
                 )
                 is ComposerSheet.Tags -> TagPickerSheet(
                     allTags = allTags,
@@ -750,88 +742,63 @@ private fun <T> PickerSheet(
             modifier = Modifier.padding(16.dp),
             color = MaterialTheme.colorScheme.onSurface
         )
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 100.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(items) { item ->
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onItemSelected(item) }
-                        .padding(vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    itemContent(item)
-                }
-            }
-            if (onAddNew != null) {
-                item {
+        if (items.isNotEmpty() && items.first() is Category) {
+            @Suppress("UNCHECKED_CAST")
+            CategorySelectionGrid(
+                categories = items as List<Category>,
+                onCategorySelected = onItemSelected as (Category) -> Unit,
+                onAddNew = onAddNew
+            )
+        } else {
+            // Fallback for other types like Account (maintains old layout)
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 100.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(items) { item ->
                     Column(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable(onClick = onAddNew)
-                            .padding(vertical = 12.dp)
-                            .height(76.dp),
+                            .clickable { onItemSelected(item) }
+                            .padding(vertical = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            Icons.Default.AddCircleOutline,
-                            contentDescription = "Create New",
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "New",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        itemContent(item)
+                    }
+                }
+                if (onAddNew != null) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(onClick = onAddNew)
+                                .padding(vertical = 12.dp)
+                                .height(76.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.AddCircleOutline,
+                                contentDescription = "Create New",
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "New",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
         }
         Spacer(Modifier.height(16.dp))
     }
-}
-
-@Composable
-private fun CategoryPickerItem(category: Category) {
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-        contentAlignment = Alignment.Center
-    ) {
-        if (category.iconKey == "letter_default") {
-            Text(
-                text = category.name.firstOrNull()?.uppercase() ?: "?",
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
-                fontSize = 22.sp
-            )
-        } else {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                contentDescription = null,
-                tint = Color.Black,
-                modifier = Modifier.padding(12.dp)
-            )
-        }
-    }
-    Text(
-        category.name,
-        style = MaterialTheme.typography.bodyMedium,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        color = MaterialTheme.colorScheme.onSurface
-    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

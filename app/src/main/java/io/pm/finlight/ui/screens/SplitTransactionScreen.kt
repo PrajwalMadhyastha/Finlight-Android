@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SplitTransactionScreen.kt
-// REASON: FEATURE (Travel Mode Splitting) - The screen is now currency-aware.
-// The SplitHeader and SplitItemRow components have been updated to display the
-// foreign currency symbol and amount if the parent transaction was made in
-// Travel Mode. A new info card has been added to show the conversion rate.
+// REASON: REFACTOR - The category selection grid (SplitCategoryPickerSheet) now
+// uses the new, reusable CategorySelectionGrid composable. This ensures a
+// consistent, compact layout and centralizes the grid's UI logic.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -13,11 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -40,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.*
+import io.pm.finlight.ui.components.CategorySelectionGrid
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
@@ -299,45 +295,11 @@ private fun SplitCategoryPickerSheet(
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp)
         )
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 100.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(categories) { category ->
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onCategorySelected(category) }
-                        .padding(vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                            contentDescription = category.name,
-                            tint = Color.Black,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    Text(
-                        category.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
+        // --- UPDATED: Replaced the LazyVerticalGrid with the new reusable component ---
+        CategorySelectionGrid(
+            categories = categories,
+            onCategorySelected = onCategorySelected
+        )
         Spacer(Modifier.height(16.dp))
     }
 }
