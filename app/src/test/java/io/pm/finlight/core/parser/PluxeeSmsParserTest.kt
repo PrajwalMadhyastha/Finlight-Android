@@ -26,7 +26,7 @@ class PluxeeSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(60.00, result?.amount)
@@ -42,7 +42,7 @@ class PluxeeSmsParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Rs. 53.00 was spent from Meal Card Wallet linked to your Pluxee Card xx1345 on 26-10-2023 13:22:39 at NIDHISH CAT. Txn no. 4451251820938. Avl bal is Rs. 1037.00. Not you? Call 18002106919. Pluxee"
         val mockSms = SmsMessage(id = 10L, sender = "VD-PLUXEE", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(53.00, result?.amount)

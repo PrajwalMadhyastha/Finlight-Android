@@ -1,12 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FIX - Corrected a compilation error in the `createAndStoreTemplate`
-// function. The logic for finding the amount string in the SMS body was using
-// an incorrect lambda with `find()`. This has been fixed by using `findAll()` to
-// get all matches and then applying a `find` operation on the resulting
-// collection, which is the correct syntax.
-// FIX - An implementation of the CategoryFinderProvider is now created and
-// passed to the SmsParser, resolving a build error caused by the new dependency.
+// REASON: REFACTOR - The `reparseTransactionFromSms` function has been enhanced.
+// After re-parsing, it now checks if the new parse result includes a categoryId
+// and, if so, updates the transaction's category in the database. This completes
+// the "Fix Parsing" workflow, ensuring both data extraction and categorization
+// are corrected.
 // =================================================================================
 package io.pm.finlight
 
@@ -599,29 +597,37 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
             val existingMappings = merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
 
-            // --- FIX: Create the required provider implementation ---
+            // --- Create provider implementations ---
             val categoryFinderProvider = object : CategoryFinderProvider {
                 override fun getCategoryIdByName(name: String): Int? {
                     return CategoryIconHelper.getCategoryIdByName(name)
                 }
             }
+            val customSmsRuleProvider = object : CustomSmsRuleProvider {
+                override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
+            }
+            val merchantRenameRuleProvider = object : MerchantRenameRuleProvider {
+                override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+            }
+            val ignoreRuleProvider = object : IgnoreRuleProvider {
+                override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
+            }
+            val merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
+                override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+            }
+            val smsParseTemplateProvider = object : SmsParseTemplateProvider {
+                override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
+            }
 
             val potentialTxn = SmsParser.parse(
                 smsMessage,
                 existingMappings,
-                object : CustomSmsRuleProvider {
-                    override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
-                },
-                object : MerchantRenameRuleProvider {
-                    override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
-                },
-                object : IgnoreRuleProvider {
-                    override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
-                },
-                object : MerchantCategoryMappingProvider {
-                    override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-                },
-                categoryFinderProvider = categoryFinderProvider // Pass the implementation
+                customSmsRuleProvider,
+                merchantRenameRuleProvider,
+                ignoreRuleProvider,
+                merchantCategoryMappingProvider,
+                categoryFinderProvider,
+                smsParseTemplateProvider // Pass the new provider
             )
 
             if (potentialTxn != null) {
@@ -630,29 +636,27 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     transactionRepository.updateDescription(transactionId, merchant)
                 }
 
+                // --- UPDATED: Also update the category if the new parse result has one ---
+                potentialTxn.categoryId?.let {
+                    if (it != transaction.categoryId) {
+                        transactionRepository.updateCategoryId(transactionId, it)
+                    }
+                }
+
                 potentialTxn.potentialAccount?.let { parsedAccount ->
                     val currentAccount = accountRepository.getAccountById(transaction.accountId).first()
-
                     if (currentAccount?.name?.equals(parsedAccount.formattedName, ignoreCase = true) == false) {
-
                         var account = db.accountDao().findByName(parsedAccount.formattedName)
-
                         if (account == null) {
                             val newAccount = Account(name = parsedAccount.formattedName, type = parsedAccount.accountType)
                             val newId = accountRepository.insert(newAccount)
                             account = db.accountDao().getAccountById(newId.toInt()).first()
                         }
-
                         if (account != null) {
                             transactionRepository.updateAccountId(transactionId, account.id)
-                        } else {
                         }
-                    } else {
-                        Log.d(logTag, "Account names are the same. No update needed.")
                     }
-                } ?: Log.d(logTag, "No potential account was parsed from the SMS.")
-            } else {
-                Log.d(logTag, "SmsParser returned null. No updates to perform.")
+                }
             }
             Log.d(logTag, "--- Reparse finished for transactionId: $transactionId ---")
         }
@@ -812,7 +816,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             return
         }
 
-        // --- FIX: Corrected lambda syntax for finding the match result ---
         val amountStr = amountRegex.findAll(smsBody).find {
             it.value.replace(",", "").toDoubleOrNull() == matchingAmountValue
         }?.value ?: return

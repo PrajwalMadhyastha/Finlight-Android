@@ -26,7 +26,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should return a result", result)
         assertEquals(11.00, result?.amount)
@@ -47,7 +47,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(388.19, result?.amount)
@@ -68,7 +68,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(349.0, result?.amount)
@@ -87,7 +87,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(11000.0, result?.amount)
@@ -108,7 +108,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(6175.0, result?.amount)
@@ -129,7 +129,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(30.0, result?.amount)
@@ -150,7 +150,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(2.0, result?.amount)
@@ -171,7 +171,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(30000.0, result?.amount)
@@ -192,7 +192,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals("income", result?.transactionType)
@@ -211,7 +211,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals("expense", result?.transactionType)
@@ -230,7 +230,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals("expense", result?.transactionType)
@@ -249,7 +249,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(199.0, result?.amount)
@@ -270,7 +270,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(180000.0, result?.amount)
@@ -291,7 +291,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(15000.0, result?.amount)
@@ -312,7 +312,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(3300.0, result?.amount)
@@ -333,7 +333,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(100000.0, result?.amount)
@@ -354,7 +354,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(100.0, result?.amount)
@@ -375,7 +375,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(50000.0, result?.amount)

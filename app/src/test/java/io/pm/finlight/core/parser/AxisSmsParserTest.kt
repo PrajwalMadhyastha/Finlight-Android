@@ -34,7 +34,7 @@ class AxisSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(95.0, result?.amount)

@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModel.kt
-// REASON: FEATURE - Added logic to support progressive loading. The ViewModel
-// now tracks the number of messages to load and includes a `loadMore` function
-// to fetch and parse the next batch of SMS messages on demand.
-// FIX - An implementation of the CategoryFinderProvider is now created and
-// passed to all calls to the SmsParser, resolving a build error caused by the new dependency.
+// REASON: REFACTOR - The ViewModel's calls to the SmsParser have been updated to
+// provide an implementation for the new SmsParseTemplateProvider interface. This
+// allows the debugger to correctly use the full, unified parsing pipeline,
+// including the heuristic learning engine.
 // =================================================================================
 package io.pm.finlight
 
@@ -35,7 +34,7 @@ data class SmsDebugUiState(
     val isLoading: Boolean = true,
     val debugResults: List<SmsDebugResult> = emptyList(),
     val selectedFilter: SmsDebugFilter = SmsDebugFilter.PROBLEMATIC,
-    val loadCount: Int = 100 // --- NEW: Track how many messages are loaded
+    val loadCount: Int = 100
 )
 
 class SmsDebugViewModel(
@@ -75,11 +74,14 @@ class SmsDebugViewModel(
     private val merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
         override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
     }
-    // --- FIX: Create the required provider implementation ---
     private val categoryFinderProvider = object : CategoryFinderProvider {
         override fun getCategoryIdByName(name: String): Int? {
             return CategoryIconHelper.getCategoryIdByName(name)
         }
+    }
+    // --- NEW: Add the new provider implementation ---
+    private val smsParseTemplateProvider = object : SmsParseTemplateProvider {
+        override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
     }
 
 
@@ -103,7 +105,8 @@ class SmsDebugViewModel(
                     merchantRenameRuleProvider = merchantRenameRuleProvider,
                     ignoreRuleProvider = ignoreRuleProvider,
                     merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                    categoryFinderProvider = categoryFinderProvider // Pass the implementation
+                    categoryFinderProvider = categoryFinderProvider,
+                    smsParseTemplateProvider = smsParseTemplateProvider // Pass the new provider
                 )
                 results.add(SmsDebugResult(sms, parseResult))
             }
@@ -116,7 +119,6 @@ class SmsDebugViewModel(
         _uiState.update { it.copy(selectedFilter = filter) }
     }
 
-    // --- NEW: Function to load the next batch of messages ---
     fun loadMore() {
         val newCount = _uiState.value.loadCount + 100
         _uiState.update { it.copy(loadCount = newCount) }
@@ -147,7 +149,8 @@ class SmsDebugViewModel(
                         merchantRenameRuleProvider = merchantRenameRuleProvider,
                         ignoreRuleProvider = ignoreRuleProvider,
                         merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                        categoryFinderProvider = categoryFinderProvider // Pass the implementation
+                        categoryFinderProvider = categoryFinderProvider,
+                        smsParseTemplateProvider = smsParseTemplateProvider // Pass the new provider
                     )
                 }
                 newResults.add(SmsDebugResult(sms, newParseResult))

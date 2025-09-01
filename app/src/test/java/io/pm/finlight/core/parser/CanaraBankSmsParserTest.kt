@@ -26,7 +26,7 @@ class CanaraBankSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(20000.0, result?.amount)
@@ -45,7 +45,7 @@ class CanaraBankSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = 1679042011072L
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(2000.00, result?.amount)
@@ -65,7 +65,7 @@ class CanaraBankSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = 1750144389022L
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(25000.00, result?.amount)
@@ -85,7 +85,7 @@ class CanaraBankSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should return a result", result)
         assertEquals(60000.00, result?.amount)
