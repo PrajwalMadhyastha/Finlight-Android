@@ -1,27 +1,23 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/DashboardScreen.kt
-// REASON: FEATURE - The "Spending Consistency" card has been updated to include
-// the new `ConsistencyCalendarLegend` component, providing users with a clear
-// explanation of the heatmap colors.
+// REASON: FEATURE - The "Last Month Summary" card is now conditionally rendered
+// at the top of the dashboard. Its visibility is controlled by the new
+// `showLastMonthSummaryCard` StateFlow from the ViewModel, ensuring it only appears
+// on the first of the month and can be dismissed by the user.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
-import android.app.Application
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.*
@@ -37,6 +33,11 @@ fun DashboardScreen(
     val yearlyConsistencyData by dashboardViewModel.yearlyConsistencyData.collectAsState()
     val budgetHealthSummary by dashboardViewModel.budgetHealthSummary.collectAsState()
 
+    // --- NEW: Collect state for the summary card ---
+    val showLastMonthSummary by dashboardViewModel.showLastMonthSummaryCard.collectAsState()
+    val lastMonthSummary by dashboardViewModel.lastMonthSummary.collectAsState()
+
+
     LaunchedEffect(Unit) {
         dashboardViewModel.refreshBudgetSummary()
     }
@@ -46,6 +47,17 @@ fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.testTag("dashboard_lazy_column")
     ) {
+        // --- NEW: Conditionally display the summary card at the top ---
+        if (showLastMonthSummary && lastMonthSummary != null) {
+            item {
+                LastMonthSummaryCard(
+                    summary = lastMonthSummary!!,
+                    navController = navController,
+                    onDismiss = { dashboardViewModel.dismissLastMonthSummaryCard() }
+                )
+            }
+        }
+
         items(visibleCards, key = { it.name }) { cardType ->
             Box(modifier = Modifier.animateItemPlacement(animationSpec = spring())) {
                 DashboardCard(
