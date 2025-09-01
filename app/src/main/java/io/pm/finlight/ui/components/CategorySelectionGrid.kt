@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/CategorySelectionGrid.kt
-// REASON: NEW FILE - This reusable composable centralizes the UI for the category
-// selection grid. It implements a more compact layout by reducing the spacing
-// between items from 16.dp to 12.dp, improving information density and reducing
-// scrolling for users with many categories.
+// REASON: UX REFINEMENT - The adaptive grid's minSize has been reduced from
+// 100.dp to 85.dp to allow more columns to fit on the screen. The spacing
+// between items has also been reduced from 12.dp to 8.dp, creating a much
+// more compact and information-dense layout.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -46,10 +46,10 @@ fun CategorySelectionGrid(
     onAddNew: (() -> Unit)? = null
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 100.dp),
+        columns = GridCells.Adaptive(minSize = 85.dp),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(categories) { category ->
             CategoryGridItem(
