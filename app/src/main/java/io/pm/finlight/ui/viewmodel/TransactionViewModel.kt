@@ -747,9 +747,15 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private suspend fun saveImageToInternalStorage(sourceUri: Uri): String? {
         return withContext(Dispatchers.IO) {
             try {
+                // --- UPDATED: Save images to a dedicated 'attachments' subdirectory ---
+                val attachmentsDir = File(context.filesDir, "attachments")
+                if (!attachmentsDir.exists()) {
+                    attachmentsDir.mkdirs()
+                }
+
                 val inputStream = context.contentResolver.openInputStream(sourceUri)
                 val fileName = "txn_attach_${System.currentTimeMillis()}.jpg"
-                val file = File(context.filesDir, fileName)
+                val file = File(attachmentsDir, fileName)
                 val outputStream = FileOutputStream(file)
                 inputStream?.use { input ->
                     outputStream.use { output ->

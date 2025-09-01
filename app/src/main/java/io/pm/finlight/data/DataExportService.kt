@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/DataExportService.kt
-// REASON: FEATURE - The CSV export logic has been completely rewritten to
-// support split transactions. It now includes "Id" and "ParentId" columns.
-// Split items are exported as separate rows linked to their parent via the
-// "ParentId", ensuring full data fidelity on re-import. The JSON backup logic
-// is also updated to include the split_transactions table.
+// REASON: FEATURE - Added createBackupSnapshot function to generate a
+// compressed (Gzip) JSON file of the database. This creates a highly compact
+// and resilient data snapshot suitable for inclusion in Android's Auto Backup
+// as a failsafe against database migration failures.
 // =================================================================================
 package io.pm.finlight.data
 
@@ -19,9 +18,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.zip.GZIPOutputStream
 import kotlin.collections.forEach
 
 object DataExportService {
@@ -31,6 +34,33 @@ object DataExportService {
             isLenient = true
             ignoreUnknownKeys = true
         }
+
+    // --- NEW: Function to create a compressed JSON snapshot for backup ---
+    suspend fun createBackupSnapshot(context: Context): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val jsonString = exportToJsonString(context) ?: return@withContext false
+
+                // Compress the JSON string using Gzip
+                val outputStream = ByteArrayOutputStream()
+                GZIPOutputStream(outputStream).use { gzip ->
+                    gzip.write(jsonString.toByteArray())
+                }
+                val compressedData = outputStream.toByteArray()
+
+                // Save the compressed data to a specific file in internal storage
+                val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+                FileOutputStream(snapshotFile).use { fos ->
+                    fos.write(compressedData)
+                }
+                true
+            } catch (e: Exception) {
+                Log.e("DataExportService", "Failed to create compressed backup snapshot", e)
+                false
+            }
+        }
+    }
+
 
     // --- UPDATED: Add "Id" and "ParentId" to the CSV template header ---
     fun getCsvTemplateString(): String {
