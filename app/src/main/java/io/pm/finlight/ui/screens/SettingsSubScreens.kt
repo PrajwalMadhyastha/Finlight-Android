@@ -3,6 +3,8 @@
 // REASON: FEATURE - Added a new "Debug SMS Parsing" SettingsActionItem to the
 // AutomationSettingsScreen. This provides the user with a clear entry point to
 // the new SMS debugger tool.
+// REFACTOR - Removed the user-configurable time picker for the monthly summary
+// notification. It is now fixed to run on the 1st of each month, simplifying the UI.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -25,8 +27,6 @@ import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.HelpOutline
-import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,7 +42,6 @@ import androidx.navigation.NavController
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.SettingsViewModel
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.MonthlyReportTimePicker
 import io.pm.finlight.ui.components.SettingsActionItem
 import io.pm.finlight.ui.components.SettingsToggleItem
 import io.pm.finlight.ui.components.WeeklyReportTimePicker
@@ -279,8 +278,6 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
     var showDailyTimePicker by remember { mutableStateOf(false) }
     val weeklyReportTime by settingsViewModel.weeklyReportTime.collectAsState()
     var showWeeklyTimePicker by remember { mutableStateOf(false) }
-    val monthlyReportTime by settingsViewModel.monthlyReportTime.collectAsState()
-    var showMonthlyTimePicker by remember { mutableStateOf(false) }
     val isAutoCaptureNotificationEnabled by settingsViewModel.autoCaptureNotificationEnabled.collectAsState()
 
     val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
@@ -353,17 +350,10 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                         SettingsToggleItem(
                             title = "Monthly Summary",
-                            subtitle = "Summary of last month's finances",
+                            subtitle = "Delivered on the 1st of each month at 9 AM",
                             icon = Icons.Default.CalendarViewMonth,
                             checked = isMonthlySummaryEnabled,
                             onCheckedChange = { settingsViewModel.setMonthlySummaryEnabled(it) },
-                        )
-                        SettingsActionItem(
-                            text = "Monthly Report Time",
-                            subtitle = "Current: Day ${monthlyReportTime.first} at ${String.format("%02d:%02d", monthlyReportTime.second, monthlyReportTime.third)}",
-                            icon = Icons.Default.Schedule,
-                            onClick = { showMonthlyTimePicker = true },
-                            enabled = isMonthlySummaryEnabled
                         )
                     }
                 }
@@ -409,19 +399,6 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
             onConfirm = { day, hour, minute ->
                 settingsViewModel.saveWeeklyReportTime(day, hour, minute)
                 showWeeklyTimePicker = false
-            }
-        )
-    }
-
-    if (showMonthlyTimePicker) {
-        MonthlyReportTimePicker(
-            initialDay = monthlyReportTime.first,
-            initialHour = monthlyReportTime.second,
-            initialMinute = monthlyReportTime.third,
-            onDismiss = { showMonthlyTimePicker = false },
-            onConfirm = { day, hour, minute ->
-                settingsViewModel.saveMonthlyReportTime(day, hour, minute)
-                showMonthlyTimePicker = false
             }
         )
     }
