@@ -2,6 +2,8 @@
 // FILE: ./app/src/test/java/io/pm/finlight/IciciSmsParserTest.kt
 // REASON: NEW FILE - Contains all unit tests specifically for parsing SMS
 // messages from ICICI Bank, refactored from the original SmsParserTest.
+// FIX - All calls to SmsParser.parse now include the required
+// categoryFinderProvider, resolving build errors.
 // =================================================================================
 package io.pm.finlight.core.parser
 
@@ -24,7 +26,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should return a result", result)
         assertEquals(8700.00, result?.amount)
@@ -45,7 +47,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should return a result", result)
         assertEquals(240.00, result?.amount)
@@ -64,7 +66,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(240.00, result?.amount)
@@ -85,7 +87,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(6000.00, result?.amount)
@@ -106,7 +108,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(1133.00, result?.amount)
@@ -122,7 +124,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Dear Customer, your ICICI Bank Account XX508 has been credited with INR 328.00 on 30-Aug-22. Info:ACH*RELIANCEINDUSTRIES*000000000002. The Available Balance is INR 42,744.71."
         val mockSms = SmsMessage(id = 1L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should return a result", result)
         assertEquals(328.00, result?.amount)
@@ -138,7 +140,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Dear Customer, your ICICI Bank Account XXX508 has been credited with Rs 50.00 on 27-Sep-22 as reversal of transaction with UPI: 227040664818."
         val mockSms = SmsMessage(id = 2L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should return a result", result)
         assertEquals(50.00, result?.amount)
@@ -154,7 +156,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Dear Customer, ICICI Bank Account XX508 is debited with INR 5,000.00 on 02-OCT-22. Info: BIL*NEFT*0005. The Available Balance is INR 9,981.28. Call 18002662 for dispute or SMS BLOCK 646 to4082711530"
         val mockSms = SmsMessage(id = 3L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should return a result", result)
         assertEquals(5000.00, result?.amount)
@@ -170,7 +172,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "INR 7,502.00 spent on ICICI Bank Card XX8011 on 31-Aug-22 at Amazon. Avl Lmt: INR 2,51,545.65. To dispute,call 18002662/SMS BLOCK 8011 to4082711530"
         val mockSms = SmsMessage(id = 4L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should return a result", result)
         assertEquals(7502.00, result?.amount)
@@ -186,7 +188,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "INR 782.00 spent using ICICI Bank Card XX1001 on 29-Jul-25 on IND*Amazon.in -. Avl Limit: INR 4,94,835.00. If not you, call 1800 2662/SMS BLOCK 1001 to4082711530."
         val mockSms = SmsMessage(id = 5L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(782.00, result?.amount)
@@ -202,7 +204,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Your account has been successfully debited with Rs 149.00 on 17-Sep-22 towards JioHotstar for Autopay AutoPay, RRN 506941017769-ICICI Bank."
         val mockSms = SmsMessage(id = 6L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(149.00, result?.amount)
@@ -216,7 +218,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "ICICI Bank Account XX508 is credited with Rs 1,800.00 on 07-Jan-25 by Account linked to mobile number XXXXX00000. IMPS Ref. no. 500713512538."
         val mockSms = SmsMessage(id = 8L, sender = "DM-ICIBNK", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(1800.00, result?.amount)
@@ -237,7 +239,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(372.0, result?.amount)
@@ -258,7 +260,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(15.0, result?.amount)
@@ -279,7 +281,7 @@ class IciciSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(20000.0, result?.amount)

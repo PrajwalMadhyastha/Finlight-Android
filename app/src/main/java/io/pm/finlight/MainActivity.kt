@@ -1,7 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX - Added specific imports for the ViewModel factories to resolve
-// the "Unresolved reference" build errors caused by package name mismatches.
+// REASON: FIX - The call to `CategoryPickerSheet` has been updated to pass the
+// `onDismiss` lambda, aligning it with the new, refactored component signature
+// and resolving the build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -456,9 +457,10 @@ fun MainAppScreen() {
             val isThemeDark = isSystemInDarkTheme()
             val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            val onDismiss = { transactionViewModel.cancelCategoryChange() }
 
             ModalBottomSheet(
-                onDismissRequest = { transactionViewModel.cancelCategoryChange() },
+                onDismissRequest = onDismiss,
                 sheetState = sheetState,
                 containerColor = popupContainerColor
             ) {
@@ -469,6 +471,8 @@ fun MainAppScreen() {
                         transactionViewModel.updateTransactionCategory(transactionForCategoryChange!!.transaction.id, newCategory.id)
                         transactionViewModel.cancelCategoryChange()
                     },
+                    // --- FIX: Pass the onDismiss lambda to the component ---
+                    onDismiss = onDismiss,
                     onAddNew = null
                 )
             }
