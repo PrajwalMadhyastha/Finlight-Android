@@ -4,9 +4,17 @@
 // parser now correctly applies the specific regex patterns from a user-created
 // rule to extract the transaction details, instead of incorrectly falling back
 // to the generic parser. This ensures custom rules work as expected.
+// FEATURE - Implemented a tiered, fallback auto-categorization system. The parser
+// now attempts to categorize transactions in the following order: (1) User's
+// learned merchant-to-category mappings, (2) Heuristic keyword matching on the
+// merchant name, and (3) Defaulting to "Uncategorized".
+// FIX - Decoupled the parser from Android-specific utilities by accepting a
+// CategoryFinderProvider. This resolves a build error where the :core module
+// was incorrectly trying to access code in the :app module.
 // =================================================================================
 package io.pm.finlight
 
+import io.pm.finlight.core.CATEGORY_KEYWORD_MAP
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 
@@ -165,9 +173,10 @@ object SmsParser {
         customSmsRuleProvider: CustomSmsRuleProvider,
         merchantRenameRuleProvider: MerchantRenameRuleProvider,
         ignoreRuleProvider: IgnoreRuleProvider,
-        merchantCategoryMappingProvider: MerchantCategoryMappingProvider
+        merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
+        categoryFinderProvider: CategoryFinderProvider // --- NEW: Add new provider
     ): PotentialTransaction? {
-        return when (val result = parseWithReason(sms, mappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)) {
+        return when (val result = parseWithReason(sms, mappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)) {
             is ParseResult.Success -> result.transaction
             is ParseResult.Ignored -> null
             is ParseResult.NotParsed -> null
@@ -183,7 +192,8 @@ object SmsParser {
         customSmsRuleProvider: CustomSmsRuleProvider,
         merchantRenameRuleProvider: MerchantRenameRuleProvider,
         ignoreRuleProvider: IgnoreRuleProvider,
-        merchantCategoryMappingProvider: MerchantCategoryMappingProvider
+        merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
+        categoryFinderProvider: CategoryFinderProvider // --- NEW: Add new provider
     ): ParseResult {
         val normalizedBody = sms.body.replace(Regex("\\s+"), " ").trim()
 
@@ -334,10 +344,18 @@ object SmsParser {
         }
 
         val originalMerchantName = merchantName
-        var learnedCategoryId: Int? = null
+        var finalCategoryId: Int? = null
+
         if (originalMerchantName != null) {
-            learnedCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(originalMerchantName)
+            // Priority 1: Check for user-learned mappings
+            finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(originalMerchantName)
+
+            // Priority 2: If no user mapping, check keyword heuristics
+            if (finalCategoryId == null) {
+                finalCategoryId = findCategoryIdByKeyword(originalMerchantName, categoryFinderProvider)
+            }
         }
+
 
         if (merchantName != null && renameRules.containsKey(merchantName.lowercase())) {
             merchantName = renameRules[merchantName.lowercase()]
@@ -357,13 +375,27 @@ object SmsParser {
             originalMessage = sms.body,
             potentialAccount = potentialAccount,
             sourceSmsHash = smsHash,
-            categoryId = learnedCategoryId,
+            categoryId = finalCategoryId,
             smsSignature = smsSignature,
             detectedCurrencyCode = detectedCurrency,
             date = sms.date
         )
         return ParseResult.Success(transaction)
     }
+
+    /**
+     * Attempts to find a category ID by matching keywords in the merchant name.
+     */
+    private fun findCategoryIdByKeyword(merchantName: String, categoryFinderProvider: CategoryFinderProvider): Int? {
+        val lowerCaseMerchant = merchantName.lowercase()
+        for ((categoryName, keywords) in CATEGORY_KEYWORD_MAP) {
+            if (keywords.any { keyword -> lowerCaseMerchant.contains(keyword) }) {
+                return categoryFinderProvider.getCategoryIdByName(categoryName)
+            }
+        }
+        return null
+    }
+
 
     fun generateSmsSignature(body: String): String {
         var signature = body.lowercase()

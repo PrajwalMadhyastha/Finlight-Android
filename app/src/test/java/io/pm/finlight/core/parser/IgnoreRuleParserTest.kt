@@ -4,6 +4,8 @@
 // more specific ignore rule ("NEFT money transfer.*has been credited to"). This
 // ensures the test accurately reflects the updated parser logic and prevents
 // regressions.
+// FIX - All calls to SmsParser.parse now include the required
+// categoryFinderProvider, resolving build errors.
 // =================================================================================
 package io.pm.finlight.core.parser
 
@@ -28,7 +30,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             date = System.currentTimeMillis()
         )
 
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
 
         assertNull("Parser should return null for a non-financial message", result)
     }
@@ -48,7 +50,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore successful payment confirmations", result)
     }
 
@@ -68,7 +70,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore has been credited to messages", result)
     }
 
@@ -87,7 +89,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore credit card payment confirmations", result)
     }
 
@@ -106,7 +108,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore Bharat Bill Pay confirmations", result)
     }
 
@@ -121,7 +123,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore messages with user-defined phrases", result)
     }
 
@@ -141,7 +143,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
 
         assertNull("Parser should ignore payments from Paytm Balance", result)
     }
@@ -162,7 +164,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
 
         assertNull("Parser should ignore declined transactions", result)
     }
@@ -183,7 +185,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
 
         assertNull("Parser should ignore AutoPay setup confirmations", result)
     }
@@ -199,7 +201,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore payee modification alerts", result)
     }
 
@@ -214,7 +216,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore recharge credited confirmations", result)
     }
 
@@ -229,7 +231,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore insurance policy conversion alerts", result)
     }
 
@@ -244,7 +246,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore failed payment notifications", result)
     }
 
@@ -259,7 +261,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore bonus points notifications", result)
     }
 
@@ -274,7 +276,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore delivery authentication code messages", result)
     }
 
@@ -289,7 +291,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore gift card voucher code messages", result)
     }
 
@@ -304,7 +306,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore scheme application messages", result)
     }
 
@@ -319,7 +321,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore promotional messages with monetary offers", result)
     }
 
@@ -335,7 +337,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore mutual fund allotment messages", result)
     }
 
@@ -350,7 +352,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore e-statement notifications", result)
     }
 
@@ -365,7 +367,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore non-financial 'order received' messages", result)
     }
 
@@ -379,7 +381,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore flight booking confirmations", result)
     }
 
@@ -393,7 +395,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore promotional wallet credit messages", result)
     }
 
@@ -407,7 +409,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore welcome kit delivery confirmations", result)
     }
 
@@ -421,7 +423,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore messages marked as suspected spam", result)
     }
 
@@ -435,7 +437,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore informational NEFT sent messages", result)
     }
 
@@ -449,7 +451,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore informational NEFT credited messages", result)
     }
 
@@ -463,7 +465,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore refund processed notifications", result)
     }
 
@@ -477,7 +479,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore promotional birthday offers", result)
     }
 
@@ -491,7 +493,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore card delivery confirmations", result)
     }
 
@@ -505,7 +507,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore promotional offer reminders", result)
     }
 
@@ -520,7 +522,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore payee modification without 'a'", result)
     }
 
@@ -534,7 +536,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull(result)
     }
 
@@ -548,7 +550,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull(result)
     }
 
@@ -562,7 +564,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore SBIL premium notices", result)
     }
 
@@ -576,7 +578,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore email added confirmations", result)
     }
 
@@ -590,7 +592,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore eSIM activation instructions", result)
     }
 
@@ -604,7 +606,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore real estate ads", result)
     }
 
@@ -618,7 +620,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore Lok Adalat notices", result)
     }
 
@@ -632,7 +634,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore FD closure messages", result)
     }
 
@@ -646,7 +648,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore Porter promotional wallet credits", result)
     }
 
@@ -660,7 +662,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore system maintenance messages", result)
     }
 
@@ -674,7 +676,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore Apollo promotional messages", result)
     }
 
@@ -688,7 +690,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore JioHealthHub informational messages", result)
     }
 
@@ -702,7 +704,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore India Post delivery messages", result)
     }
 
@@ -716,7 +718,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore cheque book delivery messages", result)
     }
 
@@ -730,7 +732,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore Practo informational messages", result)
     }
 
@@ -744,7 +746,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore JioTV promotional messages", result)
     }
 
@@ -758,7 +760,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore My11Circle promotional messages", result)
     }
 
@@ -772,7 +774,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore the receipt confirmation", result)
     }
 
@@ -786,7 +788,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore Jio activation messages", result)
     }
 
@@ -800,7 +802,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore informational IFSC messages", result)
     }
 
@@ -814,7 +816,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore SBI Life premium messages", result)
     }
 
@@ -828,7 +830,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore DICGCI claim messages", result)
     }
 
@@ -842,7 +844,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore RT-PCR sample messages", result)
     }
 
@@ -856,7 +858,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore future debit notifications", result)
     }
 
@@ -870,7 +872,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore OTP messages", result)
     }
 
@@ -881,7 +883,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Order Confirmed: Thank you for placing your order with Samsung Shop. The details of Order ID 12107357889 have been sent to your registered email id. View your order details here [http://1kx.in/XRscQ24ApYZ](http://1kx.in/XRscQ24ApYZ) . - Samsung Shop"
         val mockSms = SmsMessage(id = 1L, sender = "VM-SAMSNG", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore order confirmations with Order IDs", result)
     }
 
@@ -890,7 +892,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Insurance Policy 113992994 is credited to your e Insurance Account 1000070456279 with NSDL NIR. Login at [https://nir.ndml.in](https://nir.ndml.in) to check the policy."
         val mockSms = SmsMessage(id = 2L, sender = "VM-NSDL", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore non-monetary 'e Insurance Account' credits", result)
     }
 
@@ -899,7 +901,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "The processed visa application for GWF ref no. GWF069802268 was received at the UK Visa Application Centre on Jul 03, 2023. If a courier service was purchased from VFS, your processed visa application will be delivered to the chosen address. If not, your documents can be collected during the designated passport collection times. - VFS Global"
         val mockSms = SmsMessage(id = 3L, sender = "VM-VFSGLO", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore VFS visa application messages", result)
     }
 
@@ -908,7 +910,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Action needed for your Vincent Chase Polarized Sunglasses of order #4415082357. Exchange product or get refund of Rs at lnskt.co/E0ZgPPkY . Ignore if done"
         val mockSms = SmsMessage(id = 4L, sender = "VM-LNSKRT", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore 'refund of Rs at' when no amount is present", result)
     }
 
@@ -917,7 +919,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Hi! Tell us how you'd like to get paid for order MPMAF14822604. Choose from UPI, vouchers & more. For a quick transfer, update details NOW cashi.fi/7b461502 - Cashify"
         val mockSms = SmsMessage(id = 5L, sender = "VM-CASHFY", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore 'how you'd like to get paid' messages", result)
     }
 
@@ -926,7 +928,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "CDSL:CREDITED IN A/C *14644861 SHARES OF ITC HOTELS LIMITED TOWARDS SCHEME OF ARRANGEMENT ON 13/01/2025.CONTACT YOUR DP FOR MORE INFORMATION."
         val mockSms = SmsMessage(id = 6L, sender = "VM-CDSL", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore non-monetary 'SHARES OF' credits", result)
     }
 
@@ -937,7 +939,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "NSDL e-Gov is now Protean. Click [https://bit.ly/3BFr8M2](https://bit.ly/3BFr8M2) Units against Voluntary Contribution Rs.5,000.00 credited to PRAN XX1084 at NAV-02/09/22 -Protean"
         val mockSms = SmsMessage(id = 7L, sender = "VM-Protean", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore PRAN contribution messages", result)
     }
 
@@ -946,7 +948,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "CTMXXXXX4F registered in Cash Equity segment with broker PAYTM MONEY LTD. with Unique Client Code (UCC)BZ714284 . As per SEBI norms, NSE will start sending SMS/Email alert to you about transactions in your account. If SMS is wrongly sent to you reply by typing Y to 561614 or write to user29@nse.co.in -National Stock Exchange."
         val mockSms = SmsMessage(id = 8L, sender = "VM-NSE", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore NSE registration messages", result)
     }
 
@@ -955,7 +957,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "DEAR HDFCBANK CARDMEMBER, PAYMENT OF Rs. 1.00 RECEIVED TOWARDS YOUR CREDIT CARD ENDING 1335 THROUGH NEFT or RTGS ON 22-10-2022.YOUR AVAILABLE LIMIT IS RS. 410306.98"
         val mockSms = SmsMessage(id = 9L, sender = "AM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore credit card payment received confirmations", result)
     }
 
@@ -964,7 +966,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Complaint not responded to by your bank/NBFC/e-wallet for 30 days/not satisfied with the reply received? Approach RBI Ombudsman at [https://cms.rbi.org.in](https://cms.rbi.org.in). -RBI"
         val mockSms = SmsMessage(id = 10L, sender = "VM-RBI", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore RBI informational messages", result)
     }
 
@@ -973,7 +975,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Units against Voluntary Contribution Rs.5,000.00 credited to PRAN XX1084 at NAV-02/11/22.Contribute (D-remit) using UPI.Info-[https://bit.ly/3TiEKFJ](https://bit.ly/3TiEKFJ) -Protean"
         val mockSms = SmsMessage(id = 11L, sender = "TM-PTNNPS", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore Units against Voluntary Contribution messages", result)
     }
 
@@ -982,7 +984,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Delivered: Card- ATM / Debit Renewal for ICICI Bank Account XX9709 is delivered by DELHIVERY on 24-NOV-22 & received by PRAJWAL MADHYASTHA K P."
         val mockSms = SmsMessage(id = 12L, sender = "AD-ICICIB", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore delivered by DELHIVERY messages", result)
     }
 
@@ -991,7 +993,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Tata Play ID2299081965 has been deactivated.\nMonthly charges Rs.260\nClick bit.ly/TPRech to recharge now\n\nIf unable to recharge, give a missed call on 08061999999 from your registered mobile number and get 3 days balance. This Balance will be debited on 4th day.\n\nPlease ignore, if already recharged."
         val mockSms = SmsMessage(id = 13L, sender = "AX-TPPLAY", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore has been deactivated messages", result)
     }
 
@@ -1000,7 +1002,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Thanks! Your Simpl bill payment was a success :)\n--\nRs.305.35 has been received.\n--\nSimpl Pay"
         val mockSms = SmsMessage(id = 14L, sender = "BP-SmplPL", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore Simpl bill payment messages", result)
     }
 
@@ -1009,7 +1011,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Bharath Nursing Home has received INR 24728 towards your cashless claim no. 32978128 under policy no. 12100034230400000009 from The New India Assurance Co. Ltd with UTR no. AXISCN0275262045 and your balance sum insured is INR 375272. Team Medi Assist"
         val mockSms = SmsMessage(id = 15L, sender = "TX-MASIST", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore cashless claim messages", result)
     }
 
@@ -1019,7 +1021,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Payment Received. Your Receipt No:ES/6644609 and Bank Reference Number:2506092552735. MoRTH."
         val mockSms = SmsMessage(id = 107L, sender = "VM-MoRTH", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore MoRTH receipt notifications", result)
     }
 
@@ -1028,7 +1030,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "Request Received! Address Change request in HDFC Bank SR#CA699084A0AA Check our other Instant Online Services: [https://hdfcbk.io/HDFCBK/v/jynaQl](https://hdfcbk.io/HDFCBK/v/jynaQl)"
         val mockSms = SmsMessage(id = 108L, sender = "VM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore address change request confirmations", result)
     }
 
@@ -1043,7 +1045,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Parser should ignore UPI mandate requests", result)
     }
 
@@ -1057,7 +1059,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
 
         assertNull("Parser should ignore future-dated debit alerts", result)
     }
@@ -1067,17 +1069,17 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest()
         val smsBody = "ICICI BANK NEFT Transaction with reference number 480800675 for Rs. 5000.00 has been credited to the beneficiary account on 02-09-2022 at 08:38:47"
         val mockSms = SmsMessage(id = 7L, sender = "VK-ICIBNK", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore informational NEFT credit messages", result)
     }
 
     // --- NEW: Test for the passbook/contribution false positive ---
     @Test
     fun `test ignores passbook contribution received message`() = runBlocking {
-        setupTest() // Uses the updated default rules
+        setupTest() // Uses the updated default ignore rules
         val smsBody = "Dear XXXXXXXX1387, your passbook balance against GRAAN**************0411 is Rs. 3,85,047/-. Contribution of Rs. 2,210/- for due month Aug-25 has been received."
         val mockSms = SmsMessage(id = 9999L, sender = "XX-EPFOHO", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore passbook contribution updates", result)
     }
 
@@ -1086,7 +1088,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         setupTest() // Uses the updated default rules
         val smsBody = "CDSL:CREDITED IN A/C *14123123  SHARES OF HDFC BANK LIMITED TOWARDS BONUS ALLOTMENT ON 29/08/2025.CONTACT YOUR DP FOR MORE INFORMATION."
         val mockSms = SmsMessage(id = 9998L, sender = "XX-SOMEO", body = smsBody, date = System.currentTimeMillis())
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
         assertNull("Should ignore share bonus allotment", result)
     }
 }

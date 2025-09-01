@@ -6,6 +6,8 @@
 // most structurally similar template. If a high-confidence match is found, it
 // applies the template's known data positions to extract the merchant and amount
 // from the new SMS, enabling the app to parse previously unknown formats.
+// FIX - An implementation of the CategoryFinderProvider is now created and
+// passed to the SmsParser, resolving a build error caused by the new dependency.
 // =================================================================================
 package io.pm.finlight
 
@@ -21,6 +23,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +62,13 @@ class SmsReceiver : BroadcastReceiver() {
 
                         val smsMessage = SmsMessage(id = smsId, sender = sender, body = fullBody, date = smsId)
 
+                        // --- FIX: Create the required provider implementation ---
+                        val categoryFinderProvider = object : CategoryFinderProvider {
+                            override fun getCategoryIdByName(name: String): Int? {
+                                return CategoryIconHelper.getCategoryIdByName(name)
+                            }
+                        }
+
                         var potentialTxn = SmsParser.parse(
                             sms = smsMessage,
                             mappings = existingMappings,
@@ -73,7 +83,8 @@ class SmsReceiver : BroadcastReceiver() {
                             },
                             merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
                                 override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-                            }
+                            },
+                            categoryFinderProvider = categoryFinderProvider // Pass the implementation
                         )
 
                         // --- NEW HEURISTIC FALLBACK LOGIC ---

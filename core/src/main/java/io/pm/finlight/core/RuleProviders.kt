@@ -1,3 +1,9 @@
+// =================================================================================
+// FILE: ./core/src/main/java/io/pm/finlight/core/RuleProviders.kt
+// REASON: FEATURE - Added a new CategoryFinderProvider interface. This decouples
+// the core SmsParser from the Android-specific CategoryIconHelper, allowing it to
+// resolve a category ID from a name in a module-agnostic way.
+// =================================================================================
 package io.pm.finlight
 
 /**
@@ -27,4 +33,12 @@ interface MerchantRenameRuleProvider {
  */
 interface MerchantCategoryMappingProvider {
     suspend fun getCategoryIdForMerchant(merchantName: String): Int?
+}
+
+/**
+ * An interface that defines a contract for finding a category's ID by its name.
+ * This is used by the heuristic parser.
+ */
+interface CategoryFinderProvider {
+    fun getCategoryIdByName(name: String): Int?
 }

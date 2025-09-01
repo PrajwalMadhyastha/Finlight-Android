@@ -5,6 +5,8 @@
 // a stateful list of used colors throughout the import batch, ensuring that
 // each new category receives the next available color from the palette,
 // mirroring the behavior of manual category creation.
+// FIX - An implementation of the CategoryFinderProvider is now created and
+// passed to all calls to the SmsParser, resolving a build error caused by the new dependency.
 // =================================================================================
 package io.pm.finlight
 
@@ -216,6 +218,13 @@ class SettingsViewModel(
                     transactionRepository.getAllSmsHashes().first().toSet()
                 }
 
+                // --- FIX: Create the required provider implementation ---
+                val categoryFinderProvider = object : CategoryFinderProvider {
+                    override fun getCategoryIdByName(name: String): Int? {
+                        return CategoryIconHelper.getCategoryIdByName(name)
+                    }
+                }
+
                 val parsedList = withContext(Dispatchers.Default) {
                     rawMessages.map { sms ->
                         async {
@@ -233,7 +242,8 @@ class SettingsViewModel(
                                 },
                                 object : MerchantCategoryMappingProvider {
                                     override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-                                }
+                                },
+                                categoryFinderProvider = categoryFinderProvider // Pass the implementation
                             )
                         }
                     }.awaitAll().filterNotNull()
@@ -273,6 +283,13 @@ class SettingsViewModel(
                 val existingMappings = withContext(Dispatchers.IO) { merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName }) }
                 val existingSmsHashes = withContext(Dispatchers.IO) { transactionRepository.getAllSmsHashes().first().toSet() }
 
+                // --- FIX: Create the required provider implementation ---
+                val categoryFinderProvider = object : CategoryFinderProvider {
+                    override fun getCategoryIdByName(name: String): Int? {
+                        return CategoryIconHelper.getCategoryIdByName(name)
+                    }
+                }
+
                 val parsedList = withContext(Dispatchers.Default) {
                     rawMessages.map { sms ->
                         async {
@@ -290,7 +307,8 @@ class SettingsViewModel(
                                 },
                                 object : MerchantCategoryMappingProvider {
                                     override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-                                }
+                                },
+                                categoryFinderProvider = categoryFinderProvider // Pass the implementation
                             )
                         }
                     }.awaitAll().filterNotNull()

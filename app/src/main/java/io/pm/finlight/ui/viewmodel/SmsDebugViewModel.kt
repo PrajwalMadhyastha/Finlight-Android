@@ -3,6 +3,8 @@
 // REASON: FEATURE - Added logic to support progressive loading. The ViewModel
 // now tracks the number of messages to load and includes a `loadMore` function
 // to fetch and parse the next batch of SMS messages on demand.
+// FIX - An implementation of the CategoryFinderProvider is now created and
+// passed to all calls to the SmsParser, resolving a build error caused by the new dependency.
 // =================================================================================
 package io.pm.finlight
 
@@ -11,6 +13,7 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -72,6 +75,13 @@ class SmsDebugViewModel(
     private val merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
         override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
     }
+    // --- FIX: Create the required provider implementation ---
+    private val categoryFinderProvider = object : CategoryFinderProvider {
+        override fun getCategoryIdByName(name: String): Int? {
+            return CategoryIconHelper.getCategoryIdByName(name)
+        }
+    }
+
 
     init {
         refreshScan()
@@ -92,7 +102,8 @@ class SmsDebugViewModel(
                     customSmsRuleProvider = customSmsRuleProvider,
                     merchantRenameRuleProvider = merchantRenameRuleProvider,
                     ignoreRuleProvider = ignoreRuleProvider,
-                    merchantCategoryMappingProvider = merchantCategoryMappingProvider
+                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                    categoryFinderProvider = categoryFinderProvider // Pass the implementation
                 )
                 results.add(SmsDebugResult(sms, parseResult))
             }
@@ -135,7 +146,8 @@ class SmsDebugViewModel(
                         customSmsRuleProvider = customSmsRuleProvider,
                         merchantRenameRuleProvider = merchantRenameRuleProvider,
                         ignoreRuleProvider = ignoreRuleProvider,
-                        merchantCategoryMappingProvider = merchantCategoryMappingProvider
+                        merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                        categoryFinderProvider = categoryFinderProvider // Pass the implementation
                     )
                 }
                 newResults.add(SmsDebugResult(sms, newParseResult))

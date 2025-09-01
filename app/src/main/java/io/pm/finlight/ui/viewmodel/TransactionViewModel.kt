@@ -5,6 +5,8 @@
 // an incorrect lambda with `find()`. This has been fixed by using `findAll()` to
 // get all matches and then applying a `find` operation on the resulting
 // collection, which is the correct syntax.
+// FIX - An implementation of the CategoryFinderProvider is now created and
+// passed to the SmsParser, resolving a build error caused by the new dependency.
 // =================================================================================
 package io.pm.finlight
 
@@ -597,6 +599,13 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
             val existingMappings = merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
 
+            // --- FIX: Create the required provider implementation ---
+            val categoryFinderProvider = object : CategoryFinderProvider {
+                override fun getCategoryIdByName(name: String): Int? {
+                    return CategoryIconHelper.getCategoryIdByName(name)
+                }
+            }
+
             val potentialTxn = SmsParser.parse(
                 smsMessage,
                 existingMappings,
@@ -611,7 +620,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 },
                 object : MerchantCategoryMappingProvider {
                     override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-                }
+                },
+                categoryFinderProvider = categoryFinderProvider // Pass the implementation
             )
 
             if (potentialTxn != null) {
@@ -747,15 +757,13 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private suspend fun saveImageToInternalStorage(sourceUri: Uri): String? {
         return withContext(Dispatchers.IO) {
             try {
-                // --- UPDATED: Save images to a dedicated 'attachments' subdirectory ---
-                val attachmentsDir = File(context.filesDir, "attachments")
-                if (!attachmentsDir.exists()) {
-                    attachmentsDir.mkdirs()
-                }
-
                 val inputStream = context.contentResolver.openInputStream(sourceUri)
+                val filesDir = File(context.filesDir, "attachments")
+                if (!filesDir.exists()) {
+                    filesDir.mkdirs()
+                }
                 val fileName = "txn_attach_${System.currentTimeMillis()}.jpg"
-                val file = File(attachmentsDir, fileName)
+                val file = File(filesDir, fileName)
                 val outputStream = FileOutputStream(file)
                 inputStream?.use { input ->
                     outputStream.use { output ->

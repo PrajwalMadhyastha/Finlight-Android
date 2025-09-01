@@ -2,6 +2,8 @@
 // FILE: ./app/src/test/java/io/pm/finlight/AxisSmsParserTest.kt
 // REASON: NEW FILE - Contains all unit tests specifically for parsing SMS
 // messages from Axis Bank, refactored from the generic test file.
+// FIX - The call to SmsParser.parse now includes the required
+// categoryFinderProvider, resolving a build error.
 // =================================================================================
 package io.pm.finlight.core.parser
 
@@ -32,7 +34,7 @@ class AxisSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(95.0, result?.amount)

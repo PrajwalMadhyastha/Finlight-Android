@@ -1,3 +1,9 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/utils/CategoryIconHelper.kt
+// REASON: FEATURE - Added a new `getCategoryIdByName` function. This provides a
+// crucial utility for the new heuristic parser to look up a category's ID based
+// on its name, which is needed to complete the keyword-to-category mapping.
+// =================================================================================
 package io.pm.finlight.utils
 
 import androidx.annotation.DrawableRes
@@ -166,6 +172,11 @@ object CategoryIconHelper {
         ),
         Category(id = 26, name = "Rent", iconKey = "house", colorKey = "deep_purple_light"),
     )
+
+    // --- NEW: Function to get a category's ID by its name ---
+    fun getCategoryIdByName(name: String): Int? {
+        return predefinedCategories.find { it.name.equals(name, ignoreCase = true) }?.id
+    }
 
     fun getIcon(iconKey: String): ImageVector {
         return when (iconKey) {

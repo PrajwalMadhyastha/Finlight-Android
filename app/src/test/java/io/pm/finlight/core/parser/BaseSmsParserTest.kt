@@ -4,21 +4,13 @@
 // (Mocks, Dispatchers, Rule Providers) previously found in the monolithic
 // SmsParserTest. All new, refactored test classes will inherit from this to
 // avoid code duplication and simplify maintenance.
+// FIX - An implementation of the CategoryFinderProvider is now created and
+// passed to the SmsParser, resolving a build error caused by the new dependency.
 // =================================================================================
 package io.pm.finlight.core.parser
 
-import io.pm.finlight.CustomSmsRule
-import io.pm.finlight.CustomSmsRuleDao
-import io.pm.finlight.CustomSmsRuleProvider
-import io.pm.finlight.DEFAULT_IGNORE_PHRASES
-import io.pm.finlight.IgnoreRule
-import io.pm.finlight.IgnoreRuleDao
-import io.pm.finlight.IgnoreRuleProvider
-import io.pm.finlight.MerchantCategoryMappingDao
-import io.pm.finlight.MerchantCategoryMappingProvider
-import io.pm.finlight.MerchantRenameRule
-import io.pm.finlight.MerchantRenameRuleDao
-import io.pm.finlight.MerchantRenameRuleProvider
+import io.pm.finlight.*
+import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Before
@@ -53,6 +45,7 @@ abstract class BaseSmsParserTest {
     protected lateinit var merchantRenameRuleProvider: MerchantRenameRuleProvider
     protected lateinit var ignoreRuleProvider: IgnoreRuleProvider
     protected lateinit var merchantCategoryMappingProvider: MerchantCategoryMappingProvider
+    protected lateinit var categoryFinderProvider: CategoryFinderProvider // --- NEW: Add provider instance
 
     @Before
     fun setUp() {
@@ -70,6 +63,13 @@ abstract class BaseSmsParserTest {
         merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
             override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
                 mockMerchantCategoryMappingDao.getCategoryIdForMerchant(merchantName)
+        }
+        // --- FIX: Create the required provider implementation for tests ---
+        categoryFinderProvider = object : CategoryFinderProvider {
+            override fun getCategoryIdByName(name: String): Int? {
+                // Since this is running in the :app module's test scope, we can access the real helper
+                return CategoryIconHelper.getCategoryIdByName(name)
+            }
         }
     }
 
