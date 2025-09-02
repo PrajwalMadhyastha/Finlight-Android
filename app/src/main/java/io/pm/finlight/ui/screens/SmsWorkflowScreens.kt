@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsWorkflowScreens.kt
-// REASON: FEATURE - Unified Travel Mode. The `ApproveTransactionScreen` now
-// correctly handles the new `TravelModeSettings` structure. The UI for displaying
-// the converted amount now safely handles the nullable `conversionRate`,
-// preventing crashes and ensuring accurate information is shown to the user.
+// REASON: FIX - Resolved a smart cast error by reading the delegated State
+// property for travelSettings into a local variable before use. Corrected a
+// type mismatch by converting the Float? conversionRate to a Double before
+// performing multiplication. This also resolves the number format ambiguity.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -287,10 +287,11 @@ fun ApproveTransactionScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        if (isForeign && travelModeSettings != null) {
-                            val convertedAmount = potentialTxn.amount * (travelModeSettings.conversionRate ?: 1f)
+                        val currentTravelSettings = travelModeSettings
+                        if (isForeign && currentTravelSettings != null) {
+                            val convertedAmount = potentialTxn.amount * (currentTravelSettings.conversionRate?.toDouble() ?: 1.0)
                             Text(
-                                "≈ $homeCurrencySymbol${NumberFormat.getInstance().format(convertedAmount.toDouble())}",
+                                "≈ $homeCurrencySymbol${NumberFormat.getInstance().format(convertedAmount)}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -631,3 +632,4 @@ private fun CategoryIcon(category: Category, modifier: Modifier = Modifier) {
         }
     }
 }
+

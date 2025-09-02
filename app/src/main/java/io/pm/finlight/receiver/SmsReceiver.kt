@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/receiver/SmsReceiver.kt
-// REASON: FEATURE - Unified Travel Mode. The `saveTransaction` logic has been
-// updated to handle the new `TravelModeSettings` structure. It now correctly
-// multiplies by the conversion rate only when the trip is explicitly international
-// and the detected currency matches, and properly handles the nullable `Float?`.
+// REASON: FIX - Resolved a smart cast error by reading the delegated State
+// property for travelSettings into a local variable before use. Corrected a
+// type mismatch by converting the Float? conversionRate to a Double before
+// performing multiplication.
 // =================================================================================
 package io.pm.finlight
 
@@ -143,14 +143,15 @@ class SmsReceiver : BroadcastReceiver() {
         }
 
         if (account != null) {
-            val transactionToSave = if (isForeign && travelSettings != null) {
+            val currentTravelSettings = travelSettings
+            val transactionToSave = if (isForeign && currentTravelSettings != null) {
                 Transaction(
                     description = potentialTxn.merchantName ?: "Unknown Merchant",
                     originalDescription = potentialTxn.merchantName,
-                    amount = potentialTxn.amount * (travelSettings.conversionRate ?: 1.0f),
+                    amount = potentialTxn.amount * (currentTravelSettings.conversionRate?.toDouble() ?: 1.0),
                     originalAmount = potentialTxn.amount,
-                    currencyCode = travelSettings.currencyCode,
-                    conversionRate = travelSettings.conversionRate?.toDouble(),
+                    currencyCode = currentTravelSettings.currencyCode,
+                    conversionRate = currentTravelSettings.conversionRate?.toDouble(),
                     date = System.currentTimeMillis(),
                     accountId = account.id,
                     categoryId = potentialTxn.categoryId,
@@ -192,3 +193,4 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 }
+

@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FEATURE - Unified Travel Mode. The `AmountComposer` now correctly
-// handles the new `TravelModeSettings` structure. It checks if the trip is
-// international and safely handles the nullable `conversionRate`, displaying the
-// converted amount to the user and preventing crashes.
+// REASON: FIX - Resolved a smart cast error by reading the delegated State
+// property for travelSettings into a local variable before use. Corrected a
+// type mismatch by converting the Float? conversionRate to a Double before
+// performing multiplication. This also resolves the number format ambiguity.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -447,8 +447,9 @@ private fun AmountComposer(
     isTravelMode: Boolean,
     travelModeSettings: TravelModeSettings?
 ) {
-    val currencySymbol = if (isTravelMode && travelModeSettings?.tripType == TripType.INTERNATIONAL) {
-        CurrencyHelper.getCurrencySymbol(travelModeSettings.currencyCode)
+    val currentTravelSettings = travelModeSettings
+    val currencySymbol = if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
+        CurrencyHelper.getCurrencySymbol(currentTravelSettings.currencyCode)
     } else {
         "₹"
     }
@@ -481,12 +482,12 @@ private fun AmountComposer(
                 maxLines = 1
             )
         }
-        if (isTravelMode && travelModeSettings?.tripType == TripType.INTERNATIONAL) {
+        if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
             val enteredAmount = amount.toDoubleOrNull() ?: 0.0
-            val convertedAmount = enteredAmount * (travelModeSettings.conversionRate ?: 1f)
+            val convertedAmount = enteredAmount * (currentTravelSettings.conversionRate?.toDouble() ?: 1.0)
             val homeSymbol = "₹"
             Text(
-                text = "≈ $homeSymbol${NumberFormat.getInstance().format(convertedAmount.toDouble())}",
+                text = "≈ $homeSymbol${NumberFormat.getInstance().format(convertedAmount)}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
