@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsWorkflowScreens.kt
-// REASON: REFACTOR - The category selection grid (ApproveCategoryPickerSheet) now
-// uses the new, reusable CategorySelectionGrid composable. This ensures a
-// consistent, compact layout and centralizes the grid's UI logic.
+// REASON: FEATURE - Unified Travel Mode. The `ApproveTransactionScreen` now
+// correctly handles the new `TravelModeSettings` structure. The UI for displaying
+// the converted amount now safely handles the nullable `conversionRate`,
+// preventing crashes and ensuring accurate information is shown to the user.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -287,9 +288,9 @@ fun ApproveTransactionScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         if (isForeign && travelModeSettings != null) {
-                            val convertedAmount = potentialTxn.amount * travelModeSettings!!.conversionRate
+                            val convertedAmount = potentialTxn.amount * (travelModeSettings.conversionRate ?: 1f)
                             Text(
-                                "≈ $homeCurrencySymbol${NumberFormat.getInstance().format(convertedAmount)}",
+                                "≈ $homeCurrencySymbol${NumberFormat.getInstance().format(convertedAmount.toDouble())}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -525,7 +526,6 @@ private fun ApproveCategoryPickerSheet(
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp)
         )
-        // --- UPDATED: Replaced the LazyVerticalGrid with the new reusable component ---
         CategorySelectionGrid(
             categories = items,
             onCategorySelected = onItemSelected

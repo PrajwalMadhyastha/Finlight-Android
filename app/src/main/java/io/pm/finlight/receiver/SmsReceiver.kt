@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/receiver/SmsReceiver.kt
-// REASON: REFACTOR - The heuristic parsing logic (template matching and Levenshtein
-// distance) has been removed from the receiver and moved into the central
-// SmsParser. The receiver is now a simple delegate, ensuring all parsing,
-// including heuristics, happens within the unified pipeline.
+// REASON: FEATURE - Unified Travel Mode. The `saveTransaction` logic has been
+// updated to handle the new `TravelModeSettings` structure. It now correctly
+// multiplies by the conversion rate only when the trip is explicitly international
+// and the detected currency matches, and properly handles the nullable `Float?`.
 // =================================================================================
 package io.pm.finlight
 
@@ -57,7 +57,6 @@ class SmsReceiver : BroadcastReceiver() {
 
                         val smsMessage = SmsMessage(id = smsId, sender = sender, body = fullBody, date = smsId)
 
-                        // --- Create provider implementations ---
                         val categoryFinderProvider = object : CategoryFinderProvider {
                             override fun getCategoryIdByName(name: String): Int? {
                                 return CategoryIconHelper.getCategoryIdByName(name)
@@ -79,7 +78,6 @@ class SmsReceiver : BroadcastReceiver() {
                             override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
                         }
 
-                        // --- UPDATED: Call the single, unified parser ---
                         val potentialTxn = SmsParser.parse(
                             sms = smsMessage,
                             mappings = existingMappings,
@@ -91,15 +89,13 @@ class SmsReceiver : BroadcastReceiver() {
                             smsParseTemplateProvider = smsParseTemplateProvider
                         )
 
-                        // --- The heuristic fallback logic has been moved to the parser ---
-
                         if (potentialTxn != null && !existingSmsHashes.contains(potentialTxn.sourceSmsHash)) {
                             val travelSettings = settingsRepository.getTravelModeSettings().first()
                             val homeCurrency = settingsRepository.getHomeCurrency().first()
                             val isTravelModeActive = travelSettings?.isEnabled == true &&
                                     Date().time in travelSettings.startDate..travelSettings.endDate
 
-                            if (isTravelModeActive && travelSettings != null) {
+                            if (isTravelModeActive && travelSettings != null && travelSettings.tripType == TripType.INTERNATIONAL) {
                                 when (potentialTxn.detectedCurrencyCode) {
                                     travelSettings.currencyCode -> {
                                         saveTransaction(context, potentialTxn, isForeign = true, travelSettings = travelSettings)
@@ -151,10 +147,10 @@ class SmsReceiver : BroadcastReceiver() {
                 Transaction(
                     description = potentialTxn.merchantName ?: "Unknown Merchant",
                     originalDescription = potentialTxn.merchantName,
-                    amount = potentialTxn.amount * travelSettings.conversionRate,
+                    amount = potentialTxn.amount * (travelSettings.conversionRate ?: 1.0f),
                     originalAmount = potentialTxn.amount,
                     currencyCode = travelSettings.currencyCode,
-                    conversionRate = travelSettings.conversionRate.toDouble(),
+                    conversionRate = travelSettings.conversionRate?.toDouble(),
                     date = System.currentTimeMillis(),
                     accountId = account.id,
                     categoryId = potentialTxn.categoryId,
