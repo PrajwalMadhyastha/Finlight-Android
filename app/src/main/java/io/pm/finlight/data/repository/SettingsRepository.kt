@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
-// REASON: UX REFINEMENT - The default value for the auto-backup notification
-// has been changed from `true` to `false`. Backups will now be silent by
-// default, and users can opt-in to receive completion notifications.
+// REASON: FEATURE - Unified Travel Mode. The `TravelModeSettings` data class has
+// been updated to support both domestic and international trips. It now includes a
+// mandatory `tripName` (used for auto-tagging) and a `tripType` enum. The currency
+// and conversion rate fields are now nullable to accommodate domestic travel.
 // =================================================================================
 package io.pm.finlight
 
@@ -20,12 +21,22 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+/**
+ * An enum to distinguish between domestic and international travel modes.
+ */
+enum class TripType {
+    DOMESTIC,
+    INTERNATIONAL
+}
+
 data class TravelModeSettings(
     val isEnabled: Boolean,
-    val currencyCode: String,
-    val conversionRate: Float,
+    val tripName: String,
+    val tripType: TripType,
     val startDate: Long,
-    val endDate: Long
+    val endDate: Long,
+    val currencyCode: String?,
+    val conversionRate: Float?
 )
 
 class SettingsRepository(context: Context) {
@@ -75,7 +86,6 @@ class SettingsRepository(context: Context) {
         }
     }
 
-    // --- NEW: Function to check if the summary card has been dismissed for the current month ---
     fun hasLastMonthSummaryBeenDismissed(): Boolean {
         val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
         return prefs.getBoolean("$KEY_LAST_MONTH_SUMMARY_DISMISSED$monthKey", false)
@@ -102,7 +112,6 @@ class SettingsRepository(context: Context) {
         return prefs.getBoolean(KEY_AUTOCAPTURE_NOTIFICATION_ENABLED, true)
     }
 
-
     fun saveAutoBackupEnabled(isEnabled: Boolean) {
         prefs.edit { putBoolean(KEY_AUTO_BACKUP_ENABLED, isEnabled) }
     }
@@ -128,11 +137,11 @@ class SettingsRepository(context: Context) {
         return callbackFlow {
             val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
                 if (key == KEY_AUTO_BACKUP_NOTIFICATION_ENABLED) {
-                    trySend(sp.getBoolean(key, false)) // --- UPDATED: Default to false ---
+                    trySend(sp.getBoolean(key, false))
                 }
             }
             prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, false)) // --- UPDATED: Default to false ---
+            trySend(prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, false))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
@@ -156,7 +165,6 @@ class SettingsRepository(context: Context) {
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
-
 
     fun saveHomeCurrency(currencyCode: String) {
         prefs.edit {
@@ -327,7 +335,6 @@ class SettingsRepository(context: Context) {
         }
     }
 
-
     fun saveBackupEnabled(isEnabled: Boolean) {
         prefs.edit {
             putBoolean(KEY_BACKUP_ENABLED, isEnabled)
@@ -434,11 +441,13 @@ class SettingsRepository(context: Context) {
             putBoolean(KEY_APP_LOCK_ENABLED, isEnabled)
         }
     }
+
     fun saveDailyReportEnabled(isEnabled: Boolean) {
         prefs.edit {
             putBoolean(KEY_DAILY_REPORT_ENABLED, isEnabled)
         }
     }
+
     fun getDailyReportEnabled(): Flow<Boolean> {
         return callbackFlow {
             val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -464,6 +473,7 @@ class SettingsRepository(context: Context) {
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
+
     fun isAppLockEnabledBlocking(): Boolean {
         return prefs.getBoolean(KEY_APP_LOCK_ENABLED, false)
     }
@@ -510,10 +520,13 @@ class SettingsRepository(context: Context) {
             putBoolean(KEY_WEEKLY_SUMMARY_ENABLED, isEnabled)
         }
     }
+
     fun getWeeklySummaryEnabled(): Flow<Boolean> {
         return callbackFlow {
             val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                if (key == KEY_WEEKLY_SUMMARY_ENABLED) { trySend(prefs.getBoolean(key, true)) }
+                if (key == KEY_WEEKLY_SUMMARY_ENABLED) {
+                    trySend(prefs.getBoolean(key, true))
+                }
             }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_WEEKLY_SUMMARY_ENABLED, true))
@@ -530,7 +543,9 @@ class SettingsRepository(context: Context) {
     fun getMonthlySummaryEnabled(): Flow<Boolean> {
         return callbackFlow {
             val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                if (key == KEY_MONTHLY_SUMMARY_ENABLED) { trySend(prefs.getBoolean(key, true)) }
+                if (key == KEY_MONTHLY_SUMMARY_ENABLED) {
+                    trySend(prefs.getBoolean(key, true))
+                }
             }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_MONTHLY_SUMMARY_ENABLED, true))
@@ -543,10 +558,13 @@ class SettingsRepository(context: Context) {
             putBoolean(KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED, isEnabled)
         }
     }
+
     fun getUnknownTransactionPopupEnabled(): Flow<Boolean> {
         return callbackFlow {
             val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                if (key == KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED) { trySend(prefs.getBoolean(key, true)) }
+                if (key == KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED) {
+                    trySend(prefs.getBoolean(key, true))
+                }
             }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED, true))
