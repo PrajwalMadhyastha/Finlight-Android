@@ -1,10 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: REFACTOR - The `reparseTransactionFromSms` function has been enhanced.
-// After re-parsing, it now checks if the new parse result includes a categoryId
-// and, if so, updates the transaction's category in the database. This completes
-// the "Fix Parsing" workflow, ensuring both data extraction and categorization
-// are corrected.
+// REASON: FEATURE - Unified Travel Mode. Integrated the auto-tagging logic into
+// all transaction creation pathways (`addTransaction`, `approveSmsTransaction`,
+// `autoSaveSmsTransaction`). Also implemented the edge case logic in
+// `updateTransactionDate` to automatically add or remove the trip tag if a
+// transaction's date is moved into or out of an active trip period.
 // =================================================================================
 package io.pm.finlight
 
@@ -459,8 +459,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             }
     }
 
-    private fun loadVisitCount(originalDescription: String?, currentDescription: String) { // Renamed for clarity
-        val descriptionToQuery = currentDescription // Always use the current description
+    private fun loadVisitCount(originalDescription: String?, currentDescription: String) {
+        val descriptionToQuery = currentDescription
         viewModelScope.launch {
             transactionRepository.getTransactionCountForMerchant(descriptionToQuery).collect { count ->
                 _visitCount.value = count
@@ -495,16 +495,17 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
 
         val travelSettings = travelModeSettings.value
-        val isTravelMode = travelSettings?.isEnabled == true &&
+        val isInternationalTravel = travelSettings?.isEnabled == true &&
+                travelSettings.tripType == TripType.INTERNATIONAL &&
                 date >= travelSettings.startDate &&
                 date <= travelSettings.endDate
 
-        val transactionToSave = if (isTravelMode) {
+        val transactionToSave = if (isInternationalTravel) {
             Transaction(
                 description = description,
                 originalDescription = description,
                 categoryId = categoryId,
-                amount = enteredAmount * travelSettings!!.conversionRate,
+                amount = enteredAmount * (travelSettings!!.conversionRate ?: 1f),
                 date = date,
                 accountId = accountId,
                 notes = notes,
@@ -515,7 +516,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 source = "Added Manually",
                 originalAmount = enteredAmount,
                 currencyCode = travelSettings.currencyCode,
-                conversionRate = travelSettings.conversionRate.toDouble()
+                conversionRate = travelSettings.conversionRate?.toDouble()
             )
         } else {
             Transaction(
@@ -534,6 +535,12 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
 
+        val finalTags = _selectedTags.value.toMutableSet()
+        if (travelSettings?.isEnabled == true && date >= travelSettings.startDate && date <= travelSettings.endDate) {
+            val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
+            finalTags.add(tripTag)
+        }
+
         return try {
             withContext(Dispatchers.IO) {
                 val savedImagePaths = imageUris.mapNotNull { uri ->
@@ -541,7 +548,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 }
                 transactionRepository.insertTransactionWithTagsAndImages(
                     transactionToSave,
-                    _selectedTags.value,
+                    finalTags,
                     savedImagePaths
                 )
             }
@@ -556,7 +563,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     fun clearAddTransactionState() {
         _selectedTags.value = emptySet()
     }
-
 
     private fun loadOriginalSms(sourceSmsId: Long?) {
         if (sourceSmsId == null) {
@@ -597,7 +603,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
             val existingMappings = merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
 
-            // --- Create provider implementations ---
             val categoryFinderProvider = object : CategoryFinderProvider {
                 override fun getCategoryIdByName(name: String): Int? {
                     return CategoryIconHelper.getCategoryIdByName(name)
@@ -627,7 +632,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 ignoreRuleProvider,
                 merchantCategoryMappingProvider,
                 categoryFinderProvider,
-                smsParseTemplateProvider // Pass the new provider
+                smsParseTemplateProvider
             )
 
             if (potentialTxn != null) {
@@ -636,7 +641,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     transactionRepository.updateDescription(transactionId, merchant)
                 }
 
-                // --- UPDATED: Also update the category if the new parse result has one ---
                 potentialTxn.categoryId?.let {
                     if (it != transaction.categoryId) {
                         transactionRepository.updateCategoryId(transactionId, it)
@@ -876,7 +880,31 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun updateTransactionDate(id: Int, date: Long) = viewModelScope.launch {
+        val oldDate = initialTransactionStateForRetroUpdate?.date
+        val travelSettings = travelModeSettings.value
+
         transactionRepository.updateDate(id, date)
+
+        if (travelSettings?.isEnabled == true && oldDate != null) {
+            val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
+            val currentTags = transactionRepository.getTagsForTransaction(id).first().toMutableSet()
+
+            val oldDateInTrip = oldDate >= travelSettings.startDate && oldDate <= travelSettings.endDate
+            val newDateInTrip = date >= travelSettings.startDate && date <= travelSettings.endDate
+
+            var tagsChanged = false
+            if (newDateInTrip && !oldDateInTrip) {
+                currentTags.add(tripTag)
+                tagsChanged = true
+            } else if (!newDateInTrip && oldDateInTrip) {
+                currentTags.remove(tripTag)
+                tagsChanged = true
+            }
+
+            if (tagsChanged) {
+                transactionRepository.updateTagsForTransaction(id, currentTags)
+            }
+        }
     }
 
     fun updateTransactionExclusion(id: Int, isExcluded: Boolean) = viewModelScope.launch {
@@ -948,8 +976,14 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
                 if (account == null) return@withContext false
 
+                val finalTags = tags.toMutableSet()
+                val travelSettings = settingsRepository.getTravelModeSettings().first()
+                if (travelSettings?.isEnabled == true && potentialTxn.date >= travelSettings.startDate && potentialTxn.date <= travelSettings.endDate) {
+                    val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
+                    finalTags.add(tripTag)
+                }
+
                 val transactionToSave = if (isForeign) {
-                    val travelSettings = settingsRepository.getTravelModeSettings().first()
                     if (travelSettings == null) {
                         Log.e(TAG, "Attempted to save foreign SMS transaction, but Travel Mode is not configured.")
                         return@withContext false
@@ -958,7 +992,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                         description = description,
                         originalDescription = potentialTxn.merchantName,
                         categoryId = categoryId,
-                        amount = potentialTxn.amount * travelSettings.conversionRate,
+                        amount = potentialTxn.amount * (travelSettings.conversionRate ?: 1f),
                         date = potentialTxn.date,
                         accountId = account.id,
                         notes = notes,
@@ -968,7 +1002,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                         source = "Imported",
                         originalAmount = potentialTxn.amount,
                         currencyCode = travelSettings.currencyCode,
-                        conversionRate = travelSettings.conversionRate.toDouble()
+                        conversionRate = travelSettings.conversionRate?.toDouble()
                     )
                 } else {
                     Transaction(
@@ -986,7 +1020,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     )
                 }
 
-                transactionRepository.insertTransactionWithTags(transactionToSave, tags)
+                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
 
                 val merchantName = potentialTxn.merchantName
                 if (categoryId != null && merchantName != null) {
@@ -1023,6 +1057,13 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     return@withContext false
                 }
 
+                val finalTags = mutableSetOf<Tag>()
+                val travelSettings = settingsRepository.getTravelModeSettings().first()
+                if (travelSettings?.isEnabled == true && potentialTxn.date >= travelSettings.startDate && potentialTxn.date <= travelSettings.endDate) {
+                    val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
+                    finalTags.add(tripTag)
+                }
+
                 val transactionToSave = Transaction(
                     description = potentialTxn.merchantName ?: "Unknown Merchant",
                     originalDescription = potentialTxn.merchantName,
@@ -1037,7 +1078,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     source = "Auto-Captured"
                 )
 
-                transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
+                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
                 true
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to auto-save SMS transaction", e)
@@ -1085,9 +1126,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         _retroUpdateSheetState.update { currentState ->
             currentState?.let {
                 if (it.selectedIds.size == it.similarTransactions.size) {
-                    it.copy(selectedIds = emptySet()) // Deselect all
+                    it.copy(selectedIds = emptySet())
                 } else {
-                    it.copy(selectedIds = it.similarTransactions.map { t -> t.id }.toSet()) // Select all
+                    it.copy(selectedIds = it.similarTransactions.map { t -> t.id }.toSet())
                 }
             }
         }
