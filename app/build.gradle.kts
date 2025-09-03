@@ -1,7 +1,8 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: REFACTOR - Added a dependency on the new 'core' module to make the
-// shared parsing logic available to the main application.
+// REASON: FIX - Updated the targetSdk from 34 to 35 to meet the latest
+// Google Play Console requirements for app submissions, ensuring the app is
+// built on the latest APIs for security and performance.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -78,7 +79,7 @@ android {
     defaultConfig {
         applicationId = "io.pm.finlight"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 35 // --- UPDATED: Target SDK from 34 to 35 ---
         versionCode = generateVersionCode()
         versionName = "${versionProperties["VERSION_MAJOR"]}.${versionProperties["VERSION_MINOR"]}.${versionProperties["VERSION_PATCH"]}"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
