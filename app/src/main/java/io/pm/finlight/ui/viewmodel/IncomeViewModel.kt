@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/IncomeViewModel.kt
-// REASON: FIX - The logic for the `monthlySummaries` flow has been updated.
-// Instead of being limited to the current year, it now fetches the date of the
-// first transaction and dynamically generates the month scroller from that
-// historical point up to the present day, allowing users to view all their data.
+// REASON: REFACTOR - The instantiation of AccountRepository has been updated to
+// pass the full AppDatabase instance instead of just the DAO. This is required
+// to support the new transactional account merging logic.
 // =================================================================================
 package io.pm.finlight
 
@@ -60,7 +59,7 @@ class IncomeViewModel(application: Application) : AndroidViewModel(application) 
     init {
         val db = AppDatabase.getInstance(application)
         transactionRepository = TransactionRepository(db.transactionDao())
-        accountRepository = AccountRepository(db.accountDao())
+        accountRepository = AccountRepository(db) // --- UPDATED ---
         categoryRepository = CategoryRepository(db.categoryDao())
 
         allAccounts = accountRepository.allAccounts.stateIn(
@@ -70,7 +69,6 @@ class IncomeViewModel(application: Application) : AndroidViewModel(application) 
         )
         allCategories = categoryRepository.allCategories
 
-        // --- UPDATED: Dynamic month scroller logic ---
         monthlySummaries = transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
             val startDate = firstTransactionDate ?: System.currentTimeMillis()
 
@@ -90,7 +88,6 @@ class IncomeViewModel(application: Application) : AndroidViewModel(application) 
                     while (startCal.before(endCal) || (startCal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && startCal.get(Calendar.MONTH) == endCal.get(Calendar.MONTH))) {
                         val key = startCal.get(Calendar.YEAR) * 100 + startCal.get(Calendar.MONTH)
                         val income = monthMap[key] ?: 0.0
-                        // Note: Using 'totalSpent' field in MonthlySummaryItem for consistency, but it holds income here.
                         monthList.add(MonthlySummaryItem(calendar = startCal.clone() as Calendar, totalSpent = income))
                         startCal.add(Calendar.MONTH, 1)
                     }

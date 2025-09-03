@@ -1,10 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/DashboardViewModel.kt
-// REASON: FEATURE - The ViewModel now manages the state for the new "Last Month
-// Summary" card. It checks if the card should be displayed, fetches the
-// previous month's financial summary using the centralized DateUtils, and
-// exposes the data and visibility status to the UI. It also handles the
-// dismissal logic via the SettingsRepository.
+// REASON: REFACTOR - The instantiation of AccountRepository has been updated to
+// pass the full AppDatabase instance instead of just the DAO. This is required
+// to support the new transactional account merging logic.
 // =================================================================================
 package io.pm.finlight
 
@@ -56,7 +54,6 @@ class DashboardViewModel(
     val budgetHealthSummary: StateFlow<String>
     private val _summaryRefreshTrigger = MutableStateFlow(System.currentTimeMillis())
 
-    // --- NEW: State for the Last Month Summary card ---
     private val _lastMonthSummary = MutableStateFlow<LastMonthSummary?>(null)
     val lastMonthSummary: StateFlow<LastMonthSummary?> = _lastMonthSummary.asStateFlow()
 
@@ -102,7 +99,6 @@ class DashboardViewModel(
         val calendar = Calendar.getInstance()
         monthYear = SimpleDateFormat("MMMM", Locale.getDefault()).format(calendar.time)
 
-        // --- NEW: Logic to check and fetch data for the summary card ---
         checkForLastMonthSummary()
 
         val monthStart =
@@ -248,22 +244,18 @@ class DashboardViewModel(
                     initialValue = emptyList(),
                 )
 
-        // --- UPDATED: Make consistency data reactive to budget changes ---
         val today = Calendar.getInstance()
         val year = today.get(Calendar.YEAR)
         val currentMonthIndex = today.get(Calendar.MONTH)
 
-        // Create a list of flows, one for each month's budget up to the current month.
         val monthlyBudgetFlows = (0..currentMonthIndex).map { month ->
             settingsRepository.getOverallBudgetForMonth(year, month + 1)
         }
 
-        // Combine all monthly budget flows into a single flow that emits a list of budgets.
         val totalBudgetSoFarFlow = combine(monthlyBudgetFlows) { budgets ->
             budgets.sum()
         }
 
-        // Combine the total budget flow with the transaction data flow.
         yearlyConsistencyData = combine(
             totalBudgetSoFarFlow,
             transactionRepository.getDailySpendingForDateRange(
@@ -272,7 +264,6 @@ class DashboardViewModel(
             ),
             transactionRepository.getFirstTransactionDate()
         ) { totalBudget, dailyTotals, firstTransactionDate ->
-            // Pass the reactive budget to the generation function.
             generateYearlyConsistencyData(totalBudget, dailyTotals, firstTransactionDate)
         }.flowOn(Dispatchers.Default)
             .stateIn(
@@ -282,7 +273,6 @@ class DashboardViewModel(
             )
     }
 
-    // --- NEW: Function to dismiss the summary card ---
     fun dismissLastMonthSummaryCard() {
         settingsRepository.setLastMonthSummaryDismissed()
         _showLastMonthSummaryCard.value = false
@@ -311,7 +301,6 @@ class DashboardViewModel(
         _summaryRefreshTrigger.value = System.currentTimeMillis()
     }
 
-    // --- UPDATED: Function now accepts budget as a parameter ---
     private suspend fun generateYearlyConsistencyData(
         totalBudgetSoFar: Float,
         dailyTotals: List<DailyTotal>,

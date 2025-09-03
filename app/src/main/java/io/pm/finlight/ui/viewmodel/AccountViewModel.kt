@@ -1,10 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/AccountViewModel.kt
-// REASON: UX REFINEMENT - The `addAccount` function now checks if an account
-// with the same name already exists (case-insensitively) before attempting to
-// insert. If a duplicate is found, it sends a message to the UI via the new
-// `uiEvent` channel, providing clear feedback to the user instead of failing
-// silently.
+// REASON: FEATURE - The ViewModel has been completely updated to manage the new
+// account merging feature. It now includes StateFlows for selection mode status
+// and the set of selected account IDs. New functions have been added to handle
+// entering/exiting selection mode, toggling selections, and calling the
+// repository's atomic merge function.
 // =================================================================================
 package io.pm.finlight
 
@@ -12,32 +12,77 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.AccountDao
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class AccountViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: AccountRepository
     private val transactionRepository: TransactionRepository
-    private val accountDao: AccountDao // Expose DAO for direct checks
+    private val db = AppDatabase.getInstance(application)
 
-    // --- NEW: Channel for sending one-time UI events like snackbars ---
     private val _uiEvent = Channel<String>()
     val uiEvent = _uiEvent.receiveAsFlow()
 
     val accountsWithBalance: Flow<List<AccountWithBalance>>
 
-    init {
-        val db = AppDatabase.getInstance(application)
-        accountDao = db.accountDao() // Initialize DAO
-        repository = AccountRepository(accountDao)
-        transactionRepository = TransactionRepository(db.transactionDao())
+    // --- NEW: State for selection mode ---
+    private val _isSelectionModeActive = MutableStateFlow(false)
+    val isSelectionModeActive = _isSelectionModeActive.asStateFlow()
 
+    private val _selectedAccountIds = MutableStateFlow<Set<Int>>(emptySet())
+    val selectedAccountIds = _selectedAccountIds.asStateFlow()
+
+
+    init {
+        repository = AccountRepository(db)
+        transactionRepository = TransactionRepository(db.transactionDao())
         accountsWithBalance = repository.accountsWithBalance
+    }
+
+    // --- NEW: Functions to manage selection ---
+    fun enterSelectionMode(accountId: Int) {
+        _isSelectionModeActive.value = true
+        _selectedAccountIds.value = setOf(accountId)
+    }
+
+    fun toggleAccountSelection(accountId: Int) {
+        _selectedAccountIds.update { currentSelection ->
+            val newSelection = if (accountId in currentSelection) {
+                currentSelection - accountId
+            } else {
+                currentSelection + accountId
+            }
+
+            if (newSelection.isEmpty()) {
+                _isSelectionModeActive.value = false
+            }
+            newSelection
+        }
+    }
+
+    fun clearSelectionMode() {
+        _isSelectionModeActive.value = false
+        _selectedAccountIds.value = emptySet()
+    }
+
+    // --- NEW: Function to execute the merge ---
+    fun mergeSelectedAccounts(destinationAccountId: Int) {
+        viewModelScope.launch {
+            val sourceAccountIds = _selectedAccountIds.value.filter { it != destinationAccountId }
+            if (sourceAccountIds.isEmpty() || sourceAccountIds.size + 1 != _selectedAccountIds.value.size) {
+                _uiEvent.send("Error: Invalid selection for merge.")
+                return@launch
+            }
+            try {
+                repository.mergeAccounts(destinationAccountId, sourceAccountIds)
+                _uiEvent.send("Accounts merged successfully.")
+            } catch (e: Exception) {
+                _uiEvent.send("Error merging accounts: ${e.message}")
+            } finally {
+                clearSelectionMode()
+            }
+        }
     }
 
     fun getAccountById(accountId: Int): Flow<Account?> = repository.getAccountById(accountId)
@@ -52,14 +97,12 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         return transactionRepository.getTransactionsForAccountDetails(accountId)
     }
 
-    // --- UPDATED: Add pre-check and user feedback for duplicates ---
     fun addAccount(
         name: String,
         type: String,
     ) = viewModelScope.launch {
         if (name.isNotBlank() && type.isNotBlank()) {
-            // Check if an account with this name already exists
-            val existingAccount = accountDao.findByName(name)
+            val existingAccount = db.accountDao().findByName(name)
             if (existingAccount != null) {
                 _uiEvent.send("An account named '$name' already exists.")
             } else {
@@ -83,7 +126,6 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
             }
         }
     }
-
 
     fun deleteAccount(account: Account) =
         viewModelScope.launch {

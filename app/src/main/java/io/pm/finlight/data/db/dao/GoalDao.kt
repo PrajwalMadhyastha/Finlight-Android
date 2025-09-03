@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/GoalDao.kt
-// REASON: NEW FILE - Defines the DAO for the Goal entity, providing all
-// necessary CRUD operations and a query to fetch goals with their associated
-// account names for display in the UI.
+// REASON: FEATURE - Added the `reassignGoals` function. This is a critical
+// part of the atomic account merge operation, ensuring that savings goals linked
+// to a source account are safely moved to the destination account before deletion.
 // =================================================================================
 package io.pm.finlight
 
@@ -52,4 +52,8 @@ interface GoalDao {
 
     @Query("SELECT * FROM goals WHERE accountId = :accountId")
     fun getGoalsForAccount(accountId: Int): Flow<List<Goal>>
+
+    // --- NEW: Reassigns goals from source accounts to a destination account ---
+    @Query("UPDATE goals SET accountId = :destinationAccountId WHERE accountId IN (:sourceAccountIds)")
+    suspend fun reassignGoals(sourceAccountIds: List<Int>, destinationAccountId: Int)
 }

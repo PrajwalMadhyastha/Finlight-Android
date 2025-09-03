@@ -1,10 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FEATURE - Unified Travel Mode. Integrated the auto-tagging logic into
-// all transaction creation pathways (`addTransaction`, `approveSmsTransaction`,
-// `autoSaveSmsTransaction`). Also implemented the edge case logic in
-// `updateTransactionDate` to automatically add or remove the trip tag if a
-// transaction's date is moved into or out of an active trip period.
+// REASON: REFACTOR - The instantiation of AccountRepository has been updated to
+// pass the full AppDatabase instance instead of just the DAO. This is required
+// to support the new transactional account merging logic.
 // =================================================================================
 package io.pm.finlight
 
@@ -145,7 +143,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     init {
         transactionRepository = TransactionRepository(db.transactionDao())
-        accountRepository = AccountRepository(db.accountDao())
+        accountRepository = AccountRepository(db) // --- UPDATED ---
         categoryRepository = CategoryRepository(db.categoryDao())
         tagRepository = TagRepository(db.tagDao(), db.transactionDao())
         settingsRepository = SettingsRepository(application)
