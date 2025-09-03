@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: UX REFINEMENT - The action to initiate merging on the "Manage Accounts"
-// screen has been changed from an IconButton to a TextButton. It now displays
-// the text "Merge" next to the icon, making the feature's entry point more
-// explicit and discoverable for the user.
+// REASON: UX REFINEMENT - The "Merge" button on the "Manage Accounts" screen is
+// now hidden when account selection mode is active. This prevents user confusion
+// by removing the action to initiate merging when the merging process is already
+// underway.
 // =================================================================================
 package io.pm.finlight
 
@@ -39,7 +39,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -241,7 +240,8 @@ fun MainAppScreen() {
 
     val transactionForCategoryChange by transactionViewModel.transactionForCategoryChange.collectAsState()
 
-    val isSelectionMode by transactionViewModel.isSelectionModeActive.collectAsState()
+    val isTransactionSelectionMode by transactionViewModel.isSelectionModeActive.collectAsState()
+    val isAccountSelectionMode by accountViewModel.isSelectionModeActive.collectAsState()
     val selectedIdsCount by transactionViewModel.selectedTransactionIds.map { it.size }.collectAsState(initial = 0)
     val showDeleteConfirmation by transactionViewModel.showDeleteConfirmation.collectAsState()
 
@@ -291,7 +291,7 @@ fun MainAppScreen() {
         "recurring_transactions",
         "goals_screen"
     )
-    val showFab = baseCurrentRoute in fabRoutes
+    val showFab = baseCurrentRoute in fabRoutes && !isAccountSelectionMode
 
     val activity = LocalContext.current as AppCompatActivity
 
@@ -315,7 +315,7 @@ fun MainAppScreen() {
 
         Scaffold(
             topBar = {
-                if (isSelectionMode && baseCurrentRoute == BottomNavItem.Transactions.route) {
+                if (isTransactionSelectionMode && baseCurrentRoute == BottomNavItem.Transactions.route) {
                     TopAppBar(
                         title = { Text("$selectedIdsCount Selected") },
                         navigationIcon = {
@@ -394,10 +394,12 @@ fun MainAppScreen() {
                                     }
                                 }
                                 "account_list" -> {
-                                    TextButton(onClick = { accountViewModel.enterSelectionMode(null) }) {
-                                        Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge Accounts")
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("Merge Accounts")
+                                    if (!isAccountSelectionMode) {
+                                        TextButton(onClick = { accountViewModel.enterSelectionMode(null) }) {
+                                            Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge Accounts")
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("Merge Accounts")
+                                        }
                                     }
                                 }
                             }
