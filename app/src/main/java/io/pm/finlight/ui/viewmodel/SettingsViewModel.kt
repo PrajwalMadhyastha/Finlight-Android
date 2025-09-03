@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: REFACTOR - The ViewModel's calls to the SmsParser have been updated to
-// provide an implementation for the new SmsParseTemplateProvider interface. This
-// ensures the bulk inbox scanning feature can now leverage the full power of
-// the unified parsing pipeline, including the heuristic learning engine.
+// REASON: REFACTOR - The instantiation of AccountRepository has been updated to
+// pass the full AppDatabase instance instead of just the DAO. This is required
+// to support the new transactional account merging logic and resolves the build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -50,7 +49,7 @@ class SettingsViewModel(
     private val transactionRepository = TransactionRepository(db.transactionDao())
     private val merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
     private val context = application
-    private val accountRepository = AccountRepository(db.accountDao())
+    private val accountRepository = AccountRepository(db) // --- UPDATED ---
     private val categoryRepository = CategoryRepository(db.categoryDao())
     private val tagDao = db.tagDao()
     private val splitTransactionDao = db.splitTransactionDao()
@@ -248,7 +247,7 @@ class SettingsViewModel(
                                 ignoreRuleProvider,
                                 merchantCategoryMappingProvider,
                                 categoryFinderProvider,
-                                smsParseTemplateProvider // Pass the new provider
+                                smsParseTemplateProvider
                             )
                         }
                     }.awaitAll().filterNotNull()
@@ -322,7 +321,7 @@ class SettingsViewModel(
                                 ignoreRuleProvider,
                                 merchantCategoryMappingProvider,
                                 categoryFinderProvider,
-                                smsParseTemplateProvider // Pass the new provider
+                                smsParseTemplateProvider
                             )
                         }
                     }.awaitAll().filterNotNull()
