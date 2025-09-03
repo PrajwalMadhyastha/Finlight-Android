@@ -1,10 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AccountListScreen.kt
-// REASON: FEATURE - Implemented the full UI for the Account Merging feature.
-// This includes a new contextual top app bar for selection mode, updated list
-// items that support long-press-to-select and display a selected state, and a
-// comprehensive confirmation dialog that requires the user to pick a master account
-// before proceeding with the destructive merge operation.
+// REASON: UX REFINEMENT - The contextual top app bar in selection mode now
+// displays text labels ("Cancel", "Merge") next to the icons. This improves
+// clarity and makes the actions more explicit for the user.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -23,9 +21,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.MergeType
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MergeType
@@ -79,16 +74,22 @@ fun AccountListScreen(
                 TopAppBar(
                     title = { Text("${selectedIds.size} selected") },
                     navigationIcon = {
-                        IconButton(onClick = { viewModel.clearSelectionMode() }) {
+                        // --- UPDATED: Changed from IconButton to TextButton ---
+                        TextButton(onClick = { viewModel.clearSelectionMode() }) {
                             Icon(Icons.Default.Close, contentDescription = "Cancel Selection")
+                            Spacer(Modifier.width(4.dp))
+                            Text("Cancel")
                         }
                     },
                     actions = {
-                        IconButton(
+                        // --- UPDATED: Changed from IconButton to TextButton ---
+                        TextButton(
                             onClick = { showMergeDialog = true },
                             enabled = selectedIds.size >= 2
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge Accounts")
+                            Icon(Icons.Default.MergeType, contentDescription = "Merge Accounts")
+                            Spacer(Modifier.width(4.dp))
+                            Text("Merge")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -214,7 +215,7 @@ private fun MergeConfirmationDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = popupContainerColor,
-        icon = { Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge") },
+        icon = { Icon(Icons.Default.MergeType, contentDescription = "Merge") },
         title = { Text("Merge Accounts") },
         text = {
             Column {

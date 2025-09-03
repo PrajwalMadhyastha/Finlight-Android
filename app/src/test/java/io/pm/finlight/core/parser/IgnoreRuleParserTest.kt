@@ -1106,5 +1106,14 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
         assertNull("Should ignore share bonus allotment", result)
     }
+
+    @Test
+    fun `test ignores CDSL message`() = runBlocking {
+        setupTest() // Uses the updated default rules
+        val smsBody = "CDSL: Debit in a/c *14123461 for 78-AXIS ETSF DP GROWTH on 03SEP"
+        val mockSms = SmsMessage(id = 9998L, sender = "JD-CDSLTX-S", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+        assertNull("Should ignore messages from CDSL", result)
+    }
 }
 

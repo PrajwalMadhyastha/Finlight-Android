@@ -136,7 +136,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "*EPFOHO", "*UIICHO", "*RMATIC", "*TPPLAY",
     "*JERUMY", "*LODSHR", "*JEERMY", "*ADHAAR", "*IPRCTO", "*IRSMSa", "*LFSSTL*", "*BNCEWR", "*HGLOYL", "*CARSEL", "*RummyC",
     "*OLACAB", "*AQALEN", "*ZEPTON", "*FSTCRY", "*ACTGRP", "*INYKAA", "*PTECOM", "*NSEIPO", "*LNKART", "*GMSCLK", "*NIGAME", "*NIRAG*",
-    "*SOCIAI", "*FINSAB", "*JGLRMM", "*SxCIAL", "*CARTFT", "*AZORTE", "*iOneMG", "*CLKG*", "*EASEBZ", "*PAYRWD",
+    "*SOCIAI", "*FINSAB", "*JGLRMM", "*SxCIAL", "*CARTFT", "*AZORTE", "*iOneMG", "*CLKG*", "*EASEBZ", "*PAYRWD", "*CDSL*",
 
     // Senders for the latest batch of non-financial messages
     "*LOKADL",

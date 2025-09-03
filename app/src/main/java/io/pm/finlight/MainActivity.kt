@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: UX REFINEMENT - Added a "Merge Accounts" IconButton to the top app
-// bar specifically for the `account_list` screen. This makes the account
-// merging feature easily discoverable, allowing users to enter selection mode
-// with a single tap instead of relying on a hidden long-press gesture.
+// REASON: UX REFINEMENT - The action to initiate merging on the "Manage Accounts"
+// screen has been changed from an IconButton to a TextButton. It now displays
+// the text "Merge" next to the icon, making the feature's entry point more
+// explicit and discoverable for the user.
 // =================================================================================
 package io.pm.finlight
 
@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -393,8 +394,10 @@ fun MainAppScreen() {
                                     }
                                 }
                                 "account_list" -> {
-                                    IconButton(onClick = { accountViewModel.enterSelectionMode(null) }) {
+                                    TextButton(onClick = { accountViewModel.enterSelectionMode(null) }) {
                                         Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge Accounts")
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Merge Accounts")
                                     }
                                 }
                             }
