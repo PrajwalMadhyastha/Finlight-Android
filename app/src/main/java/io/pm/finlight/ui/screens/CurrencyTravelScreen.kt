@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/CurrencyTravelScreen.kt
-// REASON: NEW FILE - This screen provides the UI for managing the new "Travel
-// Mode" feature. It allows users to view/change their home currency and
-// enable/disable travel mode, including setting the foreign currency, conversion
-// rate, and trip duration. It is designed with the "Project Aurora" aesthetic.
+// REASON: FEATURE - Unified Travel Mode. The UI has been completely redesigned to
+// support the new unified travel mode. It now features a single "Enable" switch,
+// a mandatory "Trip Name" field for auto-tagging, a "Domestic/International"
+// selector, and conditionally displays currency fields only for international trips.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -28,13 +28,13 @@ import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.CurrencyInfo
 import io.pm.finlight.CurrencyViewModel
 import io.pm.finlight.TravelModeSettings
+import io.pm.finlight.TripType
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import java.text.SimpleDateFormat
 import java.util.*
 
-// --- FIX: Add the missing isDark() helper function ---
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +49,8 @@ fun CurrencyTravelScreen(
 
     // UI State
     var isTravelModeEnabled by remember(travelSettings) { mutableStateOf(travelSettings?.isEnabled ?: false) }
+    var tripName by remember(travelSettings) { mutableStateOf(travelSettings?.tripName ?: "") }
+    var tripType by remember(travelSettings) { mutableStateOf(travelSettings?.tripType ?: TripType.DOMESTIC) }
     var selectedCurrency by remember(travelSettings) { mutableStateOf(CurrencyHelper.getCurrencyInfo(travelSettings?.currencyCode)) }
     var conversionRate by remember(travelSettings) { mutableStateOf(travelSettings?.conversionRate?.toString() ?: "") }
     var startDate by remember(travelSettings) { mutableStateOf(travelSettings?.startDate) }
@@ -60,7 +62,14 @@ fun CurrencyTravelScreen(
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
 
-    val isSaveEnabled = isTravelModeEnabled && selectedCurrency != null && (conversionRate.toFloatOrNull() ?: 0f) > 0f && startDate != null && endDate != null
+    val isSaveEnabled = if (isTravelModeEnabled) {
+        tripName.isNotBlank() &&
+                startDate != null &&
+                endDate != null &&
+                (tripType == TripType.DOMESTIC || (selectedCurrency != null && (conversionRate.toFloatOrNull() ?: 0f) > 0f))
+    } else {
+        true // Allow saving if the mode is being disabled
+    }
 
     Scaffold(
         topBar = {
@@ -83,7 +92,6 @@ fun CurrencyTravelScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Home Currency Section
             item {
                 SettingsSection(title = "Home Currency") {
                     ListItem(
@@ -99,12 +107,11 @@ fun CurrencyTravelScreen(
                 }
             }
 
-            // Travel Mode Section
             item {
                 SettingsSection(title = "Travel Mode") {
                     ListItem(
                         headlineContent = { Text("Enable Travel Mode") },
-                        supportingContent = { Text("Log expenses in a foreign currency for a specific trip.") },
+                        supportingContent = { Text("Track expenses for a specific trip with auto-tagging.") },
                         trailingContent = {
                             Switch(
                                 checked = isTravelModeEnabled,
@@ -124,38 +131,74 @@ fun CurrencyTravelScreen(
                         Column {
                             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                             ListItem(
-                                headlineContent = { Text("Foreign Currency") },
-                                trailingContent = {
-                                    TextButton(onClick = { showTravelCurrencyPicker = true }) {
-                                        Text(selectedCurrency?.currencyCode ?: "Select")
-                                    }
+                                headlineContent = {
+                                    OutlinedTextField(
+                                        value = tripName,
+                                        onValueChange = { tripName = it },
+                                        label = { Text("Trip Name / Tag*") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
                                 },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                             ListItem(
-                                headlineContent = {
-                                    Column {
-                                        Text("Conversion Rate")
-                                        Text(
-                                            "1 ${selectedCurrency?.currencyCode ?: "Foreign"} = ? ${homeCurrencyCode}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                },
+                                headlineContent = { Text("Trip Type") },
                                 trailingContent = {
-                                    OutlinedTextField(
-                                        value = conversionRate,
-                                        onValueChange = { conversionRate = it.filter { c -> c.isDigit() || c == '.' } },
-                                        modifier = Modifier.width(100.dp),
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        singleLine = true,
-                                        label = { Text(homeCurrencyCode) }
-                                    )
+                                    SingleChoiceSegmentedButtonRow {
+                                        SegmentedButton(
+                                            selected = tripType == TripType.DOMESTIC,
+                                            onClick = { tripType = TripType.DOMESTIC },
+                                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                                        ) { Text("Domestic") }
+                                        SegmentedButton(
+                                            selected = tripType == TripType.INTERNATIONAL,
+                                            onClick = { tripType = TripType.INTERNATIONAL },
+                                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                                        ) { Text("International") }
+                                    }
                                 },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                             )
+                            AnimatedVisibility(visible = tripType == TripType.INTERNATIONAL) {
+                                Column {
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                                    ListItem(
+                                        headlineContent = { Text("Foreign Currency") },
+                                        trailingContent = {
+                                            TextButton(onClick = { showTravelCurrencyPicker = true }) {
+                                                Text(selectedCurrency?.currencyCode ?: "Select")
+                                            }
+                                        },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                    )
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                                    ListItem(
+                                        headlineContent = {
+                                            Column {
+                                                Text("Conversion Rate")
+                                                Text(
+                                                    "1 ${selectedCurrency?.currencyCode ?: "Foreign"} = ? ${homeCurrencyCode}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        },
+                                        trailingContent = {
+                                            OutlinedTextField(
+                                                value = conversionRate,
+                                                onValueChange = { conversionRate = it.filter { c -> c.isDigit() || c == '.' } },
+                                                modifier = Modifier.width(100.dp),
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                singleLine = true,
+                                                label = { Text(homeCurrencyCode) }
+                                            )
+                                        },
+                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                    )
+                                }
+                            }
                             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                             ListItem(
                                 headlineContent = { Text("Trip Start Date") },
@@ -189,10 +232,12 @@ fun CurrencyTravelScreen(
                         onClick = {
                             val settings = TravelModeSettings(
                                 isEnabled = true,
-                                currencyCode = selectedCurrency!!.currencyCode,
-                                conversionRate = conversionRate.toFloat(),
+                                tripName = tripName,
+                                tripType = tripType,
                                 startDate = startDate!!,
-                                endDate = endDate!!
+                                endDate = endDate!!,
+                                currencyCode = if (tripType == TripType.INTERNATIONAL) selectedCurrency?.currencyCode else null,
+                                conversionRate = if (tripType == TripType.INTERNATIONAL) conversionRate.toFloatOrNull() else null
                             )
                             viewModel.saveTravelModeSettings(settings)
                             Toast.makeText(context, "Travel Mode settings saved!", Toast.LENGTH_SHORT).show()
@@ -208,7 +253,6 @@ fun CurrencyTravelScreen(
         }
     }
 
-    // --- Dialogs ---
     if (showHomeCurrencyPicker) {
         CurrencyPickerDialog(
             title = "Select Home Currency",

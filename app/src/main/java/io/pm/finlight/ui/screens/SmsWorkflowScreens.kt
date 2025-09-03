@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsWorkflowScreens.kt
-// REASON: REFACTOR - The category selection grid (ApproveCategoryPickerSheet) now
-// uses the new, reusable CategorySelectionGrid composable. This ensures a
-// consistent, compact layout and centralizes the grid's UI logic.
+// REASON: FIX - Resolved a smart cast error by reading the delegated State
+// property for travelSettings into a local variable before use. Corrected a
+// type mismatch by converting the Float? conversionRate to a Double before
+// performing multiplication. This also resolves the number format ambiguity.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -286,8 +287,9 @@ fun ApproveTransactionScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        if (isForeign && travelModeSettings != null) {
-                            val convertedAmount = potentialTxn.amount * travelModeSettings!!.conversionRate
+                        val currentTravelSettings = travelModeSettings
+                        if (isForeign && currentTravelSettings != null) {
+                            val convertedAmount = potentialTxn.amount * (currentTravelSettings.conversionRate?.toDouble() ?: 1.0)
                             Text(
                                 "≈ $homeCurrencySymbol${NumberFormat.getInstance().format(convertedAmount)}",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -525,7 +527,6 @@ private fun ApproveCategoryPickerSheet(
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp)
         )
-        // --- UPDATED: Replaced the LazyVerticalGrid with the new reusable component ---
         CategorySelectionGrid(
             categories = items,
             onCategorySelected = onItemSelected
@@ -631,3 +632,4 @@ private fun CategoryIcon(category: Category, modifier: Modifier = Modifier) {
         }
     }
 }
+

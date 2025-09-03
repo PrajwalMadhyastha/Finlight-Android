@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: FEATURE - The database version has been incremented to 34. The new
-// `SmsParseTemplate` entity and its corresponding DAO have been added. A new
-// migration (33 to 34) has been implemented to create the `sms_parse_templates`
-// table, which is essential for the new heuristic learning feature.
+// REASON: FEATURE - Unified Travel Mode. The database version has been
+// incremented to 35, and a new migration has been added. MIGRATION_34_35
+// rebuilds the 'tags' table to enforce a case-insensitive uniqueness constraint
+// on the tag name, which is necessary for the new auto-tagging feature.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -42,9 +42,9 @@ import net.sqlcipher.database.SupportFactory
         Goal::class,
         RecurringPattern::class,
         SplitTransaction::class,
-        SmsParseTemplate::class // --- NEW: Add the new entity ---
+        SmsParseTemplate::class
     ],
-    version = 34, // --- UPDATED: Incremented version ---
+    version = 35, // --- UPDATED: Incremented version ---
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -62,13 +62,13 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun goalDao(): GoalDao
     abstract fun recurringPatternDao(): RecurringPatternDao
     abstract fun splitTransactionDao(): SplitTransactionDao
-    abstract fun smsParseTemplateDao(): SmsParseTemplateDao // --- NEW: Add the new DAO ---
+    abstract fun smsParseTemplateDao(): SmsParseTemplateDao
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // --- All existing migrations (1-2 through 32-33) remain here ---
+        // --- All existing migrations (1-2 through 33-34) remain here ---
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN transactionType TEXT NOT NULL DEFAULT 'expense'")
@@ -134,7 +134,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_transaction_images_transactionId` ON `transaction_images` (`transactionId`)")
             }
         }
-
         val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -148,7 +147,6 @@ abstract class AppDatabase : RoomDatabase() {
                 """)
             }
         }
-
         val MIGRATION_12_13 = object : Migration(12, 13) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("DROP TABLE IF EXISTS `custom_sms_rules`")
@@ -164,60 +162,51 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_custom_sms_rules_triggerPhrase` ON `custom_sms_rules` (`triggerPhrase`)")
             }
         }
-
         val MIGRATION_13_14 = object : Migration(13, 14) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `custom_sms_rules` ADD COLUMN `merchantNameExample` TEXT")
                 db.execSQL("ALTER TABLE `custom_sms_rules` ADD COLUMN `amountExample` TEXT")
             }
         }
-
         val MIGRATION_14_15 = object : Migration(14, 15) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `custom_sms_rules` ADD COLUMN `accountRegex` TEXT")
                 db.execSQL("ALTER TABLE `custom_sms_rules` ADD COLUMN `accountNameExample` TEXT")
             }
         }
-
         val MIGRATION_15_16 = object : Migration(15, 16) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN originalDescription TEXT")
                 db.execSQL("CREATE TABLE IF NOT EXISTS `merchant_rename_rules` (`originalName` TEXT NOT NULL, `newName` TEXT NOT NULL, PRIMARY KEY(`originalName`))")
             }
         }
-
         val MIGRATION_16_17 = object : Migration(16, 17) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN isExcluded INTEGER NOT NULL DEFAULT 0")
             }
         }
-
         val MIGRATION_17_18 = object : Migration(17, 18) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `merchant_category_mapping` (`parsedName` TEXT NOT NULL, `categoryId` INTEGER NOT NULL, PRIMARY KEY(`parsedName`))")
             }
         }
-
         val MIGRATION_18_19 = object : Migration(18, 19) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE TABLE IF NOT EXISTS `ignore_rules` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `phrase` TEXT NOT NULL)")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ignore_rules_phrase` ON `ignore_rules` (`phrase`)")
             }
         }
-
         val MIGRATION_19_20 = object : Migration(19, 20) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `ignore_rules` ADD COLUMN `isEnabled` INTEGER NOT NULL DEFAULT 1")
                 db.execSQL("ALTER TABLE `ignore_rules` ADD COLUMN `isDefault` INTEGER NOT NULL DEFAULT 0")
             }
         }
-
         val MIGRATION_20_21 = object : Migration(20, 21) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `custom_sms_rules` ADD COLUMN `sourceSmsBody` TEXT NOT NULL DEFAULT ''")
             }
         }
-
         val MIGRATION_21_22 = object : Migration(21, 22) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("INSERT OR IGNORE INTO categories (id, name, iconKey, colorKey) VALUES (16, 'Bike', 'two_wheeler', 'red_light')")
@@ -233,13 +222,11 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("INSERT OR IGNORE INTO categories (id, name, iconKey, colorKey) VALUES (26, 'Rent', 'house', 'deep_purple_light')")
             }
         }
-
         val MIGRATION_22_23 = object : Migration(22, 23) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `recurring_transactions` ADD COLUMN `lastRunDate` INTEGER")
             }
         }
-
         val MIGRATION_23_24 = object : Migration(23, 24) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -256,7 +243,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_goals_accountId` ON `goals` (`accountId`)")
             }
         }
-
         val MIGRATION_24_25 = object : Migration(24, 25) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -296,7 +282,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `merchant_rename_rules_new` RENAME TO `merchant_rename_rules`")
             }
         }
-
         val MIGRATION_25_26 = object : Migration(25, 26) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -316,14 +301,12 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_recurring_patterns_lastSeen` ON `recurring_patterns` (`lastSeen`)")
             }
         }
-
         val MIGRATION_26_27 = object : Migration(26, 27) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `smsSignature` TEXT")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_smsSignature` ON `transactions` (`smsSignature`)")
             }
         }
-
         val MIGRATION_27_28 = object : Migration(27, 28) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `originalAmount` REAL")
@@ -331,7 +314,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `conversionRate` REAL")
             }
         }
-
         val MIGRATION_28_29 = object : Migration(28, 29) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `transactions` ADD COLUMN `isSplit` INTEGER NOT NULL DEFAULT 0")
@@ -350,13 +332,11 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_split_transactions_categoryId` ON `split_transactions` (`categoryId`)")
             }
         }
-
         val MIGRATION_29_30 = object : Migration(29, 30) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `split_transactions` ADD COLUMN `originalAmount` REAL")
             }
         }
-
         val MIGRATION_30_31 = object : Migration(30, 31) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("INSERT OR IGNORE INTO ignore_rules (phrase, isEnabled, isDefault) VALUES ('We have received', 1, 1)")
@@ -365,7 +345,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("INSERT OR IGNORE INTO ignore_rules (phrase, isEnabled, isDefault) VALUES ('requested money from you', 1, 1)")
             }
         }
-
         val MIGRATION_31_32 = object : Migration(31, 32) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -386,7 +365,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `ignore_rules_new` RENAME TO `ignore_rules`")
             }
         }
-
         val MIGRATION_32_33 = object : Migration(32, 33) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -407,8 +385,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `ignore_rules_new` RENAME TO `ignore_rules`")
             }
         }
-
-        // --- NEW: Migration for the new table ---
         val MIGRATION_33_34 = object : Migration(33, 34) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -423,6 +399,22 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                 """)
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_sms_parse_templates_templateSignature` ON `sms_parse_templates` (`templateSignature`)")
+            }
+        }
+
+        // --- NEW: Migration to make the Tag name unique and case-insensitive ---
+        val MIGRATION_34_35 = object : Migration(34, 35) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE `tags_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL COLLATE NOCASE
+                    )
+                """)
+                db.execSQL("CREATE UNIQUE INDEX `index_tags_name_nocase` ON `tags_new` (`name`)")
+                db.execSQL("INSERT INTO `tags_new` (id, name) SELECT id, name FROM tags")
+                db.execSQL("DROP TABLE `tags`")
+                db.execSQL("ALTER TABLE `tags_new` RENAME TO `tags`")
             }
         }
 
@@ -444,7 +436,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
                             MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29,
                             MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
-                            MIGRATION_33_34 // --- NEW: Add migration to the builder ---
+                            MIGRATION_33_34, MIGRATION_34_35 // --- NEW: Add migration to the builder ---
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

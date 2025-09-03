@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FIX - Re-added the 'itemContent' parameter to the PickerSheet
-// composable. This was accidentally removed during the previous refactoring and
-// is still required by the Account picker, fixing the build error.
+// REASON: FIX - Resolved a smart cast error by reading the delegated State
+// property for travelSettings into a local variable before use. Corrected a
+// type mismatch by converting the Float? conversionRate to a Double before
+// performing multiplication. This also resolves the number format ambiguity.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -76,7 +78,6 @@ private sealed class ComposerSheet {
     object Merchant : ComposerSheet()
 }
 
-// --- FIX: Add the missing helper function ---
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,13 +88,12 @@ fun AddTransactionScreen(
     isCsvEdit: Boolean = false,
     initialDataJson: String? = null
 ) {
-    // region State Variables
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var transactionType by remember { mutableStateOf("expense") } // Default to expense
+    var transactionType by remember { mutableStateOf("expense") }
     var notes by remember { mutableStateOf("") }
     var attachedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
@@ -125,8 +125,6 @@ fun AddTransactionScreen(
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
 
     val isSaveEnabled = amount.isNotBlank() && description.isNotBlank() && selectedAccount != null && selectedCategory != null
-    // endregion
-
 
     LaunchedEffect(Unit) {
         viewModel.clearAddTransactionState()
@@ -148,7 +146,8 @@ fun AddTransactionScreen(
                 initialData.getOrNull(0)?.let {
                     try {
                         selectedDateTime.time = dateFormat.parse(it) ?: Date()
-                    } catch (e: Exception) { /* Keep default date on parse error */ }
+                    } catch (e: Exception) { /* Keep default date on parse error */
+                    }
                 }
                 description = initialData.getOrElse(1) { "" }
                 amount = initialData.getOrElse(2) { "" }.replace(".0", "")
@@ -172,7 +171,6 @@ fun AddTransactionScreen(
             viewModel.clearError()
         }
     }
-    // endregion
 
     val categoryColor by remember(selectedCategory) {
         derivedStateOf {
@@ -280,7 +278,6 @@ fun AddTransactionScreen(
         }
     }
 
-    // region Modals and Dialogs
     val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
@@ -306,7 +303,7 @@ fun AddTransactionScreen(
                     items = categories,
                     onItemSelected = { selectedCategory = it; activeSheet = null },
                     onAddNew = { showCreateCategoryDialog = true; activeSheet = null },
-                    itemContent = {} // Not used for categories, but required by signature
+                    itemContent = {}
                 )
                 is ComposerSheet.Tags -> TagPickerSheet(
                     allTags = allTags,
@@ -413,10 +410,8 @@ fun AddTransactionScreen(
             }
         )
     }
-    // endregion
 }
 
-// region New UI Components for Composer
 @Composable
 private fun SpotlightBackground(color: Color) {
     val animatedAlpha by animateFloatAsState(
@@ -452,10 +447,11 @@ private fun AmountComposer(
     isTravelMode: Boolean,
     travelModeSettings: TravelModeSettings?
 ) {
-    val currencySymbol = if (isTravelMode) {
-        CurrencyHelper.getCurrencySymbol(travelModeSettings?.currencyCode)
+    val currentTravelSettings = travelModeSettings
+    val currencySymbol = if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
+        CurrencyHelper.getCurrencySymbol(currentTravelSettings.currencyCode)
     } else {
-        "₹" // Default to home currency symbol
+        "₹"
     }
 
     Column(
@@ -486,10 +482,10 @@ private fun AmountComposer(
                 maxLines = 1
             )
         }
-        if (isTravelMode && travelModeSettings != null) {
+        if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
             val enteredAmount = amount.toDoubleOrNull() ?: 0.0
-            val convertedAmount = enteredAmount * travelModeSettings.conversionRate
-            val homeSymbol = "₹" // Assuming home is INR for now
+            val convertedAmount = enteredAmount * (currentTravelSettings.conversionRate?.toDouble() ?: 1.0)
+            val homeSymbol = "₹"
             Text(
                 text = "≈ $homeSymbol${NumberFormat.getInstance().format(convertedAmount)}",
                 style = MaterialTheme.typography.bodyMedium,
@@ -750,7 +746,6 @@ private fun <T> PickerSheet(
                 onAddNew = onAddNew
             )
         } else {
-            // Fallback for other types like Account (maintains old layout)
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 100.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -905,7 +900,7 @@ fun TextInputSheet(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = { onConfirm(initialValue) }) { Text("Cancel") } // Revert on cancel
+            TextButton(onClick = { onConfirm(initialValue) }) { Text("Cancel") }
             Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = { onConfirm(text) }) { Text("Done") }
         }
