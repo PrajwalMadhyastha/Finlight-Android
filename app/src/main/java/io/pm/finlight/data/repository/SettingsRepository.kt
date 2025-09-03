@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
-// REASON: FEATURE - Unified Travel Mode. The `TravelModeSettings` data class has
-// been updated to support both domestic and international trips. It now includes a
-// mandatory `tripName` (used for auto-tagging) and a `tripType` enum. The currency
-// and conversion rate fields are now nullable to accommodate domestic travel.
+// REASON: FEATURE - Added functions to save and retrieve a set of dismissed
+// merge suggestion keys. This allows the app to remember which suggestions the
+// user has already seen and ignored, preventing them from reappearing
+// unnecessarily and improving the user experience.
 // =================================================================================
 package io.pm.finlight
 
@@ -77,6 +77,28 @@ class SettingsRepository(context: Context) {
         private const val KEY_AUTO_BACKUP_NOTIFICATION_ENABLED = "auto_backup_notification_enabled"
         private const val KEY_AUTOCAPTURE_NOTIFICATION_ENABLED = "autocapture_notification_enabled"
         private const val KEY_LAST_MONTH_SUMMARY_DISMISSED = "last_month_summary_dismissed_"
+        private const val KEY_DISMISSED_MERGES = "dismissed_merge_suggestions"
+    }
+
+    fun getDismissedMergeSuggestions(): Flow<Set<String>> {
+        return callbackFlow {
+            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                if (key == KEY_DISMISSED_MERGES) {
+                    trySend(sp.getStringSet(key, emptySet()) ?: emptySet())
+                }
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(prefs.getStringSet(KEY_DISMISSED_MERGES, emptySet()) ?: emptySet())
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+    }
+
+    fun addDismissedMergeSuggestion(suggestionKey: String) {
+        val currentDismissed = prefs.getStringSet(KEY_DISMISSED_MERGES, emptySet()) ?: emptySet()
+        val newDismissed = currentDismissed.toMutableSet().apply { add(suggestionKey) }
+        prefs.edit {
+            putStringSet(KEY_DISMISSED_MERGES, newDismissed)
+        }
     }
 
     fun setLastMonthSummaryDismissed() {

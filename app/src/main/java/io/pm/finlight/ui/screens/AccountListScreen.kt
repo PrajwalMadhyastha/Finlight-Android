@@ -1,8 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AccountListScreen.kt
-// REASON: UX REFINEMENT - The contextual top app bar in selection mode now
-// displays text labels ("Cancel", "Merge") next to the icons. This improves
-// clarity and makes the actions more explicit for the user.
+// REASON: FEATURE - The screen now observes the new `suggestedMerges` StateFlow.
+// If potential duplicates are found, a dismissible `MergeSuggestionCard` is
+// displayed at the top of the list. This card allows the user to either dismiss
+// the suggestion or tap "View" to automatically enter selection mode with the
+// suggested accounts pre-selected, creating a seamless, intelligent workflow.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -12,17 +14,17 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,6 +36,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import io.pm.finlight.Account
 import io.pm.finlight.AccountViewModel
 import io.pm.finlight.AccountWithBalance
 import io.pm.finlight.ui.components.GlassPanel
@@ -56,6 +59,7 @@ fun AccountListScreen(
 
     val isSelectionMode by viewModel.isSelectionModeActive.collectAsState()
     val selectedIds by viewModel.selectedAccountIds.collectAsState()
+    val suggestedMerges by viewModel.suggestedMerges.collectAsState()
     var showMergeDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(key1 = viewModel.uiEvent) {
@@ -74,7 +78,6 @@ fun AccountListScreen(
                 TopAppBar(
                     title = { Text("${selectedIds.size} selected") },
                     navigationIcon = {
-                        // --- UPDATED: Changed from IconButton to TextButton ---
                         TextButton(onClick = { viewModel.clearSelectionMode() }) {
                             Icon(Icons.Default.Close, contentDescription = "Cancel Selection")
                             Spacer(Modifier.width(4.dp))
@@ -82,12 +85,11 @@ fun AccountListScreen(
                         }
                     },
                     actions = {
-                        // --- UPDATED: Changed from IconButton to TextButton ---
                         TextButton(
                             onClick = { showMergeDialog = true },
                             enabled = selectedIds.size >= 2
                         ) {
-                            Icon(Icons.Default.MergeType, contentDescription = "Merge Accounts")
+                            Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge Accounts")
                             Spacer(Modifier.width(4.dp))
                             Text("Merge")
                         }
@@ -106,6 +108,20 @@ fun AccountListScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (suggestedMerges.isNotEmpty() && !isSelectionMode) {
+                item {
+                    MergeSuggestionCard(
+                        suggestion = suggestedMerges.first(),
+                        onViewClick = {
+                            viewModel.enterSelectionModeWithSuggestions(listOf(it.first, it.second))
+                        },
+                        onDismissClick = {
+                            viewModel.dismissMergeSuggestion(it)
+                        }
+                    )
+                }
+            }
+
             items(accounts, key = { it.account.id }) { accountWithBalance ->
                 AccountListItem(
                     modifier = Modifier.animateItemPlacement(),
@@ -133,6 +149,57 @@ fun AccountListScreen(
         )
     }
 }
+
+@Composable
+private fun MergeSuggestionCard(
+    suggestion: Pair<Account, Account>,
+    onViewClick: (Pair<Account, Account>) -> Unit,
+    onDismissClick: (Pair<Account, Account>) -> Unit
+) {
+    GlassPanel {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = "Suggestion",
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(end = 12.dp)
+                )
+                Text(
+                    "Potential Duplicates Found",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "We found accounts with similar names that you might want to merge:",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "• ${suggestion.first.name}\n• ${suggestion.second.name}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = { onDismissClick(suggestion) }) {
+                    Text("Dismiss")
+                }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = { onViewClick(suggestion) }) {
+                    Text("View Suggestion")
+                }
+            }
+        }
+    }
+}
+
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
