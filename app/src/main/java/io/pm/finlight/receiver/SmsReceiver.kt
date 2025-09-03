@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/receiver/SmsReceiver.kt
-// REASON: FIX - Resolved a smart cast error by reading the delegated State
-// property for travelSettings into a local variable before use. Corrected a
-// type mismatch by converting the Float? conversionRate to a Double before
-// performing multiplication.
+// REASON: FIX - Resolved build error by correctly instantiating and using the
+// TransactionRepository to save transactions with tags, ensuring the auto-tagging
+// logic for travel mode works correctly for auto-captured SMS.
 // =================================================================================
 package io.pm.finlight
 
@@ -130,7 +129,9 @@ class SmsReceiver : BroadcastReceiver() {
         val db = AppDatabase.getInstance(context)
         val accountDao = db.accountDao()
         val transactionDao = db.transactionDao()
+        val tagRepository = TagRepository(db.tagDao(), transactionDao)
         val settingsRepository = SettingsRepository(context)
+        val transactionRepository = TransactionRepository(transactionDao) // Instantiate repository
 
         val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
         val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
@@ -143,16 +144,27 @@ class SmsReceiver : BroadcastReceiver() {
         }
 
         if (account != null) {
-            val currentTravelSettings = travelSettings
-            val transactionToSave = if (isForeign && currentTravelSettings != null) {
+            val currentTravelSettings = settingsRepository.getTravelModeSettings().first()
+            val isTravelModeActive = currentTravelSettings?.isEnabled == true &&
+                    potentialTxn.date >= currentTravelSettings.startDate &&
+                    potentialTxn.date <= currentTravelSettings.endDate
+
+            val tagsToSave = mutableSetOf<Tag>()
+            if (isTravelModeActive) {
+                val tripTag = tagRepository.findOrCreateTag(currentTravelSettings!!.tripName)
+                tagsToSave.add(tripTag)
+            }
+
+            val conversionRate = travelSettings?.conversionRate?.toDouble() ?: 1.0
+            val transactionToSave = if (isForeign && travelSettings != null) {
                 Transaction(
                     description = potentialTxn.merchantName ?: "Unknown Merchant",
                     originalDescription = potentialTxn.merchantName,
-                    amount = potentialTxn.amount * (currentTravelSettings.conversionRate?.toDouble() ?: 1.0),
+                    amount = potentialTxn.amount * conversionRate,
                     originalAmount = potentialTxn.amount,
-                    currencyCode = currentTravelSettings.currencyCode,
-                    conversionRate = currentTravelSettings.conversionRate?.toDouble(),
-                    date = System.currentTimeMillis(),
+                    currencyCode = travelSettings.currencyCode,
+                    conversionRate = conversionRate,
+                    date = potentialTxn.date,
                     accountId = account.id,
                     categoryId = potentialTxn.categoryId,
                     notes = "",
@@ -167,7 +179,7 @@ class SmsReceiver : BroadcastReceiver() {
                     description = potentialTxn.merchantName ?: "Unknown Merchant",
                     originalDescription = potentialTxn.merchantName,
                     amount = potentialTxn.amount,
-                    date = System.currentTimeMillis(),
+                    date = potentialTxn.date,
                     accountId = account.id,
                     categoryId = potentialTxn.categoryId,
                     notes = "",
@@ -179,7 +191,7 @@ class SmsReceiver : BroadcastReceiver() {
                 )
             }
 
-            val newTransactionId = transactionDao.insert(transactionToSave)
+            val newTransactionId = transactionRepository.insertTransactionWithTags(transactionToSave, tagsToSave)
 
             if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED &&
                 settingsRepository.isAutoCaptureNotificationEnabledBlocking()) {
