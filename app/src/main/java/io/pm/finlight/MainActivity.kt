@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX - The call to `CategoryPickerSheet` has been updated to pass the
-// `onDismiss` lambda, aligning it with the new, refactored component signature
-// and resolving the build error.
+// REASON: UX REFINEMENT - Added a "Merge Accounts" IconButton to the top app
+// bar specifically for the `account_list` screen. This makes the account
+// merging feature easily discoverable, allowing users to enter selection mode
+// with a single tap instead of relying on a hidden long-press gesture.
 // =================================================================================
 package io.pm.finlight
 
@@ -36,6 +37,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -390,6 +392,11 @@ fun MainAppScreen() {
                                         }
                                     }
                                 }
+                                "account_list" -> {
+                                    IconButton(onClick = { accountViewModel.enterSelectionMode(null) }) {
+                                        Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge Accounts")
+                                    }
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -471,7 +478,6 @@ fun MainAppScreen() {
                         transactionViewModel.updateTransactionCategory(transactionForCategoryChange!!.transaction.id, newCategory.id)
                         transactionViewModel.cancelCategoryChange()
                     },
-                    // --- FIX: Pass the onDismiss lambda to the component ---
                     onDismiss = onDismiss,
                     onAddNew = null
                 )
@@ -1065,6 +1071,7 @@ private fun CategoryPickerSheet(
     title: String,
     items: List<Category>,
     onItemSelected: (Category) -> Unit,
+    onDismiss: () -> Unit,
     onAddNew: (() -> Unit)? = null
 ) {
     Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {

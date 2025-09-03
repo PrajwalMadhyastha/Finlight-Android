@@ -1,10 +1,9 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/AccountViewModel.kt
-// REASON: FEATURE - The ViewModel has been completely updated to manage the new
-// account merging feature. It now includes StateFlows for selection mode status
-// and the set of selected account IDs. New functions have been added to handle
-// entering/exiting selection mode, toggling selections, and calling the
-// repository's atomic merge function.
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/AccountViewModel.kt
+// REASON: UX REFINEMENT - The `enterSelectionMode` function now accepts a
+// nullable accountId. This allows selection mode to be triggered from a generic
+// UI element (like a top app bar button) without requiring an initial item to
+// be pre-selected, improving the feature's discoverability.
 // =================================================================================
 package io.pm.finlight
 
@@ -40,10 +39,10 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         accountsWithBalance = repository.accountsWithBalance
     }
 
-    // --- NEW: Functions to manage selection ---
-    fun enterSelectionMode(accountId: Int) {
+    // --- UPDATED: Functions to manage selection ---
+    fun enterSelectionMode(accountId: Int?) {
         _isSelectionModeActive.value = true
-        _selectedAccountIds.value = setOf(accountId)
+        _selectedAccountIds.value = accountId?.let { setOf(it) } ?: emptySet()
     }
 
     fun toggleAccountSelection(accountId: Int) {
