@@ -1,3 +1,9 @@
+// =================================================================================
+// FILE: ./analyzer/src/main/java/io/pm/finlight/analyzer/SmsAnalysisTool.kt
+// REASON: FIX - Added mock implementations for the new CategoryFinderProvider
+// and SmsParseTemplateProvider interfaces. This resolves the build error by
+// satisfying the updated, decoupled signature of the SmsParser.
+// =================================================================================
 package io.pm.finlight.analyzer
 
 import io.pm.finlight.*
@@ -88,7 +94,6 @@ suspend fun main() {
 
     println("Found sms_dump.json. Reading and parsing file...")
 
-    // --- UPDATED: Deserialization now works with the flexible data classes ---
     val smsDump: SmsDump = json.decodeFromString(inputFile.readText())
     val smsList = smsDump.smses.sms
     val totalSmsCount = smsDump.smses.count.toIntOrNull() ?: smsList.size
@@ -99,7 +104,10 @@ suspend fun main() {
 
     val parsedTransactions = mutableListOf<ParsedTransactionRecord>()
     val ignoredMessages = mutableListOf<IgnoredMessageRecord>()
+    val notParsedMessages = mutableListOf<IgnoredMessageRecord>()
 
+
+    // --- Create Mock Providers for the Standalone Tool ---
     val mockCustomRuleProvider = object : CustomSmsRuleProvider {
         override suspend fun getAllRules(): List<CustomSmsRule> = emptyList()
     }
@@ -111,6 +119,13 @@ suspend fun main() {
     }
     val mockCategoryMappingProvider = object : MerchantCategoryMappingProvider {
         override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = null
+    }
+    // --- NEW: Add mocks for the new providers ---
+    val mockCategoryFinderProvider = object : CategoryFinderProvider {
+        override fun getCategoryIdByName(name: String): Int? = null // Not needed for this tool
+    }
+    val mockSmsParseTemplateProvider = object : SmsParseTemplateProvider {
+        override suspend fun getAllTemplates(): List<SmsParseTemplate> = emptyList() // No DB access
     }
 
     smsList.forEach { sms ->
@@ -127,7 +142,9 @@ suspend fun main() {
             customSmsRuleProvider = mockCustomRuleProvider,
             merchantRenameRuleProvider = mockRenameRuleProvider,
             ignoreRuleProvider = mockIgnoreRuleProvider,
-            merchantCategoryMappingProvider = mockCategoryMappingProvider
+            merchantCategoryMappingProvider = mockCategoryMappingProvider,
+            categoryFinderProvider = mockCategoryFinderProvider, // Pass mock
+            smsParseTemplateProvider = mockSmsParseTemplateProvider // Pass mock
         )
 
         when (result) {
@@ -155,15 +172,26 @@ suspend fun main() {
                     )
                 )
             }
+            is ParseResult.NotParsed -> {
+                notParsedMessages.add(
+                    IgnoredMessageRecord(
+                        sender = sms.address,
+                        body = sms.body,
+                        date = sms.readable_date,
+                        reason = result.reason
+                    )
+                )
+            }
         }
     }
 
     // --- Generate CSV Reports ---
     generateCsvReport("parsed_transactions.csv", parsedTransactions)
     generateCsvReport("ignored_messages.csv", ignoredMessages)
+    generateCsvReport("not_parsed_messages.csv", notParsedMessages) // Report for unparsed messages
 
     // --- Print Console Summary ---
-    printSummary(totalSmsCount, parsedTransactions.size, ignoredMessages)
+    printSummary(totalSmsCount, parsedTransactions.size, ignoredMessages.size, notParsedMessages.size, ignoredMessages)
 }
 
 /**
@@ -175,7 +203,7 @@ private fun <T> generateCsvReport(fileName: String, data: List<T>) {
     val file = File(fileName)
     file.printWriter().use { out ->
         // Write header
-        val header = when (data.first()) {
+        val header = when (data.firstOrNull()) {
             is ParsedTransactionRecord -> "Sender,Date,Amount,Type,Merchant,Account,Body"
             is IgnoredMessageRecord -> "Sender,Date,Reason,Body"
             else -> return
@@ -202,8 +230,7 @@ private fun <T> generateCsvReport(fileName: String, data: List<T>) {
 /**
  * Prints a summary of the analysis to the console.
  */
-private fun printSummary(totalCount: Int, parsedCount: Int, ignoredMessages: List<IgnoredMessageRecord>) {
-    val ignoredCount = ignoredMessages.size
+private fun printSummary(totalCount: Int, parsedCount: Int, ignoredCount: Int, notParsedCount: Int, ignoredMessages: List<IgnoredMessageRecord>) {
     val ignoredReasons = ignoredMessages.groupingBy { it.reason }.eachCount()
 
     println("\n================ ANALYSIS COMPLETE ================")
@@ -212,11 +239,13 @@ private fun printSummary(totalCount: Int, parsedCount: Int, ignoredMessages: Lis
     println("--------------------------------------------------")
     println("Total Messages Analyzed: $totalCount")
     println("Successfully Parsed:     $parsedCount (${String.format("%.2f", (parsedCount.toDouble() / totalCount) * 100)}%)")
-    println("Ignored / Not Parsed:    $ignoredCount (${String.format("%.2f", (ignoredCount.toDouble() / totalCount) * 100)}%)")
+    println("Ignored:                 $ignoredCount (${String.format("%.2f", (ignoredCount.toDouble() / totalCount) * 100)}%)")
+    println("Not Parsed:              $notParsedCount (${String.format("%.2f", (notParsedCount.toDouble() / totalCount) * 100)}%)")
     println("\n--- Ignored Reasons Breakdown (Top 15) ---")
     ignoredReasons.entries.sortedByDescending { it.value }.take(15).forEach { (reason, count) ->
         println("${reason.padEnd(50, ' ')}: $count")
     }
-    println("\nFull reports saved to parsed_transactions.csv and ignored_messages.csv")
+    println("\nFull reports saved to parsed_transactions.csv, ignored_messages.csv, and not_parsed_messages.csv")
     println("================================================")
 }
+

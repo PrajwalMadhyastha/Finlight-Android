@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FIX - Corrected a build error caused by a name collision between the
-// `Transaction` entity and the `@Transaction` annotation. The ambiguous import
-// has been removed, and the annotation is now fully qualified (`@androidx.room.Transaction`)
-// to resolve the conflict.
+// REASON: FEATURE - Added the `reassignTransactions` function. This is a core
+// component of the new account merging feature, allowing all transactions from
+// one or more source accounts to be moved to a single destination account.
 // =================================================================================
 package io.pm.finlight
 
@@ -650,4 +649,8 @@ interface TransactionDao {
         startDate: Long?,
         endDate: Long?,
     ): Flow<List<TransactionDetails>>
+
+    // --- NEW: Reassigns transactions from source accounts to a destination account ---
+    @Query("UPDATE transactions SET accountId = :destinationAccountId WHERE accountId IN (:sourceAccountIds)")
+    suspend fun reassignTransactions(sourceAccountIds: List<Int>, destinationAccountId: Int)
 }

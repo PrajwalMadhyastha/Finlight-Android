@@ -1,24 +1,13 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/BaseSmsParserTest.kt
-// REASON: NEW FILE - This abstract base class centralizes the test setup logic
-// (Mocks, Dispatchers, Rule Providers) previously found in the monolithic
-// SmsParserTest. All new, refactored test classes will inherit from this to
-// avoid code duplication and simplify maintenance.
+// REASON: FIX - Reverted the conditional mock setup. The mock for the heuristic
+// template engine is now always initialized. This resolves the NullPointerException
+// in tests where the parser logic proceeds past the ignore rule checks.
 // =================================================================================
 package io.pm.finlight.core.parser
 
-import io.pm.finlight.CustomSmsRule
-import io.pm.finlight.CustomSmsRuleDao
-import io.pm.finlight.CustomSmsRuleProvider
-import io.pm.finlight.DEFAULT_IGNORE_PHRASES
-import io.pm.finlight.IgnoreRule
-import io.pm.finlight.IgnoreRuleDao
-import io.pm.finlight.IgnoreRuleProvider
-import io.pm.finlight.MerchantCategoryMappingDao
-import io.pm.finlight.MerchantCategoryMappingProvider
-import io.pm.finlight.MerchantRenameRule
-import io.pm.finlight.MerchantRenameRuleDao
-import io.pm.finlight.MerchantRenameRuleProvider
+import io.pm.finlight.*
+import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Before
@@ -46,6 +35,9 @@ abstract class BaseSmsParserTest {
     @Mock
     protected lateinit var mockMerchantCategoryMappingDao: MerchantCategoryMappingDao
 
+    @Mock
+    protected lateinit var mockSmsParseTemplateDao: SmsParseTemplateDao
+
     protected val emptyMappings = emptyMap<String, String>()
 
     // Providers that will be used by the SmsParser
@@ -53,6 +45,8 @@ abstract class BaseSmsParserTest {
     protected lateinit var merchantRenameRuleProvider: MerchantRenameRuleProvider
     protected lateinit var ignoreRuleProvider: IgnoreRuleProvider
     protected lateinit var merchantCategoryMappingProvider: MerchantCategoryMappingProvider
+    protected lateinit var categoryFinderProvider: CategoryFinderProvider
+    protected lateinit var smsParseTemplateProvider: SmsParseTemplateProvider
 
     @Before
     fun setUp() {
@@ -71,6 +65,14 @@ abstract class BaseSmsParserTest {
             override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
                 mockMerchantCategoryMappingDao.getCategoryIdForMerchant(merchantName)
         }
+        categoryFinderProvider = object : CategoryFinderProvider {
+            override fun getCategoryIdByName(name: String): Int? {
+                return CategoryIconHelper.getCategoryIdByName(name)
+            }
+        }
+        smsParseTemplateProvider = object : SmsParseTemplateProvider {
+            override suspend fun getAllTemplates(): List<SmsParseTemplate> = mockSmsParseTemplateDao.getAllTemplates()
+        }
     }
 
     /**
@@ -85,5 +87,7 @@ abstract class BaseSmsParserTest {
         `when`(mockCustomSmsRuleDao.getAllRules()).thenReturn(flowOf(customRules))
         `when`(mockMerchantRenameRuleDao.getAllRules()).thenReturn(flowOf(renameRules))
         `when`(mockIgnoreRuleDao.getEnabledRules()).thenReturn(ignoreRules.filter { it.isEnabled })
+        // --- UPDATED: The mock is now always set up to prevent NullPointerExceptions ---
+        `when`(mockSmsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
     }
 }

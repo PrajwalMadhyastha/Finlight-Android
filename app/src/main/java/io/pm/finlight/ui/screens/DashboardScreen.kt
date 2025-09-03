@@ -1,8 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/DashboardScreen.kt
-// REASON: FEATURE - The "Spending Consistency" card has been updated to include
-// the new `ConsistencyCalendarLegend` component, providing users with a clear
-// explanation of the heatmap colors.
+// REASON: FEATURE - The "Last Month Summary" card is now conditionally rendered
+// at the top of the dashboard. Its visibility is controlled by the new
+// `showLastMonthSummaryCard` StateFlow from the ViewModel, ensuring it only appears
+// on the first of the month and can be dismissed by the user.
+// UX REFINEMENT - The "Last Month Summary" card is now positioned after the main
+// Hero Budget card for a less intrusive user experience.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -37,6 +40,11 @@ fun DashboardScreen(
     val yearlyConsistencyData by dashboardViewModel.yearlyConsistencyData.collectAsState()
     val budgetHealthSummary by dashboardViewModel.budgetHealthSummary.collectAsState()
 
+    // --- NEW: Collect state for the summary card ---
+    val showLastMonthSummary by dashboardViewModel.showLastMonthSummaryCard.collectAsState()
+    val lastMonthSummary by dashboardViewModel.lastMonthSummary.collectAsState()
+
+
     LaunchedEffect(Unit) {
         dashboardViewModel.refreshBudgetSummary()
     }
@@ -46,7 +54,35 @@ fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.testTag("dashboard_lazy_column")
     ) {
-        items(visibleCards, key = { it.name }) { cardType ->
+        // Always render the hero card first if it's visible.
+        val heroCard = visibleCards.find { it == DashboardCardType.HERO_BUDGET }
+        if (heroCard != null) {
+            item(key = heroCard.name) {
+                DashboardCard(
+                    cardType = heroCard,
+                    navController = navController,
+                    dashboardViewModel = dashboardViewModel,
+                    transactionViewModel = transactionViewModel,
+                    yearlyConsistencyData = yearlyConsistencyData,
+                    budgetHealthSummary = budgetHealthSummary
+                )
+            }
+        }
+
+        // Conditionally display the summary card right after the hero card.
+        if (showLastMonthSummary && lastMonthSummary != null) {
+            item(key = "last_month_summary_card") {
+                LastMonthSummaryCard(
+                    summary = lastMonthSummary!!,
+                    navController = navController,
+                    onDismiss = { dashboardViewModel.dismissLastMonthSummaryCard() }
+                )
+            }
+        }
+
+        // Render the rest of the cards, excluding the hero card which is already rendered.
+        val otherCards = visibleCards.filter { it != DashboardCardType.HERO_BUDGET }
+        items(otherCards, key = { it.name }) { cardType ->
             Box(modifier = Modifier.animateItemPlacement(animationSpec = spring())) {
                 DashboardCard(
                     cardType = cardType,
@@ -131,3 +167,4 @@ private fun DashboardCard(
         }
     }
 }
+

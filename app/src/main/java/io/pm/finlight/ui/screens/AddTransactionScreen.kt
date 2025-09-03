@@ -1,12 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FEATURE - Integrated the new `MerchantPredictionSheet`. Tapping the
-// description text now opens a bottom sheet that provides real-time, historical
-// suggestions for the merchant and its associated category, speeding up data
-// entry and improving consistency.
-// FIX - The DatePickerDialog and the AlertDialog wrapping the TimePicker now have
-// an explicit container color to prevent them from being overly transparent.
-// FIX - Added the missing isDark() helper function to resolve a build error.
+// REASON: FIX - Resolved a smart cast error by reading the delegated State
+// property for travelSettings into a local variable before use. Corrected a
+// type mismatch by converting the Float? conversionRate to a Double before
+// performing multiplication. This also resolves the number format ambiguity.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -56,7 +53,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -82,7 +78,6 @@ private sealed class ComposerSheet {
     object Merchant : ComposerSheet()
 }
 
-// --- FIX: Add the missing helper function ---
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,13 +88,12 @@ fun AddTransactionScreen(
     isCsvEdit: Boolean = false,
     initialDataJson: String? = null
 ) {
-    // region State Variables
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var transactionType by remember { mutableStateOf("expense") } // Default to expense
+    var transactionType by remember { mutableStateOf("expense") }
     var notes by remember { mutableStateOf("") }
     var attachedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
@@ -131,8 +125,6 @@ fun AddTransactionScreen(
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
 
     val isSaveEnabled = amount.isNotBlank() && description.isNotBlank() && selectedAccount != null && selectedCategory != null
-    // endregion
-
 
     LaunchedEffect(Unit) {
         viewModel.clearAddTransactionState()
@@ -154,7 +146,8 @@ fun AddTransactionScreen(
                 initialData.getOrNull(0)?.let {
                     try {
                         selectedDateTime.time = dateFormat.parse(it) ?: Date()
-                    } catch (e: Exception) { /* Keep default date on parse error */ }
+                    } catch (e: Exception) { /* Keep default date on parse error */
+                    }
                 }
                 description = initialData.getOrElse(1) { "" }
                 amount = initialData.getOrElse(2) { "" }.replace(".0", "")
@@ -178,7 +171,6 @@ fun AddTransactionScreen(
             viewModel.clearError()
         }
     }
-    // endregion
 
     val categoryColor by remember(selectedCategory) {
         derivedStateOf {
@@ -286,7 +278,6 @@ fun AddTransactionScreen(
         }
     }
 
-    // region Modals and Dialogs
     val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
@@ -297,7 +288,7 @@ fun AddTransactionScreen(
             windowInsets = WindowInsets(0),
             containerColor = popupContainerColor
         ) {
-            when (val sheet = activeSheet) {
+            when (activeSheet) {
                 is ComposerSheet.Account -> PickerSheet(
                     title = "Select Account",
                     items = accounts,
@@ -312,9 +303,7 @@ fun AddTransactionScreen(
                     items = categories,
                     onItemSelected = { selectedCategory = it; activeSheet = null },
                     onAddNew = { showCreateCategoryDialog = true; activeSheet = null },
-                    itemContent = { category ->
-                        CategoryPickerItem(category)
-                    }
+                    itemContent = {}
                 )
                 is ComposerSheet.Tags -> TagPickerSheet(
                     allTags = allTags,
@@ -421,10 +410,8 @@ fun AddTransactionScreen(
             }
         )
     }
-    // endregion
 }
 
-// region New UI Components for Composer
 @Composable
 private fun SpotlightBackground(color: Color) {
     val animatedAlpha by animateFloatAsState(
@@ -460,10 +447,11 @@ private fun AmountComposer(
     isTravelMode: Boolean,
     travelModeSettings: TravelModeSettings?
 ) {
-    val currencySymbol = if (isTravelMode) {
-        CurrencyHelper.getCurrencySymbol(travelModeSettings?.currencyCode)
+    val currentTravelSettings = travelModeSettings
+    val currencySymbol = if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
+        CurrencyHelper.getCurrencySymbol(currentTravelSettings.currencyCode)
     } else {
-        "₹" // Default to home currency symbol
+        "₹"
     }
 
     Column(
@@ -494,10 +482,10 @@ private fun AmountComposer(
                 maxLines = 1
             )
         }
-        if (isTravelMode && travelModeSettings != null) {
+        if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
             val enteredAmount = amount.toDoubleOrNull() ?: 0.0
-            val convertedAmount = enteredAmount * travelModeSettings.conversionRate
-            val homeSymbol = "₹" // Assuming home is INR for now
+            val convertedAmount = enteredAmount * (currentTravelSettings.conversionRate?.toDouble() ?: 1.0)
+            val homeSymbol = "₹"
             Text(
                 text = "≈ $homeSymbol${NumberFormat.getInstance().format(convertedAmount)}",
                 style = MaterialTheme.typography.bodyMedium,
@@ -750,88 +738,62 @@ private fun <T> PickerSheet(
             modifier = Modifier.padding(16.dp),
             color = MaterialTheme.colorScheme.onSurface
         )
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 100.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(items) { item ->
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onItemSelected(item) }
-                        .padding(vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    itemContent(item)
-                }
-            }
-            if (onAddNew != null) {
-                item {
+        if (items.isNotEmpty() && items.first() is Category) {
+            @Suppress("UNCHECKED_CAST")
+            CategorySelectionGrid(
+                categories = items as List<Category>,
+                onCategorySelected = onItemSelected as (Category) -> Unit,
+                onAddNew = onAddNew
+            )
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 100.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(items) { item ->
                     Column(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable(onClick = onAddNew)
-                            .padding(vertical = 12.dp)
-                            .height(76.dp),
+                            .clickable { onItemSelected(item) }
+                            .padding(vertical = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            Icons.Default.AddCircleOutline,
-                            contentDescription = "Create New",
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "New",
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        itemContent(item)
+                    }
+                }
+                if (onAddNew != null) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(onClick = onAddNew)
+                                .padding(vertical = 12.dp)
+                                .height(76.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.AddCircleOutline,
+                                contentDescription = "Create New",
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "New",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }
         }
         Spacer(Modifier.height(16.dp))
     }
-}
-
-@Composable
-private fun CategoryPickerItem(category: Category) {
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-        contentAlignment = Alignment.Center
-    ) {
-        if (category.iconKey == "letter_default") {
-            Text(
-                text = category.name.firstOrNull()?.uppercase() ?: "?",
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
-                fontSize = 22.sp
-            )
-        } else {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                contentDescription = null,
-                tint = Color.Black,
-                modifier = Modifier.padding(12.dp)
-            )
-        }
-    }
-    Text(
-        category.name,
-        style = MaterialTheme.typography.bodyMedium,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        color = MaterialTheme.colorScheme.onSurface
-    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -938,7 +900,7 @@ fun TextInputSheet(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = { onConfirm(initialValue) }) { Text("Cancel") } // Revert on cancel
+            TextButton(onClick = { onConfirm(initialValue) }) { Text("Cancel") }
             Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = { onConfirm(text) }) { Text("Done") }
         }

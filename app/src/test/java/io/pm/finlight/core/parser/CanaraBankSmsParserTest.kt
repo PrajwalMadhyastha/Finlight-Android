@@ -2,6 +2,8 @@
 // FILE: ./app/src/test/java/io/pm/finlight/CanaraBankSmsParserTest.kt
 // REASON: NEW FILE - Contains all unit tests specifically for parsing SMS
 // messages from Canara Bank, refactored from the original SmsParserTest.
+// FIX - All calls to SmsParser.parse now include the required
+// categoryFinderProvider, resolving build errors.
 // =================================================================================
 package io.pm.finlight.core.parser
 
@@ -24,7 +26,7 @@ class CanaraBankSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull(result)
         assertEquals(20000.0, result?.amount)
@@ -43,7 +45,7 @@ class CanaraBankSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = 1679042011072L
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(2000.00, result?.amount)
@@ -63,7 +65,7 @@ class CanaraBankSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = 1750144389022L
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(25000.00, result?.amount)
@@ -83,7 +85,7 @@ class CanaraBankSmsParserTest : BaseSmsParserTest() {
             body = smsBody,
             date = System.currentTimeMillis()
         )
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider)
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
 
         assertNotNull("Parser should return a result", result)
         assertEquals(60000.00, result?.amount)

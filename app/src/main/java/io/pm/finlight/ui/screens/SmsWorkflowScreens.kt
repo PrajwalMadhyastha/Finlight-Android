@@ -1,7 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsWorkflowScreens.kt
-// REASON: REFACTOR - Updated all import statements to reference data models
-// like PotentialTransaction from the new 'core' module.
+// REASON: FIX - Resolved a smart cast error by reading the delegated State
+// property for travelSettings into a local variable before use. Corrected a
+// type mismatch by converting the Float? conversionRate to a Double before
+// performing multiplication. This also resolves the number format ambiguity.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -12,12 +14,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Notes
@@ -32,7 +30,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,6 +37,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.*
+import io.pm.finlight.ui.components.CategorySelectionGrid
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
@@ -253,7 +251,7 @@ fun ApproveTransactionScreen(
                 title = { Text("Approve Transaction") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -289,8 +287,9 @@ fun ApproveTransactionScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        if (isForeign && travelModeSettings != null) {
-                            val convertedAmount = potentialTxn.amount * travelModeSettings!!.conversionRate
+                        val currentTravelSettings = travelModeSettings
+                        if (isForeign && currentTravelSettings != null) {
+                            val convertedAmount = potentialTxn.amount * (currentTravelSettings.conversionRate?.toDouble() ?: 1.0)
                             Text(
                                 "≈ $homeCurrencySymbol${NumberFormat.getInstance().format(convertedAmount)}",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -528,26 +527,10 @@ private fun ApproveCategoryPickerSheet(
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp)
         )
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 100.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(items) { category ->
-                Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onItemSelected(category) }
-                        .padding(vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    CategoryIcon(category, Modifier.size(48.dp))
-                    Text(category.name, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-                }
-            }
-        }
+        CategorySelectionGrid(
+            categories = items,
+            onCategorySelected = onItemSelected
+        )
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -649,3 +632,4 @@ private fun CategoryIcon(category: Category, modifier: Modifier = Modifier) {
         }
     }
 }
+

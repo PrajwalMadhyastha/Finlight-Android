@@ -1,6 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ProfileViewModel.kt
-// REASON: Added a function to handle updating the user's name in SharedPreferences.
+// REASON: REFACTOR - The logic for saving the profile picture has been updated
+// to store the image in a dedicated 'attachments' subdirectory. This aligns
+// with the new backup strategy, allowing the directory to be easily excluded
+// from Android's Auto Backup to save space.
 // =================================================================================
 package io.pm.finlight
 
@@ -70,12 +73,18 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private suspend fun saveImageToInternalStorage(sourceUri: Uri): String? {
         return withContext(Dispatchers.IO) {
             try {
+                // --- UPDATED: Save images to a dedicated 'attachments' subdirectory ---
+                val attachmentsDir = File(context.filesDir, "attachments")
+                if (!attachmentsDir.exists()) {
+                    attachmentsDir.mkdirs()
+                }
+
                 // Open an input stream from the source URI provided by the cropper
                 val inputStream = context.contentResolver.openInputStream(sourceUri)
 
-                // Create a destination file in the app's private 'files' directory
+                // Create a destination file in the app's private 'attachments' directory
                 val fileName = "profile_${System.currentTimeMillis()}.jpg"
-                val file = File(context.filesDir, fileName)
+                val file = File(attachmentsDir, fileName)
 
                 // Open an output stream to the destination file
                 val outputStream = FileOutputStream(file)

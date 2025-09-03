@@ -1,10 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FIX - Corrected a compilation error in the `createAndStoreTemplate`
-// function. The logic for finding the amount string in the SMS body was using
-// an incorrect lambda with `find()`. This has been fixed by using `findAll()` to
-// get all matches and then applying a `find` operation on the resulting
-// collection, which is the correct syntax.
+// REASON: REFACTOR - The instantiation of AccountRepository has been updated to
+// pass the full AppDatabase instance instead of just the DAO. This is required
+// to support the new transactional account merging logic.
 // =================================================================================
 package io.pm.finlight
 
@@ -145,7 +143,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     init {
         transactionRepository = TransactionRepository(db.transactionDao())
-        accountRepository = AccountRepository(db.accountDao())
+        accountRepository = AccountRepository(db) // --- UPDATED ---
         categoryRepository = CategoryRepository(db.categoryDao())
         tagRepository = TagRepository(db.tagDao(), db.transactionDao())
         settingsRepository = SettingsRepository(application)
@@ -459,8 +457,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             }
     }
 
-    private fun loadVisitCount(originalDescription: String?, currentDescription: String) { // Renamed for clarity
-        val descriptionToQuery = currentDescription // Always use the current description
+    private fun loadVisitCount(originalDescription: String?, currentDescription: String) {
+        val descriptionToQuery = currentDescription
         viewModelScope.launch {
             transactionRepository.getTransactionCountForMerchant(descriptionToQuery).collect { count ->
                 _visitCount.value = count
@@ -495,16 +493,17 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
 
         val travelSettings = travelModeSettings.value
-        val isTravelMode = travelSettings?.isEnabled == true &&
+        val isInternationalTravel = travelSettings?.isEnabled == true &&
+                travelSettings.tripType == TripType.INTERNATIONAL &&
                 date >= travelSettings.startDate &&
                 date <= travelSettings.endDate
 
-        val transactionToSave = if (isTravelMode) {
+        val transactionToSave = if (isInternationalTravel) {
             Transaction(
                 description = description,
                 originalDescription = description,
                 categoryId = categoryId,
-                amount = enteredAmount * travelSettings!!.conversionRate,
+                amount = enteredAmount * (travelSettings!!.conversionRate ?: 1f),
                 date = date,
                 accountId = accountId,
                 notes = notes,
@@ -515,7 +514,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 source = "Added Manually",
                 originalAmount = enteredAmount,
                 currencyCode = travelSettings.currencyCode,
-                conversionRate = travelSettings.conversionRate.toDouble()
+                conversionRate = travelSettings.conversionRate?.toDouble()
             )
         } else {
             Transaction(
@@ -534,6 +533,12 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
 
+        val finalTags = _selectedTags.value.toMutableSet()
+        if (travelSettings?.isEnabled == true && date >= travelSettings.startDate && date <= travelSettings.endDate) {
+            val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
+            finalTags.add(tripTag)
+        }
+
         return try {
             withContext(Dispatchers.IO) {
                 val savedImagePaths = imageUris.mapNotNull { uri ->
@@ -541,7 +546,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 }
                 transactionRepository.insertTransactionWithTagsAndImages(
                     transactionToSave,
-                    _selectedTags.value,
+                    finalTags,
                     savedImagePaths
                 )
             }
@@ -556,7 +561,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     fun clearAddTransactionState() {
         _selectedTags.value = emptySet()
     }
-
 
     private fun loadOriginalSms(sourceSmsId: Long?) {
         if (sourceSmsId == null) {
@@ -597,21 +601,36 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
             val existingMappings = merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
 
+            val categoryFinderProvider = object : CategoryFinderProvider {
+                override fun getCategoryIdByName(name: String): Int? {
+                    return CategoryIconHelper.getCategoryIdByName(name)
+                }
+            }
+            val customSmsRuleProvider = object : CustomSmsRuleProvider {
+                override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
+            }
+            val merchantRenameRuleProvider = object : MerchantRenameRuleProvider {
+                override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+            }
+            val ignoreRuleProvider = object : IgnoreRuleProvider {
+                override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
+            }
+            val merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
+                override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+            }
+            val smsParseTemplateProvider = object : SmsParseTemplateProvider {
+                override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
+            }
+
             val potentialTxn = SmsParser.parse(
                 smsMessage,
                 existingMappings,
-                object : CustomSmsRuleProvider {
-                    override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
-                },
-                object : MerchantRenameRuleProvider {
-                    override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
-                },
-                object : IgnoreRuleProvider {
-                    override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
-                },
-                object : MerchantCategoryMappingProvider {
-                    override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-                }
+                customSmsRuleProvider,
+                merchantRenameRuleProvider,
+                ignoreRuleProvider,
+                merchantCategoryMappingProvider,
+                categoryFinderProvider,
+                smsParseTemplateProvider
             )
 
             if (potentialTxn != null) {
@@ -620,29 +639,26 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     transactionRepository.updateDescription(transactionId, merchant)
                 }
 
+                potentialTxn.categoryId?.let {
+                    if (it != transaction.categoryId) {
+                        transactionRepository.updateCategoryId(transactionId, it)
+                    }
+                }
+
                 potentialTxn.potentialAccount?.let { parsedAccount ->
                     val currentAccount = accountRepository.getAccountById(transaction.accountId).first()
-
                     if (currentAccount?.name?.equals(parsedAccount.formattedName, ignoreCase = true) == false) {
-
                         var account = db.accountDao().findByName(parsedAccount.formattedName)
-
                         if (account == null) {
                             val newAccount = Account(name = parsedAccount.formattedName, type = parsedAccount.accountType)
                             val newId = accountRepository.insert(newAccount)
                             account = db.accountDao().getAccountById(newId.toInt()).first()
                         }
-
                         if (account != null) {
                             transactionRepository.updateAccountId(transactionId, account.id)
-                        } else {
                         }
-                    } else {
-                        Log.d(logTag, "Account names are the same. No update needed.")
                     }
-                } ?: Log.d(logTag, "No potential account was parsed from the SMS.")
-            } else {
-                Log.d(logTag, "SmsParser returned null. No updates to perform.")
+                }
             }
             Log.d(logTag, "--- Reparse finished for transactionId: $transactionId ---")
         }
@@ -748,8 +764,12 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         return withContext(Dispatchers.IO) {
             try {
                 val inputStream = context.contentResolver.openInputStream(sourceUri)
+                val filesDir = File(context.filesDir, "attachments")
+                if (!filesDir.exists()) {
+                    filesDir.mkdirs()
+                }
                 val fileName = "txn_attach_${System.currentTimeMillis()}.jpg"
-                val file = File(context.filesDir, fileName)
+                val file = File(filesDir, fileName)
                 val outputStream = FileOutputStream(file)
                 inputStream?.use { input ->
                     outputStream.use { output ->
@@ -798,7 +818,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             return
         }
 
-        // --- FIX: Corrected lambda syntax for finding the match result ---
         val amountStr = amountRegex.findAll(smsBody).find {
             it.value.replace(",", "").toDoubleOrNull() == matchingAmountValue
         }?.value ?: return
@@ -859,7 +878,31 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun updateTransactionDate(id: Int, date: Long) = viewModelScope.launch {
+        val oldDate = initialTransactionStateForRetroUpdate?.date
+        val travelSettings = travelModeSettings.value
+
         transactionRepository.updateDate(id, date)
+
+        if (travelSettings?.isEnabled == true && oldDate != null) {
+            val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
+            val currentTags = transactionRepository.getTagsForTransaction(id).first().toMutableSet()
+
+            val oldDateInTrip = oldDate >= travelSettings.startDate && oldDate <= travelSettings.endDate
+            val newDateInTrip = date >= travelSettings.startDate && date <= travelSettings.endDate
+
+            var tagsChanged = false
+            if (newDateInTrip && !oldDateInTrip) {
+                currentTags.add(tripTag)
+                tagsChanged = true
+            } else if (!newDateInTrip && oldDateInTrip) {
+                currentTags.remove(tripTag)
+                tagsChanged = true
+            }
+
+            if (tagsChanged) {
+                transactionRepository.updateTagsForTransaction(id, currentTags)
+            }
+        }
     }
 
     fun updateTransactionExclusion(id: Int, isExcluded: Boolean) = viewModelScope.launch {
@@ -931,8 +974,14 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
                 if (account == null) return@withContext false
 
+                val finalTags = tags.toMutableSet()
+                val travelSettings = settingsRepository.getTravelModeSettings().first()
+                if (travelSettings?.isEnabled == true && potentialTxn.date >= travelSettings.startDate && potentialTxn.date <= travelSettings.endDate) {
+                    val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
+                    finalTags.add(tripTag)
+                }
+
                 val transactionToSave = if (isForeign) {
-                    val travelSettings = settingsRepository.getTravelModeSettings().first()
                     if (travelSettings == null) {
                         Log.e(TAG, "Attempted to save foreign SMS transaction, but Travel Mode is not configured.")
                         return@withContext false
@@ -941,7 +990,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                         description = description,
                         originalDescription = potentialTxn.merchantName,
                         categoryId = categoryId,
-                        amount = potentialTxn.amount * travelSettings.conversionRate,
+                        amount = potentialTxn.amount * (travelSettings.conversionRate ?: 1f),
                         date = potentialTxn.date,
                         accountId = account.id,
                         notes = notes,
@@ -951,7 +1000,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                         source = "Imported",
                         originalAmount = potentialTxn.amount,
                         currencyCode = travelSettings.currencyCode,
-                        conversionRate = travelSettings.conversionRate.toDouble()
+                        conversionRate = travelSettings.conversionRate?.toDouble()
                     )
                 } else {
                     Transaction(
@@ -969,7 +1018,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     )
                 }
 
-                transactionRepository.insertTransactionWithTags(transactionToSave, tags)
+                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
 
                 val merchantName = potentialTxn.merchantName
                 if (categoryId != null && merchantName != null) {
@@ -1006,6 +1055,13 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     return@withContext false
                 }
 
+                val finalTags = mutableSetOf<Tag>()
+                val travelSettings = settingsRepository.getTravelModeSettings().first()
+                if (travelSettings?.isEnabled == true && potentialTxn.date >= travelSettings.startDate && potentialTxn.date <= travelSettings.endDate) {
+                    val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
+                    finalTags.add(tripTag)
+                }
+
                 val transactionToSave = Transaction(
                     description = potentialTxn.merchantName ?: "Unknown Merchant",
                     originalDescription = potentialTxn.merchantName,
@@ -1020,7 +1076,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     source = "Auto-Captured"
                 )
 
-                transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
+                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
                 true
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to auto-save SMS transaction", e)
@@ -1068,9 +1124,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         _retroUpdateSheetState.update { currentState ->
             currentState?.let {
                 if (it.selectedIds.size == it.similarTransactions.size) {
-                    it.copy(selectedIds = emptySet()) // Deselect all
+                    it.copy(selectedIds = emptySet())
                 } else {
-                    it.copy(selectedIds = it.similarTransactions.map { t -> t.id }.toSet()) // Select all
+                    it.copy(selectedIds = it.similarTransactions.map { t -> t.id }.toSet())
                 }
             }
         }

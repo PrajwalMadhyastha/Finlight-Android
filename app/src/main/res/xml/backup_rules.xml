@@ -1,18 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!--
-    This file specifies which app data to include in Google's Auto Backup.
-    It's the modern, recommended way to handle cloud backups.
-    -->
+    <!-- Include the encrypted database file -->
+    <include domain="database" path="finance_database.db" />
 
-    <!-- Include all files in the database directory. This covers your Room database. -->
-    <include
-        domain="database"
-        path="." />
+    <!-- Include the compressed JSON snapshot file from the app's root files directory -->
+    <include domain="file" path="backup_snapshot.gz" />
 
-    <!-- Include all SharedPreferences files. This covers your settings. -->
-    <include
-        domain="sharedpref"
-        path="." />
+    <!-- Exclude the directory where all image attachments are stored to save space -->
+    <exclude domain="file" path="attachments/" />
 
 </full-backup-content>

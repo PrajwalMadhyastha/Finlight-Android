@@ -1,3 +1,9 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/utils/CategoryIconHelper.kt
+// REASON: FEATURE - Added a new `getCategoryIdByName` function. This provides a
+// crucial utility for the new heuristic parser to look up a category's ID based
+// on its name, which is needed to complete the keyword-to-category mapping.
+// =================================================================================
 package io.pm.finlight.utils
 
 import androidx.annotation.DrawableRes
@@ -59,6 +65,19 @@ object CategoryIconHelper {
         "deep_purple_light" to Color(0xFFB39DDB),
         "yellow_light" to Color(0xFFFFF59D),
         "gray_light" to Color(0xFFE0E0E0),
+        // --- NEW: Expanded Palette ---
+        "lime_light" to Color(0xFFE6EE9C),
+        "amber_light" to Color(0xFFFFE082),
+        "deep_orange_light" to Color(0xFFFFAB91),
+        "blue_grey_light" to Color(0xFFB0BEC5),
+        "light_green_light" to Color(0xFFC5E1A5),
+        "light_blue_light" to Color(0xFF81D4FA),
+        "pink_accent_light" to Color(0xFFF8BBD0),
+        "teal_accent_light" to Color(0xFFA7FFEB),
+        "purple_accent_light" to Color(0xFFE1BEE7),
+        "orange_accent_light" to Color(0xFFFFD180),
+        "yellow_accent_light" to Color(0xFFFFFF8D),
+        "cyan_accent_light" to Color(0xFF84FFFF)
     )
 
     private val categoryBackgrounds = mapOf(
@@ -153,6 +172,11 @@ object CategoryIconHelper {
         ),
         Category(id = 26, name = "Rent", iconKey = "house", colorKey = "deep_purple_light"),
     )
+
+    // --- NEW: Function to get a category's ID by its name ---
+    fun getCategoryIdByName(name: String): Int? {
+        return predefinedCategories.find { it.name.equals(name, ignoreCase = true) }?.id
+    }
 
     fun getIcon(iconKey: String): ImageVector {
         return when (iconKey) {

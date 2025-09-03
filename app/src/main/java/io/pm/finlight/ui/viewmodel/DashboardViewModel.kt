@@ -1,14 +1,14 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/DashboardViewModel.kt
-// REASON: FIX - The `yearlyConsistencyData` flow is now reactive. It combines
-// a flow of all monthly budgets with the transaction data. This ensures that
-// whenever a budget is changed in the settings, this flow automatically
-// re-calculates the consistency heatmap, fixing the stale data bug on the dashboard.
+// REASON: REFACTOR - The instantiation of AccountRepository has been updated to
+// pass the full AppDatabase instance instead of just the DAO. This is required
+// to support the new transactional account merging logic.
 // =================================================================================
 package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.utils.DateUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -18,6 +18,11 @@ import java.util.Calendar
 import java.util.Locale
 
 data class ConsistencyStats(val goodDays: Int, val badDays: Int, val noSpendDays: Int, val noDataDays: Int)
+
+data class LastMonthSummary(
+    val totalIncome: Double,
+    val totalExpenses: Double
+)
 
 class DashboardViewModel(
     private val transactionRepository: TransactionRepository,
@@ -48,6 +53,13 @@ class DashboardViewModel(
     val yearlyConsistencyData: StateFlow<List<CalendarDayStatus>>
     val budgetHealthSummary: StateFlow<String>
     private val _summaryRefreshTrigger = MutableStateFlow(System.currentTimeMillis())
+
+    private val _lastMonthSummary = MutableStateFlow<LastMonthSummary?>(null)
+    val lastMonthSummary: StateFlow<LastMonthSummary?> = _lastMonthSummary.asStateFlow()
+
+    private val _showLastMonthSummaryCard = MutableStateFlow(false)
+    val showLastMonthSummaryCard: StateFlow<Boolean> = _showLastMonthSummaryCard.asStateFlow()
+
 
     init {
         userName = settingsRepository.getUserName()
@@ -86,6 +98,8 @@ class DashboardViewModel(
 
         val calendar = Calendar.getInstance()
         monthYear = SimpleDateFormat("MMMM", Locale.getDefault()).format(calendar.time)
+
+        checkForLastMonthSummary()
 
         val monthStart =
             (calendar.clone() as Calendar).apply {
@@ -230,22 +244,18 @@ class DashboardViewModel(
                     initialValue = emptyList(),
                 )
 
-        // --- UPDATED: Make consistency data reactive to budget changes ---
         val today = Calendar.getInstance()
         val year = today.get(Calendar.YEAR)
         val currentMonthIndex = today.get(Calendar.MONTH)
 
-        // Create a list of flows, one for each month's budget up to the current month.
         val monthlyBudgetFlows = (0..currentMonthIndex).map { month ->
             settingsRepository.getOverallBudgetForMonth(year, month + 1)
         }
 
-        // Combine all monthly budget flows into a single flow that emits a list of budgets.
         val totalBudgetSoFarFlow = combine(monthlyBudgetFlows) { budgets ->
             budgets.sum()
         }
 
-        // Combine the total budget flow with the transaction data flow.
         yearlyConsistencyData = combine(
             totalBudgetSoFarFlow,
             transactionRepository.getDailySpendingForDateRange(
@@ -254,7 +264,6 @@ class DashboardViewModel(
             ),
             transactionRepository.getFirstTransactionDate()
         ) { totalBudget, dailyTotals, firstTransactionDate ->
-            // Pass the reactive budget to the generation function.
             generateYearlyConsistencyData(totalBudget, dailyTotals, firstTransactionDate)
         }.flowOn(Dispatchers.Default)
             .stateIn(
@@ -264,11 +273,34 @@ class DashboardViewModel(
             )
     }
 
+    fun dismissLastMonthSummaryCard() {
+        settingsRepository.setLastMonthSummaryDismissed()
+        _showLastMonthSummaryCard.value = false
+    }
+
+    private fun checkForLastMonthSummary() {
+        val today = Calendar.getInstance()
+        if (today.get(Calendar.DAY_OF_MONTH) == 1 && !settingsRepository.hasLastMonthSummaryBeenDismissed()) {
+            _showLastMonthSummaryCard.value = true
+            viewModelScope.launch {
+                val (start, end) = DateUtils.getPreviousMonthDateRange()
+                transactionRepository.getFinancialSummaryForRangeFlow(start, end).collect { summary ->
+                    if (summary != null) {
+                        _lastMonthSummary.value = LastMonthSummary(
+                            totalIncome = summary.totalIncome,
+                            totalExpenses = summary.totalExpenses
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+
     fun refreshBudgetSummary() {
         _summaryRefreshTrigger.value = System.currentTimeMillis()
     }
 
-    // --- UPDATED: Function now accepts budget as a parameter ---
     private suspend fun generateYearlyConsistencyData(
         totalBudgetSoFar: Float,
         dailyTotals: List<DailyTotal>,

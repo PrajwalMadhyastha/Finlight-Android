@@ -1,8 +1,8 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/CurrencyViewModel.kt
-// REASON: NEW FILE - This ViewModel provides the state and logic for the new
-// Currency & Travel screen. It interfaces with the SettingsRepository to get
-// and save the home currency and all Travel Mode settings.
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/CurrencyViewModel.kt
+// REASON: FEATURE - Unified Travel Mode. The `saveTravelModeSettings` function
+// has been updated to accept the new `TravelModeSettings` data class, which
+// now supports both domestic and international trip details.
 // =================================================================================
 package io.pm.finlight
 

@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/ReminderManager.kt
-// REASON: REVERT - Reverted the scheduling logic for all reports (Daily, Weekly,
-// Monthly) back to using WorkManager's `setInitialDelay`. This removes the
-// dependency on AlarmManager to favor a more resilient scheduling strategy
-// that is not cancelled when the user closes the app from the recents screen.
+// REASON: FEATURE - Added a new SnapshotWorker to the scheduling logic. The
+// manager now schedules a daily background task to create a compressed JSON
+// backup of the database, which is included in Android's Auto Backup. This is
+// also added to the rescheduleAllWork function to ensure it persists after reboots.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -18,6 +18,7 @@ import io.pm.finlight.MonthlySummaryWorker
 import io.pm.finlight.RecurringPatternWorker
 import io.pm.finlight.RecurringTransactionWorker
 import io.pm.finlight.WeeklySummaryWorker
+import io.pm.finlight.workers.SnapshotWorker
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -28,6 +29,7 @@ object ReminderManager {
     private const val RECURRING_TRANSACTION_WORK_TAG = "recurring_transaction_work"
     private const val RECURRING_PATTERN_WORK_TAG = "recurring_pattern_work"
     private const val AUTO_BACKUP_WORK_TAG = "auto_backup_work"
+    private const val SNAPSHOT_WORKER_TAG = "snapshot_worker_tag"
 
 
     fun rescheduleAllWork(context: Context) {
@@ -49,6 +51,29 @@ object ReminderManager {
 
         scheduleRecurringTransactionWorker(context)
         scheduleRecurringPatternWorker(context)
+        scheduleSnapshotWorker(context) // --- NEW: Schedule snapshot on reboot ---
+    }
+
+    fun scheduleSnapshotWorker(context: Context) {
+        val now = Calendar.getInstance()
+        val nextRun = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, 1) // Run tomorrow
+            set(Calendar.HOUR_OF_DAY, 3) // At 3 AM
+            set(Calendar.MINUTE, 30)
+            set(Calendar.SECOND, 0)
+        }
+
+        val initialDelay = nextRun.timeInMillis - now.timeInMillis
+        val snapshotRequest = OneTimeWorkRequestBuilder<SnapshotWorker>()
+            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            SNAPSHOT_WORKER_TAG,
+            ExistingWorkPolicy.REPLACE,
+            snapshotRequest
+        )
+        Log.d("ReminderManager", "Database snapshot worker scheduled for ${nextRun.time}")
     }
 
     fun scheduleAutoBackup(context: Context) {

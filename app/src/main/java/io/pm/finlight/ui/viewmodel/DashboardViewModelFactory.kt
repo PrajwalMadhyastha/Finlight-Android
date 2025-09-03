@@ -1,3 +1,9 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/DashboardViewModelFactory.kt
+// REASON: REFACTOR - The factory now passes the full AppDatabase instance to the
+// AccountRepository. This is required to support the new transactional account
+// merging logic.
+// =================================================================================
 package io.pm.finlight
 
 import android.app.Application
@@ -13,7 +19,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
         if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val transactionRepository = TransactionRepository(db.transactionDao())
-            val accountRepository = AccountRepository(db.accountDao())
+            val accountRepository = AccountRepository(db) // --- UPDATED ---
             val settingsRepository = SettingsRepository(application)
 
             @Suppress("UNCHECKED_CAST")
