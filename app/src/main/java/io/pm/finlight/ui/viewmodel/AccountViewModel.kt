@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/AccountViewModel.kt
-// REASON: FEATURE - The ViewModel now implements the logic for smart merge
-// suggestions. It uses a Levenshtein distance algorithm to find potential
-// duplicates, manages a StateFlow for these suggestions, and handles dismissing
-// them via the SettingsRepository. A new function allows the UI to enter
-// selection mode with the suggested accounts pre-selected.
+// REASON: FEATURE - The smart merge suggestion logic is now more robust. A new
+// `normalizeAccountName` function strips common banking terms and masked numbers
+// from account names before the similarity check. This allows the Levenshtein
+// algorithm to correctly identify duplicates like "ICICI Bank" and "ICICI - xx123".
 // =================================================================================
 package io.pm.finlight
 
@@ -16,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
@@ -55,6 +55,19 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    private fun normalizeAccountName(name: String): String {
+        return name.lowercase(Locale.getDefault())
+            // Remove common keywords that don't add to uniqueness
+            .replace(Regex("\\b(bank|card|credit|debit|account|acct|a/c|prepaid|wallet)\\b"), "")
+            // Remove masked numbers and identifiers (e.g., xx1234, *1234, ...1234)
+            .replace(Regex("\\s+ending with\\s+\\d+"), "")
+            .replace(Regex("[x*]+\\d+|\\.{3,}\\d+"), "")
+            // Remove special characters and collapse extra spaces
+            .replace(Regex("[-_.,]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
     private fun checkForPotentialMerges(accounts: List<Account>, dismissedKeys: Set<String>) {
         if (accounts.size < 2) {
             _suggestedMerges.value = emptyList()
@@ -70,7 +83,13 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
                 val suggestionKey = "${min(account1.id, account2.id)}|${max(account1.id, account2.id)}"
                 if (suggestionKey in dismissedKeys) continue
 
-                val similarity = calculateSimilarity(account1.name, account2.name)
+                val normalizedName1 = normalizeAccountName(account1.name)
+                val normalizedName2 = normalizeAccountName(account2.name)
+
+                // Skip comparison if normalization results in an empty string
+                if (normalizedName1.isBlank() || normalizedName2.isBlank()) continue
+
+                val similarity = calculateSimilarity(normalizedName1, normalizedName2)
                 if (similarity > 0.85) { // 85% similarity threshold
                     suggestions.add(Pair(account1, account2))
                 }
