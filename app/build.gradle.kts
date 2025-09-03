@@ -78,7 +78,7 @@ android {
     defaultConfig {
         applicationId = "io.pm.finlight"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 35
         versionCode = generateVersionCode()
         versionName = "${versionProperties["VERSION_MAJOR"]}.${versionProperties["VERSION_MINOR"]}.${versionProperties["VERSION_PATCH"]}"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
