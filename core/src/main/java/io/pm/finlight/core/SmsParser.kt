@@ -388,19 +388,25 @@ object SmsParser {
         sender: String
     ): PotentialTransaction {
         val renameRules = merchantRenameRuleProvider.getAllRules().associateBy({ it.originalName.lowercase() }, { it.newName })
+        var finalCategoryId: Int? = null
+
+        // --- FIX: Perform category lookup on the ORIGINAL merchant name FIRST ---
+        txn.merchantName?.let { originalMerchant ->
+            finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(originalMerchant)
+            // Fallback to keyword if no direct mapping exists
+            if (finalCategoryId == null) {
+                finalCategoryId = findCategoryIdByKeyword(originalMerchant, categoryFinderProvider)
+            }
+        }
+
+        // --- Now, apply the rename rule ---
         val txnAfterRename = txn.merchantName?.let { currentMerchantName ->
             renameRules[currentMerchantName.lowercase()]?.let { newMerchantName ->
                 txn.copy(merchantName = newMerchantName)
             }
         } ?: txn
 
-        var finalCategoryId: Int? = null
-        txnAfterRename.merchantName?.let { merchant ->
-            finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(merchant)
-            if (finalCategoryId == null) {
-                finalCategoryId = findCategoryIdByKeyword(merchant, categoryFinderProvider)
-            }
-        }
+        // --- Finally, build the transaction, applying the category ID we found earlier ---
         val txnAfterCategorization = if (finalCategoryId != null) {
             txnAfterRename.copy(categoryId = finalCategoryId)
         } else {
