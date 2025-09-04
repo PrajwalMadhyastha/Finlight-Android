@@ -3,6 +3,17 @@
 // REASON: FIX - Resolved multiple build errors by removing dependencies on the
 // Android logcat, correcting nullable object access with safe calls, and fixing
 // an incorrect property name in a data class copy operation.
+// FEATURE - Added a new `IgnoredByClassifier` state to the ParseResult sealed
+// class. This allows the UI to specifically show when the ML model was the
+// reason a message was ignored, improving the debugger's transparency.
+// FIX - Refactored the final enrichment stage to use immutable variables (`val`)
+// and chained copy calls. This resolves smart cast and nullability build errors
+// by ensuring the transaction object is not mutated within a closure.
+// REFACTOR - The main parsing logic has been split into two distinct functions.
+// `parseWithOnlyCustomRules` exclusively checks for user-defined rules. The main
+// `parseWithReason` function now handles the rest of the pipeline (ignore rules,
+// heuristics, generic regexes). This allows the `SmsReceiver` to implement the
+// correct parsing hierarchy.
 // =================================================================================
 package io.pm.finlight
 
@@ -16,6 +27,7 @@ sealed class ParseResult {
     data class Success(val transaction: PotentialTransaction) : ParseResult()
     data class Ignored(val reason: String) : ParseResult()
     data class NotParsed(val reason: String) : ParseResult()
+    data class IgnoredByClassifier(val confidence: Float, val reason: String = "Ignored by ML model") : ParseResult()
 }
 
 object SmsParser {
@@ -175,9 +187,70 @@ object SmsParser {
     ): PotentialTransaction? {
         return when (val result = parseWithReason(sms, mappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)) {
             is ParseResult.Success -> result.transaction
-            is ParseResult.Ignored, is ParseResult.NotParsed -> null
+            is ParseResult.Ignored, is ParseResult.NotParsed, is ParseResult.IgnoredByClassifier -> null
         }
     }
+
+    /**
+     * NEW: A dedicated function to check ONLY custom user rules. This is the highest priority check.
+     * Returns a fully enriched PotentialTransaction if a rule matches.
+     */
+    suspend fun parseWithOnlyCustomRules(
+        sms: SmsMessage,
+        customSmsRuleProvider: CustomSmsRuleProvider,
+        merchantRenameRuleProvider: MerchantRenameRuleProvider,
+        merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
+        categoryFinderProvider: CategoryFinderProvider
+    ): ParseResult? {
+        val normalizedBody = sms.body.replace(Regex("\\s+"), " ").trim()
+        val customRules = customSmsRuleProvider.getAllRules()
+
+        for (rule in customRules) {
+            if (normalizedBody.contains(rule.triggerPhrase, ignoreCase = true)) {
+                var customAmount: Double? = null
+                rule.amountRegex?.let { regex ->
+                    try {
+                        val match = regex.toRegex(RegexOption.IGNORE_CASE).find(normalizedBody)
+                        match?.groups?.get(1)?.value?.let { customAmount = it.replace(",", "").toDoubleOrNull() }
+                    } catch (e: PatternSyntaxException) { /* Ignore */ }
+                }
+
+                if (customAmount != null) {
+                    var customMerchant: String? = null
+                    rule.merchantRegex?.let { regex ->
+                        try {
+                            val match = regex.toRegex(RegexOption.IGNORE_CASE).find(normalizedBody)
+                            customMerchant = match?.groups?.get(1)?.value?.trim()
+                        } catch (e: PatternSyntaxException) { /* Ignore */ }
+                    }
+
+                    var customAccountStr: String? = null
+                    rule.accountRegex?.let { regex ->
+                        try {
+                            val match = regex.toRegex(RegexOption.IGNORE_CASE).find(normalizedBody)
+                            customAccountStr = match?.groups?.get(1)?.value?.trim()
+                        } catch (e: PatternSyntaxException) { /* Ignore */ }
+                    }
+
+                    val potentialTxn = PotentialTransaction(
+                        sourceSmsId = sms.id,
+                        smsSender = sms.sender,
+                        amount = customAmount,
+                        transactionType = if (EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "expense" else "income",
+                        merchantName = customMerchant,
+                        originalMessage = sms.body,
+                        potentialAccount = customAccountStr?.let { PotentialAccount(it, "Unknown") },
+                        date = sms.date
+                    )
+                    // Enrich and return immediately if a custom rule matches
+                    val finalTxn = enrichTransaction(potentialTxn, merchantRenameRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, normalizedBody, sms.sender)
+                    return ParseResult.Success(finalTxn)
+                }
+            }
+        }
+        return null // No custom rule matched
+    }
+
 
     /**
      * Primary parsing function with detailed result.
@@ -217,74 +290,27 @@ object SmsParser {
 
         var potentialTxn: PotentialTransaction? = null
 
-        // --- Stage 2: Attempt parsing with high-priority Custom Rules ---
-        val customRules = customSmsRuleProvider.getAllRules()
-        for (rule in customRules) {
-            if (normalizedBody.contains(rule.triggerPhrase, ignoreCase = true)) {
-                var customAmount: Double? = null
-                rule.amountRegex?.let { regex ->
-                    try {
-                        val match = regex.toRegex(RegexOption.IGNORE_CASE).find(normalizedBody)
-                        match?.groups?.get(1)?.value?.let { customAmount = it.replace(",", "").toDoubleOrNull() }
-                    } catch (e: PatternSyntaxException) { /* Ignore */ }
-                }
+        // --- Stage 2: Attempt Heuristic Template Parsing ---
+        val allTemplates = smsParseTemplateProvider.getAllTemplates()
+        if (allTemplates.isNotEmpty()) {
+            var bestMatch: SmsParseTemplate? = null
+            var highestScore = 0.0
 
-                if (customAmount != null) {
-                    var customMerchant: String? = null
-                    rule.merchantRegex?.let { regex ->
-                        try {
-                            val match = regex.toRegex(RegexOption.IGNORE_CASE).find(normalizedBody)
-                            customMerchant = match?.groups?.get(1)?.value?.trim()
-                        } catch (e: PatternSyntaxException) { /* Ignore */ }
-                    }
-
-                    var customAccountStr: String? = null
-                    rule.accountRegex?.let { regex ->
-                        try {
-                            val match = regex.toRegex(RegexOption.IGNORE_CASE).find(normalizedBody)
-                            customAccountStr = match?.groups?.get(1)?.value?.trim()
-                        } catch (e: PatternSyntaxException) { /* Ignore */ }
-                    }
-
-                    potentialTxn = PotentialTransaction(
-                        sourceSmsId = sms.id,
-                        smsSender = sms.sender,
-                        amount = customAmount!!,
-                        transactionType = if (EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "expense" else "income",
-                        merchantName = customMerchant,
-                        originalMessage = sms.body,
-                        potentialAccount = customAccountStr?.let { PotentialAccount(it, "Unknown") },
-                        date = sms.date
-                    )
-                    break // Found a custom rule match, move to enrichment
+            for (template in allTemplates) {
+                val score = calculateSimilarity(normalizedBody, template.originalSmsBody)
+                if (score > highestScore) {
+                    highestScore = score
+                    bestMatch = template
                 }
             }
-        }
 
-        // --- Stage 3: If no custom rule matched, attempt Heuristic Template Parsing ---
-        if (potentialTxn == null) {
-            val allTemplates = smsParseTemplateProvider.getAllTemplates()
-            if (allTemplates.isNotEmpty()) {
-                var bestMatch: SmsParseTemplate? = null
-                var highestScore = 0.0
-
-                for (template in allTemplates) {
-                    val score = calculateSimilarity(normalizedBody, template.originalSmsBody)
-                    if (score > highestScore) {
-                        highestScore = score
-                        bestMatch = template
-                    }
-                }
-
-                if (bestMatch != null && highestScore >= SIMILARITY_THRESHOLD) {
-                    println("$TAG: Found heuristic match with score $highestScore. Template ID: ${bestMatch.id}")
-                    potentialTxn = applyTemplate(normalizedBody, bestMatch, sms)
-                }
+            if (bestMatch != null && highestScore >= SIMILARITY_THRESHOLD) {
+                potentialTxn = applyTemplate(normalizedBody, bestMatch, sms)
             }
         }
 
 
-        // --- Stage 4: If still no match, fall back to Generic Regex Parsing ---
+        // --- Stage 3: If still no match, fall back to Generic Regex Parsing ---
         if (potentialTxn == null) {
             var extractedAmount: Double? = null
             var detectedCurrency: String? = null
@@ -346,43 +372,50 @@ object SmsParser {
             return ParseResult.NotParsed("No parsing method succeeded.")
         }
 
-        // --- FIX: Create a new non-nullable var for enrichment to satisfy smart casting ---
-        var enrichedTxn = potentialTxn!!
+        val finalTxn = enrichTransaction(potentialTxn, merchantRenameRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, normalizedBody, sms.sender)
+        return ParseResult.Success(finalTxn)
+    }
 
-        // Apply merchant rename rules
+    /**
+     * A helper function to apply all enrichment steps to a PotentialTransaction.
+     */
+    private suspend fun enrichTransaction(
+        txn: PotentialTransaction,
+        merchantRenameRuleProvider: MerchantRenameRuleProvider,
+        merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
+        categoryFinderProvider: CategoryFinderProvider,
+        normalizedBody: String,
+        sender: String
+    ): PotentialTransaction {
         val renameRules = merchantRenameRuleProvider.getAllRules().associateBy({ it.originalName.lowercase() }, { it.newName })
-        enrichedTxn.merchantName?.let { currentMerchantName ->
+        val txnAfterRename = txn.merchantName?.let { currentMerchantName ->
             renameRules[currentMerchantName.lowercase()]?.let { newMerchantName ->
-                enrichedTxn = enrichedTxn.copy(merchantName = newMerchantName)
+                txn.copy(merchantName = newMerchantName)
             }
-        }
+        } ?: txn
 
-        // Tiered Auto-Categorization
         var finalCategoryId: Int? = null
-        enrichedTxn.merchantName?.let { merchant ->
-            // Priority 1: User-learned mappings
+        txnAfterRename.merchantName?.let { merchant ->
             finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(merchant)
-            // Priority 2: Keyword heuristics
             if (finalCategoryId == null) {
                 finalCategoryId = findCategoryIdByKeyword(merchant, categoryFinderProvider)
             }
         }
-        if (finalCategoryId != null) {
-            enrichedTxn = enrichedTxn.copy(categoryId = finalCategoryId)
+        val txnAfterCategorization = if (finalCategoryId != null) {
+            txnAfterRename.copy(categoryId = finalCategoryId)
+        } else {
+            txnAfterRename
         }
 
-        // Fill in any remaining details
-        val finalAccount = enrichedTxn.potentialAccount ?: parseAccount(normalizedBody, sms.sender)
-        val smsHash = (sms.sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
+        val finalAccount = txnAfterCategorization.potentialAccount ?: parseAccount(normalizedBody, sender)
+        val smsHash = (sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
         val smsSignature = generateSmsSignature(normalizedBody)
 
-        enrichedTxn = enrichedTxn.copy(
+        return txnAfterCategorization.copy(
             potentialAccount = finalAccount,
             sourceSmsHash = smsHash,
             smsSignature = smsSignature
         )
-
-        return ParseResult.Success(enrichedTxn)
     }
 
     // --- Private Helper Functions ---

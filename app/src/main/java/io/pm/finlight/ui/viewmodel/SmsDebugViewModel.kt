@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModel.kt
-// REASON: REFACTOR - The ViewModel's calls to the SmsParser have been updated to
-// provide an implementation for the new SmsParseTemplateProvider interface. This
-// allows the debugger to correctly use the full, unified parsing pipeline,
-// including the heuristic learning engine.
+// REASON: FIX - The refresh logic in both `refreshScan` and
+// `runAutoImportAndRefresh` has been updated to fully replicate the real-time
+// parsing pipeline's "Hierarchy of Trust". It now checks for high-priority
+// user-defined rules *before* running the ML classifier, ensuring that new
+// rules are correctly applied retrospectively in the debug view.
 // =================================================================================
 package io.pm.finlight
 
@@ -12,6 +13,7 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -51,7 +53,7 @@ class SmsDebugViewModel(
                 state.debugResults
             } else {
                 state.debugResults.filter {
-                    it.parseResult is ParseResult.Ignored || it.parseResult is ParseResult.NotParsed
+                    it.parseResult !is ParseResult.Success
                 }
             }
         }
@@ -60,6 +62,7 @@ class SmsDebugViewModel(
 
     private val smsRepository = SmsRepository(application)
     private val db = AppDatabase.getInstance(application)
+    private val smsClassifier = SmsClassifier(application)
 
     // Create the required rule providers
     private val customSmsRuleProvider = object : CustomSmsRuleProvider {
@@ -79,7 +82,6 @@ class SmsDebugViewModel(
             return CategoryIconHelper.getCategoryIdByName(name)
         }
     }
-    // --- NEW: Add the new provider implementation ---
     private val smsParseTemplateProvider = object : SmsParseTemplateProvider {
         override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
     }
@@ -98,22 +100,49 @@ class SmsDebugViewModel(
             val results = mutableListOf<SmsDebugResult>()
 
             for (sms in recentSms) {
-                val parseResult = SmsParser.parseWithReason(
-                    sms = sms,
-                    mappings = emptyMap(),
-                    customSmsRuleProvider = customSmsRuleProvider,
-                    merchantRenameRuleProvider = merchantRenameRuleProvider,
-                    ignoreRuleProvider = ignoreRuleProvider,
-                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                    categoryFinderProvider = categoryFinderProvider,
-                    smsParseTemplateProvider = smsParseTemplateProvider // Pass the new provider
-                )
+                // --- UPDATED: Replicate the full pipeline from SmsReceiver ---
+                val parseResult: ParseResult = withContext(Dispatchers.IO) {
+                    // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
+                    var result: ParseResult? = SmsParser.parseWithOnlyCustomRules(
+                        sms = sms,
+                        customSmsRuleProvider = customSmsRuleProvider,
+                        merchantRenameRuleProvider = merchantRenameRuleProvider,
+                        merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                        categoryFinderProvider = categoryFinderProvider
+                    )
+
+                    // --- HIERARCHY STEP 2 & 3: If no custom rule matched, run ML pre-filter and then the main parser ---
+                    if (result == null) {
+                        val transactionConfidence = smsClassifier.classify(sms.body)
+                        result = if (transactionConfidence < 0.1) {
+                            ParseResult.IgnoredByClassifier(confidence = transactionConfidence)
+                        } else {
+                            SmsParser.parseWithReason(
+                                sms = sms,
+                                mappings = emptyMap(),
+                                customSmsRuleProvider = customSmsRuleProvider,
+                                merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                ignoreRuleProvider = ignoreRuleProvider,
+                                merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                categoryFinderProvider = categoryFinderProvider,
+                                smsParseTemplateProvider = smsParseTemplateProvider
+                            )
+                        }
+                    }
+                    result
+                }
                 results.add(SmsDebugResult(sms, parseResult))
             }
 
             _uiState.update { it.copy(isLoading = false, debugResults = results) }
         }
     }
+
+    override fun onCleared() {
+        super.onCleared()
+        smsClassifier.close() // Release TFLite resources
+    }
+
 
     fun setFilter(filter: SmsDebugFilter) {
         _uiState.update { it.copy(selectedFilter = filter) }
@@ -142,21 +171,40 @@ class SmsDebugViewModel(
 
             for (sms in recentSms) {
                 val newParseResult = withContext(Dispatchers.IO) {
-                    SmsParser.parseWithReason(
+                    // --- UPDATED: Replicate the full pipeline from SmsReceiver ---
+                    // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
+                    var result: ParseResult? = SmsParser.parseWithOnlyCustomRules(
                         sms = sms,
-                        mappings = emptyMap(),
                         customSmsRuleProvider = customSmsRuleProvider,
                         merchantRenameRuleProvider = merchantRenameRuleProvider,
-                        ignoreRuleProvider = ignoreRuleProvider,
                         merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                        categoryFinderProvider = categoryFinderProvider,
-                        smsParseTemplateProvider = smsParseTemplateProvider // Pass the new provider
+                        categoryFinderProvider = categoryFinderProvider
                     )
+
+                    // --- HIERARCHY STEP 2 & 3: If no custom rule matched, run ML pre-filter and then the main parser ---
+                    if (result == null) {
+                        val transactionConfidence = smsClassifier.classify(sms.body)
+                        result = if (transactionConfidence < 0.1) {
+                            ParseResult.IgnoredByClassifier(confidence = transactionConfidence)
+                        } else {
+                            SmsParser.parseWithReason(
+                                sms = sms,
+                                mappings = emptyMap(),
+                                customSmsRuleProvider = customSmsRuleProvider,
+                                merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                ignoreRuleProvider = ignoreRuleProvider,
+                                merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                categoryFinderProvider = categoryFinderProvider,
+                                smsParseTemplateProvider = smsParseTemplateProvider
+                            )
+                        }
+                    }
+                    result
                 }
                 newResults.add(SmsDebugResult(sms, newParseResult))
 
                 val originalResult = originalResults.find { it.smsMessage.id == sms.id }?.parseResult
-                if ((originalResult is ParseResult.Ignored || originalResult is ParseResult.NotParsed) && newParseResult is ParseResult.Success) {
+                if ((originalResult !is ParseResult.Success) && newParseResult is ParseResult.Success) {
                     if (newParseResult.transaction.sourceSmsHash !in existingSmsHashes) {
                         transactionsToImport.add(newParseResult.transaction)
                     }

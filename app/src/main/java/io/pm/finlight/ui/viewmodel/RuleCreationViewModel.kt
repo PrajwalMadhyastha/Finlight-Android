@@ -5,6 +5,10 @@
 // the UI state. The `saveRule` logic is updated to check for an active rule ID
 // and calls the DAO's `update` function instead of `insert`, completing the
 // feature's data flow.
+// FIX - The `initializeStateForCreation` function has been updated to pre-fill
+// not just the amount, but also the merchant and account fields if the parser
+// was able to extract them. This restores the intended convenience feature for
+// creating new rules from partially-failed parses.
 // =================================================================================
 package io.pm.finlight
 
@@ -65,8 +69,23 @@ class RuleCreationViewModel(application: Application) : AndroidViewModel(applica
             RuleSelection()
         }
 
+        // --- FIX: Add logic to pre-select merchant and account if found ---
+        val merchantSelection = potentialTxn.merchantName?.let {
+            val index = potentialTxn.originalMessage.indexOf(it)
+            if (index != -1) RuleSelection(it, index, index + it.length) else RuleSelection()
+        } ?: RuleSelection()
+
+        val accountSelection = potentialTxn.potentialAccount?.let {
+            val accountPart = it.formattedName.split(" ").last { part -> part.any { char -> char.isDigit() } }
+            val index = potentialTxn.originalMessage.indexOf(accountPart)
+            if (index != -1) RuleSelection(accountPart, index, index + accountPart.length) else RuleSelection()
+        } ?: RuleSelection()
+
+
         _uiState.value = RuleCreationUiState(
             amountSelection = amountSelection,
+            merchantSelection = merchantSelection,
+            accountSelection = accountSelection,
             transactionType = potentialTxn.transactionType
         )
     }

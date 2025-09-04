@@ -1,8 +1,10 @@
 // =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/BaseSmsParserTest.kt
-// REASON: FIX - Reverted the conditional mock setup. The mock for the heuristic
-// template engine is now always initialized. This resolves the NullPointerException
-// in tests where the parser logic proceeds past the ignore rule checks.
+// FILE: ./core/src/test/java/io/pm/finlight/BaseSmsParserTest.kt
+// REASON: FIX - Removed the unnecessary stubbing for the `customSmsRuleDao`.
+// This mock was being prepared for all tests but was only used by a subset,
+// causing Mockito's strict stubbing checks to raise an
+// `UnnecessaryStubbingException`. Tests that require custom rules will now
+// mock this dependency individually.
 // =================================================================================
 package io.pm.finlight.core.parser
 
@@ -84,7 +86,8 @@ abstract class BaseSmsParserTest {
         ignoreRules: List<IgnoreRule> = DEFAULT_IGNORE_PHRASES
     ) {
         // Mock the DAO methods. The providers above will then use these mocks.
-        `when`(mockCustomSmsRuleDao.getAllRules()).thenReturn(flowOf(customRules))
+        // --- UPDATED: Removed unnecessary stubbing for custom rules. ---
+        // `when`(mockCustomSmsRuleDao.getAllRules()).thenReturn(flowOf(customRules))
         `when`(mockMerchantRenameRuleDao.getAllRules()).thenReturn(flowOf(renameRules))
         `when`(mockIgnoreRuleDao.getEnabledRules()).thenReturn(ignoreRules.filter { it.isEnabled })
         // --- UPDATED: The mock is now always set up to prevent NullPointerExceptions ---
