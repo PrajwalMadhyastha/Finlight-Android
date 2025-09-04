@@ -454,21 +454,43 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+            // --- NEW: onOpen callback to run checks every time the DB is opened ---
             override fun onOpen(db: SupportSQLiteDatabase) {
                 super.onOpen(db)
                 CoroutineScope(Dispatchers.IO).launch {
+                    // This will now run on every app launch, ensuring defaults are present
+                    populateDefaultsIfNeeded(getInstance(context))
                     repairCategoryIcons(getInstance(context))
                 }
             }
 
-            suspend fun populateDatabase(db: AppDatabase) {
+            private suspend fun populateDatabase(db: AppDatabase) {
                 val accountDao = db.accountDao()
-                val categoryDao = db.categoryDao()
                 val ignoreRuleDao = db.ignoreRuleDao()
 
-                categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
-                ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
+                // This populates both categories and ignore rules
+                populateDefaultsIfNeeded(db)
+
                 accountDao.insert(Account(id = 1, name = "Cash Spends", type = "Cash"))
+            }
+
+            // --- NEW: Failsafe function to populate defaults if they are missing ---
+            private suspend fun populateDefaultsIfNeeded(db: AppDatabase) {
+                // Check if categories exist. If not, populate them.
+                val categoryDao = db.categoryDao()
+                val categoryCount = categoryDao.getAllCategories().first().size
+                if (categoryCount == 0) {
+                    Log.w("DatabaseCallback", "Categories table is empty. Repopulating default categories.")
+                    categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
+                }
+
+                // Check if ignore rules exist. If not, populate them.
+                val ignoreRuleDao = db.ignoreRuleDao()
+                val ignoreRuleCount = ignoreRuleDao.getAll().first().size
+                if (ignoreRuleCount == 0) {
+                    Log.w("DatabaseCallback", "Ignore rules table is empty. Repopulating default rules.")
+                    ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
+                }
             }
 
             private suspend fun repairCategoryIcons(db: AppDatabase) {

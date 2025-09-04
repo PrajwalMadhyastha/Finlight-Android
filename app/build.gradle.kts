@@ -218,4 +218,12 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     // --- REVERTED: The exclude rule is no longer needed due to the resolutionStrategy ---
     implementation("androidx.work:work-runtime-ktx:$workVersion")
+
+    // --- TENSORFLOW LITE (UPDATED) ---
+    // Switched from task-text to the core TFLite libraries for better control and compatibility.
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    // Flex Delegate to support advanced text ops (needed for both app and tests)
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+    androidTestImplementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
 }

@@ -1,4 +1,9 @@
-// build.gradle.kts for the :analyzer module
+// =================================================================================
+// FILE: ./analyzer/build.gradle.kts
+// REASON: REFACTOR - The mainClass for the application has been changed to point
+// to the new DatasetGeneratorKt. This makes the new script directly runnable
+// for the purpose of creating the TFLite model's training data.
+// =================================================================================
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -28,8 +33,9 @@ dependencies {
 }
 
 application {
-    // Define the main class for the runnable application.
-    mainClass.set("io.pm.finlight.analyzer.SmsAnalysisToolKt")
+    // --- UPDATED: Changed the main class to our new dataset generator.
+    // To run the old tool, change this back to "io.pm.finlight.analyzer.SmsAnalysisToolKt"
+    mainClass.set("io.pm.finlight.analyzer.DatasetGeneratorKt")
 }
 
 tasks.withType<KotlinCompile>().configureEach {
