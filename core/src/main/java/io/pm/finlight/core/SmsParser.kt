@@ -406,6 +406,14 @@ object SmsParser {
             }
         } ?: txn
 
+        // --- If we haven't found a category yet, try again with the RENAMED merchant name ---
+        if (finalCategoryId == null) {
+            txnAfterRename.merchantName?.let { renamedMerchant ->
+                finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(renamedMerchant)
+            }
+        }
+
+
         // --- Finally, build the transaction, applying the category ID we found earlier ---
         val txnAfterCategorization = if (finalCategoryId != null) {
             txnAfterRename.copy(categoryId = finalCategoryId)
