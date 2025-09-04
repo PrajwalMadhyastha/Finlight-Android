@@ -3,6 +3,10 @@
 // REASON: FEATURE - Added a "Load More" button to the bottom of the list. This
 // allows the user to progressively increase the number of recent SMS messages
 // being analyzed, from 100 to 200, and so on.
+// FEATURE - The UI has been updated to handle and display the new
+// `IgnoredByClassifier` parse result. It now shows a specific message and the
+// model's confidence score when an SMS is ignored by the ML model, providing
+// full transparency into the entire parsing pipeline.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -141,20 +145,24 @@ fun SmsDebugScreen(
 
 @Composable
 private fun SmsDebugItem(result: SmsDebugResult, navController: NavController) {
+    // --- UPDATED: Handle the new IgnoredByClassifier state ---
     val statusColor = when (result.parseResult) {
         is ParseResult.Success -> MaterialTheme.colorScheme.primary
         is ParseResult.Ignored -> MaterialTheme.colorScheme.onSurfaceVariant
         is ParseResult.NotParsed -> MaterialTheme.colorScheme.error
+        is ParseResult.IgnoredByClassifier -> MaterialTheme.colorScheme.secondary
     }
     val icon = when (result.parseResult) {
         is ParseResult.Success -> Icons.Default.CheckCircle
         is ParseResult.Ignored -> Icons.Default.Block
         is ParseResult.NotParsed -> Icons.Default.Warning
+        is ParseResult.IgnoredByClassifier -> Icons.Default.AutoAwesome
     }
     val title = when (result.parseResult) {
         is ParseResult.Success -> "Parsed Successfully"
-        is ParseResult.Ignored -> "Ignored"
+        is ParseResult.Ignored -> "Ignored by Rule"
         is ParseResult.NotParsed -> "Not Parsed"
+        is ParseResult.IgnoredByClassifier -> "Ignored by ML Model"
     }
 
 
@@ -198,6 +206,15 @@ private fun SmsDebugItem(result: SmsDebugResult, navController: NavController) {
                 }
                 is ParseResult.NotParsed -> {
                     Text("Reason: ${parseResult.reason}", color = statusColor)
+                    CreateRuleButton(result.smsMessage, navController)
+                }
+                // --- UPDATED: Display logic for the ML model result ---
+                is ParseResult.IgnoredByClassifier -> {
+                    val confidencePercent = (1 - parseResult.confidence) * 100
+                    Text(
+                        "Reason: ${parseResult.reason} (${"%.1f".format(confidencePercent)}% confident it's not a transaction)",
+                        color = statusColor
+                    )
                     CreateRuleButton(result.smsMessage, navController)
                 }
             }

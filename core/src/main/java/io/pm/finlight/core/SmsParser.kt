@@ -3,6 +3,12 @@
 // REASON: FIX - Resolved multiple build errors by removing dependencies on the
 // Android logcat, correcting nullable object access with safe calls, and fixing
 // an incorrect property name in a data class copy operation.
+// FEATURE - Added a new `IgnoredByClassifier` state to the ParseResult sealed
+// class. This allows the UI to specifically show when the ML model was the
+// reason a message was ignored, improving the debugger's transparency.
+// FIX - Refactored the final enrichment stage to use immutable variables (`val`)
+// and chained copy calls. This resolves smart cast and nullability build errors
+// by ensuring the transaction object is not mutated within a closure.
 // =================================================================================
 package io.pm.finlight
 
@@ -16,6 +22,7 @@ sealed class ParseResult {
     data class Success(val transaction: PotentialTransaction) : ParseResult()
     data class Ignored(val reason: String) : ParseResult()
     data class NotParsed(val reason: String) : ParseResult()
+    data class IgnoredByClassifier(val confidence: Float, val reason: String = "Ignored by ML model") : ParseResult()
 }
 
 object SmsParser {
@@ -175,7 +182,7 @@ object SmsParser {
     ): PotentialTransaction? {
         return when (val result = parseWithReason(sms, mappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)) {
             is ParseResult.Success -> result.transaction
-            is ParseResult.Ignored, is ParseResult.NotParsed -> null
+            is ParseResult.Ignored, is ParseResult.NotParsed, is ParseResult.IgnoredByClassifier -> null
         }
     }
 
@@ -346,43 +353,38 @@ object SmsParser {
             return ParseResult.NotParsed("No parsing method succeeded.")
         }
 
-        // --- FIX: Create a new non-nullable var for enrichment to satisfy smart casting ---
-        var enrichedTxn = potentialTxn!!
-
-        // Apply merchant rename rules
+        // --- FIX: Use immutable vals and chained .copy() calls to avoid smart cast issues ---
         val renameRules = merchantRenameRuleProvider.getAllRules().associateBy({ it.originalName.lowercase() }, { it.newName })
-        enrichedTxn.merchantName?.let { currentMerchantName ->
+        val txnAfterRename = potentialTxn.merchantName?.let { currentMerchantName ->
             renameRules[currentMerchantName.lowercase()]?.let { newMerchantName ->
-                enrichedTxn = enrichedTxn.copy(merchantName = newMerchantName)
+                potentialTxn.copy(merchantName = newMerchantName)
             }
-        }
+        } ?: potentialTxn
 
-        // Tiered Auto-Categorization
         var finalCategoryId: Int? = null
-        enrichedTxn.merchantName?.let { merchant ->
-            // Priority 1: User-learned mappings
+        txnAfterRename.merchantName?.let { merchant ->
             finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(merchant)
-            // Priority 2: Keyword heuristics
             if (finalCategoryId == null) {
                 finalCategoryId = findCategoryIdByKeyword(merchant, categoryFinderProvider)
             }
         }
-        if (finalCategoryId != null) {
-            enrichedTxn = enrichedTxn.copy(categoryId = finalCategoryId)
+        val txnAfterCategorization = if (finalCategoryId != null) {
+            txnAfterRename.copy(categoryId = finalCategoryId)
+        } else {
+            txnAfterRename
         }
 
-        // Fill in any remaining details
-        val finalAccount = enrichedTxn.potentialAccount ?: parseAccount(normalizedBody, sms.sender)
+        val finalAccount = txnAfterCategorization.potentialAccount ?: parseAccount(normalizedBody, sms.sender)
         val smsHash = (sms.sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
         val smsSignature = generateSmsSignature(normalizedBody)
 
-        enrichedTxn = enrichedTxn.copy(
+        val finalTxn = txnAfterCategorization.copy(
             potentialAccount = finalAccount,
             sourceSmsHash = smsHash,
             smsSignature = smsSignature
         )
 
-        return ParseResult.Success(enrichedTxn)
+        return ParseResult.Success(finalTxn)
     }
 
     // --- Private Helper Functions ---

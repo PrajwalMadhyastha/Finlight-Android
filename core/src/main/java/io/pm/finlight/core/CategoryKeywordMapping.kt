@@ -14,7 +14,7 @@ internal val CATEGORY_KEYWORD_MAP: Map<String, List<String>> = mapOf(
     "Bills" to listOf("bill", "electricity", "water", "gas", "mobile", "phone", "internet", "subscription", "postpaid", "broadband", "dth", "recharge"),
     "EMI" to listOf("emi", "loan", "installment", "finance"),
     "Entertainment" to listOf("movie", "cinema", "tickets", "pvr", "inox", "bookmyshow", "netflix", "prime video", "hotstar", "spotify", "wynk", "concert", "theatre"),
-    "Food & Drinks" to listOf("food", "restaurant", "cafe", "swiggy", "zomato", "eats", "kitchen", "dining", "pizza", "burger"),
+    "Food & Drinks" to listOf("food", "restaurant", "cafe", "swiggy", "zomato", "eats", "kitchen", "dining", "pizza", "burger", "thindi", "khana", "hotel", "sagar", "bhavan", "udupi", "andhra"),
     "Fuel" to listOf("fuel", "petrol", "diesel", "gas station", "shell", "bp", "hpcl", "iocl", "indian oil"),
     "Groceries" to listOf("groceries", "supermarket", "bigbasket", "dunzo", "instamart", "blinkit", "reliance fresh", "more", "mart"),
     "Health" to listOf("health", "medical", "doctor", "pharmacy", "apollo", "pharmeasy", "1mg", "hospital", "clinic", "wellness"),

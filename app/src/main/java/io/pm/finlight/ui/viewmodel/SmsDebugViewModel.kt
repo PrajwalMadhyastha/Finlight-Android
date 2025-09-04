@@ -4,6 +4,11 @@
 // provide an implementation for the new SmsParseTemplateProvider interface. This
 // allows the debugger to correctly use the full, unified parsing pipeline,
 // including the heuristic learning engine.
+// FEATURE - The ViewModel now fully replicates the real-time parsing pipeline
+// by first running each SMS through an SmsClassifier. If the model is not
+// confident the message is a transaction, it's marked as "Ignored by ML model";
+// otherwise, it's passed to the main parser. This gives the user a transparent
+// view of the entire decision-making process.
 // =================================================================================
 package io.pm.finlight
 
@@ -12,6 +17,7 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -51,7 +57,7 @@ class SmsDebugViewModel(
                 state.debugResults
             } else {
                 state.debugResults.filter {
-                    it.parseResult is ParseResult.Ignored || it.parseResult is ParseResult.NotParsed
+                    it.parseResult !is ParseResult.Success
                 }
             }
         }
@@ -60,6 +66,7 @@ class SmsDebugViewModel(
 
     private val smsRepository = SmsRepository(application)
     private val db = AppDatabase.getInstance(application)
+    private val smsClassifier = SmsClassifier(application)
 
     // Create the required rule providers
     private val customSmsRuleProvider = object : CustomSmsRuleProvider {
@@ -79,7 +86,6 @@ class SmsDebugViewModel(
             return CategoryIconHelper.getCategoryIdByName(name)
         }
     }
-    // --- NEW: Add the new provider implementation ---
     private val smsParseTemplateProvider = object : SmsParseTemplateProvider {
         override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
     }
@@ -98,22 +104,34 @@ class SmsDebugViewModel(
             val results = mutableListOf<SmsDebugResult>()
 
             for (sms in recentSms) {
-                val parseResult = SmsParser.parseWithReason(
-                    sms = sms,
-                    mappings = emptyMap(),
-                    customSmsRuleProvider = customSmsRuleProvider,
-                    merchantRenameRuleProvider = merchantRenameRuleProvider,
-                    ignoreRuleProvider = ignoreRuleProvider,
-                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                    categoryFinderProvider = categoryFinderProvider,
-                    smsParseTemplateProvider = smsParseTemplateProvider // Pass the new provider
-                )
+                // --- UPDATED: Replicate the full pipeline from SmsReceiver ---
+                val transactionConfidence = smsClassifier.classify(sms.body)
+                val parseResult = if (transactionConfidence < 0.1) {
+                    ParseResult.IgnoredByClassifier(confidence = transactionConfidence)
+                } else {
+                    SmsParser.parseWithReason(
+                        sms = sms,
+                        mappings = emptyMap(),
+                        customSmsRuleProvider = customSmsRuleProvider,
+                        merchantRenameRuleProvider = merchantRenameRuleProvider,
+                        ignoreRuleProvider = ignoreRuleProvider,
+                        merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                        categoryFinderProvider = categoryFinderProvider,
+                        smsParseTemplateProvider = smsParseTemplateProvider
+                    )
+                }
                 results.add(SmsDebugResult(sms, parseResult))
             }
 
             _uiState.update { it.copy(isLoading = false, debugResults = results) }
         }
     }
+
+    override fun onCleared() {
+        super.onCleared()
+        smsClassifier.close() // Release TFLite resources
+    }
+
 
     fun setFilter(filter: SmsDebugFilter) {
         _uiState.update { it.copy(selectedFilter = filter) }
@@ -142,21 +160,27 @@ class SmsDebugViewModel(
 
             for (sms in recentSms) {
                 val newParseResult = withContext(Dispatchers.IO) {
-                    SmsParser.parseWithReason(
-                        sms = sms,
-                        mappings = emptyMap(),
-                        customSmsRuleProvider = customSmsRuleProvider,
-                        merchantRenameRuleProvider = merchantRenameRuleProvider,
-                        ignoreRuleProvider = ignoreRuleProvider,
-                        merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                        categoryFinderProvider = categoryFinderProvider,
-                        smsParseTemplateProvider = smsParseTemplateProvider // Pass the new provider
-                    )
+                    // Re-run the full pipeline to see if the new rule makes a difference
+                    val transactionConfidence = smsClassifier.classify(sms.body)
+                    if (transactionConfidence < 0.1) {
+                        ParseResult.IgnoredByClassifier(confidence = transactionConfidence)
+                    } else {
+                        SmsParser.parseWithReason(
+                            sms = sms,
+                            mappings = emptyMap(),
+                            customSmsRuleProvider = customSmsRuleProvider,
+                            merchantRenameRuleProvider = merchantRenameRuleProvider,
+                            ignoreRuleProvider = ignoreRuleProvider,
+                            merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                            categoryFinderProvider = categoryFinderProvider,
+                            smsParseTemplateProvider = smsParseTemplateProvider
+                        )
+                    }
                 }
                 newResults.add(SmsDebugResult(sms, newParseResult))
 
                 val originalResult = originalResults.find { it.smsMessage.id == sms.id }?.parseResult
-                if ((originalResult is ParseResult.Ignored || originalResult is ParseResult.NotParsed) && newParseResult is ParseResult.Success) {
+                if ((originalResult !is ParseResult.Success) && newParseResult is ParseResult.Success) {
                     if (newParseResult.transaction.sourceSmsHash !in existingSmsHashes) {
                         transactionsToImport.add(newParseResult.transaction)
                     }
