@@ -18,6 +18,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
@@ -28,6 +29,7 @@ import java.util.Date
 
 class SmsReceiver : BroadcastReceiver() {
     private val tag = "SmsReceiver"
+    private lateinit var smsClassifier: SmsClassifier // --- NEW: Add classifier instance ---
 
     override fun onReceive(
         context: Context,
@@ -35,6 +37,12 @@ class SmsReceiver : BroadcastReceiver() {
     ) {
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             val pendingResult = goAsync()
+
+            // --- NEW: Lazily initialize the classifier on first use ---
+            if (!::smsClassifier.isInitialized) {
+                smsClassifier = SmsClassifier(context)
+            }
+
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
@@ -45,6 +53,17 @@ class SmsReceiver : BroadcastReceiver() {
 
                         val fullBody = parts.joinToString("") { it.messageBody }
                         val smsId = parts.first().timestampMillis
+
+                        // --- NEW: ML Model Pre-Filter ---
+                        val transactionConfidence = smsClassifier.classify(fullBody)
+                        // We are confident it's NON-TRANSACTIONAL if the score for the TRANSACTION class is very low.
+                        // For example, if the model is >90% confident it's junk, the transaction score will be < 0.1.
+                        if (transactionConfidence < 0.1) {
+                            Log.d(tag, "ML model ignored SMS with confidence: ${1 - transactionConfidence}. Body: $fullBody")
+                            continue // Skip to the next message
+                        }
+                        // --- END: ML Model Pre-Filter ---
+
 
                         val db = AppDatabase.getInstance(context)
                         val settingsRepository = SettingsRepository(context)
@@ -205,4 +224,3 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 }
-

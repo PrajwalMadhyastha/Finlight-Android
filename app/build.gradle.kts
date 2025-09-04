@@ -218,4 +218,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     // --- REVERTED: The exclude rule is no longer needed due to the resolutionStrategy ---
     implementation("androidx.work:work-runtime-ktx:$workVersion")
+
+    implementation("org.tensorflow:tensorflow-lite-task-text:0.4.4")
 }
