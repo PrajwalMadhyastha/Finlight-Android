@@ -1,21 +1,56 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# =================================================================================
+# FILE: ./app/proguard-rules.pro
+# REASON: REFACTOR - Removed the ProGuard rules for the Google Drive API, as
+# the corresponding dependencies have been removed from the project.
+# =================================================================================
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# --- General Android & Kotlin ---
+-keep class kotlin.jvm.internal.DefaultConstructorMarker
+#-dontwarn kotlin.collections.List
+-keepattributes Signature
+-keepattributes InnerClasses
+-keepattributes *Annotation*
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# --- Coroutines ---
+-keep class kotlin.coroutines.Continuation
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# --- Room ---
+# Keep all data classes used as Room entities, DTOs, and their fields.
+-keep class io.pm.finlight.** { *; }
+-keep class io.pm.finlight.core.** { *; }
+-keep class io.pm.finlight.data.model.** { *; }
+-keep class io.pm.finlight.data.db.dao.** { *; }
+
+# --- Kotlinx Serialization ---
+# Keep classes annotated with @Serializable and their members.
+-keepclasseswithmembers,allowobfuscation class * {
+    @kotlinx.serialization.Serializable <init>(...);
+}
+-keepnames class * {
+    @kotlinx.serialization.Serializable *;
+}
+-keep class kotlinx.serialization.** { *; }
+-keep class kotlin.text.RegexOption { *; }
+
+# --- Gson ---
+# Keep the data class used with Gson for passing data between screens.
+-keepclassmembers class io.pm.finlight.PotentialTransaction {
+    <fields>;
+}
+-keep class com.google.gson.reflect.TypeToken
+-keep class * extends com.google.gson.reflect.TypeToken
+
+# --- MPAndroidChart ---
+# This library can have issues with R8, so keep the entire package.
+-keep class com.github.mikephil.charting.** { *; }
+
+# --- SQLCipher ---
+-keep class net.sqlcipher.** { *; }
+
+# --- REMOVED: Google Drive API rules are no longer needed ---
+
+# --- Compose ---
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable *(...);
+}
+-keep class androidx.compose.runtime.internal.ComposableLambdaImpl

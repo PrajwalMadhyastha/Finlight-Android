@@ -1,7 +1,6 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: REFACTOR - Added a dependency on the new 'core' module to make the
-// shared parsing logic available to the main application.
+// REASON: REFACTOR - Removed the unused Google Drive API dependencies.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -27,7 +26,6 @@ val coilVersion = "2.6.0"
 val imageCropperVersion = "4.5.0"
 val mockitoVersion = "5.11.0"
 val sqlcipherVersion = "4.5.4"
-val googleApiVersion = "1.23.0"
 
 
 // Read properties from local.properties
@@ -93,7 +91,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true // --- UPDATED: Minification is now enabled ---
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -145,6 +143,8 @@ dependencies {
     // --- NEW: Add dependency on the core module ---
     implementation(project(":core"))
     testImplementation(project(":core"))
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
+
 
     implementation("androidx.core:core-ktx:$coreKtxVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
@@ -181,12 +181,7 @@ dependencies {
 
     implementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
 
-    implementation("com.google.api-client:google-api-client-android:$googleApiVersion") {
-        exclude(group = "org.apache.httpcomponents")
-    }
-    implementation("com.google.apis:google-api-services-drive:v3-rev136-1.25.0") {
-        exclude(group = "org.apache.httpcomponents")
-    }
+    // --- REMOVED: Unused Google Drive API dependencies ---
 
 
     // Local unit tests
