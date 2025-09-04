@@ -21,7 +21,7 @@ internal val CATEGORY_KEYWORD_MAP: Map<String, List<String>> = mapOf(
     "Investment" to listOf("investment", "stocks", "mutual fund", "zerodha", "groww", "upstox", "etmoney", "sip"),
     "Shopping" to listOf("shopping", "amazon", "flipkart", "myntra", "ajio", "nykaa", "lifestyle", "shoppers stop", "westside", "croma", "reliance digital", "clothes", "electronics"),
     "Transfer" to listOf("transfer", "neft", "imps", "rtgs", "sent to", "received from", "credited by", "debited to"),
-    "Travel" to listOf("travel", "flight", "hotel", "train", "bus", "irctc", "ola", "uber", "makemytrip", "goibibo", "redbus", "indigo", "vistara", "airindia"),
+    "Travel" to listOf("travel", "flight", "hotel", "train", "bus", "irctc", "ola", "uber", "makemytrip", "goibibo", "redbus", "indigo", "vistara", "airindia", "ride", "drive"),
     "Salary" to listOf("salary", "payroll", "wages"),
     "Refund" to listOf("refund", "reversal"),
     "Bike" to listOf("bike", "scooter", "two wheeler", "rapido", "service", "spares"),
