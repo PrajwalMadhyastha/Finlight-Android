@@ -1,12 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+// =================================================================================
+// FILE: ./app/src/main/res/xml/backup_rules.xml
+// REASON: FIX - Added an <include> rule for the "file" domain. This is required
+// for the subsequent <exclude> rule to be valid, as you can only exclude a path
+// that is part of an included set. This resolves the lintVitalRelease build error.
+// =================================================================================
+-->
 <full-backup-content>
-    <!-- Include the encrypted database file -->
-    <include domain="database" path="finance_database.db" />
+    <!-- Include the shared preferences file -->
+    <include domain="sharedpref" path="."/>
+    <!-- Include the entire database -->
+    <include domain="database" path="."/>
+    <!--
+    NEW: Include all files in the app's internal storage directory.
+    This is necessary so we can then exclude a specific subdirectory from it.
+    -->
+    <include domain="file" path="."/>
 
-    <!-- Include the compressed JSON snapshot file from the app's root files directory -->
-    <include domain="file" path="backup_snapshot.gz" />
-
-    <!-- Exclude the directory where all image attachments are stored to save space -->
+    <!--
+    Exclude the 'attachments' directory. This directory contains user-uploaded
+    images like profile pictures, which can be large and are not critical to back up.
+    The primary database snapshot is the most important part of the backup.
+    -->
     <exclude domain="file" path="attachments/" />
 
 </full-backup-content>
