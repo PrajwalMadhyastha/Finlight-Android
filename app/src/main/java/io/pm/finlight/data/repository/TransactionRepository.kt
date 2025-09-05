@@ -1,8 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TransactionRepository.kt
-// REASON: FEATURE - Added `addTagForDateRange` and `removeTagForDateRange`
-// functions. These expose the new DAO methods to the ViewModel layer, enabling
-// the implementation of retrospective tagging for travel mode.
+// REASON: FEATURE - Added `getTransactionsByTagId` to expose the new DAO
+// method to the ViewModel layer. This is required for the new TripDetailViewModel.
 // =================================================================================
 package io.pm.finlight
 
@@ -234,5 +233,10 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
 
     suspend fun removeTagForDateRange(tagId: Int, startDate: Long, endDate: Long) {
         transactionDao.removeTagForDateRange(tagId, startDate, endDate)
+    }
+
+    // --- NEW: Get all transactions for a specific tag ---
+    fun getTransactionsByTagId(tagId: Int): Flow<List<TransactionDetails>> {
+        return transactionDao.getTransactionsByTagId(tagId)
     }
 }

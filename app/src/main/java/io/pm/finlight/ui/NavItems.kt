@@ -1,8 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/NavItems.kt
-// REASON: FEATURE - Added a new screen title mapping for the
-// `account_mapping_screen` route. This ensures the top app bar displays the
-// correct title when the user is on the new account mapping screen.
+// REASON: FEATURE - Added new screen title mappings for the "Travel History" and
+// "Trip Details" screens to ensure the top app bar displays the correct titles.
 // =================================================================================
 package io.pm.finlight.ui
 
@@ -60,5 +59,7 @@ val screenTitles = mapOf(
     "category_detail/{categoryName}/{month}/{year}" to "Category Details",
     "merchant_detail/{merchantName}/{month}/{year}" to "Merchant Details",
     "customize_dashboard" to "Customize Dashboard",
-    "account_mapping_screen" to "Map New Accounts"
+    "account_mapping_screen" to "Map New Accounts",
+    "travel_history_screen" to "Travel History",
+    "trip_detail/{tripId}/{tagId}" to "Trip Details"
 )

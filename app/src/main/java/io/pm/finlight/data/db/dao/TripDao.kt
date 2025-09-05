@@ -1,3 +1,9 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TripDao.kt
+// REASON: FEATURE - Added `getTripWithStatsById` to fetch a single trip's
+// details along with its calculated stats. This is required by the new
+// TripDetailViewModel to populate the detail screen's header.
+// =================================================================================
 package io.pm.finlight.data.db.dao
 
 import androidx.room.Dao
@@ -61,4 +67,33 @@ interface TripDao {
         ORDER BY t.startDate DESC
     """)
     fun getAllTripsWithStats(): Flow<List<TripWithStats>>
+
+    @Transaction
+    @Query("""
+        SELECT
+            t.id as tripId,
+            t.name as tripName,
+            t.startDate,
+            t.endDate,
+            t.tagId,
+            (
+                SELECT IFNULL(SUM(tx.amount), 0.0)
+                FROM transactions tx
+                JOIN transaction_tag_cross_ref ttcr ON tx.id = ttcr.transactionId
+                WHERE ttcr.tagId = t.tagId AND tx.isSplit = 0 AND tx.transactionType = 'expense' AND tx.isExcluded = 0
+            ) + (
+                SELECT IFNULL(SUM(s.amount), 0.0)
+                FROM split_transactions s
+                JOIN transactions p ON s.parentTransactionId = p.id
+                JOIN transaction_tag_cross_ref ttcr ON p.id = ttcr.transactionId
+                WHERE ttcr.tagId = t.tagId AND p.transactionType = 'expense' AND p.isExcluded = 0
+            ) AS totalSpend,
+            COUNT(DISTINCT tx_main.id) as transactionCount
+        FROM trips t
+        LEFT JOIN transaction_tag_cross_ref ttcr_main ON t.tagId = ttcr_main.tagId
+        LEFT JOIN transactions tx_main ON ttcr_main.transactionId = tx_main.id
+        WHERE t.id = :tripId
+        GROUP BY t.id
+    """)
+    fun getTripWithStatsById(tripId: Int): Flow<TripWithStats?>
 }

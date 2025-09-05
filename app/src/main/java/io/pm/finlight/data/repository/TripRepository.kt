@@ -1,3 +1,8 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/data/repository/TripRepository.kt
+// REASON: FEATURE - Added `getTripWithStatsById` to expose the new DAO method
+// to the ViewModel layer, which is required for the Trip Detail screen.
+// =================================================================================
 package io.pm.finlight.data.repository
 
 import io.pm.finlight.Trip
@@ -13,6 +18,10 @@ class TripRepository(private val tripDao: TripDao) {
 
     fun getAllTripsWithStats(): Flow<List<TripWithStats>> {
         return tripDao.getAllTripsWithStats()
+    }
+
+    fun getTripWithStatsById(tripId: Int): Flow<TripWithStats?> {
+        return tripDao.getTripWithStatsById(tripId)
     }
 
     suspend fun getTripByTagId(tagId: Int): Trip? {

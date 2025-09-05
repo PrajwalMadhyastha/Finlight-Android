@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FEATURE - Added `addTagForDateRange` and `removeTagForDateRange`
-// functions. These are essential for the retrospective travel mode tagging
-// feature, allowing for the batch application or removal of tags for all
-// transactions within a specified date range.
+// REASON: FEATURE - Added `getTransactionsByTagId` to fetch all transactions
+// associated with a specific trip tag. This is required for the new
+// TripDetailScreen to display the list of expenses for a selected trip.
 // =================================================================================
 package io.pm.finlight
 
@@ -675,4 +674,18 @@ interface TransactionDao {
         )
     """)
     suspend fun removeTagForDateRange(tagId: Int, startDate: Long, endDate: Long)
+
+    // --- NEW: Get all transactions for a specific tag ---
+    @androidx.room.Transaction
+    @Query("""
+        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey
+        FROM transactions AS T
+        INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.transactionId
+        LEFT JOIN accounts AS A ON T.accountId = A.id
+        LEFT JOIN categories AS C ON T.categoryId = C.id
+        WHERE TTCR.tagId = :tagId
+        ORDER BY T.date DESC
+    """)
+    fun getTransactionsByTagId(tagId: Int): Flow<List<TransactionDetails>>
+
 }

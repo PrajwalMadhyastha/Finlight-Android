@@ -1,7 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FEATURE - Added the new "Travel History" screen to the navigation
-// graph. This makes the feature accessible to the user from the Profile screen.
+// REASON: FIX - Added the missing composable entry for the "trip_detail" route
+// to the NavHost. This resolves the IllegalArgumentException crash that occurred
+// when trying to navigate to a destination that was not registered in the
+// navigation graph.
 // =================================================================================
 package io.pm.finlight
 
@@ -275,7 +277,8 @@ fun MainAppScreen() {
         "customize_dashboard",
         "account_mapping_screen",
         "sms_debug_screen",
-        "travel_history_screen" // --- NEW: Add new screen to exclusion list ---
+        "travel_history_screen",
+        "trip_detail"
     )
 
     val currentTitle = if (showBottomBar) {
@@ -1051,7 +1054,6 @@ fun AppNavHost(
                 year = year
             )
         }
-        // --- NEW: Add Travel History route ---
         composable(
             "travel_history_screen",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
@@ -1060,6 +1062,26 @@ fun AppNavHost(
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) {
             TravelHistoryScreen(navController = navController)
+        }
+        // --- NEW: Add Trip Detail route ---
+        composable(
+            "trip_detail/{tripId}/{tagId}",
+            arguments = listOf(
+                navArgument("tripId") { type = NavType.IntType },
+                navArgument("tagId") { type = NavType.IntType }
+            ),
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+        ) { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getInt("tripId") ?: 0
+            val tagId = backStackEntry.arguments?.getInt("tagId") ?: 0
+            TripDetailScreen(
+                navController = navController,
+                tripId = tripId,
+                tagId = tagId
+            )
         }
     }
 }
