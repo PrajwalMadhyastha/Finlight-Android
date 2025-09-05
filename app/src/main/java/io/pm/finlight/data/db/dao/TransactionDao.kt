@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FEATURE - Added the `reassignTransactions` function. This is a core
-// component of the new account merging feature, allowing all transactions from
-// one or more source accounts to be moved to a single destination account.
+// REASON: FEATURE - Added `addTagForDateRange` and `removeTagForDateRange`
+// functions. These are essential for the retrospective travel mode tagging
+// feature, allowing for the batch application or removal of tags for all
+// transactions within a specified date range.
 // =================================================================================
 package io.pm.finlight
 
@@ -653,4 +654,25 @@ interface TransactionDao {
     // --- NEW: Reassigns transactions from source accounts to a destination account ---
     @Query("UPDATE transactions SET accountId = :destinationAccountId WHERE accountId IN (:sourceAccountIds)")
     suspend fun reassignTransactions(sourceAccountIds: List<Int>, destinationAccountId: Int)
+
+    // --- NEW: Functions for retrospective tagging ---
+    @Query("""
+        INSERT INTO transaction_tag_cross_ref (transactionId, tagId)
+        SELECT id, :tagId
+        FROM transactions
+        WHERE date BETWEEN :startDate AND :endDate
+        AND id NOT IN (SELECT transactionId FROM transaction_tag_cross_ref WHERE tagId = :tagId)
+    """)
+    suspend fun addTagForDateRange(tagId: Int, startDate: Long, endDate: Long)
+
+    @Query("""
+        DELETE FROM transaction_tag_cross_ref
+        WHERE tagId = :tagId
+        AND transactionId IN (
+            SELECT id
+            FROM transactions
+            WHERE date BETWEEN :startDate AND :endDate
+        )
+    """)
+    suspend fun removeTagForDateRange(tagId: Int, startDate: Long, endDate: Long)
 }
