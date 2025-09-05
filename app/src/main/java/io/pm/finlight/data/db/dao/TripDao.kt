@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TripDao.kt
-// REASON: FEATURE - Added a `deleteTripById` function. This is a critical
-// part of the new "Cancel Trip" destructive action, allowing the ViewModel to
-// remove the trip's record from the historical log.
+// REASON: FEATURE - Added the `isTagUsedByTrip` query. This is a crucial check
+// for the "Manage Tags" screen to prevent a tag from being deleted if it is
+// linked to a historical trip record, thus preventing data loss.
 // =================================================================================
 package io.pm.finlight.data.db.dao
 
@@ -11,7 +11,8 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
-import io.pm.finlight.Trip
+import io.pm.finlight.TripType
+import io.pm.finlight.data.db.entity.Trip
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -24,7 +25,10 @@ data class TripWithStats(
     val endDate: Long,
     val totalSpend: Double,
     val transactionCount: Int,
-    val tagId: Int
+    val tagId: Int,
+    val tripType: TripType,
+    val currencyCode: String?,
+    val conversionRate: Float?
 )
 
 @Dao
@@ -44,6 +48,9 @@ interface TripDao {
             t.startDate,
             t.endDate,
             t.tagId,
+            t.tripType,
+            t.currencyCode,
+            t.conversionRate,
             -- Sum of non-split transactions + sum of all splits for split transactions
             (
                 -- Non-split transactions
@@ -76,6 +83,9 @@ interface TripDao {
             t.startDate,
             t.endDate,
             t.tagId,
+            t.tripType,
+            t.currencyCode,
+            t.conversionRate,
             (
                 SELECT IFNULL(SUM(tx.amount), 0.0)
                 FROM transactions tx
@@ -97,8 +107,10 @@ interface TripDao {
     """)
     fun getTripWithStatsById(tripId: Int): Flow<TripWithStats?>
 
-    // --- NEW: Delete a trip by its ID ---
     @Query("DELETE FROM trips WHERE id = :tripId")
     suspend fun deleteTripById(tripId: Int)
-}
 
+    // --- NEW: Query to check if a tag is used by any trip ---
+    @Query("SELECT COUNT(id) FROM trips WHERE tagId = :tagId")
+    suspend fun isTagUsedByTrip(tagId: Int): Int
+}

@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/CurrencyViewModel.kt
-// REASON: FEATURE - Added `completeTrip` and `cancelTrip` functions to handle
-// the different user intentions for ending a travel plan. The `saveTravelModeSettings`
-// function is now responsible for both creating and updating trip records,
-// including cleaning up old tags when date ranges change.
+// REASON: FIX - The `cancelTrip` function has been corrected. It now calls
+// `removeTagForDateRange` instead of the destructive `removeAllTransactionsForTag`.
+// This ensures that canceling a trip only untags transactions within that
+// specific trip's date range, preserving the integrity of historical trips
+// that may share the same name/tag.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -12,11 +13,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TripWithStats
+import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.data.repository.TripRepository
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class CurrencyViewModel(application: Application) : AndroidViewModel(application) {
@@ -40,6 +40,17 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = null
         )
+
+    private val _tripToEdit = MutableStateFlow<TripWithStats?>(null)
+    val tripToEdit: StateFlow<TripWithStats?> = _tripToEdit.asStateFlow()
+
+    fun loadTripForEditing(tripId: Int) {
+        viewModelScope.launch {
+            tripRepository.getTripWithStatsById(tripId).collect {
+                _tripToEdit.value = it
+            }
+        }
+    }
 
     fun saveHomeCurrency(currencyCode: String) {
         viewModelScope.launch {
@@ -75,11 +86,14 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
             }
 
             val tripRecord = Trip(
-                id = existingTrip?.id ?: 0,
+                id = existingTrip?.id ?: _tripToEdit.value?.tripId ?: 0,
                 name = newSettings.tripName,
                 startDate = newSettings.startDate,
                 endDate = newSettings.endDate,
-                tagId = newTripTag.id
+                tagId = newTripTag.id,
+                tripType = newSettings.tripType,
+                currencyCode = newSettings.currencyCode,
+                conversionRate = newSettings.conversionRate
             )
             tripRepository.insert(tripRecord)
         }
@@ -94,16 +108,17 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
 
     fun cancelTrip(settings: TravelModeSettings) {
         viewModelScope.launch {
-            // Find the associated tag and trip
             val tripTag = tagRepository.findOrCreateTag(settings.tripName)
             val tripRecord = tripRepository.getTripByTagId(tripTag.id)
 
-            // Remove all transaction links for this tag
-            transactionRepository.removeAllTransactionsForTag(tripTag.id)
+            // --- FIX: Use the date-ranged removal to preserve history ---
+            // This was the source of the critical bug.
+            transactionRepository.removeTagForDateRange(tripTag.id, settings.startDate, settings.endDate)
 
-            // Delete the historical trip record if it exists
-            tripRecord?.let {
-                tripRepository.deleteTripById(it.id)
+            // Delete the historical trip record ONLY IF it matches the dates.
+            // This is a safety check in case of tag name reuse.
+            if (tripRecord != null && tripRecord.startDate == settings.startDate && tripRecord.endDate == settings.endDate) {
+                tripRepository.deleteTripById(tripRecord.id)
             }
 
             // Finally, clear the active settings

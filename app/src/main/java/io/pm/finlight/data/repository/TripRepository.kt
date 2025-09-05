@@ -1,13 +1,14 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TripRepository.kt
-// REASON: FEATURE - Added the `deleteTripById` function to expose the new DAO
-// method to the ViewModel layer. This is required for the "Cancel Trip" action.
+// REASON: FEATURE - Added the `isTagUsedByTrip` function. This exposes the new
+// DAO query to the ViewModel layer, allowing it to check for trip associations
+// before permitting a tag deletion.
 // =================================================================================
 package io.pm.finlight.data.repository
 
-import io.pm.finlight.Trip
 import io.pm.finlight.data.db.dao.TripDao
 import io.pm.finlight.data.db.dao.TripWithStats
+import io.pm.finlight.data.db.entity.Trip
 import kotlinx.coroutines.flow.Flow
 
 class TripRepository(private val tripDao: TripDao) {
@@ -28,8 +29,12 @@ class TripRepository(private val tripDao: TripDao) {
         return tripDao.getTripByTagId(tagId)
     }
 
-    // --- NEW: Expose the delete function ---
     suspend fun deleteTripById(tripId: Int) {
         tripDao.deleteTripById(tripId)
+    }
+
+    // --- NEW: Check if a tag is associated with any trip ---
+    suspend fun isTagUsedByTrip(tagId: Int): Boolean {
+        return tripDao.isTagUsedByTrip(tagId) > 0
     }
 }

@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: FEATURE - Added the new `Trip` entity and `TripDao`. The database
-// version has been incremented to 36, and MIGRATION_35_36 has been added to
-// create the `trips` table, providing the necessary structure for the new
-// Travel History feature.
+// REASON: FEATURE - Incremented the database version to 37 and added
+// MIGRATION_36_37. This migration adds the necessary columns to the `trips`
+// table to store complete trip details, enabling the "Edit Trip" feature.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -15,8 +14,8 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.pm.finlight.*
-import io.pm.finlight.data.db.dao.AccountDao
-import io.pm.finlight.data.db.dao.TripDao
+import io.pm.finlight.data.db.dao.*
+import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.security.SecurityManager
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.CoroutineScope
@@ -44,9 +43,9 @@ import net.sqlcipher.database.SupportFactory
         RecurringPattern::class,
         SplitTransaction::class,
         SmsParseTemplate::class,
-        Trip::class // --- NEW: Add Trip entity ---
+        Trip::class
     ],
-    version = 36, // --- UPDATED: Incremented version ---
+    version = 37, // --- UPDATED: Incremented version ---
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -65,13 +64,13 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun recurringPatternDao(): RecurringPatternDao
     abstract fun splitTransactionDao(): SplitTransactionDao
     abstract fun smsParseTemplateDao(): SmsParseTemplateDao
-    abstract fun tripDao(): TripDao // --- NEW: Add TripDao ---
+    abstract fun tripDao(): TripDao
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // --- All existing migrations (1-2 through 34-35) remain here ---
+        // --- All existing migrations (1-2 through 35-36) remain here ---
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN transactionType TEXT NOT NULL DEFAULT 'expense'")
@@ -404,7 +403,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_sms_parse_templates_templateSignature` ON `sms_parse_templates` (`templateSignature`)")
             }
         }
-
         val MIGRATION_34_35 = object : Migration(34, 35) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -420,20 +418,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // --- NEW: Migration to create the trips table ---
         val MIGRATION_35_36 = object : Migration(35, 36) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `trips` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `name` TEXT NOT NULL,
-                        `startDate` INTEGER NOT NULL,
-                        `endDate` INTEGER NOT NULL,
-                        `tagId` INTEGER NOT NULL,
-                        FOREIGN KEY(`tagId`) REFERENCES `tags`(`id`) ON DELETE CASCADE
+                    CREATE TABLE `trips` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                        `name` TEXT NOT NULL, 
+                        `startDate` INTEGER NOT NULL, 
+                        `endDate` INTEGER NOT NULL, 
+                        `tagId` INTEGER NOT NULL, 
+                        FOREIGN KEY(`tagId`) REFERENCES `tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE 
                     )
                 """)
-                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_trips_tagId` ON `trips` (`tagId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_trips_tagId` ON `trips` (`tagId`)")
+            }
+        }
+
+        // --- NEW: Migration to add columns to the 'trips' table ---
+        val MIGRATION_36_37 = object : Migration(36, 37) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `trips` ADD COLUMN `tripType` TEXT NOT NULL DEFAULT 'DOMESTIC'")
+                db.execSQL("ALTER TABLE `trips` ADD COLUMN `currencyCode` TEXT")
+                db.execSQL("ALTER TABLE `trips` ADD COLUMN `conversionRate` REAL")
             }
         }
 
@@ -455,8 +461,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
                             MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29,
                             MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
-                            MIGRATION_33_34, MIGRATION_34_35,
-                            MIGRATION_35_36 // --- NEW: Add migration to the builder ---
+                            MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))
@@ -474,11 +479,9 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
-            // --- NEW: onOpen callback to run checks every time the DB is opened ---
             override fun onOpen(db: SupportSQLiteDatabase) {
                 super.onOpen(db)
                 CoroutineScope(Dispatchers.IO).launch {
-                    // This will now run on every app launch, ensuring defaults are present
                     populateDefaultsIfNeeded(getInstance(context))
                     repairCategoryIcons(getInstance(context))
                 }
@@ -488,15 +491,12 @@ abstract class AppDatabase : RoomDatabase() {
                 val accountDao = db.accountDao()
                 val ignoreRuleDao = db.ignoreRuleDao()
 
-                // This populates both categories and ignore rules
                 populateDefaultsIfNeeded(db)
 
                 accountDao.insert(Account(id = 1, name = "Cash Spends", type = "Cash"))
             }
 
-            // --- NEW: Failsafe function to populate defaults if they are missing ---
             private suspend fun populateDefaultsIfNeeded(db: AppDatabase) {
-                // Check if categories exist. If not, populate them.
                 val categoryDao = db.categoryDao()
                 val categoryCount = categoryDao.getAllCategories().first().size
                 if (categoryCount == 0) {
@@ -504,7 +504,6 @@ abstract class AppDatabase : RoomDatabase() {
                     categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
                 }
 
-                // Check if ignore rules exist. If not, populate them.
                 val ignoreRuleDao = db.ignoreRuleDao()
                 val ignoreRuleCount = ignoreRuleDao.getAll().first().size
                 if (ignoreRuleCount == 0) {

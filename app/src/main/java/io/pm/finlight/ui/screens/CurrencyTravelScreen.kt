@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/CurrencyTravelScreen.kt
-// REASON: FEATURE - The UI has been completely redesigned to support explicit
-// "Complete" and "Cancel" trip actions. The ambiguous enable/disable switch has
-// been replaced with a set of clear action buttons at the bottom of the screen,
-// providing a more intuitive and powerful user experience for managing travel plans.
+// REASON: FIX - The state initialization logic has been completely rewritten to
+// correctly and separately handle the "edit mode" (from `tripToEdit`) and
+// "active mode" (from `activeTravelSettings`). This resolves the type mismatch
+// build error and ensures the UI populates correctly in all scenarios.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -41,20 +41,60 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun CurrencyTravelScreen(
     navController: NavController,
+    tripId: Int?,
     viewModel: CurrencyViewModel = viewModel()
 ) {
+    val isEditMode = tripId != null
     val homeCurrencyCode by viewModel.homeCurrency.collectAsState()
     val activeTravelSettings by viewModel.travelModeSettings.collectAsState()
+    val tripToEdit by viewModel.tripToEdit.collectAsState()
     val context = LocalContext.current
 
-    // Local UI state, derived from the active settings or default
-    var tripName by remember(activeTravelSettings) { mutableStateOf(activeTravelSettings?.tripName ?: "") }
-    var tripType by remember(activeTravelSettings) { mutableStateOf(activeTravelSettings?.tripType ?: TripType.DOMESTIC) }
-    var selectedCurrency by remember(activeTravelSettings) { mutableStateOf(CurrencyHelper.getCurrencyInfo(activeTravelSettings?.currencyCode)) }
-    var conversionRate by remember(activeTravelSettings) { mutableStateOf(activeTravelSettings?.conversionRate?.toString() ?: "") }
-    var startDate by remember(activeTravelSettings) { mutableStateOf(activeTravelSettings?.startDate) }
-    var endDate by remember(activeTravelSettings) { mutableStateOf(activeTravelSettings?.endDate) }
-    var showCreateNewTripView by remember(activeTravelSettings) { mutableStateOf(activeTravelSettings == null) }
+    // Load trip data if in edit mode
+    LaunchedEffect(tripId) {
+        if (isEditMode && tripId != null) {
+            viewModel.loadTripForEditing(tripId)
+        }
+    }
+
+    // --- FIX: Separate state initialization logic to avoid type conflicts ---
+    var tripName by remember { mutableStateOf("") }
+    var tripType by remember { mutableStateOf(TripType.DOMESTIC) }
+    var selectedCurrency by remember { mutableStateOf<CurrencyInfo?>(null) }
+    var conversionRate by remember { mutableStateOf("") }
+    var startDate by remember { mutableStateOf<Long?>(null) }
+    var endDate by remember { mutableStateOf<Long?>(null) }
+    var showCreateNewTripView by remember(activeTravelSettings, isEditMode) { mutableStateOf(activeTravelSettings == null && !isEditMode) }
+
+
+    // Effect to populate the UI state when the relevant data source changes
+    LaunchedEffect(tripToEdit, activeTravelSettings, isEditMode) {
+        val source = if (isEditMode) {
+            tripToEdit?.let {
+                // Adapt TripWithStats to a common structure
+                TravelModeSettings(
+                    isEnabled = true,
+                    tripName = it.tripName,
+                    tripType = it.tripType,
+                    startDate = it.startDate,
+                    endDate = it.endDate,
+                    currencyCode = it.currencyCode,
+                    conversionRate = it.conversionRate
+                )
+            }
+        } else {
+            activeTravelSettings
+        }
+
+        // Reset to defaults if source is null
+        tripName = source?.tripName ?: ""
+        tripType = source?.tripType ?: TripType.DOMESTIC
+        selectedCurrency = CurrencyHelper.getCurrencyInfo(source?.currencyCode)
+        conversionRate = source?.conversionRate?.toString() ?: ""
+        startDate = source?.startDate
+        endDate = source?.endDate
+    }
+
 
     // Dialog visibility states
     var showHomeCurrencyPicker by remember { mutableStateOf(false) }
@@ -117,7 +157,12 @@ fun CurrencyTravelScreen(
 
             item {
                 AnimatedVisibility(visible = !showCreateNewTripView) {
-                    SettingsSection(title = if (activeTravelSettings != null) "Active Trip Plan" else "New Trip Plan") {
+                    val sectionTitle = when {
+                        isEditMode -> "Edit Trip Plan"
+                        activeTravelSettings != null -> "Active Trip Plan"
+                        else -> "New Trip Plan"
+                    }
+                    SettingsSection(title = sectionTitle) {
                         TripSettingsForm(
                             tripName = tripName, onTripNameChange = { tripName = it },
                             tripType = tripType, onTripTypeChange = { tripType = it },
@@ -134,8 +179,7 @@ fun CurrencyTravelScreen(
             item {
                 if (!showCreateNewTripView) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Button for completing a trip (soft deactivation)
-                        if (activeTravelSettings != null) {
+                        if (activeTravelSettings != null && !isEditMode) {
                             Button(
                                 onClick = {
                                     viewModel.completeTrip()
@@ -148,7 +192,6 @@ fun CurrencyTravelScreen(
                             }
                         }
 
-                        // Button for saving a new plan or updating an existing one
                         Button(
                             onClick = {
                                 val settings = TravelModeSettings(
@@ -158,19 +201,23 @@ fun CurrencyTravelScreen(
                                     conversionRate = if (tripType == TripType.INTERNATIONAL) conversionRate.toFloatOrNull() else null
                                 )
                                 viewModel.saveTravelModeSettings(settings)
-                                val toastMessage = if (activeTravelSettings == null) "New travel plan saved!" else "Trip details updated!"
+                                val toastMessage = if (activeTravelSettings == null && !isEditMode) "New travel plan saved!" else "Trip details updated!"
                                 Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
                                 navController.popBackStack()
                             },
                             enabled = isSaveEnabled,
                             modifier = Modifier.fillMaxWidth(),
-                            colors = if (activeTravelSettings == null) ButtonDefaults.buttonColors() else ButtonDefaults.outlinedButtonColors()
+                            colors = if (activeTravelSettings == null && !isEditMode) ButtonDefaults.buttonColors() else ButtonDefaults.outlinedButtonColors()
                         ) {
-                            Text(if (activeTravelSettings == null) "Save and Activate Plan" else "Save Changes")
+                            val buttonText = when {
+                                isEditMode -> "Update Trip"
+                                activeTravelSettings == null -> "Save and Activate Plan"
+                                else -> "Save Changes"
+                            }
+                            Text(buttonText)
                         }
 
-                        // Button for canceling a trip (destructive action)
-                        if (activeTravelSettings != null) {
+                        if (activeTravelSettings != null && !isEditMode) {
                             TextButton(
                                 onClick = { showCancelConfirmation = true },
                                 modifier = Modifier.fillMaxWidth()
@@ -206,7 +253,6 @@ fun CurrencyTravelScreen(
         )
     }
 
-    // --- Dialogs for date and currency pickers ---
     if (showHomeCurrencyPicker) {
         CurrencyPickerDialog(
             title = "Select Home Currency",
@@ -217,7 +263,6 @@ fun CurrencyTravelScreen(
             }
         )
     }
-
     if (showTravelCurrencyPicker) {
         CurrencyPickerDialog(
             title = "Select Travel Currency",
@@ -228,7 +273,6 @@ fun CurrencyTravelScreen(
             }
         )
     }
-
     if (showStartDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = startDate ?: System.currentTimeMillis())
         DatePickerDialog(
@@ -242,7 +286,6 @@ fun CurrencyTravelScreen(
             dismissButton = { TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") } }
         ) { DatePicker(state = datePickerState) }
     }
-
     if (showEndDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = endDate ?: startDate ?: System.currentTimeMillis())
         DatePickerDialog(

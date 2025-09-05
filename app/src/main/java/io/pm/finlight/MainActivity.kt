@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX - Added the missing composable entry for the "trip_detail" route
-// to the NavHost. This resolves the IllegalArgumentException crash that occurred
-// when trying to navigate to a destination that was not registered in the
-// navigation graph.
+// REASON: FEATURE - Updated the NavHost entry for "currency_travel_settings" to
+// accept an optional `tripId`. This allows the Travel History screen to navigate
+// to it in "edit mode".
 // =================================================================================
 package io.pm.finlight
 
@@ -55,6 +54,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -423,7 +423,7 @@ fun MainAppScreen() {
                                 selected = isSelected,
                                 onClick = {
                                     navController.navigate(screen.route) {
-                                        popUpTo(BottomNavItem.Dashboard.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
                                             saveState = true
                                         }
                                         launchSingleTop = true
@@ -1008,13 +1008,18 @@ fun AppNavHost(
             DataSettingsScreen(navController, settingsViewModel)
         }
         composable(
-            "currency_travel_settings",
+            "currency_travel_settings?tripId={tripId}",
+            arguments = listOf(navArgument("tripId") {
+                type = NavType.IntType
+                defaultValue = -1
+            }),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) {
-            CurrencyTravelScreen(navController)
+        ) { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getInt("tripId")
+            CurrencyTravelScreen(navController, if (tripId == -1) null else tripId)
         }
         composable(
             "category_detail/{categoryName}/{month}/{year}",
@@ -1063,7 +1068,6 @@ fun AppNavHost(
         ) {
             TravelHistoryScreen(navController = navController)
         }
-        // --- NEW: Add Trip Detail route ---
         composable(
             "trip_detail/{tripId}/{tagId}",
             arguments = listOf(
