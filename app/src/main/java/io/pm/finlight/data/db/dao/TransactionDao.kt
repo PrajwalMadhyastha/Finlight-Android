@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FEATURE - Added `getTransactionsByTagId` to fetch all transactions
-// associated with a specific trip tag. This is required for the new
-// TripDetailScreen to display the list of expenses for a selected trip.
+// REASON: FEATURE - Added `removeAllTransactionsForTag`. This function is
+// required for the "Cancel Trip" action to remove all tag associations from
+// transactions before the trip record itself is deleted.
 // =================================================================================
 package io.pm.finlight
 
@@ -687,5 +687,9 @@ interface TransactionDao {
         ORDER BY T.date DESC
     """)
     fun getTransactionsByTagId(tagId: Int): Flow<List<TransactionDetails>>
+
+    // --- NEW: Remove all cross-references for a given tag ID ---
+    @Query("DELETE FROM transaction_tag_cross_ref WHERE tagId = :tagId")
+    suspend fun removeAllTransactionsForTag(tagId: Int)
 
 }

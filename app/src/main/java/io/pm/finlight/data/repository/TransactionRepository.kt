@@ -1,7 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TransactionRepository.kt
-// REASON: FEATURE - Added `getTransactionsByTagId` to expose the new DAO
-// method to the ViewModel layer. This is required for the new TripDetailViewModel.
+// REASON: FEATURE - Added `removeAllTransactionsForTag` to expose the new DAO
+// method to the ViewModel layer. This is required for the new "Cancel Trip" action.
 // =================================================================================
 package io.pm.finlight
 
@@ -238,5 +238,10 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
     // --- NEW: Get all transactions for a specific tag ---
     fun getTransactionsByTagId(tagId: Int): Flow<List<TransactionDetails>> {
         return transactionDao.getTransactionsByTagId(tagId)
+    }
+
+    // --- NEW: Expose the function to remove all tags ---
+    suspend fun removeAllTransactionsForTag(tagId: Int) {
+        transactionDao.removeAllTransactionsForTag(tagId)
     }
 }

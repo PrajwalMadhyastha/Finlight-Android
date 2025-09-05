@@ -1,7 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TripRepository.kt
-// REASON: FEATURE - Added `getTripWithStatsById` to expose the new DAO method
-// to the ViewModel layer, which is required for the Trip Detail screen.
+// REASON: FEATURE - Added the `deleteTripById` function to expose the new DAO
+// method to the ViewModel layer. This is required for the "Cancel Trip" action.
 // =================================================================================
 package io.pm.finlight.data.repository
 
@@ -26,5 +26,10 @@ class TripRepository(private val tripDao: TripDao) {
 
     suspend fun getTripByTagId(tagId: Int): Trip? {
         return tripDao.getTripByTagId(tagId)
+    }
+
+    // --- NEW: Expose the delete function ---
+    suspend fun deleteTripById(tripId: Int) {
+        tripDao.deleteTripById(tripId)
     }
 }

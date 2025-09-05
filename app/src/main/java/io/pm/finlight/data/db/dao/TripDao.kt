@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TripDao.kt
-// REASON: FEATURE - Added `getTripWithStatsById` to fetch a single trip's
-// details along with its calculated stats. This is required by the new
-// TripDetailViewModel to populate the detail screen's header.
+// REASON: FEATURE - Added a `deleteTripById` function. This is a critical
+// part of the new "Cancel Trip" destructive action, allowing the ViewModel to
+// remove the trip's record from the historical log.
 // =================================================================================
 package io.pm.finlight.data.db.dao
 
@@ -96,4 +96,9 @@ interface TripDao {
         GROUP BY t.id
     """)
     fun getTripWithStatsById(tripId: Int): Flow<TripWithStats?>
+
+    // --- NEW: Delete a trip by its ID ---
+    @Query("DELETE FROM trips WHERE id = :tripId")
+    suspend fun deleteTripById(tripId: Int)
 }
+
