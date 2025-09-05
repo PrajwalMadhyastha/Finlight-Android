@@ -1,9 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: UX REFINEMENT - The "Merge" button on the "Manage Accounts" screen is
-// now hidden when account selection mode is active. This prevents user confusion
-// by removing the action to initiate merging when the merging process is already
-// underway.
+// REASON: FEATURE - Added the new "Travel History" screen to the navigation
+// graph. This makes the feature accessible to the user from the Profile screen.
 // =================================================================================
 package io.pm.finlight
 
@@ -55,7 +53,6 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -277,7 +274,8 @@ fun MainAppScreen() {
         "merchant_detail",
         "customize_dashboard",
         "account_mapping_screen",
-        "sms_debug_screen"
+        "sms_debug_screen",
+        "travel_history_screen" // --- NEW: Add new screen to exclusion list ---
     )
 
     val currentTitle = if (showBottomBar) {
@@ -422,15 +420,10 @@ fun MainAppScreen() {
                                 selected = isSelected,
                                 onClick = {
                                     navController.navigate(screen.route) {
-                                        // Pop up to the start destination of the graph to avoid building up a large
-                                        // stack of destinations on the back stack as users select items
-                                        popUpTo(navController.graph.findStartDestination().id) {
+                                        popUpTo(BottomNavItem.Dashboard.route) {
                                             saveState = true
                                         }
-                                        // Avoid multiple copies of the same destination when
-                                        // reselecting the same item
                                         launchSingleTop = true
-                                        // Restore state when reselecting a previously selected item
                                         restoreState = true
                                     }
                                 }
@@ -1057,6 +1050,16 @@ fun AppNavHost(
                 month = month,
                 year = year
             )
+        }
+        // --- NEW: Add Travel History route ---
+        composable(
+            "travel_history_screen",
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+        ) {
+            TravelHistoryScreen(navController = navController)
         }
     }
 }
