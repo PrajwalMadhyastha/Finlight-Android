@@ -1,10 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/CurrencyViewModel.kt
-// REASON: FIX - The `cancelTrip` function has been corrected. It now calls
-// `removeTagForDateRange` instead of the destructive `removeAllTransactionsForTag`.
-// This ensures that canceling a trip only untags transactions within that
-// specific trip's date range, preserving the integrity of historical trips
-// that may share the same name/tag.
+// REASON: FIX - The logic has been fundamentally refactored to fix the travel
+// tagging bug. There are now two distinct functions: `saveActiveTravelPlan` for
+// managing the current trip (which affects SharedPreferences) and a new
+// `updateHistoricTrip` for editing past trips (which only affects the database).
+// This separation prevents editing a historic trip from corrupting the active
+// trip's settings, thus fixing both retrospective and auto-capture tagging.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -58,35 +59,38 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun saveTravelModeSettings(
-        newSettings: TravelModeSettings
-    ) {
+    /**
+     * Manages the active travel plan. This is for creating a NEW plan or updating the CURRENTLY ACTIVE one.
+     * This function interacts with SharedPreferences.
+     */
+    fun saveActiveTravelPlan(newSettings: TravelModeSettings) {
         viewModelScope.launch {
             val oldSettings = travelModeSettings.first()
 
-            // Step 1: Cleanup old tags if dates have changed
+            // Step 1: Cleanup old tags if the active plan's dates have changed
             if (oldSettings != null && (oldSettings.startDate != newSettings.startDate || oldSettings.endDate != newSettings.endDate)) {
                 val oldTripTag = tagRepository.findOrCreateTag(oldSettings.tripName)
                 transactionRepository.removeTagForDateRange(oldTripTag.id, oldSettings.startDate, oldSettings.endDate)
             }
 
-            // Step 2: Save the new settings to SharedPreferences
+            // Step 2: Save the new settings to SharedPreferences to make it the active plan
             settingsRepository.saveTravelModeSettings(newSettings)
 
             // Step 3: Find or create the tag for the new/updated trip
             val newTripTag = tagRepository.findOrCreateTag(newSettings.tripName)
 
-            // Step 4: Apply the tag to all transactions in the new date range
+            // Step 4: Retrospectively apply the tag to all transactions in the new date range
             transactionRepository.addTagForDateRange(newTripTag.id, newSettings.startDate, newSettings.endDate)
 
-            // Step 5: Create or update the historical trip record
+            // Step 5: Find the historical record associated with the OLD active plan, if any
             val existingTrip = oldSettings?.let {
                 val oldTag = tagRepository.findOrCreateTag(it.tripName)
                 tripRepository.getTripByTagId(oldTag.id)
             }
 
+            // Step 6: Create or Update the historical trip record
             val tripRecord = Trip(
-                id = existingTrip?.id ?: _tripToEdit.value?.tripId ?: 0,
+                id = existingTrip?.id ?: 0,
                 name = newSettings.tripName,
                 startDate = newSettings.startDate,
                 endDate = newSettings.endDate,
@@ -98,6 +102,41 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
             tripRepository.insert(tripRecord)
         }
     }
+
+    /**
+     * Updates a historical trip record. This function does NOT affect the active travel plan
+     * and does NOT interact with SharedPreferences.
+     */
+    fun updateHistoricTrip(updatedSettings: TravelModeSettings) {
+        viewModelScope.launch {
+            val originalTrip = _tripToEdit.value ?: return@launch
+
+            val originalTag = tagRepository.findTagById(originalTrip.tagId) ?: return@launch
+            val newTag = tagRepository.findOrCreateTag(updatedSettings.tripName)
+
+            // Step 1: Cleanup old tags if name or dates have changed
+            if (originalTrip.startDate != updatedSettings.startDate || originalTrip.endDate != updatedSettings.endDate || originalTag.id != newTag.id) {
+                transactionRepository.removeTagForDateRange(originalTag.id, originalTrip.startDate, originalTrip.endDate)
+            }
+
+            // Step 2: Retrospectively apply the tag to all transactions in the new date range
+            transactionRepository.addTagForDateRange(newTag.id, updatedSettings.startDate, updatedSettings.endDate)
+
+            // Step 3: Update the historical record in the database
+            val updatedTripRecord = Trip(
+                id = originalTrip.tripId,
+                name = updatedSettings.tripName,
+                startDate = updatedSettings.startDate,
+                endDate = updatedSettings.endDate,
+                tagId = newTag.id,
+                tripType = updatedSettings.tripType,
+                currencyCode = updatedSettings.currencyCode,
+                conversionRate = updatedSettings.conversionRate
+            )
+            tripRepository.insert(updatedTripRecord)
+        }
+    }
+
 
     fun completeTrip() {
         viewModelScope.launch {
@@ -111,12 +150,11 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
             val tripTag = tagRepository.findOrCreateTag(settings.tripName)
             val tripRecord = tripRepository.getTripByTagId(tripTag.id)
 
-            // --- FIX: Use the date-ranged removal to preserve history ---
-            // This was the source of the critical bug.
+            // This is the crucial fix: only remove tags within the specific trip's date range.
             transactionRepository.removeTagForDateRange(tripTag.id, settings.startDate, settings.endDate)
 
             // Delete the historical trip record ONLY IF it matches the dates.
-            // This is a safety check in case of tag name reuse.
+            // This prevents accidental deletion if a tag name has been reused.
             if (tripRecord != null && tripRecord.startDate == settings.startDate && tripRecord.endDate == settings.endDate) {
                 tripRepository.deleteTripById(tripRecord.id)
             }
