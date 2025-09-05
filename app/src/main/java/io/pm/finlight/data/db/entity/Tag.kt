@@ -2,7 +2,7 @@
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/entity/Tag.kt
 // REASON: FEATURE - Unified Travel Mode. A unique, case-insensitive index has
 // been added to the 'name' column. This is a crucial step to ensure that
-// auto-generated trip tags (e.g., "Goa Trip") do not create duplicates if the
+// auto-generated trip tags (e.g., "Goa Trip.kt") do not create duplicates if the
 // user enters a different casing (e.g., "goa trip").
 // =================================================================================
 package io.pm.finlight
@@ -15,7 +15,7 @@ import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 
 /**
- * Represents a user-defined Tag (e.g., "Work Trip", "Vacation 2025", "Tax-Deductible").
+ * Represents a user-defined Tag (e.g., "Work Trip.kt", "Vacation 2025", "Tax-Deductible").
  * Tags provide a flexible way to organize transactions outside of the rigid category system.
  */
 @SuppressLint("UnsafeOptInUsageError")

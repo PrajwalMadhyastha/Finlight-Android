@@ -2,7 +2,7 @@
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/CurrencyTravelScreen.kt
 // REASON: FEATURE - Unified Travel Mode. The UI has been completely redesigned to
 // support the new unified travel mode. It now features a single "Enable" switch,
-// a mandatory "Trip Name" field for auto-tagging, a "Domestic/International"
+// a mandatory "Trip.kt Name" field for auto-tagging, a "Domestic/International"
 // selector, and conditionally displays currency fields only for international trips.
 // =================================================================================
 package io.pm.finlight.ui.screens
@@ -135,7 +135,7 @@ fun CurrencyTravelScreen(
                                     OutlinedTextField(
                                         value = tripName,
                                         onValueChange = { tripName = it },
-                                        label = { Text("Trip Name / Tag*") },
+                                        label = { Text("Trip.kt Name / Tag*") },
                                         modifier = Modifier.fillMaxWidth(),
                                         singleLine = true
                                     )
@@ -144,7 +144,7 @@ fun CurrencyTravelScreen(
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                             ListItem(
-                                headlineContent = { Text("Trip Type") },
+                                headlineContent = { Text("Trip.kt Type") },
                                 trailingContent = {
                                     SingleChoiceSegmentedButtonRow {
                                         SegmentedButton(
@@ -201,7 +201,7 @@ fun CurrencyTravelScreen(
                             }
                             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                             ListItem(
-                                headlineContent = { Text("Trip Start Date") },
+                                headlineContent = { Text("Trip.kt Start Date") },
                                 trailingContent = {
                                     val formatter = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
                                     TextButton(onClick = { showStartDatePicker = true }) {
@@ -212,7 +212,7 @@ fun CurrencyTravelScreen(
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                             ListItem(
-                                headlineContent = { Text("Trip End Date") },
+                                headlineContent = { Text("Trip.kt End Date") },
                                 trailingContent = {
                                     val formatter = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
                                     TextButton(onClick = { showEndDatePicker = true }) {
