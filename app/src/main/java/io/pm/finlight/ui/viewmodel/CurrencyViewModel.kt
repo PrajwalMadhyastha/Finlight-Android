@@ -13,6 +13,9 @@
 // `synchronized` block to prevent potential race conditions.
 // FEATURE (Data Integrity): Added logic to check for and delete orphaned tags
 // after a trip is renamed, preventing data cruft.
+// FIX (Concurrency): Replaced the `synchronized` block with a coroutine-aware
+// `Mutex.withLock` to resolve build errors related to calling suspend functions
+// from a critical section.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -26,6 +29,8 @@ import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.data.repository.TripRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class CurrencyViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -34,6 +39,7 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
     private val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
     private val tripRepository = TripRepository(db.tripDao())
     private val transactionRepository = TransactionRepository(db.transactionDao())
+    private val mutex = Mutex()
 
     val homeCurrency: StateFlow<String> = settingsRepository.getHomeCurrency()
         .stateIn(
@@ -77,7 +83,7 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
      */
     fun saveActiveTravelPlan(newSettings: TravelModeSettings) {
         viewModelScope.launch {
-            synchronized(this) {
+            mutex.withLock {
                 val oldSettings = travelModeSettings.first()
 
                 // Step 1: Cleanup old tags if the active plan's dates or name have changed
