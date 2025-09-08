@@ -6,6 +6,9 @@
 // `updateHistoricTrip` for editing past trips (which only affects the database).
 // This separation prevents editing a historic trip from corrupting the active
 // trip's settings, thus fixing both retrospective and auto-capture tagging.
+// FIX: Added a `clearTripToEdit` function to reset the `tripToEdit` state. This
+// is called by the UI when the edit screen is disposed, preventing stale data
+// from leaking into the "create new trip" screen.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -52,6 +55,12 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
             }
         }
     }
+
+    // --- NEW: Function to clear the edit state ---
+    fun clearTripToEdit() {
+        _tripToEdit.value = null
+    }
+
 
     fun saveHomeCurrency(currencyCode: String) {
         viewModelScope.launch {
