@@ -389,7 +389,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
     @Test
     fun `test ignores MakeMyTrip booking confirmation`() = runBlocking {
         setupTest(ignoreRules = DEFAULT_IGNORE_PHRASES)
-        val smsBody = "Dear Kavyashree,\n\nThank you for booking with us. We are happy to inform you that your flight with booking ID NF2A9N4J42556272467 is confirmed.\n\nYour Trip Details:\n\nDeparture Flight: Jodhpur-Bangalore | Date: 26 Sep 24 | Add-ons: JDH-BLR, 6E-6033(Seats: 26B)\n\nTotal amount paid: INR 9,266.00\n\nYou can manage your booking at [https://app.mmyt.co/Xm2V/1iur6n6j](https://app.mmyt.co/Xm2V/1iur6n6j)\n\nWe wish you a safe journey.\nTeam MakeMyTrip"
+        val smsBody = "Dear Kavyashree,\n\nThank you for booking with us. We are happy to inform you that your flight with booking ID NF2A9N4J42556272467 is confirmed.\n\nYour Trip.kt Details:\n\nDeparture Flight: Jodhpur-Bangalore | Date: 26 Sep 24 | Add-ons: JDH-BLR, 6E-6033(Seats: 26B)\n\nTotal amount paid: INR 9,266.00\n\nYou can manage your booking at [https://app.mmyt.co/Xm2V/1iur6n6j](https://app.mmyt.co/Xm2V/1iur6n6j)\n\nWe wish you a safe journey.\nTeam MakeMyTrip"
         val mockSms = SmsMessage(
             id = 601L,
             sender = "VM-MMTRIP",

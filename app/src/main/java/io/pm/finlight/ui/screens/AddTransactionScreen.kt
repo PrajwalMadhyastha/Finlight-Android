@@ -4,6 +4,9 @@
 // property for travelSettings into a local variable before use. Corrected a
 // type mismatch by converting the Float? conversionRate to a Double before
 // performing multiplication. This also resolves the number format ambiguity.
+// FIX: The logic for setting the default account ("Cash Spends") has been made
+// more robust to prevent a race condition where it could fail to be set,
+// particularly when travel mode is active.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -49,7 +52,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -126,14 +128,18 @@ fun AddTransactionScreen(
 
     val isSaveEnabled = amount.isNotBlank() && description.isNotBlank() && selectedAccount != null && selectedCategory != null
 
-    LaunchedEffect(Unit) {
-        viewModel.clearAddTransactionState()
+    // --- FIX: Logic to robustly set the default account ---
+    var isDefaultAccountApplied by remember { mutableStateOf(false) }
+    LaunchedEffect(defaultAccount) {
+        if (!isCsvEdit && !isDefaultAccountApplied && defaultAccount != null) {
+            selectedAccount = defaultAccount
+            isDefaultAccountApplied = true
+        }
     }
 
-    LaunchedEffect(defaultAccount) {
-        if (!isCsvEdit && selectedAccount == null) {
-            selectedAccount = defaultAccount
-        }
+
+    LaunchedEffect(Unit) {
+        viewModel.clearAddTransactionState()
     }
 
     LaunchedEffect(initialDataJson, accounts, categories) {

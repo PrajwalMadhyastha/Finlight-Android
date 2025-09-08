@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: UX REFINEMENT - The "Merge" button on the "Manage Accounts" screen is
-// now hidden when account selection mode is active. This prevents user confusion
-// by removing the action to initiate merging when the merging process is already
-// underway.
+// REASON: FEATURE - Updated the NavHost entry for "currency_travel_settings" to
+// accept an optional `tripId`. This allows the Travel History screen to navigate
+// to it in "edit mode".
+// REFACTOR: Removed the now-obsolete route for "travel_history_screen" as this
+// feature has been merged into the "currency_travel_settings" screen.
 // =================================================================================
 package io.pm.finlight
 
@@ -19,6 +20,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.core.tween
@@ -55,6 +57,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -276,7 +279,8 @@ fun MainAppScreen() {
         "merchant_detail",
         "customize_dashboard",
         "account_mapping_screen",
-        "sms_debug_screen"
+        "sms_debug_screen",
+        "trip_detail"
     )
 
     val currentTitle = if (showBottomBar) {
@@ -421,7 +425,7 @@ fun MainAppScreen() {
                                 selected = isSelected,
                                 onClick = {
                                     navController.navigate(screen.route) {
-                                        popUpTo(BottomNavItem.Dashboard.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
                                             saveState = true
                                         }
                                         launchSingleTop = true
@@ -513,6 +517,7 @@ fun MainAppScreen() {
 }
 
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavHost(
     navController: NavHostController,
@@ -1006,13 +1011,18 @@ fun AppNavHost(
             DataSettingsScreen(navController, settingsViewModel)
         }
         composable(
-            "currency_travel_settings",
+            "currency_travel_settings?tripId={tripId}",
+            arguments = listOf(navArgument("tripId") {
+                type = NavType.IntType
+                defaultValue = -1
+            }),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) {
-            CurrencyTravelScreen(navController)
+        ) { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getInt("tripId")
+            CurrencyTravelScreen(navController, if (tripId == -1) null else tripId)
         }
         composable(
             "category_detail/{categoryName}/{month}/{year}",
@@ -1050,6 +1060,25 @@ fun AppNavHost(
                 entityName = merchantName,
                 month = month,
                 year = year
+            )
+        }
+        composable(
+            "trip_detail/{tripId}/{tagId}",
+            arguments = listOf(
+                navArgument("tripId") { type = NavType.IntType },
+                navArgument("tagId") { type = NavType.IntType }
+            ),
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+        ) { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getInt("tripId") ?: 0
+            val tagId = backStackEntry.arguments?.getInt("tagId") ?: 0
+            TripDetailScreen(
+                navController = navController,
+                tripId = tripId,
+                tagId = tagId
             )
         }
     }

@@ -1,9 +1,8 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/TagDao.kt
-// REASON: REFACTOR - Added a new `findByName` function that performs a
-// case-insensitive search. This is essential for the ViewModel to check if a
-// tag already exists before attempting to insert a new one, allowing for
-// proper user feedback on duplicates.
+// FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TagDao.kt
+// REASON: FIX - Added the `getTagById` function. This is required by the new,
+// safer trip editing logic in the CurrencyViewModel to fetch a trip's original
+// tag details before performing cleanup operations.
 // =================================================================================
 package io.pm.finlight
 
@@ -23,9 +22,12 @@ interface TagDao {
     @Query("SELECT * FROM tags ORDER BY name ASC")
     fun getAllTags(): Flow<List<Tag>>
 
-    // --- NEW: Function to find a tag by name, case-insensitively ---
     @Query("SELECT * FROM tags WHERE name = :name COLLATE NOCASE LIMIT 1")
     suspend fun findByName(name: String): Tag?
+
+    // --- NEW: Function to find a single tag by its ID ---
+    @Query("SELECT * FROM tags WHERE id = :id")
+    suspend fun getTagById(id: Int): Tag?
 
     @Update
     suspend fun update(tag: Tag)

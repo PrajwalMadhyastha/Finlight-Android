@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FEATURE - Added the `reassignTransactions` function. This is a core
-// component of the new account merging feature, allowing all transactions from
-// one or more source accounts to be moved to a single destination account.
+// REASON: FEATURE - Added `removeAllTransactionsForTag`. This function is
+// required for the "Cancel Trip" action to remove all tag associations from
+// transactions before the trip record itself is deleted.
 // =================================================================================
 package io.pm.finlight
 
@@ -653,4 +653,43 @@ interface TransactionDao {
     // --- NEW: Reassigns transactions from source accounts to a destination account ---
     @Query("UPDATE transactions SET accountId = :destinationAccountId WHERE accountId IN (:sourceAccountIds)")
     suspend fun reassignTransactions(sourceAccountIds: List<Int>, destinationAccountId: Int)
+
+    // --- NEW: Functions for retrospective tagging ---
+    @Query("""
+        INSERT INTO transaction_tag_cross_ref (transactionId, tagId)
+        SELECT id, :tagId
+        FROM transactions
+        WHERE date BETWEEN :startDate AND :endDate
+        AND id NOT IN (SELECT transactionId FROM transaction_tag_cross_ref WHERE tagId = :tagId)
+    """)
+    suspend fun addTagForDateRange(tagId: Int, startDate: Long, endDate: Long)
+
+    @Query("""
+        DELETE FROM transaction_tag_cross_ref
+        WHERE tagId = :tagId
+        AND transactionId IN (
+            SELECT id
+            FROM transactions
+            WHERE date BETWEEN :startDate AND :endDate
+        )
+    """)
+    suspend fun removeTagForDateRange(tagId: Int, startDate: Long, endDate: Long)
+
+    // --- NEW: Get all transactions for a specific tag ---
+    @androidx.room.Transaction
+    @Query("""
+        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey
+        FROM transactions AS T
+        INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.transactionId
+        LEFT JOIN accounts AS A ON T.accountId = A.id
+        LEFT JOIN categories AS C ON T.categoryId = C.id
+        WHERE TTCR.tagId = :tagId
+        ORDER BY T.date DESC
+    """)
+    fun getTransactionsByTagId(tagId: Int): Flow<List<TransactionDetails>>
+
+    // --- NEW: Remove all cross-references for a given tag ID ---
+    @Query("DELETE FROM transaction_tag_cross_ref WHERE tagId = :tagId")
+    suspend fun removeAllTransactionsForTag(tagId: Int)
+
 }

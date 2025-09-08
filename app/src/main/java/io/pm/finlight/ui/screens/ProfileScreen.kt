@@ -1,12 +1,15 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/ProfileScreen.kt
-// REASON: FIX - The profile picture placeholder now uses the full adaptive icon
-// (`R.mipmap.ic_launcher`) and removes the theme-dependent background modifier.
-// This ensures the icon is always legible, regardless of the app's theme.
+// REASON: FEATURE - Added a new "Travel History" item to the settings list.
+// This provides a clear, logical entry point for the user to access the new
+// historic trips feature.
+// REFACTOR: The navigation for "Travel History" now points to the unified
+// "currency_travel_settings" screen, reflecting the feature consolidation.
+// REFACTOR: Removed the now-redundant "Travel History" entry point. All travel-
+// related functionality is now accessed via the "Currency & Travel" screen.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -140,10 +142,9 @@ fun ProfileScreen(
                     onClick = { navController.navigate("automation_settings") }
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                // --- NEW: Add navigation item for Currency & Travel ---
                 SettingsActionItem(
                     text = "Currency & Travel",
-                    subtitle = "Manage home currency and travel mode",
+                    subtitle = "Manage home currency, trips, and travel history",
                     icon = Icons.Default.Flight,
                     onClick = { navController.navigate("currency_travel_settings") }
                 )

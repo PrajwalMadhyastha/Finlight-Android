@@ -1,9 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TagRepository.kt
-// REASON: FEATURE - Unified Travel Mode. Added the `findOrCreateTag` function.
-// This is a critical utility for the auto-tagging feature, allowing the
-// ViewModel to get a Tag object for a trip name, creating it in the database
-// if it's the first time that trip name has been used.
+// REASON: FIX - Added the `findTagById` function to expose the new DAO method
+// to the ViewModel layer. This is needed for the refactored trip editing logic.
 // =================================================================================
 package io.pm.finlight
 
@@ -49,5 +47,10 @@ class TagRepository(
         val newTag = Tag(name = tagName)
         val newId = tagDao.insert(newTag)
         return newTag.copy(id = newId.toInt())
+    }
+
+    // --- NEW: Function to find a tag by its ID ---
+    suspend fun findTagById(id: Int): Tag? {
+        return tagDao.getTagById(id)
     }
 }

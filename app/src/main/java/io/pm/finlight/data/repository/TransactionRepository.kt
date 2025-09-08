@@ -1,8 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TransactionRepository.kt
-// REASON: FEATURE - Added the `searchMerchants` function. This exposes the new
-// DAO query to the ViewModel, enabling it to fetch real-time merchant
-// predictions from the database.
+// REASON: FEATURE - Added `removeAllTransactionsForTag` to expose the new DAO
+// method to the ViewModel layer. This is required for the new "Cancel Trip" action.
 // =================================================================================
 package io.pm.finlight
 
@@ -225,5 +224,24 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
 
     fun getDailySpendingForDateRange(startDate: Long, endDate: Long): Flow<List<DailyTotal>> {
         return transactionDao.getDailySpendingForDateRange(startDate, endDate)
+    }
+
+    // --- NEW: Functions for retrospective tagging ---
+    suspend fun addTagForDateRange(tagId: Int, startDate: Long, endDate: Long) {
+        transactionDao.addTagForDateRange(tagId, startDate, endDate)
+    }
+
+    suspend fun removeTagForDateRange(tagId: Int, startDate: Long, endDate: Long) {
+        transactionDao.removeTagForDateRange(tagId, startDate, endDate)
+    }
+
+    // --- NEW: Get all transactions for a specific tag ---
+    fun getTransactionsByTagId(tagId: Int): Flow<List<TransactionDetails>> {
+        return transactionDao.getTransactionsByTagId(tagId)
+    }
+
+    // --- NEW: Expose the function to remove all tags ---
+    suspend fun removeAllTransactionsForTag(tagId: Int) {
+        transactionDao.removeAllTransactionsForTag(tagId)
     }
 }
