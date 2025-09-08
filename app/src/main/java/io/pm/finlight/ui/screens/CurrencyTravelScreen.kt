@@ -17,6 +17,10 @@
 // FIX: The screen layout has been restructured to always show the active trip
 // form (if a trip is active) AND the travel history list below it, resolving
 // the issue where the history was incorrectly hidden.
+// FIX: Restructured the UI to always show a trip management form (either for
+// an active trip or to create a new one), resolving the bug where the user
+// could not initiate a new trip. The "Create New Trip" button has been removed
+// in favor of this persistent form.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -25,6 +29,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -165,83 +170,78 @@ fun CurrencyTravelScreen(
                 }
             }
 
-            // Show the form if a trip is active, or if we are editing a historic one,
-            // or if there's no active trip (implying we are creating a new one).
-            val showTripForm = activeTravelSettings != null || isEditMode
+
             item {
-                AnimatedVisibility(visible = showTripForm) {
-                    val sectionTitle = when {
-                        isEditMode -> "Edit Trip Plan"
-                        activeTravelSettings != null -> "Active Trip Plan"
-                        else -> "New Trip Plan" // This case is now handled by the button
-                    }
-                    SettingsSection(title = sectionTitle) {
-                        TripSettingsForm(
-                            tripName = tripName, onTripNameChange = { tripName = it },
-                            tripType = tripType, onTripTypeChange = { tripType = it },
-                            selectedCurrency = selectedCurrency, onSelectCurrencyClick = { showTravelCurrencyPicker = true },
-                            conversionRate = conversionRate, onConversionRateChange = { conversionRate = it.filter { c -> c.isDigit() || c == '.' } },
-                            homeCurrencyCode = homeCurrencyCode,
-                            startDate = startDate, onStartDateClick = { showStartDatePicker = true },
-                            endDate = endDate, onEndDateClick = { showEndDatePicker = true }
-                        )
-                    }
+                val sectionTitle = when {
+                    isEditMode -> "Edit Trip Plan"
+                    activeTravelSettings != null -> "Active Trip Plan"
+                    else -> "Create New Trip Plan"
+                }
+                SettingsSection(title = sectionTitle) {
+                    TripSettingsForm(
+                        tripName = tripName, onTripNameChange = { tripName = it },
+                        tripType = tripType, onTripTypeChange = { tripType = it },
+                        selectedCurrency = selectedCurrency, onSelectCurrencyClick = { showTravelCurrencyPicker = true },
+                        conversionRate = conversionRate, onConversionRateChange = { conversionRate = it.filter { c -> c.isDigit() || c == '.' } },
+                        homeCurrencyCode = homeCurrencyCode,
+                        startDate = startDate, onStartDateClick = { showStartDatePicker = true },
+                        endDate = endDate, onEndDateClick = { showEndDatePicker = true }
+                    )
                 }
             }
 
-            item {
-                if (showTripForm) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (activeTravelSettings != null && !isEditMode) {
-                            Button(
-                                onClick = {
-                                    viewModel.completeTrip()
-                                    Toast.makeText(context, "Trip Completed! Future transactions will not be tagged.", Toast.LENGTH_LONG).show()
-                                    navController.popBackStack()
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Mark Trip as Completed")
-                            }
-                        }
 
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (activeTravelSettings != null && !isEditMode) {
                         Button(
                             onClick = {
-                                val settings = TravelModeSettings(
-                                    isEnabled = true, tripName = tripName, tripType = tripType,
-                                    startDate = startDate!!, endDate = endDate!!,
-                                    currencyCode = if (tripType == TripType.INTERNATIONAL) selectedCurrency?.currencyCode else null,
-                                    conversionRate = if (tripType == TripType.INTERNATIONAL) conversionRate.toFloatOrNull() else null
-                                )
-                                if (isEditMode) {
-                                    viewModel.updateHistoricTrip(settings)
-                                } else {
-                                    viewModel.saveActiveTravelPlan(settings)
-                                }
-
-                                val toastMessage = if (activeTravelSettings == null && !isEditMode) "New travel plan saved!" else "Trip details updated!"
-                                Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
+                                viewModel.completeTrip()
+                                Toast.makeText(context, "Trip Completed! Future transactions will not be tagged.", Toast.LENGTH_LONG).show()
                                 navController.popBackStack()
                             },
-                            enabled = isSaveEnabled,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = if (activeTravelSettings == null && !isEditMode) ButtonDefaults.buttonColors() else ButtonDefaults.outlinedButtonColors()
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            val buttonText = when {
-                                isEditMode -> "Update Trip Details"
-                                activeTravelSettings == null -> "Save and Activate Plan"
-                                else -> "Save Changes to Active Plan"
-                            }
-                            Text(buttonText)
+                            Text("Mark Trip as Completed")
                         }
+                    }
 
-                        if (activeTravelSettings != null && !isEditMode) {
-                            TextButton(
-                                onClick = { showCancelConfirmation = true },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Cancel Active Trip", color = MaterialTheme.colorScheme.error)
+                    Button(
+                        onClick = {
+                            val settings = TravelModeSettings(
+                                isEnabled = true, tripName = tripName, tripType = tripType,
+                                startDate = startDate!!, endDate = endDate!!,
+                                currencyCode = if (tripType == TripType.INTERNATIONAL) selectedCurrency?.currencyCode else null,
+                                conversionRate = if (tripType == TripType.INTERNATIONAL) conversionRate.toFloatOrNull() else null
+                            )
+                            if (isEditMode) {
+                                viewModel.updateHistoricTrip(settings)
+                            } else {
+                                viewModel.saveActiveTravelPlan(settings)
                             }
+
+                            val toastMessage = if (activeTravelSettings == null && !isEditMode) "New travel plan saved!" else "Trip details updated!"
+                            Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
+                            navController.popBackStack()
+                        },
+                        enabled = isSaveEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = if (activeTravelSettings == null && !isEditMode) ButtonDefaults.buttonColors() else ButtonDefaults.outlinedButtonColors()
+                    ) {
+                        val buttonText = when {
+                            isEditMode -> "Update Trip Details"
+                            activeTravelSettings == null -> "Save and Activate Plan"
+                            else -> "Save Changes to Active Plan"
+                        }
+                        Text(buttonText)
+                    }
+
+                    if (activeTravelSettings != null && !isEditMode) {
+                        TextButton(
+                            onClick = { showCancelConfirmation = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Cancel Active Trip", color = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
@@ -262,29 +262,7 @@ fun CurrencyTravelScreen(
                         }
                     }
                 }
-            } else if (activeTravelSettings == null && !isEditMode) {
-                // Show this only when there's no active trip and no history
-                item {
-                    Button(
-                        onClick = {
-                            // This button's click should reveal the form.
-                            // We can achieve this by setting some dummy initial values to trigger recomposition.
-                            tripName = "" // Resetting fields
-                            startDate = null
-                            endDate = null
-                            // This navigation seems wrong. We need to stay on the same screen.
-                            // The logic needs to be revisited to show/hide the form.
-                            // For now, let's assume a state toggle.
-                            // TODO: Re-evaluate this logic. Let's navigate to the same screen but without the button.
-                            navController.navigate("currency_travel_settings")
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Create New Trip Plan")
-                    }
-                }
             }
-
         }
     }
 
