@@ -5,6 +5,10 @@
 // and the `endDate` is set to the very end (23:59:59). This resolves the
 // critical bug where transactions occurring on the last day of a trip were
 // not being tagged.
+// FIX: The date conversion logic now correctly uses java.time.Instant and
+// ZoneId.systemDefault() to make the start/end timestamps timezone-agnostic.
+// This ensures that trip date boundaries are stored in UTC, fixing tagging
+// issues for users who travel across timezones.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -34,6 +38,8 @@ import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.CurrencyViewModel
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.ZoneId
 import java.util.*
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -277,14 +283,11 @@ fun CurrencyTravelScreen(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { selectedMillis ->
-                        val cal = Calendar.getInstance().apply {
-                            timeInMillis = selectedMillis
-                            set(Calendar.HOUR_OF_DAY, 0)
-                            set(Calendar.MINUTE, 0)
-                            set(Calendar.SECOND, 0)
-                            set(Calendar.MILLISECOND, 0)
-                        }
-                        startDate = cal.timeInMillis
+                        val localDate = Instant.ofEpochMilli(selectedMillis)
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDate()
+                        val startOfDayInLocalZone = localDate.atStartOfDay(ZoneId.systemDefault())
+                        startDate = startOfDayInLocalZone.toInstant().toEpochMilli()
                     }
                     showStartDatePicker = false
                 }) { Text("OK") }
@@ -299,14 +302,12 @@ fun CurrencyTravelScreen(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { selectedMillis ->
-                        val cal = Calendar.getInstance().apply {
-                            timeInMillis = selectedMillis
-                            set(Calendar.HOUR_OF_DAY, 23)
-                            set(Calendar.MINUTE, 59)
-                            set(Calendar.SECOND, 59)
-                            set(Calendar.MILLISECOND, 999)
-                        }
-                        endDate = cal.timeInMillis
+                        val localDate = Instant.ofEpochMilli(selectedMillis)
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDate()
+                        val endOfDayInLocalZone = localDate.atTime(23, 59, 59, 999_999_999)
+                            .atZone(ZoneId.systemDefault())
+                        endDate = endOfDayInLocalZone.toInstant().toEpochMilli()
                     }
                     showEndDatePicker = false
                 }) { Text("OK") }
@@ -478,4 +479,3 @@ private fun CurrencyPickerDialog(
         containerColor = popupContainerColor
     )
 }
-
