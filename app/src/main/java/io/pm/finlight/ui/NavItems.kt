@@ -2,6 +2,8 @@
 // FILE: ./app/src/main/java/io/pm/finlight/ui/NavItems.kt
 // REASON: FEATURE - Added new screen title mappings for the "Travel History" and
 // "Trip Details" screens to ensure the top app bar displays the correct titles.
+// REFACTOR: Removed the title for "travel_history_screen" as the feature has
+// been merged into the "Currency & Travel" screen.
 // =================================================================================
 package io.pm.finlight.ui
 
@@ -60,6 +62,5 @@ val screenTitles = mapOf(
     "merchant_detail/{merchantName}/{month}/{year}" to "Merchant Details",
     "customize_dashboard" to "Customize Dashboard",
     "account_mapping_screen" to "Map New Accounts",
-    "travel_history_screen" to "Travel History",
     "trip_detail/{tripId}/{tagId}" to "Trip Details"
 )

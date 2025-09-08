@@ -3,6 +3,8 @@
 // REASON: FEATURE - Updated the NavHost entry for "currency_travel_settings" to
 // accept an optional `tripId`. This allows the Travel History screen to navigate
 // to it in "edit mode".
+// REFACTOR: Removed the now-obsolete route for "travel_history_screen" as this
+// feature has been merged into the "currency_travel_settings" screen.
 // =================================================================================
 package io.pm.finlight
 
@@ -18,6 +20,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.core.tween
@@ -277,7 +280,6 @@ fun MainAppScreen() {
         "customize_dashboard",
         "account_mapping_screen",
         "sms_debug_screen",
-        "travel_history_screen",
         "trip_detail"
     )
 
@@ -515,6 +517,7 @@ fun MainAppScreen() {
 }
 
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavHost(
     navController: NavHostController,
@@ -1058,15 +1061,6 @@ fun AppNavHost(
                 month = month,
                 year = year
             )
-        }
-        composable(
-            "travel_history_screen",
-            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) {
-            TravelHistoryScreen(navController = navController)
         }
         composable(
             "trip_detail/{tripId}/{tagId}",

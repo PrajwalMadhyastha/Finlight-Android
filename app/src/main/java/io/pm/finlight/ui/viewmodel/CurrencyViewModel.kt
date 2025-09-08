@@ -16,6 +16,8 @@
 // FIX (Concurrency): Replaced the `synchronized` block with a coroutine-aware
 // `Mutex.withLock` to resolve build errors related to calling suspend functions
 // from a critical section.
+// REFACTOR: Merged the logic from the HistoricTripsViewModel into this one to
+// create a single, unified source of truth for all travel-related data.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -57,6 +59,15 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
 
     private val _tripToEdit = MutableStateFlow<TripWithStats?>(null)
     val tripToEdit: StateFlow<TripWithStats?> = _tripToEdit.asStateFlow()
+
+    // --- NEW: Fetches all historic trips ---
+    val historicTrips: StateFlow<List<TripWithStats>> = tripRepository.getAllTripsWithStats()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
 
     fun loadTripForEditing(tripId: Int) {
         viewModelScope.launch {
@@ -195,6 +206,16 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
 
             // Finally, clear the active settings
             settingsRepository.saveTravelModeSettings(null)
+        }
+    }
+
+    // --- NEW: Function to delete a trip and untag its transactions ---
+    fun deleteTrip(tripId: Int, tagId: Int) {
+        viewModelScope.launch {
+            // First, remove all associations from the cross-reference table for that tag
+            transactionRepository.removeAllTransactionsForTag(tagId)
+            // Then, delete the trip record itself
+            tripRepository.deleteTripById(tripId)
         }
     }
 }

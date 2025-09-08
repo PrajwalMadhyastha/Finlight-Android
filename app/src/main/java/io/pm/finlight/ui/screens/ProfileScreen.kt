@@ -3,6 +3,10 @@
 // REASON: FEATURE - Added a new "Travel History" item to the settings list.
 // This provides a clear, logical entry point for the user to access the new
 // historic trips feature.
+// REFACTOR: The navigation for "Travel History" now points to the unified
+// "currency_travel_settings" screen, reflecting the feature consolidation.
+// REFACTOR: Removed the now-redundant "Travel History" entry point. All travel-
+// related functionality is now accessed via the "Currency & Travel" screen.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -113,14 +117,6 @@ fun ProfileScreen(
                     onClick = { navController.navigate("recurring_transactions") },
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                // --- NEW: Add Travel History navigation item ---
-                SettingsActionItem(
-                    text = "Travel History",
-                    subtitle = "View spending from past trips",
-                    icon = Icons.Default.History,
-                    onClick = { navController.navigate("travel_history_screen") }
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                 SettingsActionItem(
                     text = "Manage Tags",
                     subtitle = "Create and organize custom tags",
@@ -148,7 +144,7 @@ fun ProfileScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                 SettingsActionItem(
                     text = "Currency & Travel",
-                    subtitle = "Manage home currency and travel mode",
+                    subtitle = "Manage home currency, trips, and travel history",
                     icon = Icons.Default.Flight,
                     onClick = { navController.navigate("currency_travel_settings") }
                 )
