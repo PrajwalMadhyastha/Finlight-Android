@@ -9,6 +9,9 @@
 // ZoneId.systemDefault() to make the start/end timestamps timezone-agnostic.
 // This ensures that trip date boundaries are stored in UTC, fixing tagging
 // issues for users who travel across timezones.
+// FIX: Added a DisposableEffect to call `viewModel.clearTripToEdit()` when the
+// screen is left. This prevents stale data from a historic trip edit session
+// from appearing when creating a new trip.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -56,6 +59,14 @@ fun CurrencyTravelScreen(
     val activeTravelSettings by viewModel.travelModeSettings.collectAsState()
     val tripToEdit by viewModel.tripToEdit.collectAsState()
     val context = LocalContext.current
+
+    // --- NEW: Clear the ViewModel's edit state when the user leaves this screen ---
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.clearTripToEdit()
+        }
+    }
+
 
     // Load trip data if in edit mode
     LaunchedEffect(tripId) {

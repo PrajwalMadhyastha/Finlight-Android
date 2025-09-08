@@ -9,6 +9,10 @@
 // FIX: Added a `clearTripToEdit` function to reset the `tripToEdit` state. This
 // is called by the UI when the edit screen is disposed, preventing stale data
 // from leaking into the "create new trip" screen.
+// FIX (Concurrency): The `saveActiveTravelPlan` function is now wrapped in a
+// `synchronized` block to prevent potential race conditions.
+// FEATURE (Data Integrity): Added logic to check for and delete orphaned tags
+// after a trip is renamed, preventing data cruft.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -56,7 +60,6 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    // --- NEW: Function to clear the edit state ---
     fun clearTripToEdit() {
         _tripToEdit.value = null
     }
@@ -74,41 +77,50 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
      */
     fun saveActiveTravelPlan(newSettings: TravelModeSettings) {
         viewModelScope.launch {
-            val oldSettings = travelModeSettings.first()
+            synchronized(this) {
+                val oldSettings = travelModeSettings.first()
 
-            // Step 1: Cleanup old tags if the active plan's dates have changed
-            if (oldSettings != null && (oldSettings.startDate != newSettings.startDate || oldSettings.endDate != newSettings.endDate)) {
-                val oldTripTag = tagRepository.findOrCreateTag(oldSettings.tripName)
-                transactionRepository.removeTagForDateRange(oldTripTag.id, oldSettings.startDate, oldSettings.endDate)
+                // Step 1: Cleanup old tags if the active plan's dates or name have changed
+                if (oldSettings != null && (oldSettings.startDate != newSettings.startDate || oldSettings.endDate != newSettings.endDate || oldSettings.tripName != newSettings.tripName)) {
+                    val oldTripTag = tagRepository.findOrCreateTag(oldSettings.tripName)
+                    transactionRepository.removeTagForDateRange(oldTripTag.id, oldSettings.startDate, oldSettings.endDate)
+
+                    // --- NEW: Check if the old tag is now orphaned ---
+                    val isOldTagUsedByTrip = tripRepository.isTagUsedByTrip(oldTripTag.id)
+                    val isOldTagUsedByTxn = tagRepository.isTagInUse(oldTripTag.id)
+                    if (!isOldTagUsedByTrip && !isOldTagUsedByTxn) {
+                        tagRepository.delete(oldTripTag)
+                    }
+                }
+
+                // Step 2: Save the new settings to SharedPreferences to make it the active plan
+                settingsRepository.saveTravelModeSettings(newSettings)
+
+                // Step 3: Find or create the tag for the new/updated trip
+                val newTripTag = tagRepository.findOrCreateTag(newSettings.tripName)
+
+                // Step 4: Retrospectively apply the tag to all transactions in the new date range
+                transactionRepository.addTagForDateRange(newTripTag.id, newSettings.startDate, newSettings.endDate)
+
+                // Step 5: Find the historical record associated with the OLD active plan, if any
+                val existingTrip = oldSettings?.let {
+                    val oldTag = tagRepository.findOrCreateTag(it.tripName)
+                    tripRepository.getTripByTagId(oldTag.id)
+                }
+
+                // Step 6: Create or Update the historical trip record
+                val tripRecord = Trip(
+                    id = existingTrip?.id ?: 0,
+                    name = newSettings.tripName,
+                    startDate = newSettings.startDate,
+                    endDate = newSettings.endDate,
+                    tagId = newTripTag.id,
+                    tripType = newSettings.tripType,
+                    currencyCode = newSettings.currencyCode,
+                    conversionRate = newSettings.conversionRate
+                )
+                tripRepository.insert(tripRecord)
             }
-
-            // Step 2: Save the new settings to SharedPreferences to make it the active plan
-            settingsRepository.saveTravelModeSettings(newSettings)
-
-            // Step 3: Find or create the tag for the new/updated trip
-            val newTripTag = tagRepository.findOrCreateTag(newSettings.tripName)
-
-            // Step 4: Retrospectively apply the tag to all transactions in the new date range
-            transactionRepository.addTagForDateRange(newTripTag.id, newSettings.startDate, newSettings.endDate)
-
-            // Step 5: Find the historical record associated with the OLD active plan, if any
-            val existingTrip = oldSettings?.let {
-                val oldTag = tagRepository.findOrCreateTag(it.tripName)
-                tripRepository.getTripByTagId(oldTag.id)
-            }
-
-            // Step 6: Create or Update the historical trip record
-            val tripRecord = Trip(
-                id = existingTrip?.id ?: 0,
-                name = newSettings.tripName,
-                startDate = newSettings.startDate,
-                endDate = newSettings.endDate,
-                tagId = newTripTag.id,
-                tripType = newSettings.tripType,
-                currencyCode = newSettings.currencyCode,
-                conversionRate = newSettings.conversionRate
-            )
-            tripRepository.insert(tripRecord)
         }
     }
 
@@ -126,6 +138,13 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
             // Step 1: Cleanup old tags if name or dates have changed
             if (originalTrip.startDate != updatedSettings.startDate || originalTrip.endDate != updatedSettings.endDate || originalTag.id != newTag.id) {
                 transactionRepository.removeTagForDateRange(originalTag.id, originalTrip.startDate, originalTrip.endDate)
+
+                // --- NEW: Check if the old tag is now orphaned ---
+                val isOldTagUsedByTrip = tripRepository.isTagUsedByTrip(originalTag.id)
+                val isOldTagUsedByTxn = tagRepository.isTagInUse(originalTag.id)
+                if (!isOldTagUsedByTrip && !isOldTagUsedByTxn) {
+                    tagRepository.delete(originalTag)
+                }
             }
 
             // Step 2: Retrospectively apply the tag to all transactions in the new date range
