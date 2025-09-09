@@ -45,7 +45,7 @@ import net.sqlcipher.database.SupportFactory
         SmsParseTemplate::class,
         Trip::class
     ],
-    version = 37, // --- UPDATED: Incremented version ---
+    version = 38, // --- UPDATED: Incremented version ---
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -70,7 +70,7 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // --- All existing migrations (1-2 through 35-36) remain here ---
+        // --- All existing migrations (1-2 through 34-35) remain here ---
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN transactionType TEXT NOT NULL DEFAULT 'expense'")
@@ -421,7 +421,7 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_35_36 = object : Migration(35, 36) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
-                    CREATE TABLE `trips` (
+                    CREATE TABLE IF NOT EXISTS `trips` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
                         `name` TEXT NOT NULL, 
                         `startDate` INTEGER NOT NULL, 
@@ -430,16 +430,38 @@ abstract class AppDatabase : RoomDatabase() {
                         FOREIGN KEY(`tagId`) REFERENCES `tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE 
                     )
                 """)
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_trips_tagId` ON `trips` (`tagId`)")
+                // --- FIX: Create a UNIQUE index to match the entity definition ---
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_trips_tagId` ON `trips` (`tagId`)")
             }
         }
 
-        // --- NEW: Migration to add columns to the 'trips' table ---
         val MIGRATION_36_37 = object : Migration(36, 37) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE `trips` ADD COLUMN `tripType` TEXT NOT NULL DEFAULT 'DOMESTIC'")
-                db.execSQL("ALTER TABLE `trips` ADD COLUMN `currencyCode` TEXT")
-                db.execSQL("ALTER TABLE `trips` ADD COLUMN `conversionRate` REAL")
+                try {
+                    db.execSQL("ALTER TABLE `trips` ADD COLUMN `tripType` TEXT NOT NULL DEFAULT 'DOMESTIC'")
+                } catch (e: Exception) {
+                    Log.e("Migration_36_37", "Failed to add tripType column, likely already exists.", e)
+                }
+                try {
+                    db.execSQL("ALTER TABLE `trips` ADD COLUMN `currencyCode` TEXT")
+                } catch (e: Exception) {
+                    Log.e("Migration_36_37", "Failed to add currencyCode column, likely already exists.", e)
+                }
+                try {
+                    db.execSQL("ALTER TABLE `trips` ADD COLUMN `conversionRate` REAL")
+                } catch (e: Exception) {
+                    Log.e("Migration_36_37", "Failed to add conversionRate column, likely already exists.", e)
+                }
+            }
+        }
+
+        // --- NEW: Migration to fix the non-unique index for existing users ---
+        val MIGRATION_37_38 = object : Migration(37, 38) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // This will drop the old, incorrect index if it exists.
+                db.execSQL("DROP INDEX IF EXISTS `index_trips_tagId`")
+                // This creates the new, correct UNIQUE index.
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_trips_tagId` ON `trips` (`tagId`)")
             }
         }
 
@@ -461,7 +483,8 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
                             MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29,
                             MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
-                            MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37
+                            MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
+                            MIGRATION_37_38 // --- UPDATED: Add the new migration
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

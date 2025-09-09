@@ -39,6 +39,7 @@ fun DashboardScreen(
     val visibleCards by dashboardViewModel.visibleCards.collectAsState()
     val yearlyConsistencyData by dashboardViewModel.yearlyConsistencyData.collectAsState()
     val budgetHealthSummary by dashboardViewModel.budgetHealthSummary.collectAsState()
+    val isPrivacyModeEnabled by dashboardViewModel.privacyModeEnabled.collectAsState()
 
     // --- NEW: Collect state for the summary card ---
     val showLastMonthSummary by dashboardViewModel.showLastMonthSummaryCard.collectAsState()
@@ -64,7 +65,8 @@ fun DashboardScreen(
                     dashboardViewModel = dashboardViewModel,
                     transactionViewModel = transactionViewModel,
                     yearlyConsistencyData = yearlyConsistencyData,
-                    budgetHealthSummary = budgetHealthSummary
+                    budgetHealthSummary = budgetHealthSummary,
+                    isPrivacyModeEnabled = isPrivacyModeEnabled
                 )
             }
         }
@@ -90,7 +92,8 @@ fun DashboardScreen(
                     dashboardViewModel = dashboardViewModel,
                     transactionViewModel = transactionViewModel,
                     yearlyConsistencyData = yearlyConsistencyData,
-                    budgetHealthSummary = budgetHealthSummary
+                    budgetHealthSummary = budgetHealthSummary,
+                    isPrivacyModeEnabled = isPrivacyModeEnabled
                 )
             }
         }
@@ -104,7 +107,8 @@ private fun DashboardCard(
     dashboardViewModel: DashboardViewModel,
     transactionViewModel: TransactionViewModel,
     yearlyConsistencyData: List<CalendarDayStatus>,
-    budgetHealthSummary: String
+    budgetHealthSummary: String,
+    isPrivacyModeEnabled: Boolean
 ) {
     val monthlyIncome by dashboardViewModel.monthlyIncome.collectAsState()
     val monthlyExpenses by dashboardViewModel.monthlyExpenses.collectAsState()
@@ -125,7 +129,8 @@ private fun DashboardCard(
             safeToSpend = safeToSpendPerDay,
             navController = navController,
             monthYear = monthYear,
-            budgetHealthSummary = budgetHealthSummary
+            budgetHealthSummary = budgetHealthSummary,
+            isPrivacyModeEnabled = isPrivacyModeEnabled
         )
         DashboardCardType.QUICK_ACTIONS -> AuroraQuickActionsCard(navController = navController)
         DashboardCardType.RECENT_TRANSACTIONS -> AuroraRecentTransactionsCard(
@@ -167,4 +172,3 @@ private fun DashboardCard(
         }
     }
 }
-

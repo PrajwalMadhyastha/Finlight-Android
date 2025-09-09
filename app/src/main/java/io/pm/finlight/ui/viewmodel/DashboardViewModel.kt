@@ -60,6 +60,8 @@ class DashboardViewModel(
     private val _showLastMonthSummaryCard = MutableStateFlow(false)
     val showLastMonthSummaryCard: StateFlow<Boolean> = _showLastMonthSummaryCard.asStateFlow()
 
+    val privacyModeEnabled: StateFlow<Boolean>
+
 
     init {
         userName = settingsRepository.getUserName()
@@ -74,6 +76,13 @@ class DashboardViewModel(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = null
+            )
+
+        privacyModeEnabled = settingsRepository.getPrivacyModeEnabled()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = false
             )
 
         viewModelScope.launch {
