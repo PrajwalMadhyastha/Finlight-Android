@@ -26,6 +26,8 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -160,6 +162,12 @@ class SettingsViewModel(
             initialValue = true
         )
 
+    val privacyModeEnabled: StateFlow<Boolean> =
+        settingsRepository.getPrivacyModeEnabled().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false,
+        )
 
     init {
         smsScanStartDate =
@@ -169,6 +177,10 @@ class SettingsViewModel(
                     started = SharingStarted.WhileSubscribed(5000),
                     initialValue = 0L,
                 )
+    }
+
+    fun setPrivacyModeEnabled(enabled: Boolean) {
+        settingsRepository.savePrivacyModeEnabled(enabled)
     }
 
     suspend fun applyLearningAndAutoImport(mapping: MerchantCategoryMapping): Int {

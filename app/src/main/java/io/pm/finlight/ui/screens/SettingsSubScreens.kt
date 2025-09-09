@@ -420,6 +420,7 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
     val autoBackupTime by settingsViewModel.autoBackupTime.collectAsState()
     var showAutoBackupTimePicker by remember { mutableStateOf(false) }
 
+    val isPrivacyModeEnabled by settingsViewModel.privacyModeEnabled.collectAsState()
 
     val jsonFileSaverLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json"),
@@ -537,6 +538,14 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                             icon = Icons.Default.Fingerprint,
                             checked = isAppLockEnabled,
                             onCheckedChange = { settingsViewModel.setAppLockEnabled(it) },
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                        SettingsToggleItem(
+                            title = "Privacy Mode",
+                            subtitle = "Hide all amounts and balances",
+                            icon = Icons.Default.VisibilityOff,
+                            checked = isPrivacyModeEnabled,
+                            onCheckedChange = { settingsViewModel.setPrivacyModeEnabled(it) }
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                         SettingsToggleItem(
