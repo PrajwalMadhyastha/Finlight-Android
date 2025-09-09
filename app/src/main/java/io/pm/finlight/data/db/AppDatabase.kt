@@ -421,15 +421,15 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_35_36 = object : Migration(35, 36) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
-                    CREATE TABLE `trips` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
-                        `name` TEXT NOT NULL, 
-                        `startDate` INTEGER NOT NULL, 
-                        `endDate` INTEGER NOT NULL, 
-                        `tagId` INTEGER NOT NULL, 
-                        FOREIGN KEY(`tagId`) REFERENCES `tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE 
-                    )
-                """)
+            CREATE TABLE IF NOT EXISTS `trips` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                `name` TEXT NOT NULL, 
+                `startDate` INTEGER NOT NULL, 
+                `endDate` INTEGER NOT NULL, 
+                `tagId` INTEGER NOT NULL, 
+                FOREIGN KEY(`tagId`) REFERENCES `tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE 
+            )
+        """)
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_trips_tagId` ON `trips` (`tagId`)")
             }
         }
@@ -437,9 +437,23 @@ abstract class AppDatabase : RoomDatabase() {
         // --- NEW: Migration to add columns to the 'trips' table ---
         val MIGRATION_36_37 = object : Migration(36, 37) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE `trips` ADD COLUMN `tripType` TEXT NOT NULL DEFAULT 'DOMESTIC'")
-                db.execSQL("ALTER TABLE `trips` ADD COLUMN `currencyCode` TEXT")
-                db.execSQL("ALTER TABLE `trips` ADD COLUMN `conversionRate` REAL")
+                // We wrap each statement in its own try-catch block to make the migration resilient.
+                // This handles cases where a column might already exist from a previous failed migration.
+                try {
+                    db.execSQL("ALTER TABLE `trips` ADD COLUMN `tripType` TEXT NOT NULL DEFAULT 'DOMESTIC'")
+                } catch (e: Exception) {
+                    Log.e("Migration_36_37", "Failed to add tripType column, likely already exists.", e)
+                }
+                try {
+                    db.execSQL("ALTER TABLE `trips` ADD COLUMN `currencyCode` TEXT")
+                } catch (e: Exception) {
+                    Log.e("Migration_36_37", "Failed to add currencyCode column, likely already exists.", e)
+                }
+                try {
+                    db.execSQL("ALTER TABLE `trips` ADD COLUMN `conversionRate` REAL")
+                } catch (e: Exception) {
+                    Log.e("Migration_36_37", "Failed to add conversionRate column, likely already exists.", e)
+                }
             }
         }
 
