@@ -1,5 +1,5 @@
-// =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
+// =================================================================================
 // REASON: FEATURE - Added functions to save and retrieve a set of dismissed
 // merge suggestion keys. This allows the app to remember which suggestions the
 // user has already seen and ignored, preventing them from reappearing
@@ -78,6 +78,7 @@ class SettingsRepository(context: Context) {
         private const val KEY_AUTOCAPTURE_NOTIFICATION_ENABLED = "autocapture_notification_enabled"
         private const val KEY_LAST_MONTH_SUMMARY_DISMISSED = "last_month_summary_dismissed_"
         private const val KEY_DISMISSED_MERGES = "dismissed_merge_suggestions"
+        private const val KEY_PRIVACY_MODE_ENABLED = "privacy_mode_enabled"
     }
 
     fun getDismissedMergeSuggestions(): Flow<Set<String>> {
@@ -682,6 +683,26 @@ class SettingsRepository(context: Context) {
                 prefs.getInt(KEY_MONTHLY_REPORT_HOUR, 9),
                 prefs.getInt(KEY_MONTHLY_REPORT_MINUTE, 0)
             ))
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+    }
+
+    fun savePrivacyModeEnabled(isEnabled: Boolean) {
+        prefs.edit {
+            putBoolean(KEY_PRIVACY_MODE_ENABLED, isEnabled)
+        }
+    }
+
+    fun getPrivacyModeEnabled(): Flow<Boolean> {
+        return callbackFlow {
+            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                if (key == KEY_PRIVACY_MODE_ENABLED) {
+                    trySend(sp.getBoolean(key, false))
+                }
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            // Default to false (disabled)
+            trySend(prefs.getBoolean(KEY_PRIVACY_MODE_ENABLED, false))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
