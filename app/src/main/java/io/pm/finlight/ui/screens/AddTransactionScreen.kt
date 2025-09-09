@@ -1,12 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FIX - Resolved a smart cast error by reading the delegated State
-// property for travelSettings into a local variable before use. Corrected a
-// type mismatch by converting the Float? conversionRate to a Double before
-// performing multiplication. This also resolves the number format ambiguity.
-// FIX: The logic for setting the default account ("Cash Spends") has been made
-// more robust to prevent a race condition where it could fail to be set,
-// particularly when travel mode is active.
+// REASON: FIX - The `LaunchedEffect` for CSV editing has been updated to
+// deserialize a `Map<String, String>` instead of a `List<String>`. It now
+// populates fields by looking up values by their column header key (e.g.,
+// "Amount", "Category"), making the logic robust and immune to column order.
+// This resolves the data mismatch bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -132,7 +130,6 @@ fun AddTransactionScreen(
 
     val isSaveEnabled = amount.isNotBlank() && description.isNotBlank() && selectedAccount != null && selectedCategory != null
 
-    // --- FIX: Logic to robustly set the default account ---
     var isDefaultAccountApplied by remember { mutableStateOf(false) }
     LaunchedEffect(defaultAccount) {
         if (!isCsvEdit && !isDefaultAccountApplied && defaultAccount != null) {
@@ -150,21 +147,26 @@ fun AddTransactionScreen(
         if (isCsvEdit && initialDataJson != null) {
             try {
                 val gson = Gson()
-                val initialData: List<String> = gson.fromJson(URLDecoder.decode(initialDataJson, "UTF-8"), object : TypeToken<List<String>>() {}.type)
+                // --- UPDATED: Define a type token for a Map ---
+                val typeToken = object : TypeToken<Map<String, String>>() {}.type
+                // --- UPDATED: Deserialize into a Map ---
+                val initialDataMap: Map<String, String> = gson.fromJson(URLDecoder.decode(initialDataJson, "UTF-8"), typeToken)
+
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
-                initialData.getOrNull(0)?.let {
+                // --- UPDATED: Access data by key, not by index ---
+                initialDataMap["Date"]?.let {
                     try {
                         selectedDateTime.time = dateFormat.parse(it) ?: Date()
                     } catch (e: Exception) { /* Keep default date on parse error */
                     }
                 }
-                description = initialData.getOrElse(1) { "" }
-                amount = initialData.getOrElse(2) { "" }.replace(".0", "")
-                transactionType = initialData.getOrElse(3) { "expense" }
-                val categoryName = initialData.getOrElse(4) { "" }
-                val accountName = initialData.getOrElse(5) { "" }
-                notes = initialData.getOrElse(6) { "" }
+                description = initialDataMap["Description"] ?: ""
+                amount = (initialDataMap["Amount"] ?: "").replace(".0", "")
+                transactionType = initialDataMap["Type"]?.lowercase() ?: "expense"
+                val categoryName = initialDataMap["Category"] ?: ""
+                val accountName = initialDataMap["Account"] ?: ""
+                notes = initialDataMap["Notes"] ?: ""
 
                 selectedCategory = categories.find { it.name.equals(categoryName, ignoreCase = true) }
                 selectedAccount = accounts.find { it.name.equals(accountName, ignoreCase = true) }
