@@ -240,6 +240,7 @@ fun MainAppScreen() {
     val profilePictureUri by dashboardViewModel.profilePictureUri.collectAsState()
     val filterState by transactionViewModel.filterState.collectAsState()
     val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
+    val isPrivacyModeEnabled by settingsViewModel.privacyModeEnabled.collectAsState()
 
     val transactionForCategoryChange by transactionViewModel.transactionForCategoryChange.collectAsState()
 
@@ -364,6 +365,12 @@ fun MainAppScreen() {
                         actions = {
                             when (baseCurrentRoute) {
                                 BottomNavItem.Dashboard.route -> {
+                                    IconButton(onClick = { settingsViewModel.setPrivacyModeEnabled(!isPrivacyModeEnabled) }) {
+                                        Icon(
+                                            imageVector = if (isPrivacyModeEnabled) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                            contentDescription = "Toggle Privacy Mode"
+                                        )
+                                    }
                                     IconButton(onClick = { navController.navigate("customize_dashboard") }) {
                                         Icon(Icons.Default.Edit, contentDescription = "Customize Dashboard")
                                     }
