@@ -102,7 +102,8 @@ fun DashboardHeroCard(
     safeToSpend: Float,
     navController: NavController,
     monthYear: String,
-    budgetHealthSummary: String
+    budgetHealthSummary: String,
+    isPrivacyModeEnabled: Boolean
 ) {
     val progress = if (totalBudget > 0) (amountSpent / totalBudget) else 0f
     val animatedProgress by animateFloatAsState(
@@ -136,8 +137,9 @@ fun DashboardHeroCard(
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = "₹${NumberFormat.getNumberInstance(Locale("en", "IN")).format(amountSpent.toInt())}",
+            PrivacyAwareText(
+                amount = amountSpent,
+                isPrivacyMode = isPrivacyModeEnabled,
                 style = MaterialTheme.typography.displayLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -153,13 +155,17 @@ fun DashboardHeroCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Remaining: ₹${NumberFormat.getNumberInstance(Locale("en", "IN")).format(amountRemaining.toInt())}",
+                PrivacyAwareText(
+                    amount = amountRemaining,
+                    isPrivacyMode = isPrivacyModeEnabled,
+                    prefix = "Remaining: ",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text(
-                    text = "Total: ₹${NumberFormat.getNumberInstance(Locale("en", "IN")).format(totalBudget.toInt())}",
+                PrivacyAwareText(
+                    amount = totalBudget,
+                    isPrivacyMode = isPrivacyModeEnabled,
+                    prefix = "Total: ",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -174,15 +180,22 @@ fun DashboardHeroCard(
                 .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            StatItem(label = "Income", amount = income, onClick = { navController.navigate("income_screen") })
-            StatItem(label = "Budget", amount = totalBudget, isCurrency = true, onClick = { navController.navigate("budget_screen") })
-            StatItem(label = "Safe to Spend", amount = safeToSpend, isPerDay = true)
+            StatItem(label = "Income", amount = income, onClick = { navController.navigate("income_screen") }, isPrivacyModeEnabled = isPrivacyModeEnabled)
+            StatItem(label = "Budget", amount = totalBudget, isCurrency = true, onClick = { navController.navigate("budget_screen") }, isPrivacyModeEnabled = isPrivacyModeEnabled)
+            StatItem(label = "Safe to Spend", amount = safeToSpend, isPerDay = true, isPrivacyModeEnabled = isPrivacyModeEnabled)
         }
     }
 }
 
 @Composable
-private fun StatItem(label: String, amount: Float, isCurrency: Boolean = true, isPerDay: Boolean = false, onClick: (() -> Unit)? = null) {
+private fun StatItem(
+    label: String,
+    amount: Float,
+    isPrivacyModeEnabled: Boolean,
+    isCurrency: Boolean = true,
+    isPerDay: Boolean = false,
+    onClick: (() -> Unit)? = null
+) {
     val animatedAmount by animateFloatAsState(
         targetValue = amount,
         animationSpec = tween(durationMillis = 400, easing = EaseOutCubic),
@@ -200,15 +213,10 @@ private fun StatItem(label: String, amount: Float, isCurrency: Boolean = true, i
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (isCurrency) {
-                Text(
-                    text = "₹",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-            Text(
-                text = NumberFormat.getNumberInstance(Locale("en", "IN")).format(animatedAmount.toInt()),
+            PrivacyAwareText(
+                amount = animatedAmount,
+                isPrivacyMode = isPrivacyModeEnabled,
+                isCurrency = isCurrency,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -224,6 +232,7 @@ private fun StatItem(label: String, amount: Float, isCurrency: Boolean = true, i
         }
     }
 }
+
 
 @Composable
 private fun AuroraProgressBar(progress: Float) {
@@ -598,3 +607,4 @@ private fun QuickActionItem(
         )
     }
 }
+
