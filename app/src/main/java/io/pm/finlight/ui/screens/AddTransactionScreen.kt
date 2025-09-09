@@ -18,6 +18,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -50,8 +51,10 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,6 +67,7 @@ import io.pm.finlight.ui.theme.AuroraNumpadHighlight
 import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import kotlinx.coroutines.launch
@@ -295,22 +299,38 @@ fun AddTransactionScreen(
             containerColor = popupContainerColor
         ) {
             when (activeSheet) {
-                is ComposerSheet.Account -> PickerSheet(
-                    title = "Select Account",
-                    items = accounts,
-                    onItemSelected = { selectedAccount = it; activeSheet = null },
-                    onAddNew = { showCreateAccountDialog = true; activeSheet = null },
-                    itemContent = { account ->
-                        Text(account.name, color = MaterialTheme.colorScheme.onSurface)
+                is ComposerSheet.Account -> AccountPickerSheet(
+                    accounts = accounts,
+                    onAccountSelected = {
+                        selectedAccount = it
+                        activeSheet = null
+                    },
+                    onAddNew = {
+                        showCreateAccountDialog = true
+                        activeSheet = null
                     }
                 )
-                is ComposerSheet.Category -> PickerSheet(
-                    title = "Select Category",
-                    items = categories,
-                    onItemSelected = { selectedCategory = it; activeSheet = null },
-                    onAddNew = { showCreateCategoryDialog = true; activeSheet = null },
-                    itemContent = {}
-                )
+                is ComposerSheet.Category -> {
+                    Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {
+                        Text(
+                            "Select Category",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                        CategorySelectionGrid(
+                            categories = categories,
+                            onCategorySelected = {
+                                selectedCategory = it
+                                activeSheet = null
+                            },
+                            onAddNew = {
+                                showCreateCategoryDialog = true
+                                activeSheet = null
+                            }
+                        )
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
                 is ComposerSheet.Tags -> TagPickerSheet(
                     allTags = allTags,
                     selectedTags = selectedTags,
@@ -730,77 +750,92 @@ private fun NumpadButton(
 }
 
 @Composable
-private fun <T> PickerSheet(
-    title: String,
-    items: List<T>,
-    onItemSelected: (T) -> Unit,
-    onAddNew: (() -> Unit)? = null,
-    itemContent: @Composable (T) -> Unit
+private fun AccountPickerSheet(
+    accounts: List<Account>,
+    onAccountSelected: (Account) -> Unit,
+    onAddNew: () -> Unit
 ) {
     Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {
         Text(
-            title,
+            "Select Account",
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.colorScheme.onSurface
+            modifier = Modifier.padding(16.dp)
         )
-        if (items.isNotEmpty() && items.first() is Category) {
-            @Suppress("UNCHECKED_CAST")
-            CategorySelectionGrid(
-                categories = items as List<Category>,
-                onCategorySelected = onItemSelected as (Category) -> Unit,
-                onAddNew = onAddNew
-            )
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 100.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(items) { item ->
-                    Column(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { onItemSelected(item) }
-                            .padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        itemContent(item)
-                    }
-                }
-                if (onAddNew != null) {
-                    item {
-                        Column(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable(onClick = onAddNew)
-                                .padding(vertical = 12.dp)
-                                .height(76.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                Icons.Default.AddCircleOutline,
-                                contentDescription = "Create New",
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                "New",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 85.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(accounts) { account ->
+                AccountGridItem(
+                    account = account,
+                    onSelected = { onAccountSelected(account) }
+                )
+            }
+            item {
+                AddNewAccountGridItem(onAddNew = onAddNew)
             }
         }
-        Spacer(Modifier.height(16.dp))
     }
 }
+
+@Composable
+private fun AccountGridItem(
+    account: Account,
+    onSelected: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onSelected)
+            .padding(vertical = 12.dp)
+            .height(84.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Image(
+            painter = painterResource(id = BankLogoHelper.getLogoForAccount(account.name)),
+            contentDescription = "${account.name} Logo",
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            account.name,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun AddNewAccountGridItem(onAddNew: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onAddNew)
+            .padding(vertical = 12.dp)
+            .height(84.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            Icons.Default.AddCircleOutline,
+            contentDescription = "Create New Account",
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            "New",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
