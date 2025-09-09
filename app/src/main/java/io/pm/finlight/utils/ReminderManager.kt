@@ -193,7 +193,7 @@ object ReminderManager {
 
     fun scheduleWeeklySummary(context: Context) {
         val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        val dayOfWeek = prefs.getInt("weekly_report_day", Calendar.MONDAY)
+        val dayOfWeek = prefs.getInt("weekly_report_day", Calendar.SUNDAY)
         val hour = prefs.getInt("weekly_report_hour", 9)
         val minute = prefs.getInt("weekly_report_minute", 0)
 
