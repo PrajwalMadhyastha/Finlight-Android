@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TagViewModel.kt
-// REASON: UX REFINEMENT - The `addTag` function now checks if a tag with the
-// same name already exists (case-insensitively). If a duplicate is found, it
-// sends a feedback message to the UI via the `uiEvent` channel, improving the
-// user experience by preventing silent failures.
+// REASON: FIX - The `deleteTag` function has been hardened. It now also checks
+// if a tag is linked to a historical trip record before allowing deletion. This
+// prevents accidental deletion of trip data and provides clearer user feedback.
 // =================================================================================
 package io.pm.finlight
 
@@ -11,6 +10,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.repository.TripRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +20,8 @@ import kotlinx.coroutines.launch
 
 class TagViewModel(application: Application) : AndroidViewModel(application) {
     private val tagRepository: TagRepository
-    private val tagDao: TagDao // Expose DAO for direct checks
+    private val tripRepository: TripRepository // --- NEW: Add TripRepository
+    private val tagDao: TagDao
     private val _uiEvent = Channel<String>()
     val uiEvent = _uiEvent.receiveAsFlow()
 
@@ -28,9 +29,10 @@ class TagViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         val database = AppDatabase.getInstance(application)
-        tagDao = database.tagDao() // Initialize DAO
+        tagDao = database.tagDao()
         val transactionDao = database.transactionDao()
         tagRepository = TagRepository(tagDao, transactionDao)
+        tripRepository = TripRepository(database.tripDao()) // --- NEW: Initialize TripRepository
 
         allTags = tagRepository.allTags.stateIn(
             scope = viewModelScope,
@@ -67,8 +69,14 @@ class TagViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteTag(tag: Tag) {
         viewModelScope.launch {
-            if (tagRepository.isTagInUse(tag.id)) {
+            // --- UPDATED: Add a check for trip usage ---
+            val isUsedByTransaction = tagRepository.isTagInUse(tag.id)
+            val isUsedByTrip = tripRepository.isTagUsedByTrip(tag.id)
+
+            if (isUsedByTransaction) {
                 _uiEvent.send("Cannot delete '${tag.name}'. It is attached to one or more transactions.")
+            } else if (isUsedByTrip) {
+                _uiEvent.send("Cannot delete '${tag.name}'. It is linked to a trip in your travel history.")
             } else {
                 tagRepository.delete(tag)
                 _uiEvent.send("Tag '${tag.name}' deleted.")

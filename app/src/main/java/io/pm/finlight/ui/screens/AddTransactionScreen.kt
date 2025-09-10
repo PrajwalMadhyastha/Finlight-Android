@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FIX - Resolved a smart cast error by reading the delegated State
-// property for travelSettings into a local variable before use. Corrected a
-// type mismatch by converting the Float? conversionRate to a Double before
-// performing multiplication. This also resolves the number format ambiguity.
+// REASON: FIX - The `LaunchedEffect` for CSV editing has been updated to
+// deserialize a `Map<String, String>` instead of a `List<String>`. It now
+// populates fields by looking up values by their column header key (e.g.,
+// "Amount", "Category"), making the logic robust and immune to column order.
+// This resolves the data mismatch bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -15,6 +16,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,6 +49,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -62,6 +65,7 @@ import io.pm.finlight.ui.theme.AuroraNumpadHighlight
 import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import kotlinx.coroutines.launch
@@ -126,35 +130,43 @@ fun AddTransactionScreen(
 
     val isSaveEnabled = amount.isNotBlank() && description.isNotBlank() && selectedAccount != null && selectedCategory != null
 
-    LaunchedEffect(Unit) {
-        viewModel.clearAddTransactionState()
+    var isDefaultAccountApplied by remember { mutableStateOf(false) }
+    LaunchedEffect(defaultAccount) {
+        if (!isCsvEdit && !isDefaultAccountApplied && defaultAccount != null) {
+            selectedAccount = defaultAccount
+            isDefaultAccountApplied = true
+        }
     }
 
-    LaunchedEffect(defaultAccount) {
-        if (!isCsvEdit && selectedAccount == null) {
-            selectedAccount = defaultAccount
-        }
+
+    LaunchedEffect(Unit) {
+        viewModel.clearAddTransactionState()
     }
 
     LaunchedEffect(initialDataJson, accounts, categories) {
         if (isCsvEdit && initialDataJson != null) {
             try {
                 val gson = Gson()
-                val initialData: List<String> = gson.fromJson(URLDecoder.decode(initialDataJson, "UTF-8"), object : TypeToken<List<String>>() {}.type)
+                // --- UPDATED: Define a type token for a Map ---
+                val typeToken = object : TypeToken<Map<String, String>>() {}.type
+                // --- UPDATED: Deserialize into a Map ---
+                val initialDataMap: Map<String, String> = gson.fromJson(URLDecoder.decode(initialDataJson, "UTF-8"), typeToken)
+
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
-                initialData.getOrNull(0)?.let {
+                // --- UPDATED: Access data by key, not by index ---
+                initialDataMap["Date"]?.let {
                     try {
                         selectedDateTime.time = dateFormat.parse(it) ?: Date()
                     } catch (e: Exception) { /* Keep default date on parse error */
                     }
                 }
-                description = initialData.getOrElse(1) { "" }
-                amount = initialData.getOrElse(2) { "" }.replace(".0", "")
-                transactionType = initialData.getOrElse(3) { "expense" }
-                val categoryName = initialData.getOrElse(4) { "" }
-                val accountName = initialData.getOrElse(5) { "" }
-                notes = initialData.getOrElse(6) { "" }
+                description = initialDataMap["Description"] ?: ""
+                amount = (initialDataMap["Amount"] ?: "").replace(".0", "")
+                transactionType = initialDataMap["Type"]?.lowercase() ?: "expense"
+                val categoryName = initialDataMap["Category"] ?: ""
+                val accountName = initialDataMap["Account"] ?: ""
+                notes = initialDataMap["Notes"] ?: ""
 
                 selectedCategory = categories.find { it.name.equals(categoryName, ignoreCase = true) }
                 selectedAccount = accounts.find { it.name.equals(accountName, ignoreCase = true) }
@@ -289,22 +301,38 @@ fun AddTransactionScreen(
             containerColor = popupContainerColor
         ) {
             when (activeSheet) {
-                is ComposerSheet.Account -> PickerSheet(
-                    title = "Select Account",
-                    items = accounts,
-                    onItemSelected = { selectedAccount = it; activeSheet = null },
-                    onAddNew = { showCreateAccountDialog = true; activeSheet = null },
-                    itemContent = { account ->
-                        Text(account.name, color = MaterialTheme.colorScheme.onSurface)
+                is ComposerSheet.Account -> AccountPickerSheet(
+                    accounts = accounts,
+                    onAccountSelected = {
+                        selectedAccount = it
+                        activeSheet = null
+                    },
+                    onAddNew = {
+                        showCreateAccountDialog = true
+                        activeSheet = null
                     }
                 )
-                is ComposerSheet.Category -> PickerSheet(
-                    title = "Select Category",
-                    items = categories,
-                    onItemSelected = { selectedCategory = it; activeSheet = null },
-                    onAddNew = { showCreateCategoryDialog = true; activeSheet = null },
-                    itemContent = {}
-                )
+                is ComposerSheet.Category -> {
+                    Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {
+                        Text(
+                            "Select Category",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                        CategorySelectionGrid(
+                            categories = categories,
+                            onCategorySelected = {
+                                selectedCategory = it
+                                activeSheet = null
+                            },
+                            onAddNew = {
+                                showCreateCategoryDialog = true
+                                activeSheet = null
+                            }
+                        )
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
                 is ComposerSheet.Tags -> TagPickerSheet(
                     allTags = allTags,
                     selectedTags = selectedTags,
@@ -724,77 +752,92 @@ private fun NumpadButton(
 }
 
 @Composable
-private fun <T> PickerSheet(
-    title: String,
-    items: List<T>,
-    onItemSelected: (T) -> Unit,
-    onAddNew: (() -> Unit)? = null,
-    itemContent: @Composable (T) -> Unit
+private fun AccountPickerSheet(
+    accounts: List<Account>,
+    onAccountSelected: (Account) -> Unit,
+    onAddNew: () -> Unit
 ) {
     Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {
         Text(
-            title,
+            "Select Account",
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.colorScheme.onSurface
+            modifier = Modifier.padding(16.dp)
         )
-        if (items.isNotEmpty() && items.first() is Category) {
-            @Suppress("UNCHECKED_CAST")
-            CategorySelectionGrid(
-                categories = items as List<Category>,
-                onCategorySelected = onItemSelected as (Category) -> Unit,
-                onAddNew = onAddNew
-            )
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 100.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(items) { item ->
-                    Column(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { onItemSelected(item) }
-                            .padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        itemContent(item)
-                    }
-                }
-                if (onAddNew != null) {
-                    item {
-                        Column(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable(onClick = onAddNew)
-                                .padding(vertical = 12.dp)
-                                .height(76.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                Icons.Default.AddCircleOutline,
-                                contentDescription = "Create New",
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                "New",
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 85.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(accounts) { account ->
+                AccountGridItem(
+                    account = account,
+                    onSelected = { onAccountSelected(account) }
+                )
+            }
+            item {
+                AddNewAccountGridItem(onAddNew = onAddNew)
             }
         }
-        Spacer(Modifier.height(16.dp))
     }
 }
+
+@Composable
+private fun AccountGridItem(
+    account: Account,
+    onSelected: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onSelected)
+            .padding(vertical = 12.dp)
+            .height(84.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Image(
+            painter = painterResource(id = BankLogoHelper.getLogoForAccount(account.name)),
+            contentDescription = "${account.name} Logo",
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            account.name,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun AddNewAccountGridItem(onAddNew: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onAddNew)
+            .padding(vertical = 12.dp)
+            .height(84.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            Icons.Default.AddCircleOutline,
+            contentDescription = "Create New Account",
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            "New",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

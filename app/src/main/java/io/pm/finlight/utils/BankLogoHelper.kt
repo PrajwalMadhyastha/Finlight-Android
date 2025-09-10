@@ -18,6 +18,14 @@ object BankLogoHelper {
     fun getLogoForAccount(accountName: String): Int {
         val lowerCaseName = accountName.lowercase()
         return when {
+            "amazon" in lowerCaseName -> R.drawable.ic_amazon_logo
+            "airtel" in lowerCaseName -> R.drawable.ic_airtel_logo
+            "jio" in lowerCaseName -> R.drawable.ic_jio_logo
+            "paytm" in lowerCaseName -> R.drawable.ic_paytm_logo
+            "phonepe" in lowerCaseName -> R.drawable.ic_phonepe_logo
+            "ola" in lowerCaseName -> R.drawable.ic_ola_logo
+            "pluxee" in lowerCaseName || "sodexo" in lowerCaseName -> R.drawable.ic_pluxee_logo
+            "simpl" in lowerCaseName -> R.drawable.ic_simpl_logo
             "hdfc" in lowerCaseName -> R.drawable.ic_hdfc_logo
             "icici" in lowerCaseName -> R.drawable.ic_icici_logo
             "sbi" in lowerCaseName || "state bank" in lowerCaseName -> R.drawable.ic_sbi_logo

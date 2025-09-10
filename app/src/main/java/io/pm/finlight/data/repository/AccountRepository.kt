@@ -1,14 +1,15 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/AccountRepository.kt
-// REASON: FEATURE - The repository now encapsulates the entire atomic account
-// merging logic. The new `mergeAccounts` function runs a database transaction
-// that reassigns goals, reassigns transactions, and finally deletes the source
-// accounts, providing a safe and clean API for the ViewModel.
+// FILE: ./app/src/main/java/io/pm/finlight/data/repository/AccountRepository.kt
+// REASON: FEATURE - The `mergeAccounts` function has been enhanced. Before
+// deleting the source accounts, it now creates and saves `AccountAlias` records.
+// This teaches the app that the old account names should now map to the new
+// destination account, forming the core of the new learning feature.
 // =================================================================================
 package io.pm.finlight
 
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.entity.AccountAlias
 import kotlinx.coroutines.flow.Flow
 
 class AccountRepository(private val db: AppDatabase) {
@@ -43,6 +44,16 @@ class AccountRepository(private val db: AppDatabase) {
      */
     suspend fun mergeAccounts(destinationAccountId: Int, sourceAccountIds: List<Int>) {
         db.withTransaction {
+            // --- NEW: Create aliases for the source accounts before deleting them ---
+            val sourceAccounts = sourceAccountIds.mapNotNull { db.accountDao().getAccountByIdBlocking(it) }
+            val aliases = sourceAccounts.map {
+                AccountAlias(aliasName = it.name, destinationAccountId = destinationAccountId)
+            }
+            if (aliases.isNotEmpty()) {
+                db.accountAliasDao().insertAll(aliases)
+            }
+            // --- End of new logic ---
+
             // 1. Re-assign goals from source accounts to the destination account.
             db.goalDao().reassignGoals(sourceAccountIds, destinationAccountId)
 

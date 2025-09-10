@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/CsvValidationScreen.kt
-// REASON: FIX - The call to `viewModel.commitCsvImport` now correctly passes
-// the list of `ReviewableRow` objects. This aligns with the updated ViewModel
-// function signature and resolves the "Argument type mismatch" build error.
+// REASON: FIX - The `onEditClick` handler now zips the CSV header with the row's
+// data to create a `Map<String, String>`. This map is then serialized and passed
+// to the AddTransactionScreen, making the data transfer robust and independent
+// of column order, which resolves the data mismatch bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -152,8 +153,11 @@ fun CsvValidationScreen(
                     EditableRowItem(
                         row = row,
                         onEditClick = {
+                            // --- UPDATED: Create a Map from headers and row data ---
+                            val rowDataMap = currentReport.header.zip(row.rowData).toMap()
                             val gson = Gson()
-                            val rowDataJson = gson.toJson(row.rowData)
+                            // Serialize the Map, not the List.
+                            val rowDataJson = gson.toJson(rowDataMap)
                             val encodedJson = URLEncoder.encode(rowDataJson, "UTF-8")
                             navController.navigate("add_transaction?isCsvEdit=true&csvLineNumber=${row.lineNumber}&initialDataJson=$encodedJson")
                         },
