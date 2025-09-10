@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/GlassmorphismComponents.kt
-// REASON: UX REFINEMENT - The `BudgetWatchCard` is now fully clickable. A
-// `clickable` modifier has been added to its root `GlassPanel`, allowing users
-// to tap anywhere on the card to navigate directly to the budget management screen.
+// REASON: FEATURE - The header of the `AccountsCarouselCard` is now clickable.
+// Tapping the "Accounts" title on the dashboard card will navigate the user
+// directly to the main `account_list` screen, providing an intuitive shortcut.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -307,12 +307,27 @@ fun AccountsCarouselCard(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = "Accounts",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        )
+        // --- UPDATED: Make the header row clickable ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { navController.navigate("account_list") }
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Accounts",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "View All",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(horizontal = 4.dp)
@@ -607,4 +622,3 @@ private fun QuickActionItem(
         )
     }
 }
-

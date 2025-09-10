@@ -1,12 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/receiver/SmsReceiver.kt
-// REASON: FIX - Resolved build error by correctly instantiating and using the
-// TransactionRepository to save transactions with tags, ensuring the auto-tagging
-// logic for travel mode works correctly for auto-captured SMS.
-// REFACTOR - The parsing logic has been updated to follow a strict hierarchy of
-// trust: 1) User-defined custom rules, 2) ML model pre-filter, 3) Main parser
-// (heuristics then generic regex). This ensures a user's custom rule always
-// overrides the ML model, fixing the "escape hatch" functionality.
+// REASON: FEATURE - The `saveTransaction` logic has been updated to query the
+// new `AccountAliasDao`. If a parsed account name matches a known alias, the
+// transaction is automatically assigned to the correct, previously merged
+// destination account instead of creating a new duplicate.
 // =================================================================================
 package io.pm.finlight
 
@@ -22,6 +19,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.AccountDao
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.NotificationHelper
@@ -161,6 +159,7 @@ class SmsReceiver : BroadcastReceiver() {
     ) {
         val db = AppDatabase.getInstance(context)
         val accountDao = db.accountDao()
+        val accountAliasDao = db.accountAliasDao() // --- NEW: Get the alias DAO
         val transactionDao = db.transactionDao()
         val tagRepository = TagRepository(db.tagDao(), transactionDao)
         val settingsRepository = SettingsRepository(context)
@@ -169,14 +168,26 @@ class SmsReceiver : BroadcastReceiver() {
         val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
         val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
-        var account = accountDao.findByName(accountName)
-        if (account == null) {
-            val newAccount = Account(name = accountName, type = accountType)
-            accountDao.insert(newAccount)
-            account = accountDao.findByName(accountName)
+        // --- NEW: Account Alias Logic ---
+        var finalAccountId: Int? = null
+        val alias = accountAliasDao.findByAlias(accountName)
+        if (alias != null) {
+            // An alias was found, use the destination account ID.
+            finalAccountId = alias.destinationAccountId
+            Log.d(tag, "Found account alias for '$accountName'. Mapping to account ID: $finalAccountId")
+        } else {
+            // No alias found, proceed with the normal find-or-create logic.
+            var account = accountDao.findByName(accountName)
+            if (account == null) {
+                val newAccount = Account(name = accountName, type = accountType)
+                val newId = accountDao.insert(newAccount)
+                account = accountDao.getAccountByIdBlocking(newId.toInt())
+            }
+            finalAccountId = account?.id
         }
+        // --- End of new logic ---
 
-        if (account != null) {
+        if (finalAccountId != null) {
             val currentTravelSettings = settingsRepository.getTravelModeSettings().first()
             val isTravelModeActive = currentTravelSettings?.isEnabled == true &&
                     potentialTxn.date >= currentTravelSettings.startDate &&
@@ -198,7 +209,7 @@ class SmsReceiver : BroadcastReceiver() {
                     currencyCode = travelSettings.currencyCode,
                     conversionRate = conversionRate,
                     date = potentialTxn.date,
-                    accountId = account.id,
+                    accountId = finalAccountId, // --- UPDATED: Use the final ID ---
                     categoryId = potentialTxn.categoryId,
                     notes = "",
                     transactionType = potentialTxn.transactionType,
@@ -213,7 +224,7 @@ class SmsReceiver : BroadcastReceiver() {
                     originalDescription = potentialTxn.merchantName,
                     amount = potentialTxn.amount,
                     date = potentialTxn.date,
-                    accountId = account.id,
+                    accountId = finalAccountId, // --- UPDATED: Use the final ID ---
                     categoryId = potentialTxn.categoryId,
                     notes = "",
                     transactionType = potentialTxn.transactionType,

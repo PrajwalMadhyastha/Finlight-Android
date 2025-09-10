@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/AccountDao.kt
-// REASON: FEATURE - Added the `deleteByIds` function. This is a necessary
-// component of the new account merging feature, allowing the system to
-// permanently remove the source accounts after their transactions have been reassigned.
+// REASON: FEATURE - Added a new synchronous `getAccountByIdBlocking` function.
+// This is required by the AccountRepository's transactional merge logic to
+// retrieve source account names before they are deleted.
 // =================================================================================
 package io.pm.finlight.data.db.dao
 
@@ -50,6 +50,10 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE id = :accountId")
     fun getAccountById(accountId: Int): Flow<Account?>
 
+    // --- NEW: Synchronous version for use within transactions ---
+    @Query("SELECT * FROM accounts WHERE id = :accountId")
+    suspend fun getAccountByIdBlocking(accountId: Int): Account?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(accounts: List<Account>)
 
@@ -65,7 +69,6 @@ interface AccountDao {
     @Delete
     suspend fun delete(account: Account)
 
-    // --- NEW: Deletes a list of accounts by their IDs ---
     @Query("DELETE FROM accounts WHERE id IN (:accountIds)")
     suspend fun deleteByIds(accountIds: List<Int>)
 }

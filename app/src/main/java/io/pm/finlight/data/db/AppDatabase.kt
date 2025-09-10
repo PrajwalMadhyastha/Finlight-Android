@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: FEATURE - Incremented the database version to 37 and added
-// MIGRATION_36_37. This migration adds the necessary columns to the `trips`
-// table to store complete trip details, enabling the "Edit Trip" feature.
+// REASON: FEATURE - Incremented the database version to 39 and added the new
+// `AccountAlias` entity. A new migration (MIGRATION_38_39) has been added to
+// create the `account_aliases` table, which will store learned account mappings.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -15,6 +15,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.*
+import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.security.SecurityManager
 import io.pm.finlight.utils.CategoryIconHelper
@@ -43,9 +44,10 @@ import net.sqlcipher.database.SupportFactory
         RecurringPattern::class,
         SplitTransaction::class,
         SmsParseTemplate::class,
-        Trip::class
+        Trip::class,
+        AccountAlias::class // --- NEW: Add AccountAlias entity
     ],
-    version = 38, // --- UPDATED: Incremented version ---
+    version = 39, // --- UPDATED: Incremented version ---
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -65,12 +67,13 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun splitTransactionDao(): SplitTransactionDao
     abstract fun smsParseTemplateDao(): SmsParseTemplateDao
     abstract fun tripDao(): TripDao
+    abstract fun accountAliasDao(): AccountAliasDao // --- NEW: Add abstract DAO function ---
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // --- All existing migrations (1-2 through 34-35) remain here ---
+        // --- All existing migrations (1-2 through 37-38) remain here ---
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN transactionType TEXT NOT NULL DEFAULT 'expense'")
@@ -417,7 +420,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `tags_new` RENAME TO `tags`")
             }
         }
-
         val MIGRATION_35_36 = object : Migration(35, 36) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -430,11 +432,9 @@ abstract class AppDatabase : RoomDatabase() {
                         FOREIGN KEY(`tagId`) REFERENCES `tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE 
                     )
                 """)
-                // --- FIX: Create a UNIQUE index to match the entity definition ---
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_trips_tagId` ON `trips` (`tagId`)")
             }
         }
-
         val MIGRATION_36_37 = object : Migration(36, 37) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 try {
@@ -454,14 +454,24 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
         }
-
-        // --- NEW: Migration to fix the non-unique index for existing users ---
         val MIGRATION_37_38 = object : Migration(37, 38) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // This will drop the old, incorrect index if it exists.
                 db.execSQL("DROP INDEX IF EXISTS `index_trips_tagId`")
-                // This creates the new, correct UNIQUE index.
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_trips_tagId` ON `trips` (`tagId`)")
+            }
+        }
+        // --- NEW: Migration for the account_aliases table ---
+        val MIGRATION_38_39 = object : Migration(38, 39) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `account_aliases` (
+                        `aliasName` TEXT NOT NULL, 
+                        `destinationAccountId` INTEGER NOT NULL, 
+                        PRIMARY KEY(`aliasName`), 
+                        FOREIGN KEY(`destinationAccountId`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE 
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_account_aliases_destinationAccountId` ON `account_aliases` (`destinationAccountId`)")
             }
         }
 
@@ -484,7 +494,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29,
                             MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
                             MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
-                            MIGRATION_37_38 // --- UPDATED: Add the new migration
+                            MIGRATION_37_38, MIGRATION_38_39 // --- UPDATED: Add the new migration
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))
