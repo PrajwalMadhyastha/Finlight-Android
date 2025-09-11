@@ -9,16 +9,110 @@
 // FEATURE - The `searchTransactions` query has been updated to accept an
 // optional `tagId`. It now includes a subquery to filter results based on
 // whether a transaction is associated with the selected tag.
+// FEATURE - Added new queries to power the Spending Analysis screen. These
+// queries can group transactions by category, tag, or merchant and fetch the
+// detailed transaction list for a specific dimension within a date range.
 // =================================================================================
 package io.pm.finlight
 
 import androidx.room.*
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.SpendingAnalysisItem
 import kotlinx.coroutines.flow.Flow
 // Removed the ambiguous import: import androidx.room.Transaction
 
 @Dao
 interface TransactionDao {
+
+    // --- NEW: Spending Analysis Queries ---
+
+    @Query("""
+        WITH AtomicExpenses AS (
+            SELECT T.categoryId, T.amount FROM transactions AS T
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+            UNION ALL
+            SELECT S.categoryId, S.amount FROM split_transactions AS S
+            JOIN transactions AS P ON S.parentTransactionId = P.id
+            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+        )
+        SELECT
+            C.id as dimensionId,
+            C.name as dimensionName,
+            SUM(AE.amount) as totalAmount,
+            COUNT(AE.amount) as transactionCount
+        FROM AtomicExpenses AE
+        JOIN categories C ON AE.categoryId = C.id
+        WHERE AE.categoryId IS NOT NULL
+        GROUP BY C.id, C.name
+        ORDER BY totalAmount DESC
+    """)
+    fun getSpendingAnalysisByCategory(startDate: Long, endDate: Long): Flow<List<SpendingAnalysisItem>>
+
+    @Query("""
+        SELECT
+            T.id as dimensionId,
+            T.name as dimensionName,
+            SUM(TX.amount) as totalAmount,
+            COUNT(TX.id) as transactionCount
+        FROM tags T
+        JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.tagId
+        JOIN transactions TX ON TTCR.transactionId = TX.id
+        WHERE TX.transactionType = 'expense' AND TX.isExcluded = 0 AND TX.date BETWEEN :startDate AND :endDate
+        GROUP BY T.id, T.name
+        ORDER BY totalAmount DESC
+    """)
+    fun getSpendingAnalysisByTag(startDate: Long, endDate: Long): Flow<List<SpendingAnalysisItem>>
+
+    @Query("""
+        SELECT
+            LOWER(T.description) as dimensionId,
+            T.description as dimensionName,
+            SUM(T.amount) as totalAmount,
+            COUNT(T.id) as transactionCount
+        FROM transactions T
+        WHERE T.transactionType = 'expense' AND T.isExcluded = 0 AND T.isSplit = 0 AND T.date BETWEEN :startDate AND :endDate
+        GROUP BY dimensionName
+        ORDER BY totalAmount DESC
+    """)
+    fun getSpendingAnalysisByMerchant(startDate: Long, endDate: Long): Flow<List<SpendingAnalysisItem>>
+
+    @androidx.room.Transaction
+    @Query("""
+        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
+        (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
+        FROM transactions AS T
+        LEFT JOIN accounts AS A ON T.accountId = A.id
+        LEFT JOIN categories AS C ON T.categoryId = C.id
+        WHERE T.categoryId = :categoryId AND T.date BETWEEN :startDate AND :endDate
+        ORDER BY T.date DESC
+    """)
+    fun getTransactionsForCategoryInRange(categoryId: Int, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
+
+    @androidx.room.Transaction
+    @Query("""
+        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
+        (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
+        FROM transactions AS T
+        INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.transactionId
+        LEFT JOIN accounts AS A ON T.accountId = A.id
+        LEFT JOIN categories AS C ON T.categoryId = C.id
+        WHERE TTCR.tagId = :tagId AND T.date BETWEEN :startDate AND :endDate
+        ORDER BY T.date DESC
+    """)
+    fun getTransactionsForTagInRange(tagId: Int, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
+
+    @androidx.room.Transaction
+    @Query("""
+        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
+        (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
+        FROM transactions AS T
+        LEFT JOIN accounts AS A ON T.accountId = A.id
+        LEFT JOIN categories AS C ON T.categoryId = C.id
+        WHERE T.description = :merchantName AND T.date BETWEEN :startDate AND :endDate
+        ORDER BY T.date DESC
+    """)
+    fun getTransactionsForMerchantInRange(merchantName: String, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
+
 
     @Query("""
         SELECT

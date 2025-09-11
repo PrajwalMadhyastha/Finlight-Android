@@ -5,6 +5,9 @@
 // to it in "edit mode".
 // REFACTOR: Removed the now-obsolete route for "travel_history_screen" as this
 // feature has been merged into the "currency_travel_settings" screen.
+// FEATURE - Added new routes and composables for the "Spending Analysis" and
+// "Analysis Details" screens, integrating the new feature into the app's
+// navigation graph.
 // =================================================================================
 package io.pm.finlight
 
@@ -75,6 +78,7 @@ import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.ui.theme.PersonalFinanceAppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.flow.map
@@ -281,7 +285,9 @@ fun MainAppScreen() {
         "customize_dashboard",
         "account_mapping_screen",
         "sms_debug_screen",
-        "trip_detail"
+        "trip_detail",
+        "analysis_screen", // --- NEW: Add analysis screens
+        "analysis_detail_screen"
     )
 
     val currentTitle = if (showBottomBar) {
@@ -545,6 +551,48 @@ fun AppNavHost(
         startDestination = "splash_screen",
         modifier = modifier
     ) {
+        // --- NEW: Route for Spending Analysis Screen ---
+        composable(
+            "analysis_screen",
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+        ) {
+            AnalysisScreen(navController = navController)
+        }
+        // --- NEW: Route for Spending Analysis Detail Screen ---
+        composable(
+            "analysis_detail_screen/{dimension}/{dimensionId}/{startDate}/{endDate}?title={title}",
+            arguments = listOf(
+                navArgument("dimension") { type = NavType.EnumType(AnalysisDimension::class.java) },
+                navArgument("dimensionId") { type = NavType.StringType },
+                navArgument("startDate") { type = NavType.LongType },
+                navArgument("endDate") { type = NavType.LongType },
+                navArgument("title") { type = NavType.StringType }
+            ),
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+        ) { backStackEntry ->
+            val dimension = backStackEntry.arguments?.getSerializable("dimension", AnalysisDimension::class.java)
+            val dimensionId = backStackEntry.arguments?.getString("dimensionId")
+            val title = URLDecoder.decode(backStackEntry.arguments?.getString("title"), "UTF-8")
+            val startDate = backStackEntry.arguments?.getLong("startDate")
+            val endDate = backStackEntry.arguments?.getLong("endDate")
+
+            if (dimension != null && dimensionId != null && startDate != null && endDate != null) {
+                AnalysisDetailScreen(
+                    navController = navController,
+                    dimension = dimension,
+                    dimensionId = dimensionId,
+                    title = title,
+                    startDate = startDate,
+                    endDate = endDate
+                )
+            }
+        }
         composable(
             "sms_debug_screen",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },

@@ -4,6 +4,9 @@
 // `focusSearch=false` argument. This tells the destination SearchScreen not
 // to automatically request focus for the search bar, resolving the unintended
 // UI behavior.
+// FEATURE - A new "Spending Analysis" card has been added to the "Detailed
+// Reports" section. This serves as the primary entry point for the new
+// analysis feature.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -17,6 +20,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarViewMonth
 import androidx.compose.material.icons.filled.CalendarViewWeek
 import androidx.compose.material.icons.filled.Check
@@ -241,7 +245,6 @@ fun ReportsScreen(
                                     val categoryName = entry.label
                                     val category = allCategories.find { it.name.equals(categoryName, ignoreCase = true) }
                                     category?.let {
-                                        // --- UPDATED: Add focusSearch=false to the navigation route ---
                                         navController.navigate("search_screen?categoryId=${it.id}&expandFilters=false&focusSearch=false")
                                     }
                                 }
@@ -310,6 +313,14 @@ fun ReportsScreen(
             )
         }
 
+        item {
+            GlassReportNavigationCard(
+                title = "Spending Analysis",
+                subtitle = "Break down spending by category, tag, or merchant.",
+                icon = Icons.Default.Analytics,
+                onClick = { navController.navigate("analysis_screen") }
+            )
+        }
         item {
             GlassReportNavigationCard(
                 title = "Weekly Report",
