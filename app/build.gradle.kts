@@ -161,7 +161,7 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     implementation("androidx.appcompat:appcompat:1.7.1")
-    implementation("com.google.firebase:firebase-crashlytics-buildtools:3.0.4")
+    implementation("com.google.firebase:firebase-crashlytics-buildtools:3.0.6")
     ksp("androidx.room:room-compiler:$roomVersion")
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
@@ -216,9 +216,10 @@ dependencies {
 
     // --- TENSORFLOW LITE (UPDATED) ---
     // Switched from task-text to the core TFLite libraries for better control and compatibility.
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
-    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.5.0")
+    implementation("org.tensorflow:tensorflow-lite:2.17.0")
     // Flex Delegate to support advanced text ops (needed for both app and tests)
     implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
     androidTestImplementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+    //implementation("com.google.ai.edge.litert:litert:2.0.1-alpha")
 }
