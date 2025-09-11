@@ -7,6 +7,9 @@
 // FEATURE - The subtitle text now displays the comma-separated list of tag names
 // if they exist, falling back to the category name otherwise. This makes the
 // transaction list significantly more informative at a glance.
+// FIX - The subtitle's clickable modifier is now only enabled when displaying
+// the category name, preventing the confusing UX of clicking tags to open the
+// category picker. The category icon remains the consistent tap target.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -147,9 +150,8 @@ fun TransactionItem(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
                 )
 
-                // --- UPDATED LOGIC ---
-                // If tags exist, show them. Otherwise, fall back to the category name.
-                val subtitleText = if (!transactionDetails.tagNames.isNullOrEmpty()) {
+                val hasTags = !transactionDetails.tagNames.isNullOrEmpty()
+                val subtitleText = if (hasTags) {
                     transactionDetails.tagNames
                 } else if (isSplit) {
                     "Multiple Categories"
@@ -162,11 +164,10 @@ fun TransactionItem(
                     style = MaterialTheme.typography.bodyMedium,
                     fontStyle = FontStyle.Italic,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
-                    modifier = Modifier.clickable(enabled = !isSplit && !isSelectionMode) { onCategoryClick(transactionDetails) },
+                    modifier = Modifier.clickable(enabled = !isSplit && !isSelectionMode && !hasTags) { onCategoryClick(transactionDetails) },
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis // Handle long tag lists
+                    overflow = TextOverflow.Ellipsis
                 )
-                // --- END OF UPDATED LOGIC ---
 
                 Text(
                     text = SimpleDateFormat("dd MMM yy, h:mm a", Locale.getDefault()).format(Date(transactionDetails.transaction.date)),
