@@ -3,6 +3,9 @@
 // REASON: FEATURE - Added `removeAllTransactionsForTag`. This function is
 // required for the "Cancel Trip" action to remove all tag associations from
 // transactions before the trip record itself is deleted.
+// FEATURE - All queries returning TransactionDetails now include a subquery
+// using `GROUP_CONCAT` to aggregate associated tag names into a single string.
+// This efficiently provides the data needed to display tags in the transaction list.
 // =================================================================================
 package io.pm.finlight
 
@@ -115,7 +118,8 @@ interface TransactionDao {
             A.name as accountName,
             C.name as categoryName,
             C.iconKey as categoryIconKey,
-            C.colorKey as categoryColorKey
+            C.colorKey as categoryColorKey,
+            (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM
             transactions AS T
         LEFT JOIN
@@ -146,7 +150,8 @@ interface TransactionDao {
             A.name as accountName,
             C.name as categoryName,
             C.iconKey as categoryIconKey,
-            C.colorKey as categoryColorKey
+            C.colorKey as categoryColorKey,
+            (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = AI.id) as tagNames
         FROM AtomicIncomes AS AI
         LEFT JOIN accounts AS A ON AI.accountId = A.id
         LEFT JOIN categories AS C ON AI.categoryId = C.id
@@ -202,7 +207,8 @@ interface TransactionDao {
 
     @androidx.room.Transaction
     @Query("""
-        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey
+        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
+        (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM transactions AS T
         LEFT JOIN accounts AS A ON T.accountId = A.id
         LEFT JOIN categories AS C ON T.categoryId = C.id
@@ -213,7 +219,8 @@ interface TransactionDao {
 
     @androidx.room.Transaction
     @Query("""
-        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey
+        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
+        (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM transactions AS T
         LEFT JOIN accounts AS A ON T.accountId = A.id
         LEFT JOIN categories AS C ON T.categoryId = C.id
@@ -300,7 +307,8 @@ interface TransactionDao {
             A.name as accountName,
             C.name as categoryName,
             C.iconKey as categoryIconKey,
-            C.colorKey as categoryColorKey
+            C.colorKey as categoryColorKey,
+            (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM
             transactions AS T
         LEFT JOIN
@@ -321,7 +329,8 @@ interface TransactionDao {
             A.name as accountName,
             C.name as categoryName,
             C.iconKey as categoryIconKey,
-            C.colorKey as categoryColorKey
+            C.colorKey as categoryColorKey,
+            (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM
             transactions AS T
         LEFT JOIN
@@ -346,7 +355,8 @@ interface TransactionDao {
             A.name as accountName,
             C.name as categoryName,
             C.iconKey as categoryIconKey,
-            C.colorKey as categoryColorKey
+            C.colorKey as categoryColorKey,
+            (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM
             transactions AS T
         LEFT JOIN
@@ -372,7 +382,8 @@ interface TransactionDao {
     @androidx.room.Transaction
     @Query(
         """
-        SELECT t.*, a.name as accountName, c.name as categoryName, c.iconKey as categoryIconKey, c.colorKey as categoryColorKey
+        SELECT t.*, a.name as accountName, c.name as categoryName, c.iconKey as categoryIconKey, c.colorKey as categoryColorKey,
+        (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = t.id) as tagNames
         FROM transactions t
         LEFT JOIN accounts a ON t.accountId = a.id
         LEFT JOIN categories c ON t.categoryId = c.id
@@ -521,6 +532,60 @@ interface TransactionDao {
     @Query("SELECT T.* FROM tags T INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.tagId WHERE TTCR.transactionId = :transactionId")
     suspend fun getTagsForTransactionSimple(transactionId: Int): List<Tag>
 
+    suspend fun updateTagsForTransaction(transactionId: Int, tags: Set<Tag>) {
+        clearTagsForTransaction(transactionId)
+        if (tags.isNotEmpty()) {
+            val crossRefs = tags.map { tag ->
+                TransactionTagCrossRef(transactionId = transactionId, tagId = tag.id)
+            }
+            addTagsToTransaction(crossRefs)
+        }
+    }
+
+    suspend fun insertTransactionWithTags(transaction: Transaction, tags: Set<Tag>): Long {
+        val transactionId = insert(transaction)
+        if (tags.isNotEmpty()) {
+            val crossRefs = tags.map { tag ->
+                TransactionTagCrossRef(transactionId = transactionId.toInt(), tagId = tag.id)
+            }
+            addTagsToTransaction(crossRefs)
+        }
+        return transactionId
+    }
+
+    suspend fun updateTransactionWithTags(transaction: Transaction, tags: Set<Tag>) {
+        update(transaction)
+        clearTagsForTransaction(transaction.id)
+        if (tags.isNotEmpty()) {
+            val crossRefs = tags.map { tag ->
+                TransactionTagCrossRef(transactionId = transaction.id, tagId = tag.id)
+            }
+            addTagsToTransaction(crossRefs)
+        }
+    }
+
+    suspend fun insertTransactionWithTagsAndImages(
+        transaction: Transaction,
+        tags: Set<Tag>,
+        imagePaths: List<String>
+    ): Long {
+        val newTransactionId = insert(transaction)
+        if (tags.isNotEmpty()) {
+            val crossRefs = tags.map { tag ->
+                TransactionTagCrossRef(transactionId = newTransactionId.toInt(), tagId = tag.id)
+            }
+            addTagsToTransaction(crossRefs)
+        }
+        imagePaths.forEach { path ->
+            val imageEntity = TransactionImage(
+                transactionId = newTransactionId.toInt(),
+                imageUri = path
+            )
+            insertImage(imageEntity)
+        }
+        return newTransactionId
+    }
+
     @Query("""
         WITH AtomicExpenses AS (
             SELECT T.date, T.amount FROM transactions AS T
@@ -628,7 +693,8 @@ interface TransactionDao {
 
     @androidx.room.Transaction
     @Query("""
-        SELECT t.*, a.name as accountName, c.name as categoryName, c.iconKey as categoryIconKey, c.colorKey as categoryColorKey
+        SELECT t.*, a.name as accountName, c.name as categoryName, c.iconKey as categoryIconKey, c.colorKey as categoryColorKey,
+        (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = t.id) as tagNames
         FROM transactions t
         LEFT JOIN accounts a ON t.accountId = a.id
         LEFT JOIN categories c ON t.categoryId = c.id
@@ -678,7 +744,8 @@ interface TransactionDao {
     // --- NEW: Get all transactions for a specific tag ---
     @androidx.room.Transaction
     @Query("""
-        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey
+        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
+        (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM transactions AS T
         INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.transactionId
         LEFT JOIN accounts AS A ON T.accountId = A.id

@@ -4,6 +4,9 @@
 // the `TransactionItem` and `TransactionList` composables. This resolves build
 // errors by making the parameters optional for screens that don't use the
 // selection feature, such as the dashboard and search results.
+// FEATURE - The subtitle text now displays the comma-separated list of tag names
+// if they exist, falling back to the category name otherwise. This makes the
+// transaction list significantly more informative at a glance.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -39,6 +42,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.text.style.TextOverflow
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -142,13 +146,28 @@ fun TransactionItem(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
                 )
+
+                // --- UPDATED LOGIC ---
+                // If tags exist, show them. Otherwise, fall back to the category name.
+                val subtitleText = if (!transactionDetails.tagNames.isNullOrEmpty()) {
+                    transactionDetails.tagNames
+                } else if (isSplit) {
+                    "Multiple Categories"
+                } else {
+                    transactionDetails.categoryName ?: "Uncategorized"
+                }
+
                 Text(
-                    text = if (isSplit) "Multiple Categories" else (transactionDetails.categoryName ?: "Uncategorized"),
+                    text = subtitleText!!,
                     style = MaterialTheme.typography.bodyMedium,
                     fontStyle = FontStyle.Italic,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
-                    modifier = Modifier.clickable(enabled = !isSplit && !isSelectionMode) { onCategoryClick(transactionDetails) }
+                    modifier = Modifier.clickable(enabled = !isSplit && !isSelectionMode) { onCategoryClick(transactionDetails) },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis // Handle long tag lists
                 )
+                // --- END OF UPDATED LOGIC ---
+
                 Text(
                     text = SimpleDateFormat("dd MMM yy, h:mm a", Locale.getDefault()).format(Date(transactionDetails.transaction.date)),
                     style = MaterialTheme.typography.bodySmall,
