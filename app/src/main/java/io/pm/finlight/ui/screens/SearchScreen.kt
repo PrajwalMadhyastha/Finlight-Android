@@ -7,6 +7,9 @@
 // FEATURE - A new `SearchableDropdown` for filtering by tags has been added to
 // the filter panel. This allows users to narrow down their search results based
 // on the tags they have applied to transactions.
+// FIX - The filter panel expansion and search bar focus are now one-time events
+// per screen entry, preventing them from re-triggering annoyingly when
+// navigating back from a detail screen.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -57,13 +60,16 @@ fun SearchScreen(
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(false) }
+    var filtersAlreadyExpanded by remember { mutableStateOf(false) }
+    var focusAlreadyRequested by remember { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
     val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
     LaunchedEffect(searchUiState.selectedCategory, expandFilters) {
-        if (searchUiState.selectedCategory != null && expandFilters) {
+        if (searchUiState.selectedCategory != null && expandFilters && !filtersAlreadyExpanded) {
             showFilters = true
+            filtersAlreadyExpanded = true
         }
     }
 
@@ -218,8 +224,9 @@ fun SearchScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (focusSearch) {
+        if (focusSearch && !focusAlreadyRequested) {
             focusRequester.requestFocus()
+            focusAlreadyRequested = true
         }
     }
 
