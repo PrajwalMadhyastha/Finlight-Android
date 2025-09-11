@@ -36,11 +36,20 @@ fun PrivacyAwareText(
     prefix: String = "",
     isCurrency: Boolean = true
 ) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
-    val numberFormat = remember { NumberFormat.getNumberInstance(Locale("en", "IN")) }
+    // --- FIX: Apply maximumFractionDigits = 0 to remove decimal points ---
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply {
+            maximumFractionDigits = 0
+        }
+    }
+    val numberFormat = remember {
+        NumberFormat.getNumberInstance(Locale("en", "IN")).apply {
+            maximumFractionDigits = 0
+        }
+    }
 
     val textToShow = if (isPrivacyMode) {
-        prefix + if (isCurrency) "₹ ****.**" else "****"
+        prefix + if (isCurrency) "₹ ****" else "****"
     } else {
         prefix + if (isCurrency) {
             currencyFormat.format(amount)

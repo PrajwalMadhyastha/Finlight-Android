@@ -3,6 +3,9 @@
 // REASON: REFACTOR - The category selection grid (CategoryPickerSheet) now uses the
 // new, reusable CategorySelectionGrid composable. This ensures a consistent, compact
 // layout and centralizes the grid's UI logic.
+// FIX - The TagPickerSheet layout has been refactored. The FlowRow containing
+// the tags is now wrapped in a scrollable Column with a weight, ensuring the
+// list is scrollable if it overflows while keeping the header and footer fixed.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -23,9 +26,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CallSplit
@@ -1476,23 +1481,33 @@ private fun TagPickerSheet(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
-            .fillMaxHeight(),
+            .fillMaxHeight()
+            .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("Manage Tags", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+
+        // --- FIX: This column is now scrollable ---
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
         ) {
-            allTags.forEach { tag ->
-                FilterChip(
-                    selected = tag in selectedTags,
-                    onClick = { onTagSelected(tag) },
-                    label = { Text(tag.name) }
-                )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                allTags.forEach { tag ->
+                    FilterChip(
+                        selected = tag in selectedTags,
+                        onClick = { onTagSelected(tag) },
+                        label = { Text(tag.name) }
+                    )
+                }
             }
         }
+
         HorizontalDivider()
         Row(
             modifier = Modifier.fillMaxWidth(),

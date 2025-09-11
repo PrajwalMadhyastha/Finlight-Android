@@ -4,6 +4,12 @@
 // LaunchedEffect that automatically expands the filter panel now only runs if
 // this new flag is true. This prevents the panel from opening when navigating
 // from the ReportsScreen pie chart.
+// FEATURE - A new `SearchableDropdown` for filtering by tags has been added to
+// the filter panel. This allows users to narrow down their search results based
+// on the tags they have applied to transactions.
+// FIX - The filter panel expansion and search bar focus are now one-time events
+// per screen entry, preventing them from re-triggering annoyingly when
+// navigating back from a detail screen.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -25,6 +31,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -54,13 +61,16 @@ fun SearchScreen(
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(false) }
+    var filtersAlreadyExpanded by rememberSaveable { mutableStateOf(false) }
+    var focusAlreadyRequested by rememberSaveable { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
     val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
     LaunchedEffect(searchUiState.selectedCategory, expandFilters) {
-        if (searchUiState.selectedCategory != null && expandFilters) {
+        if (searchUiState.selectedCategory != null && expandFilters && !filtersAlreadyExpanded) {
             showFilters = true
+            filtersAlreadyExpanded = true
         }
     }
 
@@ -129,6 +139,14 @@ fun SearchScreen(
                                 options = searchUiState.categories,
                                 selectedOption = searchUiState.selectedCategory,
                                 onOptionSelected = { searchViewModel.onCategoryChange(it) },
+                                getDisplayName = { it.name },
+                            )
+                            // --- NEW: Add Tag dropdown filter ---
+                            SearchableDropdown(
+                                label = "Tag",
+                                options = searchUiState.tags,
+                                selectedOption = searchUiState.selectedTag,
+                                onOptionSelected = { searchViewModel.onTagChange(it) },
                                 getDisplayName = { it.name },
                             )
                             SearchableDropdown(
@@ -207,8 +225,9 @@ fun SearchScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (focusSearch) {
+        if (focusSearch && !focusAlreadyRequested) {
             focusRequester.requestFocus()
+            focusAlreadyRequested = true
         }
     }
 

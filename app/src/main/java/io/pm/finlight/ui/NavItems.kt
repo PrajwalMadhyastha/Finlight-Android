@@ -4,6 +4,8 @@
 // "Trip Details" screens to ensure the top app bar displays the correct titles.
 // REFACTOR: Removed the title for "travel_history_screen" as the feature has
 // been merged into the "Currency & Travel" screen.
+// FEATURE - Added screen titles for the new "Spending Analysis" and "Analysis
+// Details" screens.
 // =================================================================================
 package io.pm.finlight.ui
 
@@ -62,5 +64,7 @@ val screenTitles = mapOf(
     "merchant_detail/{merchantName}/{month}/{year}" to "Merchant Details",
     "customize_dashboard" to "Customize Dashboard",
     "account_mapping_screen" to "Map New Accounts",
-    "trip_detail/{tripId}/{tagId}" to "Trip Details"
+    "trip_detail/{tripId}/{tagId}" to "Trip Details",
+    "analysis_screen" to "Spending Analysis",
+    "analysis_detail_screen/{dimension}/{dimensionId}/{startDate}/{endDate}?title={title}" to "Analysis Details"
 )
