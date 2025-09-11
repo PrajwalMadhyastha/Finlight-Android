@@ -5,6 +5,9 @@
 // new Flow-based DAO method, ensuring that `searchResults` is a "live" stream
 // that automatically updates whenever the search criteria or the underlying
 // transaction data changes, thus fixing the stale data bug.
+// FEATURE - The ViewModel now supports filtering by tags. The UI state includes
+// the list of all tags and the currently selected tag. The logic has been updated
+// to fetch all tags and pass the selected tag's ID to the DAO's search query.
 // =================================================================================
 package io.pm.finlight
 
@@ -21,11 +24,13 @@ data class SearchUiState(
     val keyword: String = "",
     val selectedAccount: Account? = null,
     val selectedCategory: Category? = null,
+    val selectedTag: Tag? = null, // --- NEW: Add selectedTag
     val transactionType: String = "All", // "All", "Income", "Expense"
     val startDate: Long? = null,
     val endDate: Long? = null,
     val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
+    val tags: List<Tag> = emptyList(), // --- NEW: Add list of all tags
     val hasSearched: Boolean = false,
 )
 
@@ -34,6 +39,7 @@ class SearchViewModel(
     private val transactionDao: TransactionDao,
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
+    private val tagDao: TagDao, // --- NEW: Add TagDao
     private val initialCategoryId: Int?,
     private val initialDateMillis: Long?
 ) : ViewModel() {
@@ -45,6 +51,7 @@ class SearchViewModel(
         .flatMapLatest { state ->
             val filtersAreActive = state.selectedAccount != null ||
                     state.selectedCategory != null ||
+                    state.selectedTag != null || // --- UPDATED: Check for selected tag
                     state.transactionType != "All" ||
                     state.startDate != null ||
                     state.endDate != null
@@ -59,6 +66,7 @@ class SearchViewModel(
                     keyword = state.keyword,
                     accountId = state.selectedAccount?.id,
                     categoryId = state.selectedCategory?.id,
+                    tagId = state.selectedTag?.id, // --- UPDATED: Pass tagId
                     transactionType = if (state.transactionType.equals("All", ignoreCase = true)) null else state.transactionType.lowercase(),
                     startDate = state.startDate,
                     endDate = state.endDate
@@ -75,7 +83,7 @@ class SearchViewModel(
         )
 
     init {
-        // Load initial filter options (accounts and categories)
+        // Load initial filter options (accounts, categories, and tags)
         viewModelScope.launch {
             accountDao.getAllAccounts().collect { accounts ->
                 _uiState.update { it.copy(accounts = accounts) }
@@ -90,6 +98,12 @@ class SearchViewModel(
                         _uiState.update { it.copy(selectedCategory = initialCategory) }
                     }
                 }
+            }
+        }
+        // --- NEW: Load all tags ---
+        viewModelScope.launch {
+            tagDao.getAllTags().collect { tags ->
+                _uiState.update { it.copy(tags = tags) }
             }
         }
 
@@ -122,6 +136,11 @@ class SearchViewModel(
         _uiState.update { it.copy(selectedCategory = category) }
     }
 
+    // --- NEW: Function to handle tag selection ---
+    fun onTagChange(tag: Tag?) {
+        _uiState.update { it.copy(selectedTag = tag) }
+    }
+
     fun onTypeChange(type: String?) {
         _uiState.update { it.copy(transactionType = type ?: "All") }
     }
@@ -138,6 +157,7 @@ class SearchViewModel(
             SearchUiState(
                 accounts = _uiState.value.accounts,
                 categories = _uiState.value.categories,
+                tags = _uiState.value.tags, // --- UPDATED: Preserve tags list on clear
             )
     }
 }

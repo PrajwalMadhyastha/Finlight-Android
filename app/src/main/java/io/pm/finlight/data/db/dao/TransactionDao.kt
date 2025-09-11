@@ -6,6 +6,9 @@
 // FEATURE - All queries returning TransactionDetails now include a subquery
 // using `GROUP_CONCAT` to aggregate associated tag names into a single string.
 // This efficiently provides the data needed to display tags in the transaction list.
+// FEATURE - The `searchTransactions` query has been updated to accept an
+// optional `tagId`. It now includes a subquery to filter results based on
+// whether a transaction is associated with the selected tag.
 // =================================================================================
 package io.pm.finlight
 
@@ -704,7 +707,8 @@ interface TransactionDao {
             (:categoryId IS NULL OR t.categoryId = :categoryId) AND
             (:transactionType IS NULL OR t.transactionType = :transactionType) AND
             (:startDate IS NULL OR t.date >= :startDate) AND
-            (:endDate IS NULL OR t.date <= :endDate)
+            (:endDate IS NULL OR t.date <= :endDate) AND
+            (:tagId IS NULL OR t.id IN (SELECT transactionId FROM transaction_tag_cross_ref WHERE tagId = :tagId))
         ORDER BY t.date DESC
     """)
     fun searchTransactions(
@@ -714,6 +718,7 @@ interface TransactionDao {
         transactionType: String?,
         startDate: Long?,
         endDate: Long?,
+        tagId: Int? // --- NEW: Add tagId parameter
     ): Flow<List<TransactionDetails>>
 
     // --- NEW: Reassigns transactions from source accounts to a destination account ---

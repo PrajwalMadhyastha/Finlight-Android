@@ -4,6 +4,9 @@
 // LaunchedEffect that automatically expands the filter panel now only runs if
 // this new flag is true. This prevents the panel from opening when navigating
 // from the ReportsScreen pie chart.
+// FEATURE - A new `SearchableDropdown` for filtering by tags has been added to
+// the filter panel. This allows users to narrow down their search results based
+// on the tags they have applied to transactions.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -129,6 +132,14 @@ fun SearchScreen(
                                 options = searchUiState.categories,
                                 selectedOption = searchUiState.selectedCategory,
                                 onOptionSelected = { searchViewModel.onCategoryChange(it) },
+                                getDisplayName = { it.name },
+                            )
+                            // --- NEW: Add Tag dropdown filter ---
+                            SearchableDropdown(
+                                label = "Tag",
+                                options = searchUiState.tags,
+                                selectedOption = searchUiState.selectedTag,
+                                onOptionSelected = { searchViewModel.onTagChange(it) },
                                 getDisplayName = { it.name },
                             )
                             SearchableDropdown(
