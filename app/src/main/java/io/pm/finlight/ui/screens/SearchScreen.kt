@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -60,8 +61,8 @@ fun SearchScreen(
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(false) }
-    var filtersAlreadyExpanded by remember { mutableStateOf(false) }
-    var focusAlreadyRequested by remember { mutableStateOf(false) }
+    var filtersAlreadyExpanded by rememberSaveable { mutableStateOf(false) }
+    var focusAlreadyRequested by rememberSaveable { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
     val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
