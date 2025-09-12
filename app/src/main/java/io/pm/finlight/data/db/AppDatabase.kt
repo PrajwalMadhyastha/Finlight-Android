@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: FEATURE - Incremented the database version to 39 and added the new
-// `AccountAlias` entity. A new migration (MIGRATION_38_39) has been added to
-// create the `account_aliases` table, which will store learned account mappings.
+// REASON: FIX (Performance) - Incremented the database version to 40 and added
+// MIGRATION_39_40. This new migration creates an index on the `transactions.date`
+// column, which is essential to fix the performance bottleneck in the Spending
+// Analysis Hub and other date-filtered screens.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -45,9 +46,9 @@ import net.sqlcipher.database.SupportFactory
         SplitTransaction::class,
         SmsParseTemplate::class,
         Trip::class,
-        AccountAlias::class // --- NEW: Add AccountAlias entity
+        AccountAlias::class
     ],
-    version = 39, // --- UPDATED: Incremented version ---
+    version = 40, // --- UPDATED: Incremented version ---
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -67,13 +68,13 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun splitTransactionDao(): SplitTransactionDao
     abstract fun smsParseTemplateDao(): SmsParseTemplateDao
     abstract fun tripDao(): TripDao
-    abstract fun accountAliasDao(): AccountAliasDao // --- NEW: Add abstract DAO function ---
+    abstract fun accountAliasDao(): AccountAliasDao
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // --- All existing migrations (1-2 through 37-38) remain here ---
+        // --- All existing migrations (1-2 through 38-39) remain here ---
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN transactionType TEXT NOT NULL DEFAULT 'expense'")
@@ -460,7 +461,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_trips_tagId` ON `trips` (`tagId`)")
             }
         }
-        // --- NEW: Migration for the account_aliases table ---
         val MIGRATION_38_39 = object : Migration(38, 39) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -472,6 +472,12 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                 """)
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_account_aliases_destinationAccountId` ON `account_aliases` (`destinationAccountId`)")
+            }
+        }
+        // --- NEW: Migration for the transactions.date index ---
+        val MIGRATION_39_40 = object : Migration(39, 40) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_date` ON `transactions` (`date`)")
             }
         }
 
@@ -494,7 +500,8 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29,
                             MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
                             MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
-                            MIGRATION_37_38, MIGRATION_38_39 // --- UPDATED: Add the new migration
+                            MIGRATION_37_38, MIGRATION_38_39,
+                            MIGRATION_39_40 // --- UPDATED: Add the new migration
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

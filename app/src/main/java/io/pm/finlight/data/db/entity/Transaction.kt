@@ -1,25 +1,28 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/Transaction.kt
-// REASON: FEATURE (Splitting) - Added a new `isSplit` boolean column. This will
-// act as a simple flag to quickly identify "parent" transactions that have been
-// split into multiple items, which is crucial for UI logic and preventing direct
-// edits to a split transaction's amount.
+// REASON: FIX (Performance) - Added a new database index on the `date` column.
+// This is a critical performance optimization that will dramatically speed up all
+// date-range queries, such as those used in the Spending Analysis hub, by
+// preventing slow full-table scans.
 // =================================================================================
 package io.pm.finlight
 
+import android.annotation.SuppressLint
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 
+@SuppressLint("UnsafeOptInUsageError")
 @Serializable
 @Entity(
     tableName = "transactions",
     indices = [
         Index(value = ["categoryId"]),
         Index(value = ["accountId"]),
-        Index(value = ["smsSignature"])
+        Index(value = ["smsSignature"]),
+        Index(value = ["date"]) // --- NEW: Add index for date-based queries ---
     ],
     foreignKeys = [
         ForeignKey(
