@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EditCalendar
@@ -26,7 +25,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.data.model.SpendingAnalysisItem
@@ -130,41 +128,31 @@ fun AnalysisScreen(
         val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
-        Dialog(onDismissRequest = { showDateRangePicker = false }) {
-            Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = popupContainerColor,
-                modifier = Modifier.wrapContentSize()
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+        DatePickerDialog(
+            onDismissRequest = { showDateRangePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDateRangePicker = false
+                        viewModel.setCustomDateRange(
+                            dateRangePickerState.selectedStartDateMillis,
+                            dateRangePickerState.selectedEndDateMillis
+                        )
+                    },
+                    enabled = dateRangePickerState.selectedEndDateMillis != null
                 ) {
-                    DateRangePicker(state = dateRangePickerState)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { showDateRangePicker = false }) {
-                            Text("Cancel")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TextButton(
-                            onClick = {
-                                showDateRangePicker = false
-                                viewModel.setCustomDateRange(
-                                    dateRangePickerState.selectedStartDateMillis,
-                                    dateRangePickerState.selectedEndDateMillis
-                                )
-                            },
-                            enabled = dateRangePickerState.selectedEndDateMillis != null
-                        ) {
-                            Text("OK")
-                        }
-                    }
+                    Text("OK")
                 }
-            }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDateRangePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+            // --- FIX: Add explicit container color to prevent transparency issues ---
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
+        ) {
+            DateRangePicker(state = dateRangePickerState)
         }
     }
 }

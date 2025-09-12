@@ -8,6 +8,11 @@
 // FEATURE - Added new routes and composables for the "Spending Analysis" and
 // "Analysis Details" screens, integrating the new feature into the app's
 // navigation graph.
+// FIX (Navigation) - The onClick handlers for the bottom navigation bar and the
+// profile icon in the top app bar have been corrected. They now properly use
+// the popUpTo builder to clear the back stack when navigating between top-level
+// destinations. This ensures that pressing the back button on a main screen (like
+// Dashboard) will correctly exit the app instead of navigating to a previous screen.
 // =================================================================================
 package io.pm.finlight
 
@@ -286,7 +291,7 @@ fun MainAppScreen() {
         "account_mapping_screen",
         "sms_debug_screen",
         "trip_detail",
-        "analysis_screen", // --- NEW: Add analysis screens
+        "analysis_screen",
         "analysis_detail_screen"
     )
 
@@ -360,7 +365,16 @@ fun MainAppScreen() {
                                         .padding(start = 16.dp)
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .clickable { navController.navigate("profile") }
+                                        .clickable {
+                                            // --- FIX: Use proper back stack clearing logic for Profile navigation ---
+                                            navController.navigate(BottomNavItem.Profile.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
                                 )
                             } else if (!showBottomBar) {
                                 IconButton(onClick = { navController.popBackStack() }) {
@@ -437,11 +451,18 @@ fun MainAppScreen() {
                                 label = { Text(screen.label) },
                                 selected = isSelected,
                                 onClick = {
+                                    // --- FIX: The correct navigation logic for bottom bar items ---
                                     navController.navigate(screen.route) {
+                                        // Pop up to the start destination of the graph to
+                                        // avoid building up a large stack of destinations
+                                        // on the back stack as users select items
                                         popUpTo(navController.graph.findStartDestination().id) {
                                             saveState = true
                                         }
+                                        // Avoid multiple copies of the same destination when
+                                        // re-selecting the same item
                                         launchSingleTop = true
+                                        // Restore state when re-selecting a previously selected item
                                         restoreState = true
                                     }
                                 }
@@ -692,7 +713,7 @@ fun AppNavHost(
         ) { ReportsScreen(navController, viewModel()) }
 
         composable(
-            "profile",
+            BottomNavItem.Profile.route,
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
