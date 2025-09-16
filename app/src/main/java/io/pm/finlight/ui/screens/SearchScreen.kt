@@ -18,6 +18,9 @@
 // wrapped in a clickable Box. This prevents it from interacting with the focus
 // system and the keyboard, resolving a bug where the DatePickerDialog would
 // not appear due to conflicting UI events.
+// FIX - The `DateTextField` and `DatePickerDialog` composables have been updated
+// to call the new, more specific date handling functions in the ViewModel,
+// completing the fix for the inclusive end date range.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -172,7 +175,7 @@ fun SearchScreen(
                                     date = searchUiState.startDate,
                                     formatter = dateFormatter,
                                     onClick = { searchViewModel.onShowStartDatePicker(true) },
-                                    onClear = { searchViewModel.onDateChange(start = null) },
+                                    onClear = { searchViewModel.onClearStartDate() },
                                     modifier = Modifier.weight(1f),
                                 )
                                 DateTextField(
@@ -180,7 +183,7 @@ fun SearchScreen(
                                     date = searchUiState.endDate,
                                     formatter = dateFormatter,
                                     onClick = { searchViewModel.onShowEndDatePicker(true) },
-                                    onClear = { searchViewModel.onDateChange(end = null) },
+                                    onClear = { searchViewModel.onClearEndDate() },
                                     modifier = Modifier.weight(1f),
                                 )
                             }
@@ -246,7 +249,7 @@ fun SearchScreen(
             onDismissRequest = { searchViewModel.onShowStartDatePicker(false) },
             confirmButton = {
                 TextButton(onClick = {
-                    searchViewModel.onDateChange(start = datePickerState.selectedDateMillis)
+                    searchViewModel.onStartDateSelected(datePickerState.selectedDateMillis)
                     searchViewModel.onShowStartDatePicker(false)
                 }) { Text("OK") }
             },
@@ -265,7 +268,7 @@ fun SearchScreen(
             onDismissRequest = { searchViewModel.onShowEndDatePicker(false) },
             confirmButton = {
                 TextButton(onClick = {
-                    searchViewModel.onDateChange(end = datePickerState.selectedDateMillis)
+                    searchViewModel.onEndDateSelected(datePickerState.selectedDateMillis)
                     searchViewModel.onShowEndDatePicker(false)
                 }) { Text("OK") }
             },
@@ -343,19 +346,15 @@ fun DateTextField(
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // --- FIX: Wrap the TextField in a clickable Box ---
     Box(modifier = modifier.clickable(onClick = onClick)) {
         OutlinedTextField(
             value = date?.let { formatter.format(Date(it)) } ?: "",
             onValueChange = {},
             label = { Text(label) },
             modifier = Modifier.fillMaxWidth(),
-            // --- FIX: Disable the TextField to prevent focus ---
             enabled = false,
             trailingIcon = {
                 if (date != null) {
-                    // Use a Box with a clickable modifier for the clear icon
-                    // so it works even when the TextField is disabled.
                     Box(Modifier.clickable(onClick = onClear)) {
                         Icon(Icons.Default.Clear, "Clear Date")
                     }
@@ -363,7 +362,6 @@ fun DateTextField(
                     Icon(Icons.Default.DateRange, "Select Date")
                 }
             },
-            // --- FIX: Adjust disabled colors to make it look enabled ---
             colors = OutlinedTextFieldDefaults.colors(
                 disabledTextColor = MaterialTheme.colorScheme.onSurface,
                 disabledContainerColor = Color.Transparent,

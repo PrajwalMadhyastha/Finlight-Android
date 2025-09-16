@@ -12,6 +12,9 @@
 // to control the visibility of the date pickers. The state management has been
 // hoisted from the screen to the ViewModel to resolve a bug where the pickers
 // would not appear on click. New functions have been added to manage this state.
+// FIX - The logic for setting the end date now adjusts the timestamp to the end
+// of the selected day (23:59:59). This ensures that the date range is inclusive
+// and correctly includes transactions from the selected end date.
 // =================================================================================
 package io.pm.finlight
 
@@ -36,7 +39,6 @@ data class SearchUiState(
     val categories: List<Category> = emptyList(),
     val tags: List<Tag> = emptyList(),
     val hasSearched: Boolean = false,
-    // --- NEW: State flags to control date picker visibility ---
     val showStartDatePicker: Boolean = false,
     val showEndDatePicker: Boolean = false
 )
@@ -121,7 +123,7 @@ class SearchViewModel(
             cal.set(Calendar.SECOND, 59)
             val end = cal.timeInMillis
 
-            onDateChange(start, end)
+            _uiState.update { it.copy(startDate = start, endDate = end) }
         }
     }
 
@@ -145,14 +147,31 @@ class SearchViewModel(
         _uiState.update { it.copy(transactionType = type ?: "All") }
     }
 
-    fun onDateChange(
-        start: Long? = _uiState.value.startDate,
-        end: Long? = _uiState.value.endDate,
-    ) {
-        _uiState.update { it.copy(startDate = start, endDate = end) }
+    fun onStartDateSelected(startDateMillis: Long?) {
+        _uiState.update { it.copy(startDate = startDateMillis) }
     }
 
-    // --- NEW: Functions to control date picker visibility ---
+    fun onEndDateSelected(endDateMillis: Long?) {
+        val adjustedEnd = endDateMillis?.let {
+            Calendar.getInstance().apply {
+                timeInMillis = it
+                set(Calendar.HOUR_OF_DAY, 23)
+                set(Calendar.MINUTE, 59)
+                set(Calendar.SECOND, 59)
+                set(Calendar.MILLISECOND, 999)
+            }.timeInMillis
+        }
+        _uiState.update { it.copy(endDate = adjustedEnd) }
+    }
+
+    fun onClearStartDate() {
+        _uiState.update { it.copy(startDate = null) }
+    }
+
+    fun onClearEndDate() {
+        _uiState.update { it.copy(endDate = null) }
+    }
+
     fun onShowStartDatePicker(show: Boolean) {
         _uiState.update { it.copy(showStartDatePicker = show) }
     }
