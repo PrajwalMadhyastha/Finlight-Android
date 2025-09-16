@@ -10,9 +10,9 @@
 // navigation graph.
 // FIX (Navigation) - The onClick handlers for the bottom navigation bar and the
 // profile icon in the top app bar have been corrected. They now properly use
-// the popUpTo builder to clear the back stack when navigating between top-level
-// destinations. This ensures that pressing the back button on a main screen (like
-// Dashboard) will correctly exit the app instead of navigating to a previous screen.
+// popUpTo(navController.graph.id) to clear the back stack up to the graph's root
+// when navigating between top-level destinations. This ensures that pressing the
+// back button on a main screen (like Dashboard) will correctly exit the app.
 // =================================================================================
 package io.pm.finlight
 
@@ -65,7 +65,6 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -366,9 +365,8 @@ fun MainAppScreen() {
                                         .size(36.dp)
                                         .clip(CircleShape)
                                         .clickable {
-                                            // --- FIX: Use proper back stack clearing logic for Profile navigation ---
                                             navController.navigate(BottomNavItem.Profile.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                popUpTo(navController.graph.id) {
                                                     saveState = true
                                                 }
                                                 launchSingleTop = true
@@ -451,18 +449,11 @@ fun MainAppScreen() {
                                 label = { Text(screen.label) },
                                 selected = isSelected,
                                 onClick = {
-                                    // --- FIX: The correct navigation logic for bottom bar items ---
                                     navController.navigate(screen.route) {
-                                        // Pop up to the start destination of the graph to
-                                        // avoid building up a large stack of destinations
-                                        // on the back stack as users select items
-                                        popUpTo(navController.graph.findStartDestination().id) {
+                                        popUpTo(navController.graph.id) {
                                             saveState = true
                                         }
-                                        // Avoid multiple copies of the same destination when
-                                        // re-selecting the same item
                                         launchSingleTop = true
-                                        // Restore state when re-selecting a previously selected item
                                         restoreState = true
                                     }
                                 }
