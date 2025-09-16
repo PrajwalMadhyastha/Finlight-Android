@@ -10,6 +10,14 @@
 // FIX - The filter panel expansion and search bar focus are now one-time events
 // per screen entry, preventing them from re-triggering annoyingly when
 // navigating back from a detail screen.
+// FIX - The state for date picker visibility (`showStartDatePicker`, `showEndDatePicker`)
+// has been hoisted into the ViewModel. The screen now reads this state from the
+// `SearchUiState` and calls ViewModel functions to show/hide the dialogs,
+// resolving the bug where the pickers would not appear on click.
+// FIX - The `DateTextField` has been refactored to be a disabled TextField
+// wrapped in a clickable Box. This prevents it from interacting with the focus
+// system and the keyboard, resolving a bug where the DatePickerDialog would
+// not appear due to conflicting UI events.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -36,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.*
@@ -45,6 +54,8 @@ import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import java.text.SimpleDateFormat
 import java.util.*
+
+private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,9 +69,7 @@ fun SearchScreen(
     val searchUiState by searchViewModel.uiState.collectAsState()
     val searchResults by searchViewModel.searchResults.collectAsState()
 
-    var showStartDatePicker by remember { mutableStateOf(false) }
-    var showEndDatePicker by remember { mutableStateOf(false) }
-    var showFilters by remember { mutableStateOf(false) }
+    var showFilters by rememberSaveable { mutableStateOf(false) }
     var filtersAlreadyExpanded by rememberSaveable { mutableStateOf(false) }
     var focusAlreadyRequested by rememberSaveable { mutableStateOf(false) }
 
@@ -75,7 +84,6 @@ fun SearchScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Search Bar and Filter Section
         Column(modifier = Modifier.padding(16.dp)) {
             OutlinedTextField(
                 value = searchUiState.keyword,
@@ -141,7 +149,6 @@ fun SearchScreen(
                                 onOptionSelected = { searchViewModel.onCategoryChange(it) },
                                 getDisplayName = { it.name },
                             )
-                            // --- NEW: Add Tag dropdown filter ---
                             SearchableDropdown(
                                 label = "Tag",
                                 options = searchUiState.tags,
@@ -164,7 +171,7 @@ fun SearchScreen(
                                     label = "Start Date",
                                     date = searchUiState.startDate,
                                     formatter = dateFormatter,
-                                    onClick = { showStartDatePicker = true },
+                                    onClick = { searchViewModel.onShowStartDatePicker(true) },
                                     onClear = { searchViewModel.onDateChange(start = null) },
                                     modifier = Modifier.weight(1f),
                                 )
@@ -172,7 +179,7 @@ fun SearchScreen(
                                     label = "End Date",
                                     date = searchUiState.endDate,
                                     formatter = dateFormatter,
-                                    onClick = { showEndDatePicker = true },
+                                    onClick = { searchViewModel.onShowEndDatePicker(true) },
                                     onClear = { searchViewModel.onDateChange(end = null) },
                                     modifier = Modifier.weight(1f),
                                 )
@@ -189,7 +196,6 @@ fun SearchScreen(
 
         HorizontalDivider()
 
-        // Search Results
         if (searchResults.isNotEmpty()) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
@@ -231,37 +237,42 @@ fun SearchScreen(
         }
     }
 
-    if (showStartDatePicker) {
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+
+    if (searchUiState.showStartDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = searchUiState.startDate)
         DatePickerDialog(
-            onDismissRequest = { showStartDatePicker = false },
+            onDismissRequest = { searchViewModel.onShowStartDatePicker(false) },
             confirmButton = {
                 TextButton(onClick = {
                     searchViewModel.onDateChange(start = datePickerState.selectedDateMillis)
-                    showStartDatePicker = false
+                    searchViewModel.onShowStartDatePicker(false)
                 }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { searchViewModel.onShowStartDatePicker(false) }) { Text("Cancel") }
             },
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
         ) {
             DatePicker(state = datePickerState)
         }
     }
 
-    if (showEndDatePicker) {
+    if (searchUiState.showEndDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = searchUiState.endDate)
         DatePickerDialog(
-            onDismissRequest = { showEndDatePicker = false },
+            onDismissRequest = { searchViewModel.onShowEndDatePicker(false) },
             confirmButton = {
                 TextButton(onClick = {
                     searchViewModel.onDateChange(end = datePickerState.selectedDateMillis)
-                    showEndDatePicker = false
+                    searchViewModel.onShowEndDatePicker(false)
                 }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showEndDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { searchViewModel.onShowEndDatePicker(false) }) { Text("Cancel") }
             },
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
         ) {
             DatePicker(state = datePickerState)
         }
@@ -332,20 +343,34 @@ fun DateTextField(
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedTextField(
-        value = date?.let { formatter.format(Date(it)) } ?: "",
-        onValueChange = {},
-        readOnly = true,
-        label = { Text(label) },
-        modifier = modifier.clickable(onClick = onClick),
-        trailingIcon = {
-            if (date != null) {
-                IconButton(onClick = onClear) {
-                    Icon(Icons.Default.Clear, "Clear Date")
+    // --- FIX: Wrap the TextField in a clickable Box ---
+    Box(modifier = modifier.clickable(onClick = onClick)) {
+        OutlinedTextField(
+            value = date?.let { formatter.format(Date(it)) } ?: "",
+            onValueChange = {},
+            label = { Text(label) },
+            modifier = Modifier.fillMaxWidth(),
+            // --- FIX: Disable the TextField to prevent focus ---
+            enabled = false,
+            trailingIcon = {
+                if (date != null) {
+                    // Use a Box with a clickable modifier for the clear icon
+                    // so it works even when the TextField is disabled.
+                    Box(Modifier.clickable(onClick = onClear)) {
+                        Icon(Icons.Default.Clear, "Clear Date")
+                    }
+                } else {
+                    Icon(Icons.Default.DateRange, "Select Date")
                 }
-            } else {
-                Icon(Icons.Default.DateRange, "Select Date")
-            }
-        },
-    )
+            },
+            // --- FIX: Adjust disabled colors to make it look enabled ---
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledContainerColor = Color.Transparent,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
+    }
 }
