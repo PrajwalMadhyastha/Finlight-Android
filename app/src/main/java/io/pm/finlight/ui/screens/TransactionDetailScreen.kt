@@ -82,6 +82,7 @@ import io.pm.finlight.R
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
+import io.pm.finlight.utils.BankLogoHelper
 
 private const val TAG = "DetailScreenDebug"
 
@@ -959,25 +960,24 @@ private fun AccountCardWithSwitch(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Image(
+                painter = painterResource(id = BankLogoHelper.getLogoForAccount(details.accountName ?: "")),
+                contentDescription = "${details.accountName} Logo",
+                modifier = Modifier.size(40.dp)
+            )
+            Spacer(Modifier.width(16.dp))
+
             Column(
                 modifier = Modifier
                     .weight(0.7f)
                     .clickable(onClick = onAccountClick)
                     .padding(vertical = 8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.AccountBalanceWallet,
-                        contentDescription = "Account",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(16.dp))
-                    Text(
-                        text = "Account",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = "Account",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = details.accountName ?: "N/A",
