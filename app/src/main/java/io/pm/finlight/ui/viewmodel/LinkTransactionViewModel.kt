@@ -4,6 +4,8 @@
 // of searching for specific matches, the ViewModel now fetches all transactions
 // from the last two days (today and yesterday), providing the user with a
 // broader, more useful list of candidates to link their recurring payment to.
+// FIX - The instantiation of TransactionRepository has been updated to include
+// the required dependencies, resolving a build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -44,7 +46,9 @@ class LinkTransactionViewModel(
 
     init {
         val db = AppDatabase.getInstance(application)
-        transactionRepository = TransactionRepository(db.transactionDao())
+        val settingsRepository = SettingsRepository(application)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
         recurringTransactionDao = db.recurringTransactionDao()
         findMatches()
     }

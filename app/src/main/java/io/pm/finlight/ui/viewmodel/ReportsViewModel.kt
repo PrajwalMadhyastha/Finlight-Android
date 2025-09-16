@@ -4,6 +4,8 @@
 // `detailedMonthData`) are now fully reactive to budget changes. They now
 // combine flows from the SettingsRepository with transaction data, ensuring the
 // heatmaps update instantly when the user modifies the monthly budget.
+// FIX - The instantiation of TransactionRepository has been updated to include
+// the required dependencies, resolving a build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -64,9 +66,10 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         val db = AppDatabase.getInstance(application)
-        transactionRepository = TransactionRepository(db.transactionDao())
-        categoryDao = db.categoryDao()
         settingsRepository = SettingsRepository(application)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
+        categoryDao = db.categoryDao()
 
 
         allCategories = categoryDao.getAllCategories()

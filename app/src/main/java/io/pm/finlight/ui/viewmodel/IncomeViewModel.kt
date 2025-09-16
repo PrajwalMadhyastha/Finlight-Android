@@ -3,6 +3,8 @@
 // REASON: REFACTOR - The instantiation of AccountRepository has been updated to
 // pass the full AppDatabase instance instead of just the DAO. This is required
 // to support the new transactional account merging logic.
+// FIX - The instantiation of TransactionRepository has been updated to include
+// the required dependencies, resolving a build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -58,8 +60,10 @@ class IncomeViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         val db = AppDatabase.getInstance(application)
-        transactionRepository = TransactionRepository(db.transactionDao())
-        accountRepository = AccountRepository(db) // --- UPDATED ---
+        val settingsRepository = SettingsRepository(application)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
+        accountRepository = AccountRepository(db)
         categoryRepository = CategoryRepository(db.categoryDao())
 
         allAccounts = accountRepository.allAccounts.stateIn(

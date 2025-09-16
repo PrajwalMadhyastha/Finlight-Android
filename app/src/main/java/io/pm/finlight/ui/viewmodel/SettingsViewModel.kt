@@ -3,6 +3,8 @@
 // REASON: REFACTOR - The instantiation of AccountRepository has been updated to
 // pass the full AppDatabase instance instead of just the DAO. This is required
 // to support the new transactional account merging logic and resolves the build error.
+// FIX - The instantiation of TransactionRepository has been updated to include
+// the required dependencies, resolving a build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -48,10 +50,10 @@ class SettingsViewModel(
 ) : AndroidViewModel(application) {
     private val settingsRepository = SettingsRepository(application)
     private val db = AppDatabase.getInstance(application)
-    private val transactionRepository = TransactionRepository(db.transactionDao())
+    private val transactionRepository: TransactionRepository
     private val merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
     private val context = application
-    private val accountRepository = AccountRepository(db) // --- UPDATED ---
+    private val accountRepository = AccountRepository(db)
     private val categoryRepository = CategoryRepository(db.categoryDao())
     private val tagDao = db.tagDao()
     private val splitTransactionDao = db.splitTransactionDao()
@@ -170,6 +172,8 @@ class SettingsViewModel(
         )
 
     init {
+        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
         smsScanStartDate =
             settingsRepository.getSmsScanStartDate()
                 .stateIn(

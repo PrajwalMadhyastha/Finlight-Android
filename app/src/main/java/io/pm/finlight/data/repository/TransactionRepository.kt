@@ -2,15 +2,24 @@
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TransactionRepository.kt
 // REASON: FEATURE - Added `removeAllTransactionsForTag` to expose the new DAO
 // method to the ViewModel layer. This is required for the new "Cancel Trip" action.
+// FIX (Race Condition) - The responsibility for applying Travel Mode tags has been
+// centralized here. All insert/update methods now check the active travel plan
+// from SettingsRepository and apply the correct tag atomically, eliminating race
+// conditions between the SmsReceiver and the UI.
 // =================================================================================
 package io.pm.finlight
 
 import android.util.Log
 import io.pm.finlight.data.model.MerchantPrediction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 
-class TransactionRepository(private val transactionDao: TransactionDao) {
+class TransactionRepository(
+    private val transactionDao: TransactionDao,
+    private val settingsRepository: SettingsRepository,
+    private val tagRepository: TagRepository
+) {
 
     // --- NEW: Function to search for merchant predictions ---
     fun searchMerchants(query: String): Flow<List<MerchantPrediction>> {
@@ -154,10 +163,21 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
         }
     }
 
+    private suspend fun getFinalTagsForTransaction(transaction: Transaction, initialTags: Set<Tag>): Set<Tag> {
+        val finalTags = initialTags.toMutableSet()
+        val travelSettings = settingsRepository.getTravelModeSettings().first()
+        if (travelSettings?.isEnabled == true && transaction.date >= travelSettings.startDate && transaction.date <= travelSettings.endDate) {
+            val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
+            finalTags.add(tripTag)
+        }
+        return finalTags
+    }
+
     suspend fun insertTransactionWithTags(transaction: Transaction, tags: Set<Tag>): Long {
+        val finalTags = getFinalTagsForTransaction(transaction, tags)
         val transactionId = transactionDao.insert(transaction)
-        if (tags.isNotEmpty()) {
-            val crossRefs = tags.map { tag ->
+        if (finalTags.isNotEmpty()) {
+            val crossRefs = finalTags.map { tag ->
                 TransactionTagCrossRef(transactionId = transactionId.toInt(), tagId = tag.id)
             }
             transactionDao.addTagsToTransaction(crossRefs)
@@ -166,10 +186,11 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
     }
 
     suspend fun updateTransactionWithTags(transaction: Transaction, tags: Set<Tag>) {
+        val finalTags = getFinalTagsForTransaction(transaction, tags)
         transactionDao.update(transaction)
         transactionDao.clearTagsForTransaction(transaction.id)
-        if (tags.isNotEmpty()) {
-            val crossRefs = tags.map { tag ->
+        if (finalTags.isNotEmpty()) {
+            val crossRefs = finalTags.map { tag ->
                 TransactionTagCrossRef(transactionId = transaction.id, tagId = tag.id)
             }
             transactionDao.addTagsToTransaction(crossRefs)
@@ -181,9 +202,10 @@ class TransactionRepository(private val transactionDao: TransactionDao) {
         tags: Set<Tag>,
         imagePaths: List<String>
     ): Long {
+        val finalTags = getFinalTagsForTransaction(transaction, tags)
         val newTransactionId = transactionDao.insert(transaction)
-        if (tags.isNotEmpty()) {
-            val crossRefs = tags.map { tag ->
+        if (finalTags.isNotEmpty()) {
+            val crossRefs = finalTags.map { tag ->
                 TransactionTagCrossRef(transactionId = newTransactionId.toInt(), tagId = tag.id)
             }
             transactionDao.addTagsToTransaction(crossRefs)

@@ -4,6 +4,10 @@
 // `normalizeAccountName` function strips common banking terms and masked numbers
 // from account names before the similarity check. This allows the Levenshtein
 // algorithm to correctly identify duplicates like "ICICI Bank" and "ICICI - xx123".
+// FIX - The instantiation of TransactionRepository has been updated to include
+// the required dependencies, resolving a build error.
+// FIX - Corrected an 'Unresolved reference' error by changing `isSelectionMode`
+// to the correct property name `isSelectionModeActive`.
 // =================================================================================
 package io.pm.finlight
 
@@ -41,8 +45,9 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         repository = AccountRepository(db)
-        transactionRepository = TransactionRepository(db.transactionDao())
         settingsRepository = SettingsRepository(application)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
         accountsWithBalance = repository.accountsWithBalance
 
         viewModelScope.launch(Dispatchers.Default) {

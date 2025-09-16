@@ -3,6 +3,8 @@
 // REASON: FEATURE - Added the `deleteTrip` function. This provides the
 // necessary logic for the UI to delete a trip's historical record and untag all
 // its associated transactions in a single, atomic operation.
+// FIX - The instantiation of TransactionRepository has been updated to include
+// the required dependencies, resolving a build error.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -11,6 +13,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.SettingsRepository
+import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.TripWithStats
@@ -29,8 +33,10 @@ class HistoricTripsViewModel(application: Application) : AndroidViewModel(applic
 
     init {
         val db = AppDatabase.getInstance(application)
+        val settingsRepository = SettingsRepository(application)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
         tripRepository = TripRepository(db.tripDao())
-        transactionRepository = TransactionRepository(db.transactionDao())
+        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
 
         historicTrips = tripRepository.getAllTripsWithStats()
             .stateIn(
