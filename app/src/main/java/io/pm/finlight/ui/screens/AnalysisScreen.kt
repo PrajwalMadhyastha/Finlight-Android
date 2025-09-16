@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AnalysisScreen.kt
-// REASON: FIX (UX) - The DatePickerDialog for custom date ranges now has an
-// explicit, theme-aware background color. This prevents it from becoming
-// transparent on the "Project Aurora" themed screens, ensuring the confirmation
-// and cancel buttons are always visible and usable.
+// REASON: UX REFINEMENT - Replaced the full-screen DatePickerDialog with a more
+// intuitive ModalBottomSheet. The new sheet contains an explicit "Apply"
+// button, making the custom date range selection process clearer and more
+// user-friendly. The sheet state is also configured to skip the partially
+// expanded state, ensuring it opens fully for a better user experience.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -39,7 +40,6 @@ import java.net.URLEncoder
 import java.text.NumberFormat
 import java.util.*
 
-// Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -124,35 +124,52 @@ fun AnalysisScreen(
     }
 
     if (showDateRangePicker) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         val dateRangePickerState = rememberDateRangePickerState()
         val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
-        DatePickerDialog(
+        ModalBottomSheet(
             onDismissRequest = { showDateRangePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDateRangePicker = false
-                        viewModel.setCustomDateRange(
-                            dateRangePickerState.selectedStartDateMillis,
-                            dateRangePickerState.selectedEndDateMillis
-                        )
-                    },
-                    enabled = dateRangePickerState.selectedEndDateMillis != null
-                ) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDateRangePicker = false }) {
-                    Text("Cancel")
-                }
-            },
-            // --- FIX: Add explicit container color to prevent transparency issues ---
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
+            sheetState = sheetState,
+            containerColor = popupContainerColor,
+            windowInsets = WindowInsets(0)
         ) {
-            DateRangePicker(state = dateRangePickerState)
+            Column(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Text(
+                    "Select Date Range",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                DateRangePicker(state = dateRangePickerState, modifier = Modifier.weight(1f))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = { showDateRangePicker = false }) {
+                        Text("Cancel")
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            showDateRangePicker = false
+                            viewModel.setCustomDateRange(
+                                dateRangePickerState.selectedStartDateMillis,
+                                dateRangePickerState.selectedEndDateMillis
+                            )
+                        },
+                        enabled = dateRangePickerState.selectedEndDateMillis != null
+                    ) {
+                        Text("Apply")
+                    }
+                }
+            }
         }
     }
 }
