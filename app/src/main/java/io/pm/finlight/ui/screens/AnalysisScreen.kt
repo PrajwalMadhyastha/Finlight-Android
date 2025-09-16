@@ -5,6 +5,27 @@
 // button, making the custom date range selection process clearer and more
 // user-friendly. The sheet state is also configured to skip the partially
 // expanded state, ensuring it opens fully for a better user experience.
+// FIX - Explicitly provided DatePickerDefaults.colors to the DateRangePicker
+// to ensure text content has the correct contrast against the bottom sheet's
+// background, resolving a legibility issue in certain themes.
+// FIX - Replaced ModalBottomSheet with a standard Dialog wrapper for the
+// DateRangePicker. This gives more control over the background surface color
+// and ensures correct theme propagation, fixing text legibility issues.
+// FIX - Corrected the DateRangePicker implementation within its Dialog to
+// properly apply theme colors, ensuring text is always legible against the
+// dialog's background, regardless of the app or system theme.
+// REFACTOR - Replaced the single DateRangePicker with a two-step date selection
+// dialog. Users now tap "Start Date" and "End Date" fields individually,
+// each launching a separate DatePickerDialog. This provides a more controlled
+// and familiar user experience for defining a custom date range.
+// FIX - Resolved build error by implementing date validation correctly within
+// rememberDatePickerState using a SelectableDates object, instead of passing
+// a dateValidator parameter to the DatePicker composable.
+// FIX - Lifted date picker visibility state to the parent AnalysisScreen to
+// resolve an issue where the pickers would not open on click. Correctly applied
+// theme colors to the DatePickerDialog to ensure text legibility.
+// FIX - Reverted date picker to ModalBottomSheet implementation and corrected
+// the theme detection logic to ensure proper text color contrast.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -38,6 +59,7 @@ import io.pm.finlight.ui.viewmodel.AnalysisViewModel
 import io.pm.finlight.ui.viewmodel.AnalysisViewModelFactory
 import java.net.URLEncoder
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
 import java.util.*
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -109,7 +131,6 @@ fun AnalysisScreen(
                             item = item,
                             onClick = {
                                 val encodedName = URLEncoder.encode(item.dimensionName, "UTF-8")
-                                // Use the date range from the UI state for navigation
                                 val (start, end) = viewModel.run {
                                     val (s, e) = calculateDateRange(uiState.selectedTimePeriod, uiState.customStartDate, uiState.customEndDate)
                                     s to e
@@ -124,32 +145,49 @@ fun AnalysisScreen(
     }
 
     if (showDateRangePicker) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        val dateRangePickerState = rememberDateRangePickerState()
-        val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+        val dateRangePickerState = rememberDateRangePickerState(
+            initialSelectedStartDateMillis = uiState.customStartDate,
+            initialSelectedEndDateMillis = uiState.customEndDate
+        )
+        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
         ModalBottomSheet(
             onDismissRequest = { showDateRangePicker = false },
-            sheetState = sheetState,
-            containerColor = popupContainerColor,
-            windowInsets = WindowInsets(0)
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = popupContainerColor
         ) {
             Column(
                 modifier = Modifier
+                    .fillMaxHeight(0.9f) // Use most of the screen
                     .navigationBarsPadding()
-                    .padding(horizontal = 16.dp)
             ) {
                 Text(
                     "Select Date Range",
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(16.dp)
                 )
-                DateRangePicker(state = dateRangePickerState, modifier = Modifier.weight(1f))
+                DateRangePicker(
+                    state = dateRangePickerState,
+                    modifier = Modifier.weight(1f),
+                    colors = DatePickerDefaults.colors(
+                        containerColor = Color.Transparent, // Picker is transparent, sheet provides color
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        headlineContentColor = MaterialTheme.colorScheme.onSurface,
+                        weekdayContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        dayContentColor = MaterialTheme.colorScheme.onSurface,
+                        disabledDayContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                        selectedDayContentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledSelectedDayContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                        selectedDayContainerColor = MaterialTheme.colorScheme.primary,
+                        todayContentColor = MaterialTheme.colorScheme.primary,
+                        todayDateBorderColor = MaterialTheme.colorScheme.primary,
+                    )
+                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 16.dp),
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = { showDateRangePicker = false }) {
@@ -158,11 +196,11 @@ fun AnalysisScreen(
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            showDateRangePicker = false
                             viewModel.setCustomDateRange(
                                 dateRangePickerState.selectedStartDateMillis,
                                 dateRangePickerState.selectedEndDateMillis
                             )
+                            showDateRangePicker = false
                         },
                         enabled = dateRangePickerState.selectedEndDateMillis != null
                     ) {
