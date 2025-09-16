@@ -127,7 +127,7 @@ fun SplitTransactionScreen(
                 }
             }
 
-            Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)) {
+            Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.background.copy(alpha = 0.5f)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -154,7 +154,7 @@ fun SplitTransactionScreen(
     }
 
     if (activeSheetTarget != null) {
-        val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
         ModalBottomSheet(

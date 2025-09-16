@@ -80,7 +80,7 @@ fun AddEditGoalScreen(
     }
 
     /* Theme-aware popup background for dialogs (transparency fix) */
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor =
         if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 

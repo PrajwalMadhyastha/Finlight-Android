@@ -162,7 +162,7 @@ fun CategoryListScreen(
     }
 
     if (showDeleteDialog && selectedCategory != null) {
-        val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
         DeleteCategoryDialog(
@@ -190,7 +190,7 @@ fun EditCategoryDialog(
     val allIcons = remember { CategoryIconHelper.getAllIcons().entries.toList() }
     val allColors = remember { CategoryIconHelper.getAllIconColors().entries.toList() }
 
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     AlertDialog(
