@@ -1,20 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FEATURE - Added `removeAllTransactionsForTag`. This function is
-// required for the "Cancel Trip" action to remove all tag associations from
-// transactions before the trip record itself is deleted.
-// FEATURE - All queries returning TransactionDetails now include a subquery
-// using `GROUP_CONCAT` to aggregate associated tag names into a single string.
-// This efficiently provides the data needed to display tags in the transaction list.
-// FEATURE - The `searchTransactions` query has been updated to accept an
-// optional `tagId`. It now includes a subquery to filter results based on
-// whether a transaction is associated with the selected tag.
-// FEATURE - Added new queries to power the Spending Analysis screen. These
-// queries can group transactions by category, tag, or merchant and fetch the
-// detailed transaction list for a specific dimension within a date range.
-// FEATURE - Added the `getTotalExpensesSince` query. This is essential for the
-// new "Spending Velocity" feature on the dashboard, allowing the ViewModel to
-// efficiently calculate the user's recent spending rate.
+// REASON: FIX - The three `getSpendingAnalysisBy...` queries have been
+// completely rewritten to be more accurate and powerful. They now correctly
+// aggregate data from both split and non-split transactions and accept new
+// nullable parameters to allow for cross-dimensional filtering (e.g., group by
+// category, but filter by a specific tag). A new `getAllExpenseMerchants` query
+// has also been added to populate the new filter dropdown.
 // =================================================================================
 package io.pm.finlight
 
@@ -42,57 +33,99 @@ interface TransactionDao {
     suspend fun getTotalExpensesSince(startDate: Long): Double?
 
 
-    // --- NEW: Spending Analysis Queries ---
+    // --- UPDATED: Spending Analysis Queries with Filtering ---
+
+    @Query("SELECT DISTINCT description FROM transactions WHERE transactionType = 'expense' AND isExcluded = 0 AND description IS NOT NULL ORDER BY description ASC")
+    fun getAllExpenseMerchants(): Flow<List<String>>
 
     @Query("""
-        WITH AtomicExpenses AS (
-            SELECT T.categoryId, T.amount FROM transactions AS T
+        WITH AllExpenses AS (
+            SELECT T.id, T.categoryId, T.amount, T.description
+            FROM transactions T
             WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
             UNION ALL
-            SELECT S.categoryId, S.amount FROM split_transactions AS S
-            JOIN transactions AS P ON S.parentTransactionId = P.id
+            SELECT P.id, S.categoryId, S.amount, P.description
+            FROM split_transactions S
+            JOIN transactions P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
         )
         SELECT
             C.id as dimensionId,
             C.name as dimensionName,
             SUM(AE.amount) as totalAmount,
-            COUNT(AE.amount) as transactionCount
-        FROM AtomicExpenses AE
+            COUNT(AE.id) as transactionCount
+        FROM AllExpenses AE
         JOIN categories C ON AE.categoryId = C.id
         WHERE AE.categoryId IS NOT NULL
+          AND (:filterMerchantName IS NULL OR AE.description = :filterMerchantName)
+          AND (:filterTagId IS NULL OR EXISTS (
+              SELECT 1 FROM transaction_tag_cross_ref ttcr
+              WHERE ttcr.transactionId = AE.id AND ttcr.tagId = :filterTagId
+          ))
+          AND (:filterCategoryId IS NULL OR C.id = :filterCategoryId)
         GROUP BY C.id, C.name
         ORDER BY totalAmount DESC
     """)
-    fun getSpendingAnalysisByCategory(startDate: Long, endDate: Long): Flow<List<SpendingAnalysisItem>>
+    fun getSpendingAnalysisByCategory(startDate: Long, endDate: Long, filterTagId: Int?, filterMerchantName: String?, filterCategoryId: Int?): Flow<List<SpendingAnalysisItem>>
 
     @Query("""
+        WITH AllExpenses AS (
+            SELECT T.id, T.categoryId, T.amount, T.description
+            FROM transactions T
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+            UNION ALL
+            SELECT P.id, S.categoryId, S.amount, P.description
+            FROM split_transactions S
+            JOIN transactions P ON S.parentTransactionId = P.id
+            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+        )
         SELECT
-            T.id as dimensionId,
-            T.name as dimensionName,
-            SUM(TX.amount) as totalAmount,
-            COUNT(TX.id) as transactionCount
-        FROM tags T
-        JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.tagId
-        JOIN transactions TX ON TTCR.transactionId = TX.id
-        WHERE TX.transactionType = 'expense' AND TX.isExcluded = 0 AND TX.date BETWEEN :startDate AND :endDate
-        GROUP BY T.id, T.name
+            TG.id AS dimensionId,
+            TG.name AS dimensionName,
+            SUM(AE.amount) AS totalAmount,
+            COUNT(AE.id) AS transactionCount
+        FROM AllExpenses AE
+        JOIN transaction_tag_cross_ref TTCR ON AE.id = TTCR.transactionId
+        JOIN tags TG ON TTCR.tagId = TG.id
+        WHERE
+            (:filterCategoryId IS NULL OR AE.categoryId = :filterCategoryId)
+            AND (:filterMerchantName IS NULL OR AE.description = :filterMerchantName)
+            AND (:filterTagId IS NULL OR TG.id = :filterTagId)
+        GROUP BY TG.id, TG.name
         ORDER BY totalAmount DESC
     """)
-    fun getSpendingAnalysisByTag(startDate: Long, endDate: Long): Flow<List<SpendingAnalysisItem>>
+    fun getSpendingAnalysisByTag(startDate: Long, endDate: Long, filterCategoryId: Int?, filterMerchantName: String?, filterTagId: Int?): Flow<List<SpendingAnalysisItem>>
 
     @Query("""
+        WITH AllExpenses AS (
+            SELECT T.id, T.categoryId, T.amount, T.description
+            FROM transactions T
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+            UNION ALL
+            SELECT P.id, S.categoryId, S.amount, P.description
+            FROM split_transactions S
+            JOIN transactions P ON S.parentTransactionId = P.id
+            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+        )
         SELECT
-            LOWER(T.description) as dimensionId,
-            T.description as dimensionName,
-            SUM(T.amount) as totalAmount,
-            COUNT(T.id) as transactionCount
-        FROM transactions T
-        WHERE T.transactionType = 'expense' AND T.isExcluded = 0 AND T.isSplit = 0 AND T.date BETWEEN :startDate AND :endDate
+            LOWER(AE.description) as dimensionId,
+            AE.description as dimensionName,
+            SUM(AE.amount) as totalAmount,
+            COUNT(AE.id) as transactionCount
+        FROM AllExpenses AE
+        WHERE
+            AE.description IS NOT NULL
+            AND (:filterCategoryId IS NULL OR AE.categoryId = :filterCategoryId)
+            AND (:filterTagId IS NULL OR EXISTS (
+                SELECT 1 FROM transaction_tag_cross_ref ttcr
+                WHERE ttcr.transactionId = AE.id AND ttcr.tagId = :filterTagId
+            ))
+            AND (:filterMerchantName IS NULL OR AE.description = :filterMerchantName)
         GROUP BY dimensionName
         ORDER BY totalAmount DESC
     """)
-    fun getSpendingAnalysisByMerchant(startDate: Long, endDate: Long): Flow<List<SpendingAnalysisItem>>
+    fun getSpendingAnalysisByMerchant(startDate: Long, endDate: Long, filterCategoryId: Int?, filterTagId: Int?, filterMerchantName: String?): Flow<List<SpendingAnalysisItem>>
+
 
     @androidx.room.Transaction
     @Query("""

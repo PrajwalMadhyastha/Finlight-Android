@@ -1,47 +1,32 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AnalysisScreen.kt
-// REASON: UX REFINEMENT - Replaced the full-screen DatePickerDialog with a more
-// intuitive ModalBottomSheet. The new sheet contains an explicit "Apply"
-// button, making the custom date range selection process clearer and more
-// user-friendly. The sheet state is also configured to skip the partially
-// expanded state, ensuring it opens fully for a better user experience.
-// FIX - Explicitly provided DatePickerDefaults.colors to the DateRangePicker
-// to ensure text content has the correct contrast against the bottom sheet's
-// background, resolving a legibility issue in certain themes.
-// FIX - Replaced ModalBottomSheet with a standard Dialog wrapper for the
-// DateRangePicker. This gives more control over the background surface color
-// and ensures correct theme propagation, fixing text legibility issues.
-// FIX - Corrected the DateRangePicker implementation within its Dialog to
-// properly apply theme colors, ensuring text is always legible against the
-// dialog's background, regardless of the app or system theme.
-// REFACTOR - Replaced the single DateRangePicker with a two-step date selection
-// dialog. Users now tap "Start Date" and "End Date" fields individually,
-// each launching a separate DatePickerDialog. This provides a more controlled
-// and familiar user experience for defining a custom date range.
-// FIX - Resolved build error by implementing date validation correctly within
-// rememberDatePickerState using a SelectableDates object, instead of passing
-// a dateValidator parameter to the DatePicker composable.
-// FIX - Lifted date picker visibility state to the parent AnalysisScreen to
-// resolve an issue where the pickers would not open on click. Correctly applied
-// theme colors to the DatePickerDialog to ensure text legibility.
-// FIX - Reverted date picker to ModalBottomSheet implementation and corrected
-// the theme detection logic to ensure proper text color contrast.
+// REASON: FEATURE - The UI has been updated to include a persistent filter bar.
+// It contains the scrollable time period chips and a new, always-visible filter
+// icon. Tapping the icon opens a bottom sheet with dropdowns for filtering by
+// category, tag, and merchant, using a reused SearchableDropdown component.
+// A BadgedBox indicates when filters are active.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
 import android.app.Application
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.EditCalendar
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -49,17 +34,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import io.pm.finlight.Category
+import io.pm.finlight.Tag
 import io.pm.finlight.data.model.SpendingAnalysisItem
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.AnalysisTimePeriod
+import io.pm.finlight.ui.viewmodel.AnalysisUiState
 import io.pm.finlight.ui.viewmodel.AnalysisViewModel
 import io.pm.finlight.ui.viewmodel.AnalysisViewModelFactory
 import java.net.URLEncoder
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -75,6 +62,12 @@ fun AnalysisScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showDateRangePicker by remember { mutableStateOf(false) }
 
+    val areFiltersActive by remember(uiState) {
+        derivedStateOf {
+            uiState.selectedFilterCategory != null || uiState.selectedFilterTag != null || uiState.selectedFilterMerchant != null
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(
             selectedTabIndex = uiState.selectedDimension.ordinal,
@@ -88,11 +81,38 @@ fun AnalysisScreen(
             }
         }
 
-        TimePeriodFilter(
-            selectedPeriod = uiState.selectedTimePeriod,
-            onPeriodSelected = { viewModel.selectTimePeriod(it) },
-            onCustomRangeClick = { showDateRangePicker = true }
-        )
+        // --- NEW: Filter Bar ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TimePeriodFilter(
+                modifier = Modifier.weight(1f),
+                selectedPeriod = uiState.selectedTimePeriod,
+                onPeriodSelected = { viewModel.selectTimePeriod(it) },
+                onCustomRangeClick = { showDateRangePicker = true }
+            )
+            BadgedBox(
+                badge = {
+                    if (areFiltersActive) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                    }
+                },
+                modifier = Modifier.padding(end = 8.dp)
+            ) {
+                IconButton(onClick = { viewModel.onFilterSheetToggled(true) }) {
+                    Icon(Icons.Default.FilterList, "Advanced Filters")
+                }
+            }
+        }
+
 
         if (uiState.isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -159,7 +179,7 @@ fun AnalysisScreen(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxHeight(0.9f) // Use most of the screen
+                    .fillMaxHeight(0.9f)
                     .navigationBarsPadding()
             ) {
                 Text(
@@ -171,7 +191,7 @@ fun AnalysisScreen(
                     state = dateRangePickerState,
                     modifier = Modifier.weight(1f),
                     colors = DatePickerDefaults.colors(
-                        containerColor = Color.Transparent, // Picker is transparent, sheet provides color
+                        containerColor = Color.Transparent,
                         titleContentColor = MaterialTheme.colorScheme.onSurface,
                         headlineContentColor = MaterialTheme.colorScheme.onSurface,
                         weekdayContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -210,16 +230,34 @@ fun AnalysisScreen(
             }
         }
     }
+
+    if (uiState.showFilterSheet) {
+        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+        val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.onFilterSheetToggled(false) },
+            containerColor = popupContainerColor
+        ) {
+            FilterSheetContent(
+                uiState = uiState,
+                onCategorySelected = viewModel::selectFilterCategory,
+                onTagSelected = viewModel::selectFilterTag,
+                onMerchantSelected = viewModel::selectFilterMerchant,
+                onClearFilters = viewModel::clearFilters
+            )
+        }
+    }
 }
 
 @Composable
 private fun TimePeriodFilter(
+    modifier: Modifier = Modifier,
     selectedPeriod: AnalysisTimePeriod,
     onPeriodSelected: (AnalysisTimePeriod) -> Unit,
     onCustomRangeClick: () -> Unit
 ) {
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.padding(start = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(AnalysisTimePeriod.entries.filter { it != AnalysisTimePeriod.CUSTOM }) { period ->
@@ -319,16 +357,121 @@ private fun AnalysisItemRow(
     }
 }
 
-// Private function in AnalysisViewModel is not needed here
-// but this is an extension function on the ViewModel
-// so it must be defined at the top level in this file.
+@Composable
+private fun FilterSheetContent(
+    uiState: AnalysisUiState,
+    onCategorySelected: (Category?) -> Unit,
+    onTagSelected: (Tag?) -> Unit,
+    onMerchantSelected: (String?) -> Unit,
+    onClearFilters: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .navigationBarsPadding(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            "Filter Analysis",
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        AnalysisSearchableDropdown(
+            label = "Category",
+            options = uiState.allCategories,
+            selectedOption = uiState.selectedFilterCategory,
+            onOptionSelected = onCategorySelected,
+            getDisplayName = { it.name }
+        )
+
+        AnalysisSearchableDropdown(
+            label = "Tag",
+            options = uiState.allTags,
+            selectedOption = uiState.selectedFilterTag,
+            onOptionSelected = onTagSelected,
+            getDisplayName = { it.name }
+        )
+
+        AnalysisSearchableDropdown(
+            label = "Merchant",
+            options = uiState.allMerchants,
+            selectedOption = uiState.selectedFilterMerchant,
+            onOptionSelected = onMerchantSelected,
+            getDisplayName = { it }
+        )
+
+        Button(
+            onClick = onClearFilters,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Clear All Filters")
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> AnalysisSearchableDropdown(
+    label: String,
+    options: List<T>,
+    selectedOption: T?,
+    onOptionSelected: (T?) -> Unit,
+    getDisplayName: (T) -> String,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            value = selectedOption?.let { getDisplayName(it) } ?: "All",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = {
+                Row {
+                    if (selectedOption != null) {
+                        IconButton(onClick = { onOptionSelected(null) }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear selection")
+                        }
+                    }
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                }
+            },
+            modifier =
+                Modifier
+                    .menuAnchor()
+                    .fillMaxWidth(),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(
+                if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight
+            )
+        ) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(getDisplayName(option)) },
+                    onClick = {
+                        onOptionSelected(option)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+
 private fun AnalysisViewModel.calculateDateRange(
     period: AnalysisTimePeriod,
     customStart: Long?,
     customEnd: Long?
 ): Pair<Long, Long> {
     val calendar = Calendar.getInstance()
-    // Set to end of today to include all of today's transactions
     calendar.set(Calendar.HOUR_OF_DAY, 23)
     calendar.set(Calendar.MINUTE, 59)
     calendar.set(Calendar.SECOND, 59)

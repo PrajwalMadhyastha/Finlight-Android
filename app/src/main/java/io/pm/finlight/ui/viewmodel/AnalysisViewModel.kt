@@ -1,19 +1,20 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/AnalysisViewModel.kt
-// REASON: FIX - Refactored the ViewModel to use a proper unidirectional data flow.
-// The previous implementation had a feedback loop where updating the UI state
-// would immediately re-trigger the database query, causing infinite loading and
-// UI flashing. This new structure separates user inputs from the final result,
-// combining them reactively to produce a stable UI state and eliminating the loop.
+// REASON: FEATURE - The ViewModel has been significantly enhanced to support
+// advanced filtering. It now fetches all categories, tags, and merchants to
+// populate filter dropdowns. The UI state and reactive flows have been updated
+// to manage the state of these new filters, calling the updated DAO queries
+// with the selected filter parameters to produce a fully interactive analysis view.
+// FIX - The reactive stream logic has been rewritten to correctly chain multiple
+// `combine` operators. This resolves all build errors related to argument type
+// mismatches and failed type inference by breaking down the complex combination
+// of 11 flows into manageable, type-safe steps.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.TransactionDao
-import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.*
 import io.pm.finlight.data.model.SpendingAnalysisItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -34,66 +35,121 @@ data class AnalysisUiState(
     val customEndDate: Long? = null,
     val analysisItems: List<SpendingAnalysisItem> = emptyList(),
     val totalSpending: Double = 0.0,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    // --- NEW: State for filters ---
+    val showFilterSheet: Boolean = false,
+    val selectedFilterCategory: Category? = null,
+    val selectedFilterTag: Tag? = null,
+    val selectedFilterMerchant: String? = null,
+    val allCategories: List<Category> = emptyList(),
+    val allTags: List<Tag> = emptyList(),
+    val allMerchants: List<String> = emptyList()
 )
 
-class AnalysisViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(AnalysisViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
-            @Suppress("UNCHECKED_CAST")
-            return AnalysisViewModel(db.transactionDao()) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
+// --- NEW: Helper data class for combining flows ---
+private data class AnalysisInputs(
+    val dimension: AnalysisDimension,
+    val period: AnalysisTimePeriod,
+    val dateRange: Pair<Long?, Long?>,
+    val filterCat: Category?,
+    val filterTag: Tag?,
+    val filterMerchant: String?
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class AnalysisViewModel(private val transactionDao: TransactionDao) : ViewModel() {
+class AnalysisViewModel(
+    private val transactionDao: TransactionDao,
+    private val categoryDao: CategoryDao,
+    private val tagDao: TagDao
+) : ViewModel() {
 
     // --- INPUTS: StateFlows to hold user selections ---
     private val _selectedDimension = MutableStateFlow(AnalysisDimension.CATEGORY)
     private val _selectedTimePeriod = MutableStateFlow(AnalysisTimePeriod.MONTH)
     private val _customDateRange = MutableStateFlow<Pair<Long?, Long?>>(Pair(null, null))
+    private val _showFilterSheet = MutableStateFlow(false)
 
-    // --- LOGIC: A flow that reacts to input changes and queries the DB ---
-    private val analysisResultFlow = combine(
-        _selectedDimension, _selectedTimePeriod, _customDateRange
-    ) { dimension, period, dateRange ->
-        // This Triple acts as the trigger for our database query
-        Triple(dimension, period, dateRange)
-    }.flatMapLatest { (dimension, period, dateRange) ->
-        // This flow will cancel and restart if the inputs change
-        val (start, end) = calculateDateRange(period, dateRange.first, dateRange.second)
-        when (dimension) {
-            AnalysisDimension.CATEGORY -> transactionDao.getSpendingAnalysisByCategory(start, end)
-            AnalysisDimension.TAG -> transactionDao.getSpendingAnalysisByTag(start, end)
-            AnalysisDimension.MERCHANT -> transactionDao.getSpendingAnalysisByMerchant(start, end)
+    // --- NEW: Input flows for advanced filters ---
+    private val _selectedFilterCategory = MutableStateFlow<Category?>(null)
+    private val _selectedFilterTag = MutableStateFlow<Tag?>(null)
+    private val _selectedFilterMerchant = MutableStateFlow<String?>(null)
+
+    // --- DATA: Flows for filter dropdowns ---
+    private val allCategories = categoryDao.getAllCategories()
+    private val allTags = tagDao.getAllTags()
+    private val allMerchants = transactionDao.getAllExpenseMerchants()
+
+    // --- REFACTORED LOGIC ---
+
+    // 1. Combine all user inputs into a single flow of a data class.
+    private val analysisInputsFlow = combine(
+        _selectedDimension, _selectedTimePeriod, _customDateRange,
+        _selectedFilterCategory, _selectedFilterTag, _selectedFilterMerchant
+    ) { args ->
+        @Suppress("UNCHECKED_CAST")
+        AnalysisInputs(
+            dimension = args[0] as AnalysisDimension,
+            period = args[1] as AnalysisTimePeriod,
+            dateRange = args[2] as Pair<Long?, Long?>,
+            filterCat = args[3] as? Category,
+            filterTag = args[4] as? Tag,
+            filterMerchant = args[5] as? String
+        )
+    }
+
+    // 2. Use that single input flow to trigger the database query.
+    private val analysisResultFlow = analysisInputsFlow.flatMapLatest { inputs ->
+        val (start, end) = calculateDateRange(inputs.period, inputs.dateRange.first, inputs.dateRange.second)
+        when (inputs.dimension) {
+            AnalysisDimension.CATEGORY -> transactionDao.getSpendingAnalysisByCategory(start, end, inputs.filterTag?.id, inputs.filterMerchant, inputs.filterCat?.id)
+            AnalysisDimension.TAG -> transactionDao.getSpendingAnalysisByTag(start, end, inputs.filterCat?.id, inputs.filterMerchant, inputs.filterTag?.id)
+            AnalysisDimension.MERCHANT -> transactionDao.getSpendingAnalysisByMerchant(start, end, inputs.filterCat?.id, inputs.filterTag?.id, inputs.filterMerchant)
         }
     }
 
-    // --- OUTPUT: A single StateFlow for the UI, combining inputs and results ---
+    // 3. Combine the input flow, data flows, and result flow into the final UI state.
     val uiState: StateFlow<AnalysisUiState> = combine(
-        _selectedDimension,
-        _selectedTimePeriod,
-        _customDateRange,
+        analysisInputsFlow,
+        _showFilterSheet,
+        allCategories,
+        allTags,
+        allMerchants,
         analysisResultFlow
-    ) { dimension, period, dateRange, items ->
-        // This combines all our inputs and the final result into one state object for the UI
+    ) { args ->
+        @Suppress("UNCHECKED_CAST")
+        val inputs = args[0] as AnalysisInputs
+        @Suppress("UNCHECKED_CAST")
+        val showSheet = args[1] as Boolean
+        @Suppress("UNCHECKED_CAST")
+        val cats = args[2] as List<Category>
+        @Suppress("UNCHECKED_CAST")
+        val tags = args[3] as List<Tag>
+        @Suppress("UNCHECKED_CAST")
+        val merchants = args[4] as List<String>
+        @Suppress("UNCHECKED_CAST")
+        val items = args[5] as List<SpendingAnalysisItem>
+
         val total = items.sumOf { it.totalAmount }
         AnalysisUiState(
-            selectedDimension = dimension,
-            selectedTimePeriod = period,
-            customStartDate = dateRange.first,
-            customEndDate = dateRange.second,
+            selectedDimension = inputs.dimension,
+            selectedTimePeriod = inputs.period,
+            customStartDate = inputs.dateRange.first,
+            customEndDate = inputs.dateRange.second,
             analysisItems = items,
             totalSpending = total,
-            isLoading = false // Loading is handled implicitly by stateIn's initial value
+            isLoading = false,
+            showFilterSheet = showSheet,
+            selectedFilterCategory = inputs.filterCat,
+            selectedFilterTag = inputs.filterTag,
+            selectedFilterMerchant = inputs.filterMerchant,
+            allCategories = cats,
+            allTags = tags,
+            allMerchants = merchants
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = AnalysisUiState(isLoading = true) // Start in loading state, will update when the flow emits
+        initialValue = AnalysisUiState(isLoading = true)
     )
 
     fun selectDimension(dimension: AnalysisDimension) {
@@ -102,21 +158,41 @@ class AnalysisViewModel(private val transactionDao: TransactionDao) : ViewModel(
 
     fun selectTimePeriod(period: AnalysisTimePeriod) {
         _selectedTimePeriod.value = period
-        // Clear custom dates if a predefined period is selected
         if (period != AnalysisTimePeriod.CUSTOM) {
             _customDateRange.value = Pair(null, null)
         }
     }
 
     fun setCustomDateRange(start: Long?, end: Long?) {
-        // Setting a custom range automatically selects the CUSTOM period
         _selectedTimePeriod.value = AnalysisTimePeriod.CUSTOM
         _customDateRange.value = Pair(start, end)
     }
 
+    // --- NEW: Functions to manage filter state ---
+    fun onFilterSheetToggled(show: Boolean) {
+        _showFilterSheet.value = show
+    }
+
+    fun selectFilterCategory(category: Category?) {
+        _selectedFilterCategory.value = category
+    }
+
+    fun selectFilterTag(tag: Tag?) {
+        _selectedFilterTag.value = tag
+    }
+
+    fun selectFilterMerchant(merchant: String?) {
+        _selectedFilterMerchant.value = merchant
+    }
+
+    fun clearFilters() {
+        _selectedFilterCategory.value = null
+        _selectedFilterTag.value = null
+        _selectedFilterMerchant.value = null
+    }
+
     private fun calculateDateRange(period: AnalysisTimePeriod, customStart: Long?, customEnd: Long?): Pair<Long, Long> {
         val calendar = Calendar.getInstance()
-        // Set to end of today to include all of today's transactions
         calendar.set(Calendar.HOUR_OF_DAY, 23)
         calendar.set(Calendar.MINUTE, 59)
         calendar.set(Calendar.SECOND, 59)
