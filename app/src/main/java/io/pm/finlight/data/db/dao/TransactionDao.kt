@@ -12,6 +12,9 @@
 // FEATURE - Added new queries to power the Spending Analysis screen. These
 // queries can group transactions by category, tag, or merchant and fetch the
 // detailed transaction list for a specific dimension within a date range.
+// FEATURE - Added the `getTotalExpensesSince` query. This is essential for the
+// new "Spending Velocity" feature on the dashboard, allowing the ViewModel to
+// efficiently calculate the user's recent spending rate.
 // =================================================================================
 package io.pm.finlight
 
@@ -23,6 +26,21 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TransactionDao {
+
+    // --- NEW: Query for Spending Velocity ---
+    @Query("""
+        WITH AtomicExpenses AS (
+            SELECT T.amount FROM transactions AS T
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.date >= :startDate
+            UNION ALL
+            SELECT S.amount FROM split_transactions AS S
+            JOIN transactions AS P ON S.parentTransactionId = P.id
+            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.date >= :startDate
+        )
+        SELECT SUM(AE.amount) FROM AtomicExpenses AS AE
+    """)
+    suspend fun getTotalExpensesSince(startDate: Long): Double?
+
 
     // --- NEW: Spending Analysis Queries ---
 

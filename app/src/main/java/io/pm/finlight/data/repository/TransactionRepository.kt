@@ -6,6 +6,9 @@
 // centralized here. All insert/update methods now check the active travel plan
 // from SettingsRepository and apply the correct tag atomically, eliminating race
 // conditions between the SmsReceiver and the UI.
+// FEATURE - Added the `getTotalExpensesSince` function. This exposes the new
+// DAO query to the ViewModel layer, enabling the "Spending Velocity" feature on
+// the dashboard.
 // =================================================================================
 package io.pm.finlight
 
@@ -20,6 +23,11 @@ class TransactionRepository(
     private val settingsRepository: SettingsRepository,
     private val tagRepository: TagRepository
 ) {
+
+    // --- NEW: Function for Spending Velocity feature ---
+    suspend fun getTotalExpensesSince(startDate: Long): Double {
+        return transactionDao.getTotalExpensesSince(startDate) ?: 0.0
+    }
 
     // --- NEW: Function to search for merchant predictions ---
     fun searchMerchants(query: String): Flow<List<MerchantPrediction>> {

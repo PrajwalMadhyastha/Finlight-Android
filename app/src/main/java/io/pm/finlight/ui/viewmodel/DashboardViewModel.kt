@@ -3,6 +3,15 @@
 // REASON: REFACTOR - The instantiation of AccountRepository has been updated to
 // pass the full AppDatabase instance instead of just the DAO. This is required
 // to support the new transactional account merging logic.
+// FEATURE - The `budgetHealthSummary` logic is now more dynamic and insightful.
+// It incorporates the day of the week and days remaining in the month to provide
+// more context-aware and personalized financial advice.
+// FEATURE - The `budgetHealthSummary` logic has been completely rewritten to use
+// a "Spending Velocity" and forecasting model. It now analyzes the user's recent
+// spending rate to predict their month-end total, providing much more accurate
+// and empathetic advice that correctly handles front-loaded monthly expenses.
+// FIX - Corrected the reactive stream logic for `budgetHealthSummary` to resolve
+// build errors caused by an incorrect `combine` operator usage.
 // =================================================================================
 package io.pm.finlight
 
@@ -163,72 +172,92 @@ class DashboardViewModel(
             monthlyExpenses,
             overallMonthlyBudget,
             _summaryRefreshTrigger
-        ) { expenses, budget, _ ->
+        ) { expenses, budget, trigger ->
+            Triple(expenses, budget, trigger)
+        }.flatMapLatest { (expenses, budget) ->
             if (budget <= 0f) {
-                "Set a budget to see insights"
-            } else {
+                return@flatMapLatest flowOf("Set a budget to see insights")
+            }
+
+            flow {
+                // --- Spending Velocity & Forecasting Logic ---
                 val cal = Calendar.getInstance()
-                val monthName = cal.getDisplayName(Calendar.MONTH, Calendar.LONG, Locale.getDefault())
+                val lookbackPeriodDays = 3
+                val lookbackStartDate = (cal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -lookbackPeriodDays) }.timeInMillis
+                val recentSpend = transactionRepository.getTotalExpensesSince(lookbackStartDate)
+                val spendingVelocity = if (lookbackPeriodDays > 0) recentSpend / lookbackPeriodDays.toDouble() else 0.0
+
                 val dayOfMonth = cal.get(Calendar.DAY_OF_MONTH)
                 val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                val daysLeft = (daysInMonth - dayOfMonth).coerceAtLeast(0)
+                val forecastedSpend = expenses + (spendingVelocity * daysLeft)
 
                 val percentOfMonthPassed = dayOfMonth.toFloat() / daysInMonth.toFloat()
-                val percentOfBudgetSpent = (expenses / budget).toFloat()
+                val percentOfBudgetSpent = if (budget > 0) (expenses.toFloat() / budget) else 0f
 
-                when {
-                    percentOfBudgetSpent > 1 -> listOf(
-                        "You've gone over for $monthName.",
-                        "Let's get back on track next month.",
-                        "Budget exceeded for the month.",
-                        "Whoops! Over budget this month.",
-                        "Time to pump the brakes!",
-                        "Too much spent this time.",
-                        "$monthName went over.",
-                        "Budget says 'ouch!' for $monthName.",
-                        "Time to tighten things up.",
-                        "This month went off-budget!"
-                    ).random()
-                    percentOfBudgetSpent > percentOfMonthPassed + 0.2 -> listOf(
-                        "A little ahead of schedule.",
-                        "Watch your spending for the rest of $monthName.",
-                        "Heads up: spending is a bit high.",
-                        "You’re burning through the budget a bit fast.",
-                        "Pacing ahead of plan.",
-                        "Try slowing down a bit.",
-                        "Spending’s moving fast.",
-                        "Budget’s feeling the heat.",
-                        "Easy does it.",
-                        "Still time left in $monthName.",
-                        "Might want to ease up.",
-                        "You're spending early."
-                    ).random()
-                    percentOfBudgetSpent < percentOfMonthPassed - 0.2 -> listOf(
-                        "Well under budget so far!",
-                        "You're saving more this month.",
-                        "Plenty of room in the budget.",
-                        "Nice! Under budget.",
-                        "Strong control this month.",
-                        "Spending’s staying low.",
-                        "Good pace so far!",
-                        "Budget’s in great shape.",
-                        "You’re ahead! Keep it up!",
-                        "Plenty left to use.",
-                        "Great saving streak!"
-                    ).random()
-                    else -> listOf(
-                        "Looking good for $monthName!",
-                        "Great job staying on budget!",
-                        "Your spending is right on track.",
-                        "All good so far.",
-                        "Tracking well!",
-                        "Nice and steady.",
-                        "You're on point.",
-                        "Smooth budget flow.",
-                        "No worries this month.",
-                        "Keep it going!",
-                        "Right where you should be."
-                    ).random()
+                val message = when {
+                    // Scenario C: Still Pacing High (High total spend AND high recent spend)
+                    percentOfBudgetSpent > percentOfMonthPassed && forecastedSpend > budget -> {
+                        listOf(
+                            "Pacing a bit high for this month.",
+                            "Time to ease up on spending.",
+                            "Still trending over budget.",
+                            "Let's try to slow things down.",
+                            "Watch the spending for a bit.",
+                            "Heads up: pacing is still high.",
+                            "A bit too fast for this month.",
+                            "Let's pump the brakes slightly.",
+                            "Budget is feeling the pressure.",
+                            "Trending to overspend."
+                        ).random()
+                    }
+                    // Scenario D: Recently Slipped Up (OK total spend, but high recent spend)
+                    percentOfBudgetSpent <= percentOfMonthPassed && forecastedSpend > budget -> {
+                        listOf(
+                            "Spending has picked up recently.",
+                            "Careful, you're trending over.",
+                            "Watch the recent spending.",
+                            "You were on track, pace has increased.",
+                            "A recent slip-up in spending.",
+                            "Let's get back to that great pace.",
+                            "Trending high the last few days.",
+                            "A little adjustment will help.",
+                            "Let's avoid a spending spree.",
+                            "Back on the brakes for a bit."
+                        ).random()
+                    }
+                    // Scenario A: Back on Track (High total spend, but low recent spend)
+                    percentOfBudgetSpent > percentOfMonthPassed && forecastedSpend <= budget -> {
+                        listOf(
+                            "Nice recovery! You're on pace now.",
+                            "Spending slowed, looking good.",
+                            "Back on track for the month!",
+                            "Great adjustment on spending.",
+                            "You've course-corrected perfectly.",
+                            "Well done reining it in.",
+                            "Pacing is now under control.",
+                            "The rest of the month looks good.",
+                            "Good save! Keep it up.",
+                            "Back within your monthly plan."
+                        ).random()
+                    }
+                    // Scenario B: Consistently Good
+                    else -> {
+                        listOf(
+                            "Excellent pacing this month!",
+                            "On track with room to spare.",
+                            "Well within budget, great job.",
+                            "Your budget is looking healthy.",
+                            "Consistently great spending.",
+                            "Keep this momentum going!",
+                            "Smooth sailing this month.",
+                            "You're building a nice buffer.",
+                            "Perfectly on track.",
+                            "Another great spending day."
+                        ).random()
+                    }
                 }
+                emit(message)
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Monthly Budget")
 
