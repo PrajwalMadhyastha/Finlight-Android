@@ -10,9 +10,9 @@ Project Aurora: A Glimpse into Finlight
 
 Finlight's UI is built on a custom design language that emphasizes depth, light, and motion. We use theme-aware animated backgrounds and frosted glass effects to create an experience that is both functional and beautiful.
 
-| Dashboard & Privacy Mode                   | Spending Analysis Hub                      | Customization                 |
-|--------------------------------------------|--------------------------------------------|-------------------------------|
-| [Privacy Mode](docs/gifs/Privacy_mode.gif) | [Analysis Hub](docs/gifs/Analysis_hub.gif) | [Themes](docs/gifs/theme.gif) |
+| Dashboard & Privacy Mode                    | Spending Analysis Hub                       | Customization                  |
+|---------------------------------------------|---------------------------------------------|--------------------------------|
+| ![Privacy Mode](docs/gifs/Privacy_mode.gif) | ![Analysis Hub](docs/gifs/Analysis_hub.gif) | ![Themes](docs/gifs/theme.gif) |
 
 Core Philosophy
 ---------------
