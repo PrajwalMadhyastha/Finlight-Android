@@ -6,6 +6,8 @@
 // FIX - The TagPickerSheet layout has been refactored. The FlowRow containing
 // the tags is now wrapped in a scrollable Column with a weight, ensuring the
 // list is scrollable if it overflows while keeping the header and footer fixed.
+// REFACTOR - The `NotesRow` has been changed from a Row to a Column layout to
+// better display multi-line notes, improving readability.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -1012,24 +1014,44 @@ private fun AccountCardWithSwitch(
 
 @Composable
 private fun NotesRow(details: TransactionDetails, onClick: () -> Unit) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp) // Space between label row and value
     ) {
-        Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = "Notes", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("Notes", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
+        // Label Row
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.Notes,
+                contentDescription = "Notes",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "Notes",
+                style = MaterialTheme.typography.titleMedium, // Using a slightly larger style for the label
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Icon(
+                Icons.Default.Edit,
+                contentDescription = "Edit Notes",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Value Text (indented)
         Text(
             details.transaction.notes ?: "Tap to add",
             fontWeight = if (details.transaction.notes.isNullOrBlank()) FontWeight.Normal else FontWeight.SemiBold,
             color = if (details.transaction.notes.isNullOrBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            modifier = Modifier.padding(start = 40.dp) // Indent the note text
         )
-        Icon(Icons.Default.Edit, contentDescription = "Edit Notes", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
