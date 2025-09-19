@@ -3,6 +3,8 @@
 // REASON: REFACTOR - The instantiation of AccountRepository has been updated to
 // pass the full AppDatabase instance instead of just the DAO. This is required
 // to support the new transactional account merging logic.
+// FIX - The instantiation of TransactionRepository has been updated to include
+// the required dependencies, resolving a build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -142,11 +144,11 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     val merchantPredictions: StateFlow<List<MerchantPrediction>>
 
     init {
-        transactionRepository = TransactionRepository(db.transactionDao())
-        accountRepository = AccountRepository(db) // --- UPDATED ---
-        categoryRepository = CategoryRepository(db.categoryDao())
-        tagRepository = TagRepository(db.tagDao(), db.transactionDao())
         settingsRepository = SettingsRepository(application)
+        tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
+        accountRepository = AccountRepository(db)
+        categoryRepository = CategoryRepository(db.categoryDao())
         smsRepository = SmsRepository(application)
         merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao())
         merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao())
@@ -533,12 +535,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             )
         }
 
-        val finalTags = _selectedTags.value.toMutableSet()
-        if (travelSettings?.isEnabled == true && date >= travelSettings.startDate && date <= travelSettings.endDate) {
-            val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
-            finalTags.add(tripTag)
-        }
-
         return try {
             withContext(Dispatchers.IO) {
                 val savedImagePaths = imageUris.mapNotNull { uri ->
@@ -546,7 +542,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 }
                 transactionRepository.insertTransactionWithTagsAndImages(
                     transactionToSave,
-                    finalTags,
+                    _selectedTags.value,
                     savedImagePaths
                 )
             }
@@ -878,31 +874,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun updateTransactionDate(id: Int, date: Long) = viewModelScope.launch {
-        val oldDate = initialTransactionStateForRetroUpdate?.date
-        val travelSettings = travelModeSettings.value
-
         transactionRepository.updateDate(id, date)
-
-        if (travelSettings?.isEnabled == true && oldDate != null) {
-            val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
-            val currentTags = transactionRepository.getTagsForTransaction(id).first().toMutableSet()
-
-            val oldDateInTrip = oldDate >= travelSettings.startDate && oldDate <= travelSettings.endDate
-            val newDateInTrip = date >= travelSettings.startDate && date <= travelSettings.endDate
-
-            var tagsChanged = false
-            if (newDateInTrip && !oldDateInTrip) {
-                currentTags.add(tripTag)
-                tagsChanged = true
-            } else if (!newDateInTrip && oldDateInTrip) {
-                currentTags.remove(tripTag)
-                tagsChanged = true
-            }
-
-            if (tagsChanged) {
-                transactionRepository.updateTagsForTransaction(id, currentTags)
-            }
-        }
     }
 
     fun updateTransactionExclusion(id: Int, isExcluded: Boolean) = viewModelScope.launch {
@@ -974,14 +946,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
                 if (account == null) return@withContext false
 
-                val finalTags = tags.toMutableSet()
-                val travelSettings = settingsRepository.getTravelModeSettings().first()
-                if (travelSettings?.isEnabled == true && potentialTxn.date >= travelSettings.startDate && potentialTxn.date <= travelSettings.endDate) {
-                    val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
-                    finalTags.add(tripTag)
-                }
-
                 val transactionToSave = if (isForeign) {
+                    val travelSettings = settingsRepository.getTravelModeSettings().first()
                     if (travelSettings == null) {
                         Log.e(TAG, "Attempted to save foreign SMS transaction, but Travel Mode is not configured.")
                         return@withContext false
@@ -1018,7 +984,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     )
                 }
 
-                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
+                transactionRepository.insertTransactionWithTags(transactionToSave, tags)
 
                 val merchantName = potentialTxn.merchantName
                 if (categoryId != null && merchantName != null) {
@@ -1055,13 +1021,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     return@withContext false
                 }
 
-                val finalTags = mutableSetOf<Tag>()
-                val travelSettings = settingsRepository.getTravelModeSettings().first()
-                if (travelSettings?.isEnabled == true && potentialTxn.date >= travelSettings.startDate && potentialTxn.date <= travelSettings.endDate) {
-                    val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
-                    finalTags.add(tripTag)
-                }
-
                 val transactionToSave = Transaction(
                     description = potentialTxn.merchantName ?: "Unknown Merchant",
                     originalDescription = potentialTxn.merchantName,
@@ -1076,7 +1035,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     source = "Auto-Captured"
                 )
 
-                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
+                transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
                 true
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to auto-save SMS transaction", e)

@@ -101,7 +101,7 @@ fun WeeklyReportTimePicker(
         Pair(it, cal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.getDefault()))
     }
 
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     AlertDialog(
@@ -166,7 +166,7 @@ fun MonthlyReportTimePicker(
     val timePickerState = rememberTimePickerState(initialHour, initialMinute, false)
     var isDayPickerExpanded by remember { mutableStateOf(false) }
 
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     AlertDialog(

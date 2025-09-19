@@ -8,6 +8,13 @@
 // FEATURE - The ViewModel now supports filtering by tags. The UI state includes
 // the list of all tags and the currently selected tag. The logic has been updated
 // to fetch all tags and pass the selected tag's ID to the DAO's search query.
+// FIX - The UI state now includes boolean flags (`showStartDatePicker`, `showEndDatePicker`)
+// to control the visibility of the date pickers. The state management has been
+// hoisted from the screen to the ViewModel to resolve a bug where the pickers
+// would not appear on click. New functions have been added to manage this state.
+// FIX - The logic for setting the end date now adjusts the timestamp to the end
+// of the selected day (23:59:59). This ensures that the date range is inclusive
+// and correctly includes transactions from the selected end date.
 // =================================================================================
 package io.pm.finlight
 
@@ -24,14 +31,16 @@ data class SearchUiState(
     val keyword: String = "",
     val selectedAccount: Account? = null,
     val selectedCategory: Category? = null,
-    val selectedTag: Tag? = null, // --- NEW: Add selectedTag
+    val selectedTag: Tag? = null,
     val transactionType: String = "All", // "All", "Income", "Expense"
     val startDate: Long? = null,
     val endDate: Long? = null,
     val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
-    val tags: List<Tag> = emptyList(), // --- NEW: Add list of all tags
+    val tags: List<Tag> = emptyList(),
     val hasSearched: Boolean = false,
+    val showStartDatePicker: Boolean = false,
+    val showEndDatePicker: Boolean = false
 )
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -39,7 +48,7 @@ class SearchViewModel(
     private val transactionDao: TransactionDao,
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
-    private val tagDao: TagDao, // --- NEW: Add TagDao
+    private val tagDao: TagDao,
     private val initialCategoryId: Int?,
     private val initialDateMillis: Long?
 ) : ViewModel() {
@@ -51,28 +60,25 @@ class SearchViewModel(
         .flatMapLatest { state ->
             val filtersAreActive = state.selectedAccount != null ||
                     state.selectedCategory != null ||
-                    state.selectedTag != null || // --- UPDATED: Check for selected tag
+                    state.selectedTag != null ||
                     state.transactionType != "All" ||
                     state.startDate != null ||
                     state.endDate != null
 
             val shouldSearch = state.keyword.isNotBlank() || filtersAreActive
-            // We can update the `hasSearched` flag directly within the flow
             _uiState.update { it.copy(hasSearched = shouldSearch) }
 
             if (shouldSearch) {
-                // Call the new reactive DAO function
                 transactionDao.searchTransactions(
                     keyword = state.keyword,
                     accountId = state.selectedAccount?.id,
                     categoryId = state.selectedCategory?.id,
-                    tagId = state.selectedTag?.id, // --- UPDATED: Pass tagId
+                    tagId = state.selectedTag?.id,
                     transactionType = if (state.transactionType.equals("All", ignoreCase = true)) null else state.transactionType.lowercase(),
                     startDate = state.startDate,
                     endDate = state.endDate
                 )
             } else {
-                // If there are no search criteria, return a Flow with an empty list
                 flowOf(emptyList())
             }
         }
@@ -83,7 +89,6 @@ class SearchViewModel(
         )
 
     init {
-        // Load initial filter options (accounts, categories, and tags)
         viewModelScope.launch {
             accountDao.getAllAccounts().collect { accounts ->
                 _uiState.update { it.copy(accounts = accounts) }
@@ -100,14 +105,12 @@ class SearchViewModel(
                 }
             }
         }
-        // --- NEW: Load all tags ---
         viewModelScope.launch {
             tagDao.getAllTags().collect { tags ->
                 _uiState.update { it.copy(tags = tags) }
             }
         }
 
-        // Pre-select date range if an initial date was passed from another screen
         if (initialDateMillis != null && initialDateMillis != -1L) {
             val cal = Calendar.getInstance().apply { timeInMillis = initialDateMillis }
             cal.set(Calendar.HOUR_OF_DAY, 0)
@@ -120,7 +123,7 @@ class SearchViewModel(
             cal.set(Calendar.SECOND, 59)
             val end = cal.timeInMillis
 
-            onDateChange(start, end)
+            _uiState.update { it.copy(startDate = start, endDate = end) }
         }
     }
 
@@ -136,7 +139,6 @@ class SearchViewModel(
         _uiState.update { it.copy(selectedCategory = category) }
     }
 
-    // --- NEW: Function to handle tag selection ---
     fun onTagChange(tag: Tag?) {
         _uiState.update { it.copy(selectedTag = tag) }
     }
@@ -145,11 +147,37 @@ class SearchViewModel(
         _uiState.update { it.copy(transactionType = type ?: "All") }
     }
 
-    fun onDateChange(
-        start: Long? = _uiState.value.startDate,
-        end: Long? = _uiState.value.endDate,
-    ) {
-        _uiState.update { it.copy(startDate = start, endDate = end) }
+    fun onStartDateSelected(startDateMillis: Long?) {
+        _uiState.update { it.copy(startDate = startDateMillis) }
+    }
+
+    fun onEndDateSelected(endDateMillis: Long?) {
+        val adjustedEnd = endDateMillis?.let {
+            Calendar.getInstance().apply {
+                timeInMillis = it
+                set(Calendar.HOUR_OF_DAY, 23)
+                set(Calendar.MINUTE, 59)
+                set(Calendar.SECOND, 59)
+                set(Calendar.MILLISECOND, 999)
+            }.timeInMillis
+        }
+        _uiState.update { it.copy(endDate = adjustedEnd) }
+    }
+
+    fun onClearStartDate() {
+        _uiState.update { it.copy(startDate = null) }
+    }
+
+    fun onClearEndDate() {
+        _uiState.update { it.copy(endDate = null) }
+    }
+
+    fun onShowStartDatePicker(show: Boolean) {
+        _uiState.update { it.copy(showStartDatePicker = show) }
+    }
+
+    fun onShowEndDatePicker(show: Boolean) {
+        _uiState.update { it.copy(showEndDatePicker = show) }
     }
 
     fun clearFilters() {
@@ -157,7 +185,7 @@ class SearchViewModel(
             SearchUiState(
                 accounts = _uiState.value.accounts,
                 categories = _uiState.value.categories,
-                tags = _uiState.value.tags, // --- UPDATED: Preserve tags list on clear
+                tags = _uiState.value.tags,
             )
     }
 }

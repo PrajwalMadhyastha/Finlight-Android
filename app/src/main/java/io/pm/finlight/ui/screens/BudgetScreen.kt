@@ -72,7 +72,7 @@ fun BudgetScreen(
     var budgetToDelete by remember { mutableStateOf<Budget?>(null) }
     var showOverallBudgetDialog by remember { mutableStateOf(false) }
 
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     LazyColumn(
@@ -354,7 +354,7 @@ fun EditOverallBudgetDialog(
     onConfirm: (String) -> Unit
 ) {
     var budgetInput by remember { mutableStateOf(if (currentBudget > 0) "%.0f".format(currentBudget) else "") }
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     AlertDialog(

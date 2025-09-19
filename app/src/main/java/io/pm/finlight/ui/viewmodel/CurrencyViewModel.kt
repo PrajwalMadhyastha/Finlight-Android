@@ -10,6 +10,8 @@
 // currently active one before exposing the list to the UI. This ensures the
 // "Travel History" section only shows completed or future trips, not the one
 // currently being managed.
+// FIX - The instantiation of TransactionRepository has been updated to include
+// the required dependencies, resolving a build error.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -32,7 +34,7 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
     private val db = AppDatabase.getInstance(application)
     private val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
     private val tripRepository = TripRepository(db.tripDao())
-    private val transactionRepository = TransactionRepository(db.transactionDao())
+    private val transactionRepository: TransactionRepository
     private val mutex = Mutex()
 
 
@@ -82,6 +84,10 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    init {
+        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
+    }
 
 
     fun loadTripForEditing(tripId: Int) {
