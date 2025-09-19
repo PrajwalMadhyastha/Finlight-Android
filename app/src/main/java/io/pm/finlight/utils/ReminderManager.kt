@@ -4,6 +4,11 @@
 // manager now schedules a daily background task to create a compressed JSON
 // backup of the database, which is included in Android's Auto Backup. This is
 // also added to the rescheduleAllWork function to ensure it persists after reboots.
+// FIX - The scheduling logic for the weekly summary has been made more robust.
+// It no longer relies on a simple `set(DAY_OF_WEEK)`, which can be ambiguous
+// depending on locale. Instead, it now iterates day-by-day to find the next
+// correct instance of the target day, ensuring notifications are triggered
+// on the correct day of the week.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -51,7 +56,7 @@ object ReminderManager {
 
         scheduleRecurringTransactionWorker(context)
         scheduleRecurringPatternWorker(context)
-        scheduleSnapshotWorker(context) // --- NEW: Schedule snapshot on reboot ---
+        scheduleSnapshotWorker(context)
     }
 
     fun scheduleSnapshotWorker(context: Context) {
@@ -199,15 +204,22 @@ object ReminderManager {
 
         val now = Calendar.getInstance()
         val nextRun = Calendar.getInstance().apply {
-            set(Calendar.DAY_OF_WEEK, dayOfWeek)
             set(Calendar.HOUR_OF_DAY, hour)
             set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
         }
 
-        if (nextRun.before(now)) {
-            nextRun.add(Calendar.WEEK_OF_YEAR, 1)
+        // If today is the target day but the time has already passed, start checking from tomorrow
+        if (nextRun.get(Calendar.DAY_OF_WEEK) == dayOfWeek && nextRun.before(now)) {
+            nextRun.add(Calendar.DAY_OF_YEAR, 1)
         }
+
+        // Loop until we find the next occurrence of the target day of the week
+        while (nextRun.get(Calendar.DAY_OF_WEEK) != dayOfWeek) {
+            nextRun.add(Calendar.DAY_OF_YEAR, 1)
+        }
+
 
         val initialDelay = nextRun.timeInMillis - now.timeInMillis
         val weeklyReportRequest = OneTimeWorkRequestBuilder<WeeklySummaryWorker>()

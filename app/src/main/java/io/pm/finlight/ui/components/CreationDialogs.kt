@@ -56,7 +56,7 @@ fun CreateAccountDialog(
     var name by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("") }
 
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     AlertDialog(
@@ -100,7 +100,7 @@ fun CreateCategoryDialog(
     val allIcons = remember { CategoryIconHelper.getAllIcons().entries.toList() }
     val allColors = remember { CategoryIconHelper.getAllIconColors().entries.toList() }
 
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     AlertDialog(

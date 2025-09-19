@@ -6,6 +6,8 @@
 // `uiEvent` channel, preventing silent failures.
 // FIX - The unused `getCategoryById` function has been removed to resolve the
 // "UnusedSymbol" warning.
+// FIX - The instantiation of TransactionRepository has been updated to include
+// the required dependencies, resolving a build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -31,9 +33,11 @@ class CategoryViewModel(application: Application) : AndroidViewModel(application
 
     init {
         val db = AppDatabase.getInstance(application)
+        val settingsRepository = SettingsRepository(application)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
         categoryDao = db.categoryDao() // Initialize DAO
         categoryRepository = CategoryRepository(categoryDao)
-        transactionRepository = TransactionRepository(db.transactionDao())
+        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
         allCategories = categoryRepository.allCategories
     }
 

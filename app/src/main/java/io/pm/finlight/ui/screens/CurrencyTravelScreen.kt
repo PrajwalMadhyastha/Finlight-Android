@@ -21,6 +21,9 @@
 // an active trip or to create a new one), resolving the bug where the user
 // could not initiate a new trip. The "Create New Trip" button has been removed
 // in favor of this persistent form.
+// FIX (Theming) - All AlertDialogs and DatePickerDialogs on this screen now
+// correctly derive their background color from the app's MaterialTheme, ensuring
+// text is always legible in both light and dark modes.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -133,6 +136,9 @@ fun CurrencyTravelScreen(
             startDate != null &&
             endDate != null &&
             (tripType == TripType.DOMESTIC || (selectedCurrency != null && (conversionRate.toFloatOrNull() ?: 0f) > 0f))
+
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     Scaffold(
         topBar = {
@@ -269,6 +275,7 @@ fun CurrencyTravelScreen(
     if (showCancelConfirmation) {
         AlertDialog(
             onDismissRequest = { showCancelConfirmation = false },
+            containerColor = popupContainerColor,
             title = { Text("Cancel Trip?") },
             text = { Text("This will untag all transactions for this specific trip instance. The trip will be removed from your history. This cannot be undone.") },
             confirmButton = {
@@ -291,6 +298,7 @@ fun CurrencyTravelScreen(
     if (tripToDelete != null) {
         AlertDialog(
             onDismissRequest = { tripToDelete = null },
+            containerColor = popupContainerColor,
             title = { Text("Delete Trip?") },
             text = { Text("Are you sure you want to delete '${tripToDelete?.tripName}'? This will untag ${tripToDelete?.transactionCount} transaction(s). This action cannot be undone.") },
             confirmButton = {
@@ -344,7 +352,8 @@ fun CurrencyTravelScreen(
                     showStartDatePicker = false
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") } },
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
         ) { DatePicker(state = datePickerState) }
     }
     if (showEndDatePicker) {
@@ -364,7 +373,8 @@ fun CurrencyTravelScreen(
                     showEndDatePicker = false
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showEndDatePicker = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { showEndDatePicker = false }) { Text("Cancel") } },
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
         ) { DatePicker(state = datePickerState) }
     }
 }
@@ -503,7 +513,7 @@ private fun CurrencyPickerDialog(
     onDismiss: () -> Unit,
     onCurrencySelected: (CurrencyInfo) -> Unit
 ) {
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     AlertDialog(

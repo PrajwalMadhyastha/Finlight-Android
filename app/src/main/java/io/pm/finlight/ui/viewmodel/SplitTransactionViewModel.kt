@@ -1,9 +1,11 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/SplitTransactionViewModel.kt
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SplitTransactionViewModel.kt
 // REASON: FEATURE (Travel Mode Splitting) - The ViewModel's initialization
 // logic now checks if the parent transaction has a foreign currency amount. If
 // so, it uses that as the total for splitting and populates the initial split
 // item with the foreign amount, preparing the UI for foreign currency input.
+// FIX - The instantiation of TransactionRepository has been updated to include
+// the required dependencies, resolving a build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -52,7 +54,7 @@ class SplitTransactionViewModel(
 ) : ViewModel() {
 
     private val db = AppDatabase.getInstance(application)
-    private val transactionRepository = TransactionRepository(db.transactionDao())
+    private val transactionRepository: TransactionRepository
     val categoryRepository = CategoryRepository(db.categoryDao())
     private val splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
 
@@ -63,6 +65,10 @@ class SplitTransactionViewModel(
     private var nextTempId = -1 // For unique keys for new items
 
     init {
+        val settingsRepository = SettingsRepository(application)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
+
         viewModelScope.launch {
             val parentTxn = transactionRepository.getTransactionById(transactionId).firstOrNull()
             if (parentTxn != null) {

@@ -15,21 +15,22 @@ internal val CATEGORY_KEYWORD_MAP: Map<String, List<String>> = mapOf(
     "Bills" to listOf(
         "bill", "electricity", "water", "gas", "mobile", "phone", "internet", "subscription",
         "postpaid", "broadband", "dth", "recharge", "bescom", "bwssb", "jiofiber", "airtel", "act",
-        "airtel xstream", "act fibernet", "vi postpaid", "bsnl", "statement due", "credit card bill"
+        "airtel xstream", "act fibernet", "vi postpaid", "bsnl", "statement", "credit card"
     ),
     "EMI" to listOf("emi", "loan", "installment", "finance", "bajaj finserv", "hdfc fin", "idfc first"),
     "Entertainment" to listOf(
         "movie", "cinema", "tickets", "pvr", "inox", "bookmyshow", "netflix", "prime video",
-        "hotstar", "disney", "spotify", "wynk", "jiosaavn", "gaana", "concert", "theatre", "youtube"
+        "hotstar", "disney", "spotify", "wynk", "jiosaavn", "gaana", "concert", "theatre", "youtube", "prime"
     ),
     "Food & Drinks" to listOf(
         "food", "restaurant", "cafe", "swiggy", "zomato", "eats", "kitchen", "dining", "pizza",
         "burger", "thindi", "khana", "hotel", "sagar", "bhavan", "udupi", "andhra", "domino's",
         "pizza", "mcdonald's", "kfc", "box8", "biryani", "dosa", "juice", "coffee",
-        "starbucks", "cafe coffee day", "barista", "chai", "bakery", "sweets", "eatsure"
+        "starbucks", "cafe coffee day", "barista", "chai", "bakery", "sweets", "eatsure", "donald",
+        "domino", "truffles", "kanavali", "dakshin"
     ),
     "Fuel" to listOf(
-        "fuel", "petrol", "diesel", "gas station", "shell", "bp", "hpcl", "iocl", "indian oil",
+        "fuel", "petrol", "diesel", "gas station", "shell", "bp", "hpcl", "iocl", "indian",
         "bharat petroleum"
     ),
     "Groceries" to listOf(
@@ -49,7 +50,8 @@ internal val CATEGORY_KEYWORD_MAP: Map<String, List<String>> = mapOf(
     "Shopping" to listOf(
         "shopping", "amazon", "flipkart", "myntra", "ajio", "nykaa", "lifestyle", "shoppers stop",
         "westside", "croma", "reliance digital", "clothes", "electronics", "zara", "h&m",
-        "pantaloons", "max fashion", "meesho", "tatacliq", "decathlon", "ikea", "trends footwear"
+        "pantaloons", "max fashion", "meesho", "tatacliq", "decathlon", "ikea", "trends",
+        "footware"
     ),
     "Transfer" to listOf(
         "transfer", "neft", "imps", "rtgs", "sent to", "received from", "credited by", "debited to"
@@ -57,7 +59,7 @@ internal val CATEGORY_KEYWORD_MAP: Map<String, List<String>> = mapOf(
     "Travel" to listOf(
         "travel", "flight", "hotel", "train", "bus", "irctc", "ola", "uber", "makemytrip",
         "goibibo", "redbus", "indigo", "vistara", "airindia", "spicejet", "ride", "drive",
-        "metro", "bmtc", "local train", "cleartrip", "yatra"
+        "metro", "bmtc", "local train", "cleartrip", "yatra", "namma"
     ),
     "Salary" to listOf("salary", "payroll", "wages"),
     "Refund" to listOf("refund", "reversal"),

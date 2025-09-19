@@ -8,11 +8,10 @@
 // FEATURE - Added new routes and composables for the "Spending Analysis" and
 // "Analysis Details" screens, integrating the new feature into the app's
 // navigation graph.
-// FIX (Navigation) - The onClick handlers for the bottom navigation bar and the
-// profile icon in the top app bar have been corrected. They now properly use
-// the popUpTo builder to clear the back stack when navigating between top-level
-// destinations. This ensures that pressing the back button on a main screen (like
-// Dashboard) will correctly exit the app instead of navigating to a previous screen.
+// FIX (Navigation) - The entire top-level navigation logic has been rewritten
+// to correctly handle the back stack. Navigating between bottom bar items now
+// correctly returns to the Dashboard on back press. Navigating to and from the
+// Profile screen now behaves as expected, returning to the previous screen.
 // =================================================================================
 package io.pm.finlight
 
@@ -261,7 +260,8 @@ fun MainAppScreen() {
     val bottomNavItems = listOf(
         BottomNavItem.Dashboard,
         BottomNavItem.Transactions,
-        BottomNavItem.Reports
+        BottomNavItem.Reports,
+        BottomNavItem.Profile
     )
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -295,12 +295,11 @@ fun MainAppScreen() {
         "analysis_detail_screen"
     )
 
-    val currentTitle = if (showBottomBar) {
-        "Hi, $userName!"
-    } else {
-        screenTitles[currentRoute] ?: screenTitles[baseCurrentRoute] ?: "Finance App"
+    val currentTitle = when {
+        baseCurrentRoute == BottomNavItem.Profile.route -> "Profile"
+        showBottomBar -> "Hi, $userName!"
+        else -> screenTitles[currentRoute] ?: screenTitles[baseCurrentRoute] ?: "Finance App"
     }
-    val showProfileIcon = showBottomBar
 
     val fabRoutes = setOf(
         "account_list",
@@ -356,26 +355,10 @@ fun MainAppScreen() {
                     TopAppBar(
                         title = { Text(currentTitle) },
                         navigationIcon = {
-                            if (showProfileIcon) {
-                                AsyncImage(
-                                    model = profilePictureUri ?: R.mipmap.ic_launcher,
-                                    contentDescription = "User Profile Picture",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .padding(start = 16.dp)
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .clickable {
-                                            // --- FIX: Use proper back stack clearing logic for Profile navigation ---
-                                            navController.navigate(BottomNavItem.Profile.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) {
-                                                    saveState = true
-                                                }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        }
-                                )
+                            if (baseCurrentRoute == BottomNavItem.Profile.route) {
+                                IconButton(onClick = { navController.popBackStack() }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                                }
                             } else if (!showBottomBar) {
                                 IconButton(onClick = { navController.popBackStack() }) {
                                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -383,6 +366,18 @@ fun MainAppScreen() {
                             }
                         },
                         actions = {
+                            if (showBottomBar && baseCurrentRoute != BottomNavItem.Profile.route) {
+                                AsyncImage(
+                                    model = profilePictureUri ?: R.mipmap.ic_launcher,
+                                    contentDescription = "User Profile Picture",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .padding(end = 16.dp)
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .clickable { navController.navigate(BottomNavItem.Profile.route) }
+                                )
+                            }
                             when (baseCurrentRoute) {
                                 BottomNavItem.Dashboard.route -> {
                                     IconButton(onClick = { settingsViewModel.setPrivacyModeEnabled(!isPrivacyModeEnabled) }) {
@@ -451,18 +446,12 @@ fun MainAppScreen() {
                                 label = { Text(screen.label) },
                                 selected = isSelected,
                                 onClick = {
-                                    // --- FIX: The correct navigation logic for bottom bar items ---
                                     navController.navigate(screen.route) {
-                                        // Pop up to the start destination of the graph to
-                                        // avoid building up a large stack of destinations
-                                        // on the back stack as users select items
-                                        popUpTo(navController.graph.findStartDestination().id) {
+                                        popUpTo(BottomNavItem.Dashboard.route) {
                                             saveState = true
+                                            inclusive = screen.route == BottomNavItem.Dashboard.route
                                         }
-                                        // Avoid multiple copies of the same destination when
-                                        // re-selecting the same item
                                         launchSingleTop = true
-                                        // Restore state when re-selecting a previously selected item
                                         restoreState = true
                                     }
                                 }

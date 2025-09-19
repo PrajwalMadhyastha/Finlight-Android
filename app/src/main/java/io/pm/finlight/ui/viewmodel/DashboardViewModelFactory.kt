@@ -3,6 +3,9 @@
 // REASON: REFACTOR - The factory now passes the full AppDatabase instance to the
 // AccountRepository. This is required to support the new transactional account
 // merging logic.
+// FIX (Race Condition) - The factory now also passes the SettingsRepository and
+// TagRepository to the TransactionRepository. This is required for the new
+// centralized, atomic travel mode tagging logic.
 // =================================================================================
 package io.pm.finlight
 
@@ -18,9 +21,10 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
-            val transactionRepository = TransactionRepository(db.transactionDao())
-            val accountRepository = AccountRepository(db) // --- UPDATED ---
             val settingsRepository = SettingsRepository(application)
+            val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
+            val accountRepository = AccountRepository(db)
 
             @Suppress("UNCHECKED_CAST")
             return DashboardViewModel(

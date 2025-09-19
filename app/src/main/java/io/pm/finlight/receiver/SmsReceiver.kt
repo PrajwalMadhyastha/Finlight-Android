@@ -4,6 +4,10 @@
 // new `AccountAliasDao`. If a parsed account name matches a known alias, the
 // transaction is automatically assigned to the correct, previously merged
 // destination account instead of creating a new duplicate.
+// FIX (Race Condition) - The `saveTransaction` method has been simplified. It no
+// longer contains any Travel Mode logic. It now relies completely on the
+// centralized logic within the TransactionRepository to handle tagging, which
+// eliminates the race condition.
 // =================================================================================
 package io.pm.finlight
 
@@ -159,24 +163,22 @@ class SmsReceiver : BroadcastReceiver() {
     ) {
         val db = AppDatabase.getInstance(context)
         val accountDao = db.accountDao()
-        val accountAliasDao = db.accountAliasDao() // --- NEW: Get the alias DAO
+        val accountAliasDao = db.accountAliasDao()
         val transactionDao = db.transactionDao()
-        val tagRepository = TagRepository(db.tagDao(), transactionDao)
         val settingsRepository = SettingsRepository(context)
-        val transactionRepository = TransactionRepository(transactionDao)
+        val tagRepository = TagRepository(db.tagDao(), transactionDao)
+        val transactionRepository = TransactionRepository(transactionDao, settingsRepository, tagRepository)
+
 
         val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
         val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
-        // --- NEW: Account Alias Logic ---
         var finalAccountId: Int? = null
         val alias = accountAliasDao.findByAlias(accountName)
         if (alias != null) {
-            // An alias was found, use the destination account ID.
             finalAccountId = alias.destinationAccountId
             Log.d(tag, "Found account alias for '$accountName'. Mapping to account ID: $finalAccountId")
         } else {
-            // No alias found, proceed with the normal find-or-create logic.
             var account = accountDao.findByName(accountName)
             if (account == null) {
                 val newAccount = Account(name = accountName, type = accountType)
@@ -185,20 +187,8 @@ class SmsReceiver : BroadcastReceiver() {
             }
             finalAccountId = account?.id
         }
-        // --- End of new logic ---
 
         if (finalAccountId != null) {
-            val currentTravelSettings = settingsRepository.getTravelModeSettings().first()
-            val isTravelModeActive = currentTravelSettings?.isEnabled == true &&
-                    potentialTxn.date >= currentTravelSettings.startDate &&
-                    potentialTxn.date <= currentTravelSettings.endDate
-
-            val tagsToSave = mutableSetOf<Tag>()
-            if (isTravelModeActive) {
-                val tripTag = tagRepository.findOrCreateTag(currentTravelSettings!!.tripName)
-                tagsToSave.add(tripTag)
-            }
-
             val conversionRate = travelSettings?.conversionRate?.toDouble() ?: 1.0
             val transactionToSave = if (isForeign && travelSettings != null) {
                 Transaction(
@@ -209,7 +199,7 @@ class SmsReceiver : BroadcastReceiver() {
                     currencyCode = travelSettings.currencyCode,
                     conversionRate = conversionRate,
                     date = potentialTxn.date,
-                    accountId = finalAccountId, // --- UPDATED: Use the final ID ---
+                    accountId = finalAccountId,
                     categoryId = potentialTxn.categoryId,
                     notes = "",
                     transactionType = potentialTxn.transactionType,
@@ -224,7 +214,7 @@ class SmsReceiver : BroadcastReceiver() {
                     originalDescription = potentialTxn.merchantName,
                     amount = potentialTxn.amount,
                     date = potentialTxn.date,
-                    accountId = finalAccountId, // --- UPDATED: Use the final ID ---
+                    accountId = finalAccountId,
                     categoryId = potentialTxn.categoryId,
                     notes = "",
                     transactionType = potentialTxn.transactionType,
@@ -235,7 +225,8 @@ class SmsReceiver : BroadcastReceiver() {
                 )
             }
 
-            val newTransactionId = transactionRepository.insertTransactionWithTags(transactionToSave, tagsToSave)
+            // The repository will now handle travel tagging automatically.
+            val newTransactionId = transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
 
             if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED &&
                 settingsRepository.isAutoCaptureNotificationEnabledBlocking()) {

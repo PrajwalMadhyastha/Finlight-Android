@@ -3,6 +3,8 @@
 // REASON: NEW FILE - This ViewModel powers the new Trip Detail screen. It takes a
 // tripId and tagId, and fetches the specific trip's stats and its associated
 // list of transactions from their respective repositories.
+// FIX - The instantiation of TransactionRepository has been updated to include
+// the required dependencies, resolving a build error.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -11,6 +13,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.SettingsRepository
+import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
@@ -48,8 +52,10 @@ class TripDetailViewModel(
 
     init {
         val db = AppDatabase.getInstance(application)
+        val settingsRepository = SettingsRepository(application)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
         tripRepository = TripRepository(db.tripDao())
-        transactionRepository = TransactionRepository(db.transactionDao())
+        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
 
         tripDetails = tripRepository.getTripWithStatsById(tripId)
             .stateIn(

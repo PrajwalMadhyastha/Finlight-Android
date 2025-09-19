@@ -60,10 +60,9 @@ class DashboardViewModelTest {
         Dispatchers.setMain(testDispatcher)
 
         // --- FIX: Set up default mock behaviors BEFORE ViewModel initialization ---
-        // These are required for the ViewModel's init block to succeed.
-        // Individual tests can override these with more specific `when` clauses.
         Mockito.`when`(settingsRepository.getUserName()).thenReturn(flowOf("User"))
         Mockito.`when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(null))
+        Mockito.`when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
         Mockito.`when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(emptyList()))
         Mockito.`when`(settingsRepository.getDashboardVisibleCards()).thenReturn(flowOf(emptySet()))
         Mockito.`when`(
@@ -72,6 +71,10 @@ class DashboardViewModelTest {
                 Mockito.anyLong()
             )
         ).thenReturn(flowOf(FinancialSummary(0.0, 0.0)))
+        // --- FIX: Added mock for the new dependency, wrapped in runTest ---
+        runTest {
+            Mockito.`when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(0.0)
+        }
         Mockito.`when`(
             settingsRepository.getOverallBudgetForMonth(
                 Mockito.anyInt(),
@@ -211,6 +214,9 @@ class DashboardViewModelTest {
                 Mockito.anyLong()
             )
         ).thenReturn(flowOf(FinancialSummary(0.0, 1200.0)))
+        // --- FIX: Mock the new dependency for spending velocity ---
+        Mockito.`when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(200.0)
+
 
         // ACT
         viewModel = DashboardViewModel(
@@ -219,27 +225,28 @@ class DashboardViewModelTest {
             budgetDao,
             settingsRepository
         )
-        viewModel.refreshBudgetSummary() // Trigger a new phrase selection
+        viewModel.refreshBudgetSummary()
         advanceUntilIdle()
 
-        // ASSERT
+        // --- FIX: Assert against the correct, new list of possible messages ---
         val possibleMessages = listOf(
-            "You've gone over for ${viewModel.monthYear}.",
-            "Let's get back on track next month.",
-            "Budget exceeded for the month.",
-            "Whoops! Over budget this month.",
-            "Time to pump the brakes!",
-            "Too much spent this time.",
-            "${viewModel.monthYear} went over.",
-            "Budget says 'ouch!' for ${viewModel.monthYear}.",
-            "Time to tighten things up.",
-            "This month went off-budget!"
+            "Pacing a bit high for this month.",
+            "Time to ease up on spending.",
+            "Still trending over budget.",
+            "Let's try to slow things down.",
+            "Watch the spending for a bit.",
+            "Heads up: pacing is still high.",
+            "A bit too fast for this month.",
+            "Let's pump the brakes slightly.",
+            "Budget is feeling the pressure.",
+            "Trending to overspend."
         )
         Assert.assertTrue(
             "Summary message should be one of the 'over budget' phrases.",
             viewModel.budgetHealthSummary.first() in possibleMessages
         )
     }
+
 
     @Test
     fun `updateCardOrder calls settingsRepository to save layout`() = runTest {

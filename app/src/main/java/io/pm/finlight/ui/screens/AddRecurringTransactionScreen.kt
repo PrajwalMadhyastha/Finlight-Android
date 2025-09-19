@@ -3,12 +3,14 @@
 // REASON: FEATURE - The screen now supports both "add" and "edit" modes. It
 // accepts an optional ruleId, loads the existing rule's data if provided,
 // and calls the appropriate ViewModel function (insert or update) upon saving.
+// FIX - The theme detection logic for the ExposedDropdownMenu has been corrected
+// to check the background color instead of the transparent surface color. This
+// ensures the dropdown's background has the correct contrast in all themes.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -34,6 +36,8 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+
+private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,6 +66,10 @@ fun AddRecurringTransactionScreen(
     val categories by transactionViewModel.allCategories.collectAsState(initial = emptyList())
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
     var categoryExpanded by remember { mutableStateOf(false) }
+
+    // --- NEW: Correct theme detection ---
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     val ruleToEdit by if (isEditMode) {
         recurringViewModel.getRuleById(ruleId!!).collectAsState(initial = null)
@@ -151,7 +159,7 @@ fun AddRecurringTransactionScreen(
                             ExposedDropdownMenu(
                                 expanded = intervalExpanded,
                                 onDismissRequest = { intervalExpanded = false },
-                                modifier = Modifier.background(if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight)
+                                modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
                             ) {
                                 recurrenceIntervals.forEach { interval ->
                                     DropdownMenuItem(text = { Text(interval) }, onClick = {
@@ -177,7 +185,7 @@ fun AddRecurringTransactionScreen(
                             ExposedDropdownMenu(
                                 expanded = accountExpanded,
                                 onDismissRequest = { accountExpanded = false },
-                                modifier = Modifier.background(if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight)
+                                modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
                             ) {
                                 accounts.forEach { account ->
                                     DropdownMenuItem(text = { Text(account.name) }, onClick = {
@@ -203,7 +211,7 @@ fun AddRecurringTransactionScreen(
                             ExposedDropdownMenu(
                                 expanded = categoryExpanded,
                                 onDismissRequest = { categoryExpanded = false },
-                                modifier = Modifier.background(if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight)
+                                modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
                             ) {
                                 categories.forEach { category ->
                                     DropdownMenuItem(text = { Text(category.name) }, onClick = {
@@ -261,7 +269,7 @@ private fun TransactionTypeToggle(
     selectedType: String,
     onTypeSelected: (String) -> Unit
 ) {
-    val glassFillColor = if (isSystemInDarkTheme()) {
+    val glassFillColor = if (MaterialTheme.colorScheme.background.isDark()) {
         Color.White.copy(alpha = 0.08f)
     } else {
         Color.Black.copy(alpha = 0.04f)

@@ -184,7 +184,7 @@ private fun EditTagDialog(
     onConfirm: (Tag) -> Unit
 ) {
     var tagName by remember(tag) { mutableStateOf(tag.name) }
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     AlertDialog(
@@ -219,7 +219,7 @@ private fun DeleteTagDialog(
     onDismiss: () -> Unit,
     onConfirm: (Tag) -> Unit
 ) {
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     AlertDialog(
