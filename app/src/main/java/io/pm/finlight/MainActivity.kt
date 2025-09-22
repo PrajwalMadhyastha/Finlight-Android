@@ -1,17 +1,14 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FEATURE - Updated the NavHost entry for "currency_travel_settings" to
-// accept an optional `tripId`. This allows the Travel History screen to navigate
-// to it in "edit mode".
-// REFACTOR: Removed the now-obsolete route for "travel_history_screen" as this
-// feature has been merged into the "currency_travel_settings" screen.
-// FEATURE - Added new routes and composables for the "Spending Analysis" and
-// "Analysis Details" screens, integrating the new feature into the app's
-// navigation graph.
-// FIX (Navigation) - The entire top-level navigation logic has been rewritten
-// to correctly handle the back stack. Navigating between bottom bar items now
-// correctly returns to the Dashboard on back press. Navigating to and from the
-// Profile screen now behaves as expected, returning to the previous screen.
+// REASON: FIX (Navigation) - The navigation logic for the bottom bar has been
+// corrected to remove the `inclusive = true` popUpTo condition when navigating
+// to the Dashboard. This prevents the back stack from being emptied, which was
+// causing the screen to flicker. The Dashboard is now correctly treated as the
+// non-inclusive root of the back stack for all tab navigations.
+// FIX (Navigation) - The onClick handler for the profile icon in the top app
+// bar now uses the same `popUpTo` logic as the bottom navigation bar. This
+// resolves an inconsistency where the back button behaved differently depending
+// on how the user navigated to the Profile screen.
 // =================================================================================
 package io.pm.finlight
 
@@ -375,7 +372,16 @@ fun MainAppScreen() {
                                         .padding(end = 16.dp)
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .clickable { navController.navigate(BottomNavItem.Profile.route) }
+                                        .clickable {
+                                            // --- FIX #2: Use consistent navigation logic for profile icon ---
+                                            navController.navigate(BottomNavItem.Profile.route) {
+                                                popUpTo(BottomNavItem.Dashboard.route) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
                                 )
                             }
                             when (baseCurrentRoute) {
@@ -449,7 +455,7 @@ fun MainAppScreen() {
                                     navController.navigate(screen.route) {
                                         popUpTo(BottomNavItem.Dashboard.route) {
                                             saveState = true
-                                            inclusive = screen.route == BottomNavItem.Dashboard.route
+                                            // --- FIX #1: Removed the inclusive = true logic ---
                                         }
                                         launchSingleTop = true
                                         restoreState = true
