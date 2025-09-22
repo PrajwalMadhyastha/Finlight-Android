@@ -11,6 +11,8 @@
 // effect is drawn before being clipped, making the smart guidance visible.
 // FIX - Replaced the unreliable .glow() modifier with a more robust implementation
 // using an animated border to ensure the guidance highlight always appears.
+// FEATURE - The description prompt now dynamically changes from "Paid to..." to
+// "Add a description" to further guide the user after an amount is entered.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -265,8 +267,10 @@ fun AddTransactionScreen(
                     onDescriptionClick = { activeSheet = ComposerSheet.Merchant },
                     isTravelMode = isTravelModeActive,
                     travelModeSettings = travelModeSettings,
-                    // --- NEW: Pass guidance state ---
-                    highlightDescription = hasInteracted && !isDescriptionEntered
+                    highlightDescription = hasInteracted && !isDescriptionEntered,
+                    // --- NEW: Pass state for dynamic text ---
+                    isDescriptionEntered = isDescriptionEntered,
+                    hasInteractedWithNumpad = hasInteracted
                 )
                 Spacer(Modifier.height(24.dp))
 
@@ -584,7 +588,9 @@ private fun AmountComposer(
     onDescriptionClick: () -> Unit,
     isTravelMode: Boolean,
     travelModeSettings: TravelModeSettings?,
-    highlightDescription: Boolean
+    highlightDescription: Boolean,
+    isDescriptionEntered: Boolean,
+    hasInteractedWithNumpad: Boolean
 ) {
     val currentTravelSettings = travelModeSettings
     val currencySymbol = if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
@@ -594,24 +600,29 @@ private fun AmountComposer(
     }
     val highlightColor = MaterialTheme.colorScheme.primary
 
-    // --- NEW: Animate the border color for a robust highlight effect ---
     val animatedBorderColor by animateColorAsState(
         targetValue = if (highlightDescription) highlightColor else Color.Transparent,
         animationSpec = tween(durationMillis = 300, easing = EaseOutCubic),
         label = "HighlightBorderAnimation"
     )
 
+    // --- NEW: Logic for dynamic description text ---
+    val descriptionText = when {
+        isDescriptionEntered -> description
+        hasInteractedWithNumpad -> "Add a description"
+        else -> "Paid to..."
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = description.ifBlank { "Paid to..." },
+            text = descriptionText,
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                // --- FIX: Use the new animated border modifier ---
                 .clip(RoundedCornerShape(12.dp))
                 .border(2.dp, animatedBorderColor, RoundedCornerShape(12.dp))
                 .clickable(onClick = onDescriptionClick)
