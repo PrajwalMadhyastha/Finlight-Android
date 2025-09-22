@@ -1,10 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FIX - The `LaunchedEffect` for CSV editing has been updated to
-// deserialize a `Map<String, String>` instead of a `List<String>`. It now
-// populates fields by looking up values by their column header key (e.g.,
-// "Amount", "Category"), making the logic robust and immune to column order.
-// This resolves the data mismatch bug.
+// REASON: FEATURE - Implemented the full "Smart Guidance" system. The screen
+// now features a dynamic checklist and contextual highlighting to guide the user
+// in filling out the mandatory amount and description fields. The save button's
+// logic is now tied to the new, smarter ViewModel flow, which attempts to
+// auto-categorize before prompting the user with the category picker as a fallback.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -40,6 +40,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -52,7 +53,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,7 +68,6 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
-import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -101,6 +100,12 @@ fun AddTransactionScreen(
     var notes by remember { mutableStateOf("") }
     var attachedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
+    // --- NEW: State for guidance system ---
+    var hasInteracted by remember { mutableStateOf(false) }
+    val isAmountEntered = amount.isNotBlank() && (amount.toDoubleOrNull() ?: 0.0) > 0.0
+    val isDescriptionEntered = description.isNotBlank()
+
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
@@ -114,6 +119,8 @@ fun AddTransactionScreen(
     val defaultAccount by viewModel.defaultAccount.collectAsState()
     val validationError by viewModel.validationError.collectAsState()
     val travelModeSettings by viewModel.travelModeSettings.collectAsState()
+    val categoryNudgeData by viewModel.showCategoryNudge.collectAsState()
+
 
     var selectedAccount by remember { mutableStateOf<Account?>(null) }
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
@@ -128,7 +135,8 @@ fun AddTransactionScreen(
     var showCreateAccountDialog by remember { mutableStateOf(false) }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
 
-    val isSaveEnabled = amount.isNotBlank() && description.isNotBlank() && selectedAccount != null && selectedCategory != null
+    // --- MODIFIED: Save is enabled with only Amount and Description ---
+    val isSaveEnabled = isAmountEntered && isDescriptionEntered
 
     var isDefaultAccountApplied by remember { mutableStateOf(false) }
     LaunchedEffect(defaultAccount) {
@@ -147,14 +155,11 @@ fun AddTransactionScreen(
         if (isCsvEdit && initialDataJson != null) {
             try {
                 val gson = Gson()
-                // --- UPDATED: Define a type token for a Map ---
                 val typeToken = object : TypeToken<Map<String, String>>() {}.type
-                // --- UPDATED: Deserialize into a Map ---
                 val initialDataMap: Map<String, String> = gson.fromJson(URLDecoder.decode(initialDataJson, "UTF-8"), typeToken)
 
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
-                // --- UPDATED: Access data by key, not by index ---
                 initialDataMap["Date"]?.let {
                     try {
                         selectedDateTime.time = dateFormat.parse(it) ?: Date()
@@ -174,6 +179,13 @@ fun AddTransactionScreen(
             } catch (e: Exception) {
                 Toast.makeText(context, "Error loading row data", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    // --- NEW: Effect to trigger the Category Nudge bottom sheet ---
+    LaunchedEffect(categoryNudgeData) {
+        if (categoryNudgeData != null) {
+            activeSheet = ComposerSheet.Category
         }
     }
 
@@ -234,7 +246,9 @@ fun AddTransactionScreen(
                     description = description,
                     onDescriptionClick = { activeSheet = ComposerSheet.Merchant },
                     isTravelMode = isTravelModeActive,
-                    travelModeSettings = travelModeSettings
+                    travelModeSettings = travelModeSettings,
+                    // --- NEW: Pass guidance state ---
+                    highlightDescription = hasInteracted && !isDescriptionEntered
                 )
                 Spacer(Modifier.height(24.dp))
 
@@ -263,25 +277,35 @@ fun AddTransactionScreen(
                     onAttachmentClick = { imagePickerLauncher.launch("image/*") }
                 )
 
+                // --- NEW: Guidance Checklist ---
+                AnimatedVisibility(
+                    visible = hasInteracted && !isSaveEnabled,
+                    enter = fadeIn(animationSpec = tween(200)),
+                    exit = fadeOut(animationSpec = tween(200))
+                ) {
+                    ValidationChecklist(
+                        isAmountEntered = isAmountEntered,
+                        isDescriptionEntered = isDescriptionEntered
+                    )
+                }
+
+
                 GlassmorphicNumpad(
-                    onDigitClick = { digit -> if (amount.length < 9) amount += digit },
+                    onDigitClick = { digit ->
+                        if (!hasInteracted) hasInteracted = true
+                        if (amount.length < 9) amount += digit
+                    },
                     onBackspaceClick = { if (amount.isNotEmpty()) amount = amount.dropLast(1) },
                     onConfirm = {
-                        scope.launch {
-                            val success = viewModel.addTransaction(
-                                description = description,
-                                categoryId = selectedCategory?.id,
-                                amountStr = amount,
-                                accountId = selectedAccount!!.id,
-                                notes = notes.takeIf { it.isNotBlank() },
-                                date = selectedDateTime.timeInMillis,
-                                transactionType = transactionType,
-                                imageUris = attachedImageUris
-                            )
-                            if (success) {
-                                navController.popBackStack()
-                            }
-                        }
+                        viewModel.onSaveTapped(
+                            description = description,
+                            amountStr = amount,
+                            accountId = selectedAccount?.id,
+                            notes = notes,
+                            date = selectedDateTime.timeInMillis,
+                            transactionType = transactionType,
+                            imageUris = attachedImageUris
+                        )
                     },
                     isConfirmEnabled = isSaveEnabled
                 )
@@ -295,7 +319,15 @@ fun AddTransactionScreen(
 
     if (activeSheet != null) {
         ModalBottomSheet(
-            onDismissRequest = { activeSheet = null },
+            onDismissRequest = {
+                // If this sheet was triggered by the nudge, complete the save flow on dismiss
+                if (categoryNudgeData != null) {
+                    viewModel.saveWithSelectedCategory(null) {
+                        navController.popBackStack()
+                    }
+                }
+                activeSheet = null
+            },
             sheetState = sheetState,
             windowInsets = WindowInsets(0),
             containerColor = popupContainerColor
@@ -323,6 +355,12 @@ fun AddTransactionScreen(
                             categories = categories,
                             onCategorySelected = {
                                 selectedCategory = it
+                                // If this sheet was triggered by the nudge, complete the save flow
+                                if (categoryNudgeData != null) {
+                                    viewModel.saveWithSelectedCategory(it.id) {
+                                        navController.popBackStack()
+                                    }
+                                }
                                 activeSheet = null
                             },
                             onAddNew = {
@@ -353,6 +391,7 @@ fun AddTransactionScreen(
                     initialDescription = description,
                     onPredictionSelected = { prediction ->
                         description = prediction.description
+                        if (!hasInteracted) hasInteracted = true
                         prediction.categoryId?.let { catId ->
                             selectedCategory = categories.find { it.id == catId }
                         }
@@ -360,6 +399,7 @@ fun AddTransactionScreen(
                     },
                     onManualSave = { newDescription ->
                         description = newDescription
+                        if (!hasInteracted) hasInteracted = true
                         activeSheet = null
                     },
                     onDismiss = { activeSheet = null }
@@ -433,10 +473,69 @@ fun AddTransactionScreen(
             onConfirm = { name, iconKey, colorKey ->
                 viewModel.createCategory(name, iconKey, colorKey) { newCategory ->
                     selectedCategory = newCategory
+                    // If this was triggered by the nudge, complete the save
+                    if (categoryNudgeData != null) {
+                        viewModel.saveWithSelectedCategory(newCategory.id) {
+                            navController.popBackStack()
+                        }
+                    }
                 }
                 showCreateCategoryDialog = false
             }
         )
+    }
+}
+
+// --- NEW: A modifier to draw a glowing highlight ---
+fun Modifier.glow(color: Color, isEnabled: Boolean) = this.drawBehind {
+    if (isEnabled) {
+        val paint = Paint()
+        val frameworkPaint = paint.asFrameworkPaint()
+        val spread = 6.dp.toPx()
+        frameworkPaint.color = color.toArgb()
+        frameworkPaint.setShadowLayer(
+            spread, 0f, 0f, color.copy(alpha = 0.5f).toArgb()
+        )
+        drawRoundRect(
+            color = Color.Transparent, // The color is from the shadow layer
+            size = size,
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx())
+        )
+    }
+}
+
+// --- NEW: Checklist composable ---
+@Composable
+private fun ValidationChecklist(
+    isAmountEntered: Boolean,
+    isDescriptionEntered: Boolean
+) {
+    GlassPanel {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ChecklistItem(label = "Enter an amount", isChecked = isAmountEntered)
+            ChecklistItem(label = "Add a description", isChecked = isDescriptionEntered)
+        }
+    }
+}
+
+@Composable
+private fun ChecklistItem(label: String, isChecked: Boolean) {
+    val color = if (isChecked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    val icon = if (isChecked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(text = label, color = color)
     }
 }
 
@@ -473,7 +572,8 @@ private fun AmountComposer(
     description: String,
     onDescriptionClick: () -> Unit,
     isTravelMode: Boolean,
-    travelModeSettings: TravelModeSettings?
+    travelModeSettings: TravelModeSettings?,
+    highlightDescription: Boolean
 ) {
     val currentTravelSettings = travelModeSettings
     val currencySymbol = if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
@@ -481,6 +581,7 @@ private fun AmountComposer(
     } else {
         "₹"
     }
+    val highlightColor = MaterialTheme.colorScheme.error
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -491,7 +592,11 @@ private fun AmountComposer(
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.clickable(onClick = onDescriptionClick)
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onDescriptionClick)
+                .glow(highlightColor, highlightDescription)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
         Spacer(Modifier.height(8.dp))
