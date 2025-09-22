@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FIX - The `onConfirm` lambda in the `GlassmorphicNumpad` now correctly
-// includes the `onSaveComplete` callback, passing the navigation action to the
-// ViewModel. This resolves the bug where the UI would not navigate away after a
-// successful auto-categorized save.
+// REASON: FEATURE - The screen now observes the new `suggestedCategory` StateFlow.
+// A LaunchedEffect updates the local `selectedCategory` state when a suggestion
+// is emitted. It also notifies the ViewModel when the user manually interacts
+// with the category picker to prevent their choice from being overwritten.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -122,6 +122,7 @@ fun AddTransactionScreen(
     val validationError by viewModel.validationError.collectAsState()
     val travelModeSettings by viewModel.travelModeSettings.collectAsState()
     val categoryNudgeData by viewModel.showCategoryNudge.collectAsState()
+    val suggestedCategory by viewModel.suggestedCategory.collectAsState()
 
 
     var selectedAccount by remember { mutableStateOf<Account?>(null) }
@@ -145,6 +146,13 @@ fun AddTransactionScreen(
         if (!isCsvEdit && !isDefaultAccountApplied && defaultAccount != null) {
             selectedAccount = defaultAccount
             isDefaultAccountApplied = true
+        }
+    }
+
+    // --- NEW: Effect to update the local category state when a suggestion is made ---
+    LaunchedEffect(suggestedCategory) {
+        suggestedCategory?.let {
+            selectedCategory = it
         }
     }
 
@@ -264,7 +272,10 @@ fun AddTransactionScreen(
                     selectedCategory = selectedCategory,
                     selectedAccount = selectedAccount,
                     selectedDateTime = selectedDateTime.time,
-                    onCategoryClick = { activeSheet = ComposerSheet.Category },
+                    onCategoryClick = {
+                        viewModel.onUserManuallySelectedCategory() // User is taking control
+                        activeSheet = ComposerSheet.Category
+                    },
                     onAccountClick = { activeSheet = ComposerSheet.Account },
                     onDateClick = { showDatePicker = true }
                 )
@@ -303,6 +314,7 @@ fun AddTransactionScreen(
                             description = description,
                             amountStr = amount,
                             accountId = selectedAccount?.id,
+                            categoryId = selectedCategory?.id, // Pass category ID
                             notes = notes,
                             date = selectedDateTime.timeInMillis,
                             transactionType = transactionType,
@@ -392,6 +404,10 @@ fun AddTransactionScreen(
                 is ComposerSheet.Merchant -> MerchantPredictionSheet(
                     viewModel = viewModel,
                     initialDescription = description,
+                    onQueryChanged = {
+                        description = it // Keep local state in sync
+                        viewModel.onAddTransactionDescriptionChanged(it)
+                    },
                     onPredictionSelected = { prediction ->
                         description = prediction.description
                         if (!hasInteracted) hasInteracted = true

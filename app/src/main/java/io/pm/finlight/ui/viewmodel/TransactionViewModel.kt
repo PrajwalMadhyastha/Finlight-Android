@@ -1,9 +1,14 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FIX - The `onSaveTapped` function now accepts an `onSaveComplete`
-// callback. When a transaction is successfully auto-categorized, this callback
-// is invoked to trigger navigation from the UI, fixing a bug where the user
-// was left on the "Add Transaction" screen after a successful save.
+// REASON: FEATURE - Implemented real-time auto-categorization. The ViewModel
+// now listens to description changes from the UI, debounces them, and emits
+// a category suggestion via a new `suggestedCategory` StateFlow.
+// REFACTOR - The `onSaveTapped` logic has been updated to work with the new
+// real-time flow. It now accepts the category ID directly from the UI state,
+// which is populated either by the new suggestion flow or by the user's manual
+// selection.
+// FIX - Resolved a type inference build error by explicitly typing the null-
+// emitting flow in the `suggestedCategory` stream to `Flow<Category?>`.
 // =================================================================================
 package io.pm.finlight
 
@@ -50,7 +55,6 @@ data class RetroUpdateSheetState(
     val isLoading: Boolean = true
 )
 
-// --- NEW: Data class to hold transaction data during the category nudge flow ---
 data class ManualTransactionData(
     val description: String,
     val amountStr: String,
@@ -156,9 +160,29 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
     private val _merchantSearchQuery = MutableStateFlow("")
     val merchantPredictions: StateFlow<List<MerchantPrediction>>
 
-    // --- NEW: StateFlow to trigger the category nudge ---
     private val _showCategoryNudge = MutableStateFlow<ManualTransactionData?>(null)
     val showCategoryNudge = _showCategoryNudge.asStateFlow()
+
+    // --- NEW: StateFlows for real-time auto-categorization ---
+    private val _addTransactionDescription = MutableStateFlow("")
+    private val _userManuallySelectedCategory = MutableStateFlow(false)
+
+    val suggestedCategory: StateFlow<Category?> = _addTransactionDescription
+        .debounce(400) // Wait for the user to stop typing
+        .combine(_userManuallySelectedCategory) { description, manualSelect ->
+            description to manualSelect
+        }
+        .flatMapLatest { (description, manualSelect) ->
+            if (description.length > 2 && !manualSelect) {
+                flow {
+                    val allCategoriesList = allCategories.first()
+                    emit(HeuristicCategorizer.findCategoryForDescription(description, allCategoriesList))
+                }
+            } else {
+                flowOf<Category?>(null) // --- FIX: Explicitly type the null flow ---
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
 
     init {
@@ -486,12 +510,26 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    // --- NEW: Public functions for real-time UI interaction ---
+    fun onAddTransactionDescriptionChanged(description: String) {
+        _addTransactionDescription.value = description
+        // If user clears description, allow auto-suggestion again and reset manual flag
+        if (description.isBlank()) {
+            _userManuallySelectedCategory.value = false
+        }
+    }
+
+    fun onUserManuallySelectedCategory() {
+        _userManuallySelectedCategory.value = true
+    }
+
     // --- UPDATED: Smart Add Transaction Logic ---
 
     fun onSaveTapped(
         description: String,
         amountStr: String,
         accountId: Int?,
+        categoryId: Int?, // Accept category ID from UI state
         notes: String?,
         date: Long,
         transactionType: String,
@@ -514,9 +552,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 return@launch
             }
 
-            val allCategories = allCategories.first()
-            val suggestedCategory = HeuristicCategorizer.findCategoryForDescription(description, allCategories)
-
             val transactionData = ManualTransactionData(
                 description = description,
                 amountStr = amountStr,
@@ -528,14 +563,14 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 tags = _selectedTags.value
             )
 
-            if (suggestedCategory != null) {
-                // Magic Path: Auto-categorized, save immediately
-                val success = saveManualTransaction(transactionData, suggestedCategory.id)
+            if (categoryId != null) {
+                // Magic Path: Auto-categorized (or manually selected), save immediately
+                val success = saveManualTransaction(transactionData, categoryId)
                 if (success) {
                     onSaveComplete()
                 }
             } else {
-                // Guided Path: No match found, trigger the nudge
+                // Guided Path: No category found, trigger the nudge
                 _showCategoryNudge.value = transactionData
             }
         }
@@ -625,6 +660,9 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     fun clearAddTransactionState() {
         _selectedTags.value = emptySet()
+        // --- NEW: Reset real-time suggestion state ---
+        _addTransactionDescription.value = ""
+        _userManuallySelectedCategory.value = false
     }
 
     private fun loadOriginalSms(sourceSmsId: Long?) {
