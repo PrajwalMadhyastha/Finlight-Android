@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/NotificationHelper.kt
-// REASON: REVERT - The `getBackupNotificationBuilder` has been removed. A simple
-// `showAutoBackupNotification` function has been re-added to show a completion
-// notification, as the backup worker will no longer run as a foreground service.
+// REASON: REFACTOR - The expanded notification view has been redesigned. It now
+// prominently displays the amount and merchant as the main title.
+// FEATURE - A random, colorful emoji is now appended to the "visit count" line
+// for a more personalized and dynamic feel.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -43,7 +44,11 @@ object NotificationHelper {
 
 
     fun showAutoBackupNotification(context: Context) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             return
         }
 
@@ -65,7 +70,11 @@ object NotificationHelper {
         potentialTxn: PotentialTransaction,
         travelSettings: TravelModeSettings
     ) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             return
         }
 
@@ -76,22 +85,34 @@ object NotificationHelper {
 
         val foreignTxn = potentialTxn.copy(isForeignCurrency = true)
         val foreignJson = URLEncoder.encode(Gson().toJson(foreignTxn), "UTF-8")
-        val foreignIntent = Intent(Intent.ACTION_VIEW, "$DEEP_LINK_URI_APPROVE?potentialTxnJson=$foreignJson".toUri()).apply {
+        val foreignIntent = Intent(
+            Intent.ACTION_VIEW,
+            "$DEEP_LINK_URI_APPROVE?potentialTxnJson=$foreignJson".toUri()
+        ).apply {
             `package` = context.packageName
         }
         val foreignPendingIntent: PendingIntent? = TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(foreignIntent)
-            getPendingIntent(potentialTxn.sourceSmsId.toInt() + 1, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            getPendingIntent(
+                potentialTxn.sourceSmsId.toInt() + 1,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
         val homeTxn = potentialTxn.copy(isForeignCurrency = false)
         val homeJson = URLEncoder.encode(Gson().toJson(homeTxn), "UTF-8")
-        val homeIntent = Intent(Intent.ACTION_VIEW, "$DEEP_LINK_URI_APPROVE?potentialTxnJson=$homeJson".toUri()).apply {
+        val homeIntent = Intent(
+            Intent.ACTION_VIEW,
+            "$DEEP_LINK_URI_APPROVE?potentialTxnJson=$homeJson".toUri()
+        ).apply {
             `package` = context.packageName
         }
         val homePendingIntent: PendingIntent? = TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(homeIntent)
-            getPendingIntent(potentialTxn.sourceSmsId.toInt() + 2, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            getPendingIntent(
+                potentialTxn.sourceSmsId.toInt() + 2,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
         val builder = NotificationCompat.Builder(context, MainApplication.TRANSACTION_CHANNEL_ID)
@@ -115,16 +136,26 @@ object NotificationHelper {
         monthlyTotal: Double,
         visitCount: Int
     ) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             return
         }
 
-        val intent = Intent(Intent.ACTION_VIEW, "$DEEP_LINK_URI_EDIT/${details.transaction.id}".toUri()).apply {
+        val intent = Intent(
+            Intent.ACTION_VIEW,
+            "$DEEP_LINK_URI_EDIT/${details.transaction.id}".toUri()
+        ).apply {
             `package` = context.packageName
         }
         val pendingIntent: PendingIntent? = TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(intent)
-            getPendingIntent(details.transaction.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            getPendingIntent(
+                details.transaction.id,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
         val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
@@ -134,11 +165,17 @@ object NotificationHelper {
 
         val categoryBitmap = createCategoryIconBitmap(context, details)
 
+        // --- NEW: List of emojis for personalization ---
+        val emojis = listOf("🛍️", "✨", "🎉", "👍", "💸", "💳", "🛒", "✅", "💯", "🤩", "🚀", "🙌", "🔥")
+        val randomEmoji = emojis.random()
+
         val inboxStyle = NotificationCompat.InboxStyle()
-            .setBigContentTitle(title)
+            // --- MODIFIED: Use the contentText for the big title ---
+            .setBigContentTitle(contentText)
             .setSummaryText(details.categoryName ?: "Uncategorized")
 
-        val totalLabel = if (details.transaction.transactionType == "income") "income this month" else "spent this month"
+        val totalLabel =
+            if (details.transaction.transactionType == "income") "income this month" else "spent this month"
         inboxStyle.addLine("${currencyFormat.format(monthlyTotal)} $totalLabel")
 
         if (visitCount > 0) {
@@ -148,21 +185,23 @@ object NotificationHelper {
                 3 -> "This is your 3rd visit here."
                 else -> "This is your ${visitCount}th visit here."
             }
-            inboxStyle.addLine(visitText)
+            // --- MODIFIED: Append the random emoji to the visit count line ---
+            inboxStyle.addLine("$visitText $randomEmoji")
         }
 
-        val builder = NotificationCompat.Builder(context, MainApplication.RICH_TRANSACTION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_logo)
-            .setContentTitle(title)
-            .setContentText(contentText)
-            .setLargeIcon(categoryBitmap)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(pendingIntent)
-            .setStyle(inboxStyle)
-            .setAutoCancel(true)
-            .setShowWhen(true)
-            .setWhen(System.currentTimeMillis())
-            .addAction(0, "View Details", pendingIntent)
+        val builder =
+            NotificationCompat.Builder(context, MainApplication.RICH_TRANSACTION_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_logo)
+                .setContentTitle(title)
+                .setContentText(contentText)
+                .setLargeIcon(categoryBitmap)
+                .setPriority(NotificationCompat.PRIORITY_HIGH) // Retained as requested
+                .setContentIntent(pendingIntent)
+                .setStyle(inboxStyle)
+                .setAutoCancel(true)
+                .setShowWhen(true)
+                .setWhen(System.currentTimeMillis())
+                .addAction(0, "View Details", pendingIntent)
 
         with(NotificationManagerCompat.from(context)) {
             notify(details.transaction.id, builder.build())
@@ -223,7 +262,10 @@ object NotificationHelper {
             val iconDrawable = ContextCompat.getDrawable(context, drawableResId)
 
             if (iconDrawable == null) {
-                Log.e("NotificationHelper", "Failed to load drawable for key '$iconKey' (Res ID: $drawableResId)")
+                Log.e(
+                    "NotificationHelper",
+                    "Failed to load drawable for key '$iconKey' (Res ID: $drawableResId)"
+                )
             }
 
             val iconSize = (width * 0.6).toInt()
@@ -240,7 +282,10 @@ object NotificationHelper {
                 textSize = width * 0.5f
                 textAlign = Paint.Align.CENTER
                 isAntiAlias = true
-                typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+                typeface = android.graphics.Typeface.create(
+                    android.graphics.Typeface.DEFAULT,
+                    android.graphics.Typeface.BOLD
+                )
             }
             val textY = (height / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
             canvas.drawText(text, width / 2f, textY, textPaint)
@@ -254,7 +299,11 @@ object NotificationHelper {
         context: Context,
         rule: RecurringTransaction
     ) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             return
         }
 
@@ -267,10 +316,14 @@ object NotificationHelper {
         val notificationId = "pattern_${rule.id}".hashCode()
         val pendingIntent: PendingIntent? = TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(intent)
-            getPendingIntent(notificationId, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            getPendingIntent(
+                notificationId,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
-        val contentText = "We noticed a recurring ${rule.transactionType} for '${rule.description}'. We've created a rule for you. Tap to review."
+        val contentText =
+            "We noticed a recurring ${rule.transactionType} for '${rule.description}'. We've created a rule for you. Tap to review."
 
         val builder = NotificationCompat.Builder(context, MainApplication.TRANSACTION_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_logo)
@@ -292,7 +345,11 @@ object NotificationHelper {
         context: Context,
         potentialTxn: PotentialTransaction
     ) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             return
         }
 
@@ -306,11 +363,15 @@ object NotificationHelper {
 
         val pendingIntent: PendingIntent? = TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(intent)
-            getPendingIntent(potentialTxn.sourceSmsId.toInt(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            getPendingIntent(
+                potentialTxn.sourceSmsId.toInt(),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
         val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-        val contentText = "Your payment of ${currencyFormat.format(potentialTxn.amount)} for ${potentialTxn.merchantName} is due. Tap to confirm."
+        val contentText =
+            "Your payment of ${currencyFormat.format(potentialTxn.amount)} for ${potentialTxn.merchantName} is due. Tap to confirm."
 
         val builder = NotificationCompat.Builder(context, MainApplication.TRANSACTION_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_logo)
@@ -337,7 +398,11 @@ object NotificationHelper {
         topCategories: List<CategorySpending>,
         deepLinkUri: String
     ) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             return
         }
 
@@ -346,7 +411,10 @@ object NotificationHelper {
 
         val pendingIntent: PendingIntent? = TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(intent)
-            getPendingIntent(notificationId, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            getPendingIntent(
+                notificationId,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
         val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
@@ -437,7 +505,8 @@ object NotificationHelper {
         percentageChange: Int?,
         topCategories: List<CategorySpending>
     ) {
-        val monthName = calendar.getDisplayName(Calendar.MONTH, Calendar.LONG, Locale.getDefault()) ?: "Month"
+        val monthName =
+            calendar.getDisplayName(Calendar.MONTH, Calendar.LONG, Locale.getDefault()) ?: "Month"
         val title = when {
             percentageChange == null -> "Your $monthName Summary"
             percentageChange == 0 -> "Spends same as last month"
@@ -462,7 +531,11 @@ object NotificationHelper {
         context: Context,
         transaction: Transaction
     ) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             return
         }
 
@@ -475,7 +548,10 @@ object NotificationHelper {
 
         val pendingIntent: PendingIntent? = TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(detailIntent)
-            getPendingIntent(transaction.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            getPendingIntent(
+                transaction.id,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
         val groupKey = "finlight_transaction_group_${transaction.id}"
@@ -499,7 +575,11 @@ object NotificationHelper {
         context: Context,
         transaction: Transaction,
     ) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             return
         }
 
@@ -511,11 +591,15 @@ object NotificationHelper {
 
         val pendingIntent: PendingIntent? = TaskStackBuilder.create(context).run {
             addNextIntentWithParentStack(intent)
-            getPendingIntent(transaction.id, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            getPendingIntent(
+                transaction.id,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
         val typeText = transaction.transactionType.replaceFirstChar { it.uppercase() }
-        val bigText = "$typeText of ₹${"%.2f".format(transaction.amount)} from ${transaction.description} detected. Tap to review and categorize."
+        val bigText =
+            "$typeText of ₹${"%.2f".format(transaction.amount)} from ${transaction.description} detected. Tap to review and categorize."
 
         val builder = NotificationCompat.Builder(context, MainApplication.TRANSACTION_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_logo)
