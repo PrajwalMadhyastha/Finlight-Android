@@ -4,6 +4,13 @@
 // A LaunchedEffect updates the local `selectedCategory` state when a suggestion
 // is emitted. It also notifies the ViewModel when the user manually interacts
 // with the category picker to prevent their choice from being overwritten.
+// FEATURE - Implemented a "Smart Guidance" system. Once a user enters an amount,
+// a glowing border highlights the description field and a simple checklist appears
+// to guide them through the required steps, creating a zero-friction flow.
+// FIX - Corrected the modifier order on the description Text to ensure the .glow()
+// effect is drawn before being clipped, making the smart guidance visible.
+// FIX - Replaced the unreliable .glow() modifier with a more robust implementation
+// using an animated border to ensure the guidance highlight always appears.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -12,6 +19,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -505,23 +513,7 @@ fun AddTransactionScreen(
     }
 }
 
-// --- NEW: A modifier to draw a glowing highlight ---
-fun Modifier.glow(color: Color, isEnabled: Boolean) = this.drawBehind {
-    if (isEnabled) {
-        val paint = Paint()
-        val frameworkPaint = paint.asFrameworkPaint()
-        val spread = 6.dp.toPx()
-        frameworkPaint.color = color.toArgb()
-        frameworkPaint.setShadowLayer(
-            spread, 0f, 0f, color.copy(alpha = 0.5f).toArgb()
-        )
-        drawRoundRect(
-            color = Color.Transparent, // The color is from the shadow layer
-            size = size,
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx())
-        )
-    }
-}
+// --- REMOVED: Unreliable .glow() modifier function ---
 
 // --- NEW: Checklist composable ---
 @Composable
@@ -600,7 +592,14 @@ private fun AmountComposer(
     } else {
         "₹"
     }
-    val highlightColor = MaterialTheme.colorScheme.error
+    val highlightColor = MaterialTheme.colorScheme.primary
+
+    // --- NEW: Animate the border color for a robust highlight effect ---
+    val animatedBorderColor by animateColorAsState(
+        targetValue = if (highlightDescription) highlightColor else Color.Transparent,
+        animationSpec = tween(durationMillis = 300, easing = EaseOutCubic),
+        label = "HighlightBorderAnimation"
+    )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -612,9 +611,10 @@ private fun AmountComposer(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
+                // --- FIX: Use the new animated border modifier ---
                 .clip(RoundedCornerShape(12.dp))
+                .border(2.dp, animatedBorderColor, RoundedCornerShape(12.dp))
                 .clickable(onClick = onDescriptionClick)
-                .glow(highlightColor, highlightDescription)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
