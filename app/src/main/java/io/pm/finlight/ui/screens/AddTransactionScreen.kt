@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FEATURE - Implemented the full "Smart Guidance" system. The screen
-// now features a dynamic checklist and contextual highlighting to guide the user
-// in filling out the mandatory amount and description fields. The save button's
-// logic is now tied to the new, smarter ViewModel flow, which attempts to
-// auto-categorize before prompting the user with the category picker as a fallback.
+// REASON: FIX - The `onConfirm` lambda in the `GlassmorphicNumpad` now correctly
+// includes the `onSaveComplete` callback, passing the navigation action to the
+// ViewModel. This resolves the bug where the UI would not navigate away after a
+// successful auto-categorized save.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -43,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,6 +69,7 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
+import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -304,7 +306,8 @@ fun AddTransactionScreen(
                             notes = notes,
                             date = selectedDateTime.timeInMillis,
                             transactionType = transactionType,
-                            imageUris = attachedImageUris
+                            imageUris = attachedImageUris,
+                            onSaveComplete = { navController.popBackStack() }
                         )
                     },
                     isConfirmEnabled = isSaveEnabled

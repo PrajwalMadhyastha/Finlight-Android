@@ -126,7 +126,7 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
     val dateFormatter = remember { SimpleDateFormat("dd MMMM, yyyy", Locale.getDefault()) }
     val isUnknownTransactionPopupEnabled by settingsViewModel.unknownTransactionPopupEnabled.collectAsState()
 
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     Scaffold(
@@ -280,7 +280,7 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
     var showWeeklyTimePicker by remember { mutableStateOf(false) }
     val isAutoCaptureNotificationEnabled by settingsViewModel.autoCaptureNotificationEnabled.collectAsState()
 
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     Scaffold(
@@ -412,7 +412,7 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
     val isAppLockEnabled by settingsViewModel.appLockEnabled.collectAsState()
     var showImportJsonDialog by remember { mutableStateOf(false) }
     var showCsvInfoDialog by remember { mutableStateOf(false) }
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     val isAutoBackupEnabled by settingsViewModel.autoBackupEnabled.collectAsState()
@@ -753,7 +753,7 @@ private fun CsvInfoDialog(
     onExportTemplate: () -> Unit,
     onProceed: () -> Unit
 ) {
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     AlertDialog(

@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FEATURE - The ViewModel now drives the "smart add transaction" flow.
-// It includes a new `onSaveTapped` function that first attempts to auto-categorize
-// a new manual transaction using the HeuristicCategorizer. If it can't find a
-// match, it updates the `showCategoryNudge` state, signaling the UI to prompt
-// the user for a category. The final save is handled by `saveWithSelectedCategory`.
+// REASON: FIX - The `onSaveTapped` function now accepts an `onSaveComplete`
+// callback. When a transaction is successfully auto-categorized, this callback
+// is invoked to trigger navigation from the UI, fixing a bug where the user
+// was left on the "Add Transaction" screen after a successful save.
 // =================================================================================
 package io.pm.finlight
 
@@ -487,7 +486,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // --- NEW: Smart Add Transaction Logic ---
+    // --- UPDATED: Smart Add Transaction Logic ---
 
     fun onSaveTapped(
         description: String,
@@ -496,7 +495,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         notes: String?,
         date: Long,
         transactionType: String,
-        imageUris: List<Uri>
+        imageUris: List<Uri>,
+        onSaveComplete: () -> Unit
     ) {
         viewModelScope.launch {
             _validationError.value = null
@@ -530,7 +530,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
             if (suggestedCategory != null) {
                 // Magic Path: Auto-categorized, save immediately
-                saveTransactionAndNavigateBack(transactionData, suggestedCategory.id)
+                val success = saveManualTransaction(transactionData, suggestedCategory.id)
+                if (success) {
+                    onSaveComplete()
+                }
             } else {
                 // Guided Path: No match found, trigger the nudge
                 _showCategoryNudge.value = transactionData
@@ -542,7 +545,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             val transactionData = _showCategoryNudge.value
             if (transactionData != null) {
-                val success = saveTransactionAndNavigateBack(transactionData, categoryId)
+                val success = saveManualTransaction(transactionData, categoryId)
                 if (success) {
                     onComplete()
                 }
@@ -551,7 +554,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    private suspend fun saveTransactionAndNavigateBack(data: ManualTransactionData, categoryId: Int?): Boolean {
+    private suspend fun saveManualTransaction(data: ManualTransactionData, categoryId: Int?): Boolean {
         _validationError.value = null
         val enteredAmount = data.amountStr.toDoubleOrNull()
         if (enteredAmount == null || enteredAmount <= 0.0) {
