@@ -245,15 +245,15 @@ class DashboardViewModel(
                     else -> {
                         listOf(
                             "Excellent pacing this month!",
-                            "On track with room to spare.",
-                            "Well within budget, great job.",
-                            "Your budget is looking healthy.",
-                            "Consistently great spending.",
+                            "On track with room to spare",
+                            "Well within budget, great job",
+                            "Your budget is looking healthy",
+                            "Consistently great spending",
                             "Keep this momentum going!",
-                            "Smooth sailing this month.",
-                            "You're building a nice buffer.",
-                            "Perfectly on track.",
-                            "Another great spending day."
+                            "Smooth sailing this month",
+                            "You're building a nice buffer",
+                            "Perfectly on track",
+                            "Another great spending day"
                         ).random()
                     }
                 }

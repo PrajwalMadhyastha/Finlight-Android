@@ -35,7 +35,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PersonalFinanceApp"
         tools:targetApi="33"
-        android:enableOnBackInvokedCallback="true">
+        android:enableOnBackInvokedCallback="true"
+        android:backupAgent=".FinlightBackupAgent"
+        tools:replace="android:fullBackupContent">
 
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
@@ -44,7 +46,6 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:launchMode="singleTop"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.PersonalFinanceApp">

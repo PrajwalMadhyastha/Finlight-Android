@@ -2,25 +2,32 @@
 <!--
 // =================================================================================
 // FILE: ./app/src/main/res/xml/data_extraction_rules.xml
-// REASON: FIX (Backup Restore) - The backup strategy has been fundamentally changed
-// to be more robust. We no longer back up the live, encrypted database file,
-// as the decryption key from the Android Keystore is lost on uninstall, making
-// the file unrestorable. Instead, we now rely exclusively on the compressed JSON
-// snapshot file ('backup_snapshot.gz') which is stored in the 'files' domain.
-// The secure preferences file containing the old encrypted key is also excluded
-// to prevent decryption errors on restore.
+// REASON: FIX (Backup Restore) - The backup strategy has been corrected.
+// The <cloud-backup> rules no longer attempt to back up the live, encrypted
+// database file, as the decryption key is lost on uninstall. Instead, we now
+// exclusively include the 'file' domain, which contains the restorable
+// compressed JSON snapshot ('backup_snapshot.gz'). This is the definitive fix
+// to ensure transactions and other database data are restored.
 // =================================================================================
 -->
 <data-extraction-rules>
     <cloud-backup>
+        <!-- Include standard preferences -->
         <include domain="sharedpref" path="."/>
+        <!-- Exclude the file with the now-unusable encrypted key -->
         <exclude domain="sharedpref" path="finlight_secure_prefs.xml" />
 
+        <!-- DO NOT include the 'database' domain for cloud backup. -->
+        <!-- The restored .db file would be encrypted and unusable without the Keystore key. -->
+
+        <!-- THIS IS THE FIX: Include the 'file' domain, which contains backup_snapshot.gz -->
         <include domain="file" path="." />
+        <!-- But, exclude the large, non-essential image attachments from the backup -->
         <exclude domain="file" path="attachments/" />
     </cloud-backup>
 
     <device-transfer>
+        <!-- For device-to-device transfers, we can include everything -->
         <include domain="sharedpref" path="."/>
         <exclude domain="sharedpref" path="finlight_secure_prefs.xml" />
         <include domain="database" path="." />

@@ -4,6 +4,11 @@
 // compressed (Gzip) JSON file of the database. This creates a highly compact
 // and resilient data snapshot suitable for inclusion in Android's Auto Backup
 // as a failsafe against database migration failures.
+// FEATURE - Added restoreFromBackupSnapshot function to handle the core logic
+// of checking for, decompressing, and importing the JSON snapshot on app startup.
+// REFACTOR - The JSON import logic has been centralized into a private
+// `importDataFromJsonString` function, which is now used by both the manual
+// "Import from JSON" feature and the new automatic restore process.
 // =================================================================================
 package io.pm.finlight.data
 
@@ -20,10 +25,12 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 import kotlin.collections.forEach
 
@@ -61,6 +68,39 @@ object DataExportService {
         }
     }
 
+    // --- NEW: Function to restore data from the snapshot file ---
+    suspend fun restoreFromBackupSnapshot(context: Context): Boolean {
+        return withContext(Dispatchers.IO) {
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            if (!snapshotFile.exists()) {
+                Log.d("DataExportService", "No backup snapshot found. Proceeding with normal startup.")
+                return@withContext false // No snapshot to restore
+            }
+
+            Log.d("DataExportService", "Backup snapshot found. Starting restore process.")
+            try {
+                // Decompress the Gzip file
+                val jsonString = GZIPInputStream(FileInputStream(snapshotFile)).bufferedReader().use { it.readText() }
+
+                // Import the data from the JSON string
+                val success = importDataFromJsonString(context, jsonString)
+
+                if (success) {
+                    // CRITICAL: Delete the file after a successful restore to prevent re-importing on every app launch
+                    snapshotFile.delete()
+                    Log.d("DataExportService", "Restore successful. Snapshot file deleted.")
+                } else {
+                    Log.e("DataExportService", "Restore failed during data import phase.")
+                }
+                return@withContext success
+            } catch (e: Exception) {
+                Log.e("DataExportService", "Failed to restore from backup snapshot", e)
+                // Attempt to delete the corrupted file to prevent future errors
+                snapshotFile.delete()
+                return@withContext false
+            }
+        }
+    }
 
     // --- UPDATED: Add "Id" and "ParentId" to the CSV template header ---
     fun getCsvTemplateString(): String {
@@ -91,6 +131,7 @@ object DataExportService {
         }
     }
 
+    // --- UPDATED: Refactored to use the new common import function ---
     suspend fun importDataFromJson(
         context: Context,
         uri: Uri,
@@ -99,37 +140,46 @@ object DataExportService {
             try {
                 val jsonString = context.contentResolver.openInputStream(uri)?.bufferedReader()
                     .use { it?.readText() }
-                if (jsonString == null) return@withContext false
-
-                val backupData = json.decodeFromString<AppDataBackup>(jsonString)
-
-                val db = AppDatabase.getInstance(context)
-                // Clear all data in the correct order (respecting foreign keys)
-                db.splitTransactionDao().deleteAll()
-                db.transactionDao().deleteAll()
-                db.accountDao().deleteAll()
-                db.categoryDao().deleteAll()
-                db.budgetDao().deleteAll()
-                db.merchantMappingDao().deleteAll()
-
-
-                // Insert new data
-                db.accountDao().insertAll(backupData.accounts)
-                db.categoryDao().insertAll(backupData.categories)
-                db.budgetDao().insertAll(backupData.budgets)
-                db.merchantMappingDao().insertAll(backupData.merchantMappings)
-                db.transactionDao().insertAll(backupData.transactions)
-                // --- NEW: Import split transactions ---
-                db.splitTransactionDao().insertAll(backupData.splitTransactions)
-
-
-                true
+                if (jsonString == null) {
+                    Log.e("DataExportService", "Failed to read JSON from URI.")
+                    return@withContext false
+                }
+                importDataFromJsonString(context, jsonString)
             } catch (e: Exception) {
-                Log.e("DataExportService", "Error importing from JSON", e)
+                Log.e("DataExportService", "Error importing from JSON URI", e)
                 false
             }
         }
     }
+
+    // --- NEW: Centralized import logic that takes a JSON string ---
+    private suspend fun importDataFromJsonString(context: Context, jsonString: String): Boolean {
+        return try {
+            val backupData = json.decodeFromString<AppDataBackup>(jsonString)
+            val db = AppDatabase.getInstance(context)
+
+            // Clear all data in the correct order (respecting foreign keys)
+            db.splitTransactionDao().deleteAll()
+            db.transactionDao().deleteAll()
+            db.accountDao().deleteAll()
+            db.categoryDao().deleteAll()
+            db.budgetDao().deleteAll()
+            db.merchantMappingDao().deleteAll()
+
+            // Insert new data
+            db.accountDao().insertAll(backupData.accounts)
+            db.categoryDao().insertAll(backupData.categories)
+            db.budgetDao().insertAll(backupData.budgets)
+            db.merchantMappingDao().insertAll(backupData.merchantMappings)
+            db.transactionDao().insertAll(backupData.transactions)
+            db.splitTransactionDao().insertAll(backupData.splitTransactions)
+            true
+        } catch (e: Exception) {
+            Log.e("DataExportService", "Error processing JSON string during import", e)
+            false
+        }
+    }
+
 
     suspend fun exportToCsvString(context: Context): String? {
         return withContext(Dispatchers.IO) {

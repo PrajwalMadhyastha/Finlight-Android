@@ -5,11 +5,20 @@
 // to support the new transactional account merging logic and resolves the build error.
 // FIX - The instantiation of TransactionRepository has been updated to include
 // the required dependencies, resolving a build error.
+// FEATURE - Added a createBackupSnapshotForTest() function to allow manual
+// triggering of the snapshot creation for easier testing of the backup/restore flow.
+// FEATURE - Added a verifySnapshotFile() function to check for the snapshot's
+// existence from the UI, bypassing the need for ADB 'run-as' on non-debuggable builds.
+// REFACTOR (Cleanup) - Removed the test-only `verifySnapshotFile` function.
+// Renamed `createBackupSnapshotForTest` to `createBackupSnapshot` and enhanced
+// it to programmatically trigger a backup run via `BackupManager.dataChanged()`,
+// making it a production-ready, user-facing feature.
 // =================================================================================
 package io.pm.finlight
 
 import android.Manifest
 import android.app.Application
+import android.app.backup.BackupManager
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
@@ -18,6 +27,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.CategoryIconHelper
@@ -57,6 +67,7 @@ class SettingsViewModel(
     private val categoryRepository = CategoryRepository(db.categoryDao())
     private val tagDao = db.tagDao()
     private val splitTransactionDao = db.splitTransactionDao()
+    private val backupManager = BackupManager(context)
 
 
     val smsScanStartDate: StateFlow<Long>
@@ -830,5 +841,22 @@ class SettingsViewModel(
 
     fun clearCsvValidationReport() {
         _csvValidationReport.value = null
+    }
+
+    fun createBackupSnapshot() {
+        viewModelScope.launch {
+            val success = withContext(Dispatchers.IO) {
+                DataExportService.createBackupSnapshot(context)
+            }
+            withContext(Dispatchers.Main) {
+                val message = if (success) {
+                    backupManager.dataChanged() // Notify the system to schedule a backup
+                    "Backup snapshot created and backup requested."
+                } else {
+                    "Failed to create snapshot."
+                }
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            }
+        }
     }
 }

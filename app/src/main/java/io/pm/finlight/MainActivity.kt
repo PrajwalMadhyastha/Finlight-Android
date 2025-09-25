@@ -9,6 +9,10 @@
 // bar now uses the same `popUpTo` logic as the bottom navigation bar. This
 // resolves an inconsistency where the back button behaved differently depending
 // on how the user navigated to the Profile screen.
+// FIX (Backup Restore) - The SplashScreen has been enhanced to check for a
+// restored backup snapshot on first launch. It now displays the restore status
+// to the user and triggers the data import process before navigating to the dashboard,
+// ensuring a seamless data recovery experience.
 // =================================================================================
 package io.pm.finlight
 
@@ -69,6 +73,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import coil.compose.AsyncImage
 import com.google.gson.Gson
+import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
@@ -82,7 +87,11 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.utils.CategoryIconHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.net.URLDecoder
 import java.util.concurrent.Executor
 
@@ -639,7 +648,7 @@ fun AppNavHost(
         }
 
         composable("splash_screen") {
-            SplashScreen(navController = navController, activity = activity)
+            SplashScreen(navController = navController)
         }
 
         composable(
@@ -1156,8 +1165,23 @@ fun AppNavHost(
 }
 
 @Composable
-fun SplashScreen(navController: NavHostController, activity: Activity) {
-    LaunchedEffect(key1 = Unit) {
+fun SplashScreen(navController: NavHostController) {
+    var statusText by remember { mutableStateOf("Initializing...") }
+    val context = LocalContext.current
+
+    LaunchedEffect(key1 = true) {
+        statusText = "Checking for backup..."
+        // Use Dispatchers.IO for file operations
+        val restored = withContext(Dispatchers.IO) {
+            DataExportService.restoreFromBackupSnapshot(context)
+        }
+
+        if (restored) {
+            statusText = "Data restored successfully!"
+            delay(1500) // Give user time to see the message
+        }
+
+        statusText = "Loading dashboard..."
         navController.navigate(BottomNavItem.Dashboard.route) {
             popUpTo("splash_screen") { inclusive = true }
         }
@@ -1167,7 +1191,11 @@ fun SplashScreen(navController: NavHostController, activity: Activity) {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(statusText, style = MaterialTheme.typography.bodyLarge)
+        }
     }
 }
 

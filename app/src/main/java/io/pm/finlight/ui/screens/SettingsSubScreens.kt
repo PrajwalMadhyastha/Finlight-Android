@@ -5,6 +5,15 @@
 // the new SMS debugger tool.
 // REFACTOR - Removed the user-configurable time picker for the monthly summary
 // notification. It is now fixed to run on the 1st of each month, simplifying the UI.
+// FEATURE - Added a "Create Backup Snapshot" button to the Data Settings screen
+// to allow for manual triggering of the snapshot creation process, which is
+// essential for reliably testing the backup and restore workflow.
+// FEATURE - Added a "Verify Snapshot File" button for testing purposes. It checks
+// for the existence of the snapshot file and displays a toast, allowing verification
+// on non-debuggable builds where 'adb run-as' is not available.
+// REFACTOR (Cleanup) - Removed the test-only "Verify Snapshot" button and
+// updated the text of the "Create Snapshot" button to be more user-friendly,
+// reflecting its new role as a permanent feature.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -605,6 +614,13 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                             subtitle = "Add new transactions from a CSV file",
                             icon = Icons.Default.PostAdd,
                             onClick = { showCsvInfoDialog = true },
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                        SettingsActionItem(
+                            text = "Create Backup Now",
+                            subtitle = "Manually create a snapshot & request a backup",
+                            icon = Icons.Default.Save,
+                            onClick = { settingsViewModel.createBackupSnapshot() }
                         )
                     }
                 }
