@@ -14,16 +14,17 @@
 <data-extraction-rules>
     <cloud-backup>
         <include domain="sharedpref" path="."/>
-
         <exclude domain="sharedpref" path="finlight_secure_prefs.xml" />
 
-        <include domain="database" path="finance_database.db" />
-        <exclude domain="database" path="finance_database.db-shm" />
-        <exclude domain="database" path="finance_database.db-wal" />
+        <include domain="file" path="." />
+        <exclude domain="file" path="attachments/" />
     </cloud-backup>
+
     <device-transfer>
         <include domain="sharedpref" path="."/>
         <exclude domain="sharedpref" path="finlight_secure_prefs.xml" />
         <include domain="database" path="." />
+        <include domain="file" path="." />
+        <exclude domain="file" path="attachments/" />
     </device-transfer>
 </data-extraction-rules>
