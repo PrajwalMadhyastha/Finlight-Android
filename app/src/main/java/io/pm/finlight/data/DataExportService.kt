@@ -1,23 +1,11 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/data/DataExportService.kt
-// REASON: FEATURE - Added createBackupSnapshot function to generate a
-// compressed (Gzip) JSON file of the database. This creates a highly compact
-// and resilient data snapshot suitable for inclusion in Android's Auto Backup
-// as a failsafe against database migration failures.
-// FEATURE - Added restoreFromBackupSnapshot function to handle the core logic
-// of checking for, decompressing, and importing the JSON snapshot on app startup.
-// REFACTOR - The JSON import logic has been centralized into a private
-// `importDataFromJsonString` function, which is now used by both the manual
-// "Import from JSON" feature and the new automatic restore process.
-// =================================================================================
 package io.pm.finlight.data
 
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import io.pm.finlight.AppDataBackup
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.model.AppDataBackup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -42,7 +30,6 @@ object DataExportService {
             ignoreUnknownKeys = true
         }
 
-    // --- NEW: Function to create a compressed JSON snapshot for backup ---
     suspend fun createBackupSnapshot(context: Context): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -68,7 +55,6 @@ object DataExportService {
         }
     }
 
-    // --- NEW: Function to restore data from the snapshot file ---
     suspend fun restoreFromBackupSnapshot(context: Context): Boolean {
         return withContext(Dispatchers.IO) {
             val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
@@ -102,7 +88,6 @@ object DataExportService {
         }
     }
 
-    // --- UPDATED: Add "Id" and "ParentId" to the CSV template header ---
     fun getCsvTemplateString(): String {
         return "Id,ParentId,Date,Description,Amount,Type,Category,Account,Notes,IsExcluded,Tags\n"
     }
@@ -119,8 +104,13 @@ object DataExportService {
                         categories = db.categoryDao().getAllCategories().first(),
                         budgets = db.budgetDao().getAllBudgets().first(),
                         merchantMappings = db.merchantMappingDao().getAllMappings().first(),
-                        // --- NEW: Include split transactions in the backup ---
-                        splitTransactions = db.splitTransactionDao().getAllSplits().first()
+                        splitTransactions = db.splitTransactionDao().getAllSplits().first(),
+                        // --- Phase 1: Export Core Parsing Intelligence ---
+                        customSmsRules = db.customSmsRuleDao().getAllRulesList(),
+                        merchantRenameRules = db.merchantRenameRuleDao().getAllRulesList(),
+                        merchantCategoryMappings = db.merchantCategoryMappingDao().getAll(),
+                        ignoreRules = db.ignoreRuleDao().getAllList(),
+                        smsParseTemplates = db.smsParseTemplateDao().getAllTemplates()
                     )
 
                 json.encodeToString(backupData)
@@ -131,7 +121,6 @@ object DataExportService {
         }
     }
 
-    // --- UPDATED: Refactored to use the new common import function ---
     suspend fun importDataFromJson(
         context: Context,
         uri: Uri,
@@ -152,7 +141,6 @@ object DataExportService {
         }
     }
 
-    // --- NEW: Centralized import logic that takes a JSON string ---
     private suspend fun importDataFromJsonString(context: Context, jsonString: String): Boolean {
         return try {
             val backupData = json.decodeFromString<AppDataBackup>(jsonString)
@@ -165,6 +153,12 @@ object DataExportService {
             db.categoryDao().deleteAll()
             db.budgetDao().deleteAll()
             db.merchantMappingDao().deleteAll()
+            // --- Phase 1: Clear Core Parsing Intelligence Tables ---
+            db.customSmsRuleDao().deleteAll()
+            db.merchantRenameRuleDao().deleteAll()
+            db.merchantCategoryMappingDao().deleteAll()
+            db.ignoreRuleDao().deleteAll()
+            db.smsParseTemplateDao().deleteAll()
 
             // Insert new data
             db.accountDao().insertAll(backupData.accounts)
@@ -173,13 +167,18 @@ object DataExportService {
             db.merchantMappingDao().insertAll(backupData.merchantMappings)
             db.transactionDao().insertAll(backupData.transactions)
             db.splitTransactionDao().insertAll(backupData.splitTransactions)
+            // --- Phase 1: Insert Core Parsing Intelligence Data ---
+            db.customSmsRuleDao().insertAll(backupData.customSmsRules)
+            db.merchantRenameRuleDao().insertAll(backupData.merchantRenameRules)
+            db.merchantCategoryMappingDao().insertAll(backupData.merchantCategoryMappings)
+            db.ignoreRuleDao().insertAll(backupData.ignoreRules)
+            db.smsParseTemplateDao().insertAll(backupData.smsParseTemplates)
             true
         } catch (e: Exception) {
             Log.e("DataExportService", "Error processing JSON string during import", e)
             false
         }
     }
-
 
     suspend fun exportToCsvString(context: Context): String? {
         return withContext(Dispatchers.IO) {
@@ -208,7 +207,6 @@ object DataExportService {
                     val escapedTags = escapeCsvField(tagsString)
 
                     if (transaction.isSplit) {
-                        // This is a parent transaction
                         val category = "Split Transaction" // Parent has a special category
                         csvBuilder.append("${transaction.id},,$date,$description,$amount,$type,$category,$account,$notes,$isExcluded,$escapedTags\n")
 

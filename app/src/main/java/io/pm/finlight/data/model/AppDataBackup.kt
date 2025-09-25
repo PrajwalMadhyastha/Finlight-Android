@@ -1,11 +1,6 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/data/model/AppDataBackup.kt
-// REASON: FEATURE - The backup data model has been updated to include a list of
-// `SplitTransaction` entities. This ensures that detailed split transaction
-// data is correctly included in JSON backups and restores.
-// =================================================================================
-package io.pm.finlight
+package io.pm.finlight.data.model
 
+import io.pm.finlight.*
 import kotlinx.serialization.Serializable
 
 /**
@@ -19,6 +14,11 @@ data class AppDataBackup(
     val categories: List<Category>,
     val budgets: List<Budget>,
     val merchantMappings: List<MerchantMapping>,
-    // --- NEW: Add split transactions to the backup model ---
-    val splitTransactions: List<SplitTransaction> = emptyList()
+    val splitTransactions: List<SplitTransaction> = emptyList(),
+    // --- Phase 1: Core Parsing Intelligence ---
+    val customSmsRules: List<CustomSmsRule> = emptyList(),
+    val merchantRenameRules: List<MerchantRenameRule> = emptyList(),
+    val merchantCategoryMappings: List<MerchantCategoryMapping> = emptyList(),
+    val ignoreRules: List<IgnoreRule> = emptyList(),
+    val smsParseTemplates: List<SmsParseTemplate> = emptyList()
 )
