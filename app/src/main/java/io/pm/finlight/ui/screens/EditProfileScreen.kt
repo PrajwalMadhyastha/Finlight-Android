@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/EditProfileScreen.kt
-// REASON: FIX - Replaced the `Uri.parse(it)` call with the more idiomatic
-// `it.toUri()` KTX extension function. This resolves the "AndroidLintUseKtx"
-// warning and improves code readability.
-// FIX - Removed a redundant `.let` call for converting the saved URI string,
-// making the code more concise.
+// REASON: FIX (Theming) - The AlertDialog for selecting a profile picture source
+// now correctly derives its background color from the app's MaterialTheme. This
+// ensures it is always opaque and legible, resolving the display issue in light
+// themes.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -28,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -45,9 +45,14 @@ import com.canhub.cropper.CropImageOptions
 import com.canhub.cropper.CropImageView
 import io.pm.finlight.ProfileViewModel
 import io.pm.finlight.R
+import io.pm.finlight.ui.theme.PopupSurfaceDark
+import io.pm.finlight.ui.theme.PopupSurfaceLight
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+
+// Helper function to determine if a color is 'dark' based on luminance.
+private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @Composable
 fun EditProfileScreen(
@@ -63,7 +68,6 @@ fun EditProfileScreen(
     var tempCameraImageUri by remember { mutableStateOf<Uri?>(null) }
     var showImageSourceDialog by remember { mutableStateOf(false) }
 
-    // --- FIX: Removed redundant .let call ---
     val displayUri = croppedImageUri ?: savedProfilePictureUri?.toUri()
 
     val toolbarColor = MaterialTheme.colorScheme.primary.toArgb()
@@ -102,15 +106,18 @@ fun EditProfileScreen(
     }
 
     if (showImageSourceDialog) {
+        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+        val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+
         AlertDialog(
             onDismissRequest = { showImageSourceDialog = false },
+            containerColor = popupContainerColor,
             title = { Text("Change Profile Picture") },
             text = { Text("Choose a source for your new image.") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showImageSourceDialog = false
-                        // --- FIX: Create the temp file and get its secure URI before launching the camera ---
                         val tempFile = createTempImageFile(context)
                         val newTempUri = FileProvider.getUriForFile(
                             context,
@@ -225,7 +232,6 @@ private fun createCropOptions(toolbarColor: Int, toolbarTintColor: Int, activity
  * Helper function to create a temporary image file in the app's external files directory.
  */
 private fun createTempImageFile(context: Context): File {
-    // --- FIX: Use the external files directory for better compatibility with the camera intent ---
     val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
     val storageDir: File? = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
     return File.createTempFile(

@@ -1,10 +1,5 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FIX - Refactored the `getSpendingByCategoryForMonth` and
-// `getIncomeTransactionsForRange` queries to resolve a KSP build error. The
-// `accountId` filter has been moved inside the CTE subqueries, and missing
-// columns have been added to the `getIncomeTransactionsForRange` CTE to fix a
-// "no such column" SQL error.
 // =================================================================================
 package io.pm.finlight
 
