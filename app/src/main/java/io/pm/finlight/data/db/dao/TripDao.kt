@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TripDao.kt
-// REASON: FEATURE - Added the `isTagUsedByTrip` query. This is a crucial check
-// for the "Manage Tags" screen to prevent a tag from being deleted if it is
-// linked to a historical trip record, thus preventing data loss.
+// REASON: FEATURE (Backup Phase 2) - Added `getAll`, `insertAll`, and `deleteAll`
+// functions. These are required by the DataExportService to back up and restore
+// the travel history.
 // =================================================================================
 package io.pm.finlight.data.db.dao
 
@@ -37,8 +37,26 @@ interface TripDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(trip: Trip): Long
 
+    /**
+     * Inserts a list of trips, used during data restore.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(trips: List<Trip>)
+
+    /**
+     * Deletes all trips, used during data restore.
+     */
+    @Query("DELETE FROM trips")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM trips WHERE tagId = :tagId LIMIT 1")
     suspend fun getTripByTagId(tagId: Int): Trip?
+
+    /**
+     * Retrieves all trips for backup purposes.
+     */
+    @Query("SELECT * FROM trips")
+    suspend fun getAll(): List<Trip>
 
     @Transaction
     @Query("""

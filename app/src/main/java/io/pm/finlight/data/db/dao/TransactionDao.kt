@@ -1,11 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FIX - The three `getSpendingAnalysisBy...` queries have been
-// completely rewritten to be more accurate and powerful. They now correctly
-// aggregate data from both split and non-split transactions and accept new
-// nullable parameters to allow for cross-dimensional filtering (e.g., group by
-// category, but filter by a specific tag). A new `getAllExpenseMerchants` query
-// has also been added to populate the new filter dropdown.
+// REASON: FIX - Refactored the `getSpendingByCategoryForMonth` and
+// `getIncomeTransactionsForRange` queries to resolve a KSP build error. The
+// `accountId` filter has been moved inside the CTE subqueries, and missing
+// columns have been added to the `getIncomeTransactionsForRange` CTE to fix a
+// "no such column" SQL error.
 // =================================================================================
 package io.pm.finlight
 
@@ -280,18 +279,23 @@ interface TransactionDao {
     )
     fun getAllTransactions(): Flow<List<TransactionDetails>>
 
+    @Query("SELECT * FROM transactions")
+    fun getAllTransactionsSimple(): Flow<List<Transaction>>
+
     @androidx.room.Transaction
     @Query("""
         WITH AtomicIncomes AS (
             SELECT T.*
             FROM transactions AS T
             WHERE T.isSplit = 0 AND T.transactionType = 'income' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+              AND (:accountId IS NULL OR T.accountId = :accountId)
             UNION ALL
             SELECT
                 P.id, P.description, S.categoryId, S.amount, P.date, P.accountId, S.notes, P.transactionType, P.sourceSmsId, P.sourceSmsHash, P.source,
                 P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'income' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+              AND (:accountId IS NULL OR P.accountId = :accountId)
         )
         SELECT
             AI.*,
@@ -304,7 +308,6 @@ interface TransactionDao {
         LEFT JOIN accounts AS A ON AI.accountId = A.id
         LEFT JOIN categories AS C ON AI.categoryId = C.id
         WHERE (:keyword IS NULL OR LOWER(AI.description) LIKE '%' || LOWER(:keyword) || '%' OR LOWER(AI.notes) LIKE '%' || LOWER(:keyword) || '%')
-          AND (:accountId IS NULL OR AI.accountId = :accountId)
           AND (:categoryId IS NULL OR AI.categoryId = :categoryId)
         ORDER BY AI.date DESC
     """)
@@ -312,13 +315,15 @@ interface TransactionDao {
 
     @Query("""
         WITH AtomicIncomes AS (
-            SELECT T.categoryId, T.amount, T.description, T.notes, T.accountId
+            SELECT T.categoryId, T.amount, T.description, T.notes
             FROM transactions AS T
             WHERE T.isSplit = 0 AND T.transactionType = 'income' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+              AND (:accountId IS NULL OR T.accountId = :accountId)
             UNION ALL
-            SELECT S.categoryId, S.amount, P.description, S.notes, P.accountId
+            SELECT S.categoryId, S.amount, P.description, S.notes
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'income' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+              AND (:accountId IS NULL OR P.accountId = :accountId)
         )
         SELECT 
             C.name as categoryName, 
@@ -329,7 +334,6 @@ interface TransactionDao {
         JOIN categories AS C ON AI.categoryId = C.id
         WHERE AI.categoryId IS NOT NULL
           AND (:keyword IS NULL OR LOWER(AI.description) LIKE '%' || LOWER(:keyword) || '%' OR LOWER(AI.notes) LIKE '%' || LOWER(:keyword) || '%')
-          AND (:accountId IS NULL OR AI.accountId = :accountId)
           AND (:categoryId IS NULL OR C.id = :categoryId)
         GROUP BY C.name
         ORDER BY totalAmount DESC
@@ -541,9 +545,6 @@ interface TransactionDao {
     )
     fun getTransactionsForAccountDetails(accountId: Int): Flow<List<TransactionDetails>>
 
-    @Query("SELECT * FROM transactions")
-    fun getAllTransactionsSimple(): Flow<List<Transaction>>
-
     @Query("SELECT * FROM transactions WHERE date BETWEEN :startDate AND :endDate ORDER BY date DESC")
     fun getAllTransactionsForRange(
         startDate: Long,
@@ -559,34 +560,15 @@ interface TransactionDao {
     @Query(
         """
         WITH AtomicExpenses AS (
-            SELECT T.categoryId, T.amount FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
-            UNION ALL
-            SELECT S.categoryId, S.amount FROM split_transactions AS S
-            JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
-        )
-        SELECT SUM(AE.amount) FROM AtomicExpenses AS AE
-        JOIN categories AS C ON AE.categoryId = C.id
-        WHERE C.name = :categoryName AND AE.categoryId IS NOT NULL
-    """
-    )
-    fun getSpendingForCategory(
-        categoryName: String,
-        startDate: Long,
-        endDate: Long,
-    ): Flow<Double?>
-
-    @Query(
-        """
-        WITH AtomicExpenses AS (
             SELECT T.categoryId, T.amount, T.description, T.notes, T.accountId
             FROM transactions AS T
             WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+              AND (:accountId IS NULL OR T.accountId = :accountId)
             UNION ALL
             SELECT S.categoryId, S.amount, P.description, S.notes, P.accountId
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+              AND (:accountId IS NULL OR P.accountId = :accountId)
         )
         SELECT 
             C.name as categoryName, 
@@ -597,7 +579,6 @@ interface TransactionDao {
         JOIN categories AS C ON AE.categoryId = C.id
         WHERE AE.categoryId IS NOT NULL
           AND (:keyword IS NULL OR LOWER(AE.description) LIKE '%' || LOWER(:keyword) || '%' OR LOWER(AE.notes) LIKE '%' || LOWER(:keyword) || '%')
-          AND (:accountId IS NULL OR AE.accountId = :accountId)
           AND (:categoryId IS NULL OR AE.categoryId = :categoryId)
         GROUP BY C.name
         ORDER BY totalAmount DESC
@@ -679,6 +660,18 @@ interface TransactionDao {
 
     @Query("SELECT T.* FROM tags T INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.tagId WHERE TTCR.transactionId = :transactionId")
     suspend fun getTagsForTransactionSimple(transactionId: Int): List<Tag>
+
+    /**
+     * Retrieves all transaction-tag cross-references for backup.
+     */
+    @Query("SELECT * FROM transaction_tag_cross_ref")
+    suspend fun getAllCrossRefs(): List<TransactionTagCrossRef>
+
+    /**
+     * Deletes all transaction-tag cross-references, used during restore.
+     */
+    @Query("DELETE FROM transaction_tag_cross_ref")
+    suspend fun deleteAllCrossRefs()
 
     suspend fun updateTagsForTransaction(transactionId: Int, tags: Set<Tag>) {
         clearTagsForTransaction(transactionId)

@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/GoalDao.kt
-// REASON: FEATURE - Added the `reassignGoals` function. This is a critical
-// part of the atomic account merge operation, ensuring that savings goals linked
-// to a source account are safely moved to the destination account before deletion.
+// REASON: FEATURE (Backup Phase 2) - Added `getAll`, `insertAll`, and `deleteAll`
+// functions. These are required by the DataExportService to back up and restore
+// all user-created savings goals.
 // =================================================================================
 package io.pm.finlight
 
@@ -32,14 +32,32 @@ interface GoalDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(goal: Goal)
 
+    /**
+     * Inserts a list of goals, used during data restore.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(goals: List<Goal>)
+
     @Update
     suspend fun update(goal: Goal)
 
     @Delete
     suspend fun delete(goal: Goal)
 
+    /**
+     * Deletes all goals, used during data restore.
+     */
+    @Query("DELETE FROM goals")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM goals WHERE id = :id")
     fun getGoalById(id: Int): Flow<Goal?>
+
+    /**
+     * Retrieves all goals for backup purposes.
+     */
+    @Query("SELECT * FROM goals")
+    suspend fun getAll(): List<Goal>
 
     @Query("""
         SELECT

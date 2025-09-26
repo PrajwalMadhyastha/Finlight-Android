@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/entity/AccountAlias.kt
-// REASON: NEW FILE - This entity creates the "memory" for account merges. It
-// stores a mapping from an old, merged account name (the alias) to the ID of
-// the account that was kept (the destination).
+// REASON: FEATURE (Backup Phase 2) - Added the @Serializable annotation. This is
+// required by the kotlinx.serialization library to include this entity's data
+// in the JSON backup snapshot.
 // =================================================================================
 package io.pm.finlight.data.db.entity
 
@@ -11,7 +11,9 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import io.pm.finlight.Account
+import kotlinx.serialization.Serializable
 
+@Serializable
 @Entity(
     tableName = "account_aliases",
     foreignKeys = [

@@ -1,3 +1,10 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/data/DataExportService.kt
+// REASON: FEATURE (Backup Phase 2) - The export and import functions have been
+// updated to handle all the new Phase 2 entities. The service now correctly
+// backs up and restores Tags, Goals, Trips, AccountAliases, and their
+// relationships, making the app's "intelligence" fully restorable.
+// =================================================================================
 package io.pm.finlight.data
 
 import android.content.Context
@@ -110,7 +117,13 @@ object DataExportService {
                         merchantRenameRules = db.merchantRenameRuleDao().getAllRulesList(),
                         merchantCategoryMappings = db.merchantCategoryMappingDao().getAll(),
                         ignoreRules = db.ignoreRuleDao().getAllList(),
-                        smsParseTemplates = db.smsParseTemplateDao().getAllTemplates()
+                        smsParseTemplates = db.smsParseTemplateDao().getAllTemplates(),
+                        // --- Phase 2: Export Remaining App Intelligence ---
+                        tags = db.tagDao().getAllTagsList(),
+                        transactionTagCrossRefs = db.transactionDao().getAllCrossRefs(),
+                        goals = db.goalDao().getAll(),
+                        trips = db.tripDao().getAll(),
+                        accountAliases = db.accountAliasDao().getAll()
                     )
 
                 json.encodeToString(backupData)
@@ -148,11 +161,15 @@ object DataExportService {
 
             // Clear all data in the correct order (respecting foreign keys)
             db.splitTransactionDao().deleteAll()
-            db.transactionDao().deleteAll()
+            db.transactionDao().deleteAll() // Deletes transactions and their tag cross-refs via cascade
+            db.tagDao().deleteAll() // Must be after transactions
             db.accountDao().deleteAll()
             db.categoryDao().deleteAll()
             db.budgetDao().deleteAll()
             db.merchantMappingDao().deleteAll()
+            db.goalDao().deleteAll()
+            db.tripDao().deleteAll()
+            db.accountAliasDao().deleteAll()
             // --- Phase 1: Clear Core Parsing Intelligence Tables ---
             db.customSmsRuleDao().deleteAll()
             db.merchantRenameRuleDao().deleteAll()
@@ -165,8 +182,14 @@ object DataExportService {
             db.categoryDao().insertAll(backupData.categories)
             db.budgetDao().insertAll(backupData.budgets)
             db.merchantMappingDao().insertAll(backupData.merchantMappings)
+            db.tagDao().insertAll(backupData.tags)
+            db.goalDao().insertAll(backupData.goals)
+            db.tripDao().insertAll(backupData.trips)
+            db.accountAliasDao().insertAll(backupData.accountAliases)
             db.transactionDao().insertAll(backupData.transactions)
             db.splitTransactionDao().insertAll(backupData.splitTransactions)
+            db.transactionDao().addTagsToTransaction(backupData.transactionTagCrossRefs)
+
             // --- Phase 1: Insert Core Parsing Intelligence Data ---
             db.customSmsRuleDao().insertAll(backupData.customSmsRules)
             db.merchantRenameRuleDao().insertAll(backupData.merchantRenameRules)
