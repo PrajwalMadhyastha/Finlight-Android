@@ -221,12 +221,17 @@ dependencies {
     // --- REVERTED: The exclude rule is no longer needed due to the resolutionStrategy ---
     implementation("androidx.work:work-runtime-ktx:$workVersion")
 
-    // --- TENSORFLOW LITE (UPDATED) ---
+    // --- TENSORFLOW LITE (UPDATED) (Replaced by LiteRT which supports 16kb page size) ---
     // Switched from task-text to the core TFLite libraries for better control and compatibility.
-    implementation("org.tensorflow:tensorflow-lite-support:0.5.0")
-    implementation("org.tensorflow:tensorflow-lite:2.17.0")
+    //implementation("org.tensorflow:tensorflow-lite-support:0.5.0")
+   // implementation("org.tensorflow:tensorflow-lite:2.17.0")
     // Flex Delegate to support advanced text ops (needed for both app and tests)
-    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
-    androidTestImplementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
-    //implementation("com.google.ai.edge.litert:litert:2.0.1-alpha")
+    //implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+    //androidTestImplementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+
+    // Using LiteRT for 16kb page size Support
+    implementation("com.google.ai.edge.litert:litert:1.4.0")
+    implementation("com.google.ai.edge.litert:litert-api:1.4.0")
+    implementation("com.google.ai.edge.litert:litert-support:1.4.0")
+    implementation("com.google.ai.edge.litert:litert-metadata:1.4.0")
 }
