@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/AccountAliasDao.kt
-// REASON: NEW FILE - This DAO provides the necessary methods to interact with
-// the new `account_aliases` table. It allows the AccountRepository to save new
-// aliases and the SmsReceiver to look them up.
+// REASON: FEATURE (Backup Phase 2) - Added `getAll` and `deleteAll` functions.
+// These are required by the DataExportService to back up and restore the
+// learned account merge mappings.
 // =================================================================================
 package io.pm.finlight.data.db.dao
 
@@ -19,4 +19,16 @@ interface AccountAliasDao {
 
     @Query("SELECT * FROM account_aliases WHERE aliasName = :aliasName COLLATE NOCASE")
     suspend fun findByAlias(aliasName: String): AccountAlias?
+
+    /**
+     * Retrieves all account aliases for backup purposes.
+     */
+    @Query("SELECT * FROM account_aliases")
+    suspend fun getAll(): List<AccountAlias>
+
+    /**
+     * Deletes all account aliases, used during data restore.
+     */
+    @Query("DELETE FROM account_aliases")
+    suspend fun deleteAll()
 }

@@ -1,15 +1,10 @@
-// =================================================================================
-// FILE: ./core/src/main/java/io/pm/finlight/core/SmsParseTemplate.kt
-// REASON: REFACTOR - Moved this entity from the :app module to the :core module.
-// As a core data model for the parsing engine, it needs to be accessible by all
-// modules, and this move resolves the 'Unresolved reference' build errors.
-// =================================================================================
 package io.pm.finlight
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /**
  * Represents a learned SMS parsing template.
@@ -26,6 +21,7 @@ import androidx.room.PrimaryKey
  * @param originalAmountStartIndex The starting index of the amount in the originalSmsBody.
  * @param originalAmountEndIndex The ending index of the amount in the originalSmsBody.
  */
+@Serializable
 @Entity(
     tableName = "sms_parse_templates",
     indices = [Index(value = ["templateSignature"])]

@@ -1,7 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/Goal.kt
-// REASON: NEW FILE - Defines the Room entity for a savings goal, including its
-// name, target and saved amounts, target date, and the associated account.
+// REASON: FEATURE (Backup Phase 2) - Added the @Serializable annotation. This is
+// required by the kotlinx.serialization library to include this entity's data
+// in the JSON backup snapshot.
 // =================================================================================
 package io.pm.finlight
 
@@ -9,7 +10,9 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
+@Serializable
 @Entity(
     tableName = "goals",
     foreignKeys = [

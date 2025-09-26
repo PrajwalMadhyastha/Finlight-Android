@@ -4,10 +4,12 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /**
  * Enum to define the type of content an IgnoreRule should match against.
  */
+@Serializable
 enum class RuleType {
     SENDER,
     BODY_PHRASE
@@ -22,6 +24,7 @@ enum class RuleType {
  * @param isEnabled Whether this rule is currently active.
  * @param isDefault True if this is a pre-populated rule, false if user-added.
  */
+@Serializable
 @Entity(
     tableName = "ignore_rules",
     indices = [Index(value = ["pattern"], unique = true, name = "index_ignore_rules_pattern_nocase")]

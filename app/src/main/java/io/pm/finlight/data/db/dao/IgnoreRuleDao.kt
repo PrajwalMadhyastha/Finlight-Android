@@ -1,10 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/IgnoreRuleDao.kt
-// REASON: FEATURE - The `getEnabledPhrases` function has been replaced with
-// `getEnabledRules`, which returns the full IgnoreRule objects. This provides
-// the SmsParser with the necessary `type` information to distinguish between
-// sender and body phrase patterns.
-// =================================================================================
 package io.pm.finlight
 
 import androidx.room.Dao
@@ -29,6 +22,13 @@ interface IgnoreRuleDao {
     fun getAll(): Flow<List<IgnoreRule>>
 
     /**
+     * Retrieves all ignore rules as a simple List for backup purposes.
+     * @return A List of all IgnoreRule objects.
+     */
+    @Query("SELECT * FROM ignore_rules")
+    suspend fun getAllList(): List<IgnoreRule>
+
+    /**
      * Retrieves all enabled ignore rules.
      * @return A list of the active IgnoreRule objects.
      */
@@ -49,6 +49,12 @@ interface IgnoreRuleDao {
      */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(rules: List<IgnoreRule>)
+
+    /**
+     * Deletes all ignore rules from the database.
+     */
+    @Query("DELETE FROM ignore_rules")
+    suspend fun deleteAll()
 
     /**
      * Updates an existing ignore rule.

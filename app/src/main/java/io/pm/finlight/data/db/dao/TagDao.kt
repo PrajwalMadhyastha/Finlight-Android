@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TagDao.kt
-// REASON: FIX - Added the `getTagById` function. This is required by the new,
-// safer trip editing logic in the CurrencyViewModel to fetch a trip's original
-// tag details before performing cleanup operations.
+// REASON: FEATURE (Backup Phase 2) - Added `getAllTagsList`, `insertAll`, and
+// `deleteAll` functions. These are required by the DataExportService to back up
+// and restore all user-created tags.
 // =================================================================================
 package io.pm.finlight
 
@@ -19,8 +19,20 @@ interface TagDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(tag: Tag): Long
 
+    /**
+     * Inserts a list of tags, used during data restore.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(tags: List<Tag>)
+
     @Query("SELECT * FROM tags ORDER BY name ASC")
     fun getAllTags(): Flow<List<Tag>>
+
+    /**
+     * Retrieves all tags as a simple List for backup purposes.
+     */
+    @Query("SELECT * FROM tags")
+    suspend fun getAllTagsList(): List<Tag>
 
     @Query("SELECT * FROM tags WHERE name = :name COLLATE NOCASE LIMIT 1")
     suspend fun findByName(name: String): Tag?
@@ -34,4 +46,10 @@ interface TagDao {
 
     @Delete
     suspend fun delete(tag: Tag)
+
+    /**
+     * Deletes all tags, used during data restore.
+     */
+    @Query("DELETE FROM tags")
+    suspend fun deleteAll()
 }

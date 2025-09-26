@@ -430,7 +430,7 @@ fun ApproveTransactionScreen(
     }
 
     if (activeSheetContent != null) {
-        val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
         ModalBottomSheet(
             onDismissRequest = { activeSheetContent = null },

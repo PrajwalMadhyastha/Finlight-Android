@@ -1,10 +1,14 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: REFACTOR - The instantiation of AccountRepository has been updated to
-// pass the full AppDatabase instance instead of just the DAO. This is required
-// to support the new transactional account merging logic.
-// FIX - The instantiation of TransactionRepository has been updated to include
-// the required dependencies, resolving a build error.
+// REASON: FEATURE - Implemented real-time auto-categorization. The ViewModel
+// now listens to description changes from the UI, debounces them, and emits
+// a category suggestion via a new `suggestedCategory` StateFlow.
+// REFACTOR - The `onSaveTapped` logic has been updated to work with the new
+// real-time flow. It now accepts the category ID directly from the UI state,
+// which is populated either by the new suggestion flow or by the user's manual
+// selection.
+// FIX - Resolved a type inference build error by explicitly typing the null-
+// emitting flow in the `suggestedCategory` stream to `Flow<Category?>`.
 // =================================================================================
 package io.pm.finlight
 
@@ -19,6 +23,7 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.HeuristicCategorizer
 import io.pm.finlight.utils.ShareImageGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -49,6 +54,18 @@ data class RetroUpdateSheetState(
     val selectedIds: Set<Int> = emptySet(),
     val isLoading: Boolean = true
 )
+
+data class ManualTransactionData(
+    val description: String,
+    val amountStr: String,
+    val accountId: Int,
+    val notes: String?,
+    val date: Long,
+    val transactionType: String,
+    val imageUris: List<Uri>,
+    val tags: Set<Tag>
+)
+
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class TransactionViewModel(application: Application) : AndroidViewModel(application) {
@@ -142,6 +159,31 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _merchantSearchQuery = MutableStateFlow("")
     val merchantPredictions: StateFlow<List<MerchantPrediction>>
+
+    private val _showCategoryNudge = MutableStateFlow<ManualTransactionData?>(null)
+    val showCategoryNudge = _showCategoryNudge.asStateFlow()
+
+    // --- NEW: StateFlows for real-time auto-categorization ---
+    private val _addTransactionDescription = MutableStateFlow("")
+    private val _userManuallySelectedCategory = MutableStateFlow(false)
+
+    val suggestedCategory: StateFlow<Category?> = _addTransactionDescription
+        .debounce(400) // Wait for the user to stop typing
+        .combine(_userManuallySelectedCategory) { description, manualSelect ->
+            description to manualSelect
+        }
+        .flatMapLatest { (description, manualSelect) ->
+            if (description.length > 2 && !manualSelect) {
+                flow {
+                    val allCategoriesList = allCategories.first()
+                    emit(HeuristicCategorizer.findCategoryForDescription(description, allCategoriesList))
+                }
+            } else {
+                flowOf<Category?>(null) // --- FIX: Explicitly type the null flow ---
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
 
     init {
         settingsRepository = SettingsRepository(application)
@@ -468,48 +510,109 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    suspend fun addTransaction(
+    // --- NEW: Public functions for real-time UI interaction ---
+    fun onAddTransactionDescriptionChanged(description: String) {
+        _addTransactionDescription.value = description
+        // If user clears description, allow auto-suggestion again and reset manual flag
+        if (description.isBlank()) {
+            _userManuallySelectedCategory.value = false
+        }
+    }
+
+    fun onUserManuallySelectedCategory() {
+        _userManuallySelectedCategory.value = true
+    }
+
+    // --- UPDATED: Smart Add Transaction Logic ---
+
+    fun onSaveTapped(
         description: String,
-        categoryId: Int?,
         amountStr: String,
-        accountId: Int,
+        accountId: Int?,
+        categoryId: Int?, // Accept category ID from UI state
         notes: String?,
         date: Long,
         transactionType: String,
-        imageUris: List<Uri>
-    ): Boolean {
-        _validationError.value = null
+        imageUris: List<Uri>,
+        onSaveComplete: () -> Unit
+    ) {
+        viewModelScope.launch {
+            _validationError.value = null
 
-        if (description.isBlank()) {
-            _validationError.value = "Description cannot be empty."
-            return false
+            if (description.isBlank()) {
+                _validationError.value = "Description cannot be empty."
+                return@launch
+            }
+            if ((amountStr.toDoubleOrNull() ?: 0.0) <= 0.0) {
+                _validationError.value = "Please enter a valid, positive amount."
+                return@launch
+            }
+            if (accountId == null) {
+                _validationError.value = "An account must be selected."
+                return@launch
+            }
+
+            val transactionData = ManualTransactionData(
+                description = description,
+                amountStr = amountStr,
+                accountId = accountId,
+                notes = notes,
+                date = date,
+                transactionType = transactionType,
+                imageUris = imageUris,
+                tags = _selectedTags.value
+            )
+
+            if (categoryId != null) {
+                // Magic Path: Auto-categorized (or manually selected), save immediately
+                val success = saveManualTransaction(transactionData, categoryId)
+                if (success) {
+                    onSaveComplete()
+                }
+            } else {
+                // Guided Path: No category found, trigger the nudge
+                _showCategoryNudge.value = transactionData
+            }
         }
-        val enteredAmount = amountStr.toDoubleOrNull()
+    }
+
+    fun saveWithSelectedCategory(categoryId: Int?, onComplete: () -> Unit) {
+        viewModelScope.launch {
+            val transactionData = _showCategoryNudge.value
+            if (transactionData != null) {
+                val success = saveManualTransaction(transactionData, categoryId)
+                if (success) {
+                    onComplete()
+                }
+            }
+            _showCategoryNudge.value = null // Clear the nudge state
+        }
+    }
+
+    private suspend fun saveManualTransaction(data: ManualTransactionData, categoryId: Int?): Boolean {
+        _validationError.value = null
+        val enteredAmount = data.amountStr.toDoubleOrNull()
         if (enteredAmount == null || enteredAmount <= 0.0) {
             _validationError.value = "Please enter a valid, positive amount."
-            return false
-        }
-        if (categoryId == null) {
-            _validationError.value = "Please select a category."
             return false
         }
 
         val travelSettings = travelModeSettings.value
         val isInternationalTravel = travelSettings?.isEnabled == true &&
                 travelSettings.tripType == TripType.INTERNATIONAL &&
-                date >= travelSettings.startDate &&
-                date <= travelSettings.endDate
+                data.date >= travelSettings.startDate &&
+                data.date <= travelSettings.endDate
 
         val transactionToSave = if (isInternationalTravel) {
             Transaction(
-                description = description,
-                originalDescription = description,
+                description = data.description,
+                originalDescription = data.description,
                 categoryId = categoryId,
                 amount = enteredAmount * (travelSettings!!.conversionRate ?: 1f),
-                date = date,
-                accountId = accountId,
-                notes = notes,
-                transactionType = transactionType,
+                date = data.date,
+                accountId = data.accountId,
+                notes = data.notes,
+                transactionType = data.transactionType,
                 isExcluded = false,
                 sourceSmsId = null,
                 sourceSmsHash = null,
@@ -520,14 +623,14 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
             )
         } else {
             Transaction(
-                description = description,
-                originalDescription = description,
+                description = data.description,
+                originalDescription = data.description,
                 categoryId = categoryId,
                 amount = enteredAmount,
-                date = date,
-                accountId = accountId,
-                notes = notes,
-                transactionType = transactionType,
+                date = data.date,
+                accountId = data.accountId,
+                notes = data.notes,
+                transactionType = data.transactionType,
                 isExcluded = false,
                 sourceSmsId = null,
                 sourceSmsHash = null,
@@ -537,12 +640,12 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
         return try {
             withContext(Dispatchers.IO) {
-                val savedImagePaths = imageUris.mapNotNull { uri ->
+                val savedImagePaths = data.imageUris.mapNotNull { uri ->
                     saveImageToInternalStorage(uri)
                 }
                 transactionRepository.insertTransactionWithTagsAndImages(
                     transactionToSave,
-                    _selectedTags.value,
+                    data.tags,
                     savedImagePaths
                 )
             }
@@ -554,8 +657,12 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+
     fun clearAddTransactionState() {
         _selectedTags.value = emptySet()
+        // --- NEW: Reset real-time suggestion state ---
+        _addTransactionDescription.value = ""
+        _userManuallySelectedCategory.value = false
     }
 
     private fun loadOriginalSms(sourceSmsId: Long?) {

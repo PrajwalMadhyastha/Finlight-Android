@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/entity/Trip.kt
-// REASON: FIX - Aligned the Room entity schema with the actual database
-// schema created by the migrations. Added the `defaultValue` to the tripType
-// column and marked the index on `tagId` as unique to resolve the
-// "Migration didn't properly handle" runtime crash.
+// REASON: FEATURE (Backup Phase 2) - Added the @Serializable annotation. This is
+// required by the kotlinx.serialization library to include this entity's data
+// in the JSON backup snapshot.
 // =================================================================================
 package io.pm.finlight.data.db.entity
 
@@ -14,7 +13,9 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import io.pm.finlight.Tag
 import io.pm.finlight.TripType
+import kotlinx.serialization.Serializable
 
+@Serializable
 @Entity(
     tableName = "trips",
     foreignKeys = [
