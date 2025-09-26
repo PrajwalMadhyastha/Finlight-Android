@@ -199,61 +199,61 @@ class DashboardViewModel(
                     // Scenario C: Still Pacing High (High total spend AND high recent spend)
                     percentOfBudgetSpent > percentOfMonthPassed && forecastedSpend > budget -> {
                         listOf(
-                            "Pacing a bit high for this month.",
-                            "Time to ease up on spending.",
-                            "Still trending over budget.",
-                            "Let's try to slow things down.",
-                            "Watch the spending for a bit.",
-                            "Heads up: pacing is still high.",
-                            "A bit too fast for this month.",
-                            "Let's pump the brakes slightly.",
-                            "Budget is feeling the pressure.",
-                            "Trending to overspend."
+                            "Pacing a bit high for this month",
+                            "Time to ease up on spending",
+                            "Still trending over budget",
+                            "Let's try to slow things down",
+                            "Watch the spending for a bit",
+                            "Heads up: pacing is still high",
+                            "A bit too fast for this month",
+                            "Let's pump the brakes slightly",
+                            "Budget is feeling the pressure",
+                            "Trending to overspend"
                         ).random()
                     }
                     // Scenario D: Recently Slipped Up (OK total spend, but high recent spend)
                     percentOfBudgetSpent <= percentOfMonthPassed && forecastedSpend > budget -> {
                         listOf(
-                            "Spending has picked up recently.",
-                            "Careful, you're trending over.",
-                            "Watch the recent spending.",
-                            "You were on track, pace has increased.",
-                            "A recent slip-up in spending.",
-                            "Let's get back to that great pace.",
-                            "Trending high the last few days.",
-                            "A little adjustment will help.",
-                            "Let's avoid a spending spree.",
-                            "Back on the brakes for a bit."
+                            "Spending has picked up recently",
+                            "Careful, you're trending over",
+                            "Watch the recent spending",
+                            "You were on track, pace has increased",
+                            "A recent slip-up in spending",
+                            "Let's get back to that great pace",
+                            "Trending high the last few days",
+                            "A little adjustment will help",
+                            "Let's avoid a spending spree",
+                            "Back on the brakes for a bit"
                         ).random()
                     }
                     // Scenario A: Back on Track (High total spend, but low recent spend)
                     percentOfBudgetSpent > percentOfMonthPassed && forecastedSpend <= budget -> {
                         listOf(
-                            "Nice recovery! You're on pace now.",
-                            "Spending slowed, looking good.",
+                            "Nice recovery! You're on pace now",
+                            "Spending slowed, looking good",
                             "Back on track for the month!",
-                            "Great adjustment on spending.",
-                            "You've course-corrected perfectly.",
-                            "Well done reining it in.",
-                            "Pacing is now under control.",
-                            "The rest of the month looks good.",
-                            "Good save! Keep it up.",
-                            "Back within your monthly plan."
+                            "Great adjustment on spending",
+                            "You've course-corrected perfectly",
+                            "Well done reining it in",
+                            "Pacing is now under control",
+                            "The rest of the month looks good",
+                            "Good save! Keep it up",
+                            "Back within your monthly plan"
                         ).random()
                     }
                     // Scenario B: Consistently Good
                     else -> {
                         listOf(
                             "Excellent pacing this month!",
-                            "On track with room to spare.",
-                            "Well within budget, great job.",
-                            "Your budget is looking healthy.",
-                            "Consistently great spending.",
+                            "On track with room to spare",
+                            "Well within budget, great job",
+                            "Your budget is looking healthy",
+                            "Consistently great spending",
                             "Keep this momentum going!",
-                            "Smooth sailing this month.",
-                            "You're building a nice buffer.",
-                            "Perfectly on track.",
-                            "Another great spending day."
+                            "Smooth sailing this month",
+                            "You're building a nice buffer",
+                            "Perfectly on track",
+                            "Another great spending day"
                         ).random()
                     }
                 }

@@ -1,19 +1,9 @@
 // =================================================================================
 // FILE: ./core/src/main/java/io/pm/finlight/core/SmsParser.kt
-// REASON: FIX - Resolved multiple build errors by removing dependencies on the
-// Android logcat, correcting nullable object access with safe calls, and fixing
-// an incorrect property name in a data class copy operation.
-// FEATURE - Added a new `IgnoredByClassifier` state to the ParseResult sealed
-// class. This allows the UI to specifically show when the ML model was the
-// reason a message was ignored, improving the debugger's transparency.
-// FIX - Refactored the final enrichment stage to use immutable variables (`val`)
-// and chained copy calls. This resolves smart cast and nullability build errors
-// by ensuring the transaction object is not mutated within a closure.
-// REFACTOR - The main parsing logic has been split into two distinct functions.
-// `parseWithOnlyCustomRules` exclusively checks for user-defined rules. The main
-// `parseWithReason` function now handles the rest of the pipeline (ignore rules,
-// heuristics, generic regexes). This allows the `SmsReceiver` to implement the
-// correct parsing hierarchy.
+// REASON: FIX - Corrected a regex pattern for ICICI Bank messages by making it
+// more specific (requiring a period after the word "credited") and increasing
+// its priority in the pattern list. This resolves a bug where the merchant name
+// was being parsed incorrectly for certain debit transactions.
 // =================================================================================
 package io.pm.finlight
 
@@ -113,6 +103,8 @@ object SmsParser {
             "at\\s+'([^']+)'\\s+from".toRegex(RegexOption.IGNORE_CASE),
             "at\\s+(.*?)\\s+\\(UPI Ref No".toRegex(RegexOption.IGNORE_CASE),
             "^([A-Z0-9*\\s]+) refund of".toRegex(RegexOption.IGNORE_CASE),
+            // --- FIX: Increased specificity and priority of this ICICI pattern ---
+            ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s+credited\\.".toRegex(RegexOption.IGNORE_CASE),
             "towards\\s+(.+?)(?:\\. UPI Ref| for Autopay)".toRegex(RegexOption.IGNORE_CASE),
             "transfer from\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\s+Ref No|$)".toRegex(RegexOption.IGNORE_CASE),
             "towards\\s+(annual maintenance charges)\\s+for".toRegex(RegexOption.IGNORE_CASE),
@@ -149,7 +141,6 @@ object SmsParser {
             "\\d{2}-\\d{2}-\\d{2,4}\\s+\\d{2}:\\d{2}:\\d{2}\\s+([A-Za-z0-9\\s.&'-]+?)\\s+Avl Lmt".toRegex(RegexOption.IGNORE_CASE),
             "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3}|\\.)".toRegex(RegexOption.IGNORE_CASE),
             "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on".toRegex(RegexOption.IGNORE_CASE),
-            ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s*credited".toRegex(RegexOption.IGNORE_CASE),
             "as (reversal of transaction)".toRegex(RegexOption.IGNORE_CASE),
             "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'@-]+?)(?:\\.|\\s*\\()".toRegex(RegexOption.IGNORE_CASE),
             "sent to\\s+([A-Za-z0-9\\s.-]+?)(?:\\s+on\\s+|\\s+|-|$)".toRegex(RegexOption.IGNORE_CASE),

@@ -2,32 +2,36 @@
 <!--
 // =================================================================================
 // FILE: ./app/src/main/res/xml/data_extraction_rules.xml
-// REASON: NEW FILE - This file configures Android's Auto Backup feature.
-// It explicitly includes the Room database files while excluding the temporary
-// journal files (-wal, -shm). This is the recommended approach to safely back
-// up a Room database, preventing data corruption while ensuring user data is saved.
+// REASON: FIX (Backup Restore) - The backup strategy has been corrected.
+// The <cloud-backup> rules no longer attempt to back up the live, encrypted
+// database file, as the decryption key is lost on uninstall. Instead, we now
+// exclusively include the 'file' domain, which contains the restorable
+// compressed JSON snapshot ('backup_snapshot.gz'). This is the definitive fix
+// to ensure transactions and other database data are restored.
 // =================================================================================
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- Include all shared preferences -->
+        <!-- Include standard preferences -->
         <include domain="sharedpref" path="."/>
-        <!--
-            Include the main database file.
-            The path corresponds to the database file created by Room.
-        -->
-        <include domain="database" path="finance_database.db" />
-        <!--
-            Exclude the temporary Write-Ahead-Log and Shared-Memory files.
-            Backing these up while the app is running can lead to a corrupted
-            and unusable backup.
-        -->
-        <exclude domain="database" path="finance_database.db-shm" />
-        <exclude domain="database" path="finance_database.db-wal" />
+        <!-- Exclude the file with the now-unusable encrypted key -->
+        <exclude domain="sharedpref" path="finlight_secure_prefs.xml" />
+
+        <!-- DO NOT include the 'database' domain for cloud backup. -->
+        <!-- The restored .db file would be encrypted and unusable without the Keystore key. -->
+
+        <!-- THIS IS THE FIX: Include the 'file' domain, which contains backup_snapshot.gz -->
+        <include domain="file" path="." />
+        <!-- But, exclude the large, non-essential image attachments from the backup -->
+        <exclude domain="file" path="attachments/" />
     </cloud-backup>
+
     <device-transfer>
-        <!-- Rules for device-to-device transfers can be defined here if needed -->
+        <!-- For device-to-device transfers, we can include everything -->
         <include domain="sharedpref" path="."/>
+        <exclude domain="sharedpref" path="finlight_secure_prefs.xml" />
         <include domain="database" path="." />
+        <include domain="file" path="." />
+        <exclude domain="file" path="attachments/" />
     </device-transfer>
 </data-extraction-rules>

@@ -1,18 +1,18 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/DataExportService.kt
-// REASON: FEATURE - Added createBackupSnapshot function to generate a
-// compressed (Gzip) JSON file of the database. This creates a highly compact
-// and resilient data snapshot suitable for inclusion in Android's Auto Backup
-// as a failsafe against database migration failures.
+// REASON: FEATURE (Backup Phase 2) - The export and import functions have been
+// updated to handle all the new Phase 2 entities. The service now correctly
+// backs up and restores Tags, Goals, Trips, AccountAliases, and their
+// relationships, making the app's "intelligence" fully restorable.
 // =================================================================================
 package io.pm.finlight.data
 
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import io.pm.finlight.AppDataBackup
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.model.AppDataBackup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -20,10 +20,12 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 import kotlin.collections.forEach
 
@@ -35,7 +37,6 @@ object DataExportService {
             ignoreUnknownKeys = true
         }
 
-    // --- NEW: Function to create a compressed JSON snapshot for backup ---
     suspend fun createBackupSnapshot(context: Context): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -61,8 +62,39 @@ object DataExportService {
         }
     }
 
+    suspend fun restoreFromBackupSnapshot(context: Context): Boolean {
+        return withContext(Dispatchers.IO) {
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            if (!snapshotFile.exists()) {
+                Log.d("DataExportService", "No backup snapshot found. Proceeding with normal startup.")
+                return@withContext false // No snapshot to restore
+            }
 
-    // --- UPDATED: Add "Id" and "ParentId" to the CSV template header ---
+            Log.d("DataExportService", "Backup snapshot found. Starting restore process.")
+            try {
+                // Decompress the Gzip file
+                val jsonString = GZIPInputStream(FileInputStream(snapshotFile)).bufferedReader().use { it.readText() }
+
+                // Import the data from the JSON string
+                val success = importDataFromJsonString(context, jsonString)
+
+                if (success) {
+                    // CRITICAL: Delete the file after a successful restore to prevent re-importing on every app launch
+                    snapshotFile.delete()
+                    Log.d("DataExportService", "Restore successful. Snapshot file deleted.")
+                } else {
+                    Log.e("DataExportService", "Restore failed during data import phase.")
+                }
+                return@withContext success
+            } catch (e: Exception) {
+                Log.e("DataExportService", "Failed to restore from backup snapshot", e)
+                // Attempt to delete the corrupted file to prevent future errors
+                snapshotFile.delete()
+                return@withContext false
+            }
+        }
+    }
+
     fun getCsvTemplateString(): String {
         return "Id,ParentId,Date,Description,Amount,Type,Category,Account,Notes,IsExcluded,Tags\n"
     }
@@ -79,8 +111,19 @@ object DataExportService {
                         categories = db.categoryDao().getAllCategories().first(),
                         budgets = db.budgetDao().getAllBudgets().first(),
                         merchantMappings = db.merchantMappingDao().getAllMappings().first(),
-                        // --- NEW: Include split transactions in the backup ---
-                        splitTransactions = db.splitTransactionDao().getAllSplits().first()
+                        splitTransactions = db.splitTransactionDao().getAllSplits().first(),
+                        // --- Phase 1: Export Core Parsing Intelligence ---
+                        customSmsRules = db.customSmsRuleDao().getAllRulesList(),
+                        merchantRenameRules = db.merchantRenameRuleDao().getAllRulesList(),
+                        merchantCategoryMappings = db.merchantCategoryMappingDao().getAll(),
+                        ignoreRules = db.ignoreRuleDao().getAllList(),
+                        smsParseTemplates = db.smsParseTemplateDao().getAllTemplates(),
+                        // --- Phase 2: Export Remaining App Intelligence ---
+                        tags = db.tagDao().getAllTagsList(),
+                        transactionTagCrossRefs = db.transactionDao().getAllCrossRefs(),
+                        goals = db.goalDao().getAll(),
+                        trips = db.tripDao().getAll(),
+                        accountAliases = db.accountAliasDao().getAll()
                     )
 
                 json.encodeToString(backupData)
@@ -99,35 +142,64 @@ object DataExportService {
             try {
                 val jsonString = context.contentResolver.openInputStream(uri)?.bufferedReader()
                     .use { it?.readText() }
-                if (jsonString == null) return@withContext false
-
-                val backupData = json.decodeFromString<AppDataBackup>(jsonString)
-
-                val db = AppDatabase.getInstance(context)
-                // Clear all data in the correct order (respecting foreign keys)
-                db.splitTransactionDao().deleteAll()
-                db.transactionDao().deleteAll()
-                db.accountDao().deleteAll()
-                db.categoryDao().deleteAll()
-                db.budgetDao().deleteAll()
-                db.merchantMappingDao().deleteAll()
-
-
-                // Insert new data
-                db.accountDao().insertAll(backupData.accounts)
-                db.categoryDao().insertAll(backupData.categories)
-                db.budgetDao().insertAll(backupData.budgets)
-                db.merchantMappingDao().insertAll(backupData.merchantMappings)
-                db.transactionDao().insertAll(backupData.transactions)
-                // --- NEW: Import split transactions ---
-                db.splitTransactionDao().insertAll(backupData.splitTransactions)
-
-
-                true
+                if (jsonString == null) {
+                    Log.e("DataExportService", "Failed to read JSON from URI.")
+                    return@withContext false
+                }
+                importDataFromJsonString(context, jsonString)
             } catch (e: Exception) {
-                Log.e("DataExportService", "Error importing from JSON", e)
+                Log.e("DataExportService", "Error importing from JSON URI", e)
                 false
             }
+        }
+    }
+
+    private suspend fun importDataFromJsonString(context: Context, jsonString: String): Boolean {
+        return try {
+            val backupData = json.decodeFromString<AppDataBackup>(jsonString)
+            val db = AppDatabase.getInstance(context)
+
+            // Clear all data in the correct order (respecting foreign keys)
+            db.splitTransactionDao().deleteAll()
+            db.transactionDao().deleteAll() // Deletes transactions and their tag cross-refs via cascade
+            db.tagDao().deleteAll() // Must be after transactions
+            db.accountDao().deleteAll()
+            db.categoryDao().deleteAll()
+            db.budgetDao().deleteAll()
+            db.merchantMappingDao().deleteAll()
+            db.goalDao().deleteAll()
+            db.tripDao().deleteAll()
+            db.accountAliasDao().deleteAll()
+            // --- Phase 1: Clear Core Parsing Intelligence Tables ---
+            db.customSmsRuleDao().deleteAll()
+            db.merchantRenameRuleDao().deleteAll()
+            db.merchantCategoryMappingDao().deleteAll()
+            db.ignoreRuleDao().deleteAll()
+            db.smsParseTemplateDao().deleteAll()
+
+            // Insert new data
+            db.accountDao().insertAll(backupData.accounts)
+            db.categoryDao().insertAll(backupData.categories)
+            db.budgetDao().insertAll(backupData.budgets)
+            db.merchantMappingDao().insertAll(backupData.merchantMappings)
+            db.tagDao().insertAll(backupData.tags)
+            db.goalDao().insertAll(backupData.goals)
+            db.tripDao().insertAll(backupData.trips)
+            db.accountAliasDao().insertAll(backupData.accountAliases)
+            db.transactionDao().insertAll(backupData.transactions)
+            db.splitTransactionDao().insertAll(backupData.splitTransactions)
+            db.transactionDao().addTagsToTransaction(backupData.transactionTagCrossRefs)
+
+            // --- Phase 1: Insert Core Parsing Intelligence Data ---
+            db.customSmsRuleDao().insertAll(backupData.customSmsRules)
+            db.merchantRenameRuleDao().insertAll(backupData.merchantRenameRules)
+            db.merchantCategoryMappingDao().insertAll(backupData.merchantCategoryMappings)
+            db.ignoreRuleDao().insertAll(backupData.ignoreRules)
+            db.smsParseTemplateDao().insertAll(backupData.smsParseTemplates)
+            true
+        } catch (e: Exception) {
+            Log.e("DataExportService", "Error processing JSON string during import", e)
+            false
         }
     }
 
@@ -158,7 +230,6 @@ object DataExportService {
                     val escapedTags = escapeCsvField(tagsString)
 
                     if (transaction.isSplit) {
-                        // This is a parent transaction
                         val category = "Split Transaction" // Parent has a special category
                         csvBuilder.append("${transaction.id},,$date,$description,$amount,$type,$category,$account,$notes,$isExcluded,$escapedTags\n")
 

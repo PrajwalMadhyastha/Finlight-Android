@@ -1,6 +1,9 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
 // REASON: REFACTOR - Removed the unused Google Drive API dependencies.
+// FEATURE - Enabled the generation of native debug symbols for release builds.
+// This will allow for symbolication of native crashes (e.g., from SQLCipher
+// or TensorFlow Lite) in the Google Play Console, making them easier to debug.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -97,6 +100,10 @@ android {
                 "proguard-rules.pro",
             )
             signingConfig = signingConfigs.getByName("release")
+            // --- NEW: Enable native debug symbol generation ---
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
         debug {
             isDebuggable = true

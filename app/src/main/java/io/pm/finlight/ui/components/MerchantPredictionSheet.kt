@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/MerchantPredictionSheet.kt
-// REASON: NEW FILE - This composable defines the UI for the new smart merchant
-// search feature. It includes a text field for the search query and a lazy
-// column to display the real-time predictions, complete with merchant names and
-// their associated categories. It is designed to be reusable across different screens.
+// REASON: FEATURE - The composable's signature is updated to accept an
+// `onQueryChanged` lambda. This callback is now invoked whenever the text in
+// the search field changes, feeding the description in real-time to the new
+// auto-categorization flow in the ViewModel.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -35,6 +35,7 @@ import kotlin.collections.isNotEmpty
 fun MerchantPredictionSheet(
     viewModel: TransactionViewModel,
     initialDescription: String,
+    onQueryChanged: (String) -> Unit, // --- NEW: Add callback for real-time updates
     onPredictionSelected: (prediction: MerchantPrediction) -> Unit,
     onManualSave: (newDescription: String) -> Unit,
     onDismiss: () -> Unit
@@ -75,7 +76,10 @@ fun MerchantPredictionSheet(
         Spacer(Modifier.height(16.dp))
         OutlinedTextField(
             value = currentDescription,
-            onValueChange = { currentDescription = it },
+            onValueChange = {
+                currentDescription = it
+                onQueryChanged(it) // --- NEW: Call the real-time update handler ---
+            },
             label = { Text("Search or enter new merchant") },
             modifier = Modifier
                 .fillMaxWidth()

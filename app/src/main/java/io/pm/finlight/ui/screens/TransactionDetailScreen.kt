@@ -8,6 +8,9 @@
 // list is scrollable if it overflows while keeping the header and footer fixed.
 // REFACTOR - The `NotesRow` has been changed from a Row to a Column layout to
 // better display multi-line notes, improving readability.
+// FIX - The call to MerchantPredictionSheet has been updated to include the
+// required `onQueryChanged` parameter, resolving a build error. An empty
+// lambda is passed as this screen does not require real-time categorization.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -1171,6 +1174,7 @@ private fun TransactionEditSheetContent(
             MerchantPredictionSheet(
                 viewModel = viewModel,
                 initialDescription = details.transaction.description,
+                onQueryChanged = {}, // This screen doesn't need real-time categorization
                 onPredictionSelected = { prediction ->
                     viewModel.updateTransactionDescription(transactionId, prediction.description)
                     prediction.categoryId?.let { catId ->

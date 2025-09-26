@@ -1109,11 +1109,20 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
 
     @Test
     fun `test ignores CDSL message`() = runBlocking {
-        setupTest() // Uses the updated default rules
+        setupTest()
         val smsBody = "CDSL: Debit in a/c *14123461 for 78-AXIS ETSF DP GROWTH on 03SEP"
         val mockSms = SmsMessage(id = 9998L, sender = "JD-CDSLTX-S", body = smsBody, date = System.currentTimeMillis())
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
         assertNull("Should ignore messages from CDSL", result)
+    }
+
+    @Test
+    fun `test ignores HDFC E-Mandate message`() = runBlocking {
+        setupTest()
+        val smsBody = "E-Mandate!\nRs.59.00 will be deducted on 07/09/25, 00:00:00\nFor Google Play mandate\nUMN 28a800d66345345gdfgd435e8eee20a6085@okhdfcbank\nMaintain Balance\n-HDFC Bank"
+        val mockSms = SmsMessage(id = 9798L, sender = "JD-HDFCB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+        assertNull("Should ignore messages from HDFC E-Mandate", result)
     }
 }
 

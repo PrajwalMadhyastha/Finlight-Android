@@ -1,17 +1,18 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FEATURE - Updated the NavHost entry for "currency_travel_settings" to
-// accept an optional `tripId`. This allows the Travel History screen to navigate
-// to it in "edit mode".
-// REFACTOR: Removed the now-obsolete route for "travel_history_screen" as this
-// feature has been merged into the "currency_travel_settings" screen.
-// FEATURE - Added new routes and composables for the "Spending Analysis" and
-// "Analysis Details" screens, integrating the new feature into the app's
-// navigation graph.
-// FIX (Navigation) - The entire top-level navigation logic has been rewritten
-// to correctly handle the back stack. Navigating between bottom bar items now
-// correctly returns to the Dashboard on back press. Navigating to and from the
-// Profile screen now behaves as expected, returning to the previous screen.
+// REASON: FIX (Navigation) - The navigation logic for the bottom bar has been
+// corrected to remove the `inclusive = true` popUpTo condition when navigating
+// to the Dashboard. This prevents the back stack from being emptied, which was
+// causing the screen to flicker. The Dashboard is now correctly treated as the
+// non-inclusive root of the back stack for all tab navigations.
+// FIX (Navigation) - The onClick handler for the profile icon in the top app
+// bar now uses the same `popUpTo` logic as the bottom navigation bar. This
+// resolves an inconsistency where the back button behaved differently depending
+// on how the user navigated to the Profile screen.
+// FIX (Backup Restore) - The SplashScreen has been enhanced to check for a
+// restored backup snapshot on first launch. It now displays the restore status
+// to the user and triggers the data import process before navigating to the dashboard,
+// ensuring a seamless data recovery experience.
 // =================================================================================
 package io.pm.finlight
 
@@ -72,6 +73,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import coil.compose.AsyncImage
 import com.google.gson.Gson
+import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
@@ -85,7 +87,11 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.utils.CategoryIconHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.net.URLDecoder
 import java.util.concurrent.Executor
 
@@ -375,7 +381,16 @@ fun MainAppScreen() {
                                         .padding(end = 16.dp)
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .clickable { navController.navigate(BottomNavItem.Profile.route) }
+                                        .clickable {
+                                            // --- FIX #2: Use consistent navigation logic for profile icon ---
+                                            navController.navigate(BottomNavItem.Profile.route) {
+                                                popUpTo(BottomNavItem.Dashboard.route) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
                                 )
                             }
                             when (baseCurrentRoute) {
@@ -449,7 +464,7 @@ fun MainAppScreen() {
                                     navController.navigate(screen.route) {
                                         popUpTo(BottomNavItem.Dashboard.route) {
                                             saveState = true
-                                            inclusive = screen.route == BottomNavItem.Dashboard.route
+                                            // --- FIX #1: Removed the inclusive = true logic ---
                                         }
                                         launchSingleTop = true
                                         restoreState = true
@@ -517,7 +532,7 @@ fun MainAppScreen() {
         }
 
         if (showDeleteConfirmation) {
-            val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+            val isThemeDark = MaterialTheme.colorScheme.background.isDark()
             val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
             AlertDialog(
@@ -633,7 +648,7 @@ fun AppNavHost(
         }
 
         composable("splash_screen") {
-            SplashScreen(navController = navController, activity = activity)
+            SplashScreen(navController = navController)
         }
 
         composable(
@@ -1150,8 +1165,23 @@ fun AppNavHost(
 }
 
 @Composable
-fun SplashScreen(navController: NavHostController, activity: Activity) {
-    LaunchedEffect(key1 = Unit) {
+fun SplashScreen(navController: NavHostController) {
+    var statusText by remember { mutableStateOf("Initializing...") }
+    val context = LocalContext.current
+
+    LaunchedEffect(key1 = true) {
+        statusText = "Checking for backup..."
+        // Use Dispatchers.IO for file operations
+        val restored = withContext(Dispatchers.IO) {
+            DataExportService.restoreFromBackupSnapshot(context)
+        }
+
+        if (restored) {
+            statusText = "Data restored successfully!"
+            delay(1500) // Give user time to see the message
+        }
+
+        statusText = "Loading dashboard..."
         navController.navigate(BottomNavItem.Dashboard.route) {
             popUpTo("splash_screen") { inclusive = true }
         }
@@ -1161,7 +1191,11 @@ fun SplashScreen(navController: NavHostController, activity: Activity) {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(statusText, style = MaterialTheme.typography.bodyLarge)
+        }
     }
 }
 

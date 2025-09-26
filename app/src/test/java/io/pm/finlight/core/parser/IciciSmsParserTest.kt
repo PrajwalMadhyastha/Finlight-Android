@@ -291,4 +291,22 @@ class IciciSmsParserTest : BaseSmsParserTest() {
         assertEquals("ICICI Bank Account XX898", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses debit with recipient credited as expense`() = runBlocking {
+        setupTest()
+        val smsBody = "ICICI Bank Acct XX123 debited for Rs 600.00 on 20-Sep-25; KOMALSHREE BHAT credited. UPI:562098765250. Call 18002662 for dispute. SMS BLOCK 646 to 9215676766."
+        val mockSms = SmsMessage(
+            id = 99L,
+            sender = "DM-ICIBNK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(600.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("KOMALSHREE BHAT", result?.merchantName)
+    }
 }

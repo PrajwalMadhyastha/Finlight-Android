@@ -193,7 +193,7 @@ private fun DeleteGoalDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    val isThemeDark = MaterialTheme.colorScheme.surface.isDark()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     AlertDialog(

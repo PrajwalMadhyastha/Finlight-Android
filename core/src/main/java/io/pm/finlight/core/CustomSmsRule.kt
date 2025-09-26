@@ -3,6 +3,7 @@ package io.pm.finlight
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /**
  * Represents a user-defined parsing rule that is independent of the SMS sender.
@@ -20,6 +21,7 @@ import androidx.room.PrimaryKey
  * @param priority The execution priority. Higher numbers are checked first.
  * @param sourceSmsBody The original SMS text this rule was created from.
  */
+@Serializable
 @Entity(
     tableName = "custom_sms_rules",
     indices = [Index(value = ["triggerPhrase"], unique = true)]

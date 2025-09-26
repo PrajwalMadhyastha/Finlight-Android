@@ -1,10 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/CustomSmsRuleDao.kt
-// REASON: FEATURE - Added the `getRuleById` and `update` functions. These are
-// essential for the "Edit Rule" feature, allowing the ViewModel to fetch a
-// specific rule for editing and then save the updated version back to the
-// database.
-// =================================================================================
 package io.pm.finlight
 
 import androidx.room.Dao
@@ -32,6 +25,13 @@ interface CustomSmsRuleDao {
     suspend fun insert(rule: CustomSmsRule)
 
     /**
+     * Inserts a list of custom SMS rules.
+     * @param rules The list of rules to insert.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(rules: List<CustomSmsRule>)
+
+    /**
      * Retrieves all custom SMS rules from the database, ordered by priority in descending order.
      * This ensures that higher-priority rules are evaluated first.
      *
@@ -41,6 +41,13 @@ interface CustomSmsRuleDao {
     fun getAllRules(): Flow<List<CustomSmsRule>>
 
     /**
+     * Retrieves all custom SMS rules as a simple List for backup purposes.
+     * @return A List of all CustomSmsRule objects.
+     */
+    @Query("SELECT * FROM custom_sms_rules")
+    suspend fun getAllRulesList(): List<CustomSmsRule>
+
+    /**
      * Deletes a specific custom rule from the database.
      *
      * @param rule The CustomSmsRule object to delete.
@@ -48,11 +55,15 @@ interface CustomSmsRuleDao {
     @Delete
     suspend fun delete(rule: CustomSmsRule)
 
-    // --- NEW: Function to get a single rule by its ID ---
+    /**
+     * Deletes all custom SMS rules from the database.
+     */
+    @Query("DELETE FROM custom_sms_rules")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM custom_sms_rules WHERE id = :id")
     fun getRuleById(id: Int): Flow<CustomSmsRule?>
 
-    // --- NEW: Function to update an existing rule ---
     @Update
     suspend fun update(rule: CustomSmsRule)
 }

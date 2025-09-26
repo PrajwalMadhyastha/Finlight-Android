@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/MerchantCategoryMappingDao.kt
-// REASON: FEATURE - Added an `insertAll` function. This allows for the efficient
-// batch insertion of multiple merchant-to-category mappings, which is a core
-// requirement for the new "learn from CSV import" feature.
-// =================================================================================
 package io.pm.finlight
 
 import androidx.room.Dao
@@ -26,9 +20,21 @@ interface MerchantCategoryMappingDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(mapping: MerchantCategoryMapping)
 
-    // --- NEW: Function to insert a list of mappings during CSV import ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(mappings: List<MerchantCategoryMapping>)
+
+    /**
+     * Deletes all merchant-category mappings from the database.
+     */
+    @Query("DELETE FROM merchant_category_mapping")
+    suspend fun deleteAll()
+
+    /**
+     * Retrieves all merchant-category mappings as a simple List for backup purposes.
+     * @return A List of all MerchantCategoryMapping objects.
+     */
+    @Query("SELECT * FROM merchant_category_mapping")
+    suspend fun getAll(): List<MerchantCategoryMapping>
 
     /**
      * Retrieves the learned category ID for a given merchant name.
