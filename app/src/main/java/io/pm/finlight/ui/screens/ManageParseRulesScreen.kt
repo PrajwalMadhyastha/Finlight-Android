@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -33,13 +34,14 @@ import androidx.navigation.NavController
 import io.pm.finlight.CustomSmsRule
 import io.pm.finlight.ManageParseRulesViewModel
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ManageParseRulesScreen(
     navController: NavController,
@@ -48,35 +50,56 @@ fun ManageParseRulesScreen(
     val rules by viewModel.allRules.collectAsState()
     var ruleToDelete by remember { mutableStateOf<CustomSmsRule?>(null) }
 
-    if (rules.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                "No custom parsing rules have been created yet.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Manage Parse Rules") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "manage_parse_rules")
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
-        }
-    } else {
-        LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(rules, key = { it.id }) { rule ->
-                RuleItemCard(
-                    modifier = Modifier.animateItemPlacement(),
-                    rule = rule,
-                    onEditClick = {
-                        navController.navigate("rule_creation_screen?ruleId=${rule.id}")
-                    },
-                    onDeleteClick = { ruleToDelete = rule }
+        },
+        containerColor = Color.Transparent
+    ) { innerPadding ->
+        if (rules.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "No custom parsing rules have been created yet.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.padding(innerPadding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(rules, key = { it.id }) { rule ->
+                    RuleItemCard(
+                        modifier = Modifier.animateItemPlacement(),
+                        rule = rule,
+                        onEditClick = {
+                            navController.navigate("rule_creation_screen?ruleId=${rule.id}")
+                        },
+                        onDeleteClick = { ruleToDelete = rule }
+                    )
+                }
             }
         }
     }
+
 
     if (ruleToDelete != null) {
         val isThemeDark = MaterialTheme.colorScheme.background.isDark()

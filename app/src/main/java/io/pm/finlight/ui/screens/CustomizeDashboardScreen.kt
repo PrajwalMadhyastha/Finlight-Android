@@ -22,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -29,6 +30,7 @@ import androidx.navigation.NavController
 import io.pm.finlight.DashboardCardType
 import io.pm.finlight.DashboardViewModel
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.rememberDragDropState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -55,10 +57,13 @@ fun CustomizeDashboardScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+                actions = {
+                    HelpActionIcon(helpKey = "dashboard_customize")
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         },
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = Color.Transparent
     ) { innerPadding ->
         LazyColumn(
             state = dragDropState.lazyListState,
@@ -102,7 +107,7 @@ fun CustomizeDashboardScreen(
                         ListItem(
                             headlineContent = { Text(cardType.name.toDisplayString()) },
                             supportingContent = { Text("This card is always visible and at the top.") },
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f))
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )
                     } else {
                         ListItem(
@@ -119,7 +124,7 @@ fun CustomizeDashboardScreen(
                                     contentDescription = "Drag to reorder"
                                 )
                             },
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.2f))
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )
                     }
                 }
