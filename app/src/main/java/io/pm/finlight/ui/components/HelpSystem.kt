@@ -113,7 +113,7 @@ fun HelpBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+        containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
         windowInsets = WindowInsets(0) // Edge-to-edge
     ) {
         GlassPanel {
