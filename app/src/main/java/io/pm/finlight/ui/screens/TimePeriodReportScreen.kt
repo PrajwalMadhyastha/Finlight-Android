@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TimePeriodReportScreen.kt
-// REASON: FIX - The composable now accepts a `showPreviousMonth` boolean
-// parameter. This parameter is passed directly to the ViewModelFactory, enabling
-// it to create a ViewModel that is correctly initialized to the previous month's
-// data when navigated to from a monthly summary notification.
+// REASON: FEATURE (Help System - Phase 3) - Integrated the HelpActionIcon into
+// the TopAppBar to provide users with contextual guidance on how to interpret
+// the report and navigate between periods.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -38,6 +37,7 @@ import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import io.pm.finlight.*
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.MonthlyConsistencyCalendarCard
 import io.pm.finlight.ui.components.TransactionItem
 import java.text.NumberFormat
@@ -91,6 +91,9 @@ fun TimePeriodReportScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "time_period_report_screen")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )

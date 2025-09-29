@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon into
-// the TopAppBar for the main "Transaction List" screen to provide users with
-// contextual guidance on the screen's features.
+// REASON: FIX (Build) - Passed the NavController instance to the
+// TagManagementScreen composable within the NavHost. This resolves the
+// "No value passed for parameter 'navController'" compilation error that was
+// introduced when adding the screen's TopAppBar.
 // =================================================================================
 package io.pm.finlight
 
@@ -917,7 +918,7 @@ fun AppNavHost(
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) { TagManagementScreen() }
+        ) { TagManagementScreen(navController = navController) }
 
         composable(
             "rule_creation_screen?potentialTransactionJson={potentialTransactionJson}&ruleId={ruleId}",

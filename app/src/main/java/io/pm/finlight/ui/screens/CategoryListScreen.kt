@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/CategoryListScreen.kt
-// REASON: UX REFINEMENT - The screen's layout is now wrapped in a Scaffold that
-// includes a SnackbarHost. This allows the screen to display feedback messages
-// from the ViewModel, such as "Category already exists," which was previously
-// failing silently.
+// REASON: FEATURE (Help System - Phase 3) - Added a TopAppBar to the existing
+// Scaffold, which now includes a HelpActionIcon to provide users with contextual
+// guidance on how to manage their categories.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -18,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,6 +33,7 @@ import io.pm.finlight.Category
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.CategoryViewModel
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 
@@ -57,8 +58,21 @@ fun CategoryListScreen(
         }
     }
 
-    // --- NEW: Added Scaffold to host the Snackbar ---
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Manage Categories") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "category_list")
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.Transparent
     ) { innerPadding ->

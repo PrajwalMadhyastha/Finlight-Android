@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/HelpSystem.kt
-// REASON: FEATURE (Help System - Phase 2) - Populated the HelpContentRegistry
-// with detailed help text for the seven medium-priority screens, including
-// core features like adding/editing transactions, splitting, searching, and
-// the main transaction/income lists.
+// REASON: FEATURE (Help System - Phase 3) - Populated the HelpContentRegistry
+// with detailed help text for all five low-priority screens, completing the
+// content implementation for the entire "Guiding Star" system.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -22,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -299,6 +299,56 @@ object HelpContentRegistry {
                 - **Time Period:** The chips below the tabs let you change the time window for the analysis (e.g., Last Week, Last Month, etc.).
                 - **Advanced Filters:** Tap the filter icon to drill down even further. For example, you can see your spending in the "Food" category, but only for transactions tagged as "Work Lunch".
             """.trimIndent()
+        ),
+        // --- NEW: Phase 3 (Low Priority) Help Content ---
+        "time_period_report_screen" to HelpInfo(
+            title = "About Reports",
+            content = """
+                These screens provide a detailed look at your finances over a specific period (Day, Week, or Month).
+
+                - **Navigation:** **Swipe left or right** anywhere on the screen to move to the next or previous period.
+                - **Insights:** The top card gives you a quick summary, comparing your spending to the previous period and highlighting your top spending category.
+                - **Spending Chart:** This bar chart visualizes your spending trend over a longer duration (e.g., the last 6 months for a monthly report).
+                - **Consistency Calendar (Monthly Report):** This heatmap shows your daily spending habits relative to your overall monthly budget. Tap any day to see the transactions for that date.
+            """.trimIndent()
+        ),
+        "account_detail" to HelpInfo(
+            title = "About Account Details",
+            content = """
+                This screen shows the complete, unfiltered transaction history for a single account.
+
+                - **View & Edit:** Tap on any transaction in the list to navigate to its detail screen, where you can make edits.
+                - **Balance:** The 'Current Balance' at the top is a calculated total of all income and expenses for this specific account.
+            """.trimIndent()
+        ),
+        "category_list" to HelpInfo(
+            title = "Managing Categories",
+            content = """
+                Categories are the primary way to organize your transactions.
+
+                - **Create:** Tap the 'Add New Category' button to create a new one. You can choose a name, icon, and color.
+                - **Edit:** Tap the pencil icon on any category to change its name, icon, or color.
+                - **Delete:** Tap the trash icon to delete a category. **Note:** You can only delete a category if it is not currently used by any transactions.
+            """.trimIndent()
+        ),
+        "tag_management" to HelpInfo(
+            title = "Managing Tags",
+            content = """
+                Tags offer a flexible, secondary way to group transactions that might span multiple categories. They are perfect for tracking specific events like "Vacation 2025" or "Work Project X".
+
+                - **Create:** Type a name in the text field at the top and tap the '+' button.
+                - **Edit & Delete:** Use the icons next to each tag to rename or delete it. **Note:** You cannot delete a tag if it is currently in use by a transaction or linked to a trip plan.
+            """.trimIndent()
+        ),
+        "review_sms_screen" to HelpInfo(
+            title = "Reviewing SMS Transactions",
+            content = """
+                This screen appears after a bulk SMS scan if Finlight found transactions from new senders it doesn't recognize.
+
+                - **Why it's important:** To correctly import these transactions, you must first map each new sender to one of your accounts.
+                - **Approve:** Tapping 'Approve' will take you to a confirmation screen where you can add more details (like a category or tags) before saving the transaction.
+                - **Link:** If this SMS is for a transaction you've already entered manually (e.g., a cash payment that was later confirmed via SMS), tap 'Link' to connect the SMS to the existing entry.
+            """.trimIndent()
         )
     )
 }
@@ -385,7 +435,7 @@ fun HelpActionIcon(helpKey: String) {
 
     IconButton(onClick = { showSheet = true }) {
         Icon(
-            imageVector = Icons.Default.HelpOutline,
+            imageVector = Icons.AutoMirrored.Filled.HelpOutline,
             contentDescription = "Help"
         )
     }

@@ -1,13 +1,8 @@
 // =================================================================================
 // FILE: app/src/main/java/io/pm/finlight/ui/screens/TagManagementScreen.kt
-// REASON: MAJOR REFACTOR - The screen has been completely redesigned to align
-// with the "Project Aurora" vision. All standard components (TextFields,
-// Buttons, ListItems, Dialogs) have been replaced with GlassPanel-based
-// layouts and styled to ensure a cohesive, modern, and high-contrast user
-// experience for managing tags.
-// BUG FIX - The AlertDialogs now correctly derive their background color from
-// the app's MaterialTheme, ensuring they match the selected theme (e.g.,
-// Aurora) instead of defaulting to the system's light/dark mode.
+// REASON: FEATURE (Help System - Phase 3) - Added a TopAppBar to the existing
+// Scaffold, which now includes a HelpActionIcon to provide users with contextual
+// guidance on how to create and manage tags.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -15,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -25,9 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import io.pm.finlight.Tag
 import io.pm.finlight.TagViewModel
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 
@@ -36,7 +34,10 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TagManagementScreen(viewModel: TagViewModel = viewModel()) {
+fun TagManagementScreen(
+    navController: NavController,
+    viewModel: TagViewModel = viewModel()
+) {
     val tags by viewModel.allTags.collectAsState()
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -50,6 +51,20 @@ fun TagManagementScreen(viewModel: TagViewModel = viewModel()) {
     }
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Manage Tags") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "tag_management")
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.Transparent
     ) { innerPadding ->
