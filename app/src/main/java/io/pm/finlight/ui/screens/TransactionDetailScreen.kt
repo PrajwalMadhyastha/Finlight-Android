@@ -1,16 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TransactionDetailScreen.kt
-// REASON: REFACTOR - The category selection grid (CategoryPickerSheet) now uses the
-// new, reusable CategorySelectionGrid composable. This ensures a consistent, compact
-// layout and centralizes the grid's UI logic.
-// FIX - The TagPickerSheet layout has been refactored. The FlowRow containing
-// the tags is now wrapped in a scrollable Column with a weight, ensuring the
-// list is scrollable if it overflows while keeping the header and footer fixed.
-// REFACTOR - The `NotesRow` has been changed from a Row to a Column layout to
-// better display multi-line notes, improving readability.
-// FIX - The call to MerchantPredictionSheet has been updated to include the
-// required `onQueryChanged` parameter, resolving a build error. An empty
-// lambda is passed as this screen does not require real-time categorization.
+// REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon into
+// the TopAppBar to provide users with contextual guidance on how to edit and
+// manage a transaction's details.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -257,6 +249,8 @@ fun TransactionDetailScreen(
                             }
                         },
                         actions = {
+                            // --- NEW: Add HelpActionIcon ---
+                            HelpActionIcon(helpKey = "transaction_detail")
                             IconButton(onClick = { showMenu = true }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "More options")
                             }

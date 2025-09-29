@@ -28,7 +28,7 @@ val gsonVersion = "2.10.1"
 val coilVersion = "2.6.0"
 val imageCropperVersion = "4.5.0"
 val mockitoVersion = "5.11.0"
-val sqlcipherVersion = "4.5.4"
+val sqlcipherVersion = "4.10.0"
 
 
 // Read properties from local.properties
@@ -168,7 +168,10 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     implementation("androidx.appcompat:appcompat:1.7.1")
-    implementation("com.google.firebase:firebase-crashlytics-buildtools:3.0.6")
+
+    //Disabling crashlytics until 16kb page size is supported
+    //implementation("com.google.firebase:firebase-crashlytics-buildtools:3.0.6")
+
     ksp("androidx.room:room-compiler:$roomVersion")
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
@@ -186,9 +189,10 @@ dependencies {
 
     implementation("com.vanniktech:android-image-cropper:$imageCropperVersion")
 
-    implementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
-
-    // --- REMOVED: Unused Google Drive API dependencies ---
+    // --- MIGRATION: Swapped to the new SQLCipher for Android library ---
+    implementation("net.zetetic:sqlcipher-android:$sqlcipherVersion")
+    // Explicitly add the SQLite dependency as recommended by SQLCipher docs
+    implementation("androidx.sqlite:sqlite-ktx:2.2.0")
 
 
     // Local unit tests
@@ -199,7 +203,7 @@ dependencies {
     testImplementation("org.robolectric:robolectric:$robolectricVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
-    testImplementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
+    testImplementation("net.zetetic:sqlcipher-android:$sqlcipherVersion")
 
 
     // Instrumented UI tests
@@ -221,12 +225,17 @@ dependencies {
     // --- REVERTED: The exclude rule is no longer needed due to the resolutionStrategy ---
     implementation("androidx.work:work-runtime-ktx:$workVersion")
 
-    // --- TENSORFLOW LITE (UPDATED) ---
+    // --- TENSORFLOW LITE (UPDATED) (Replaced by LiteRT which supports 16kb page size) ---
     // Switched from task-text to the core TFLite libraries for better control and compatibility.
-    implementation("org.tensorflow:tensorflow-lite-support:0.5.0")
-    implementation("org.tensorflow:tensorflow-lite:2.17.0")
+    //implementation("org.tensorflow:tensorflow-lite-support:0.5.0")
+   // implementation("org.tensorflow:tensorflow-lite:2.17.0")
     // Flex Delegate to support advanced text ops (needed for both app and tests)
-    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
-    androidTestImplementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
-    //implementation("com.google.ai.edge.litert:litert:2.0.1-alpha")
+    //implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+    //androidTestImplementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+
+    // Using LiteRT for 16kb page size Support
+    implementation("com.google.ai.edge.litert:litert:1.4.0")
+    implementation("com.google.ai.edge.litert:litert-api:1.4.0")
+    implementation("com.google.ai.edge.litert:litert-support:1.4.0")
+    implementation("com.google.ai.edge.litert:litert-metadata:1.4.0")
 }

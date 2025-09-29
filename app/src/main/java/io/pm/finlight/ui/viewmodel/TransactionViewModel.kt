@@ -1,14 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FEATURE - Implemented real-time auto-categorization. The ViewModel
-// now listens to description changes from the UI, debounces them, and emits
-// a category suggestion via a new `suggestedCategory` StateFlow.
-// REFACTOR - The `onSaveTapped` logic has been updated to work with the new
-// real-time flow. It now accepts the category ID directly from the UI state,
-// which is populated either by the new suggestion flow or by the user's manual
-// selection.
-// FIX - Resolved a type inference build error by explicitly typing the null-
-// emitting flow in the `suggestedCategory` stream to `Flow<Category?>`.
+// REASON: FEATURE (Quick Add) - The transaction saving logic has been updated.
+// The `onSaveTapped` function no longer requires a description. If the description
+// field is blank upon saving, it now defaults to the placeholder "Unknown".
+// REFINEMENT (Quick Add) - The logic in `onSaveTapped` has been refined. The
+// category selection prompt ("nudge") will now only appear if the user has
+// entered a description. If only an amount is entered, the transaction is saved
+// immediately without prompting for a category, streamlining the quick-add flow.
 // =================================================================================
 package io.pm.finlight
 
@@ -510,10 +508,8 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // --- NEW: Public functions for real-time UI interaction ---
     fun onAddTransactionDescriptionChanged(description: String) {
         _addTransactionDescription.value = description
-        // If user clears description, allow auto-suggestion again and reset manual flag
         if (description.isBlank()) {
             _userManuallySelectedCategory.value = false
         }
@@ -523,13 +519,12 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         _userManuallySelectedCategory.value = true
     }
 
-    // --- UPDATED: Smart Add Transaction Logic ---
-
+    // --- UPDATED: Refined Quick Add Logic ---
     fun onSaveTapped(
         description: String,
         amountStr: String,
         accountId: Int?,
-        categoryId: Int?, // Accept category ID from UI state
+        categoryId: Int?,
         notes: String?,
         date: Long,
         transactionType: String,
@@ -539,10 +534,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             _validationError.value = null
 
-            if (description.isBlank()) {
-                _validationError.value = "Description cannot be empty."
-                return@launch
-            }
             if ((amountStr.toDoubleOrNull() ?: 0.0) <= 0.0) {
                 _validationError.value = "Please enter a valid, positive amount."
                 return@launch
@@ -552,8 +543,10 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 return@launch
             }
 
+            val finalDescription = description.ifBlank { "Unknown" }
+
             val transactionData = ManualTransactionData(
-                description = description,
+                description = finalDescription,
                 amountStr = amountStr,
                 accountId = accountId,
                 notes = notes,
@@ -563,15 +556,18 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 tags = _selectedTags.value
             )
 
-            if (categoryId != null) {
-                // Magic Path: Auto-categorized (or manually selected), save immediately
+            // The condition to show the category nudge is now more specific.
+            // It should only appear if the user has provided a description but not yet chosen a category.
+            if (categoryId == null && description.isNotBlank()) {
+                _showCategoryNudge.value = transactionData
+            } else {
+                // Either a category is already selected, or it's a "Quick Add" with no description.
+                // In both cases, save the transaction directly.
+                // For a Quick Add, categoryId will be null, which is the desired behavior.
                 val success = saveManualTransaction(transactionData, categoryId)
                 if (success) {
                     onSaveComplete()
                 }
-            } else {
-                // Guided Path: No category found, trigger the nudge
-                _showCategoryNudge.value = transactionData
             }
         }
     }
@@ -585,7 +581,7 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                     onComplete()
                 }
             }
-            _showCategoryNudge.value = null // Clear the nudge state
+            _showCategoryNudge.value = null
         }
     }
 
@@ -660,7 +656,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
     fun clearAddTransactionState() {
         _selectedTags.value = emptySet()
-        // --- NEW: Reset real-time suggestion state ---
         _addTransactionDescription.value = ""
         _userManuallySelectedCategory.value = false
     }

@@ -1,23 +1,13 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX (Navigation) - The navigation logic for the bottom bar has been
-// corrected to remove the `inclusive = true` popUpTo condition when navigating
-// to the Dashboard. This prevents the back stack from being emptied, which was
-// causing the screen to flicker. The Dashboard is now correctly treated as the
-// non-inclusive root of the back stack for all tab navigations.
-// FIX (Navigation) - The onClick handler for the profile icon in the top app
-// bar now uses the same `popUpTo` logic as the bottom navigation bar. This
-// resolves an inconsistency where the back button behaved differently depending
-// on how the user navigated to the Profile screen.
-// FIX (Backup Restore) - The SplashScreen has been enhanced to check for a
-// restored backup snapshot on first launch. It now displays the restore status
-// to the user and triggers the data import process before navigating to the dashboard,
-// ensuring a seamless data recovery experience.
+// REASON: FIX (Build) - Passed the NavController instance to the
+// TagManagementScreen composable within the NavHost. This resolves the
+// "No value passed for parameter 'navController'" compilation error that was
+// introduced when adding the screen's TopAppBar.
 // =================================================================================
 package io.pm.finlight
 
 import android.Manifest
-import android.app.Activity
 import android.app.Application
 import android.content.pm.PackageManager
 import android.os.Build
@@ -65,7 +55,6 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -78,6 +67,7 @@ import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
 import io.pm.finlight.ui.components.DaybreakAnimatedBackground
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.screenTitles
 import io.pm.finlight.ui.screens.*
 import io.pm.finlight.ui.theme.AppTheme
@@ -90,7 +80,6 @@ import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URLDecoder
 import java.util.concurrent.Executor
@@ -234,6 +223,7 @@ fun LockScreen(onUnlock: () -> Unit) {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppScreen() {
@@ -308,9 +298,7 @@ fun MainAppScreen() {
     }
 
     val fabRoutes = setOf(
-        "account_list",
-        "recurring_transactions",
-        "goals_screen"
+        "account_list"
     )
     val showFab = baseCurrentRoute in fabRoutes && !isAccountSelectionMode
 
@@ -414,6 +402,7 @@ fun MainAppScreen() {
                                             filterState.keyword.isNotBlank() || filterState.account != null || filterState.category != null
                                         }
                                     }
+                                    HelpActionIcon(helpKey = "transaction_list")
                                     IconButton(onClick = { navController.navigate("add_transaction") }) {
                                         Icon(Icons.Default.Add, contentDescription = "Add Transaction")
                                     }
@@ -442,6 +431,13 @@ fun MainAppScreen() {
                                             Text("Merge Accounts")
                                         }
                                     }
+                                    HelpActionIcon(helpKey = "account_list")
+                                }
+                                BottomNavItem.Reports.route -> {
+                                    HelpActionIcon(helpKey = "reports_screen")
+                                }
+                                "budget_screen" -> {
+                                    HelpActionIcon(helpKey = "budget_screen")
                                 }
                             }
                         },
@@ -480,8 +476,6 @@ fun MainAppScreen() {
                     FloatingActionButton(onClick = {
                         when (baseCurrentRoute) {
                             "account_list" -> navController.navigate("add_account")
-                            "recurring_transactions" -> navController.navigate("add_recurring_transaction")
-                            "goals_screen" -> navController.navigate("add_edit_goal")
                         }
                     }) {
                         Icon(Icons.Filled.Add, contentDescription = "Add")
@@ -679,7 +673,7 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) {
-            ManageIgnoreRulesScreen()
+            ManageIgnoreRulesScreen(navController = navController)
         }
 
         composable(BottomNavItem.Dashboard.route) {
@@ -924,26 +918,7 @@ fun AppNavHost(
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) { TagManagementScreen() }
-        composable(
-            "recurring_transactions",
-            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) { RecurringTransactionScreen(navController) }
-
-        composable(
-            "add_recurring_transaction?ruleId={ruleId}",
-            arguments = listOf(navArgument("ruleId") { type = NavType.IntType; defaultValue = -1 }),
-            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) { backStackEntry ->
-            val ruleId = backStackEntry.arguments?.getInt("ruleId")
-            AddRecurringTransactionScreen(navController = navController, ruleId = if (ruleId == -1) null else ruleId)
-        }
+        ) { TagManagementScreen(navController = navController) }
 
         composable(
             "rule_creation_screen?potentialTransactionJson={potentialTransactionJson}&ruleId={ruleId}",
@@ -1021,38 +996,6 @@ fun AppNavHost(
                 )
             }
         }
-
-        composable(
-            "goals_screen",
-            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) {
-            GoalScreen(navController = navController, goalViewModel = goalViewModel)
-        }
-
-        composable(
-            "add_edit_goal",
-            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) {
-            AddEditGoalScreen(navController = navController, goalId = null)
-        }
-        composable(
-            "add_edit_goal/{goalId}",
-            arguments = listOf(navArgument("goalId") { type = NavType.IntType }),
-            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) { backStackEntry ->
-            val goalId = backStackEntry.arguments?.getInt("goalId")
-            AddEditGoalScreen(navController = navController, goalId = goalId)
-        }
-
 
         composable(
             "appearance_settings",
@@ -1168,20 +1111,26 @@ fun AppNavHost(
 fun SplashScreen(navController: NavHostController) {
     var statusText by remember { mutableStateOf("Initializing...") }
     val context = LocalContext.current
+    val settingsRepository = remember { SettingsRepository(context) }
 
     LaunchedEffect(key1 = true) {
-        statusText = "Checking for backup..."
-        // Use Dispatchers.IO for file operations
-        val restored = withContext(Dispatchers.IO) {
-            DataExportService.restoreFromBackupSnapshot(context)
-        }
+        val isFirstLaunch = !settingsRepository.isFirstLaunchCompleteBlocking()
 
-        if (restored) {
-            statusText = "Data restored successfully!"
-            delay(1500) // Give user time to see the message
+        if (isFirstLaunch) {
+            statusText = "Checking for restored data..."
+            val restored = withContext(Dispatchers.IO) {
+                DataExportService.restoreFromBackupSnapshot(context)
+            }
+            if (restored) {
+                statusText = "Data restored successfully!"
+                delay(1500) // Give user time to see the message
+            }
+            // Set the flag *after* the first-launch check is complete
+            settingsRepository.setFirstLaunchComplete()
         }
 
         statusText = "Loading dashboard..."
+        delay(200) // A small delay for a smoother transition
         navController.navigate(BottomNavItem.Dashboard.route) {
             popUpTo("splash_screen") { inclusive = true }
         }

@@ -7,6 +7,9 @@
 // "currency_travel_settings" screen, reflecting the feature consolidation.
 // REFACTOR: Removed the now-redundant "Travel History" entry point. All travel-
 // related functionality is now accessed via the "Currency & Travel" screen.
+// CLEANUP - Temporarily removed the entry points for "Savings Goals" and
+// "Manage Recurring Rules" to disable these features from the UI pending
+// future improvements.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -101,20 +104,6 @@ fun ProfileScreen(
                     subtitle = "Set and edit your monthly budgets",
                     icon = Icons.Default.Savings,
                     onClick = { navController.navigate("budget_screen") },
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                SettingsActionItem(
-                    text = "Savings Goals",
-                    subtitle = "Set and track your savings goals",
-                    icon = Icons.Default.TrackChanges,
-                    onClick = { navController.navigate("goals_screen") },
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                SettingsActionItem(
-                    text = "Manage Recurring Rules",
-                    subtitle = "Automate your regular bills and income",
-                    icon = Icons.Default.Autorenew,
-                    onClick = { navController.navigate("recurring_transactions") },
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                 SettingsActionItem(

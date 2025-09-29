@@ -55,6 +55,7 @@ import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TripType
 import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.CurrencyViewModel
@@ -148,6 +149,9 @@ fun CurrencyTravelScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "currency_travel_settings")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )

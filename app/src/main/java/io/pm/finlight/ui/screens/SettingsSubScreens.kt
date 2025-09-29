@@ -51,6 +51,7 @@ import androidx.navigation.NavController
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.SettingsViewModel
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.SettingsActionItem
 import io.pm.finlight.ui.components.SettingsToggleItem
 import io.pm.finlight.ui.components.WeeklyReportTimePicker
@@ -81,6 +82,9 @@ fun AppearanceSettingsScreen(navController: NavController, settingsViewModel: Se
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "appearance_settings")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
@@ -146,6 +150,9 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "automation_settings")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
@@ -300,6 +307,9 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "notification_settings")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
@@ -528,6 +538,9 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "data_settings")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
