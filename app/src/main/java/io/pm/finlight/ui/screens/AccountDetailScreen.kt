@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AccountDetailScreen.kt
-// REASON: FEATURE - The transaction items within the account detail view are
-// now clickable. A `clickable` modifier has been added to each item, which
-// navigates the user to the corresponding `TransactionDetailScreen`, improving
-// the app's interactivity and user flow.
+// REASON: FEATURE (Help System - Phase 3) - Wrapped the screen in a Scaffold
+// and added a TopAppBar with a HelpActionIcon to provide users with contextual
+// guidance.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -13,6 +12,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -20,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,6 +30,7 @@ import io.pm.finlight.Account
 import io.pm.finlight.AccountViewModel
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
@@ -37,6 +40,7 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountDetailScreen(
     navController: NavController,
@@ -49,49 +53,69 @@ fun AccountDetailScreen(
 
     val currentAccount = account ?: return // Don't compose if account is not loaded yet
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            AccountDetailHeader(
-                account = currentAccount,
-                balance = balance
-            )
-        }
-
-        if (transactions.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Recent Transactions",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
-            items(transactions, key = { it.transaction.id }) { details ->
-                // --- UPDATED: Pass the navigation logic to the item ---
-                AccountDetailTransactionItem(
-                    transactionDetails = details,
-                    onClick = {
-                        navController.navigate("transaction_detail/${details.transaction.id}")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(currentAccount.name) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "account_detail")
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        },
+        containerColor = Color.Transparent
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                AccountDetailHeader(
+                    account = currentAccount,
+                    balance = balance
                 )
             }
-        } else {
-            item {
-                GlassPanel(modifier = Modifier.fillMaxWidth()) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp)
-                    ) {
-                        Text(
-                            "No transactions for this account yet.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+
+            if (transactions.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Recent Transactions",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+                items(transactions, key = { it.transaction.id }) { details ->
+                    // --- UPDATED: Pass the navigation logic to the item ---
+                    AccountDetailTransactionItem(
+                        transactionDetails = details,
+                        onClick = {
+                            navController.navigate("transaction_detail/${details.transaction.id}")
+                        }
+                    )
+                }
+            } else {
+                item {
+                    GlassPanel(modifier = Modifier.fillMaxWidth()) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp)
+                        ) {
+                            Text(
+                                "No transactions for this account yet.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }

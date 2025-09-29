@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: FIX (Performance) - Incremented the database version to 40 and added
-// MIGRATION_39_40. This new migration creates an index on the `transactions.date`
-// column, which is essential to fix the performance bottleneck in the Spending
-// Analysis Hub and other date-filtered screens.
+// REASON: MIGRATION - The database factory has been updated from the legacy
+// `SupportFactory` to the new `SupportOpenHelperFactory`. This change, along with
+// the dependency update, completes the migration to the modern SQLCipher library.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -24,7 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import net.sqlcipher.database.SupportFactory
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(
     entities = [
@@ -474,7 +473,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_account_aliases_destinationAccountId` ON `account_aliases` (`destinationAccountId`)")
             }
         }
-        // --- NEW: Migration for the transactions.date index ---
         val MIGRATION_39_40 = object : Migration(39, 40) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_date` ON `transactions` (`date`)")
@@ -485,7 +483,8 @@ abstract class AppDatabase : RoomDatabase() {
             return INSTANCE ?: synchronized(this) {
                 val securityManager = SecurityManager(context)
                 val passphrase = securityManager.getPassphrase()
-                val factory = SupportFactory(passphrase)
+                // --- MIGRATION: Use the new SupportOpenHelperFactory ---
+                val factory = SupportOpenHelperFactory(passphrase)
 
                 val instance =
                     Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "finance_database")
@@ -501,7 +500,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
                             MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
                             MIGRATION_37_38, MIGRATION_38_39,
-                            MIGRATION_39_40 // --- UPDATED: Add the new migration
+                            MIGRATION_39_40
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

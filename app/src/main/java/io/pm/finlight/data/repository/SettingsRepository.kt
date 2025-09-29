@@ -1,9 +1,10 @@
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
 // =================================================================================
-// REASON: FEATURE - Added functions to save and retrieve a set of dismissed
-// merge suggestion keys. This allows the app to remember which suggestions the
-// user has already seen and ignored, preventing them from reappearing
-// unnecessarily and improving the user experience.
+// REASON: FIX (Daily Restore) - Added a secondary, non-backed-up SharedPreferences
+// file ('internalPrefs') to store a new `is_first_launch_complete` flag. This
+// allows the SplashScreen to reliably determine if it's running for the very
+// first time after an installation, which is the only time it should attempt
+// to restore data from a backup snapshot.
 // =================================================================================
 package io.pm.finlight
 
@@ -43,10 +44,14 @@ class SettingsRepository(context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    // --- NEW: A separate, non-backed-up preferences file for internal state ---
+    private val internalPrefs: SharedPreferences =
+        context.getSharedPreferences(INTERNAL_PREF_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
 
     companion object {
         private const val PREF_NAME = "finance_app_settings"
+        private const val INTERNAL_PREF_NAME = "finlight_internal_state" // Must match data_extraction_rules.xml
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_PROFILE_PICTURE_URI = "profile_picture_uri"
         private const val KEY_BUDGET_PREFIX = "overall_budget_"
@@ -79,6 +84,8 @@ class SettingsRepository(context: Context) {
         private const val KEY_LAST_MONTH_SUMMARY_DISMISSED = "last_month_summary_dismissed_"
         private const val KEY_DISMISSED_MERGES = "dismissed_merge_suggestions"
         private const val KEY_PRIVACY_MODE_ENABLED = "privacy_mode_enabled"
+        // --- NEW: Key for the first launch flag ---
+        private const val KEY_IS_FIRST_LAUNCH_COMPLETE = "is_first_launch_complete"
     }
 
     fun getDismissedMergeSuggestions(): Flow<Set<String>> {
@@ -704,6 +711,25 @@ class SettingsRepository(context: Context) {
             // Default to false (disabled)
             trySend(prefs.getBoolean(KEY_PRIVACY_MODE_ENABLED, false))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+    }
+
+    // --- NEW: Functions to manage the first launch flag ---
+
+    /**
+     * Checks if the app has completed its first launch sequence.
+     * This is a blocking call and should only be used during app startup.
+     */
+    fun isFirstLaunchCompleteBlocking(): Boolean {
+        return internalPrefs.getBoolean(KEY_IS_FIRST_LAUNCH_COMPLETE, false)
+    }
+
+    /**
+     * Sets the flag indicating that the first launch sequence is complete.
+     */
+    fun setFirstLaunchComplete() {
+        internalPrefs.edit {
+            putBoolean(KEY_IS_FIRST_LAUNCH_COMPLETE, true)
         }
     }
 }

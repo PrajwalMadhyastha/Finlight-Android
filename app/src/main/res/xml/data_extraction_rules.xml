@@ -2,12 +2,11 @@
 <!--
 // =================================================================================
 // FILE: ./app/src/main/res/xml/data_extraction_rules.xml
-// REASON: FIX (Backup Restore) - The backup strategy has been corrected.
-// The <cloud-backup> rules no longer attempt to back up the live, encrypted
-// database file, as the decryption key is lost on uninstall. Instead, we now
-// exclusively include the 'file' domain, which contains the restorable
-// compressed JSON snapshot ('backup_snapshot.gz'). This is the definitive fix
-// to ensure transactions and other database data are restored.
+// REASON: FIX (Daily Restore) - Added an <exclude> rule for the new
+// 'finlight_internal_state.xml' SharedPreferences file. This file contains a
+// flag to track if the app has been launched before. Excluding it from backups
+// is CRITICAL, as it ensures the "first launch" state can be reliably detected
+// after a reinstall, preventing the app from restoring data every day.
 // =================================================================================
 -->
 <data-extraction-rules>
@@ -16,6 +15,8 @@
         <include domain="sharedpref" path="."/>
         <!-- Exclude the file with the now-unusable encrypted key -->
         <exclude domain="sharedpref" path="finlight_secure_prefs.xml" />
+        <!-- NEW: Exclude the internal state file that tracks first launch -->
+        <exclude domain="sharedpref" path="finlight_internal_state.xml"/>
 
         <!-- DO NOT include the 'database' domain for cloud backup. -->
         <!-- The restored .db file would be encrypted and unusable without the Keystore key. -->
@@ -30,6 +31,8 @@
         <!-- For device-to-device transfers, we can include everything -->
         <include domain="sharedpref" path="."/>
         <exclude domain="sharedpref" path="finlight_secure_prefs.xml" />
+        <!-- NEW: Exclude the internal state file here as well for consistency -->
+        <exclude domain="sharedpref" path="finlight_internal_state.xml"/>
         <include domain="database" path="." />
         <include domain="file" path="." />
         <exclude domain="file" path="attachments/" />

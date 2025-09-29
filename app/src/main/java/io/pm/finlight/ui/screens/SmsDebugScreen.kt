@@ -1,12 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsDebugScreen.kt
-// REASON: FEATURE - Added a "Load More" button to the bottom of the list. This
-// allows the user to progressively increase the number of recent SMS messages
-// being analyzed, from 100 to 200, and so on.
-// FEATURE - The UI has been updated to handle and display the new
-// `IgnoredByClassifier` parse result. It now shows a specific message and the
-// model's confidence score when an SMS is ignored by the ML model, providing
-// full transparency into the entire parsing pipeline.
+// REASON: FEATURE (Help System - Phase 1) - Integrated the HelpActionIcon into
+// the TopAppBar to explain the different parsing statuses to the user.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -30,6 +25,7 @@ import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.viewmodel.SmsDebugViewModelFactory
 import java.net.URLEncoder
 
@@ -66,6 +62,10 @@ fun SmsDebugScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                // --- NEW: Add HelpActionIcon ---
+                actions = {
+                    HelpActionIcon(helpKey = "sms_debug_screen")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
             )

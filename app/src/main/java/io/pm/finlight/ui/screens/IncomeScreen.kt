@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/IncomeScreen.kt
-// REASON: FIX - The call to CategorySpendingScreen has been updated to include
-// the onCategoryClick handler. This resolves the compilation error and enables
-// users to filter the income transaction list by clicking on a category.
+// REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon into
+// the TopAppBar to provide users with guidance on the screen's features, such
+// as the different tabs and filtering options.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -35,6 +35,7 @@ import io.pm.finlight.MonthlySummaryItem
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.ui.components.FilterBottomSheet
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.TransactionList
 import io.pm.finlight.ui.components.pagerTabIndicatorOffset
 import kotlinx.coroutines.launch
@@ -79,6 +80,7 @@ fun IncomeScreen(
                     }
                 },
                 actions = {
+                    HelpActionIcon(helpKey = "income_screen")
                     BadgedBox(
                         badge = {
                             if (areFiltersActive) {

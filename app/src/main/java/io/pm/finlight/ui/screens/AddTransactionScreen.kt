@@ -1,18 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FEATURE - The screen now observes the new `suggestedCategory` StateFlow.
-// A LaunchedEffect updates the local `selectedCategory` state when a suggestion
-// is emitted. It also notifies the ViewModel when the user manually interacts
-// with the category picker to prevent their choice from being overwritten.
-// FEATURE - Implemented a "Smart Guidance" system. Once a user enters an amount,
-// a glowing border highlights the description field and a simple checklist appears
-// to guide them through the required steps, creating a zero-friction flow.
-// FIX - Corrected the modifier order on the description Text to ensure the .glow()
-// effect is drawn before being clipped, making the smart guidance visible.
-// FIX - Replaced the unreliable .glow() modifier with a more robust implementation
-// using an animated border to ensure the guidance highlight always appears.
-// FEATURE - The description prompt now dynamically changes from "Paid to..." to
-// "Add a description" to further guide the user after an amount is entered.
+// REASON: FEATURE (Quick Add) - The screen logic has been updated to enable the
+// "Quick Add" feature. The save button on the numpad is now enabled as soon as a
+// valid amount is entered, removing the requirement to enter a description first.
+// The guidance checklist has been updated to reflect that the description is now
+// an optional (but recommended) field.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -49,10 +41,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -63,7 +53,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -79,7 +68,6 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
-import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -148,8 +136,8 @@ fun AddTransactionScreen(
     var showCreateAccountDialog by remember { mutableStateOf(false) }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
 
-    // --- MODIFIED: Save is enabled with only Amount and Description ---
-    val isSaveEnabled = isAmountEntered && isDescriptionEntered
+    // --- UPDATED: Save is now enabled once an amount is entered ---
+    val isSaveEnabled = isAmountEntered
 
     var isDefaultAccountApplied by remember { mutableStateOf(false) }
     LaunchedEffect(defaultAccount) {
@@ -248,6 +236,10 @@ fun AddTransactionScreen(
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },
+                    // --- NEW: Add HelpActionIcon ---
+                    actions = {
+                        HelpActionIcon(helpKey = "add_transaction")
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                 )
             },
@@ -268,7 +260,6 @@ fun AddTransactionScreen(
                     isTravelMode = isTravelModeActive,
                     travelModeSettings = travelModeSettings,
                     highlightDescription = hasInteracted && !isDescriptionEntered,
-                    // --- NEW: Pass state for dynamic text ---
                     isDescriptionEntered = isDescriptionEntered,
                     hasInteractedWithNumpad = hasInteracted
                 )
@@ -302,15 +293,16 @@ fun AddTransactionScreen(
                     onAttachmentClick = { imagePickerLauncher.launch("image/*") }
                 )
 
-                // --- NEW: Guidance Checklist ---
+                // --- UPDATED: Guidance Checklist is now always visible after interaction ---
                 AnimatedVisibility(
-                    visible = hasInteracted && !isSaveEnabled,
+                    visible = hasInteracted,
                     enter = fadeIn(animationSpec = tween(200)),
                     exit = fadeOut(animationSpec = tween(200))
                 ) {
                     ValidationChecklist(
                         isAmountEntered = isAmountEntered,
-                        isDescriptionEntered = isDescriptionEntered
+                        isDescriptionEntered = isDescriptionEntered,
+                        isDescriptionRequired = false // Description is now optional
                     )
                 }
 
@@ -347,7 +339,6 @@ fun AddTransactionScreen(
     if (activeSheet != null) {
         ModalBottomSheet(
             onDismissRequest = {
-                // If this sheet was triggered by the nudge, complete the save flow on dismiss
                 if (categoryNudgeData != null) {
                     viewModel.saveWithSelectedCategory(null) {
                         navController.popBackStack()
@@ -382,7 +373,6 @@ fun AddTransactionScreen(
                             categories = categories,
                             onCategorySelected = {
                                 selectedCategory = it
-                                // If this sheet was triggered by the nudge, complete the save flow
                                 if (categoryNudgeData != null) {
                                     viewModel.saveWithSelectedCategory(it.id) {
                                         navController.popBackStack()
@@ -417,7 +407,7 @@ fun AddTransactionScreen(
                     viewModel = viewModel,
                     initialDescription = description,
                     onQueryChanged = {
-                        description = it // Keep local state in sync
+                        description = it
                         viewModel.onAddTransactionDescriptionChanged(it)
                     },
                     onPredictionSelected = { prediction ->
@@ -504,7 +494,6 @@ fun AddTransactionScreen(
             onConfirm = { name, iconKey, colorKey ->
                 viewModel.createCategory(name, iconKey, colorKey) { newCategory ->
                     selectedCategory = newCategory
-                    // If this was triggered by the nudge, complete the save
                     if (categoryNudgeData != null) {
                         viewModel.saveWithSelectedCategory(newCategory.id) {
                             navController.popBackStack()
@@ -517,13 +506,12 @@ fun AddTransactionScreen(
     }
 }
 
-// --- REMOVED: Unreliable .glow() modifier function ---
-
-// --- NEW: Checklist composable ---
+// --- UPDATED: Checklist now handles optional items ---
 @Composable
 private fun ValidationChecklist(
     isAmountEntered: Boolean,
-    isDescriptionEntered: Boolean
+    isDescriptionEntered: Boolean,
+    isDescriptionRequired: Boolean = true
 ) {
     GlassPanel {
         Column(
@@ -532,15 +520,19 @@ private fun ValidationChecklist(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            ChecklistItem(label = "Enter an amount", isChecked = isAmountEntered)
-            ChecklistItem(label = "Add a description", isChecked = isDescriptionEntered)
+            ChecklistItem(label = "Enter an amount", isChecked = isAmountEntered, isRequired = true)
+            ChecklistItem(label = "Add a description", isChecked = isDescriptionEntered, isRequired = isDescriptionRequired)
         }
     }
 }
 
 @Composable
-private fun ChecklistItem(label: String, isChecked: Boolean) {
-    val color = if (isChecked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+private fun ChecklistItem(label: String, isChecked: Boolean, isRequired: Boolean) {
+    val color = when {
+        isChecked -> MaterialTheme.colorScheme.primary
+        !isRequired -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        else -> MaterialTheme.colorScheme.error
+    }
     val icon = if (isChecked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(
@@ -606,7 +598,6 @@ private fun AmountComposer(
         label = "HighlightBorderAnimation"
     )
 
-    // --- NEW: Logic for dynamic description text ---
     val descriptionText = when {
         isDescriptionEntered -> description
         hasInteractedWithNumpad -> "Add a description"

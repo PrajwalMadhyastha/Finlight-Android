@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/OnboardingScreen.kt
-// REASON: REFACTOR - Combined OnboardingPages.kt into this file to resolve an
-// 'Unresolved reference' compilation error and improve code cohesion.
-// FIX - Added Modifier.navigationBarsPadding() to the OnboardingBottomBar to
-// prevent it from overlapping with the system navigation bar on edge-to-edge displays.
+// REASON: REFACTOR - Removed the 'SmsScanningInfoPage' (page 5) from the
+// onboarding flow to streamline the user's first experience. The pager count
+// and bottom bar logic have been updated to reflect this change.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -55,7 +54,8 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(viewModel: OnboardingViewModel, onOnboardingFinished: () -> Unit) {
-    val pagerState = rememberPagerState { 8 }
+    // --- UPDATED: Page count reduced from 8 to 7 ---
+    val pagerState = rememberPagerState { 7 }
     val scope = rememberCoroutineScope()
 
     val onNextClicked: () -> Unit = {
@@ -90,9 +90,9 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, onOnboardingFinished: () ->
                 2 -> BudgetSetupPage(viewModel = viewModel, pagerState = pagerState)
                 3 -> CurrencySetupPage(viewModel = viewModel)
                 4 -> SmsPermissionPage(onPermissionResult = onNextClicked)
-                5 -> SmsScanningInfoPage()
-                6 -> NotificationPermissionPage(onPermissionResult = onNextClicked)
-                7 -> CompletionPage()
+                // --- REMOVED: SmsScanningInfoPage ---
+                5 -> NotificationPermissionPage(onPermissionResult = onNextClicked)
+                6 -> CompletionPage()
             }
         }
     }
@@ -119,9 +119,10 @@ fun OnboardingBottomBar(
         ) {
             PageIndicator(pageCount = pagerState.pageCount, currentPage = pagerState.currentPage)
 
+            // --- UPDATED: Logic adjusted for the removed page. Notification page is now at index 5. ---
             val isNextButtonVisible = pagerState.currentPage < pagerState.pageCount - 1 &&
                     pagerState.currentPage != 4 && // Hide on SMS Permission Page
-                    pagerState.currentPage != 6    // Hide on Notification Permission Page
+                    pagerState.currentPage != 5    // Hide on Notification Permission Page
 
             val isNextEnabled = if (pagerState.currentPage == 1) {
                 userName.isNotBlank()
@@ -260,7 +261,9 @@ fun UserNamePage(viewModel: OnboardingViewModel, pagerState: PagerState) {
                     capitalization = KeyboardCapitalization.Words
                 ),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
@@ -318,7 +321,9 @@ fun BudgetSetupPage(viewModel: OnboardingViewModel, pagerState: PagerState) {
                 label = { Text("Total Monthly Budget") },
                 leadingIcon = { Text("₹", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
@@ -467,49 +472,6 @@ fun SmsPermissionPage(onPermissionResult: () -> Unit) {
         }
     }
 }
-
-@Composable
-fun SmsScanningInfoPage() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.AutoAwesome,
-            contentDescription = "Magic Wand Icon",
-            modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.height(24.dp))
-        Text("Supercharge Your Setup", style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.height(16.dp))
-        Text(
-            buildAnnotatedString {
-                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                    append("After setup, you can visit the ")
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) {
-                        append("Settings")
-                    }
-                    append(" screen at any time to import existing transactions from your SMS inbox.\n\nYou'll have two options:\n\n")
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) {
-                        append("• Quick Scan:")
-                    }
-                    append(" A fast scan of recent messages. This defaults to the last 30 days, but you can pick any start date you like!\n\n")
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) {
-                        append("• Full Scan:")
-                    }
-                    append(" A complete scan of your entire inbox.")
-                }
-            },
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
 
 @Composable
 fun NotificationPermissionPage(onPermissionResult: () -> Unit) {

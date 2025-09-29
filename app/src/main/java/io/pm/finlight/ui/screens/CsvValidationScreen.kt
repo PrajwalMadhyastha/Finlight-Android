@@ -1,9 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/CsvValidationScreen.kt
-// REASON: FIX - The `onEditClick` handler now zips the CSV header with the row's
-// data to create a `Map<String, String>`. This map is then serialized and passed
-// to the AddTransactionScreen, making the data transfer robust and independent
-// of column order, which resolves the data mismatch bug.
+// REASON: FEATURE (Help System - Phase 1) - Integrated the HelpActionIcon into
+// the TopAppBar to explain the different row statuses and actions to the user.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -30,6 +28,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
 
@@ -69,6 +68,10 @@ fun CsvValidationScreen(
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                // --- NEW: Add HelpActionIcon ---
+                actions = {
+                    HelpActionIcon(helpKey = "csv_validation_screen")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )

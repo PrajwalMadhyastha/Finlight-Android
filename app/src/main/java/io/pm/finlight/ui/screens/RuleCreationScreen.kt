@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/RuleCreationScreen.kt
-// REASON: FEATURE - The save logic now sets an `auto_import_after_rule_creation`
-// flag on the previous back stack entry. This signals the SMS Debugger screen to
-// automatically import any transactions that are now parsable with the new rule.
+// REASON: FEATURE (Help System - Phase 1) - Integrated the HelpActionIcon into
+// the TopAppBar to provide users with contextual guidance on how to create
+// custom parsing rules.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -37,6 +37,7 @@ import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -89,6 +90,10 @@ fun RuleCreationScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
+                },
+                // --- NEW: Add HelpActionIcon ---
+                actions = {
+                    HelpActionIcon(helpKey = "rule_creation_screen")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
