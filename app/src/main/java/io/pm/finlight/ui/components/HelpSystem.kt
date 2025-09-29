@@ -50,7 +50,7 @@ import io.pm.finlight.R
 data class HelpInfo(
     val title: String,
     val content: String,
-    @DrawableRes val visual: Int? = null
+    // @DrawableRes val visual: Int? = null // Temporarily commented out as requested.
 )
 
 /**
@@ -91,7 +91,7 @@ object HelpContentRegistry {
                 - **Toggle Visibility:** Use the switch to show or hide a card.
                 - **Reorder Cards:** Long-press the drag handle (:::) and drag any card (except the main budget card) up or down to change its position.
             """.trimIndent(),
-            visual = R.drawable.help_gif_reorder // Note: A real drawable resource is needed here.
+            // visual = R.drawable.help_gif_reorder // Temporarily commented out as requested.
         )
     )
 }
@@ -141,6 +141,8 @@ fun HelpBottomSheet(
                 ) {
                     MarkdownText(markdown = info.content)
 
+                    // Temporarily commented out the visual/GIF display logic as requested.
+                    /*
                     AnimatedVisibility(visible = info.visual != null) {
                         Box(
                             modifier = Modifier
@@ -156,6 +158,7 @@ fun HelpBottomSheet(
                             )
                         }
                     }
+                    */
                 }
             }
         }
