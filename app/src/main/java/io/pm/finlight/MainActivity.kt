@@ -1,23 +1,15 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX (Navigation) - The navigation logic for the bottom bar has been
-// corrected to remove the `inclusive = true` popUpTo condition when navigating
-// to the Dashboard. This prevents the back stack from being emptied, which was
-// causing the screen to flicker. The Dashboard is now correctly treated as the
-// non-inclusive root of the back stack for all tab navigations.
-// FIX (Navigation) - The onClick handler for the profile icon in the top app
-// bar now uses the same `popUpTo` logic as the bottom navigation bar. This
-// resolves an inconsistency where the back button behaved differently depending
-// on how the user navigated to the Profile screen.
-// FIX (Backup Restore) - The SplashScreen has been enhanced to check for a
-// restored backup snapshot on first launch. It now displays the restore status
-// to the user and triggers the data import process before navigating to the dashboard,
-// ensuring a seamless data recovery experience.
+// REASON: FIX (Daily Restore) - The SplashScreen logic has been completely
+// rewritten. It now uses a new, non-backed-up "first launch" flag from the
+// SettingsRepository. The restore process is now only attempted if this flag is
+// false AND a backup snapshot file exists. The flag is set to true after this
+// one-time check, definitively preventing the app from restoring data every
+// morning after the daily snapshot is created.
 // =================================================================================
 package io.pm.finlight
 
 import android.Manifest
-import android.app.Activity
 import android.app.Application
 import android.content.pm.PackageManager
 import android.os.Build
@@ -234,6 +226,7 @@ fun LockScreen(onUnlock: () -> Unit) {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppScreen() {
@@ -1168,20 +1161,26 @@ fun AppNavHost(
 fun SplashScreen(navController: NavHostController) {
     var statusText by remember { mutableStateOf("Initializing...") }
     val context = LocalContext.current
+    val settingsRepository = remember { SettingsRepository(context) }
 
     LaunchedEffect(key1 = true) {
-        statusText = "Checking for backup..."
-        // Use Dispatchers.IO for file operations
-        val restored = withContext(Dispatchers.IO) {
-            DataExportService.restoreFromBackupSnapshot(context)
-        }
+        val isFirstLaunch = !settingsRepository.isFirstLaunchCompleteBlocking()
 
-        if (restored) {
-            statusText = "Data restored successfully!"
-            delay(1500) // Give user time to see the message
+        if (isFirstLaunch) {
+            statusText = "Checking for restored data..."
+            val restored = withContext(Dispatchers.IO) {
+                DataExportService.restoreFromBackupSnapshot(context)
+            }
+            if (restored) {
+                statusText = "Data restored successfully!"
+                delay(1500) // Give user time to see the message
+            }
+            // Set the flag *after* the first-launch check is complete
+            settingsRepository.setFirstLaunchComplete()
         }
 
         statusText = "Loading dashboard..."
+        delay(200) // A small delay for a smoother transition
         navController.navigate(BottomNavItem.Dashboard.route) {
             popUpTo("splash_screen") { inclusive = true }
         }
