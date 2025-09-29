@@ -1,3 +1,9 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/ui/components/HelpSystem.kt
+// REASON: FEATURE (Help System - Phase 1) - Populated the HelpContentRegistry
+// with detailed, user-friendly help text for the four high-priority screens:
+// Rule Creation, SMS Debugger, CSV Validation, and Account Mapping.
+// =================================================================================
 package io.pm.finlight.ui.components
 
 import androidx.annotation.DrawableRes
@@ -171,6 +177,53 @@ object HelpContentRegistry {
 
                 - **View Details:** Tap any account to see its transaction history.
                 - **Merge Duplicates:** If you have duplicate accounts (e.g., "ICICI" and "ICICI Bank"), **long-press** any item to enter selection mode. Select two or more accounts and tap 'Merge' to combine them into one. The app will learn from this and auto-map future transactions correctly.
+            """.trimIndent()
+        ),
+        // --- NEW: Phase 1 Help Content ---
+        "rule_creation_screen" to HelpInfo(
+            title = "How to Create a Rule",
+            content = """
+                This screen teaches Finlight how to read new SMS formats.
+
+                - **1. Select Text:** **Long-press and drag** on the message text above to highlight the part you want to define (like the merchant name or amount).
+                - **2. Mark the Part:** Tap one of the "Mark as..." buttons below.
+                - **Trigger Phrase:** This is the most important part. Select a piece of text that is **unique and unchanging** in every similar SMS (e.g., "spent on HDFC Bank Card"). This tells Finlight when to use your rule.
+                - **Merchant, Amount, Account:** Mark these if the parser missed them. Finlight will create smart patterns to find them in future messages.
+                - **Save:** You must define at least a Trigger Phrase and one other part to save the rule.
+            """.trimIndent()
+        ),
+        "sms_debug_screen" to HelpInfo(
+            title = "About the SMS Debugger",
+            content = """
+                This is a power-user tool that shows exactly how Finlight's parser interpreted your most recent SMS messages.
+
+                - **Parsed Successfully:** The parser understood the message and it was likely saved as a transaction.
+                - **Ignored by Rule:** The message contained a word or sender pattern from your **Ignore List**.
+                - **Ignored by ML Model:** The app's AI model predicted with high confidence that this was **not** a financial transaction (e.g., an OTP or promotional message).
+                - **Not Parsed:** The parser identified it as potentially transactional but couldn't understand its format.
+                - **Create Rule:** For messages that were not parsed correctly, you can tap this button to manually teach Finlight how to read them in the future.
+            """.trimIndent()
+        ),
+        "csv_validation_screen" to HelpInfo(
+            title = "Reviewing Your CSV Import",
+            content = """
+                This screen shows a preview of the transactions from your CSV file before they are permanently added to your database.
+
+                - **Status Icons:** Each row has a status icon. Green means the row is valid. Yellow means the app needs to create a new Category or Account, which it will do automatically. Red indicates an error (like a wrong date format) that you must fix.
+                - **Edit a Row:** **Tap on any row** to open an editor and correct mistakes.
+                - **Ignore a Row:** Tap the **trash icon** to exclude a specific row from the import.
+                - **Import:** When you're ready, tap the "Import" button to save all valid and auto-fixable rows.
+            """.trimIndent()
+        ),
+        "account_mapping_screen" to HelpInfo(
+            title = "Why Map Accounts?",
+            content = """
+                During a bulk SMS scan, Finlight found transactions from new senders it hasn't seen before (e.g., "VK-ICIBNK").
+
+                To import these transactions correctly, you need to tell the app which of your accounts they belong to.
+
+                - **How it works:** For each sender in the list, use the dropdown to either select one of your existing accounts or create a new one.
+                - **Learning:** You only have to do this once per sender. Finlight will remember your choice and automatically map all future transactions from that sender to the correct account.
             """.trimIndent()
         )
     )

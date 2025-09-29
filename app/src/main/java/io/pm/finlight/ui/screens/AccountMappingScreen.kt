@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AccountMappingScreen.kt
-// REASON: NEW FILE - This screen implements the "Account Mapping" pre-processing
-// step. It displays a list of unmapped SMS senders and allows the user to
-// associate each one with an existing account or create a new one. This makes
-// the bulk import process significantly more accurate and efficient.
+// REASON: FEATURE (Help System - Phase 1) - Integrated the HelpActionIcon into
+// the TopAppBar to provide users with contextual guidance on why and how to
+// map their accounts.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -27,6 +26,7 @@ import io.pm.finlight.SenderToMap
 import io.pm.finlight.SettingsViewModel
 import io.pm.finlight.ui.components.CreateAccountDialog
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 
@@ -53,6 +53,10 @@ fun AccountMappingScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                // --- NEW: Add HelpActionIcon ---
+                actions = {
+                    HelpActionIcon(helpKey = "account_mapping_screen")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
             )
