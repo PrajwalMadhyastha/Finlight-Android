@@ -14,8 +14,6 @@
 // REFACTOR (Cleanup) - Removed the test-only "Verify Snapshot" button and
 // updated the text of the "Create Snapshot" button to be more user-friendly,
 // reflecting its new role as a permanent feature.
-// FEATURE (Help System) - Integrated the new HelpActionIcon into the Automation
-// and Data settings screens.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -84,6 +82,9 @@ fun AppearanceSettingsScreen(navController: NavController, settingsViewModel: Se
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "appearance_settings")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
@@ -306,6 +307,9 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "notification_settings")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )

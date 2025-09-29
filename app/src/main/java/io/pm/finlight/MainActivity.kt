@@ -59,7 +59,6 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -72,6 +71,7 @@ import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
 import io.pm.finlight.ui.components.DaybreakAnimatedBackground
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.screenTitles
 import io.pm.finlight.ui.screens.*
 import io.pm.finlight.ui.theme.AppTheme
@@ -84,7 +84,6 @@ import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URLDecoder
 import java.util.concurrent.Executor
@@ -435,6 +434,13 @@ fun MainAppScreen() {
                                             Text("Merge Accounts")
                                         }
                                     }
+                                    HelpActionIcon(helpKey = "account_list")
+                                }
+                                BottomNavItem.Reports.route -> {
+                                    HelpActionIcon(helpKey = "reports_screen")
+                                }
+                                "budget_screen" -> {
+                                    HelpActionIcon(helpKey = "budget_screen")
                                 }
                             }
                         },

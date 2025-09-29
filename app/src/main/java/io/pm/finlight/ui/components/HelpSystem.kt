@@ -92,6 +92,86 @@ object HelpContentRegistry {
                 - **Reorder Cards:** Long-press the drag handle (:::) and drag any card (except the main budget card) up or down to change its position.
             """.trimIndent(),
             // visual = R.drawable.help_gif_reorder // Temporarily commented out as requested.
+        ),
+        // --- NEW CONTENT FROM AUDIT ---
+        "manage_parse_rules" to HelpInfo(
+            title = "About Parse Rules",
+            content = """
+                Custom Parse Rules are powerful tools that teach Finlight how to read new or tricky SMS formats.
+
+                - **How they are created:** When you edit a transaction that came from an SMS, you can choose to 'Fix Parsing'. This takes you to a screen where you can highlight the parts of the message to create a new, high-priority rule.
+                - **Management:** This screen lists all the rules you have created. You can **Edit** them to refine the parsing logic or **Delete** them if they are no longer needed.
+            """.trimIndent()
+        ),
+        "manage_ignore_rules" to HelpInfo(
+            title = "About the Ignore List",
+            content = """
+                The ignore list tells the SMS parser to completely skip messages that match certain patterns, reducing clutter from non-transactional messages.
+
+                - **Rule Types:** You can ignore messages based on the **Sender** (e.g., `*Jio*`) or a **Body Phrase** (e.g., "Your OTP is").
+                - **Wildcards:** For sender rules, you can use an asterisk `*` as a wildcard to match any characters.
+                - **Default vs. Custom:** The app comes with a set of default rules that you can disable. You can also add your own custom rules which can be deleted.
+            """.trimIndent()
+        ),
+        "reports_screen" to HelpInfo(
+            title = "About Reports",
+            content = """
+                This screen provides a high-level overview of your financial health.
+
+                - **Time Period:** Select a time period at the top to change the scope of the entire report.
+                - **Consistency Calendar:** This heatmap visualizes your spending habits. You can toggle between a detailed **Monthly** view and a condensed **Yearly** overview. Tap on any day to see the transactions for that date.
+                - **Spending by Category:** This donut chart shows where your money went. **Tap on a slice** of the chart to see all transactions for that category in the selected period.
+                - **Trend Chart:** This bar chart compares your income versus your expenses over the last several months.
+            """.trimIndent()
+        ),
+        "budget_screen" to HelpInfo(
+            title = "About Budgets",
+            content = """
+                The Budget Hub helps you track and control your spending.
+
+                - **Overall Budget:** This is your main spending target for the entire month. Tap the large card at the top to set or edit it.
+                - **Category Budgets:** You can set specific budgets for individual categories (e.g., ₹5,000 for Food). This helps you track spending in more detail.
+                - **Budget Rollover:** If you don't set a budget for a category this month, Finlight will automatically use the budget you set for it in the most recent previous month.
+            """.trimIndent()
+        ),
+        "currency_travel_settings" to HelpInfo(
+            title = "Currency & Travel Mode",
+            content = """
+                Manage your home currency and automate tracking for your trips.
+
+                - **Home Currency:** This is the default currency for all your budgets and reports.
+                - **Travel Mode:** When you create a trip plan, Finlight will automatically tag all transactions that occur within the trip's date range.
+                - **International Trips:** For international trips, the app can automatically convert foreign currency amounts to your home currency based on the rate you provide.
+                - **Travel History:** All past and future trips are listed here. You can edit their details or delete them.
+            """.trimIndent()
+        ),
+        "appearance_settings" to HelpInfo(
+            title = "About Appearance",
+            content = """
+                Customize the look and feel of the app.
+
+                - **System:** Automatically switches between a light and dark theme based on your phone's system settings.
+                - **Aurora & Midnight:** Dark themes.
+                - **Daybreak & Paper:** Light themes.
+            """.trimIndent()
+        ),
+        "notification_settings" to HelpInfo(
+            title = "About Notifications",
+            content = """
+                Control the alerts and summaries you receive from Finlight.
+
+                - **Auto-Captured Transactions:** Get a notification each time Finlight successfully saves a new transaction from an SMS.
+                - **Summaries & Reports:** Receive daily, weekly, and monthly notifications that summarize your spending activity. You can configure the time for each summary.
+            """.trimIndent()
+        ),
+        "account_list" to HelpInfo(
+            title = "Managing Accounts",
+            content = """
+                This screen lists all your financial accounts.
+
+                - **View Details:** Tap any account to see its transaction history.
+                - **Merge Duplicates:** If you have duplicate accounts (e.g., "ICICI" and "ICICI Bank"), **long-press** any item to enter selection mode. Select two or more accounts and tap 'Merge' to combine them into one. The app will learn from this and auto-map future transactions correctly.
+            """.trimIndent()
         )
     )
 }
