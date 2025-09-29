@@ -6,6 +6,8 @@
 // false AND a backup snapshot file exists. The flag is set to true after this
 // one-time check, definitively preventing the app from restoring data every
 // morning after the daily snapshot is created.
+// CLEANUP - Removed the NavHost routes and FAB logic for the disabled
+// "Savings Goals" and "Recurring Transactions" features.
 // =================================================================================
 package io.pm.finlight
 
@@ -301,9 +303,7 @@ fun MainAppScreen() {
     }
 
     val fabRoutes = setOf(
-        "account_list",
-        "recurring_transactions",
-        "goals_screen"
+        "account_list"
     )
     val showFab = baseCurrentRoute in fabRoutes && !isAccountSelectionMode
 
@@ -473,8 +473,6 @@ fun MainAppScreen() {
                     FloatingActionButton(onClick = {
                         when (baseCurrentRoute) {
                             "account_list" -> navController.navigate("add_account")
-                            "recurring_transactions" -> navController.navigate("add_recurring_transaction")
-                            "goals_screen" -> navController.navigate("add_edit_goal")
                         }
                     }) {
                         Icon(Icons.Filled.Add, contentDescription = "Add")
@@ -918,25 +916,6 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) { TagManagementScreen() }
-        composable(
-            "recurring_transactions",
-            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) { RecurringTransactionScreen(navController) }
-
-        composable(
-            "add_recurring_transaction?ruleId={ruleId}",
-            arguments = listOf(navArgument("ruleId") { type = NavType.IntType; defaultValue = -1 }),
-            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) { backStackEntry ->
-            val ruleId = backStackEntry.arguments?.getInt("ruleId")
-            AddRecurringTransactionScreen(navController = navController, ruleId = if (ruleId == -1) null else ruleId)
-        }
 
         composable(
             "rule_creation_screen?potentialTransactionJson={potentialTransactionJson}&ruleId={ruleId}",
@@ -1014,38 +993,6 @@ fun AppNavHost(
                 )
             }
         }
-
-        composable(
-            "goals_screen",
-            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) {
-            GoalScreen(navController = navController, goalViewModel = goalViewModel)
-        }
-
-        composable(
-            "add_edit_goal",
-            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) {
-            AddEditGoalScreen(navController = navController, goalId = null)
-        }
-        composable(
-            "add_edit_goal/{goalId}",
-            arguments = listOf(navArgument("goalId") { type = NavType.IntType }),
-            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
-            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) { backStackEntry ->
-            val goalId = backStackEntry.arguments?.getInt("goalId")
-            AddEditGoalScreen(navController = navController, goalId = goalId)
-        }
-
 
         composable(
             "appearance_settings",
