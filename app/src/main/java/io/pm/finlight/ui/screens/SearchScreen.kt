@@ -1,26 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SearchScreen.kt
-// REASON: FIX - The screen now accepts an `expandFilters` boolean. The
-// LaunchedEffect that automatically expands the filter panel now only runs if
-// this new flag is true. This prevents the panel from opening when navigating
-// from the ReportsScreen pie chart.
-// FEATURE - A new `SearchableDropdown` for filtering by tags has been added to
-// the filter panel. This allows users to narrow down their search results based
-// on the tags they have applied to transactions.
-// FIX - The filter panel expansion and search bar focus are now one-time events
-// per screen entry, preventing them from re-triggering annoyingly when
-// navigating back from a detail screen.
-// FIX - The state for date picker visibility (`showStartDatePicker`, `showEndDatePicker`)
-// has been hoisted into the ViewModel. The screen now reads this state from the
-// `SearchUiState` and calls ViewModel functions to show/hide the dialogs,
-// resolving the bug where the pickers would not appear on click.
-// FIX - The `DateTextField` has been refactored to be a disabled TextField
-// wrapped in a clickable Box. This prevents it from interacting with the focus
-// system and the keyboard, resolving a bug where the DatePickerDialog would
-// not appear due to conflicting UI events.
-// FIX - The `DateTextField` and `DatePickerDialog` composables have been updated
-// to call the new, more specific date handling functions in the ViewModel,
-// completing the fix for the inclusive end date range.
+// REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon by
+// wrapping the screen's content in a Scaffold and adding a TopAppBar. This
+// provides users with contextual guidance and improves UI consistency.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -35,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.FilterList
@@ -52,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.TransactionItem
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
@@ -86,149 +70,167 @@ fun SearchScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            OutlinedTextField(
-                value = searchUiState.keyword,
-                onValueChange = { searchViewModel.onKeywordChange(it) },
-                label = { Text("Keyword (description, notes)") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester),
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            GlassPanel {
-                Column {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showFilters = !showFilters }
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.FilterList,
-                            contentDescription = "Filters",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "Filters",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(
-                            imageVector = if (showFilters) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = if (showFilters) "Collapse Filters" else "Expand Filters",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Search Transactions") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "search_screen")
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+            )
+        },
+        containerColor = Color.Transparent
+    ) { innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                OutlinedTextField(
+                    value = searchUiState.keyword,
+                    onValueChange = { searchViewModel.onKeywordChange(it) },
+                    label = { Text("Keyword (description, notes)") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                    singleLine = true
+                )
 
-                    AnimatedVisibility(
-                        visible = showFilters,
-                        enter = expandVertically(animationSpec = tween(200)),
-                        exit = shrinkVertically(animationSpec = tween(200))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                GlassPanel {
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showFilters = !showFilters }
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                            SearchableDropdown(
-                                label = "Account",
-                                options = searchUiState.accounts,
-                                selectedOption = searchUiState.selectedAccount,
-                                onOptionSelected = { searchViewModel.onAccountChange(it) },
-                                getDisplayName = { it.name },
+                            Icon(
+                                Icons.Default.FilterList,
+                                contentDescription = "Filters",
+                                tint = MaterialTheme.colorScheme.primary
                             )
-                            SearchableDropdown(
-                                label = "Category",
-                                options = searchUiState.categories,
-                                selectedOption = searchUiState.selectedCategory,
-                                onOptionSelected = { searchViewModel.onCategoryChange(it) },
-                                getDisplayName = { it.name },
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Filters",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
                             )
-                            SearchableDropdown(
-                                label = "Tag",
-                                options = searchUiState.tags,
-                                selectedOption = searchUiState.selectedTag,
-                                onOptionSelected = { searchViewModel.onTagChange(it) },
-                                getDisplayName = { it.name },
+                            Icon(
+                                imageVector = if (showFilters) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (showFilters) "Collapse Filters" else "Expand Filters",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            SearchableDropdown(
-                                label = "Transaction Type",
-                                options = listOf("All", "Income", "Expense"),
-                                selectedOption = searchUiState.transactionType.replaceFirstChar { it.uppercase() },
-                                onOptionSelected = { searchViewModel.onTypeChange(it) },
-                                getDisplayName = { it },
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        }
+
+                        AnimatedVisibility(
+                            visible = showFilters,
+                            enter = expandVertically(animationSpec = tween(200)),
+                            exit = shrinkVertically(animationSpec = tween(200))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                DateTextField(
-                                    label = "Start Date",
-                                    date = searchUiState.startDate,
-                                    formatter = dateFormatter,
-                                    onClick = { searchViewModel.onShowStartDatePicker(true) },
-                                    onClear = { searchViewModel.onClearStartDate() },
-                                    modifier = Modifier.weight(1f),
+                                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                                SearchableDropdown(
+                                    label = "Account",
+                                    options = searchUiState.accounts,
+                                    selectedOption = searchUiState.selectedAccount,
+                                    onOptionSelected = { searchViewModel.onAccountChange(it) },
+                                    getDisplayName = { it.name },
                                 )
-                                DateTextField(
-                                    label = "End Date",
-                                    date = searchUiState.endDate,
-                                    formatter = dateFormatter,
-                                    onClick = { searchViewModel.onShowEndDatePicker(true) },
-                                    onClear = { searchViewModel.onClearEndDate() },
-                                    modifier = Modifier.weight(1f),
+                                SearchableDropdown(
+                                    label = "Category",
+                                    options = searchUiState.categories,
+                                    selectedOption = searchUiState.selectedCategory,
+                                    onOptionSelected = { searchViewModel.onCategoryChange(it) },
+                                    getDisplayName = { it.name },
                                 )
+                                SearchableDropdown(
+                                    label = "Tag",
+                                    options = searchUiState.tags,
+                                    selectedOption = searchUiState.selectedTag,
+                                    onOptionSelected = { searchViewModel.onTagChange(it) },
+                                    getDisplayName = { it.name },
+                                )
+                                SearchableDropdown(
+                                    label = "Transaction Type",
+                                    options = listOf("All", "Income", "Expense"),
+                                    selectedOption = searchUiState.transactionType.replaceFirstChar { it.uppercase() },
+                                    onOptionSelected = { searchViewModel.onTypeChange(it) },
+                                    getDisplayName = { it },
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    DateTextField(
+                                        label = "Start Date",
+                                        date = searchUiState.startDate,
+                                        formatter = dateFormatter,
+                                        onClick = { searchViewModel.onShowStartDatePicker(true) },
+                                        onClear = { searchViewModel.onClearStartDate() },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    DateTextField(
+                                        label = "End Date",
+                                        date = searchUiState.endDate,
+                                        formatter = dateFormatter,
+                                        onClick = { searchViewModel.onShowEndDatePicker(true) },
+                                        onClear = { searchViewModel.onClearEndDate() },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = { searchViewModel.clearFilters() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text("Clear All Filters") }
                             }
-                            OutlinedButton(
-                                onClick = { searchViewModel.clearFilters() },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) { Text("Clear All Filters") }
                         }
                     }
                 }
             }
-        }
 
-        HorizontalDivider()
+            HorizontalDivider()
 
-        if (searchResults.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                item {
-                    Text(
-                        text = "Results (${searchResults.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
+            if (searchResults.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        Text(
+                            text = "Results (${searchResults.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
+                    items(searchResults) { transactionDetails ->
+                        TransactionItem(
+                            transactionDetails = transactionDetails,
+                            onClick = { navController.navigate("transaction_detail/${transactionDetails.transaction.id}") },
+                            onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
+                        )
+                    }
                 }
-                items(searchResults) { transactionDetails ->
-                    TransactionItem(
-                        transactionDetails = transactionDetails,
-                        onClick = { navController.navigate("transaction_detail/${transactionDetails.transaction.id}") },
-                        onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
-                    )
+            } else if (searchUiState.hasSearched) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No transactions match your criteria.")
                 }
-            }
-        } else if (searchUiState.hasSearched) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No transactions match your criteria.")
             }
         }
     }

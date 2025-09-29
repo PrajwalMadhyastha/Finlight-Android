@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX (Build) - Passed the NavController instance to the
-// ManageIgnoreRulesScreen composable within the NavHost. This resolves the
-// "No value passed for parameter 'navController'" compilation error.
+// REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon into
+// the TopAppBar for the main "Transaction List" screen to provide users with
+// contextual guidance on the screen's features.
 // =================================================================================
 package io.pm.finlight
 
@@ -401,6 +401,7 @@ fun MainAppScreen() {
                                             filterState.keyword.isNotBlank() || filterState.account != null || filterState.category != null
                                         }
                                     }
+                                    HelpActionIcon(helpKey = "transaction_list")
                                     IconButton(onClick = { navController.navigate("add_transaction") }) {
                                         Icon(Icons.Default.Add, contentDescription = "Add Transaction")
                                     }

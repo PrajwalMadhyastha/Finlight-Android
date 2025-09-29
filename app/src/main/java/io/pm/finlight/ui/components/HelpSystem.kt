@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/HelpSystem.kt
-// REASON: FEATURE (Help System - Phase 1) - Populated the HelpContentRegistry
-// with detailed, user-friendly help text for the four high-priority screens:
-// Rule Creation, SMS Debugger, CSV Validation, and Account Mapping.
+// REASON: FEATURE (Help System - Phase 2) - Populated the HelpContentRegistry
+// with detailed help text for the seven medium-priority screens, including
+// core features like adding/editing transactions, splitting, searching, and
+// the main transaction/income lists.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -179,7 +180,6 @@ object HelpContentRegistry {
                 - **Merge Duplicates:** If you have duplicate accounts (e.g., "ICICI" and "ICICI Bank"), **long-press** any item to enter selection mode. Select two or more accounts and tap 'Merge' to combine them into one. The app will learn from this and auto-map future transactions correctly.
             """.trimIndent()
         ),
-        // --- NEW: Phase 1 Help Content ---
         "rule_creation_screen" to HelpInfo(
             title = "How to Create a Rule",
             content = """
@@ -224,6 +224,80 @@ object HelpContentRegistry {
 
                 - **How it works:** For each sender in the list, use the dropdown to either select one of your existing accounts or create a new one.
                 - **Learning:** You only have to do this once per sender. Finlight will remember your choice and automatically map all future transactions from that sender to the correct account.
+            """.trimIndent()
+        ),
+        // --- NEW: Phase 2 Help Content ---
+        "transaction_detail" to HelpInfo(
+            title = "Editing a Transaction",
+            content = """
+                This screen gives you full control over a single transaction.
+
+                - **Tap to Edit:** Almost every field on this screen is tappable! Tap the description, amount, category, or date to change them.
+                - **Splitting:** If a single payment was for multiple things (e.g., groceries and a bill payment), tap "Split Transaction" to break it down into multiple categorized items.
+                - **Fix Parsing:** If this transaction came from an SMS and the details were wrong, tap this button. It will take you to the Rule Creation screen to teach Finlight how to parse it correctly next time.
+                - **Attachments & Tags:** Use the icons at the bottom to add photo receipts or organize the transaction with custom tags.
+            """.trimIndent()
+        ),
+        "add_transaction" to HelpInfo(
+            title = "Adding a Transaction",
+            content = """
+                This is the composer for manually adding a new expense or income.
+
+                - **Smart Suggestions:** As you type in the "Description", the app will try to automatically suggest a category for you based on your past habits and common keywords.
+                - **Guidance:** After you enter an amount, a simple checklist will appear to guide you through the required fields, making the process quick and easy.
+                - **Orbital Chips:** Tap the 'Category', 'Account', or 'Date' chips to change their values.
+                - **Actions:** Use the icons at the bottom to add optional details like notes, tags, or photo attachments.
+            """.trimIndent()
+        ),
+        "split_transaction" to HelpInfo(
+            title = "How to Split a Transaction",
+            content = """
+                Splitting is useful when one payment covers multiple categories.
+
+                - **The Goal:** Adjust the amounts and categories for each item until the "Remaining" amount at the top is exactly zero.
+                - **Add Item:** Tap the "Add Item" button to create a new line for another category.
+                - **Set Category:** Tap the '+' icon on any line to assign a category to that part of the payment.
+                - **Save:** The "Save Splits" button will only become active when the total of your split items exactly matches the original transaction amount and every item has a category.
+            """.trimIndent()
+        ),
+        "transaction_list" to HelpInfo(
+            title = "Navigating Your Transactions",
+            content = """
+                This is your main transaction feed.
+
+                - **Tabs:** Switch between viewing individual **Transactions**, a summary grouped by **Categories**, or a summary grouped by **Merchants**.
+                - **Filter:** Tap the filter icon in the top-right to search by keyword or narrow down the list by a specific account or category.
+                - **Multi-Select:** **Long-press** on any transaction to enter selection mode. This allows you to delete or share multiple items at once.
+                - **Drill Down:** In the 'Categories' or 'Merchants' tab, tap any item to see a detailed list of all transactions for that item in the selected month.
+            """.trimIndent()
+        ),
+        "income_screen" to HelpInfo(
+            title = "Tracking Your Income",
+            content = """
+                This screen works just like the main transaction list but is filtered to only show your income.
+
+                - **Tabs:** Switch between viewing individual income **Credits** or seeing a summary grouped by **Categories**.
+                - **Filter:** Tap the filter icon in the top-right to search or narrow down the list by account or category.
+            """.trimIndent()
+        ),
+        "search_screen" to HelpInfo(
+            title = "How to Search",
+            content = """
+                Use the search screen to find specific transactions across your entire history.
+
+                - **Keyword:** Searches the **Description** and **Notes** of your transactions.
+                - **Filters:** Use the dropdowns to narrow your search by a specific Account, Category, or Tag.
+                - **Date Range:** You can also filter for transactions that occurred between a specific start and end date.
+            """.trimIndent()
+        ),
+        "analysis_screen" to HelpInfo(
+            title = "About Spending Analysis",
+            content = """
+                This hub provides powerful tools to understand your spending habits over time.
+
+                - **Dimensions:** The tabs at the top let you group your spending by **Category**, **Tag**, or **Merchant**.
+                - **Time Period:** The chips below the tabs let you change the time window for the analysis (e.g., Last Week, Last Month, etc.).
+                - **Advanced Filters:** Tap the filter icon to drill down even further. For example, you can see your spending in the "Food" category, but only for transactions tagged as "Work Lunch".
             """.trimIndent()
         )
     )

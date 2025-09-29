@@ -1,18 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FEATURE - The screen now observes the new `suggestedCategory` StateFlow.
-// A LaunchedEffect updates the local `selectedCategory` state when a suggestion
-// is emitted. It also notifies the ViewModel when the user manually interacts
-// with the category picker to prevent their choice from being overwritten.
-// FEATURE - Implemented a "Smart Guidance" system. Once a user enters an amount,
-// a glowing border highlights the description field and a simple checklist appears
-// to guide them through the required steps, creating a zero-friction flow.
-// FIX - Corrected the modifier order on the description Text to ensure the .glow()
-// effect is drawn before being clipped, making the smart guidance visible.
-// FIX - Replaced the unreliable .glow() modifier with a more robust implementation
-// using an animated border to ensure the guidance highlight always appears.
-// FEATURE - The description prompt now dynamically changes from "Paid to..." to
-// "Add a description" to further guide the user after an amount is entered.
+// REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon into
+// the TopAppBar to provide users with contextual guidance on the "Smart
+// Guidance" and auto-categorization features.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -247,6 +237,10 @@ fun AddTransactionScreen(
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
+                    },
+                    // --- NEW: Add HelpActionIcon ---
+                    actions = {
+                        HelpActionIcon(helpKey = "add_transaction")
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
                 )
@@ -516,8 +510,6 @@ fun AddTransactionScreen(
         )
     }
 }
-
-// --- REMOVED: Unreliable .glow() modifier function ---
 
 // --- NEW: Checklist composable ---
 @Composable

@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SplitTransactionScreen.kt
-// REASON: REFACTOR - The category selection grid (SplitCategoryPickerSheet) now
-// uses the new, reusable CategorySelectionGrid composable. This ensures a
-// consistent, compact layout and centralizes the grid's UI logic.
+// REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon into
+// the TopAppBar to provide users with contextual guidance on how to split a
+// transaction.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -37,6 +37,7 @@ import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.CategorySelectionGrid
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.CategoryIconHelper
@@ -74,6 +75,9 @@ fun SplitTransactionScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    HelpActionIcon(helpKey = "split_transaction")
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
