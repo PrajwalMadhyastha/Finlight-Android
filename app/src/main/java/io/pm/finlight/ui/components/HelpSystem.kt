@@ -1,6 +1,34 @@
-package io.pmfinlight.ui.components
+package io.pm.finlight.ui.components
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import io.pm.finlight.R
 
 /**
@@ -55,7 +83,120 @@ object HelpContentRegistry {
                 - **Toggle Visibility:** Use the switch to show or hide a card.
                 - **Reorder Cards:** Long-press the drag handle (:::) and drag any card (except the main budget card) up or down to change its position.
             """.trimIndent(),
-            visual = R.drawable.help_gif_reorder // Placeholder for now
+            visual = R.drawable.help_gif_reorder // Note: A real drawable resource is needed here.
         )
+    )
+}
+
+/**
+ * A themed ModalBottomSheet that displays help content from a [HelpInfo] object.
+ *
+ * @param info The [HelpInfo] object containing the content to display.
+ * @param onDismiss The callback to be invoked when the sheet is dismissed.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HelpBottomSheet(
+    info: HelpInfo,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+        windowInsets = WindowInsets(0) // Edge-to-edge
+    ) {
+        GlassPanel {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = info.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+                Spacer(Modifier.height(16.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp) // Limit height to prevent overly tall sheets
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MarkdownText(markdown = info.content)
+
+                    AnimatedVisibility(visible = info.visual != null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Using AsyncImage from Coil to support GIFs in the future
+                            AsyncImage(
+                                model = info.visual,
+                                contentDescription = "${info.title} Visual Aid",
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A simple composable to render basic Markdown text.
+ * Supports **bold** text and lines starting with `- ` as bullet points.
+ */
+@Composable
+private fun MarkdownText(markdown: String) {
+    val bullet = "•"
+    Text(
+        buildAnnotatedString {
+            markdown.lines().forEach { line ->
+                val trimmedLine = line.trim()
+                val isListItem = trimmedLine.startsWith("- ")
+                val lineWithoutBullet = if (isListItem) trimmedLine.substring(2) else trimmedLine
+
+                if (isListItem) {
+                    append("  $bullet  ")
+                }
+
+                var startIndex = 0
+                val boldRegex = "\\*\\*(.*?)\\*\\*".toRegex()
+                boldRegex.findAll(lineWithoutBullet).forEach { matchResult ->
+                    val (boldText) = matchResult.destructured
+                    val range = matchResult.range
+
+                    // Append text before the bold part
+                    append(lineWithoutBullet.substring(startIndex, range.first))
+
+                    // Append bold text
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append(boldText)
+                    }
+
+                    startIndex = range.last + 1
+                }
+
+                // Append any remaining text after the last bold part
+                if (startIndex < lineWithoutBullet.length) {
+                    append(lineWithoutBullet.substring(startIndex))
+                }
+                append("\n")
+            }
+        },
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
