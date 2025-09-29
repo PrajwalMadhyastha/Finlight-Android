@@ -14,13 +14,21 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
@@ -151,6 +159,32 @@ fun HelpBottomSheet(
                 }
             }
         }
+    }
+}
+
+/**
+ * A reusable help icon button that, when clicked, displays a modal bottom sheet
+ * with contextual help content.
+ *
+ * @param helpKey The unique key used to look up the help content from the [HelpContentRegistry].
+ */
+@Composable
+fun HelpActionIcon(helpKey: String) {
+    var showSheet by remember { mutableStateOf(false) }
+    val helpInfo = remember(helpKey) { HelpContentRegistry.content[helpKey] }
+
+    IconButton(onClick = { showSheet = true }) {
+        Icon(
+            imageVector = Icons.Default.HelpOutline,
+            contentDescription = "Help"
+        )
+    }
+
+    if (showSheet && helpInfo != null) {
+        HelpBottomSheet(
+            info = helpInfo,
+            onDismiss = { showSheet = false }
+        )
     }
 }
 
