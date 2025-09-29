@@ -28,7 +28,7 @@ val gsonVersion = "2.10.1"
 val coilVersion = "2.6.0"
 val imageCropperVersion = "4.5.0"
 val mockitoVersion = "5.11.0"
-val sqlcipherVersion = "4.5.4"
+val sqlcipherVersion = "4.10.0"
 
 
 // Read properties from local.properties
@@ -189,9 +189,10 @@ dependencies {
 
     implementation("com.vanniktech:android-image-cropper:$imageCropperVersion")
 
-    implementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
-
-    // --- REMOVED: Unused Google Drive API dependencies ---
+    // --- MIGRATION: Swapped to the new SQLCipher for Android library ---
+    implementation("net.zetetic:sqlcipher-android:$sqlcipherVersion")
+    // Explicitly add the SQLite dependency as recommended by SQLCipher docs
+    implementation("androidx.sqlite:sqlite-ktx:2.2.0")
 
 
     // Local unit tests
@@ -202,7 +203,7 @@ dependencies {
     testImplementation("org.robolectric:robolectric:$robolectricVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
-    testImplementation("net.zetetic:android-database-sqlcipher:$sqlcipherVersion")
+    testImplementation("net.zetetic:sqlcipher-android:$sqlcipherVersion")
 
 
     // Instrumented UI tests

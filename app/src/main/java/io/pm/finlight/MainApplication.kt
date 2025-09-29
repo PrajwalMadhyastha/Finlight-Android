@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainApplication.kt
-// REASON: FEATURE - Added a new notification channel for backup completion
-// alerts. This ensures that backup notifications can be managed separately by
-// the user in the system settings.
+// REASON: MIGRATION - Added a call to System.loadLibrary("sqlcipher"). This is
+// now required to manually load the native SQLCipher libraries into memory
+// before any database operations are performed.
 // =================================================================================
 package io.pm.finlight
 
@@ -19,12 +19,14 @@ class MainApplication : Application() {
         const val DAILY_REPORT_CHANNEL_ID = "daily_report_channel"
         const val SUMMARY_CHANNEL_ID = "summary_channel"
         const val MONTHLY_SUMMARY_CHANNEL_ID = "monthly_summary_channel"
-        // --- NEW: Channel ID for backup notifications ---
         const val BACKUP_CHANNEL_ID = "backup_channel"
     }
 
     override fun onCreate() {
         super.onCreate()
+
+        // --- MIGRATION: Manually load the native SQLCipher library ---
+        System.loadLibrary("sqlcipher")
 
         Utils.init(this)
 
@@ -33,11 +35,9 @@ class MainApplication : Application() {
         createDailyReportNotificationChannel()
         createSummaryNotificationChannel()
         createMonthlySummaryNotificationChannel()
-        // --- NEW: Create the backup channel on app start ---
         createBackupNotificationChannel()
     }
 
-    // --- NEW: Function to create the backup notification channel ---
     private fun createBackupNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Data Backups"
