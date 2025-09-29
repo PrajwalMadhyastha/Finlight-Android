@@ -33,7 +33,7 @@ jobs:
 
       # 5. Run unit tests
       - name: Run unit tests
-        run: ./gradlew testDebugUnitTest --tests "*" --exclude-tests "io.pm.finlight.ui.viewmodel.DashboardViewModelTest"
+        run: ./gradlew testDebugUnitTest
 
       # 6. Build the debug version of the app to ensure it compiles
       - name: Build with Gradle
