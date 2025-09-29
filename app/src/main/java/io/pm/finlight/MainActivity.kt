@@ -1,13 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX (Daily Restore) - The SplashScreen logic has been completely
-// rewritten. It now uses a new, non-backed-up "first launch" flag from the
-// SettingsRepository. The restore process is now only attempted if this flag is
-// false AND a backup snapshot file exists. The flag is set to true after this
-// one-time check, definitively preventing the app from restoring data every
-// morning after the daily snapshot is created.
-// CLEANUP - Removed the NavHost routes and FAB logic for the disabled
-// "Savings Goals" and "Recurring Transactions" features.
+// REASON: FIX (Build) - Passed the NavController instance to the
+// ManageIgnoreRulesScreen composable within the NavHost. This resolves the
+// "No value passed for parameter 'navController'" compilation error.
 // =================================================================================
 package io.pm.finlight
 
@@ -676,7 +671,7 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) {
-            ManageIgnoreRulesScreen()
+            ManageIgnoreRulesScreen(navController = navController)
         }
 
         composable(BottomNavItem.Dashboard.route) {
