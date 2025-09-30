@@ -6,6 +6,9 @@
 // FEATURE - The screen now supports a YEARLY time period. It dynamically adjusts
 // its title and subtitle, displays the new Yearly Consistency Calendar, and hides
 // the transaction list to provide a high-level annual overview.
+// REFACTOR (UX) - Replaced the static ReportHeader with the new interactive
+// ReportPeriodSelector and a separate SpendingSummaryCard. This makes period
+// navigation more discoverable and improves the screen's structure.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -44,10 +47,13 @@ import io.pm.finlight.ui.components.ConsistencyCalendar
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.MonthlyConsistencyCalendarCard
+import io.pm.finlight.ui.components.ReportPeriodSelector
+import io.pm.finlight.ui.components.SpendingSummaryCard
 import io.pm.finlight.ui.components.TransactionItem
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,11 +143,18 @@ fun TimePeriodReportScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    ReportHeader(
-                        totalSpent = totalSpent,
-                        totalIncome = totalIncome,
+                    ReportPeriodSelector(
                         timePeriod = timePeriod,
-                        selectedDate = selectedDate.time
+                        selectedDate = selectedDate.time,
+                        onPrevious = viewModel::selectPreviousPeriod,
+                        onNext = viewModel::selectNextPeriod
+                    )
+                }
+
+                item {
+                    SpendingSummaryCard(
+                        totalSpent = totalSpent,
+                        totalIncome = totalIncome
                     )
                 }
 
@@ -266,100 +279,6 @@ fun TimePeriodReportScreen(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReportHeader(totalSpent: Double, totalIncome: Double, timePeriod: TimePeriod, selectedDate: Date) {
-    val subtitle = when (timePeriod) {
-        TimePeriod.DAILY -> {
-            val format = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
-            val startCal = Calendar.getInstance().apply {
-                time = selectedDate
-                add(Calendar.HOUR_OF_DAY, -24)
-            }
-            "Since ${format.format(startCal.time)}"
-        }
-        TimePeriod.WEEKLY -> {
-            val format = SimpleDateFormat("MMM d", Locale.getDefault())
-            val startCal = Calendar.getInstance().apply {
-                time = selectedDate
-                add(Calendar.DAY_OF_YEAR, -7)
-            }
-            "Since ${format.format(startCal.time)}"
-        }
-        TimePeriod.MONTHLY -> {
-            "For ${SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(selectedDate)}"
-        }
-        TimePeriod.YEARLY -> {
-            "For the Year ${SimpleDateFormat("yyyy", Locale.getDefault()).format(selectedDate)}"
-        }
-    }
-
-    val backgroundIcon = when (timePeriod) {
-        TimePeriod.DAILY -> Icons.Default.CalendarViewDay
-        TimePeriod.WEEKLY -> Icons.Default.CalendarViewWeek
-        TimePeriod.MONTHLY -> Icons.Default.CalendarViewMonth
-        TimePeriod.YEARLY -> Icons.Default.CalendarToday
-    }
-
-    GlassPanel {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(240.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = backgroundIcon,
-                contentDescription = null,
-                modifier = Modifier.size(180.dp),
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
-            )
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Total Income",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "₹${NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(totalIncome).drop(1)}",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Total Spent",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "₹${NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(totalSpent).drop(1)}",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }
