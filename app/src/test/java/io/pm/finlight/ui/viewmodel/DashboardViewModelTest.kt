@@ -6,19 +6,17 @@
 // strings returned by the ViewModel, resolving the test failure.
 // TEMP: Added the @Ignore annotation to temporarily disable this entire test
 // suite due to persistent native library loading issues in the test environment.
+// FIX - Removed the @Ignore annotation and updated the @Config to use the
+// custom TestApplication class. This prevents Robolectric from attempting to
+// load the native SQLCipher library, resolving the UnsatisfiedLinkError crash
+// and re-enabling the test suite.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import io.pm.finlight.AccountRepository
-import io.pm.finlight.BudgetDao
-import io.pm.finlight.DashboardCardType
-import io.pm.finlight.DashboardViewModel
-import io.pm.finlight.FinancialSummary
-import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TransactionRepository
+import io.pm.finlight.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -31,7 +29,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,8 +39,7 @@ import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE])
-@Ignore("Temporarily disabling due to Robolectric/SQLCipher native library issues in CI.")
+@Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class DashboardViewModelTest {
 
     @get:Rule

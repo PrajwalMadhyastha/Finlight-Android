@@ -4,13 +4,15 @@
 // updated. It now correctly identifies categories that do not have a budget set
 // for the current month, allowing users to override a carried-over budget by
 // creating a new one.
+// REFACTOR (Testing) - The ViewModel now uses constructor dependency injection,
+// accepting its repository dependencies instead of creating them internally. This
+// decouples it from direct database access and allows for easier unit testing
+// with mock repositories, resolving the AndroidKeyStore crash in tests.
 // =================================================================================
 package io.pm.finlight
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -18,10 +20,11 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class BudgetViewModel(application: Application) : AndroidViewModel(application) {
-    private val budgetRepository: BudgetRepository
-    private val settingsRepository: SettingsRepository
-    private val categoryRepository: CategoryRepository
+class BudgetViewModel(
+    private val budgetRepository: BudgetRepository,
+    private val settingsRepository: SettingsRepository,
+    categoryRepository: CategoryRepository
+) : ViewModel() {
 
     private val calendar: Calendar = Calendar.getInstance()
     private val currentMonth: Int
@@ -34,11 +37,6 @@ class BudgetViewModel(application: Application) : AndroidViewModel(application) 
     val totalSpending: StateFlow<Double>
 
     init {
-        val db = AppDatabase.getInstance(application)
-        budgetRepository = BudgetRepository(db.budgetDao())
-        settingsRepository = SettingsRepository(application)
-        categoryRepository = CategoryRepository(db.categoryDao())
-
         currentMonth = calendar.get(Calendar.MONTH) + 1
         currentYear = calendar.get(Calendar.YEAR)
 
