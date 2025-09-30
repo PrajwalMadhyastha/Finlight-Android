@@ -27,7 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.Account
-import io.pm.finlight.AccountViewModel
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
@@ -35,6 +34,7 @@ import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
 import io.pm.finlight.ui.theme.IncomeGreenLight
+import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.utils.BankLogoHelper
 import java.text.NumberFormat
 import java.text.SimpleDateFormat

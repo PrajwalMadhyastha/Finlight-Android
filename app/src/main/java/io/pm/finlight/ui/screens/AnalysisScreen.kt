@@ -309,7 +309,10 @@ private fun TotalSpendingHero(
     dimension: AnalysisDimension,
     timePeriod: AnalysisTimePeriod
 ) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
+    }
     val timeText = when (timePeriod) {
         AnalysisTimePeriod.CUSTOM -> "in custom range"
         AnalysisTimePeriod.ALL_TIME -> "for all time"

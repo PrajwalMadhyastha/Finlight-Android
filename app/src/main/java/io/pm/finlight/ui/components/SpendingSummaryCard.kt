@@ -20,7 +20,10 @@ import java.util.*
 
 @Composable
 fun SpendingSummaryCard(totalSpent: Double, totalIncome: Double) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
+    }
 
     GlassPanel {
         Row(

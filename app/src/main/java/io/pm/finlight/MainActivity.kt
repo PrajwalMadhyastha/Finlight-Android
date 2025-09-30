@@ -1,15 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX (Build) - Passed the NavController instance to the
-// TagManagementScreen composable within the NavHost. This resolves the
-// "No value passed for parameter 'navController'" compilation error that was
-// introduced when adding the screen's TopAppBar.
-// FIX (UI) - Refactored the TopAppBar logic to be truly centralized. This
-// removes the duplicate app bar on settings screens and restores the
-// HelpActionIcon to all settings sub-screens where it was missing.
-// REFACTOR (Testing) - Updated the instantiation of TransactionViewModel and
-// BudgetViewModel to use their new ViewModelFactories. This supports the
-// dependency injection pattern required to make the ViewModels unit-testable.
+// REASON: REFACTOR (Testing) - Updated the instantiation of AccountViewModel
+// to use its new ViewModelFactory. This supports the dependency injection pattern
+// required to make the ViewModel unit-testable.
 // =================================================================================
 package io.pm.finlight
 
@@ -80,6 +73,8 @@ import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.ui.theme.PersonalFinanceAppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.AccountViewModel
+import io.pm.finlight.ui.viewmodel.AccountViewModelFactory
 import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.BudgetViewModelFactory
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
@@ -242,7 +237,7 @@ fun MainAppScreen() {
     val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModelFactory(context))
     val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(context))
     val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context, transactionViewModel))
-    val accountViewModel: AccountViewModel = viewModel()
+    val accountViewModel: AccountViewModel = viewModel(factory = AccountViewModelFactory(context))
     val categoryViewModel: CategoryViewModel = viewModel()
     val budgetViewModel: BudgetViewModel = viewModel(factory = BudgetViewModelFactory(context))
     val profileViewModel: ProfileViewModel = viewModel()
