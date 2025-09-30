@@ -3,6 +3,9 @@
 // REASON: FEATURE (Help System - Phase 3) - Integrated the HelpActionIcon into
 // the TopAppBar to provide users with contextual guidance on how to interpret
 // the report and navigate between periods.
+// FEATURE - The screen now supports a YEARLY time period. It dynamically adjusts
+// its title and subtitle, displays the new Yearly Consistency Calendar, and hides
+// the transaction list to provide a high-level annual overview.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -33,9 +36,11 @@ import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
+import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import io.pm.finlight.*
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.ui.components.ConsistencyCalendar
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.MonthlyConsistencyCalendarCard
@@ -63,6 +68,7 @@ fun TimePeriodReportScreen(
     val chartDataPair by viewModel.chartData.collectAsState()
     val insights by viewModel.insights.collectAsState()
     val monthlyConsistencyData by viewModel.monthlyConsistencyData.collectAsState()
+    val yearlyConsistencyData by viewModel.yearlyConsistencyData.collectAsState()
     val consistencyStats by viewModel.consistencyStats.collectAsState()
 
     val totalSpent = transactions.filter { it.transaction.transactionType == "expense" && !it.transaction.isExcluded }.sumOf { it.transaction.amount }
@@ -84,6 +90,7 @@ fun TimePeriodReportScreen(
                             TimePeriod.DAILY -> "Daily Report"
                             TimePeriod.WEEKLY -> "Weekly Report"
                             TimePeriod.MONTHLY -> "Monthly Report"
+                            TimePeriod.YEARLY -> "Yearly Report"
                         }
                     )
                 },
@@ -159,6 +166,34 @@ fun TimePeriodReportScreen(
                     }
                 }
 
+                if (timePeriod == TimePeriod.YEARLY) {
+                    item {
+                        GlassPanel {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    "Yearly Spending Consistency",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                if (yearlyConsistencyData.isEmpty()) {
+                                    CircularProgressIndicator()
+                                } else {
+                                    ConsistencyCalendar(
+                                        data = yearlyConsistencyData,
+                                        onDayClick = { date ->
+                                            navController.navigate("search_screen?date=${date.time}&focusSearch=false")
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
 
                 item {
                     GlassPanel {
@@ -193,7 +228,7 @@ fun TimePeriodReportScreen(
                     }
                 }
 
-                if (transactions.isNotEmpty()) {
+                if (transactions.isNotEmpty() && timePeriod != TimePeriod.YEARLY) {
                     item {
                         Text(
                             "Transactions in this Period",
@@ -208,7 +243,7 @@ fun TimePeriodReportScreen(
                             onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
                         )
                     }
-                } else {
+                } else if (timePeriod != TimePeriod.YEARLY) {
                     item {
                         GlassPanel {
                             Row(
@@ -256,14 +291,10 @@ private fun ReportHeader(totalSpent: Double, totalIncome: Double, timePeriod: Ti
             "Since ${format.format(startCal.time)}"
         }
         TimePeriod.MONTHLY -> {
-            val format = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
-            val startCal = (selectedDate.clone() as Date).apply {
-                val cal = Calendar.getInstance()
-                cal.time = this
-                cal.set(Calendar.DAY_OF_MONTH, 1)
-                time = cal.timeInMillis
-            }
             "For ${SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(selectedDate)}"
+        }
+        TimePeriod.YEARLY -> {
+            "For the Year ${SimpleDateFormat("yyyy", Locale.getDefault()).format(selectedDate)}"
         }
     }
 
@@ -271,6 +302,7 @@ private fun ReportHeader(totalSpent: Double, totalIncome: Double, timePeriod: Ti
         TimePeriod.DAILY -> Icons.Default.CalendarViewDay
         TimePeriod.WEEKLY -> Icons.Default.CalendarViewWeek
         TimePeriod.MONTHLY -> Icons.Default.CalendarViewMonth
+        TimePeriod.YEARLY -> Icons.Default.CalendarToday
     }
 
     GlassPanel {

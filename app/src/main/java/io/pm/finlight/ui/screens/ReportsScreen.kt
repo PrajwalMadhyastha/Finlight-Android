@@ -7,6 +7,8 @@
 // FEATURE - A new "Spending Analysis" card has been added to the "Detailed
 // Reports" section. This serves as the primary entry point for the new
 // analysis feature.
+// FEATURE - Added a new "Yearly Report" card to provide an entry point for the
+// new yearly summary feature.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -21,9 +23,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.CalendarViewDay
 import androidx.compose.material.icons.filled.CalendarViewMonth
 import androidx.compose.material.icons.filled.CalendarViewWeek
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -323,6 +327,14 @@ fun ReportsScreen(
         }
         item {
             GlassReportNavigationCard(
+                title = "Daily Report",
+                subtitle = "See a summary of yesterday's spending.",
+                icon = Icons.Default.CalendarViewDay,
+                onClick = { navController.navigate("time_period_report_screen/${TimePeriod.DAILY}") }
+            )
+        }
+        item {
+            GlassReportNavigationCard(
                 title = "Weekly Report",
                 subtitle = "Analyze your spending week by week.",
                 icon = Icons.Default.CalendarViewWeek,
@@ -335,6 +347,14 @@ fun ReportsScreen(
                 subtitle = "Get a high-level overview of your monthly habits.",
                 icon = Icons.Default.CalendarViewMonth,
                 onClick = { navController.navigate("time_period_report_screen/${TimePeriod.MONTHLY}") }
+            )
+        }
+        item {
+            GlassReportNavigationCard(
+                title = "Yearly Report",
+                subtitle = "Review your financial performance for the year.",
+                icon = Icons.Default.ShowChart,
+                onClick = { navController.navigate("time_period_report_screen/${TimePeriod.YEARLY}") }
             )
         }
     }

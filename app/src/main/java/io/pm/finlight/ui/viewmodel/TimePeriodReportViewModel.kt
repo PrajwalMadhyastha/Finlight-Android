@@ -7,6 +7,9 @@
 // FIX - The spending chart logic for the Daily report has been corrected. It
 // now fetches and displays data for the relevant 24-hour period, consistent
 // with the rest of the screen, instead of incorrectly showing a 7-day summary.
+// FEATURE - The ViewModel now fully supports a YEARLY time period, including
+// date range calculations, chart data generation (12-month breakdown), and a
+// yearly spending consistency heatmap.
 // =================================================================================
 package io.pm.finlight
 
@@ -65,6 +68,7 @@ class TimePeriodReportViewModel(
                     TimePeriod.DAILY -> add(Calendar.HOUR_OF_DAY, -24)
                     TimePeriod.WEEKLY -> add(Calendar.DAY_OF_YEAR, -7)
                     TimePeriod.MONTHLY -> add(Calendar.MONTH, -1)
+                    TimePeriod.YEARLY -> add(Calendar.YEAR, -1)
                 }
             }
             val (previousStart, previousEnd) = getPeriodDateRange(previousPeriodEndCal)
@@ -183,16 +187,65 @@ class TimePeriodReportViewModel(
                     Pair(BarData(dataSet), labels)
                 }
             }
+            TimePeriod.YEARLY -> {
+                val endCal = (calendar.clone() as Calendar).apply {
+                    set(Calendar.MONTH, Calendar.DECEMBER)
+                    set(Calendar.DAY_OF_MONTH, 31)
+                }
+                val startCal = (calendar.clone() as Calendar).apply {
+                    set(Calendar.MONTH, Calendar.JANUARY)
+                    set(Calendar.DAY_OF_MONTH, 1)
+                }
+
+                transactionDao.getMonthlySpendingForDateRange(startCal.timeInMillis, endCal.timeInMillis).map { monthlyTotals ->
+                    val entries = mutableListOf<BarEntry>()
+                    val labels = mutableListOf<String>()
+                    val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
+                    val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                    val totalsMap = monthlyTotals.associateBy { it.period }
+
+                    for (i in 0..11) {
+                        val monthCal = (startCal.clone() as Calendar).apply { add(Calendar.MONTH, i) }
+                        val yearMonth = yearMonthFormat.format(monthCal.time)
+
+                        val total = totalsMap[yearMonth]?.totalAmount?.toFloat() ?: 0f
+                        entries.add(BarEntry(i.toFloat(), total))
+                        labels.add(monthFormat.format(monthCal.time))
+                    }
+
+                    if (entries.all { it.y == 0f }) return@map null
+
+                    val dataSet = BarDataSet(entries, "Yearly Spending").apply {
+                        color = 0xFF4DD0E1.toInt() // Cyan
+                        setDrawValues(true)
+                        valueTextColor = 0xFFFFFFFF.toInt()
+                    }
+                    Pair(BarData(dataSet), labels)
+                }
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val monthlyConsistencyData: StateFlow<List<CalendarDayStatus>> = _selectedDate.flatMapLatest { calendar ->
+        if (timePeriod != TimePeriod.MONTHLY) return@flatMapLatest flowOf(emptyList())
         flow {
             emit(generateMonthConsistencyData(calendar))
         }.flowOn(Dispatchers.Default)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val consistencyStats: StateFlow<ConsistencyStats> = monthlyConsistencyData.map { data ->
+    val yearlyConsistencyData: StateFlow<List<CalendarDayStatus>> = _selectedDate.flatMapLatest { calendar ->
+        if (timePeriod != TimePeriod.YEARLY) return@flatMapLatest flowOf(emptyList())
+        flow {
+            emit(generateYearlyConsistencyData(calendar))
+        }.flowOn(Dispatchers.Default)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+
+    val consistencyStats: StateFlow<ConsistencyStats> = combine(
+        monthlyConsistencyData,
+        yearlyConsistencyData
+    ) { monthlyData, yearlyData ->
+        val data = if (timePeriod == TimePeriod.MONTHLY) monthlyData else yearlyData
         val goodDays = data.count { it.status == SpendingStatus.WITHIN_LIMIT }
         val badDays = data.count { it.status == SpendingStatus.OVER_LIMIT }
         val noSpendDays = data.count { it.status == SpendingStatus.NO_SPEND }
@@ -209,6 +262,7 @@ class TimePeriodReportViewModel(
                         TimePeriod.DAILY -> Calendar.DAY_OF_YEAR
                         TimePeriod.WEEKLY -> Calendar.WEEK_OF_YEAR
                         TimePeriod.MONTHLY -> Calendar.MONTH
+                        TimePeriod.YEARLY -> Calendar.YEAR
                     }, -1
                 )
             }
@@ -223,6 +277,7 @@ class TimePeriodReportViewModel(
                         TimePeriod.DAILY -> Calendar.DAY_OF_YEAR
                         TimePeriod.WEEKLY -> Calendar.WEEK_OF_YEAR
                         TimePeriod.MONTHLY -> Calendar.MONTH
+                        TimePeriod.YEARLY -> Calendar.YEAR
                     }, 1
                 )
             }
@@ -244,6 +299,19 @@ class TimePeriodReportViewModel(
                 startCal.set(Calendar.MILLISECOND, 0)
 
                 endCal.set(Calendar.DAY_OF_MONTH, endCal.getActualMaximum(Calendar.DAY_OF_MONTH))
+                endCal.set(Calendar.HOUR_OF_DAY, 23)
+                endCal.set(Calendar.MINUTE, 59)
+                endCal.set(Calendar.SECOND, 59)
+                endCal.set(Calendar.MILLISECOND, 999)
+            }
+            TimePeriod.YEARLY -> {
+                startCal.set(Calendar.DAY_OF_YEAR, 1)
+                startCal.set(Calendar.HOUR_OF_DAY, 0)
+                startCal.set(Calendar.MINUTE, 0)
+                startCal.set(Calendar.SECOND, 0)
+                startCal.set(Calendar.MILLISECOND, 0)
+
+                endCal.set(Calendar.DAY_OF_YEAR, endCal.getActualMaximum(Calendar.DAY_OF_YEAR))
                 endCal.set(Calendar.HOUR_OF_DAY, 23)
                 endCal.set(Calendar.MINUTE, 59)
                 endCal.set(Calendar.SECOND, 59)
@@ -299,4 +367,47 @@ class TimePeriodReportViewModel(
         }
         return@withContext resultList
     }
+
+    private suspend fun generateYearlyConsistencyData(calendar: Calendar): List<CalendarDayStatus> = withContext(Dispatchers.IO) {
+        val year = calendar.get(Calendar.YEAR)
+        val today = Calendar.getInstance()
+
+        val budgetsForYear = (1..12).map { month ->
+            settingsRepository.getOverallBudgetForMonthBlocking(year, month)
+        }
+        val totalBudgetForYear = budgetsForYear.sum()
+        val daysInYear = if (calendar.getActualMaximum(Calendar.DAY_OF_YEAR) > 365) 366 else 365
+        val yearlySafeToSpend = if (totalBudgetForYear > 0 && daysInYear > 0) (totalBudgetForYear / daysInYear).toDouble() else 0.0
+
+
+        val yearStartCal = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_YEAR, 1) }
+        val yearEndCal = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_YEAR, getActualMaximum(Calendar.DAY_OF_YEAR)) }
+
+        val firstTransactionDate = transactionDao.getFirstTransactionDate().first()
+        val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
+
+        val dailyTotals = transactionDao.getDailySpendingForDateRange(yearStartCal.timeInMillis, yearEndCal.timeInMillis).first()
+        val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
+
+        val resultList = mutableListOf<CalendarDayStatus>()
+        val dayIterator = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_YEAR, 1) }
+
+        while (dayIterator.get(Calendar.YEAR) == year) {
+            if (dayIterator.after(today) || (firstDataCal != null && dayIterator.before(firstDataCal))) {
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+            } else {
+                val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", dayIterator.get(Calendar.YEAR), dayIterator.get(Calendar.MONTH) + 1, dayIterator.get(Calendar.DAY_OF_MONTH))
+                val amountSpent = spendingMap[dateKey] ?: 0.0
+                val status = when {
+                    amountSpent == 0.0 -> SpendingStatus.NO_SPEND
+                    yearlySafeToSpend > 0 && amountSpent > yearlySafeToSpend -> SpendingStatus.OVER_LIMIT
+                    else -> SpendingStatus.WITHIN_LIMIT
+                }
+                resultList.add(CalendarDayStatus(dayIterator.time, status, amountSpent, yearlySafeToSpend))
+            }
+            dayIterator.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        return@withContext resultList
+    }
+
 }
