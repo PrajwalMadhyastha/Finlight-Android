@@ -1,6 +1,6 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: REFACTOR (Testing) - Updated the instantiation of AccountViewModel
+// REASON: REFACTOR (Testing) - Updated the instantiation of CategoryViewModel
 // to use its new ViewModelFactory. This supports the dependency injection pattern
 // required to make the ViewModel unit-testable.
 // =================================================================================
@@ -77,6 +77,7 @@ import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.ui.viewmodel.AccountViewModelFactory
 import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.BudgetViewModelFactory
+import io.pm.finlight.ui.viewmodel.CategoryViewModelFactory
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.ui.viewmodel.TransactionViewModelFactory
 import io.pm.finlight.utils.CategoryIconHelper
@@ -238,7 +239,7 @@ fun MainAppScreen() {
     val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(context))
     val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context, transactionViewModel))
     val accountViewModel: AccountViewModel = viewModel(factory = AccountViewModelFactory(context))
-    val categoryViewModel: CategoryViewModel = viewModel()
+    val categoryViewModel: CategoryViewModel = viewModel(factory = CategoryViewModelFactory(context))
     val budgetViewModel: BudgetViewModel = viewModel(factory = BudgetViewModelFactory(context))
     val profileViewModel: ProfileViewModel = viewModel()
     val incomeViewModel: IncomeViewModel = viewModel()
