@@ -1,15 +1,5 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/DashboardViewModelTest.kt
-// REASON: FIX - The list of expected strings in the
-// `budgetHealthSummary shows 'over budget' message` test has been corrected by
-// removing the trailing periods. This makes the assertion match the actual
-// strings returned by the ViewModel, resolving the test failure.
-// TEMP: Added the @Ignore annotation to temporarily disable this entire test
-// suite due to persistent native library loading issues in the test environment.
-// FIX - Removed the @Ignore annotation and updated the @Config to use the
-// custom TestApplication class. This prevents Robolectric from attempting to
-// load the native SQLCipher library, resolving the UnsatisfiedLinkError crash
-// and re-enabling the test suite.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 

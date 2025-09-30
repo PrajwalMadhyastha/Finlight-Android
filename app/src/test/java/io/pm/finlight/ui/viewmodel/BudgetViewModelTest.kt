@@ -1,18 +1,5 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/BudgetViewModelTest.kt
-// REASON: NEW FILE - Implements unit tests for the BudgetViewModel. This is the
-// first step in Task 2 of the comprehensive testing plan. The primary test
-// validates the "available categories" logic, ensuring that the UI correctly
-// determines which categories can have a new budget created, including scenarios
-// where budgets are carried over from previous months.
-// FIX - Updated the @Config annotation to use a custom TestApplication class.
-// This prevents Robolectric from calling the real MainApplication.onCreate(),
-// which bypasses the call to System.loadLibrary("sqlcipher") and resolves the
-// UnsatisfiedLinkError crash.
-// REFACTOR (Testing) - The test now instantiates the BudgetViewModel directly,
-// passing in mock repositories. This uses dependency injection to completely
-// isolate the ViewModel from the database and AndroidKeyStore, resolving the
-// KeyStoreException and making the test a true, fast unit test.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 

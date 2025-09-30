@@ -1,10 +1,5 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/TransactionViewModelTest.kt
-// REASON: NEW FILE - This file contains the unit tests for the TransactionViewModel,
-// addressing a key part of Task 2. The tests validate the filtering logic and
-// the behavior of the `onAttemptToLeaveScreen` function, which is critical for the
-// "retroactive update" feature. It uses the `TestApplication` and dependency
-// injection pattern to run as a true unit test.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 

@@ -1,10 +1,5 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/CategoryViewModelTest.kt
-// REASON: REWRITE - The entire test file has been rewritten from scratch to
-// provide a clean, robust, and correct suite of unit tests for the
-// CategoryViewModel. This new version resolves previous Mockito and Kotlin
-// interop issues by using the correct argument matchers and provides
-// comprehensive coverage for all success and failure scenarios.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -32,7 +27,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
-import org.mockito.ArgumentMatchers
 import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.Mockito.never

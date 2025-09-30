@@ -1,13 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/AccountViewModelTest.kt
-// REASON: FIX (Testing) - Switched the test dispatcher from StandardTestDispatcher
-// to UnconfinedTestDispatcher. This aligns it with the other working ViewModel
-// tests in the project for consistency and ensures coroutines launched in the
-// ViewModel are executed eagerly, simplifying the test logic.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
 import android.os.Build
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider

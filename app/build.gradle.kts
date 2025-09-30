@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: FIX (Testing) - Added the dependency for 'app.cash.turbine'. This
-// library is essential for testing Kotlin Flows and resolves the "Unresolved
-// reference" build errors for functions like `test` and `awaitItem` in the
-// ViewModel unit tests.
+// REASON: FIX (Testing) - Added the 'mockito-inline' dependency. This is
+// essential for Mockito to be able to mock final classes and methods, which is
+// standard in Kotlin. This resolves potential Mockito errors in our unit tests.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -29,7 +28,9 @@ val coilVersion = "2.6.0"
 val imageCropperVersion = "4.5.0"
 val mockitoVersion = "5.11.0"
 val sqlcipherVersion = "4.10.0"
-val turbineVersion = "1.1.0"
+val turbineVersion = "1.2.0"
+
+val mockitoInlineVersion = "5.2.0"
 
 
 // Read properties from local.properties
@@ -199,6 +200,7 @@ dependencies {
     // Local unit tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
+    testImplementation("org.mockito:mockito-inline:$mockitoInlineVersion")
     testImplementation("androidx.test:core-ktx:$androidxTestVersion")
     testImplementation("androidx.test.ext:junit:$testExtJunitVersion")
     testImplementation("org.robolectric:robolectric:$robolectricVersion")
