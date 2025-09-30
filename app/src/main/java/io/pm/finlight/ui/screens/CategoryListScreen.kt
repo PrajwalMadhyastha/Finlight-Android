@@ -3,6 +3,9 @@
 // REASON: FEATURE (Help System - Phase 3) - Added a TopAppBar to the existing
 // Scaffold, which now includes a HelpActionIcon to provide users with contextual
 // guidance on how to manage their categories.
+// FIX (UI) - Removed the local TopAppBar from this screen's Scaffold. The main
+// NavHost now provides a centralized TopAppBar, and this change removes the
+// duplicate, resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -59,20 +62,6 @@ fun CategoryListScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Manage Categories") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "category_list")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.Transparent
     ) { innerPadding ->

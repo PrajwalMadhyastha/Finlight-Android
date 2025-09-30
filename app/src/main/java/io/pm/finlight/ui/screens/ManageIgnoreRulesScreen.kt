@@ -4,6 +4,9 @@
 // ignore rules. A segmented button has been added to allow the user to select
 // the rule type. The list items now display the rule type and pattern, providing
 // clear context for each rule.
+// FIX (UI) - Removed the local Scaffold and TopAppBar from this screen. The main
+// NavHost now provides a centralized TopAppBar, and this change removes the
+// duplicate, resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -48,162 +51,144 @@ fun ManageIgnoreRulesScreen(
 
     val (defaultRules, customRules) = rules.partition { it.isDefault }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Manage Ignore List") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "manage_ignore_rules")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Text(
+                "Ignore SMS messages based on the sender's name or phrases in the message body. Use '*' as a wildcard for sender patterns.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        }
+
+        item {
+            GlassPanel {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = selectedRuleType == RuleType.BODY_PHRASE,
+                            onClick = { selectedRuleType = RuleType.BODY_PHRASE },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        ) {
+                            Text("Body Phrase")
+                        }
+                        SegmentedButton(
+                            selected = selectedRuleType == RuleType.SENDER,
+                            onClick = { selectedRuleType = RuleType.SENDER },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        ) {
+                            Text("Sender")
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = newPattern,
+                            onValueChange = { newPattern = it },
+                            label = { Text(if (selectedRuleType == RuleType.BODY_PHRASE) "Phrase to ignore" else "Sender pattern to ignore") },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                cursorColor = MaterialTheme.colorScheme.primary,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                            )
+                        )
+                        Button(
+                            onClick = {
+                                viewModel.addIgnoreRule(newPattern, selectedRuleType)
+                                newPattern = "" // Clear input
+                            },
+                            enabled = newPattern.isNotBlank()
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Rule")
+                        }
+                    }
+                }
+            }
+        }
+
+        if (customRules.isNotEmpty()) {
             item {
                 Text(
-                    "Ignore SMS messages based on the sender's name or phrases in the message body. Use '*' as a wildcard for sender patterns.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    "Your Custom Rules",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
-
-            item {
-                GlassPanel {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            SegmentedButton(
-                                selected = selectedRuleType == RuleType.BODY_PHRASE,
-                                onClick = { selectedRuleType = RuleType.BODY_PHRASE },
-                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                            ) {
-                                Text("Body Phrase")
-                            }
-                            SegmentedButton(
-                                selected = selectedRuleType == RuleType.SENDER,
-                                onClick = { selectedRuleType = RuleType.SENDER },
-                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                            ) {
-                                Text("Sender")
-                            }
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = newPattern,
-                                onValueChange = { newPattern = it },
-                                label = { Text(if (selectedRuleType == RuleType.BODY_PHRASE) "Phrase to ignore" else "Sender pattern to ignore") },
-                                modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    cursorColor = MaterialTheme.colorScheme.primary,
-                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                )
+            items(customRules, key = { "custom-${it.id}" }) { rule ->
+                GlassPanel(modifier = Modifier.animateItemPlacement()) {
+                    ListItem(
+                        headlineContent = { Text(rule.pattern, color = MaterialTheme.colorScheme.onSurface) },
+                        supportingContent = {
+                            Text(
+                                text = if (rule.type == RuleType.SENDER) "Sender Rule" else "Body Phrase Rule",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Button(
-                                onClick = {
-                                    viewModel.addIgnoreRule(newPattern, selectedRuleType)
-                                    newPattern = "" // Clear input
-                                },
-                                enabled = newPattern.isNotBlank()
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = "Add Rule")
+                        },
+                        trailingContent = {
+                            IconButton(onClick = { ruleToDelete = rule }) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete rule",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
                             }
-                        }
-                    }
-                }
-            }
-
-            if (customRules.isNotEmpty()) {
-                item {
-                    Text(
-                        "Your Custom Rules",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp)
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
                 }
-                items(customRules, key = { "custom-${it.id}" }) { rule ->
-                    GlassPanel(modifier = Modifier.animateItemPlacement()) {
-                        ListItem(
-                            headlineContent = { Text(rule.pattern, color = MaterialTheme.colorScheme.onSurface) },
-                            supportingContent = {
-                                Text(
-                                    text = if (rule.type == RuleType.SENDER) "Sender Rule" else "Body Phrase Rule",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            },
-                            trailingContent = {
-                                IconButton(onClick = { ruleToDelete = rule }) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = "Delete rule",
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
+            }
+        }
+
+        if (defaultRules.isNotEmpty()) {
+            item {
+                Text(
+                    "Default App Rules",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+            items(defaultRules, key = { "default-${it.id}" }) { rule ->
+                GlassPanel(modifier = Modifier.animateItemPlacement()) {
+                    ListItem(
+                        headlineContent = { Text(rule.pattern, color = MaterialTheme.colorScheme.onSurface) },
+                        supportingContent = {
+                            Text(
+                                text = if (rule.type == RuleType.SENDER) "Sender Rule" else "Body Phrase Rule",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = rule.isEnabled,
+                                onCheckedChange = { isEnabled ->
+                                    viewModel.updateIgnoreRule(rule.copy(isEnabled = isEnabled))
                                 }
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                        )
-                    }
-                }
-            }
-
-            if (defaultRules.isNotEmpty()) {
-                item {
-                    Text(
-                        "Default App Rules",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp)
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
-                }
-                items(defaultRules, key = { "default-${it.id}" }) { rule ->
-                    GlassPanel(modifier = Modifier.animateItemPlacement()) {
-                        ListItem(
-                            headlineContent = { Text(rule.pattern, color = MaterialTheme.colorScheme.onSurface) },
-                            supportingContent = {
-                                Text(
-                                    text = if (rule.type == RuleType.SENDER) "Sender Rule" else "Body Phrase Rule",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            },
-                            trailingContent = {
-                                Switch(
-                                    checked = rule.isEnabled,
-                                    onCheckedChange = { isEnabled ->
-                                        viewModel.updateIgnoreRule(rule.copy(isEnabled = isEnabled))
-                                    }
-                                )
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                        )
-                    }
                 }
             }
         }

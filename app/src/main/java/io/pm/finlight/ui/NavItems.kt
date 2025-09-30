@@ -8,6 +8,8 @@
 // Details" screens.
 // CLEANUP - Removed screen titles for the disabled "Savings Goals" and
 // "Recurring Transactions" features.
+// FIX (UI) - Changed the title for 'automation_settings' from "Automation & AI"
+// to simply "Automation" to resolve a UI inconsistency.
 // =================================================================================
 package io.pm.finlight.ui
 
@@ -53,7 +55,7 @@ val screenTitles = mapOf(
     "link_transaction_screen/{potentialTransactionJson}" to "Link to Existing Transaction",
     "retrospective_update_screen/{transactionId}/{originalDescription}?newDescription={newDescription}&newCategoryId={newCategoryId}" to "Update Similar",
     "appearance_settings" to "Theme & Appearance",
-    "automation_settings" to "Automation & AI",
+    "automation_settings" to "Automation",
     "notification_settings" to "Notifications",
     "data_settings" to "Security & Data",
     "currency_travel_settings" to "Currency & Travel",

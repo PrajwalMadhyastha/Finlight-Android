@@ -3,6 +3,9 @@
 // REASON: FEATURE (Help System - Phase 3) - Added a TopAppBar to the existing
 // Scaffold, which now includes a HelpActionIcon to provide users with contextual
 // guidance on how to create and manage tags.
+// FIX (UI) - Removed the local TopAppBar from this screen's Scaffold. The main
+// NavHost now provides a centralized TopAppBar, and this change removes the
+// duplicate, resolving a UI bug while preserving the Snackbar.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -51,20 +54,6 @@ fun TagManagementScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Manage Tags") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "tag_management")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.Transparent
     ) { innerPadding ->

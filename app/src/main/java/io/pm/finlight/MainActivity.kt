@@ -4,6 +4,9 @@
 // TagManagementScreen composable within the NavHost. This resolves the
 // "No value passed for parameter 'navController'" compilation error that was
 // introduced when adding the screen's TopAppBar.
+// FIX (UI) - Refactored the TopAppBar logic to be truly centralized. This
+// removes the duplicate app bar on settings screens and restores the
+// HelpActionIcon to all settings sub-screens where it was missing.
 // =================================================================================
 package io.pm.finlight
 
@@ -267,29 +270,20 @@ fun MainAppScreen() {
 
     val showBottomBar = bottomNavItems.any { it.route == baseCurrentRoute }
 
-    val showMainTopBar = baseCurrentRoute !in setOf(
-        "transaction_detail",
-        "income_screen",
+    val screensWithCustomTopBars = setOf(
         "splash_screen",
         "add_transaction",
-        "time_period_report_screen",
-        "link_recurring_transaction",
-        "appearance_settings",
-        "automation_settings",
-        "notification_settings",
-        "data_settings",
-        "add_edit_goal",
-        "currency_travel_settings",
+        "transaction_detail",
         "split_transaction",
-        "category_detail",
-        "merchant_detail",
-        "customize_dashboard",
-        "account_mapping_screen",
-        "sms_debug_screen",
-        "trip_detail",
-        "analysis_screen",
-        "analysis_detail_screen"
+        "rule_creation_screen",
+        "csv_validation_screen",
+        "link_transaction_screen",
+        "link_recurring_transaction",
+        "add_edit_goal",
+        "approve_transaction_screen"
     )
+
+    val showMainTopBar = baseCurrentRoute !in screensWithCustomTopBars
 
     val currentTitle = when {
         baseCurrentRoute == BottomNavItem.Profile.route -> "Profile"
@@ -349,11 +343,7 @@ fun MainAppScreen() {
                     TopAppBar(
                         title = { Text(currentTitle) },
                         navigationIcon = {
-                            if (baseCurrentRoute == BottomNavItem.Profile.route) {
-                                IconButton(onClick = { navController.popBackStack() }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                                }
-                            } else if (!showBottomBar) {
+                            if (!showBottomBar) { // Show back arrow on non-bottom-nav screens
                                 IconButton(onClick = { navController.popBackStack() }) {
                                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                                 }
@@ -370,7 +360,6 @@ fun MainAppScreen() {
                                         .size(36.dp)
                                         .clip(CircleShape)
                                         .clickable {
-                                            // --- FIX #2: Use consistent navigation logic for profile icon ---
                                             navController.navigate(BottomNavItem.Profile.route) {
                                                 popUpTo(BottomNavItem.Dashboard.route) {
                                                     saveState = true
@@ -433,12 +422,20 @@ fun MainAppScreen() {
                                     }
                                     HelpActionIcon(helpKey = "account_list")
                                 }
-                                BottomNavItem.Reports.route -> {
-                                    HelpActionIcon(helpKey = "reports_screen")
-                                }
-                                "budget_screen" -> {
-                                    HelpActionIcon(helpKey = "budget_screen")
-                                }
+                                BottomNavItem.Reports.route -> HelpActionIcon(helpKey = "reports_screen")
+                                "budget_screen" -> HelpActionIcon(helpKey = "budget_screen")
+                                "income_screen" -> HelpActionIcon(helpKey = "income_screen")
+                                "appearance_settings" -> HelpActionIcon(helpKey = "appearance_settings")
+                                "automation_settings" -> HelpActionIcon(helpKey = "automation_settings")
+                                "notification_settings" -> HelpActionIcon(helpKey = "notification_settings")
+                                "data_settings" -> HelpActionIcon(helpKey = "data_settings")
+                                "currency_travel_settings" -> HelpActionIcon(helpKey = "currency_travel_settings")
+                                "customize_dashboard" -> HelpActionIcon(helpKey = "dashboard_customize")
+                                "analysis_screen" -> HelpActionIcon(helpKey = "analysis_screen")
+                                "category_list" -> HelpActionIcon(helpKey = "category_list")
+                                "tag_management" -> HelpActionIcon(helpKey = "tag_management")
+                                "manage_parse_rules" -> HelpActionIcon(helpKey = "manage_parse_rules")
+                                "manage_ignore_rules" -> HelpActionIcon(helpKey = "manage_ignore_rules")
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -460,7 +457,6 @@ fun MainAppScreen() {
                                     navController.navigate(screen.route) {
                                         popUpTo(BottomNavItem.Dashboard.route) {
                                             saveState = true
-                                            // --- FIX #1: Removed the inclusive = true logic ---
                                         }
                                         launchSingleTop = true
                                         restoreState = true

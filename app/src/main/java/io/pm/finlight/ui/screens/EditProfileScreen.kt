@@ -4,10 +4,15 @@
 // now correctly derives its background color from the app's MaterialTheme. This
 // ensures it is always opaque and legible, resolving the display issue in light
 // themes.
+// FIX (Crash) - Added a runtime permission check for the CAMERA permission. The
+// app now requests the permission if it's not already granted before launching
+// the camera intent, resolving a SecurityException crash.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
@@ -34,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -105,6 +111,26 @@ fun EditProfileScreen(
         }
     }
 
+    // --- NEW: Launcher for the camera permission request ---
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            // Permission is granted, now launch the camera.
+            val tempFile = createTempImageFile(context)
+            val newTempUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.provider",
+                tempFile
+            )
+            tempCameraImageUri = newTempUri
+            cameraLauncher.launch(newTempUri)
+        } else {
+            Toast.makeText(context, "Camera permission is required to take a photo.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+
     if (showImageSourceDialog) {
         val isThemeDark = MaterialTheme.colorScheme.background.isDark()
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -118,14 +144,24 @@ fun EditProfileScreen(
                 TextButton(
                     onClick = {
                         showImageSourceDialog = false
-                        val tempFile = createTempImageFile(context)
-                        val newTempUri = FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.provider",
-                            tempFile
-                        )
-                        tempCameraImageUri = newTempUri
-                        cameraLauncher.launch(newTempUri)
+                        // --- UPDATED: Check for permission before launching camera ---
+                        when (PackageManager.PERMISSION_GRANTED) {
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) -> {
+                                // Permission is already granted
+                                val tempFile = createTempImageFile(context)
+                                val newTempUri = FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.provider",
+                                    tempFile
+                                )
+                                tempCameraImageUri = newTempUri
+                                cameraLauncher.launch(newTempUri)
+                            }
+                            else -> {
+                                // Permission is not granted, request it
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        }
                     }
                 ) {
                     Icon(Icons.Default.CameraAlt, contentDescription = "Camera")

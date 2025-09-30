@@ -24,6 +24,9 @@
 // FIX (Theming) - All AlertDialogs and DatePickerDialogs on this screen now
 // correctly derive their background color from the app's MaterialTheme, ensuring
 // text is always legible in both light and dark modes.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -141,140 +144,122 @@ fun CurrencyTravelScreen(
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Currency & Travel") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "currency_travel_settings")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                SettingsSection(title = "Home Currency") {
-                    ListItem(
-                        headlineContent = { Text("Default Currency") },
-                        supportingContent = { Text("Used for all reports and budgets") },
-                        trailingContent = {
-                            TextButton(onClick = { showHomeCurrencyPicker = true }) {
-                                Text("${CurrencyHelper.getCurrencyInfo(homeCurrencyCode)?.currencyCode ?: homeCurrencyCode} (${CurrencyHelper.getCurrencySymbol(homeCurrencyCode)})")
-                            }
-                        },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                    )
-                }
-            }
-
-
-            item {
-                val sectionTitle = when {
-                    isEditMode -> "Edit Trip Plan"
-                    activeTravelSettings != null -> "Active Trip Plan"
-                    else -> "Create New Trip Plan"
-                }
-                SettingsSection(title = sectionTitle) {
-                    TripSettingsForm(
-                        tripName = tripName, onTripNameChange = { tripName = it },
-                        tripType = tripType, onTripTypeChange = { tripType = it },
-                        selectedCurrency = selectedCurrency, onSelectCurrencyClick = { showTravelCurrencyPicker = true },
-                        conversionRate = conversionRate, onConversionRateChange = { conversionRate = it.filter { c -> c.isDigit() || c == '.' } },
-                        homeCurrencyCode = homeCurrencyCode,
-                        startDate = startDate, onStartDateClick = { showStartDatePicker = true },
-                        endDate = endDate, onEndDateClick = { showEndDatePicker = true }
-                    )
-                }
-            }
-
-
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (activeTravelSettings != null && !isEditMode) {
-                        Button(
-                            onClick = {
-                                viewModel.completeTrip()
-                                Toast.makeText(context, "Trip Completed! Future transactions will not be tagged.", Toast.LENGTH_LONG).show()
-                                navController.popBackStack()
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Mark Trip as Completed")
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            SettingsSection(title = "Home Currency") {
+                ListItem(
+                    headlineContent = { Text("Default Currency") },
+                    supportingContent = { Text("Used for all reports and budgets") },
+                    trailingContent = {
+                        TextButton(onClick = { showHomeCurrencyPicker = true }) {
+                            Text("${CurrencyHelper.getCurrencyInfo(homeCurrencyCode)?.currencyCode ?: homeCurrencyCode} (${CurrencyHelper.getCurrencySymbol(homeCurrencyCode)})")
                         }
-                    }
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+            }
+        }
 
+
+        item {
+            val sectionTitle = when {
+                isEditMode -> "Edit Trip Plan"
+                activeTravelSettings != null -> "Active Trip Plan"
+                else -> "Create New Trip Plan"
+            }
+            SettingsSection(title = sectionTitle) {
+                TripSettingsForm(
+                    tripName = tripName, onTripNameChange = { tripName = it },
+                    tripType = tripType, onTripTypeChange = { tripType = it },
+                    selectedCurrency = selectedCurrency, onSelectCurrencyClick = { showTravelCurrencyPicker = true },
+                    conversionRate = conversionRate, onConversionRateChange = { conversionRate = it.filter { c -> c.isDigit() || c == '.' } },
+                    homeCurrencyCode = homeCurrencyCode,
+                    startDate = startDate, onStartDateClick = { showStartDatePicker = true },
+                    endDate = endDate, onEndDateClick = { showEndDatePicker = true }
+                )
+            }
+        }
+
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (activeTravelSettings != null && !isEditMode) {
                     Button(
                         onClick = {
-                            val settings = TravelModeSettings(
-                                isEnabled = true, tripName = tripName, tripType = tripType,
-                                startDate = startDate!!, endDate = endDate!!,
-                                currencyCode = if (tripType == TripType.INTERNATIONAL) selectedCurrency?.currencyCode else null,
-                                conversionRate = if (tripType == TripType.INTERNATIONAL) conversionRate.toFloatOrNull() else null
-                            )
-                            if (isEditMode) {
-                                viewModel.updateHistoricTrip(settings)
-                            } else {
-                                viewModel.saveActiveTravelPlan(settings)
-                            }
-
-                            val toastMessage = if (activeTravelSettings == null && !isEditMode) "New travel plan saved!" else "Trip details updated!"
-                            Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
+                            viewModel.completeTrip()
+                            Toast.makeText(context, "Trip Completed! Future transactions will not be tagged.", Toast.LENGTH_LONG).show()
                             navController.popBackStack()
                         },
-                        enabled = isSaveEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = if (activeTravelSettings == null && !isEditMode) ButtonDefaults.buttonColors() else ButtonDefaults.outlinedButtonColors()
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        val buttonText = when {
-                            isEditMode -> "Update Trip Details"
-                            activeTravelSettings == null -> "Save and Activate Plan"
-                            else -> "Save Changes to Active Plan"
-                        }
-                        Text(buttonText)
+                        Text("Mark Trip as Completed")
                     }
+                }
 
-                    if (activeTravelSettings != null && !isEditMode) {
-                        TextButton(
-                            onClick = { showCancelConfirmation = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Cancel Active Trip", color = MaterialTheme.colorScheme.error)
+                Button(
+                    onClick = {
+                        val settings = TravelModeSettings(
+                            isEnabled = true, tripName = tripName, tripType = tripType,
+                            startDate = startDate!!, endDate = endDate!!,
+                            currencyCode = if (tripType == TripType.INTERNATIONAL) selectedCurrency?.currencyCode else null,
+                            conversionRate = if (tripType == TripType.INTERNATIONAL) conversionRate.toFloatOrNull() else null
+                        )
+                        if (isEditMode) {
+                            viewModel.updateHistoricTrip(settings)
+                        } else {
+                            viewModel.saveActiveTravelPlan(settings)
                         }
+
+                        val toastMessage = if (activeTravelSettings == null && !isEditMode) "New travel plan saved!" else "Trip details updated!"
+                        Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
+                        navController.popBackStack()
+                    },
+                    enabled = isSaveEnabled,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = if (activeTravelSettings == null && !isEditMode) ButtonDefaults.buttonColors() else ButtonDefaults.outlinedButtonColors()
+                ) {
+                    val buttonText = when {
+                        isEditMode -> "Update Trip Details"
+                        activeTravelSettings == null -> "Save and Activate Plan"
+                        else -> "Save Changes to Active Plan"
+                    }
+                    Text(buttonText)
+                }
+
+                if (activeTravelSettings != null && !isEditMode) {
+                    TextButton(
+                        onClick = { showCancelConfirmation = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cancel Active Trip", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
+        }
 
-            if (historicTrips.isNotEmpty()) {
-                item {
-                    SettingsSection("Travel History") {
-                        Column {
-                            historicTrips.forEach { trip ->
-                                HistoricTripItem(
-                                    trip = trip,
-                                    onClick = { navController.navigate("trip_detail/${trip.tripId}/${trip.tagId}") },
-                                    onEditClick = { navController.navigate("currency_travel_settings?tripId=${trip.tripId}") },
-                                    onDeleteClick = { tripToDelete = trip }
-                                )
-                            }
+        if (historicTrips.isNotEmpty()) {
+            item {
+                SettingsSection("Travel History") {
+                    Column {
+                        historicTrips.forEach { trip ->
+                            HistoricTripItem(
+                                trip = trip,
+                                onClick = { navController.navigate("trip_detail/${trip.tripId}/${trip.tagId}") },
+                                onEditClick = { navController.navigate("currency_travel_settings?tripId=${trip.tripId}") },
+                                onDeleteClick = { tripToDelete = trip }
+                            )
                         }
                     }
                 }
             }
         }
     }
+
 
     if (showCancelConfirmation) {
         AlertDialog(
