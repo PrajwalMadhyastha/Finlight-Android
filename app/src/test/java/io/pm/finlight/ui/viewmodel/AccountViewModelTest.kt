@@ -1,13 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/AccountViewModelTest.kt
-// REASON: NEW FILE - This file contains the unit tests for the AccountViewModel.
-// It validates key logic such as account merging, selection mode, and the smart
-// merge suggestion feature. It uses the established dependency injection pattern
-// with mocks to ensure fast and reliable execution.
-// FIX - Assertions now use `.value` instead of `.first()` on StateFlows to
-// prevent race conditions in the test environment.
-// FIX - Switched to StandardTestDispatcher to provide more control over coroutine
-// execution and resolve the race condition causing the test to fail.
+// REASON: FIX (Testing) - Switched the test dispatcher from StandardTestDispatcher
+// to UnconfinedTestDispatcher. This aligns it with the other working ViewModel
+// tests in the project for consistency and ensures coroutines launched in the
+// ViewModel are executed eagerly, simplifying the test logic.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -43,8 +39,7 @@ class AccountViewModelTest {
     @get:Rule
     var instantTaskExecutorRule = InstantTaskExecutorRule()
 
-    // --- FIX: Switched to StandardTestDispatcher for better control ---
-    private val testDispatcher = StandardTestDispatcher()
+    private val testDispatcher = UnconfinedTestDispatcher()
 
     @Mock
     private lateinit var accountRepository: AccountRepository
@@ -78,7 +73,7 @@ class AccountViewModelTest {
     }
 
     @Test
-    fun `accountsWithBalance should emit what the repository provides`() = runTest(testDispatcher) {
+    fun `accountsWithBalance should emit what the repository provides`() = runTest {
         // ARRANGE
         val mockAccounts = listOf(
             AccountWithBalance(Account(id = 1, name = "Savings", type = "Bank"), 1000.0),
@@ -93,14 +88,14 @@ class AccountViewModelTest {
             transactionRepository,
             settingsRepository
         )
-        val result = viewModel.accountsWithBalance.first() // .first() is correct here for a normal Flow
+        val result = viewModel.accountsWithBalance.first()
 
         // ASSERT
         assertEquals(mockAccounts, result)
     }
 
     @Test
-    fun `toggleAccountSelection should add and remove ids from selection`() = runTest(testDispatcher) {
+    fun `toggleAccountSelection should add and remove ids from selection`() = runTest {
         // ACT
         viewModel.enterSelectionMode(null) // Enter selection mode first
         viewModel.toggleAccountSelection(1)
@@ -119,14 +114,13 @@ class AccountViewModelTest {
     }
 
     @Test
-    fun `clearSelectionMode should reset selection state`() = runTest(testDispatcher) {
+    fun `clearSelectionMode should reset selection state`() = runTest {
         // ARRANGE
         viewModel.enterSelectionMode(1)
         viewModel.toggleAccountSelection(2)
 
         // ACT
         viewModel.clearSelectionMode()
-        advanceUntilIdle()
 
         // ASSERT
         assertEquals(false, viewModel.isSelectionModeActive.value)
@@ -134,7 +128,7 @@ class AccountViewModelTest {
     }
 
     @Test
-    fun `mergeSelectedAccounts should call repository and clear selection`() = runTest(testDispatcher) {
+    fun `mergeSelectedAccounts should call repository and clear selection`() = runTest {
         // ARRANGE
         val destinationId = 1
         val sourceIds = listOf(2, 3)
@@ -145,7 +139,6 @@ class AccountViewModelTest {
 
         // ACT
         viewModel.mergeSelectedAccounts(destinationId)
-        advanceUntilIdle() // Ensure coroutine launched in viewModel completes
 
         // ASSERT
         verify(accountRepository).mergeAccounts(destinationId, sourceIds)
@@ -154,7 +147,7 @@ class AccountViewModelTest {
     }
 
     @Test
-    fun `suggestedMerges should identify similar account names`() = runTest(testDispatcher) {
+    fun `suggestedMerges should identify similar account names`() = runTest {
         // ARRANGE
         val mockAccounts = listOf(
             AccountWithBalance(Account(id = 1, name = "ICICI Bank", type = "Bank"), 1000.0),

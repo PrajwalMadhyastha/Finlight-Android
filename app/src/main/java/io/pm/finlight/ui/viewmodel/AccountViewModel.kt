@@ -1,10 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/AccountViewModel.kt
-// REASON: REFACTOR (Testing) - The ViewModel now uses constructor dependency injection,
-// accepting its repository dependencies. This decouples it from direct database
-// access, allowing for easier unit testing with mock repositories.
-// FIX - Corrected a logic bug in `mergeSelectedAccounts` where an early return
-// would skip the `finally` block, leaving the UI stuck in selection mode.
+// REASON: FIX (Testing) - The UI event channel (_uiEvent) has been changed
+// from a default (Rendezvous) channel to an UNLIMITED buffered channel. This
+// prevents the viewModelScope coroutine from suspending indefinitely on a `send`
+// call when there is no collector, which was causing the `mergeSelectedAccounts`
+// unit test to fail.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -32,7 +32,7 @@ class AccountViewModel(
     private val settingsRepository: SettingsRepository
 ) : AndroidViewModel(application) {
 
-    private val _uiEvent = Channel<String>()
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
     val accountsWithBalance: Flow<List<AccountWithBalance>>
