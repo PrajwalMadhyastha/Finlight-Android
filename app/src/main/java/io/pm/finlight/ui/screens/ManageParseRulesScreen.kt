@@ -10,6 +10,9 @@
 // ANIMATION - Added `animateItemPlacement()` to the RuleItemCard in the
 // LazyColumn. This makes the list fluidly animate changes when rules are
 // added or removed.
+// FIX (UI) - Removed the local Scaffold and TopAppBar from this screen. The main
+// NavHost now provides a centralized TopAppBar, and this change removes the
+// duplicate, resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -41,7 +44,7 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ManageParseRulesScreen(
     navController: NavController,
@@ -50,56 +53,35 @@ fun ManageParseRulesScreen(
     val rules by viewModel.allRules.collectAsState()
     var ruleToDelete by remember { mutableStateOf<CustomSmsRule?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Manage Parse Rules") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "manage_parse_rules")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+    if (rules.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "No custom parsing rules have been created yet.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        if (rules.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "No custom parsing rules have been created yet.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    } else {
+        LazyColumn(
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(rules, key = { it.id }) { rule ->
+                RuleItemCard(
+                    modifier = Modifier.animateItemPlacement(),
+                    rule = rule,
+                    onEditClick = {
+                        navController.navigate("rule_creation_screen?ruleId=${rule.id}")
+                    },
+                    onDeleteClick = { ruleToDelete = rule }
                 )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(rules, key = { it.id }) { rule ->
-                    RuleItemCard(
-                        modifier = Modifier.animateItemPlacement(),
-                        rule = rule,
-                        onEditClick = {
-                            navController.navigate("rule_creation_screen?ruleId=${rule.id}")
-                        },
-                        onDeleteClick = { ruleToDelete = rule }
-                    )
-                }
             }
         }
     }
-
 
     if (ruleToDelete != null) {
         val isThemeDark = MaterialTheme.colorScheme.background.isDark()

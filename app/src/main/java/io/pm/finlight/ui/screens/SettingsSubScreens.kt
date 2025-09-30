@@ -14,6 +14,8 @@
 // REFACTOR (Cleanup) - Removed the test-only "Verify Snapshot" button and
 // updated the text of the "Create Snapshot" button to be more user-friendly,
 // reflecting its new role as a permanent feature.
+// FIX (UI) - Removed the local Scaffold and TopAppBar from AutomationSettingsScreen
+// to resolve a duplicate toolbar bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -74,53 +76,35 @@ private fun hasSmsPermission(context: Context): Boolean {
 fun AppearanceSettingsScreen(navController: NavController, settingsViewModel: SettingsViewModel) {
     val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Theme & Appearance") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "appearance_settings")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                GlassPanel {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "Theme",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Select the app's color palette.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceAround
-                        ) {
-                            AppTheme.entries.forEach { theme ->
-                                ThemePickerItem(
-                                    theme = theme,
-                                    isSelected = selectedTheme == theme,
-                                    onClick = { settingsViewModel.saveSelectedTheme(theme) }
-                                )
-                            }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            GlassPanel {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Theme",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Select the app's color palette.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceAround
+                    ) {
+                        AppTheme.entries.forEach { theme ->
+                            ThemePickerItem(
+                                theme = theme,
+                                isSelected = selectedTheme == theme,
+                                onClick = { settingsViewModel.saveSelectedTheme(theme) }
+                            )
                         }
                     }
                 }
@@ -142,108 +126,91 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Automation") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "automation_settings")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                GlassPanel {
-                    Column {
-                        SettingsActionItem(
-                            text = "Scan Full Inbox",
-                            subtitle = "Scan all messages to find transactions",
-                            icon = Icons.AutoMirrored.Filled.ManageSearch,
-                            onClick = {
-                                if (!isScanning) {
-                                    settingsViewModel.startSmsScanAndIdentifyMappings(null) { mappingNeeded ->
-                                        if (mappingNeeded) {
-                                            navController.navigate("account_mapping_screen")
-                                        }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            GlassPanel {
+                Column {
+                    SettingsActionItem(
+                        text = "Scan Full Inbox",
+                        subtitle = "Scan all messages to find transactions",
+                        icon = Icons.AutoMirrored.Filled.ManageSearch,
+                        onClick = {
+                            if (!isScanning) {
+                                settingsViewModel.startSmsScanAndIdentifyMappings(null) { mappingNeeded ->
+                                    if (mappingNeeded) {
+                                        navController.navigate("account_mapping_screen")
                                     }
                                 }
-                            },
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        ListItem(
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = { Text("Scan from specific date", color = MaterialTheme.colorScheme.onSurface) },
-                            supportingContent = {
-                                Text(
-                                    text = "Start date: ${dateFormatter.format(Date(smsScanStartDate))}",
-                                    modifier = Modifier.clickable { showDatePickerDialog = true },
-                                    color = MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            },
-                            leadingContent = { Icon(Icons.Default.Event, "Scan from date", tint = MaterialTheme.colorScheme.primary) },
-                            trailingContent = {
-                                Button(
-                                    onClick = {
-                                        if (!isScanning) {
-                                            settingsViewModel.startSmsScanAndIdentifyMappings(smsScanStartDate) { mappingNeeded ->
-                                                if (mappingNeeded) {
-                                                    navController.navigate("account_mapping_screen")
-                                                }
+                            }
+                        },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    ListItem(
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        headlineContent = { Text("Scan from specific date", color = MaterialTheme.colorScheme.onSurface) },
+                        supportingContent = {
+                            Text(
+                                text = "Start date: ${dateFormatter.format(Date(smsScanStartDate))}",
+                                modifier = Modifier.clickable { showDatePickerDialog = true },
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingContent = { Icon(Icons.Default.Event, "Scan from date", tint = MaterialTheme.colorScheme.primary) },
+                        trailingContent = {
+                            Button(
+                                onClick = {
+                                    if (!isScanning) {
+                                        settingsViewModel.startSmsScanAndIdentifyMappings(smsScanStartDate) { mappingNeeded ->
+                                            if (mappingNeeded) {
+                                                navController.navigate("account_mapping_screen")
                                             }
                                         }
-                                    },
-                                    enabled = !isScanning
-                                ) { Text("Scan") }
-                            }
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsActionItem(
-                            text = "Manage Custom Parse Rules",
-                            subtitle = "View or delete your SMS parsing rules",
-                            icon = Icons.AutoMirrored.Filled.Rule,
-                            onClick = { navController.navigate("manage_parse_rules") },
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsActionItem(
-                            text = "Manage Parser Ignore List",
-                            subtitle = "Add or remove phrases to ignore",
-                            icon = Icons.Default.Block,
-                            onClick = { navController.navigate("manage_ignore_rules") },
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        // --- NEW: Entry point for the SMS Debugger ---
-                        SettingsActionItem(
-                            text = "Debug SMS Parsing",
-                            subtitle = "See why recent messages were parsed or ignored",
-                            icon = Icons.Default.BugReport,
-                            onClick = { navController.navigate("sms_debug_screen") }
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsToggleItem(
-                            title = "Popup for Unknown Transactions",
-                            subtitle = "Show notification for new merchants",
-                            icon = Icons.AutoMirrored.Filled.HelpOutline,
-                            checked = isUnknownTransactionPopupEnabled,
-                            onCheckedChange = { settingsViewModel.setUnknownTransactionPopupEnabled(it) },
-                        )
-                    }
+                                    }
+                                },
+                                enabled = !isScanning
+                            ) { Text("Scan") }
+                        }
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsActionItem(
+                        text = "Manage Custom Parse Rules",
+                        subtitle = "View or delete your SMS parsing rules",
+                        icon = Icons.AutoMirrored.Filled.Rule,
+                        onClick = { navController.navigate("manage_parse_rules") },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsActionItem(
+                        text = "Manage Parser Ignore List",
+                        subtitle = "Add or remove phrases to ignore",
+                        icon = Icons.Default.Block,
+                        onClick = { navController.navigate("manage_ignore_rules") },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    // --- NEW: Entry point for the SMS Debugger ---
+                    SettingsActionItem(
+                        text = "Debug SMS Parsing",
+                        subtitle = "See why recent messages were parsed or ignored",
+                        icon = Icons.Default.BugReport,
+                        onClick = { navController.navigate("sms_debug_screen") }
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsToggleItem(
+                        title = "Popup for Unknown Transactions",
+                        subtitle = "Show notification for new merchants",
+                        icon = Icons.AutoMirrored.Filled.HelpOutline,
+                        checked = isUnknownTransactionPopupEnabled,
+                        onCheckedChange = { settingsViewModel.setUnknownTransactionPopupEnabled(it) },
+                    )
                 }
             }
         }
     }
+
 
     if (showDatePickerDialog) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = smsScanStartDate)
@@ -299,86 +266,69 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Notifications") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "notification_settings")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-        ) {
-            item {
-                SettingsSection(title = "Transaction Notifications") {
-                    SettingsToggleItem(
-                        title = "Auto-Captured Transactions",
-                        subtitle = "Notify when a transaction is saved from an SMS",
-                        icon = Icons.Default.Sms,
-                        checked = isAutoCaptureNotificationEnabled,
-                        onCheckedChange = { settingsViewModel.setAutoCaptureNotificationEnabled(it) }
-                    )
-                }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+    ) {
+        item {
+            SettingsSection(title = "Transaction Notifications") {
+                SettingsToggleItem(
+                    title = "Auto-Captured Transactions",
+                    subtitle = "Notify when a transaction is saved from an SMS",
+                    icon = Icons.Default.Sms,
+                    checked = isAutoCaptureNotificationEnabled,
+                    onCheckedChange = { settingsViewModel.setAutoCaptureNotificationEnabled(it) }
+                )
             }
-            item {
-                Spacer(Modifier.height(16.dp))
-                SettingsSection(title = "Summaries & Reports") {
-                    Column {
-                        SettingsToggleItem(
-                            title = "Daily Summary",
-                            subtitle = "Report of yesterday's spending",
-                            icon = Icons.Default.Notifications,
-                            checked = isDailyReportEnabled,
-                            onCheckedChange = { settingsViewModel.setDailyReportEnabled(it) },
-                        )
-                        SettingsActionItem(
-                            text = "Daily Report Time",
-                            subtitle = "Current: ${String.format("%02d:%02d", dailyReportTime.first, dailyReportTime.second)}",
-                            icon = Icons.Default.Schedule,
-                            onClick = { showDailyTimePicker = true },
-                            enabled = isDailyReportEnabled
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsToggleItem(
-                            title = "Weekly Summary",
-                            subtitle = "Summary of your finances every week",
-                            icon = Icons.Default.CalendarViewWeek,
-                            checked = isWeeklySummaryEnabled,
-                            onCheckedChange = { settingsViewModel.setWeeklySummaryEnabled(it) },
-                        )
-                        SettingsActionItem(
-                            text = "Weekly Report Time",
-                            subtitle = "Current: ${SimpleDateFormat("EEEE", Locale.getDefault()).format(
-                                Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, weeklyReportTime.first) }.time
-                            )} at ${String.format("%02d:%02d", weeklyReportTime.second, weeklyReportTime.third)}",
-                            icon = Icons.Default.Schedule,
-                            onClick = { showWeeklyTimePicker = true },
-                            enabled = isWeeklySummaryEnabled
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsToggleItem(
-                            title = "Monthly Summary",
-                            subtitle = "Delivered on the 1st of each month at 9 AM",
-                            icon = Icons.Default.CalendarViewMonth,
-                            checked = isMonthlySummaryEnabled,
-                            onCheckedChange = { settingsViewModel.setMonthlySummaryEnabled(it) },
-                        )
-                    }
+        }
+        item {
+            Spacer(Modifier.height(16.dp))
+            SettingsSection(title = "Summaries & Reports") {
+                Column {
+                    SettingsToggleItem(
+                        title = "Daily Summary",
+                        subtitle = "Report of yesterday's spending",
+                        icon = Icons.Default.Notifications,
+                        checked = isDailyReportEnabled,
+                        onCheckedChange = { settingsViewModel.setDailyReportEnabled(it) },
+                    )
+                    SettingsActionItem(
+                        text = "Daily Report Time",
+                        subtitle = "Current: ${String.format("%02d:%02d", dailyReportTime.first, dailyReportTime.second)}",
+                        icon = Icons.Default.Schedule,
+                        onClick = { showDailyTimePicker = true },
+                        enabled = isDailyReportEnabled
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsToggleItem(
+                        title = "Weekly Summary",
+                        subtitle = "Summary of your finances every week",
+                        icon = Icons.Default.CalendarViewWeek,
+                        checked = isWeeklySummaryEnabled,
+                        onCheckedChange = { settingsViewModel.setWeeklySummaryEnabled(it) },
+                    )
+                    SettingsActionItem(
+                        text = "Weekly Report Time",
+                        subtitle = "Current: ${SimpleDateFormat("EEEE", Locale.getDefault()).format(
+                            Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, weeklyReportTime.first) }.time
+                        )} at ${String.format("%02d:%02d", weeklyReportTime.second, weeklyReportTime.third)}",
+                        icon = Icons.Default.Schedule,
+                        onClick = { showWeeklyTimePicker = true },
+                        enabled = isWeeklySummaryEnabled
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsToggleItem(
+                        title = "Monthly Summary",
+                        subtitle = "Delivered on the 1st of each month at 9 AM",
+                        icon = Icons.Default.CalendarViewMonth,
+                        checked = isMonthlySummaryEnabled,
+                        onCheckedChange = { settingsViewModel.setMonthlySummaryEnabled(it) },
+                    )
                 }
             }
         }
     }
+
 
     if (showDailyTimePicker) {
         val timePickerState = rememberTimePickerState(
@@ -530,116 +480,99 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
         }
     )
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Security & Data") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "data_settings")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-        ) {
-            item {
-                GlassPanel {
-                    Column {
-                        SettingsToggleItem(
-                            title = "Enable App Lock",
-                            subtitle = "Use biometrics to secure the app",
-                            icon = Icons.Default.Fingerprint,
-                            checked = isAppLockEnabled,
-                            onCheckedChange = { settingsViewModel.setAppLockEnabled(it) },
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsToggleItem(
-                            title = "Privacy Mode",
-                            subtitle = "Hide all amounts and balances",
-                            icon = Icons.Default.VisibilityOff,
-                            checked = isPrivacyModeEnabled,
-                            onCheckedChange = { settingsViewModel.setPrivacyModeEnabled(it) }
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsToggleItem(
-                            title = "Automatic Daily Backup",
-                            subtitle = "Backup your data to Google Drive daily",
-                            icon = Icons.Default.CloudUpload,
-                            checked = isAutoBackupEnabled,
-                            onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) }
-                        )
-                        SettingsActionItem(
-                            text = "Backup Time",
-                            subtitle = "Current: ${String.format("%02d:%02d", autoBackupTime.first, autoBackupTime.second)}",
-                            icon = Icons.Default.Schedule,
-                            onClick = { showAutoBackupTimePicker = true },
-                            enabled = isAutoBackupEnabled
-                        )
-                        SettingsToggleItem(
-                            title = "Backup Notification",
-                            subtitle = "Notify when a backup is complete",
-                            icon = Icons.Default.Notifications,
-                            checked = isAutoBackupNotificationEnabled,
-                            onCheckedChange = { settingsViewModel.setAutoBackupNotificationEnabled(it) },
-                            enabled = isAutoBackupEnabled
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsActionItem(
-                            text = "Export Data (JSON)",
-                            subtitle = "Create a full backup of all your data",
-                            icon = Icons.Default.DataObject,
-                            onClick = {
-                                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                                val fileName = "Finlight_Backup_${sdf.format(Date())}.json"
-                                jsonFileSaverLauncher.launch(fileName)
-                            },
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsActionItem(
-                            text = "Export Transactions (CSV)",
-                            subtitle = "Save transactions in a spreadsheet format",
-                            icon = Icons.Default.GridOn,
-                            onClick = {
-                                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                                val fileName = "Finlight_Transactions_${sdf.format(Date())}.csv"
-                                csvFileSaverLauncher.launch(fileName)
-                            },
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsActionItem(
-                            text = "Import from JSON",
-                            subtitle = "Restore data from a backup file",
-                            icon = Icons.Default.Download,
-                            onClick = { showImportJsonDialog = true },
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsActionItem(
-                            text = "Import from CSV",
-                            subtitle = "Add new transactions from a CSV file",
-                            icon = Icons.Default.PostAdd,
-                            onClick = { showCsvInfoDialog = true },
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                        SettingsActionItem(
-                            text = "Create Backup Now",
-                            subtitle = "Manually create a snapshot & request a backup",
-                            icon = Icons.Default.Save,
-                            onClick = { settingsViewModel.createBackupSnapshot() }
-                        )
-                    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+    ) {
+        item {
+            GlassPanel {
+                Column {
+                    SettingsToggleItem(
+                        title = "Enable App Lock",
+                        subtitle = "Use biometrics to secure the app",
+                        icon = Icons.Default.Fingerprint,
+                        checked = isAppLockEnabled,
+                        onCheckedChange = { settingsViewModel.setAppLockEnabled(it) },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsToggleItem(
+                        title = "Privacy Mode",
+                        subtitle = "Hide all amounts and balances",
+                        icon = Icons.Default.VisibilityOff,
+                        checked = isPrivacyModeEnabled,
+                        onCheckedChange = { settingsViewModel.setPrivacyModeEnabled(it) }
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsToggleItem(
+                        title = "Automatic Daily Backup",
+                        subtitle = "Backup your data to Google Drive daily",
+                        icon = Icons.Default.CloudUpload,
+                        checked = isAutoBackupEnabled,
+                        onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) }
+                    )
+                    SettingsActionItem(
+                        text = "Backup Time",
+                        subtitle = "Current: ${String.format("%02d:%02d", autoBackupTime.first, autoBackupTime.second)}",
+                        icon = Icons.Default.Schedule,
+                        onClick = { showAutoBackupTimePicker = true },
+                        enabled = isAutoBackupEnabled
+                    )
+                    SettingsToggleItem(
+                        title = "Backup Notification",
+                        subtitle = "Notify when a backup is complete",
+                        icon = Icons.Default.Notifications,
+                        checked = isAutoBackupNotificationEnabled,
+                        onCheckedChange = { settingsViewModel.setAutoBackupNotificationEnabled(it) },
+                        enabled = isAutoBackupEnabled
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsActionItem(
+                        text = "Export Data (JSON)",
+                        subtitle = "Create a full backup of all your data",
+                        icon = Icons.Default.DataObject,
+                        onClick = {
+                            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                            val fileName = "Finlight_Backup_${sdf.format(Date())}.json"
+                            jsonFileSaverLauncher.launch(fileName)
+                        },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsActionItem(
+                        text = "Export Transactions (CSV)",
+                        subtitle = "Save transactions in a spreadsheet format",
+                        icon = Icons.Default.GridOn,
+                        onClick = {
+                            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                            val fileName = "Finlight_Transactions_${sdf.format(Date())}.csv"
+                            csvFileSaverLauncher.launch(fileName)
+                        },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsActionItem(
+                        text = "Import from JSON",
+                        subtitle = "Restore data from a backup file",
+                        icon = Icons.Default.Download,
+                        onClick = { showImportJsonDialog = true },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsActionItem(
+                        text = "Import from CSV",
+                        subtitle = "Add new transactions from a CSV file",
+                        icon = Icons.Default.PostAdd,
+                        onClick = { showCsvInfoDialog = true },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsActionItem(
+                        text = "Create Backup Now",
+                        subtitle = "Manually create a snapshot & request a backup",
+                        icon = Icons.Default.Save,
+                        onClick = { settingsViewModel.createBackupSnapshot() }
+                    )
                 }
             }
         }
     }
+
 
     if (showCsvInfoDialog) {
         CsvInfoDialog(

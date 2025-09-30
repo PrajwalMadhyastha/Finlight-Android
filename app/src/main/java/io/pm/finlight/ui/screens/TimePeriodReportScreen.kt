@@ -3,6 +3,12 @@
 // REASON: FEATURE (Help System - Phase 3) - Integrated the HelpActionIcon into
 // the TopAppBar to provide users with contextual guidance on how to interpret
 // the report and navigate between periods.
+// FEATURE - The screen now supports a YEARLY time period. It dynamically adjusts
+// its title and subtitle, displays the new Yearly Consistency Calendar, and hides
+// the transaction list to provide a high-level annual overview.
+// REFACTOR (UX) - Replaced the static ReportHeader with the new interactive
+// ReportPeriodSelector and a separate SpendingSummaryCard. This makes period
+// navigation more discoverable and improves the screen's structure.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -33,16 +39,21 @@ import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
+import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import io.pm.finlight.*
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.ui.components.ConsistencyCalendar
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.MonthlyConsistencyCalendarCard
+import io.pm.finlight.ui.components.ReportPeriodSelector
+import io.pm.finlight.ui.components.SpendingSummaryCard
 import io.pm.finlight.ui.components.TransactionItem
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +74,7 @@ fun TimePeriodReportScreen(
     val chartDataPair by viewModel.chartData.collectAsState()
     val insights by viewModel.insights.collectAsState()
     val monthlyConsistencyData by viewModel.monthlyConsistencyData.collectAsState()
+    val yearlyConsistencyData by viewModel.yearlyConsistencyData.collectAsState()
     val consistencyStats by viewModel.consistencyStats.collectAsState()
 
     val totalSpent = transactions.filter { it.transaction.transactionType == "expense" && !it.transaction.isExcluded }.sumOf { it.transaction.amount }
@@ -84,6 +96,7 @@ fun TimePeriodReportScreen(
                             TimePeriod.DAILY -> "Daily Report"
                             TimePeriod.WEEKLY -> "Weekly Report"
                             TimePeriod.MONTHLY -> "Monthly Report"
+                            TimePeriod.YEARLY -> "Yearly Report"
                         }
                     )
                 },
@@ -130,11 +143,18 @@ fun TimePeriodReportScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    ReportHeader(
-                        totalSpent = totalSpent,
-                        totalIncome = totalIncome,
+                    ReportPeriodSelector(
                         timePeriod = timePeriod,
-                        selectedDate = selectedDate.time
+                        selectedDate = selectedDate.time,
+                        onPrevious = viewModel::selectPreviousPeriod,
+                        onNext = viewModel::selectNextPeriod
+                    )
+                }
+
+                item {
+                    SpendingSummaryCard(
+                        totalSpent = totalSpent,
+                        totalIncome = totalIncome
                     )
                 }
 
@@ -156,6 +176,34 @@ fun TimePeriodReportScreen(
                                 navController.navigate("search_screen?date=${date.time}")
                             }
                         )
+                    }
+                }
+
+                if (timePeriod == TimePeriod.YEARLY) {
+                    item {
+                        GlassPanel {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    "Yearly Spending Consistency",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                if (yearlyConsistencyData.isEmpty()) {
+                                    CircularProgressIndicator()
+                                } else {
+                                    ConsistencyCalendar(
+                                        data = yearlyConsistencyData,
+                                        onDayClick = { date ->
+                                            navController.navigate("search_screen?date=${date.time}&focusSearch=false")
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -193,7 +241,7 @@ fun TimePeriodReportScreen(
                     }
                 }
 
-                if (transactions.isNotEmpty()) {
+                if (transactions.isNotEmpty() && timePeriod != TimePeriod.YEARLY) {
                     item {
                         Text(
                             "Transactions in this Period",
@@ -208,7 +256,7 @@ fun TimePeriodReportScreen(
                             onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
                         )
                     }
-                } else {
+                } else if (timePeriod != TimePeriod.YEARLY) {
                     item {
                         GlassPanel {
                             Row(
@@ -231,103 +279,6 @@ fun TimePeriodReportScreen(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReportHeader(totalSpent: Double, totalIncome: Double, timePeriod: TimePeriod, selectedDate: Date) {
-    val subtitle = when (timePeriod) {
-        TimePeriod.DAILY -> {
-            val format = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
-            val startCal = Calendar.getInstance().apply {
-                time = selectedDate
-                add(Calendar.HOUR_OF_DAY, -24)
-            }
-            "Since ${format.format(startCal.time)}"
-        }
-        TimePeriod.WEEKLY -> {
-            val format = SimpleDateFormat("MMM d", Locale.getDefault())
-            val startCal = Calendar.getInstance().apply {
-                time = selectedDate
-                add(Calendar.DAY_OF_YEAR, -7)
-            }
-            "Since ${format.format(startCal.time)}"
-        }
-        TimePeriod.MONTHLY -> {
-            val format = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
-            val startCal = (selectedDate.clone() as Date).apply {
-                val cal = Calendar.getInstance()
-                cal.time = this
-                cal.set(Calendar.DAY_OF_MONTH, 1)
-                time = cal.timeInMillis
-            }
-            "For ${SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(selectedDate)}"
-        }
-    }
-
-    val backgroundIcon = when (timePeriod) {
-        TimePeriod.DAILY -> Icons.Default.CalendarViewDay
-        TimePeriod.WEEKLY -> Icons.Default.CalendarViewWeek
-        TimePeriod.MONTHLY -> Icons.Default.CalendarViewMonth
-    }
-
-    GlassPanel {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(240.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = backgroundIcon,
-                contentDescription = null,
-                modifier = Modifier.size(180.dp),
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
-            )
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Total Income",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "₹${NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(totalIncome).drop(1)}",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Total Spent",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "₹${NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(totalSpent).drop(1)}",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }

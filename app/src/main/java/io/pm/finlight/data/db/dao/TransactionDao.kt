@@ -574,7 +574,7 @@ interface TransactionDao {
         JOIN categories AS C ON AE.categoryId = C.id
         WHERE AE.categoryId IS NOT NULL
           AND (:keyword IS NULL OR LOWER(AE.description) LIKE '%' || LOWER(:keyword) || '%' OR LOWER(AE.notes) LIKE '%' || LOWER(:keyword) || '%')
-          AND (:categoryId IS NULL OR AE.categoryId = :categoryId)
+          AND (:categoryId IS NULL OR C.id = :categoryId)
         GROUP BY C.name
         ORDER BY totalAmount DESC
     """
