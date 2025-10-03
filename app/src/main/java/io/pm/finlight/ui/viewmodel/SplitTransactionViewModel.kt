@@ -1,19 +1,14 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SplitTransactionViewModel.kt
-// REASON: FEATURE (Travel Mode Splitting) - The ViewModel's initialization
-// logic now checks if the parent transaction has a foreign currency amount. If
-// so, it uses that as the total for splitting and populates the initial split
-// item with the foreign amount, preparing the UI for foreign currency input.
-// FIX - The instantiation of TransactionRepository has been updated to include
-// the required dependencies, resolving a build error.
+// REASON: REFACTOR (Testing) - The ViewModel now uses constructor dependency
+// injection for its repository dependencies and extends ViewModel instead of
+// AndroidViewModel. This decouples it from the Android framework and direct
+// database instantiation, making it fully unit-testable.
 // =================================================================================
 package io.pm.finlight
 
-import android.app.Application
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
@@ -35,29 +30,12 @@ data class SplitTransactionUiState(
     val error: String? = null
 )
 
-class SplitTransactionViewModelFactory(
-    private val application: Application,
-    private val transactionId: Int
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(SplitTransactionViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return SplitTransactionViewModel(application, transactionId) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
-
 class SplitTransactionViewModel(
-    application: Application,
+    private val transactionRepository: TransactionRepository,
+    val categoryRepository: CategoryRepository,
+    private val splitTransactionRepository: SplitTransactionRepository,
     private val transactionId: Int
 ) : ViewModel() {
-
-    private val db = AppDatabase.getInstance(application)
-    private val transactionRepository: TransactionRepository
-    val categoryRepository = CategoryRepository(db.categoryDao())
-    private val splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
-
 
     private val _uiState = MutableStateFlow(SplitTransactionUiState())
     val uiState = _uiState.asStateFlow()
@@ -65,10 +43,6 @@ class SplitTransactionViewModel(
     private var nextTempId = -1 // For unique keys for new items
 
     init {
-        val settingsRepository = SettingsRepository(application)
-        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
-
         viewModelScope.launch {
             val parentTxn = transactionRepository.getTransactionById(transactionId).firstOrNull()
             if (parentTxn != null) {
