@@ -74,6 +74,7 @@ import io.pm.finlight.ui.viewmodel.BudgetViewModelFactory
 import io.pm.finlight.ui.viewmodel.CategoryViewModelFactory
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
 import io.pm.finlight.ui.viewmodel.ManageIgnoreRulesViewModelFactory
+import io.pm.finlight.ui.viewmodel.ManageParseRulesViewModelFactory
 import io.pm.finlight.ui.viewmodel.ProfileViewModelFactory
 import io.pm.finlight.ui.viewmodel.ReportsViewModelFactory
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
@@ -244,6 +245,7 @@ fun MainAppScreen() {
     val goalViewModel: GoalViewModel = viewModel()
     val reportsViewModel: ReportsViewModel = viewModel(factory = ReportsViewModelFactory(context))
     val manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = viewModel(factory = ManageIgnoreRulesViewModelFactory(context))
+    val manageParseRulesViewModel: ManageParseRulesViewModel = viewModel(factory = ManageParseRulesViewModelFactory(context))
 
 
     val userName by dashboardViewModel.userName.collectAsState()
@@ -497,7 +499,8 @@ fun MainAppScreen() {
                 incomeViewModel = incomeViewModel,
                 goalViewModel = goalViewModel,
                 reportsViewModel = reportsViewModel,
-                manageIgnoreRulesViewModel = manageIgnoreRulesViewModel
+                manageIgnoreRulesViewModel = manageIgnoreRulesViewModel,
+                manageParseRulesViewModel = manageParseRulesViewModel
             )
         }
 
@@ -566,7 +569,8 @@ fun AppNavHost(
     incomeViewModel: IncomeViewModel,
     goalViewModel: GoalViewModel,
     reportsViewModel: ReportsViewModel,
-    manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel
+    manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel,
+    manageParseRulesViewModel: ManageParseRulesViewModel
 ) {
     NavHost(
         navController = navController,
@@ -667,7 +671,7 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) {
-            ManageParseRulesScreen(navController)
+            ManageParseRulesScreen(navController, manageParseRulesViewModel)
         }
         composable(
             "manage_ignore_rules",
