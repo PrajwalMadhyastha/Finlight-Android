@@ -33,9 +33,10 @@ class DrilldownViewModelFactory(
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(DrilldownViewModel::class.java)) {
+            val db = AppDatabase.getInstance(application)
             @Suppress("UNCHECKED_CAST")
             return DrilldownViewModel(
-                application = application,
+                transactionDao = db.transactionDao(),
                 drilldownType = drilldownType,
                 entityName = entityName,
                 month = month,
@@ -47,14 +48,12 @@ class DrilldownViewModelFactory(
 }
 
 class DrilldownViewModel(
-    application: Application,
+    private val transactionDao: TransactionDao,
     private val drilldownType: DrilldownType,
     val entityName: String,
     private val month: Int,
     private val year: Int
 ) : ViewModel() {
-
-    private val transactionDao = AppDatabase.getInstance(application).transactionDao()
 
     val transactionsForMonth: StateFlow<List<TransactionDetails>>
     val monthlyTrendChartData: StateFlow<Pair<BarData, List<String>>?>
