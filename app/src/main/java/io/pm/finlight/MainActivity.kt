@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: REFACTOR (Testing) - Updated the instantiation of CategoryViewModel
-// to use its new ViewModelFactory. This supports the dependency injection pattern
-// required to make the ViewModel unit-testable.
-// =================================================================================
 package io.pm.finlight
 
 import android.Manifest
@@ -78,6 +72,7 @@ import io.pm.finlight.ui.viewmodel.AccountViewModelFactory
 import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.BudgetViewModelFactory
 import io.pm.finlight.ui.viewmodel.CategoryViewModelFactory
+import io.pm.finlight.ui.viewmodel.ReportsViewModelFactory
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.ui.viewmodel.TransactionViewModelFactory
 import io.pm.finlight.utils.CategoryIconHelper
@@ -244,6 +239,8 @@ fun MainAppScreen() {
     val profileViewModel: ProfileViewModel = viewModel()
     val incomeViewModel: IncomeViewModel = viewModel()
     val goalViewModel: GoalViewModel = viewModel()
+    val reportsViewModel: ReportsViewModel = viewModel(factory = ReportsViewModelFactory(context))
+
 
     val userName by dashboardViewModel.userName.collectAsState()
     val profilePictureUri by dashboardViewModel.profilePictureUri.collectAsState()
@@ -494,7 +491,8 @@ fun MainAppScreen() {
                 budgetViewModel = budgetViewModel,
                 profileViewModel = profileViewModel,
                 incomeViewModel = incomeViewModel,
-                goalViewModel = goalViewModel
+                goalViewModel = goalViewModel,
+                reportsViewModel = reportsViewModel
             )
         }
 
@@ -561,7 +559,8 @@ fun AppNavHost(
     budgetViewModel: BudgetViewModel,
     profileViewModel: ProfileViewModel,
     incomeViewModel: IncomeViewModel,
-    goalViewModel: GoalViewModel
+    goalViewModel: GoalViewModel,
+    reportsViewModel: ReportsViewModel
 ) {
     NavHost(
         navController = navController,
@@ -706,7 +705,7 @@ fun AppNavHost(
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) { ReportsScreen(navController, viewModel()) }
+        ) { ReportsScreen(navController, reportsViewModel) }
 
         composable(
             BottomNavItem.Profile.route,

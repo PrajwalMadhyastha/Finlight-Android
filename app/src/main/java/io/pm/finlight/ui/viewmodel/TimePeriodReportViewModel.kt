@@ -365,7 +365,8 @@ class TimePeriodReportViewModel(
         }
         val totalBudgetForYear = budgetsForYear.sum()
         val daysInYear = if (calendar.getActualMaximum(Calendar.DAY_OF_YEAR) > 365) 366 else 365
-        val yearlySafeToSpend = if (totalBudgetForYear > 0 && daysInYear > 0) (totalBudgetForYear / daysInYear).toLong() else 0L
+        // --- FIX: Changed .toLong() to .roundToLong() to prevent truncation ---
+        val yearlySafeToSpend = if (totalBudgetForYear > 0 && daysInYear > 0) (totalBudgetForYear.toDouble() / daysInYear).roundToLong() else 0L
 
 
         val yearStartCal = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_YEAR, 1) }

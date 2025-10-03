@@ -1,6 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/BudgetViewModelTest.kt
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.content.Context
@@ -11,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.Budget
 import io.pm.finlight.BudgetRepository
 import io.pm.finlight.BudgetViewModel
+import io.pm.finlight.BudgetWithSpending
 import io.pm.finlight.Category
 import io.pm.finlight.CategoryRepository
 import io.pm.finlight.SettingsRepository
@@ -31,12 +29,15 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentMatchers.anyInt
+import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 import java.util.Calendar
+import kotlin.math.roundToLong
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -146,6 +147,39 @@ class BudgetViewModelTest {
         // ASSERT
         // The overallBudget flow should find the August budget, skipping September.
         val result = viewModel.overallBudget.first()
-        assertEquals("The budget should be carried over from two months prior.", augustBudget, result)
+        assertEquals("The budget should be carried over from two months prior.", augustBudget.roundToLong(), result)
+    }
+
+    @Test
+    fun `totalSpending and overallBudget are converted to Long`() = runTest {
+        // ARRANGE
+        val overallBudgetFloat = 10000.55f
+        val spendingPerCategory = 1234.56
+
+        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(overallBudgetFloat))
+        `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(listOf(
+            // Mock a single budget item
+            BudgetWithSpending(
+                Budget(1, "Food", 5000.0, 10, 2025),
+                spendingPerCategory,
+                "icon",
+                "color"
+            )
+        )))
+        `when`(budgetRepository.getActualSpendingForCategory(anyString(), anyInt(), anyInt())).thenReturn(flowOf(spendingPerCategory))
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
+        `when`(budgetRepository.getBudgetsForMonth(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+
+
+        // ACT
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository)
+        advanceUntilIdle()
+
+        // ASSERT
+        val actualBudget = viewModel.overallBudget.first()
+        val actualSpending = viewModel.totalSpending.first()
+
+        assertEquals(overallBudgetFloat.roundToLong(), actualBudget)
+        assertEquals(spendingPerCategory.roundToLong(), actualSpending)
     }
 }

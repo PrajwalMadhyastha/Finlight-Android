@@ -3,6 +3,7 @@ package io.pm.finlight
 import android.app.Application
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
@@ -32,10 +33,11 @@ enum class ReportViewType {
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ReportsViewModel(application: Application) : AndroidViewModel(application) {
-    private val transactionRepository: TransactionRepository
-    private val categoryDao: CategoryDao
+class ReportsViewModel(
+    private val transactionRepository: TransactionRepository,
+    private val categoryDao: CategoryDao,
     private val settingsRepository: SettingsRepository
+) : ViewModel() {
 
     val allCategories: StateFlow<List<Category>>
 
@@ -57,13 +59,6 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
     val displayedConsistencyStats: StateFlow<ConsistencyStats>
 
     init {
-        val db = AppDatabase.getInstance(application)
-        settingsRepository = SettingsRepository(application)
-        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
-        categoryDao = db.categoryDao()
-
-
         allCategories = categoryDao.getAllCategories()
             .stateIn(
                 scope = viewModelScope,
@@ -237,7 +232,8 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
         }
 
         val daysSoFar = today.get(Calendar.DAY_OF_YEAR)
-        val yearlySafeToSpend = if (totalBudgetSoFar > 0 && daysSoFar > 0) (totalBudgetSoFar / daysSoFar).toLong() else 0L
+        // --- FIX: Changed .toLong() to .roundToLong() to prevent truncation ---
+        val yearlySafeToSpend = if (totalBudgetSoFar > 0 && daysSoFar > 0) (totalBudgetSoFar / daysSoFar).roundToLong() else 0L
 
         val firstDataCal = Calendar.getInstance().apply { timeInMillis = firstTransactionDate }
         val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
