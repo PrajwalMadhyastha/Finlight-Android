@@ -1,8 +1,12 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/ReportsViewModel.kt
+// REASON: REFACTOR (Testing) - The ViewModel now uses constructor dependency
+// injection for its repositories and DAO. It also extends ViewModel instead of
+// AndroidViewModel, decoupling it from the Android framework for easier unit testing.
+// =================================================================================
 package io.pm.finlight
 
-import android.app.Application
 import androidx.compose.ui.graphics.toArgb
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.mikephil.charting.data.BarData
@@ -11,7 +15,6 @@ import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -191,7 +194,6 @@ class ReportsViewModel(
             consistencyCalendarData,
             detailedMonthData
         ) { viewType, yearlyData, monthlyData ->
-            val today = Calendar.getInstance()
             val dataToProcess = if (viewType == ReportViewType.YEARLY) {
                 yearlyData
             } else {
