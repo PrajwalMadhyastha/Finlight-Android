@@ -3,6 +3,9 @@
 // REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon by
 // wrapping the screen's content in a Scaffold and adding a TopAppBar. This
 // provides users with contextual guidance and improves UI consistency.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -70,170 +73,153 @@ fun SearchScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Search Transactions") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "search_screen")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            OutlinedTextField(
+                value = searchUiState.keyword,
+                onValueChange = { searchViewModel.onKeywordChange(it) },
+                label = { Text("Keyword (description, notes)") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+                singleLine = true
             )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                OutlinedTextField(
-                    value = searchUiState.keyword,
-                    onValueChange = { searchViewModel.onKeywordChange(it) },
-                    label = { Text("Keyword (description, notes)") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester),
-                    singleLine = true
-                )
 
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                GlassPanel {
-                    Column {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showFilters = !showFilters }
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.FilterList,
-                                contentDescription = "Filters",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                "Filters",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(
-                                imageVector = if (showFilters) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (showFilters) "Collapse Filters" else "Expand Filters",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        AnimatedVisibility(
-                            visible = showFilters,
-                            enter = expandVertically(animationSpec = tween(200)),
-                            exit = shrinkVertically(animationSpec = tween(200))
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                                SearchableDropdown(
-                                    label = "Account",
-                                    options = searchUiState.accounts,
-                                    selectedOption = searchUiState.selectedAccount,
-                                    onOptionSelected = { searchViewModel.onAccountChange(it) },
-                                    getDisplayName = { it.name },
-                                )
-                                SearchableDropdown(
-                                    label = "Category",
-                                    options = searchUiState.categories,
-                                    selectedOption = searchUiState.selectedCategory,
-                                    onOptionSelected = { searchViewModel.onCategoryChange(it) },
-                                    getDisplayName = { it.name },
-                                )
-                                SearchableDropdown(
-                                    label = "Tag",
-                                    options = searchUiState.tags,
-                                    selectedOption = searchUiState.selectedTag,
-                                    onOptionSelected = { searchViewModel.onTagChange(it) },
-                                    getDisplayName = { it.name },
-                                )
-                                SearchableDropdown(
-                                    label = "Transaction Type",
-                                    options = listOf("All", "Income", "Expense"),
-                                    selectedOption = searchUiState.transactionType.replaceFirstChar { it.uppercase() },
-                                    onOptionSelected = { searchViewModel.onTypeChange(it) },
-                                    getDisplayName = { it },
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    DateTextField(
-                                        label = "Start Date",
-                                        date = searchUiState.startDate,
-                                        formatter = dateFormatter,
-                                        onClick = { searchViewModel.onShowStartDatePicker(true) },
-                                        onClear = { searchViewModel.onClearStartDate() },
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    DateTextField(
-                                        label = "End Date",
-                                        date = searchUiState.endDate,
-                                        formatter = dateFormatter,
-                                        onClick = { searchViewModel.onShowEndDatePicker(true) },
-                                        onClear = { searchViewModel.onClearEndDate() },
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                }
-                                OutlinedButton(
-                                    onClick = { searchViewModel.clearFilters() },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) { Text("Clear All Filters") }
-                            }
-                        }
-                    }
-                }
-            }
-
-            HorizontalDivider()
-
-            if (searchResults.isNotEmpty()) {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    item {
+            GlassPanel {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showFilters = !showFilters }
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.FilterList,
+                            contentDescription = "Filters",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "Results (${searchResults.size})",
+                            "Filters",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(bottom = 8.dp),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                            imageVector = if (showFilters) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = if (showFilters) "Collapse Filters" else "Expand Filters",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    items(searchResults) { transactionDetails ->
-                        TransactionItem(
-                            transactionDetails = transactionDetails,
-                            onClick = { navController.navigate("transaction_detail/${transactionDetails.transaction.id}") },
-                            onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
-                        )
+
+                    AnimatedVisibility(
+                        visible = showFilters,
+                        enter = expandVertically(animationSpec = tween(200)),
+                        exit = shrinkVertically(animationSpec = tween(200))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                            SearchableDropdown(
+                                label = "Account",
+                                options = searchUiState.accounts,
+                                selectedOption = searchUiState.selectedAccount,
+                                onOptionSelected = { searchViewModel.onAccountChange(it) },
+                                getDisplayName = { it.name },
+                            )
+                            SearchableDropdown(
+                                label = "Category",
+                                options = searchUiState.categories,
+                                selectedOption = searchUiState.selectedCategory,
+                                onOptionSelected = { searchViewModel.onCategoryChange(it) },
+                                getDisplayName = { it.name },
+                            )
+                            SearchableDropdown(
+                                label = "Tag",
+                                options = searchUiState.tags,
+                                selectedOption = searchUiState.selectedTag,
+                                onOptionSelected = { searchViewModel.onTagChange(it) },
+                                getDisplayName = { it.name },
+                            )
+                            SearchableDropdown(
+                                label = "Transaction Type",
+                                options = listOf("All", "Income", "Expense"),
+                                selectedOption = searchUiState.transactionType.replaceFirstChar { it.uppercase() },
+                                onOptionSelected = { searchViewModel.onTypeChange(it) },
+                                getDisplayName = { it },
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                DateTextField(
+                                    label = "Start Date",
+                                    date = searchUiState.startDate,
+                                    formatter = dateFormatter,
+                                    onClick = { searchViewModel.onShowStartDatePicker(true) },
+                                    onClear = { searchViewModel.onClearStartDate() },
+                                    modifier = Modifier.weight(1f),
+                                )
+                                DateTextField(
+                                    label = "End Date",
+                                    date = searchUiState.endDate,
+                                    formatter = dateFormatter,
+                                    onClick = { searchViewModel.onShowEndDatePicker(true) },
+                                    onClear = { searchViewModel.onClearEndDate() },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = { searchViewModel.clearFilters() },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Clear All Filters") }
+                        }
                     }
-                }
-            } else if (searchUiState.hasSearched) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("No transactions match your criteria.")
                 }
             }
         }
+
+        HorizontalDivider()
+
+        if (searchResults.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    Text(
+                        text = "Results (${searchResults.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+                items(searchResults) { transactionDetails ->
+                    TransactionItem(
+                        transactionDetails = transactionDetails,
+                        onClick = { navController.navigate("transaction_detail/${transactionDetails.transaction.id}") },
+                        onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
+                    )
+                }
+            }
+        } else if (searchUiState.hasSearched) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No transactions match your criteria.")
+            }
+        }
     }
+
 
     LaunchedEffect(Unit) {
         if (focusSearch && !focusAlreadyRequested) {
