@@ -1,12 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ReportsViewModel.kt
-// REASON: FIX - The consistency calendar flows (`consistencyCalendarData` and
-// `detailedMonthData`) are now fully reactive to budget changes. They now
-// combine flows from the SettingsRepository with transaction data, ensuring the
-// heatmaps update instantly when the user modifies the monthly budget.
-// FIX - The instantiation of TransactionRepository has been updated to include
-// the required dependencies, resolving a build error.
-// =================================================================================
 package io.pm.finlight
 
 import android.app.Application
@@ -30,6 +21,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * Enum to manage the state of the view toggle on the reports screen.
@@ -238,14 +230,14 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
                 set(Calendar.DAY_OF_YEAR, 1)
             }
             while (!dayIterator.after(today)) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
                 dayIterator.add(Calendar.DAY_OF_YEAR, 1)
             }
             return@withContext resultList
         }
 
         val daysSoFar = today.get(Calendar.DAY_OF_YEAR)
-        val yearlySafeToSpend = if (totalBudgetSoFar > 0 && daysSoFar > 0) (totalBudgetSoFar / daysSoFar).toDouble() else 0.0
+        val yearlySafeToSpend = if (totalBudgetSoFar > 0 && daysSoFar > 0) (totalBudgetSoFar / daysSoFar).toLong() else 0L
 
         val firstDataCal = Calendar.getInstance().apply { timeInMillis = firstTransactionDate }
         val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
@@ -258,16 +250,16 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
 
         while (!dayIterator.after(today)) {
             if (dayIterator.before(firstDataCal)) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
                 dayIterator.add(Calendar.DAY_OF_YEAR, 1)
                 continue
             }
 
             val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", dayIterator.get(Calendar.YEAR), dayIterator.get(Calendar.MONTH) + 1, dayIterator.get(Calendar.DAY_OF_MONTH))
-            val amountSpent = spendingMap[dateKey] ?: 0.0
+            val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
 
             val status = when {
-                amountSpent == 0.0 -> SpendingStatus.NO_SPEND
+                amountSpent == 0L -> SpendingStatus.NO_SPEND
                 yearlySafeToSpend > 0 && amountSpent > yearlySafeToSpend -> SpendingStatus.OVER_LIMIT
                 else -> SpendingStatus.WITHIN_LIMIT
             }
@@ -291,7 +283,7 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
         val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
 
         val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
-        val safeToSpend = if (budget > 0) (budget.toDouble() / daysInMonth) else 0.0
+        val safeToSpend = if (budget > 0) (budget.toDouble() / daysInMonth).roundToLong() else 0L
 
         val resultList = mutableListOf<CalendarDayStatus>()
         val dayIterator = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1) }
@@ -302,13 +294,13 @@ class ReportsViewModel(application: Application) : AndroidViewModel(application)
             val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
 
             if (dayIterator.after(today) || (firstDataCal != null && dayIterator.before(firstDataCal))) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
                 continue
             }
 
-            val amountSpent = spendingMap[dateKey] ?: 0.0
+            val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
             val status = when {
-                amountSpent == 0.0 -> SpendingStatus.NO_SPEND
+                amountSpent == 0L -> SpendingStatus.NO_SPEND
                 safeToSpend > 0 && amountSpent > safeToSpend -> SpendingStatus.OVER_LIMIT
                 else -> SpendingStatus.WITHIN_LIMIT
             }

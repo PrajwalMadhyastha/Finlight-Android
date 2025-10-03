@@ -13,6 +13,6 @@ import java.util.Date
 data class CalendarDayStatus(
     val date: Date,
     val status: SpendingStatus,
-    val amountSpent: Double,
-    val safeToSpend: Double
+    val amountSpent: Long,
+    val safeToSpend: Long
 )

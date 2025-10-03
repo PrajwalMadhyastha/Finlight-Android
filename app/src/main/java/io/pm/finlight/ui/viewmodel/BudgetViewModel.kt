@@ -1,14 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/BudgetViewModel.kt
-// REASON: FEATURE - The logic for `availableCategoriesForNewBudget` has been
-// updated. It now correctly identifies categories that do not have a budget set
-// for the current month, allowing users to override a carried-over budget by
-// creating a new one.
-// REFACTOR (Testing) - The ViewModel now uses constructor dependency injection,
-// accepting its repository dependencies instead of creating them internally. This
-// decouples it from direct database access and allows for easier unit testing
-// with mock repositories, resolving the AndroidKeyStore crash in tests.
-// =================================================================================
 package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
@@ -18,6 +7,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class BudgetViewModel(
@@ -31,10 +21,10 @@ class BudgetViewModel(
     private val currentYear: Int
 
     val budgetsForCurrentMonth: StateFlow<List<BudgetWithSpending>>
-    val overallBudget: StateFlow<Float>
+    val overallBudget: StateFlow<Long>
     val allCategories: Flow<List<Category>>
     val availableCategoriesForNewBudget: Flow<List<Category>>
-    val totalSpending: StateFlow<Double>
+    val totalSpending: StateFlow<Long>
 
     init {
         currentMonth = calendar.get(Calendar.MONTH) + 1
@@ -53,10 +43,11 @@ class BudgetViewModel(
 
         overallBudget =
             settingsRepository.getOverallBudgetForMonth(currentYear, currentMonth)
+                .map { it.roundToLong() }
                 .stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(5000),
-                    initialValue = 0f,
+                    initialValue = 0L,
                 )
 
         // --- UPDATED: This logic now correctly determines which categories can have a NEW budget ---
@@ -71,7 +62,7 @@ class BudgetViewModel(
 
         totalSpending = budgetsForCurrentMonth.flatMapLatest { budgets ->
             if (budgets.isEmpty()) {
-                flowOf(0.0)
+                flowOf(0L)
             } else {
                 val spendingFlows = budgets.map {
                     getActualSpending(it.budget.categoryName)
@@ -83,13 +74,13 @@ class BudgetViewModel(
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 0.0
+            initialValue = 0L
         )
     }
 
-    fun getActualSpending(categoryName: String): Flow<Double> {
+    fun getActualSpending(categoryName: String): Flow<Long> {
         return budgetRepository.getActualSpendingForCategory(categoryName, currentMonth, currentYear)
-            .map { spending -> spending ?: 0.0 }
+            .map { (it ?: 0.0).roundToLong() }
     }
 
     fun addCategoryBudget(

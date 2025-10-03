@@ -332,44 +332,45 @@ class DashboardViewModel(
         firstTransactionDate: Long?
     ): List<CalendarDayStatus> = withContext(Dispatchers.IO) {
         val today = Calendar.getInstance()
+        val year = today.get(Calendar.YEAR)
 
         if (firstTransactionDate == null) {
             val resultList = mutableListOf<CalendarDayStatus>()
             val dayIterator = Calendar.getInstance().apply {
-                set(Calendar.YEAR, today.get(Calendar.YEAR))
+                set(Calendar.YEAR, year)
                 set(Calendar.DAY_OF_YEAR, 1)
             }
             while (!dayIterator.after(today)) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
                 dayIterator.add(Calendar.DAY_OF_YEAR, 1)
             }
             return@withContext resultList
         }
 
         val daysSoFar = today.get(Calendar.DAY_OF_YEAR)
-        val yearlySafeToSpend = if (totalBudgetSoFar > 0 && daysSoFar > 0) (totalBudgetSoFar / daysSoFar).toDouble() else 0.0
+        val yearlySafeToSpend = if (totalBudgetSoFar > 0 && daysSoFar > 0) (totalBudgetSoFar / daysSoFar).toLong() else 0L
 
         val firstDataCal = Calendar.getInstance().apply { timeInMillis = firstTransactionDate }
         val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
 
         val resultList = mutableListOf<CalendarDayStatus>()
         val dayIterator = Calendar.getInstance().apply {
-            set(Calendar.YEAR, today.get(Calendar.YEAR))
+            set(Calendar.YEAR, year)
             set(Calendar.DAY_OF_YEAR, 1)
         }
 
         while (!dayIterator.after(today)) {
             if (dayIterator.before(firstDataCal)) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
                 dayIterator.add(Calendar.DAY_OF_YEAR, 1)
                 continue
             }
 
             val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", dayIterator.get(Calendar.YEAR), dayIterator.get(Calendar.MONTH) + 1, dayIterator.get(Calendar.DAY_OF_MONTH))
-            val amountSpent = spendingMap[dateKey] ?: 0.0
+            val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
 
             val status = when {
-                amountSpent == 0.0 -> SpendingStatus.NO_SPEND
+                amountSpent == 0L -> SpendingStatus.NO_SPEND
                 yearlySafeToSpend > 0 && amountSpent > yearlySafeToSpend -> SpendingStatus.OVER_LIMIT
                 else -> SpendingStatus.WITHIN_LIMIT
             }

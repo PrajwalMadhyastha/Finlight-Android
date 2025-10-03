@@ -1,17 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/screens/BudgetScreen.kt
-// REASON: MAJOR REFACTOR - The entire screen has been redesigned to align with
-// the "Project Aurora" vision. Standard cards and progress bars have been
-// replaced with custom GlassPanel components and more artistic, animated data
-// visualizations. The layout is now more dynamic and visually engaging,
-// transforming it into a "Budget Hub" while preserving all original
-// functionality and ensuring high-contrast legibility.
-// FIX: Corrected a @Composable invocation error by reading the theme color
-// outside the Canvas draw scope.
-// BUG FIX - The AlertDialogs now correctly derive their background color from
-// the app's MaterialTheme, ensuring they match the selected theme (e.g.,
-// Aurora) instead of defaulting to the system's light/dark mode.
-// =================================================================================
 package io.pm.finlight.ui.screens
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -171,16 +157,18 @@ fun BudgetScreen(
 
 @Composable
 private fun OverallBudgetHub(
-    totalBudget: Float,
-    totalSpent: Double,
+    totalBudget: Long,
+    totalSpent: Long,
     onEditClick: () -> Unit
 ) {
-    val progress = if (totalBudget > 0) (totalSpent.toFloat() / totalBudget) else 0f
+    val progress = if (totalBudget > 0) (totalSpent.toFloat() / totalBudget.toFloat()) else 0f
     val remaining = totalBudget - totalSpent
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 1500), label = "OverallBudgetProgress"
     )
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 0 } }
+
 
     GlassPanel(modifier = Modifier.clickable(onClick = onEditClick)) {
         Column(
@@ -205,7 +193,7 @@ private fun OverallBudgetHub(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        "₹${NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(remaining).drop(1)}",
+                        currencyFormat.format(remaining),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -218,12 +206,12 @@ private fun OverallBudgetHub(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    "Spent: ₹${NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(totalSpent).drop(1)}",
+                    "Spent: ${currencyFormat.format(totalSpent)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Budget: ₹${NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(totalBudget).drop(1)}",
+                    "Budget: ${currencyFormat.format(totalBudget)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -286,6 +274,8 @@ private fun CategoryBudgetItem(
         progress > 0.8f -> MaterialTheme.colorScheme.secondary
         else -> MaterialTheme.colorScheme.primary
     }
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 0 } }
+
 
     GlassPanel {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -318,7 +308,7 @@ private fun CategoryBudgetItem(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        "₹${NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(budgetWithSpending.spent).drop(1)} of ₹${NumberFormat.getCurrencyInstance(Locale("en", "IN")).format(budgetWithSpending.budget.amount).drop(1)}",
+                        "${currencyFormat.format(budgetWithSpending.spent)} of ${currencyFormat.format(budgetWithSpending.budget.amount)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -349,11 +339,11 @@ private fun CategoryBudgetItem(
 
 @Composable
 fun EditOverallBudgetDialog(
-    currentBudget: Float,
+    currentBudget: Long,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
-    var budgetInput by remember { mutableStateOf(if (currentBudget > 0) "%.0f".format(currentBudget) else "") }
+    var budgetInput by remember { mutableStateOf(if (currentBudget > 0) currentBudget.toString() else "") }
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 

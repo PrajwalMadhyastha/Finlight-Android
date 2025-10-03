@@ -1,18 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TimePeriodReportScreen.kt
-// REASON: FEATURE (Help System - Phase 3) - Integrated the HelpActionIcon into
-// the TopAppBar to provide users with contextual guidance on how to interpret
-// the report and navigate between periods.
-// FEATURE - The screen now supports a YEARLY time period. It dynamically adjusts
-// its title and subtitle, displays the new Yearly Consistency Calendar, and hides
-// the transaction list to provide a high-level annual overview.
-// REFACTOR (UX) - Replaced the static ReportHeader with the new interactive
-// ReportPeriodSelector and a separate SpendingSummaryCard. This makes period
-// navigation more discoverable and improves the screen's structure.
-// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
-// provides a centralized TopAppBar, and this change removes the duplicate,
-// resolving a UI bug.
-// =================================================================================
 package io.pm.finlight.ui.screens
 
 import android.app.Application
@@ -57,6 +42,7 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,7 +66,7 @@ fun TimePeriodReportScreen(
     val yearlyConsistencyData by viewModel.yearlyConsistencyData.collectAsState()
     val consistencyStats by viewModel.consistencyStats.collectAsState()
 
-    val totalSpent = transactions.filter { it.transaction.transactionType == "expense" && !it.transaction.isExcluded }.sumOf { it.transaction.amount }
+    val totalSpent = transactions.filter { it.transaction.transactionType == "expense" && !it.transaction.isExcluded }.sumOf { it.transaction.amount }.roundToLong()
     val totalIncome by viewModel.totalIncome.collectAsState()
 
     val context = LocalContext.current
