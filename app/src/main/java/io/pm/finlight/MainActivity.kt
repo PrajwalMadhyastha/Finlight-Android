@@ -57,6 +57,8 @@ import coil.compose.AsyncImage
 import com.google.gson.Gson
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.IncomeViewModelFactory
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
 import io.pm.finlight.ui.components.DaybreakAnimatedBackground
@@ -230,7 +232,7 @@ fun MainAppScreen() {
     val categoryViewModel: CategoryViewModel = viewModel(factory = CategoryViewModelFactory(context))
     val budgetViewModel: BudgetViewModel = viewModel(factory = BudgetViewModelFactory(context))
     val profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModelFactory(context))
-    val incomeViewModel: IncomeViewModel = viewModel()
+    val incomeViewModel: IncomeViewModel = viewModel(factory = IncomeViewModelFactory(context))
     val goalViewModel: GoalViewModel = viewModel(factory = GoalViewModelFactory(context))
     val reportsViewModel: ReportsViewModel = viewModel(factory = ReportsViewModelFactory(context))
     val manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = viewModel(factory = ManageIgnoreRulesViewModelFactory(context))
