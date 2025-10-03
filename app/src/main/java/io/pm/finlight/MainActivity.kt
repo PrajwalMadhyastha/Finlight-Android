@@ -73,6 +73,7 @@ import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.BudgetViewModelFactory
 import io.pm.finlight.ui.viewmodel.CategoryViewModelFactory
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.ProfileViewModelFactory
 import io.pm.finlight.ui.viewmodel.ReportsViewModelFactory
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.ui.viewmodel.TransactionViewModelFactory
@@ -237,7 +238,7 @@ fun MainAppScreen() {
     val accountViewModel: AccountViewModel = viewModel(factory = AccountViewModelFactory(context))
     val categoryViewModel: CategoryViewModel = viewModel(factory = CategoryViewModelFactory(context))
     val budgetViewModel: BudgetViewModel = viewModel(factory = BudgetViewModelFactory(context))
-    val profileViewModel: ProfileViewModel = viewModel()
+    val profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModelFactory(context))
     val incomeViewModel: IncomeViewModel = viewModel()
     val goalViewModel: GoalViewModel = viewModel()
     val reportsViewModel: ReportsViewModel = viewModel(factory = ReportsViewModelFactory(context))
