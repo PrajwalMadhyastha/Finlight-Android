@@ -1043,8 +1043,10 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) { backStackEntry ->
+            val context = LocalContext.current.applicationContext as Application
             val tripId = backStackEntry.arguments?.getInt("tripId")
-            CurrencyTravelScreen(navController, if (tripId == -1) null else tripId)
+            val currencyViewModel: CurrencyViewModel = viewModel(factory = CurrencyViewModelFactory(context))
+            CurrencyTravelScreen(navController, if (tripId == -1) null else tripId, currencyViewModel)
         }
         composable(
             "category_detail/{categoryName}/{month}/{year}",
