@@ -72,6 +72,7 @@ import io.pm.finlight.ui.viewmodel.AccountViewModelFactory
 import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.BudgetViewModelFactory
 import io.pm.finlight.ui.viewmodel.CategoryViewModelFactory
+import io.pm.finlight.ui.viewmodel.IncomeViewModel
 import io.pm.finlight.ui.viewmodel.ReportsViewModelFactory
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.ui.viewmodel.TransactionViewModelFactory

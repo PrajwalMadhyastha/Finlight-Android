@@ -51,7 +51,7 @@ fun AccountDetailScreen(
     accountId: Int,
 ) {
     val account by viewModel.getAccountById(accountId).collectAsState(initial = null)
-    val balance by viewModel.getAccountBalance(accountId).collectAsState(initial = 0.0)
+    val balance by viewModel.getAccountBalance(accountId).collectAsState(initial = 0L)
     val transactions by viewModel.getTransactionsForAccount(accountId).collectAsState(initial = emptyList())
 
     val currentAccount = account ?: return // Don't compose if account is not loaded yet
@@ -108,8 +108,11 @@ fun AccountDetailScreen(
 }
 
 @Composable
-private fun AccountDetailHeader(account: Account, balance: Double) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+private fun AccountDetailHeader(account: Account, balance: Long) {
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
+    }
     val balanceColor = when {
         balance > 0 -> MaterialTheme.colorScheme.primary
         balance < 0 -> MaterialTheme.colorScheme.error

@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToLong
 
 class AccountViewModel(
     application: Application,
@@ -35,7 +36,7 @@ class AccountViewModel(
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
-    val accountsWithBalance: Flow<List<AccountWithBalance>>
+    val accountsWithBalance: Flow<List<AccountWithBalance>> = repository.accountsWithBalance
 
     private val _isSelectionModeActive = MutableStateFlow(false)
     val isSelectionModeActive = _isSelectionModeActive.asStateFlow()
@@ -47,8 +48,6 @@ class AccountViewModel(
     val suggestedMerges = _suggestedMerges.asStateFlow()
 
     init {
-        accountsWithBalance = repository.accountsWithBalance
-
         viewModelScope.launch(Dispatchers.Default) {
             combine(
                 repository.accountsWithBalance,
@@ -197,9 +196,9 @@ class AccountViewModel(
 
     fun getAccountById(accountId: Int): Flow<Account?> = repository.getAccountById(accountId)
 
-    fun getAccountBalance(accountId: Int): Flow<Double> {
+    fun getAccountBalance(accountId: Int): Flow<Long> {
         return transactionRepository.getTransactionsForAccount(accountId).map { transactions ->
-            transactions.sumOf { if (it.transactionType == "income") it.amount else -it.amount }
+            transactions.sumOf { if (it.transactionType == "income") it.amount else -it.amount }.roundToLong()
         }
     }
 
