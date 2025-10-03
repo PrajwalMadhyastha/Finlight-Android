@@ -3,6 +3,9 @@
 // REASON: NEW FILE - This is the main UI for the Trip Detail screen. It displays
 // a header with the trip's stats and a list of all transactions tagged for
 // that trip, allowing users to drill down into their travel spending.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -50,48 +53,32 @@ fun TripDetailScreen(
     val tripDetails by viewModel.tripDetails.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(tripDetails?.tripName ?: "Trip Details") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.surface
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                tripDetails?.let {
-                    TripDetailHeader(trip = it)
-                }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            tripDetails?.let {
+                TripDetailHeader(trip = it)
             }
+        }
 
-            if (transactions.isNotEmpty()) {
-                item {
-                    Text(
-                        "Transactions",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                items(transactions, key = { it.transaction.id }) { transaction ->
-                    TransactionItem(
-                        transactionDetails = transaction,
-                        onClick = { navController.navigate("transaction_detail/${transaction.transaction.id}") },
-                        onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
-                    )
-                }
+        if (transactions.isNotEmpty()) {
+            item {
+                Text(
+                    "Transactions",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            items(transactions, key = { it.transaction.id }) { transaction ->
+                TransactionItem(
+                    transactionDetails = transaction,
+                    onClick = { navController.navigate("transaction_detail/${transaction.transaction.id}") },
+                    onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
+                )
             }
         }
     }
