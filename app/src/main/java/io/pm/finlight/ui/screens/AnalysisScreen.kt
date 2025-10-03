@@ -3,6 +3,9 @@
 // REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon by
 // wrapping the screen's content in a Scaffold and adding a TopAppBar. This
 // provides users with contextual guidance on how to use the analysis tools.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -68,123 +71,105 @@ fun AnalysisScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Spending Analysis") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "analysis_screen")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        TabRow(
+            selectedTabIndex = uiState.selectedDimension.ordinal,
         ) {
-            TabRow(
-                selectedTabIndex = uiState.selectedDimension.ordinal,
-            ) {
-                AnalysisDimension.entries.forEach { dimension ->
-                    Tab(
-                        selected = uiState.selectedDimension == dimension,
-                        onClick = { viewModel.selectDimension(dimension) },
-                        text = { Text(dimension.name.replaceFirstChar { it.titlecase() }) }
-                    )
-                }
-            }
-
-            // --- NEW: Filter Bar ---
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TimePeriodFilter(
-                    modifier = Modifier.weight(1f),
-                    selectedPeriod = uiState.selectedTimePeriod,
-                    onPeriodSelected = { viewModel.selectTimePeriod(it) },
-                    onCustomRangeClick = { showDateRangePicker = true }
+            AnalysisDimension.entries.forEach { dimension ->
+                Tab(
+                    selected = uiState.selectedDimension == dimension,
+                    onClick = { viewModel.selectDimension(dimension) },
+                    text = { Text(dimension.name.replaceFirstChar { it.titlecase() }) }
                 )
-                BadgedBox(
-                    badge = {
-                        if (areFiltersActive) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                            )
-                        }
-                    },
-                    modifier = Modifier.padding(end = 8.dp)
-                ) {
-                    IconButton(onClick = { viewModel.onFilterSheetToggled(true) }) {
-                        Icon(Icons.Default.FilterList, "Advanced Filters")
-                    }
-                }
             }
+        }
 
-
-            if (uiState.isLoading) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    item {
-                        TotalSpendingHero(
-                            total = uiState.totalSpending,
-                            dimension = uiState.selectedDimension,
-                            timePeriod = uiState.selectedTimePeriod
+        // --- NEW: Filter Bar ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TimePeriodFilter(
+                modifier = Modifier.weight(1f),
+                selectedPeriod = uiState.selectedTimePeriod,
+                onPeriodSelected = { viewModel.selectTimePeriod(it) },
+                onCustomRangeClick = { showDateRangePicker = true }
+            )
+            BadgedBox(
+                badge = {
+                    if (areFiltersActive) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
                         )
                     }
+                },
+                modifier = Modifier.padding(end = 8.dp)
+            ) {
+                IconButton(onClick = { viewModel.onFilterSheetToggled(true) }) {
+                    Icon(Icons.Default.FilterList, "Advanced Filters")
+                }
+            }
+        }
 
-                    if (uiState.analysisItems.isEmpty()) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 48.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "No spending data for this selection.",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    } else {
-                        items(uiState.analysisItems, key = { it.dimensionId }) { item ->
-                            AnalysisItemRow(
-                                item = item,
-                                onClick = {
-                                    val encodedName = URLEncoder.encode(item.dimensionName, "UTF-8")
-                                    val (start, end) = viewModel.run {
-                                        val (s, e) = calculateDateRange(uiState.selectedTimePeriod, uiState.customStartDate, uiState.customEndDate)
-                                        s to e
-                                    }
-                                    navController.navigate("analysis_detail_screen/${uiState.selectedDimension.name}/${item.dimensionId}/${start}/${end}?title=$encodedName")
-                                }
+
+        if (uiState.isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    TotalSpendingHero(
+                        total = uiState.totalSpending,
+                        dimension = uiState.selectedDimension,
+                        timePeriod = uiState.selectedTimePeriod
+                    )
+                }
+
+                if (uiState.analysisItems.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No spending data for this selection.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                } else {
+                    items(uiState.analysisItems, key = { it.dimensionId }) { item ->
+                        AnalysisItemRow(
+                            item = item,
+                            onClick = {
+                                val encodedName = URLEncoder.encode(item.dimensionName, "UTF-8")
+                                val (start, end) = viewModel.run {
+                                    val (s, e) = calculateDateRange(uiState.selectedTimePeriod, uiState.customStartDate, uiState.customEndDate)
+                                    s to e
+                                }
+                                navController.navigate("analysis_detail_screen/${uiState.selectedDimension.name}/${item.dimensionId}/${start}/${end}?title=$encodedName")
+                            }
+                        )
                     }
                 }
             }
         }
     }
+
 
     if (showDateRangePicker) {
         val dateRangePickerState = rememberDateRangePickerState(

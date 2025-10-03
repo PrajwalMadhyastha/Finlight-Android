@@ -4,6 +4,9 @@
 // screens. It displays a title, a monthly trend bar chart, and a list of
 // transactions for the specified entity (category or merchant) and month,
 // all styled according to the "Project Aurora" vision.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -55,78 +58,58 @@ fun DrilldownScreen(
 
     val transactions by viewModel.transactionsForMonth.collectAsState()
     val chartData by viewModel.monthlyTrendChartData.collectAsState()
-    val title = when (drilldownType) {
-        DrilldownType.CATEGORY -> "Category: ${viewModel.entityName}"
-        DrilldownType.MERCHANT -> "Merchant: ${viewModel.entityName}"
-    }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                GlassPanel {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "6-Month Spending Trend",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        if (chartData != null) {
-                            SpendingBarChart(chartData = chartData!!)
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "Not enough data for a trend chart.",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            GlassPanel {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "6-Month Spending Trend",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    if (chartData != null) {
+                        SpendingBarChart(chartData = chartData!!)
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Not enough data for a trend chart.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
             }
+        }
 
-            if (transactions.isNotEmpty()) {
-                item {
-                    Text(
-                        "Transactions this month",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                items(transactions, key = { it.transaction.id }) { transaction ->
-                    TransactionItem(
-                        transactionDetails = transaction,
-                        onClick = { navController.navigate("transaction_detail/${transaction.transaction.id}") },
-                        onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
-                    )
-                }
+        if (transactions.isNotEmpty()) {
+            item {
+                Text(
+                    "Transactions this month",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            items(transactions, key = { it.transaction.id }) { transaction ->
+                TransactionItem(
+                    transactionDetails = transaction,
+                    onClick = { navController.navigate("transaction_detail/${transaction.transaction.id}") },
+                    onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
+                )
             }
         }
     }
