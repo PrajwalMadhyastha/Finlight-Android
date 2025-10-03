@@ -1,10 +1,9 @@
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
 // =================================================================================
-// REASON: FIX (Daily Restore) - Added a secondary, non-backed-up SharedPreferences
-// file ('internalPrefs') to store a new `is_first_launch_complete` flag. This
-// allows the SplashScreen to reliably determine if it's running for the very
-// first time after an installation, which is the only time it should attempt
-// to restore data from a backup snapshot.
+// REASON: FIX - Added functions to save and retrieve a checksum for the default
+// ignore rules. This provides the persistence layer needed for the new "checksum"
+// seeding strategy, allowing the AppDatabase callback to detect when the rules
+// in the source code have been updated.
 // =================================================================================
 package io.pm.finlight
 
@@ -86,7 +85,21 @@ class SettingsRepository(context: Context) {
         private const val KEY_PRIVACY_MODE_ENABLED = "privacy_mode_enabled"
         // --- NEW: Key for the first launch flag ---
         private const val KEY_IS_FIRST_LAUNCH_COMPLETE = "is_first_launch_complete"
+        // --- NEW: Key for the ignore rules checksum ---
+        private const val KEY_IGNORE_RULES_CHECKSUM = "ignore_rules_checksum"
     }
+
+    // --- NEW: Functions to manage the ignore rules checksum ---
+    fun saveIgnoreRulesChecksum(checksum: Int) {
+        prefs.edit {
+            putInt(KEY_IGNORE_RULES_CHECKSUM, checksum)
+        }
+    }
+
+    fun getIgnoreRulesChecksum(): Int {
+        return prefs.getInt(KEY_IGNORE_RULES_CHECKSUM, 0)
+    }
+
 
     fun getDismissedMergeSuggestions(): Flow<Set<String>> {
         return callbackFlow {
