@@ -3,6 +3,9 @@
 // REASON: FEATURE (Help System - Phase 1) - Integrated the HelpActionIcon into
 // the TopAppBar to provide users with contextual guidance on why and how to
 // map their accounts.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug while preserving the BottomBar.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -45,51 +48,11 @@ fun AccountMappingScreen(
     var showCreateAccountDialog by remember { mutableStateOf(false) }
     var senderForNewAccount by remember { mutableStateOf<String?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Map New Accounts") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                // --- NEW: Add HelpActionIcon ---
-                actions = {
-                    HelpActionIcon(helpKey = "account_mapping_screen")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
-            )
-        },
-        bottomBar = {
-            Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .navigationBarsPadding(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    OutlinedButton(onClick = { navController.popBackStack() }, modifier = Modifier.weight(1f)) {
-                        Text("Cancel")
-                    }
-                    Button(
-                        onClick = {
-                            settingsViewModel.finalizeImport(userMappings)
-                            navController.popBackStack()
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Finish Import")
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
+    Column(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
+                .weight(1f)
+                .fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -119,7 +82,31 @@ fun AccountMappingScreen(
                 )
             }
         }
+
+        Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .navigationBarsPadding(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                OutlinedButton(onClick = { navController.popBackStack() }, modifier = Modifier.weight(1f)) {
+                    Text("Cancel")
+                }
+                Button(
+                    onClick = {
+                        settingsViewModel.finalizeImport(userMappings)
+                        navController.popBackStack()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Finish Import")
+                }
+            }
+        }
     }
+
 
     if (showCreateAccountDialog && senderForNewAccount != null) {
         CreateAccountDialog(

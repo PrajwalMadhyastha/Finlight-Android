@@ -3,6 +3,9 @@
 // REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon into
 // the TopAppBar to provide users with guidance on the screen's features, such
 // as the different tabs and filtering options.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -64,98 +67,60 @@ fun IncomeScreen(
     val allCategories by incomeViewModel.allCategories.collectAsState(initial = emptyList())
     var showFilterSheet by remember { mutableStateOf(false) }
 
-    val areFiltersActive by remember(filterState) {
-        derivedStateOf {
-            filterState.keyword.isNotBlank() || filterState.account != null || filterState.category != null
-        }
-    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        IncomeHeader(
+            totalIncome = totalIncome,
+            selectedMonth = selectedMonth,
+            monthlySummaries = monthlySummaries,
+            onMonthSelected = { incomeViewModel.setSelectedMonth(it) }
+        )
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Income") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "income_screen")
-                    BadgedBox(
-                        badge = {
-                            if (areFiltersActive) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary)
-                                )
-                            }
-                        }
-                    ) {
-                        IconButton(onClick = { showFilterSheet = true }) {
-                            Icon(Icons.Default.FilterList, contentDescription = "Filter Income")
-                        }
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+        TabRow(
+            selectedTabIndex = pagerState.currentPage,
+            indicator = { tabPositions ->
+                TabRowDefaults.SecondaryIndicator(
+                    Modifier.pagerTabIndicatorOffset(pagerState, tabPositions)
+                )
+            }
         ) {
-            IncomeHeader(
-                totalIncome = totalIncome,
-                selectedMonth = selectedMonth,
-                monthlySummaries = monthlySummaries,
-                onMonthSelected = { incomeViewModel.setSelectedMonth(it) }
-            )
-
-            TabRow(
-                selectedTabIndex = pagerState.currentPage,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.pagerTabIndicatorOffset(pagerState, tabPositions)
-                    )
-                }
-            ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = pagerState.currentPage == index,
-                        onClick = {
-                            scope.launch {
-                                pagerState.animateScrollToPage(index)
-                            }
-                        },
-                        text = { Text(title) }
-                    )
-                }
-            }
-
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.weight(1f)
-            ) { page ->
-                when (page) {
-                    0 -> TransactionList(
-                        transactions = incomeTransactions,
-                        navController = navController,
-                        onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
-                    )
-                    1 -> CategorySpendingScreen(
-                        spendingList = incomeByCategory,
-                        onCategoryClick = { categorySpendingItem ->
-                            val category = allCategories.find { it.name == categorySpendingItem.categoryName }
-                            incomeViewModel.updateFilterCategory(category)
-                            scope.launch { pagerState.animateScrollToPage(0) }
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    onClick = {
+                        scope.launch {
+                            pagerState.animateScrollToPage(index)
                         }
-                    )
-                }
+                    },
+                    text = { Text(title) }
+                )
+            }
+        }
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.weight(1f)
+        ) { page ->
+            when (page) {
+                0 -> TransactionList(
+                    transactions = incomeTransactions,
+                    navController = navController,
+                    onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
+                )
+                1 -> CategorySpendingScreen(
+                    spendingList = incomeByCategory,
+                    onCategoryClick = { categorySpendingItem ->
+                        val category = allCategories.find { it.name == categorySpendingItem.categoryName }
+                        incomeViewModel.updateFilterCategory(category)
+                        scope.launch { pagerState.animateScrollToPage(0) }
+                    }
+                )
             }
         }
     }
+
 
     if (showFilterSheet) {
         ModalBottomSheet(onDismissRequest = { showFilterSheet = false }) {
