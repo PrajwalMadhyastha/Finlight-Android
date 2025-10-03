@@ -317,7 +317,13 @@ class TransactionViewModel(
                 return@launch
             }
 
-            val descriptionChanged = initial.description != current.description
+            // --- FIX: Use a case-insensitive comparison for the description. ---
+            // The original check (initial.description != current.description) was too sensitive.
+            // It triggered the retro-update prompt for simple case corrections (e.g., "amzn" -> "Amazon")
+            // which the user does not consider a "new" merchant change.
+            // This now aligns with the case-insensitive logic used when creating a MerchantRenameRule,
+            // ensuring the prompt only appears for meaningful changes.
+            val descriptionChanged = !initial.description.equals(current.description, ignoreCase = true)
             val categoryChanged = initial.categoryId != current.categoryId
 
             if (!descriptionChanged && !categoryChanged) {
