@@ -73,6 +73,7 @@ import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.BudgetViewModelFactory
 import io.pm.finlight.ui.viewmodel.CategoryViewModelFactory
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.ManageIgnoreRulesViewModelFactory
 import io.pm.finlight.ui.viewmodel.ProfileViewModelFactory
 import io.pm.finlight.ui.viewmodel.ReportsViewModelFactory
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
@@ -242,6 +243,7 @@ fun MainAppScreen() {
     val incomeViewModel: IncomeViewModel = viewModel()
     val goalViewModel: GoalViewModel = viewModel()
     val reportsViewModel: ReportsViewModel = viewModel(factory = ReportsViewModelFactory(context))
+    val manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = viewModel(factory = ManageIgnoreRulesViewModelFactory(context))
 
 
     val userName by dashboardViewModel.userName.collectAsState()
@@ -494,7 +496,8 @@ fun MainAppScreen() {
                 profileViewModel = profileViewModel,
                 incomeViewModel = incomeViewModel,
                 goalViewModel = goalViewModel,
-                reportsViewModel = reportsViewModel
+                reportsViewModel = reportsViewModel,
+                manageIgnoreRulesViewModel = manageIgnoreRulesViewModel
             )
         }
 
@@ -562,7 +565,8 @@ fun AppNavHost(
     profileViewModel: ProfileViewModel,
     incomeViewModel: IncomeViewModel,
     goalViewModel: GoalViewModel,
-    reportsViewModel: ReportsViewModel
+    reportsViewModel: ReportsViewModel,
+    manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel
 ) {
     NavHost(
         navController = navController,
@@ -672,7 +676,7 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) {
-            ManageIgnoreRulesScreen(navController = navController)
+            ManageIgnoreRulesScreen(navController = navController, viewModel = manageIgnoreRulesViewModel)
         }
 
         composable(BottomNavItem.Dashboard.route) {

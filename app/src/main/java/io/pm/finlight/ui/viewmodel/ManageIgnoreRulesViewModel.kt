@@ -4,21 +4,19 @@
 // different types of ignore rules. The `addIgnoreRule` function now accepts a
 // `RuleType`, allowing the UI to specify whether a new rule should apply to
 // the sender or the message body.
+// REFACTOR (Testing) - The ViewModel now uses constructor dependency injection
+// and extends ViewModel instead of AndroidViewModel, making it easier to unit test.
 // =================================================================================
 package io.pm.finlight
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class ManageIgnoreRulesViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val ignoreRuleDao = AppDatabase.getInstance(application).ignoreRuleDao()
+class ManageIgnoreRulesViewModel(private val ignoreRuleDao: IgnoreRuleDao) : ViewModel() {
 
     /**
      * A flow of all ignore rules, collected as a StateFlow for the UI.
