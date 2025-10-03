@@ -1,17 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/CurrencyViewModel.kt
-// REASON: FIX - Replaced the synchronized block with a coroutine-aware Mutex to
-// resolve build errors caused by calling suspend functions from a critical
-// section.
-// FIX: Added a clearTripToEdit() function and call it from a DisposableEffect
-// in the UI to prevent stale data when navigating between editing a historic
-// trip and creating a new one.
-// REFACTOR: The ViewModel now fetches all trips and then filters out the
-// currently active one before exposing the list to the UI. This ensures the
-// "Travel History" section only shows completed or future trips, not the one
-// currently being managed.
-// FIX - The instantiation of TransactionRepository has been updated to include
-// the required dependencies, resolving a build error.
+// REASON: REFACTOR (Testing) - The ViewModel has been updated to use constructor
+// dependency injection for its repository dependencies. This decouples it from
+// direct instantiation of data sources, making it fully unit-testable.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -19,7 +10,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.data.repository.TripRepository
@@ -28,13 +18,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class CurrencyViewModel(application: Application) : AndroidViewModel(application) {
+class CurrencyViewModel(
+    application: Application,
+    private val settingsRepository: SettingsRepository,
+    private val tripRepository: TripRepository,
+    private val transactionRepository: TransactionRepository,
+    private val tagRepository: TagRepository
+) : AndroidViewModel(application) {
 
-    private val settingsRepository = SettingsRepository(application)
-    private val db = AppDatabase.getInstance(application)
-    private val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-    private val tripRepository = TripRepository(db.tripDao())
-    private val transactionRepository: TransactionRepository
     private val mutex = Mutex()
 
 
@@ -84,11 +75,6 @@ class CurrencyViewModel(application: Application) : AndroidViewModel(application
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
-
-    init {
-        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
-    }
-
 
     fun loadTripForEditing(tripId: Int) {
         viewModelScope.launch {

@@ -1,24 +1,19 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ManageParseRulesViewModel.kt
-// REASON: NEW FILE - This ViewModel provides the logic for the new rule management
-// screen. It fetches all custom SMS parsing rules from the database and exposes
-// them as a StateFlow for the UI. It also includes a function to handle the
-// deletion of a specific rule.
+// REASON: REFACTOR (Testing) - The ViewModel now uses constructor dependency
+// injection for CustomSmsRuleDao and extends ViewModel instead of AndroidViewModel.
+// This decouples it from the Application context, making it unit-testable.
 // =================================================================================
 package io.pm.finlight
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class ManageParseRulesViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val customSmsRuleDao = AppDatabase.getInstance(application).customSmsRuleDao()
+class ManageParseRulesViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : ViewModel() {
 
     /**
      * A flow of all custom SMS parsing rules, collected as StateFlow for the UI.

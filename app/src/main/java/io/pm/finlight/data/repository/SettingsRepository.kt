@@ -1,10 +1,9 @@
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
 // =================================================================================
-// REASON: FIX (Daily Restore) - Added a secondary, non-backed-up SharedPreferences
-// file ('internalPrefs') to store a new `is_first_launch_complete` flag. This
-// allows the SplashScreen to reliably determine if it's running for the very
-// first time after an installation, which is the only time it should attempt
-// to restore data from a backup snapshot.
+// REASON: FIX - Added functions to save and retrieve a checksum for the default
+// ignore rules. This provides the persistence layer needed for the new "checksum"
+// seeding strategy, allowing the AppDatabase callback to detect when the rules
+// in the source code have been updated.
 // =================================================================================
 package io.pm.finlight
 
@@ -86,7 +85,21 @@ class SettingsRepository(context: Context) {
         private const val KEY_PRIVACY_MODE_ENABLED = "privacy_mode_enabled"
         // --- NEW: Key for the first launch flag ---
         private const val KEY_IS_FIRST_LAUNCH_COMPLETE = "is_first_launch_complete"
+        // --- NEW: Key for the ignore rules checksum ---
+        private const val KEY_IGNORE_RULES_CHECKSUM = "ignore_rules_checksum"
     }
+
+    // --- NEW: Functions to manage the ignore rules checksum ---
+    fun saveIgnoreRulesChecksum(checksum: Int) {
+        prefs.edit {
+            putInt(KEY_IGNORE_RULES_CHECKSUM, checksum)
+        }
+    }
+
+    fun getIgnoreRulesChecksum(): Int {
+        return prefs.getInt(KEY_IGNORE_RULES_CHECKSUM, 0)
+    }
+
 
     fun getDismissedMergeSuggestions(): Flow<Set<String>> {
         return callbackFlow {
@@ -508,36 +521,42 @@ class SettingsRepository(context: Context) {
         return prefs.getBoolean(KEY_APP_LOCK_ENABLED, false)
     }
 
+    // --- BUG FIX: Replaced the flawed logic with the robust, looping carry-forward logic ---
     fun getOverallBudgetForMonth(year: Int, month: Int): Flow<Float> {
         return callbackFlow {
-            val currentMonthKey = getBudgetKey(year, month)
-
-            val previousMonthCalendar = Calendar.getInstance().apply {
-                set(Calendar.YEAR, year)
-                set(Calendar.MONTH, month - 1)
-                add(Calendar.MONTH, -1)
+            // Helper function to find the correct carried-over budget.
+            // This is the same logic as the blocking version.
+            fun findCarriedOverBudget(): Float {
+                val currentMonthKey = getBudgetKey(year, month)
+                if (prefs.contains(currentMonthKey)) {
+                    return prefs.getFloat(currentMonthKey, 0f)
+                }
+                val searchCal = Calendar.getInstance().apply {
+                    set(Calendar.YEAR, year)
+                    set(Calendar.MONTH, month - 1)
+                }
+                for (i in 0..11) { // Look back a maximum of 12 months
+                    searchCal.add(Calendar.MONTH, -1)
+                    val prevYear = searchCal.get(Calendar.YEAR)
+                    val prevMonth = searchCal.get(Calendar.MONTH) + 1
+                    val prevKey = getBudgetKey(prevYear, prevMonth)
+                    if (prefs.contains(prevKey)) {
+                        return prefs.getFloat(prevKey, 0f)
+                    }
+                }
+                return 0f
             }
-            val previousMonthKey = getBudgetKey(
-                previousMonthCalendar.get(Calendar.YEAR),
-                previousMonthCalendar.get(Calendar.MONTH) + 1
-            )
 
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
-                if (changedKey == currentMonthKey) {
-                    trySend(sharedPreferences.getFloat(currentMonthKey, 0f))
-                } else if (changedKey == previousMonthKey && !sharedPreferences.contains(currentMonthKey)) {
-                    trySend(sharedPreferences.getFloat(previousMonthKey, 0f))
+            // The listener now re-runs the entire lookback logic whenever ANY budget key changes.
+            val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key?.startsWith(KEY_BUDGET_PREFIX) == true) {
+                    trySend(findCarriedOverBudget())
                 }
             }
 
             prefs.registerOnSharedPreferenceChangeListener(listener)
-
-            val budget = if (prefs.contains(currentMonthKey)) {
-                prefs.getFloat(currentMonthKey, 0f)
-            } else {
-                prefs.getFloat(previousMonthKey, 0f)
-            }
-            trySend(budget)
+            // Emit the initial correct value.
+            trySend(findCarriedOverBudget())
 
             awaitClose {
                 prefs.unregisterOnSharedPreferenceChangeListener(listener)

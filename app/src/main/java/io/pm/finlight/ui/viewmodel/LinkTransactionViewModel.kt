@@ -1,55 +1,33 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/LinkTransactionViewModel.kt
-// REASON: REFACTOR - The transaction matching logic has been updated. Instead
-// of searching for specific matches, the ViewModel now fetches all transactions
-// from the last two days (today and yesterday), providing the user with a
-// broader, more useful list of candidates to link their recurring payment to.
-// FIX - The instantiation of TransactionRepository has been updated to include
-// the required dependencies, resolving a build error.
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/LinkTransactionViewModel.kt
+// REASON: REFACTOR (Testing) - The ViewModel has been refactored to use
+// constructor dependency injection for its repository dependencies. It now extends
+// ViewModel instead of AndroidViewModel, decoupling it from the Android framework
+// and making it fully unit-testable.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.PotentialTransaction
+import io.pm.finlight.RecurringTransactionDao
+import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-class LinkTransactionViewModelFactory(
-    private val application: Application,
-    private val potentialTransaction: PotentialTransaction
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(LinkTransactionViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return LinkTransactionViewModel(application, potentialTransaction) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
-
 class LinkTransactionViewModel(
-    application: Application,
+    private val transactionRepository: TransactionRepository,
+    private val recurringTransactionDao: RecurringTransactionDao,
     val potentialTransaction: PotentialTransaction
-) : AndroidViewModel(application) {
-
-    private val transactionRepository: TransactionRepository
-    private val recurringTransactionDao: RecurringTransactionDao
+) : ViewModel() {
 
     private val _linkableTransactions = MutableStateFlow<List<Transaction>>(emptyList())
     val linkableTransactions = _linkableTransactions.asStateFlow()
 
     init {
-        val db = AppDatabase.getInstance(application)
-        val settingsRepository = SettingsRepository(application)
-        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
-        recurringTransactionDao = db.recurringTransactionDao()
         findMatches()
     }
 

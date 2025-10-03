@@ -4,6 +4,9 @@
 // DragDropState. The `graphicsLayer` modifier correctly applies the translation,
 // and the `shadow` elevation is animated to visually "lift" the card being
 // dragged. This ensures a smooth, stable, and intuitive reordering experience.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -48,85 +51,66 @@ fun CustomizeDashboardScreen(
     var overscrollJob by remember { mutableStateOf<Job?>(null) }
     val dragDropState = rememberDragDropState(onMove = viewModel::updateCardOrder)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Customize Dashboard") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "dashboard_customize")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        LazyColumn(
-            state = dragDropState.lazyListState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .pointerInput(Unit) {
-                    detectDragGesturesAfterLongPress(
-                        onDrag = { change, offset ->
-                            change.consume()
-                            dragDropState.onDrag(offset)
-                            if (overscrollJob?.isActive == true) return@detectDragGesturesAfterLongPress
-                            dragDropState
-                                .checkForOverScroll()
-                                .takeIf { it != 0f }
-                                ?.let { overscrollJob = coroutineScope.launch { dragDropState.lazyListState.scrollBy(it) } }
-                                ?: run { overscrollJob?.cancel() }
-                        },
-                        onDragStart = { offset -> dragDropState.onDragStart(offset) },
-                        onDragEnd = { dragDropState.onDragEnd() },
-                        onDragCancel = { dragDropState.onDragEnd() }
-                    )
-                },
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            itemsIndexed(allCards, key = { _, item -> item.name }) { index, cardType ->
-                val isBeingDragged = dragDropState.draggingItemKey == cardType.name
-                val elevation by animateFloatAsState(if (isBeingDragged) 8f else 0f, label = "elevation")
+    LazyColumn(
+        state = dragDropState.lazyListState,
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectDragGesturesAfterLongPress(
+                    onDrag = { change, offset ->
+                        change.consume()
+                        dragDropState.onDrag(offset)
+                        if (overscrollJob?.isActive == true) return@detectDragGesturesAfterLongPress
+                        dragDropState
+                            .checkForOverScroll()
+                            .takeIf { it != 0f }
+                            ?.let { overscrollJob = coroutineScope.launch { dragDropState.lazyListState.scrollBy(it) } }
+                            ?: run { overscrollJob?.cancel() }
+                    },
+                    onDragStart = { offset -> dragDropState.onDragStart(offset) },
+                    onDragEnd = { dragDropState.onDragEnd() },
+                    onDragCancel = { dragDropState.onDragEnd() }
+                )
+            },
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        itemsIndexed(allCards, key = { _, item -> item.name }) { index, cardType ->
+            val isBeingDragged = dragDropState.draggingItemKey == cardType.name
+            val elevation by animateFloatAsState(if (isBeingDragged) 8f else 0f, label = "elevation")
 
-                GlassPanel(
-                    modifier = Modifier
-                        .animateItemPlacement()
-                        .graphicsLayer {
-                            translationY = if (isBeingDragged) dragDropState.draggingItemTranslationY else 0f
-                        }
-                        .shadow(elevation.dp, MaterialTheme.shapes.extraLarge)
-                ) {
-                    // Hero Budget is not movable or hideable
-                    if (cardType == DashboardCardType.HERO_BUDGET) {
-                        ListItem(
-                            headlineContent = { Text(cardType.name.toDisplayString()) },
-                            supportingContent = { Text("This card is always visible and at the top.") },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                        )
-                    } else {
-                        ListItem(
-                            headlineContent = { Text(cardType.name.toDisplayString()) },
-                            leadingContent = {
-                                Switch(
-                                    checked = visibleCards.contains(cardType),
-                                    onCheckedChange = { viewModel.toggleCardVisibility(cardType) }
-                                )
-                            },
-                            trailingContent = {
-                                Icon(
-                                    Icons.Default.DragHandle,
-                                    contentDescription = "Drag to reorder"
-                                )
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                        )
+            GlassPanel(
+                modifier = Modifier
+                    .animateItemPlacement()
+                    .graphicsLayer {
+                        translationY = if (isBeingDragged) dragDropState.draggingItemTranslationY else 0f
                     }
+                    .shadow(elevation.dp, MaterialTheme.shapes.extraLarge)
+            ) {
+                // Hero Budget is not movable or hideable
+                if (cardType == DashboardCardType.HERO_BUDGET) {
+                    ListItem(
+                        headlineContent = { Text(cardType.name.toDisplayString()) },
+                        supportingContent = { Text("This card is always visible and at the top.") },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                } else {
+                    ListItem(
+                        headlineContent = { Text(cardType.name.toDisplayString()) },
+                        leadingContent = {
+                            Switch(
+                                checked = visibleCards.contains(cardType),
+                                onCheckedChange = { viewModel.toggleCardVisibility(cardType) }
+                            )
+                        },
+                        trailingContent = {
+                            Icon(
+                                Icons.Default.DragHandle,
+                                contentDescription = "Drag to reorder"
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
                 }
             }
         }

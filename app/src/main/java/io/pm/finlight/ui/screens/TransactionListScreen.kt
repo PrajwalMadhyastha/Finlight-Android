@@ -46,8 +46,10 @@ import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -95,8 +97,8 @@ fun TransactionListScreen(
         MonthlySummaryHeader(
             selectedMonth = selectedMonth,
             monthlySummaries = monthlySummaries,
-            totalSpent = totalSpent,
-            totalIncome = totalIncome,
+            totalSpent = totalSpent.roundToLong(),
+            totalIncome = totalIncome.roundToLong(),
             budget = budget,
             onMonthSelected = { viewModel.setSelectedMonth(it) }
         )
@@ -199,14 +201,19 @@ fun TransactionListScreen(
 fun MonthlySummaryHeader(
     selectedMonth: Calendar,
     monthlySummaries: List<MonthlySummaryItem>,
-    totalSpent: Double,
-    totalIncome: Double,
+    totalSpent: Long,
+    totalIncome: Long,
     budget: Float,
     onMonthSelected: (Calendar) -> Unit
 ) {
     val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
     val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
     var showMonthScroller by remember { mutableStateOf(false) }
+
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
+    }
 
     val selectedTabIndex = monthlySummaries.indexOfFirst {
         it.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
@@ -268,7 +275,7 @@ fun MonthlySummaryHeader(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
                                 Text(
-                                    text = formatAmountInLakhs(summaryItem.totalSpent),
+                                    text = formatAmountInLakhs(summaryItem.totalSpent.roundToLong()),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -292,7 +299,7 @@ fun MonthlySummaryHeader(
             Column(modifier = Modifier.weight(1f)) {
                 Text("Total Spent", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    "₹${"%,.2f".format(totalSpent)}",
+                    currencyFormat.format(totalSpent),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.error
@@ -301,7 +308,7 @@ fun MonthlySummaryHeader(
             Column(horizontalAlignment = Alignment.End) {
                 Text("Total Income", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    "₹${"%,.2f".format(totalIncome)}",
+                    currencyFormat.format(totalIncome),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -313,8 +320,8 @@ fun MonthlySummaryHeader(
 
         if (budget > 0) {
             BudgetProgress(
-                spent = totalSpent.toFloat(),
-                budget = budget,
+                spent = totalSpent,
+                budget = budget.roundToLong(),
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         } else {
@@ -330,17 +337,24 @@ fun MonthlySummaryHeader(
     }
 }
 
-private fun formatAmountInLakhs(amount: Double): String {
-    if (amount < 1000) return "₹${"%,.0f".format(amount)}"
-    if (amount < 100000) return "₹${"%,.0f".format(amount / 1000)}K"
-    return "₹${"%.2f".format(amount / 100000.0)}L"
+private fun formatAmountInLakhs(amount: Long): String {
+    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+        .apply { maximumFractionDigits = 0 }
+    if (amount < 1000) return currencyFormat.format(amount)
+    if (amount < 100000) return "${currencyFormat.format(amount / 1000)}K"
+    return "${NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 2 }.format(amount / 100000.0)}L"
 }
 
 
 @Composable
-fun BudgetProgress(spent: Float, budget: Float, modifier: Modifier = Modifier) {
-    val progress = (spent / budget).coerceIn(0f, 1f)
+fun BudgetProgress(spent: Long, budget: Long, modifier: Modifier = Modifier) {
+    val progress = if (budget > 0) (spent.toFloat() / budget.toFloat()) else 0f
     val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = tween(1000), label = "")
+
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
+    }
 
     val progressColor = when {
         progress > 1f -> MaterialTheme.colorScheme.error
@@ -362,13 +376,13 @@ fun BudgetProgress(spent: Float, budget: Float, modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
-                text = "Spent: ₹${"%,.0f".format(spent)}",
+                text = "Spent: ${currencyFormat.format(spent)}",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Budget: ₹${"%,.0f".format(budget)}",
+                text = "Budget: ${currencyFormat.format(budget)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

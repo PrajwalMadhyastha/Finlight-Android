@@ -1,12 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/screens/DashboardScreen.kt
-// REASON: FEATURE - The "Last Month Summary" card is now conditionally rendered
-// at the top of the dashboard. Its visibility is controlled by the new
-// `showLastMonthSummaryCard` StateFlow from the ViewModel, ensuring it only appears
-// on the first of the month and can be dismissed by the user.
-// UX REFINEMENT - The "Last Month Summary" card is now positioned after the main
-// Hero Budget card for a less intrusive user experience.
-// =================================================================================
 package io.pm.finlight.ui.screens
 
 import android.app.Application
@@ -28,6 +19,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.*
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -123,9 +115,9 @@ private fun DashboardCard(
     when (cardType) {
         DashboardCardType.HERO_BUDGET -> DashboardHeroCard(
             totalBudget = overallBudget,
-            amountSpent = monthlyExpenses.toFloat(),
+            amountSpent = monthlyExpenses,
             amountRemaining = amountRemaining,
-            income = monthlyIncome.toFloat(),
+            income = monthlyIncome,
             safeToSpend = safeToSpendPerDay,
             navController = navController,
             monthYear = monthYear,

@@ -1,15 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TimePeriodReportScreen.kt
-// REASON: FEATURE (Help System - Phase 3) - Integrated the HelpActionIcon into
-// the TopAppBar to provide users with contextual guidance on how to interpret
-// the report and navigate between periods.
-// FEATURE - The screen now supports a YEARLY time period. It dynamically adjusts
-// its title and subtitle, displays the new Yearly Consistency Calendar, and hides
-// the transaction list to provide a high-level annual overview.
-// REFACTOR (UX) - Replaced the static ReportHeader with the new interactive
-// ReportPeriodSelector and a separate SpendingSummaryCard. This makes period
-// navigation more discoverable and improves the screen's structure.
-// =================================================================================
 package io.pm.finlight.ui.screens
 
 import android.app.Application
@@ -54,6 +42,7 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,7 +66,7 @@ fun TimePeriodReportScreen(
     val yearlyConsistencyData by viewModel.yearlyConsistencyData.collectAsState()
     val consistencyStats by viewModel.consistencyStats.collectAsState()
 
-    val totalSpent = transactions.filter { it.transaction.transactionType == "expense" && !it.transaction.isExcluded }.sumOf { it.transaction.amount }
+    val totalSpent = transactions.filter { it.transaction.transactionType == "expense" && !it.transaction.isExcluded }.sumOf { it.transaction.amount }.roundToLong()
     val totalIncome by viewModel.totalIncome.collectAsState()
 
     val context = LocalContext.current
@@ -87,195 +76,167 @@ fun TimePeriodReportScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = when (timePeriod) {
-                            TimePeriod.DAILY -> "Daily Report"
-                            TimePeriod.WEEKLY -> "Weekly Report"
-                            TimePeriod.MONTHLY -> "Monthly Report"
-                            TimePeriod.YEARLY -> "Yearly Report"
-                        }
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "time_period_report_screen")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        var dragAmount by remember { mutableStateOf(0f) }
+    var dragAmount by remember { mutableStateOf(0f) }
 
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { },
-                        onDragEnd = {
-                            if (dragAmount > 150) {
-                                viewModel.selectPreviousPeriod()
-                            } else if (dragAmount < -150) {
-                                viewModel.selectNextPeriod()
-                            }
-                            dragAmount = 0f
-                        },
-                        onDragCancel = { dragAmount = 0f }
-                    ) { change, horizontalDragAmount ->
-                        dragAmount += horizontalDragAmount
-                        change.consume()
-                    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { },
+                    onDragEnd = {
+                        if (dragAmount > 150) {
+                            viewModel.selectPreviousPeriod()
+                        } else if (dragAmount < -150) {
+                            viewModel.selectNextPeriod()
+                        }
+                        dragAmount = 0f
+                    },
+                    onDragCancel = { dragAmount = 0f }
+                ) { change, horizontalDragAmount ->
+                    dragAmount += horizontalDragAmount
+                    change.consume()
                 }
+            }
+    ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+            item {
+                ReportPeriodSelector(
+                    timePeriod = timePeriod,
+                    selectedDate = selectedDate.time,
+                    onPrevious = viewModel::selectPreviousPeriod,
+                    onNext = viewModel::selectNextPeriod
+                )
+            }
+
+            item {
+                SpendingSummaryCard(
+                    totalSpent = totalSpent,
+                    totalIncome = totalIncome
+                )
+            }
+
+            item {
+                insights?.let {
+                    ReportInsightsCard(insights = it)
+                }
+            }
+
+            if (timePeriod == TimePeriod.MONTHLY) {
                 item {
-                    ReportPeriodSelector(
-                        timePeriod = timePeriod,
-                        selectedDate = selectedDate.time,
-                        onPrevious = viewModel::selectPreviousPeriod,
-                        onNext = viewModel::selectNextPeriod
-                    )
-                }
-
-                item {
-                    SpendingSummaryCard(
-                        totalSpent = totalSpent,
-                        totalIncome = totalIncome
-                    )
-                }
-
-                item {
-                    insights?.let {
-                        ReportInsightsCard(insights = it)
-                    }
-                }
-
-                if (timePeriod == TimePeriod.MONTHLY) {
-                    item {
-                        MonthlyConsistencyCalendarCard(
-                            data = monthlyConsistencyData,
-                            stats = consistencyStats,
-                            selectedMonth = selectedDate,
-                            onPreviousMonth = viewModel::selectPreviousPeriod,
-                            onNextMonth = viewModel::selectNextPeriod,
-                            onDayClick = { date ->
-                                navController.navigate("search_screen?date=${date.time}")
-                            }
-                        )
-                    }
-                }
-
-                if (timePeriod == TimePeriod.YEARLY) {
-                    item {
-                        GlassPanel {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                Text(
-                                    "Yearly Spending Consistency",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                if (yearlyConsistencyData.isEmpty()) {
-                                    CircularProgressIndicator()
-                                } else {
-                                    ConsistencyCalendar(
-                                        data = yearlyConsistencyData,
-                                        onDayClick = { date ->
-                                            navController.navigate("search_screen?date=${date.time}&focusSearch=false")
-                                        }
-                                    )
-                                }
-                            }
+                    MonthlyConsistencyCalendarCard(
+                        data = monthlyConsistencyData,
+                        stats = consistencyStats,
+                        selectedMonth = selectedDate,
+                        onPreviousMonth = viewModel::selectPreviousPeriod,
+                        onNextMonth = viewModel::selectNextPeriod,
+                        onDayClick = { date ->
+                            navController.navigate("search_screen?date=${date.time}")
                         }
-                    }
+                    )
                 }
+            }
 
-
+            if (timePeriod == TimePeriod.YEARLY) {
                 item {
                     GlassPanel {
                         Column(
                             modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Text(
-                                "Spending Chart",
-                                style = MaterialTheme.typography.titleLarge,
+                                "Yearly Spending Consistency",
+                                style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Spacer(Modifier.height(16.dp))
-                            if (chartDataPair != null) {
-                                SpendingBarChart(
-                                    chartData = chartDataPair!!
-                                )
+                            if (yearlyConsistencyData.isEmpty()) {
+                                CircularProgressIndicator()
                             } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(200.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        "No chart data for this period.",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                                ConsistencyCalendar(
+                                    data = yearlyConsistencyData,
+                                    onDayClick = { date ->
+                                        navController.navigate("search_screen?date=${date.time}&focusSearch=false")
+                                    }
+                                )
                             }
                         }
                     }
                 }
+            }
 
-                if (transactions.isNotEmpty() && timePeriod != TimePeriod.YEARLY) {
-                    item {
+
+            item {
+                GlassPanel {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text(
-                            "Transactions in this Period",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            "Spending Chart",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                    }
-                    items(transactions, key = { it.transaction.id }) { transaction ->
-                        TransactionItem(
-                            transactionDetails = transaction,
-                            onClick = { navController.navigate("transaction_detail/${transaction.transaction.id}") },
-                            onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
-                        )
-                    }
-                } else if (timePeriod != TimePeriod.YEARLY) {
-                    item {
-                        GlassPanel {
-                            Row(
+                        Spacer(Modifier.height(16.dp))
+                        if (chartDataPair != null) {
+                            SpendingBarChart(
+                                chartData = chartDataPair!!
+                            )
+                        } else {
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                    .height(200.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    Icons.Default.Info,
-                                    contentDescription = "Info",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                                 Text(
-                                    "No transactions recorded for this period.",
+                                    "No chart data for this period.",
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                        }
+                    }
+                }
+            }
+
+            if (transactions.isNotEmpty() && timePeriod != TimePeriod.YEARLY) {
+                item {
+                    Text(
+                        "Transactions in this Period",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                items(transactions, key = { it.transaction.id }) { transaction ->
+                    TransactionItem(
+                        transactionDetails = transaction,
+                        onClick = { navController.navigate("transaction_detail/${transaction.transaction.id}") },
+                        onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
+                    )
+                }
+            } else if (timePeriod != TimePeriod.YEARLY) {
+                item {
+                    GlassPanel {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = "Info",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "No transactions recorded for this period.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }

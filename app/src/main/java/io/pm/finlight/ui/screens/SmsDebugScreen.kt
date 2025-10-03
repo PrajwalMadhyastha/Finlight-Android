@@ -2,6 +2,9 @@
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SmsDebugScreen.kt
 // REASON: FEATURE (Help System - Phase 1) - Integrated the HelpActionIcon into
 // the TopAppBar to explain the different parsing statuses to the user.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -54,88 +57,69 @@ fun SmsDebugScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("SMS Parsing Debugger") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                // --- NEW: Add HelpActionIcon ---
-                actions = {
-                    HelpActionIcon(helpKey = "sms_debug_screen")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.surface
-    ) { innerPadding ->
-        if (uiState.isLoading && uiState.debugResults.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = uiState.selectedFilter == SmsDebugFilter.PROBLEMATIC,
-                            onClick = { viewModel.setFilter(SmsDebugFilter.PROBLEMATIC) },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                        ) {
-                            Text("Problematic")
-                        }
-                        SegmentedButton(
-                            selected = uiState.selectedFilter == SmsDebugFilter.ALL,
-                            onClick = { viewModel.setFilter(SmsDebugFilter.ALL) },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                        ) {
-                            Text("All")
-                        }
-                    }
-                }
-
-                item {
-                    Text(
-                        "Showing the last ${uiState.loadCount} SMS messages received.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                if (filteredResults.isEmpty()) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
-                            Text(
-                                "No problematic messages found in the last ${uiState.loadCount} SMS.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                } else {
-                    items(filteredResults, key = { it.smsMessage.id }) { result ->
-                        SmsDebugItem(result = result, navController = navController)
-                    }
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { viewModel.loadMore() },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !uiState.isLoading
+    if (uiState.isLoading && uiState.debugResults.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = uiState.selectedFilter == SmsDebugFilter.PROBLEMATIC,
+                        onClick = { viewModel.setFilter(SmsDebugFilter.PROBLEMATIC) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                     ) {
-                        if (uiState.isLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                        } else {
-                            Text("Load More")
-                        }
+                        Text("Problematic")
+                    }
+                    SegmentedButton(
+                        selected = uiState.selectedFilter == SmsDebugFilter.ALL,
+                        onClick = { viewModel.setFilter(SmsDebugFilter.ALL) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) {
+                        Text("All")
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    "Showing the last ${uiState.loadCount} SMS messages received.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (filteredResults.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            "No problematic messages found in the last ${uiState.loadCount} SMS.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                items(filteredResults, key = { it.smsMessage.id }) { result ->
+                    SmsDebugItem(result = result, navController = navController)
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { viewModel.loadMore() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading
+                ) {
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Load More")
                     }
                 }
             }

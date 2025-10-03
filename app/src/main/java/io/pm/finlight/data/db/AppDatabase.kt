@@ -1,8 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: MIGRATION - The database factory has been updated from the legacy
-// `SupportFactory` to the new `SupportOpenHelperFactory`. This change, along with
-// the dependency update, completes the migration to the modern SQLCipher library.
+// REASON: FIX - The database seeding logic in the `onOpen` callback has been
+// completely replaced with a robust "checksum" strategy. This new approach
+// compares a hash of the current default ignore rules in the code against a
+// stored hash. If they differ (meaning the rules have been updated), it
+// automatically deletes the old default rules from the database and inserts the
+// new set, ensuring the app always uses the latest rules without requiring
+// a manual migration.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -514,40 +518,46 @@ abstract class AppDatabase : RoomDatabase() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 CoroutineScope(Dispatchers.IO).launch {
-                    populateDatabase(getInstance(context))
+                    val database = getInstance(context)
+                    // Seed initial account
+                    database.accountDao().insert(Account(id = 1, name = "Cash Spends", type = "Cash"))
+                    // The onOpen callback will handle the rest of the seeding.
                 }
             }
 
             override fun onOpen(db: SupportSQLiteDatabase) {
                 super.onOpen(db)
                 CoroutineScope(Dispatchers.IO).launch {
-                    populateDefaultsIfNeeded(getInstance(context))
-                    repairCategoryIcons(getInstance(context))
-                }
-            }
+                    val database = getInstance(context)
+                    val settingsRepository = SettingsRepository(context)
 
-            private suspend fun populateDatabase(db: AppDatabase) {
-                val accountDao = db.accountDao()
-                val ignoreRuleDao = db.ignoreRuleDao()
+                    // 1. Handle Categories (only on first creation)
+                    val categoryDao = database.categoryDao()
+                    val categoryCount = categoryDao.getAllCategories().first().size
+                    if (categoryCount == 0) {
+                        Log.w("DatabaseCallback", "Categories table is empty. Repopulating default categories.")
+                        categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
+                    }
 
-                populateDefaultsIfNeeded(db)
+                    // 2. Handle Ignore Rules (sync on every update via checksum)
+                    val ignoreRuleDao = database.ignoreRuleDao()
+                    // Calculate a checksum of the current rules in the code
+                    val liveChecksum = DEFAULT_IGNORE_PHRASES.joinToString { it.pattern }.hashCode()
+                    val storedChecksum = settingsRepository.getIgnoreRulesChecksum()
 
-                accountDao.insert(Account(id = 1, name = "Cash Spends", type = "Cash"))
-            }
+                    if (liveChecksum != storedChecksum) {
+                        Log.w("DatabaseCallback", "Ignore rule checksum mismatch (Live: $liveChecksum, Stored: $storedChecksum). Syncing default rules.")
+                        // Delete only the default rules, leaving user-added ones intact
+                        ignoreRuleDao.deleteDefaultRules()
+                        // Insert the new set of default rules
+                        ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
+                        // Save the new checksum to prevent this from running again until the rules change
+                        settingsRepository.saveIgnoreRulesChecksum(liveChecksum)
+                        Log.i("DatabaseCallback", "Default ignore rules synced successfully.")
+                    }
 
-            private suspend fun populateDefaultsIfNeeded(db: AppDatabase) {
-                val categoryDao = db.categoryDao()
-                val categoryCount = categoryDao.getAllCategories().first().size
-                if (categoryCount == 0) {
-                    Log.w("DatabaseCallback", "Categories table is empty. Repopulating default categories.")
-                    categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
-                }
-
-                val ignoreRuleDao = db.ignoreRuleDao()
-                val ignoreRuleCount = ignoreRuleDao.getAll().first().size
-                if (ignoreRuleCount == 0) {
-                    Log.w("DatabaseCallback", "Ignore rules table is empty. Repopulating default rules.")
-                    ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
+                    // 3. Handle legacy icon repair (can stay as is)
+                    repairCategoryIcons(database)
                 }
             }
 

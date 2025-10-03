@@ -7,6 +7,9 @@
 // FIX (UI) - Removed the local Scaffold and TopAppBar from this screen. The main
 // NavHost now provides a centralized TopAppBar, and this change removes the
 // duplicate, resolving a UI bug.
+// REFACTOR (Testing) - The ViewModel is now passed as a parameter to the screen,
+// removing the default viewModel() call to support proper dependency injection
+// and unit testing.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -41,8 +44,8 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ManageIgnoreRulesScreen(
-    navController: NavController, // Added NavController
-    viewModel: ManageIgnoreRulesViewModel = viewModel()
+    navController: NavController,
+    viewModel: ManageIgnoreRulesViewModel
 ) {
     val rules by viewModel.allRules.collectAsState()
     var newPattern by remember { mutableStateOf("") }

@@ -1,3 +1,10 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/IgnoreRuleDao.kt
+// REASON: FIX - Added the `deleteDefaultRules` function. This is a critical
+// part of the new "checksum" seeding strategy, allowing the system to refresh
+// the default rules from the source code without affecting any custom rules
+// the user may have created.
+// =================================================================================
 package io.pm.finlight
 
 import androidx.room.Dao
@@ -69,4 +76,11 @@ interface IgnoreRuleDao {
      */
     @Delete
     suspend fun delete(rule: IgnoreRule)
+
+    /**
+     * Deletes all ignore rules that are marked as default.
+     * This is used to refresh the default rules on app update.
+     */
+    @Query("DELETE FROM ignore_rules WHERE isDefault = 1")
+    suspend fun deleteDefaultRules()
 }

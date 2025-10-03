@@ -4,6 +4,9 @@
 // DatePickerDialog. The dialog is now explicitly given a solid, theme-aware
 // background color, which prevents it from inheriting the screen's transparency
 // and ensures it is always visible.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -84,172 +87,157 @@ fun AddEditGoalScreen(
     val popupContainerColor =
         if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(screenTitle) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            /* ------------ Goal Basics ------------ */
-            item {
-                GlassPanel {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        OutlinedTextField(
-                            value = name,
-                            onValueChange = { name = it },
-                            label = { Text("Goal Name") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = auroraTextFieldColors()
-                        )
-                        OutlinedTextField(
-                            value = targetAmount,
-                            onValueChange = { targetAmount = it.filter { ch -> ch.isDigit() || ch == '.' } },
-                            label = { Text("Target Amount") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            leadingIcon = { Text("₹") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = auroraTextFieldColors()
-                        )
-                        OutlinedTextField(
-                            value = savedAmount,
-                            onValueChange = { savedAmount = it.filter { ch -> ch.isDigit() || ch == '.' } },
-                            label = { Text("Already Saved") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            leadingIcon = { Text("₹") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = auroraTextFieldColors()
-                        )
-                    }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        /* ------------ Goal Basics ------------ */
+        item {
+            GlassPanel {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Goal Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = auroraTextFieldColors()
+                    )
+                    OutlinedTextField(
+                        value = targetAmount,
+                        onValueChange = { targetAmount = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                        label = { Text("Target Amount") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        leadingIcon = { Text("₹") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = auroraTextFieldColors()
+                    )
+                    OutlinedTextField(
+                        value = savedAmount,
+                        onValueChange = { savedAmount = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                        label = { Text("Already Saved") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        leadingIcon = { Text("₹") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = auroraTextFieldColors()
+                    )
                 }
             }
+        }
 
-            /* ------------ Account Picker ------------ */
-            item {
-                GlassPanel {
-                    Column(Modifier.padding(16.dp)) {
-                        ExposedDropdownMenuBox(
-                            expanded = accountExpanded,
-                            onExpandedChange = { accountExpanded = !accountExpanded }
-                        ) {
-                            OutlinedTextField(
-                                value = selectedAccount?.name ?: "Select Account",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Allocate To Account") },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(
-                                        expanded = accountExpanded
-                                    )
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor(),
-                                colors = auroraTextFieldColors()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = accountExpanded,
-                                onDismissRequest = { accountExpanded = false },
-                                modifier = Modifier.background(
-                                    if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight
+        /* ------------ Account Picker ------------ */
+        item {
+            GlassPanel {
+                Column(Modifier.padding(16.dp)) {
+                    ExposedDropdownMenuBox(
+                        expanded = accountExpanded,
+                        onExpandedChange = { accountExpanded = !accountExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedAccount?.name ?: "Select Account",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Allocate To Account") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(
+                                    expanded = accountExpanded
                                 )
-                            ) {
-                                accounts.forEach { account ->
-                                    DropdownMenuItem(
-                                        text = { Text(account.name) },
-                                        onClick = {
-                                            selectedAccount = account
-                                            accountExpanded = false
-                                        }
-                                    )
-                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            colors = auroraTextFieldColors()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = accountExpanded,
+                            onDismissRequest = { accountExpanded = false },
+                            modifier = Modifier.background(
+                                if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight
+                            )
+                        ) {
+                            accounts.forEach { account ->
+                                DropdownMenuItem(
+                                    text = { Text(account.name) },
+                                    onClick = {
+                                        selectedAccount = account
+                                        accountExpanded = false
+                                    }
+                                )
                             }
                         }
                     }
                 }
             }
+        }
 
-            /* ------------ Target Date ------------ */
-            item {
-                GlassPanel {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Target Date",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        val dateDisplay = targetDateMillis?.let {
-                            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(it))
-                        } ?: "Select"
-                        TextButton(onClick = { showDatePicker = true }) {
-                            Text(dateDisplay)
-                        }
-                    }
-                }
-            }
-
-            /* ------------ Save / Cancel Buttons ------------ */
-            item {
+        /* ------------ Target Date ------------ */
+        item {
+            GlassPanel {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(
-                        onClick = { navController.popBackStack() },
-                        modifier = Modifier.weight(1f)
-                    ) { Text("Cancel") }
-
-                    val saveEnabled = name.isNotBlank()
-                            && targetAmount.toDoubleOrNull() != null
-                            && selectedAccount != null
-
-                    Button(
-                        onClick = {
-                            val tgtAmt = targetAmount.toDouble()
-                            val svdAmt = savedAmount.toDoubleOrNull() ?: 0.0
-
-                            goalViewModel.saveGoal(
-                                id = goalId,
-                                name = name.trim(),
-                                targetAmount = tgtAmt,
-                                savedAmount = svdAmt,
-                                targetDate = targetDateMillis,
-                                accountId = selectedAccount!!.id
-                            )
-                            navController.popBackStack()
-                        },
-                        enabled = saveEnabled,
-                        modifier = Modifier.weight(1f)
-                    ) { Text(if (isEditMode) "Update" else "Save") }
+                    Text(
+                        text = "Target Date",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    val dateDisplay = targetDateMillis?.let {
+                        SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(it))
+                    } ?: "Select"
+                    TextButton(onClick = { showDatePicker = true }) {
+                        Text(dateDisplay)
+                    }
                 }
             }
         }
+
+        /* ------------ Save / Cancel Buttons ------------ */
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { navController.popBackStack() },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Cancel") }
+
+                val saveEnabled = name.isNotBlank()
+                        && targetAmount.toDoubleOrNull() != null
+                        && selectedAccount != null
+
+                Button(
+                    onClick = {
+                        val tgtAmt = targetAmount.toDouble()
+                        val svdAmt = savedAmount.toDoubleOrNull() ?: 0.0
+
+                        goalViewModel.saveGoal(
+                            id = goalId,
+                            name = name.trim(),
+                            targetAmount = tgtAmt,
+                            savedAmount = svdAmt,
+                            targetDate = targetDateMillis,
+                            accountId = selectedAccount!!.id
+                        )
+                        navController.popBackStack()
+                    },
+                    enabled = saveEnabled,
+                    modifier = Modifier.weight(1f)
+                ) { Text(if (isEditMode) "Update" else "Save") }
+            }
+        }
     }
+
 
     /* ---------- Date Picker Dialog (with transparency fix) ---------- */
     if (showDatePicker) {

@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/build.gradle.kts
-// REASON: REFACTOR - Removed the unused Google Drive API dependencies.
-// FEATURE - Enabled the generation of native debug symbols for release builds.
-// This will allow for symbolication of native crashes (e.g., from SQLCipher
-// or TensorFlow Lite) in the Google Play Console, making them easier to debug.
+// REASON: FIX (Testing) - Added the 'mockito-inline' dependency. This is
+// essential for Mockito to be able to mock final classes and methods, which is
+// standard in Kotlin. This resolves potential Mockito errors in our unit tests.
 // =================================================================================
 import java.io.FileInputStream
 import java.text.SimpleDateFormat
@@ -29,6 +28,9 @@ val coilVersion = "2.6.0"
 val imageCropperVersion = "4.5.0"
 val mockitoVersion = "5.11.0"
 val sqlcipherVersion = "4.10.0"
+val turbineVersion = "1.2.0"
+
+val mockitoInlineVersion = "5.2.0"
 
 
 // Read properties from local.properties
@@ -198,12 +200,14 @@ dependencies {
     // Local unit tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
+    testImplementation("org.mockito:mockito-inline:$mockitoInlineVersion")
     testImplementation("androidx.test:core-ktx:$androidxTestVersion")
     testImplementation("androidx.test.ext:junit:$testExtJunitVersion")
     testImplementation("org.robolectric:robolectric:$robolectricVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesTestVersion")
     testImplementation("androidx.arch.core:core-testing:2.2.0")
     testImplementation("net.zetetic:sqlcipher-android:$sqlcipherVersion")
+    testImplementation("app.cash.turbine:turbine:$turbineVersion")
 
 
     // Instrumented UI tests
@@ -228,7 +232,7 @@ dependencies {
     // --- TENSORFLOW LITE (UPDATED) (Replaced by LiteRT which supports 16kb page size) ---
     // Switched from task-text to the core TFLite libraries for better control and compatibility.
     //implementation("org.tensorflow:tensorflow-lite-support:0.5.0")
-   // implementation("org.tensorflow:tensorflow-lite:2.17.0")
+    // implementation("org.tensorflow:tensorflow-lite:2.17.0")
     // Flex Delegate to support advanced text ops (needed for both app and tests)
     //implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
     //androidTestImplementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")

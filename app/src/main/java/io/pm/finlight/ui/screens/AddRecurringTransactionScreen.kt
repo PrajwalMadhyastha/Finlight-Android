@@ -6,6 +6,9 @@
 // FIX - The theme detection logic for the ExposedDropdownMenu has been corrected
 // to check the background color instead of the transparent surface color. This
 // ensures the dropdown's background has the correct contrast in all themes.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -90,174 +93,158 @@ fun AddRecurringTransactionScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(titleText) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item {
+            TransactionTypeToggle(
+                selectedType = transactionType,
+                onTypeSelected = { transactionType = it }
             )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                TransactionTypeToggle(
-                    selectedType = transactionType,
-                    onTypeSelected = { transactionType = it }
-                )
-            }
+        }
 
-            item {
-                GlassPanel {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        OutlinedTextField(
-                            value = description,
-                            onValueChange = { description = it },
-                            label = { Text("Description") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = auroraTextFieldColors()
-                        )
-                        OutlinedTextField(
-                            value = amount,
-                            onValueChange = { amount = it },
-                            label = { Text("Amount") },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            leadingIcon = { Text("₹") },
-                            colors = auroraTextFieldColors()
-                        )
-                    }
+        item {
+            GlassPanel {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Description") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = auroraTextFieldColors()
+                    )
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = { amount = it },
+                        label = { Text("Amount") },
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        leadingIcon = { Text("₹") },
+                        colors = auroraTextFieldColors()
+                    )
                 }
             }
+        }
 
-            item {
-                GlassPanel {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        ExposedDropdownMenuBox(expanded = intervalExpanded, onExpandedChange = { intervalExpanded = !intervalExpanded }) {
-                            OutlinedTextField(
-                                value = selectedInterval,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Repeats") },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = intervalExpanded) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor(),
-                                colors = auroraTextFieldColors()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = intervalExpanded,
-                                onDismissRequest = { intervalExpanded = false },
-                                modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
-                            ) {
-                                recurrenceIntervals.forEach { interval ->
-                                    DropdownMenuItem(text = { Text(interval) }, onClick = {
-                                        selectedInterval = interval
-                                        intervalExpanded = false
-                                    })
-                                }
+        item {
+            GlassPanel {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    ExposedDropdownMenuBox(expanded = intervalExpanded, onExpandedChange = { intervalExpanded = !intervalExpanded }) {
+                        OutlinedTextField(
+                            value = selectedInterval,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Repeats") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = intervalExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            colors = auroraTextFieldColors()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = intervalExpanded,
+                            onDismissRequest = { intervalExpanded = false },
+                            modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
+                        ) {
+                            recurrenceIntervals.forEach { interval ->
+                                DropdownMenuItem(text = { Text(interval) }, onClick = {
+                                    selectedInterval = interval
+                                    intervalExpanded = false
+                                })
                             }
                         }
+                    }
 
-                        ExposedDropdownMenuBox(expanded = accountExpanded, onExpandedChange = { accountExpanded = !accountExpanded }) {
-                            OutlinedTextField(
-                                value = selectedAccount?.name ?: "Select Account",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Account") },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accountExpanded) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor(),
-                                colors = auroraTextFieldColors()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = accountExpanded,
-                                onDismissRequest = { accountExpanded = false },
-                                modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
-                            ) {
-                                accounts.forEach { account ->
-                                    DropdownMenuItem(text = { Text(account.name) }, onClick = {
-                                        selectedAccount = account
-                                        accountExpanded = false
-                                    })
-                                }
+                    ExposedDropdownMenuBox(expanded = accountExpanded, onExpandedChange = { accountExpanded = !accountExpanded }) {
+                        OutlinedTextField(
+                            value = selectedAccount?.name ?: "Select Account",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Account") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accountExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            colors = auroraTextFieldColors()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = accountExpanded,
+                            onDismissRequest = { accountExpanded = false },
+                            modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
+                        ) {
+                            accounts.forEach { account ->
+                                DropdownMenuItem(text = { Text(account.name) }, onClick = {
+                                    selectedAccount = account
+                                    accountExpanded = false
+                                })
                             }
                         }
+                    }
 
-                        ExposedDropdownMenuBox(expanded = categoryExpanded, onExpandedChange = { categoryExpanded = !categoryExpanded }) {
-                            OutlinedTextField(
-                                value = selectedCategory?.name ?: "Select Category",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Category") },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor(),
-                                colors = auroraTextFieldColors()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = categoryExpanded,
-                                onDismissRequest = { categoryExpanded = false },
-                                modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
-                            ) {
-                                categories.forEach { category ->
-                                    DropdownMenuItem(text = { Text(category.name) }, onClick = {
-                                        selectedCategory = category
-                                        categoryExpanded = false
-                                    })
-                                }
+                    ExposedDropdownMenuBox(expanded = categoryExpanded, onExpandedChange = { categoryExpanded = !categoryExpanded }) {
+                        OutlinedTextField(
+                            value = selectedCategory?.name ?: "Select Category",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Category") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            colors = auroraTextFieldColors()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = categoryExpanded,
+                            onDismissRequest = { categoryExpanded = false },
+                            modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
+                        ) {
+                            categories.forEach { category ->
+                                DropdownMenuItem(text = { Text(category.name) }, onClick = {
+                                    selectedCategory = category
+                                    categoryExpanded = false
+                                })
                             }
                         }
                     }
                 }
             }
+        }
 
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                OutlinedButton(onClick = { navController.popBackStack() }, modifier = Modifier.weight(1f)) {
+                    Text("Cancel")
+                }
+                Button(
+                    onClick = {
+                        val amountDouble = amount.toDoubleOrNull()
+                        if (amountDouble != null && selectedAccount != null) {
+                            recurringViewModel.saveRule(
+                                ruleId = ruleId,
+                                description = description,
+                                amount = amountDouble,
+                                transactionType = transactionType,
+                                recurrenceInterval = selectedInterval,
+                                startDate = ruleToEdit?.startDate ?: System.currentTimeMillis(),
+                                accountId = selectedAccount!!.id,
+                                categoryId = selectedCategory?.id,
+                                lastRunDate = ruleToEdit?.lastRunDate
+                            )
+                            navController.popBackStack()
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = description.isNotBlank() && amount.isNotBlank() && selectedAccount != null && selectedCategory != null,
                 ) {
-                    OutlinedButton(onClick = { navController.popBackStack() }, modifier = Modifier.weight(1f)) {
-                        Text("Cancel")
-                    }
-                    Button(
-                        onClick = {
-                            val amountDouble = amount.toDoubleOrNull()
-                            if (amountDouble != null && selectedAccount != null) {
-                                recurringViewModel.saveRule(
-                                    ruleId = ruleId,
-                                    description = description,
-                                    amount = amountDouble,
-                                    transactionType = transactionType,
-                                    recurrenceInterval = selectedInterval,
-                                    startDate = ruleToEdit?.startDate ?: System.currentTimeMillis(),
-                                    accountId = selectedAccount!!.id,
-                                    categoryId = selectedCategory?.id,
-                                    lastRunDate = ruleToEdit?.lastRunDate
-                                )
-                                navController.popBackStack()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        enabled = description.isNotBlank() && amount.isNotBlank() && selectedAccount != null && selectedCategory != null,
-                    ) {
-                        Text(if (isEditMode) "Update Rule" else "Save Rule")
-                    }
+                    Text(if (isEditMode) "Update Rule" else "Save Rule")
                 }
             }
         }

@@ -1,22 +1,15 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/HistoricTripsViewModel.kt
-// REASON: FEATURE - Added the `deleteTrip` function. This provides the
-// necessary logic for the UI to delete a trip's historical record and untag all
-// its associated transactions in a single, atomic operation.
-// FIX - The instantiation of TransactionRepository has been updated to include
-// the required dependencies, resolving a build error.
+// REASON: REFACTOR (Testing) - The ViewModel has been refactored to use
+// constructor dependency injection for TripRepository and TransactionRepository.
+// It now extends ViewModel instead of AndroidViewModel, decoupling it from the
+// Android framework and making it fully unit-testable.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.repository.TripRepository
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,28 +18,18 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 
-class HistoricTripsViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val tripRepository: TripRepository
+class HistoricTripsViewModel(
+    private val tripRepository: TripRepository,
     private val transactionRepository: TransactionRepository
-    val historicTrips: StateFlow<List<TripWithStats>>
+) : ViewModel() {
 
-    init {
-        val db = AppDatabase.getInstance(application)
-        val settingsRepository = SettingsRepository(application)
-        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-        tripRepository = TripRepository(db.tripDao())
-        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
+    val historicTrips: StateFlow<List<TripWithStats>> = tripRepository.getAllTripsWithStats()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
-        historicTrips = tripRepository.getAllTripsWithStats()
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
-    }
-
-    // --- NEW: Function to delete a trip and untag its transactions ---
     fun deleteTrip(tripId: Int, tagId: Int) {
         viewModelScope.launch {
             // First, remove all associations from the cross-reference table for that tag

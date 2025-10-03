@@ -3,6 +3,9 @@
 // REASON: FEATURE (Help System - Phase 3) - Wrapped the screen in a Scaffold
 // and added a TopAppBar with a HelpActionIcon to provide users with contextual
 // guidance.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -27,7 +30,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.Account
-import io.pm.finlight.AccountViewModel
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
@@ -35,6 +37,7 @@ import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
 import io.pm.finlight.ui.theme.IncomeGreenLight
+import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.utils.BankLogoHelper
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -48,74 +51,55 @@ fun AccountDetailScreen(
     accountId: Int,
 ) {
     val account by viewModel.getAccountById(accountId).collectAsState(initial = null)
-    val balance by viewModel.getAccountBalance(accountId).collectAsState(initial = 0.0)
+    val balance by viewModel.getAccountBalance(accountId).collectAsState(initial = 0L)
     val transactions by viewModel.getTransactionsForAccount(accountId).collectAsState(initial = emptyList())
 
     val currentAccount = account ?: return // Don't compose if account is not loaded yet
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(currentAccount.name) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "account_detail")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            AccountDetailHeader(
+                account = currentAccount,
+                balance = balance
             )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        }
+
+        if (transactions.isNotEmpty()) {
             item {
-                AccountDetailHeader(
-                    account = currentAccount,
-                    balance = balance
+                Text(
+                    text = "Recent Transactions",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp)
                 )
             }
-
-            if (transactions.isNotEmpty()) {
-                item {
-                    Text(
-                        text = "Recent Transactions",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-                items(transactions, key = { it.transaction.id }) { details ->
-                    // --- UPDATED: Pass the navigation logic to the item ---
-                    AccountDetailTransactionItem(
-                        transactionDetails = details,
-                        onClick = {
-                            navController.navigate("transaction_detail/${details.transaction.id}")
-                        }
-                    )
-                }
-            } else {
-                item {
-                    GlassPanel(modifier = Modifier.fillMaxWidth()) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp)
-                        ) {
-                            Text(
-                                "No transactions for this account yet.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+            items(transactions, key = { it.transaction.id }) { details ->
+                // --- UPDATED: Pass the navigation logic to the item ---
+                AccountDetailTransactionItem(
+                    transactionDetails = details,
+                    onClick = {
+                        navController.navigate("transaction_detail/${details.transaction.id}")
+                    }
+                )
+            }
+        } else {
+            item {
+                GlassPanel(modifier = Modifier.fillMaxWidth()) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp)
+                    ) {
+                        Text(
+                            "No transactions for this account yet.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -124,8 +108,11 @@ fun AccountDetailScreen(
 }
 
 @Composable
-private fun AccountDetailHeader(account: Account, balance: Double) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+private fun AccountDetailHeader(account: Account, balance: Long) {
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
+    }
     val balanceColor = when {
         balance > 0 -> MaterialTheme.colorScheme.primary
         balance < 0 -> MaterialTheme.colorScheme.error

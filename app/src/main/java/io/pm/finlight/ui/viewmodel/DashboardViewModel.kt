@@ -1,18 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/DashboardViewModel.kt
-// REASON: REFACTOR - The instantiation of AccountRepository has been updated to
-// pass the full AppDatabase instance instead of just the DAO. This is required
-// to support the new transactional account merging logic.
-// FEATURE - The `budgetHealthSummary` logic is now more dynamic and insightful.
-// It incorporates the day of the week and days remaining in the month to provide
-// more context-aware and personalized financial advice.
-// FEATURE - The `budgetHealthSummary` logic has been completely rewritten to use
-// a "Spending Velocity" and forecasting model. It now analyzes the user's recent
-// spending rate to predict their month-end total, providing much more accurate
-// and empathetic advice that correctly handles front-loaded monthly expenses.
-// FIX - Corrected the reactive stream logic for `budgetHealthSummary` to resolve
-// build errors caused by an incorrect `combine` operator usage.
-// =================================================================================
 package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
@@ -25,6 +10,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import kotlin.math.roundToLong
 
 data class ConsistencyStats(val goodDays: Int, val badDays: Int, val noSpendDays: Int, val noDataDays: Int)
 
@@ -42,14 +28,14 @@ class DashboardViewModel(
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
 
-    val netWorth: StateFlow<Double>
-    val monthlyIncome: StateFlow<Double>
-    val monthlyExpenses: StateFlow<Double>
+    val netWorth: StateFlow<Long>
+    val monthlyIncome: StateFlow<Long>
+    val monthlyExpenses: StateFlow<Long>
     val recentTransactions: StateFlow<List<TransactionDetails>>
     val budgetStatus: StateFlow<List<BudgetWithSpending>>
-    val overallMonthlyBudget: StateFlow<Float>
-    val amountRemaining: StateFlow<Float>
-    val safeToSpendPerDay: StateFlow<Float>
+    val overallMonthlyBudget: StateFlow<Long>
+    val amountRemaining: StateFlow<Long>
+    val safeToSpendPerDay: StateFlow<Long>
     val accountsSummary: StateFlow<List<AccountWithBalance>>
     val monthYear: String
 
@@ -141,23 +127,24 @@ class DashboardViewModel(
         val financialSummaryFlow = transactionRepository.getFinancialSummaryForRangeFlow(monthStart, monthEnd)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-        monthlyIncome = financialSummaryFlow.map { it?.totalIncome ?: 0.0 }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+        monthlyIncome = financialSummaryFlow.map { (it?.totalIncome ?: 0.0).roundToLong() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-        monthlyExpenses = financialSummaryFlow.map { it?.totalExpenses ?: 0.0 }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+        monthlyExpenses = financialSummaryFlow.map { (it?.totalExpenses ?: 0.0).roundToLong() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
         val currentYear = calendar.get(Calendar.YEAR)
         val currentMonth = calendar.get(Calendar.MONTH) + 1
 
         overallMonthlyBudget =
             settingsRepository.getOverallBudgetForMonth(currentYear, currentMonth)
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+                .map { it.roundToLong() }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
         amountRemaining =
             combine(overallMonthlyBudget, monthlyExpenses) { budget, expenses ->
-                budget - expenses.toFloat()
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+                budget - expenses
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
         safeToSpendPerDay =
             amountRemaining.map { remaining ->
@@ -165,8 +152,8 @@ class DashboardViewModel(
                 val lastDayOfMonth = today.getActualMaximum(Calendar.DAY_OF_MONTH)
                 val remainingDays = (lastDayOfMonth - today.get(Calendar.DAY_OF_MONTH) + 1).coerceAtLeast(1)
 
-                if (remaining > 0) remaining / remainingDays else 0f
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+                if (remaining > 0) (remaining / remainingDays) else 0L
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
         budgetHealthSummary = combine(
             monthlyExpenses,
@@ -175,7 +162,7 @@ class DashboardViewModel(
         ) { expenses, budget, trigger ->
             Triple(expenses, budget, trigger)
         }.flatMapLatest { (expenses, budget) ->
-            if (budget <= 0f) {
+            if (budget <= 0L) {
                 return@flatMapLatest flowOf("Set a budget to see insights")
             }
 
@@ -193,7 +180,7 @@ class DashboardViewModel(
                 val forecastedSpend = expenses + (spendingVelocity * daysLeft)
 
                 val percentOfMonthPassed = dayOfMonth.toFloat() / daysInMonth.toFloat()
-                val percentOfBudgetSpent = if (budget > 0) (expenses.toFloat() / budget) else 0f
+                val percentOfBudgetSpent = if (budget > 0) (expenses.toFloat() / budget.toFloat()) else 0f
 
                 val message = when {
                     // Scenario C: Still Pacing High (High total spend AND high recent spend)
@@ -263,8 +250,8 @@ class DashboardViewModel(
 
         netWorth =
             accountRepository.accountsWithBalance.map { list ->
-                list.sumOf { it.balance }
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+                list.sumOf { it.balance }.roundToLong()
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
         recentTransactions =
             transactionRepository.recentTransactions
@@ -345,44 +332,45 @@ class DashboardViewModel(
         firstTransactionDate: Long?
     ): List<CalendarDayStatus> = withContext(Dispatchers.IO) {
         val today = Calendar.getInstance()
+        val year = today.get(Calendar.YEAR)
 
         if (firstTransactionDate == null) {
             val resultList = mutableListOf<CalendarDayStatus>()
             val dayIterator = Calendar.getInstance().apply {
-                set(Calendar.YEAR, today.get(Calendar.YEAR))
+                set(Calendar.YEAR, year)
                 set(Calendar.DAY_OF_YEAR, 1)
             }
             while (!dayIterator.after(today)) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
                 dayIterator.add(Calendar.DAY_OF_YEAR, 1)
             }
             return@withContext resultList
         }
 
         val daysSoFar = today.get(Calendar.DAY_OF_YEAR)
-        val yearlySafeToSpend = if (totalBudgetSoFar > 0 && daysSoFar > 0) (totalBudgetSoFar / daysSoFar).toDouble() else 0.0
+        val yearlySafeToSpend = if (totalBudgetSoFar > 0 && daysSoFar > 0) (totalBudgetSoFar / daysSoFar).toLong() else 0L
 
         val firstDataCal = Calendar.getInstance().apply { timeInMillis = firstTransactionDate }
         val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
 
         val resultList = mutableListOf<CalendarDayStatus>()
         val dayIterator = Calendar.getInstance().apply {
-            set(Calendar.YEAR, today.get(Calendar.YEAR))
+            set(Calendar.YEAR, year)
             set(Calendar.DAY_OF_YEAR, 1)
         }
 
         while (!dayIterator.after(today)) {
             if (dayIterator.before(firstDataCal)) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
                 dayIterator.add(Calendar.DAY_OF_YEAR, 1)
                 continue
             }
 
             val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", dayIterator.get(Calendar.YEAR), dayIterator.get(Calendar.MONTH) + 1, dayIterator.get(Calendar.DAY_OF_MONTH))
-            val amountSpent = spendingMap[dateKey] ?: 0.0
+            val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
 
             val status = when {
-                amountSpent == 0.0 -> SpendingStatus.NO_SPEND
+                amountSpent == 0L -> SpendingStatus.NO_SPEND
                 yearlySafeToSpend > 0 && amountSpent > yearlySafeToSpend -> SpendingStatus.OVER_LIMIT
                 else -> SpendingStatus.WITHIN_LIMIT
             }

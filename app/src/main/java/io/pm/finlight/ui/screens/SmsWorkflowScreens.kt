@@ -3,6 +3,9 @@
 // REASON: FEATURE (Help System - Phase 3) - Wrapped the ReviewSmsScreen in a
 // Scaffold and added a TopAppBar with a HelpActionIcon to provide users with
 // contextual guidance on the SMS review process.
+// FIX (UI) - Removed the local Scaffold and TopAppBar from ReviewSmsScreen.
+// The main NavHost now provides a centralized TopAppBar, and this change
+// removes the duplicate, resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -42,6 +45,7 @@ import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import kotlinx.coroutines.launch
@@ -90,67 +94,48 @@ fun ReviewSmsScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Review SMS Transactions") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    HelpActionIcon(helpKey = "review_sms_screen")
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        containerColor = Color.Transparent
-    ) { innerPadding ->
-        if (isScanning && !hasLoadedOnce) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Scanning for transactions...", style = MaterialTheme.typography.titleMedium)
-                    CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
-                }
+    if (isScanning && !hasLoadedOnce) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Scanning for transactions...", style = MaterialTheme.typography.titleMedium)
+                CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                item {
-                    Text(
-                        "${potentialTransactions.size} potential transactions found.",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                items(potentialTransactions, key = { it.sourceSmsId }) { pt ->
-                    PotentialTransactionItem(
-                        transaction = pt,
-                        onDismiss = { viewModel.dismissPotentialTransaction(it) },
-                        onApprove = { transaction ->
-                            val encodedPotentialTxn = URLEncoder.encode(Gson().toJson(transaction), "UTF-8")
-                            val route = "approve_transaction_screen?potentialTxnJson=$encodedPotentialTxn"
-                            navController.navigate(route)
-                        },
-                        onCreateRule = { transaction ->
-                            val json = Gson().toJson(transaction)
-                            val encodedJson = URLEncoder.encode(json, "UTF-8")
-                            navController.navigate("rule_creation_screen?potentialTransactionJson=$encodedJson")
-                        },
-                        onLink = { transaction ->
-                            val json = Gson().toJson(transaction)
-                            val encodedJson = URLEncoder.encode(json, "UTF-8")
-                            navController.navigate("link_transaction_screen/$encodedJson")
-                        }
-                    )
-                }
+        }
+    } else {
+        LazyColumn(
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item {
+                Text(
+                    "${potentialTransactions.size} potential transactions found.",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            items(potentialTransactions, key = { it.sourceSmsId }) { pt ->
+                PotentialTransactionItem(
+                    transaction = pt,
+                    onDismiss = { viewModel.dismissPotentialTransaction(it) },
+                    onApprove = { transaction ->
+                        val encodedPotentialTxn = URLEncoder.encode(Gson().toJson(transaction), "UTF-8")
+                        val route = "approve_transaction_screen?potentialTxnJson=$encodedPotentialTxn"
+                        navController.navigate(route)
+                    },
+                    onCreateRule = { transaction ->
+                        val json = Gson().toJson(transaction)
+                        val encodedJson = URLEncoder.encode(json, "UTF-8")
+                        navController.navigate("rule_creation_screen?potentialTransactionJson=$encodedJson")
+                    },
+                    onLink = { transaction ->
+                        val json = Gson().toJson(transaction)
+                        val encodedJson = URLEncoder.encode(json, "UTF-8")
+                        navController.navigate("link_transaction_screen/$encodedJson")
+                    }
+                )
             }
         }
     }

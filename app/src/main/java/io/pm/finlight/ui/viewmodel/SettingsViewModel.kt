@@ -1,20 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: REFACTOR - The instantiation of AccountRepository has been updated to
-// pass the full AppDatabase instance instead of just the DAO. This is required
-// to support the new transactional account merging logic and resolves the build error.
-// FIX - The instantiation of TransactionRepository has been updated to include
-// the required dependencies, resolving a build error.
-// FEATURE - Added a createBackupSnapshotForTest() function to allow manual
-// triggering of the snapshot creation for easier testing of the backup/restore flow.
-// FEATURE - Added a verifySnapshotFile() function to check for the snapshot's
-// existence from the UI, bypassing the need for ADB 'run-as' on non-debuggable builds.
-// REFACTOR (Cleanup) - Removed the test-only `verifySnapshotFile` function.
-// Renamed `createBackupSnapshotForTest` to `createBackupSnapshot` and enhanced
-// it to programmatically trigger a backup run via `BackupManager.dataChanged()`,
-// making it a production-ready, user-facing feature.
+// REASON: REFACTOR (Testing) - The ViewModel has been refactored to use
+// constructor dependency injection for its repository dependencies. This decouples
+// it from direct instantiation of its data sources, making it fully unit-testable.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import android.Manifest
 import android.app.Application
@@ -27,6 +17,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
+import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.theme.AppTheme
@@ -56,15 +47,17 @@ data class SenderToMap(
 
 class SettingsViewModel(
     application: Application,
+    private val settingsRepository: SettingsRepository,
+    private val db: AppDatabase,
+    private val transactionRepository: TransactionRepository,
+    private val merchantMappingRepository: MerchantMappingRepository,
+    private val accountRepository: AccountRepository,
+    private val categoryRepository: CategoryRepository,
+    private val smsRepository: SmsRepository,
     private val transactionViewModel: TransactionViewModel
 ) : AndroidViewModel(application) {
-    private val settingsRepository = SettingsRepository(application)
-    private val db = AppDatabase.getInstance(application)
-    private val transactionRepository: TransactionRepository
-    private val merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
+
     private val context = application
-    private val accountRepository = AccountRepository(db)
-    private val categoryRepository = CategoryRepository(db.categoryDao())
     private val tagDao = db.tagDao()
     private val splitTransactionDao = db.splitTransactionDao()
     private val backupManager = BackupManager(context)
@@ -183,8 +176,6 @@ class SettingsViewModel(
         )
 
     init {
-        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
         smsScanStartDate =
             settingsRepository.getSmsScanStartDate()
                 .stateIn(
@@ -231,7 +222,7 @@ class SettingsViewModel(
             try {
                 val startDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -30) }.timeInMillis
                 val rawMessages = withContext(Dispatchers.IO) {
-                    SmsRepository(context).fetchAllSms(startDate)
+                    smsRepository.fetchAllSms(startDate)
                 }
 
                 val existingMappings = withContext(Dispatchers.IO) {
@@ -310,7 +301,7 @@ class SettingsViewModel(
             _isScanning.value = true
             var autoImportedCount = 0
             try {
-                val rawMessages = withContext(Dispatchers.IO) { SmsRepository(context).fetchAllSms(startDate) }
+                val rawMessages = withContext(Dispatchers.IO) { smsRepository.fetchAllSms(startDate) }
                 val existingMappings = withContext(Dispatchers.IO) { merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName }) }
                 val existingSmsHashes = withContext(Dispatchers.IO) { transactionRepository.getAllSmsHashes().first().toSet() }
 

@@ -1,24 +1,9 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/DashboardViewModelTest.kt
-// REASON: FIX - The list of expected strings in the
-// `budgetHealthSummary shows 'over budget' message` test has been corrected by
-// removing the trailing periods. This makes the assertion match the actual
-// strings returned by the ViewModel, resolving the test failure.
-// TEMP: Added the @Ignore annotation to temporarily disable this entire test
-// suite due to persistent native library loading issues in the test environment.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import io.pm.finlight.AccountRepository
-import io.pm.finlight.BudgetDao
-import io.pm.finlight.DashboardCardType
-import io.pm.finlight.DashboardViewModel
-import io.pm.finlight.FinancialSummary
-import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TransactionRepository
+import io.pm.finlight.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -31,7 +16,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,11 +23,11 @@ import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
+import kotlin.math.roundToLong
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE])
-@Ignore("Temporarily disabling due to Robolectric/SQLCipher native library issues in CI.")
+@Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class DashboardViewModelTest {
 
     @get:Rule
@@ -145,8 +129,8 @@ class DashboardViewModelTest {
         advanceUntilIdle() // Let flows emit
 
         // ASSERT: Check if the StateFlows in the ViewModel reflect the mocked data
-        Assert.assertEquals(5000.0, viewModel.monthlyIncome.first(), 0.0)
-        Assert.assertEquals(1500.0, viewModel.monthlyExpenses.first(), 0.0)
+        Assert.assertEquals(5000L, viewModel.monthlyIncome.first())
+        Assert.assertEquals(1500L, viewModel.monthlyExpenses.first())
     }
 
     @Test
@@ -177,8 +161,8 @@ class DashboardViewModelTest {
         advanceUntilIdle()
 
         // ASSERT
-        val expectedRemaining = budget - expenses.toFloat()
-        Assert.assertEquals(expectedRemaining, viewModel.amountRemaining.first(), 0.01f)
+        val expectedRemaining = budget.roundToLong() - expenses.roundToLong()
+        Assert.assertEquals(expectedRemaining, viewModel.amountRemaining.first())
     }
 
     @Test
@@ -324,5 +308,33 @@ class DashboardViewModelTest {
         val expectedNewVisible = setOf(DashboardCardType.HERO_BUDGET)
         // Verify that the repository's save method was called with the updated visible set
         Mockito.verify(settingsRepository).saveDashboardLayout(initialOrder, expectedNewVisible)
+    }
+
+    @Test
+    fun `monthlyIncomeAndExpenses are converted to Long and rounded correctly`() = runTest {
+        // ARRANGE
+        val summaryWithDecimals = FinancialSummary(totalIncome = 5000.75, totalExpenses = 1500.25)
+        Mockito.`when`(
+            transactionRepository.getFinancialSummaryForRangeFlow(
+                Mockito.anyLong(),
+                Mockito.anyLong()
+            )
+        ).thenReturn(flowOf(summaryWithDecimals))
+
+        // ACT
+        viewModel = DashboardViewModel(
+            transactionRepository,
+            accountRepository,
+            budgetDao,
+            settingsRepository
+        )
+        advanceUntilIdle()
+
+        // ASSERT
+        val expectedIncome = 5000.75.roundToLong() // Should be 5001
+        val expectedExpenses = 1500.25.roundToLong() // Should be 1500
+
+        Assert.assertEquals(expectedIncome, viewModel.monthlyIncome.first())
+        Assert.assertEquals(expectedExpenses, viewModel.monthlyExpenses.first())
     }
 }

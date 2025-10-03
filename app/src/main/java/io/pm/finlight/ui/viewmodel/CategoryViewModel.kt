@@ -1,20 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/CategoryViewModel.kt
-// REASON: UX REFINEMENT - The `addCategory` function now performs a
-// case-insensitive check to see if a category with the same name already exists
-// before insertion. If it does, it sends a feedback message to the UI via the
-// `uiEvent` channel, preventing silent failures.
-// FIX - The unused `getCategoryById` function has been removed to resolve the
-// "UnusedSymbol" warning.
-// FIX - The instantiation of TransactionRepository has been updated to include
-// the required dependencies, resolving a build error.
 // =================================================================================
 package io.pm.finlight
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -22,26 +12,20 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
-class CategoryViewModel(application: Application) : AndroidViewModel(application) {
-    private val categoryRepository: CategoryRepository
-    private val transactionRepository: TransactionRepository
-    private val categoryDao: CategoryDao // Expose DAO for direct checks
+class CategoryViewModel(
+    private val categoryRepository: CategoryRepository,
+    private val transactionRepository: TransactionRepository,
+    private val categoryDao: CategoryDao
+) : ViewModel() {
 
     val allCategories: Flow<List<Category>>
-    private val _uiEvent = Channel<String>()
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
     init {
-        val db = AppDatabase.getInstance(application)
-        val settingsRepository = SettingsRepository(application)
-        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-        categoryDao = db.categoryDao() // Initialize DAO
-        categoryRepository = CategoryRepository(categoryDao)
-        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
         allCategories = categoryRepository.allCategories
     }
 
-    // --- UPDATED: Add pre-check and user feedback for duplicates ---
     fun addCategory(name: String, iconKey: String, colorKey: String) =
         viewModelScope.launch {
             // Check if a category with this name already exists

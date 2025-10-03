@@ -3,6 +3,9 @@
 // REASON: FEATURE - Added "Edit" and "Delete" IconButtons to each trip item.
 // The "Edit" button navigates to the CurrencyTravelScreen with the tripId, and
 // the "Delete" button shows a confirmation dialog before removing the trip.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -47,51 +50,34 @@ fun TravelHistoryScreen(
     val trips by viewModel.historicTrips.collectAsState()
     var tripToDelete by remember { mutableStateOf<TripWithStats?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Travel History") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+    if (trips.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "No past trips recorded.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(16.dp)
             )
-        },
-        containerColor = MaterialTheme.colorScheme.surface
-    ) { innerPadding ->
-        if (trips.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "No past trips recorded.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(16.dp)
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(trips, key = { it.tripId }) { trip ->
+                HistoricTripItem(
+                    modifier = Modifier.animateItemPlacement(animationSpec = spring()),
+                    trip = trip,
+                    onClick = { navController.navigate("trip_detail/${trip.tripId}/${trip.tagId}") },
+                    onEditClick = { navController.navigate("currency_travel_settings?tripId=${trip.tripId}") },
+                    onDeleteClick = { tripToDelete = trip }
                 )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(trips, key = { it.tripId }) { trip ->
-                    HistoricTripItem(
-                        modifier = Modifier.animateItemPlacement(animationSpec = spring()),
-                        trip = trip,
-                        onClick = { navController.navigate("trip_detail/${trip.tripId}/${trip.tagId}") },
-                        onEditClick = { navController.navigate("currency_travel_settings?tripId=${trip.tripId}") },
-                        onDeleteClick = { tripToDelete = trip }
-                    )
-                }
             }
         }
     }
