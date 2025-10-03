@@ -24,14 +24,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.Account
-import io.pm.finlight.SenderToMap
-import io.pm.finlight.SettingsViewModel
 import io.pm.finlight.ui.components.CreateAccountDialog
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.AccountViewModel
+import io.pm.finlight.ui.viewmodel.SenderToMap
+import io.pm.finlight.ui.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

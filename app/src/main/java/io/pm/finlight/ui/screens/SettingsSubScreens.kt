@@ -51,7 +51,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import io.pm.finlight.data.DataExportService
-import io.pm.finlight.SettingsViewModel
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.SettingsActionItem
@@ -64,6 +63,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.ui.unit.dp
+import io.pm.finlight.ui.viewmodel.SettingsViewModel
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 

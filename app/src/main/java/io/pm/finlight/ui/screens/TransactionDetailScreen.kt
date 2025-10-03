@@ -77,6 +77,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import io.pm.finlight.R
 import io.pm.finlight.ui.viewmodel.AccountViewModel
+import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory

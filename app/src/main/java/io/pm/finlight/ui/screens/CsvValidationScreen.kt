@@ -29,6 +29,7 @@ import com.google.gson.reflect.TypeToken
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
+import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
 

@@ -45,6 +45,7 @@ import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import kotlinx.coroutines.launch
