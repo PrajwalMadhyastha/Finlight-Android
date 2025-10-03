@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/components/GlassmorphismComponents.kt
-// REASON: FEATURE - The header of the `AccountsCarouselCard` is now clickable.
-// Tapping the "Accounts" title on the dashboard card will navigate the user
-// directly to the main `account_list` screen, providing an intuitive shortcut.
-// =================================================================================
 package io.pm.finlight.ui.components
 
 import androidx.compose.animation.core.EaseOutCubic
@@ -95,17 +89,17 @@ fun GlassPanel(
 
 @Composable
 fun DashboardHeroCard(
-    totalBudget: Float,
-    amountSpent: Float,
-    amountRemaining: Float,
-    income: Float,
-    safeToSpend: Float,
+    totalBudget: Long,
+    amountSpent: Long,
+    amountRemaining: Long,
+    income: Long,
+    safeToSpend: Long,
     navController: NavController,
     monthYear: String,
     budgetHealthSummary: String,
     isPrivacyModeEnabled: Boolean
 ) {
-    val progress = if (totalBudget > 0) (amountSpent / totalBudget) else 0f
+    val progress = if (totalBudget > 0) (amountSpent.toFloat() / totalBudget.toFloat()) else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 400, easing = EaseOutCubic),
@@ -190,14 +184,14 @@ fun DashboardHeroCard(
 @Composable
 private fun StatItem(
     label: String,
-    amount: Float,
+    amount: Long,
     isPrivacyModeEnabled: Boolean,
     isCurrency: Boolean = true,
     isPerDay: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     val animatedAmount by animateFloatAsState(
-        targetValue = amount,
+        targetValue = amount.toFloat(),
         animationSpec = tween(durationMillis = 400, easing = EaseOutCubic),
         label = "StatItemAnimation"
     )
@@ -214,7 +208,7 @@ private fun StatItem(
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             PrivacyAwareText(
-                amount = animatedAmount,
+                amount = animatedAmount.roundToInt(),
                 isPrivacyMode = isPrivacyModeEnabled,
                 isCurrency = isCurrency,
                 style = MaterialTheme.typography.titleLarge,
