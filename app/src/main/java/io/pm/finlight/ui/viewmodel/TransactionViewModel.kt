@@ -7,6 +7,10 @@
 // category selection prompt ("nudge") will now only appear if the user has
 // entered a description. If only an amount is entered, the transaction is saved
 // immediately without prompting for a category, streamlining the quick-add flow.
+// REFACTOR (Testing) - The ViewModel now uses constructor dependency injection,
+// accepting its repository and DAO dependencies. This decouples it from direct
+// database access, resolving the AndroidKeyStore crash in unit tests and making
+// it more testable.
 // =================================================================================
 package io.pm.finlight
 
@@ -66,21 +70,24 @@ data class ManualTransactionData(
 
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
-class TransactionViewModel(application: Application) : AndroidViewModel(application) {
-    private val transactionRepository: TransactionRepository
-    val accountRepository: AccountRepository
-    val categoryRepository: CategoryRepository
-    private val tagRepository: TagRepository
-    private val settingsRepository: SettingsRepository
-    private val smsRepository: SmsRepository
-    private val merchantRenameRuleRepository: MerchantRenameRuleRepository
-    private val merchantCategoryMappingRepository: MerchantCategoryMappingRepository
-    private val merchantMappingRepository: MerchantMappingRepository
-    private val splitTransactionRepository: SplitTransactionRepository
+class TransactionViewModel(
+    application: Application,
+    private val db: AppDatabase,
+    val transactionRepository: TransactionRepository,
+    val accountRepository: AccountRepository,
+    val categoryRepository: CategoryRepository,
+    private val tagRepository: TagRepository,
+    private val settingsRepository: SettingsRepository,
+    private val smsRepository: SmsRepository,
+    private val merchantRenameRuleRepository: MerchantRenameRuleRepository,
+    private val merchantCategoryMappingRepository: MerchantCategoryMappingRepository,
+    private val merchantMappingRepository: MerchantMappingRepository,
+    private val splitTransactionRepository: SplitTransactionRepository,
     private val smsParseTemplateDao: SmsParseTemplateDao
+) : AndroidViewModel(application) {
+
     private val context = application
 
-    private val db = AppDatabase.getInstance(application)
     private var areTagsLoadedForCurrentTxn = false
     private var currentTxnIdForTags: Int? = null
 
@@ -184,18 +191,6 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
 
 
     init {
-        settingsRepository = SettingsRepository(application)
-        tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
-        accountRepository = AccountRepository(db)
-        categoryRepository = CategoryRepository(db.categoryDao())
-        smsRepository = SmsRepository(application)
-        merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao())
-        merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao())
-        merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
-        splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
-        smsParseTemplateDao = db.smsParseTemplateDao()
-
         merchantPredictions = _merchantSearchQuery
             .debounce(300)
             .flatMapLatest { query ->
@@ -322,7 +317,13 @@ class TransactionViewModel(application: Application) : AndroidViewModel(applicat
                 return@launch
             }
 
-            val descriptionChanged = initial.description != current.description
+            // --- FIX: Use a case-insensitive comparison for the description. ---
+            // The original check (initial.description != current.description) was too sensitive.
+            // It triggered the retro-update prompt for simple case corrections (e.g., "amzn" -> "Amazon")
+            // which the user does not consider a "new" merchant change.
+            // This now aligns with the case-insensitive logic used when creating a MerchantRenameRule,
+            // ensuring the prompt only appears for meaningful changes.
+            val descriptionChanged = !initial.description.equals(current.description, ignoreCase = true)
             val categoryChanged = initial.categoryId != current.categoryId
 
             if (!descriptionChanged && !categoryChanged) {

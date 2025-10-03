@@ -1,36 +1,15 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/CurrencyTravelScreen.kt
-// REASON: FIX - The logic for handling date selection has been corrected. The
-// `startDate` is now explicitly set to the beginning of the selected day (00:00),
-// and the `endDate` is set to the very end (23:59:59). This resolves the
-// critical bug where transactions occurring on the last day of a trip were
-// not being tagged.
-// FIX: The date conversion logic now correctly uses java.time.Instant and
-// ZoneId.systemDefault() to make the start/end timestamps timezone-agnostic.
-// This ensures that trip date boundaries are stored in UTC, fixing tagging
-// issues for users who travel across timezones.
-// FIX: Added a DisposableEffect to call `viewModel.clearTripToEdit()` when the
-// screen is left. This prevents stale data from a historic trip edit session
-// from appearing when creating a new trip.
-// REFACTOR: The screen now displays the list of historic trips directly,
-// creating a unified "Travel Hub" and removing the need for a separate screen.
-// FIX: The screen layout has been restructured to always show the active trip
-// form (if a trip is active) AND the travel history list below it, resolving
-// the issue where the history was incorrectly hidden.
-// FIX: Restructured the UI to always show a trip management form (either for
-// an active trip or to create a new one), resolving the bug where the user
-// could not initiate a new trip. The "Create New Trip" button has been removed
-// in favor of this persistent form.
-// FIX (Theming) - All AlertDialogs and DatePickerDialogs on this screen now
-// correctly derive their background color from the app's MaterialTheme, ensuring
-// text is always legible in both light and dark modes.
-// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
-// provides a centralized TopAppBar, and this change removes the duplicate,
-// resolving a UI bug.
+// REASON: REFACTOR (Testing) - The composable no longer instantiates its own
+// ViewModel. It now accepts the CurrencyViewModel as a parameter, allowing a
+// ViewModel created with a factory to be passed in from the NavHost, which is
+// essential for proper dependency injection and testing.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
+import android.os.Build
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -38,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -50,7 +28,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.CurrencyInfo
@@ -58,7 +35,6 @@ import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TripType
 import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.CurrencyViewModel
@@ -70,12 +46,13 @@ import java.util.*
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CurrencyTravelScreen(
     navController: NavController,
     tripId: Int?,
-    viewModel: CurrencyViewModel = viewModel()
+    viewModel: CurrencyViewModel
 ) {
     val isEditMode = tripId != null
     val homeCurrencyCode by viewModel.homeCurrency.collectAsState()

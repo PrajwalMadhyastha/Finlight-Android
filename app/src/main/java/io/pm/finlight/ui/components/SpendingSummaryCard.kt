@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/components/SpendingSummaryCard.kt
-// REASON: NEW FILE - This component extracts the income and expense totals from
-// the old report header into a dedicated, reusable card. This simplifies the
-// screen structure and improves code organization.
-// =================================================================================
 package io.pm.finlight.ui.components
 
 import androidx.compose.foundation.layout.*
@@ -19,8 +13,11 @@ import java.text.NumberFormat
 import java.util.*
 
 @Composable
-fun SpendingSummaryCard(totalSpent: Double, totalIncome: Double) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+fun SpendingSummaryCard(totalSpent: Long, totalIncome: Long) {
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
+    }
 
     GlassPanel {
         Row(

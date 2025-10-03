@@ -1124,5 +1124,14 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
         assertNull("Should ignore messages from HDFC E-Mandate", result)
     }
+
+    @Test
+    fun `test ignores HDFC Reward Points credit message`() = runBlocking {
+        setupTest()
+        val smsBody = "Reward Points Credited: 368 To HDFC Bank Credit Card 1122 On 01/OCT/2025 Towards Regalia Gold_5XRP_Select_merchantsCheck Here: https://hdfcbk.io/HDFCBK/s/AXyY60LX"
+        val mockSms = SmsMessage(id = 9698L, sender = "JD-HDFCB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+        assertNull("Should ignore messages from HDFC Reward Points credit", result)
+    }
 }
 

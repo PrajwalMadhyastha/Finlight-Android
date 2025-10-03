@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ProfileViewModel.kt
-// REASON: REFACTOR - The logic for saving the profile picture has been updated
-// to store the image in a dedicated 'attachments' subdirectory. This aligns
-// with the new backup strategy, allowing the directory to be easily excluded
-// from Android's Auto Backup to save space.
+// REASON: REFACTOR (Testing) - The ViewModel now uses constructor dependency
+// injection for SettingsRepository. This decouples it from direct instantiation,
+// making it fully unit-testable.
 // =================================================================================
 package io.pm.finlight
 
@@ -21,9 +20,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-class ProfileViewModel(application: Application) : AndroidViewModel(application) {
+class ProfileViewModel(
+    application: Application,
+    private val settingsRepository: SettingsRepository
+) : AndroidViewModel(application) {
 
-    private val settingsRepository = SettingsRepository(application)
     private val context = application
 
     val userName: StateFlow<String> = settingsRepository.getUserName()

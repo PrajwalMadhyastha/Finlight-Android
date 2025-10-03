@@ -1,30 +1,29 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/IncomeViewModel.kt
-// REASON: REFACTOR - The instantiation of AccountRepository has been updated to
-// pass the full AppDatabase instance instead of just the DAO. This is required
-// to support the new transactional account merging logic.
-// FIX - The instantiation of TransactionRepository has been updated to include
-// the required dependencies, resolving a build error.
+// REASON: REFACTOR (Testing) - The ViewModel has been refactored to use
+// constructor dependency injection for its repository dependencies. It now extends
+// ViewModel instead of AndroidViewModel, decoupling it from the Android framework
+// and making it fully unit-testable.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class IncomeViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val transactionRepository: TransactionRepository
-    val accountRepository: AccountRepository
+class IncomeViewModel(
+    private val transactionRepository: TransactionRepository,
+    val accountRepository: AccountRepository,
     val categoryRepository: CategoryRepository
+) : ViewModel() {
 
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
     val selectedMonth: StateFlow<Calendar> = _selectedMonth.asStateFlow()
@@ -46,9 +45,9 @@ class IncomeViewModel(application: Application) : AndroidViewModel(application) 
         transactionRepository.getIncomeTransactionsForRange(monthStart, monthEnd, filters.keyword.takeIf { it.isNotBlank() }, filters.account?.id, filters.category?.id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val totalIncomeForSelectedMonth: StateFlow<Double> = incomeTransactionsForSelectedMonth.map { transactions ->
-        transactions.sumOf { it.transaction.amount }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+    val totalIncomeForSelectedMonth: StateFlow<Long> = incomeTransactionsForSelectedMonth.map { transactions ->
+        transactions.sumOf { it.transaction.amount }.roundToLong()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
     val incomeByCategoryForSelectedMonth: StateFlow<List<CategorySpending>> = combinedState.flatMapLatest { (calendar, filters) ->
         val monthStart = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
@@ -59,13 +58,6 @@ class IncomeViewModel(application: Application) : AndroidViewModel(application) 
     val monthlySummaries: StateFlow<List<MonthlySummaryItem>>
 
     init {
-        val db = AppDatabase.getInstance(application)
-        val settingsRepository = SettingsRepository(application)
-        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
-        accountRepository = AccountRepository(db)
-        categoryRepository = CategoryRepository(db.categoryDao())
-
         allAccounts = accountRepository.allAccounts.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

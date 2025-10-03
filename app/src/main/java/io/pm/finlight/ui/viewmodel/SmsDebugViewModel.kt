@@ -1,10 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModel.kt
-// REASON: FIX - The refresh logic in both `refreshScan` and
-// `runAutoImportAndRefresh` has been updated to fully replicate the real-time
-// parsing pipeline's "Hierarchy of Trust". It now checks for high-priority
-// user-defined rules *before* running the ML classifier, ensuring that new
-// rules are correctly applied retrospectively in the debug view.
+// REASON: REFACTOR (Testing) - The ViewModel now uses constructor dependency
+// injection for SmsRepository, AppDatabase, and SmsClassifier. This decouples
+// it from direct instantiation of its dependencies, making it fully unit-testable.
 // =================================================================================
 package io.pm.finlight
 
@@ -41,6 +39,9 @@ data class SmsDebugUiState(
 
 class SmsDebugViewModel(
     private val application: Application,
+    private val smsRepository: SmsRepository,
+    private val db: AppDatabase,
+    private val smsClassifier: SmsClassifier,
     private val transactionViewModel: TransactionViewModel
 ) : AndroidViewModel(application) {
 
@@ -58,11 +59,6 @@ class SmsDebugViewModel(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-
-    private val smsRepository = SmsRepository(application)
-    private val db = AppDatabase.getInstance(application)
-    private val smsClassifier = SmsClassifier(application)
 
     // Create the required rule providers
     private val customSmsRuleProvider = object : CustomSmsRuleProvider {

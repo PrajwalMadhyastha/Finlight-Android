@@ -1,7 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TagRepository.kt
-// REASON: FIX - Added the `findTagById` function to expose the new DAO method
-// to the ViewModel layer. This is needed for the refactored trip editing logic.
+// REASON: REFACTOR - The `findByName` function has been added to expose the
+// underlying DAO method. This is required by the refactored TagViewModel to check
+// for existing tags before creating a new one, ensuring all data access goes
+// through the repository layer.
 // =================================================================================
 package io.pm.finlight
 
@@ -52,5 +54,10 @@ class TagRepository(
     // --- NEW: Function to find a tag by its ID ---
     suspend fun findTagById(id: Int): Tag? {
         return tagDao.getTagById(id)
+    }
+
+    // --- NEW: Expose findByName for ViewModel logic ---
+    suspend fun findByName(name: String): Tag? {
+        return tagDao.findByName(name)
     }
 }

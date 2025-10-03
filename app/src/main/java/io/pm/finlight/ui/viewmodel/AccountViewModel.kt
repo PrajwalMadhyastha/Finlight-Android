@@ -1,20 +1,22 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/AccountViewModel.kt
-// REASON: FEATURE - The smart merge suggestion logic is now more robust. A new
-// `normalizeAccountName` function strips common banking terms and masked numbers
-// from account names before the similarity check. This allows the Levenshtein
-// algorithm to correctly identify duplicates like "ICICI Bank" and "ICICI - xx123".
-// FIX - The instantiation of TransactionRepository has been updated to include
-// the required dependencies, resolving a build error.
-// FIX - Corrected an 'Unresolved reference' error by changing `isSelectionMode`
-// to the correct property name `isSelectionModeActive`.
+// REASON: FIX (Testing) - The UI event channel (_uiEvent) has been changed
+// from a default (Rendezvous) channel to an UNLIMITED buffered channel. This
+// prevents the viewModelScope coroutine from suspending indefinitely on a `send`
+// call when there is no collector, which was causing the `mergeSelectedAccounts`
+// unit test to fail.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.Account
+import io.pm.finlight.AccountRepository
+import io.pm.finlight.AccountWithBalance
+import io.pm.finlight.SettingsRepository
+import io.pm.finlight.TransactionDetails
+import io.pm.finlight.TransactionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -22,17 +24,19 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToLong
 
-class AccountViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository: AccountRepository
-    private val transactionRepository: TransactionRepository
+class AccountViewModel(
+    application: Application,
+    private val repository: AccountRepository,
+    private val transactionRepository: TransactionRepository,
     private val settingsRepository: SettingsRepository
-    private val db = AppDatabase.getInstance(application)
+) : AndroidViewModel(application) {
 
-    private val _uiEvent = Channel<String>()
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
-    val accountsWithBalance: Flow<List<AccountWithBalance>>
+    val accountsWithBalance: Flow<List<AccountWithBalance>> = repository.accountsWithBalance
 
     private val _isSelectionModeActive = MutableStateFlow(false)
     val isSelectionModeActive = _isSelectionModeActive.asStateFlow()
@@ -44,12 +48,6 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     val suggestedMerges = _suggestedMerges.asStateFlow()
 
     init {
-        repository = AccountRepository(db)
-        settingsRepository = SettingsRepository(application)
-        val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-        transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
-        accountsWithBalance = repository.accountsWithBalance
-
         viewModelScope.launch(Dispatchers.Default) {
             combine(
                 repository.accountsWithBalance,
@@ -168,7 +166,6 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-
     fun clearSelectionMode() {
         _isSelectionModeActive.value = false
         _selectedAccountIds.value = emptySet()
@@ -177,16 +174,21 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     fun mergeSelectedAccounts(destinationAccountId: Int) {
         viewModelScope.launch {
             val sourceAccountIds = _selectedAccountIds.value.filter { it != destinationAccountId }
+
+            // 1. Perform validation first.
             if (sourceAccountIds.isEmpty() || sourceAccountIds.size + 1 != _selectedAccountIds.value.size) {
                 _uiEvent.send("Error: Invalid selection for merge.")
-                return@launch
+                return@launch // Exit without clearing selection so the user can fix it.
             }
+
+            // 2. If validation passes, proceed with the operation inside a try-finally.
             try {
                 repository.mergeAccounts(destinationAccountId, sourceAccountIds)
                 _uiEvent.send("Accounts merged successfully.")
             } catch (e: Exception) {
                 _uiEvent.send("Error merging accounts: ${e.message}")
             } finally {
+                // This is now guaranteed to run after a valid merge attempt.
                 clearSelectionMode()
             }
         }
@@ -194,9 +196,9 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
 
     fun getAccountById(accountId: Int): Flow<Account?> = repository.getAccountById(accountId)
 
-    fun getAccountBalance(accountId: Int): Flow<Double> {
+    fun getAccountBalance(accountId: Int): Flow<Long> {
         return transactionRepository.getTransactionsForAccount(accountId).map { transactions ->
-            transactions.sumOf { if (it.transactionType == "income") it.amount else -it.amount }
+            transactions.sumOf { if (it.transactionType == "income") it.amount else -it.amount }.roundToLong()
         }
     }
 
@@ -209,7 +211,9 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         type: String,
     ) = viewModelScope.launch {
         if (name.isNotBlank() && type.isNotBlank()) {
-            val existingAccount = db.accountDao().findByName(name)
+            // This check should ideally be in the repository or a UseCase,
+            // but keeping it here to match existing pattern.
+            val existingAccount = repository.allAccounts.first().find { it.name.equals(name, ignoreCase = true) }
             if (existingAccount != null) {
                 _uiEvent.send("An account named '$name' already exists.")
             } else {

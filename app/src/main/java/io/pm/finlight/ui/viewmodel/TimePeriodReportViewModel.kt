@@ -1,16 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/TimePeriodReportViewModel.kt
-// REASON: FIX - The ViewModel now accepts a `showPreviousMonth` boolean flag.
-// The initialization logic for the `selectedDate` state now checks this flag.
-// If true, it sets the initial view to the previous month, ensuring that deep
-// links from monthly summary notifications show the correct report.
-// FIX - The spending chart logic for the Daily report has been corrected. It
-// now fetches and displays data for the relevant 24-hour period, consistent
-// with the rest of the screen, instead of incorrectly showing a 7-day summary.
-// FEATURE - The ViewModel now fully supports a YEARLY time period, including
-// date range calculations, chart data generation (12-month breakdown), and a
-// yearly spending consistency heatmap.
-// =================================================================================
 package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
@@ -26,6 +13,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimePeriodReportViewModel(
@@ -52,11 +40,11 @@ class TimePeriodReportViewModel(
         transactionDao.getTransactionDetailsForRange(start, end, null, null, null)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val totalIncome: StateFlow<Double> = transactionsForPeriod.map { transactions ->
+    val totalIncome: StateFlow<Long> = transactionsForPeriod.map { transactions ->
         transactions
             .filter { it.transaction.transactionType == "income" && !it.transaction.isExcluded }
-            .sumOf { it.transaction.amount }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+            .sumOf { it.transaction.amount }.roundToLong()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
 
     val insights: StateFlow<ReportInsights?> = _selectedDate.flatMapLatest { calendar ->
@@ -343,7 +331,7 @@ class TimePeriodReportViewModel(
 
         val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
         val budget = settingsRepository.getOverallBudgetForMonthBlocking(year, month)
-        val safeToSpend = if (budget > 0) (budget.toDouble() / daysInMonth) else 0.0
+        val safeToSpend = if (budget > 0) (budget.toDouble() / daysInMonth).roundToLong() else 0L
 
         val resultList = mutableListOf<CalendarDayStatus>()
         val dayIterator = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1) }
@@ -352,14 +340,14 @@ class TimePeriodReportViewModel(
             dayIterator.set(Calendar.DAY_OF_MONTH, i)
 
             if (firstDataCal != null && dayIterator.before(firstDataCal)) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
                 continue
             }
 
             val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
-            val amountSpent = spendingMap[dateKey] ?: 0.0
+            val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
             val status = when {
-                amountSpent == 0.0 -> SpendingStatus.NO_SPEND
+                amountSpent == 0L -> SpendingStatus.NO_SPEND
                 safeToSpend > 0 && amountSpent > safeToSpend -> SpendingStatus.OVER_LIMIT
                 else -> SpendingStatus.WITHIN_LIMIT
             }
@@ -377,7 +365,8 @@ class TimePeriodReportViewModel(
         }
         val totalBudgetForYear = budgetsForYear.sum()
         val daysInYear = if (calendar.getActualMaximum(Calendar.DAY_OF_YEAR) > 365) 366 else 365
-        val yearlySafeToSpend = if (totalBudgetForYear > 0 && daysInYear > 0) (totalBudgetForYear / daysInYear).toDouble() else 0.0
+        // --- FIX: Changed .toLong() to .roundToLong() to prevent truncation ---
+        val yearlySafeToSpend = if (totalBudgetForYear > 0 && daysInYear > 0) (totalBudgetForYear.toDouble() / daysInYear).roundToLong() else 0L
 
 
         val yearStartCal = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_YEAR, 1) }
@@ -394,12 +383,12 @@ class TimePeriodReportViewModel(
 
         while (dayIterator.get(Calendar.YEAR) == year) {
             if (dayIterator.after(today) || (firstDataCal != null && dayIterator.before(firstDataCal))) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0.0, 0.0))
+                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
             } else {
                 val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", dayIterator.get(Calendar.YEAR), dayIterator.get(Calendar.MONTH) + 1, dayIterator.get(Calendar.DAY_OF_MONTH))
-                val amountSpent = spendingMap[dateKey] ?: 0.0
+                val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
                 val status = when {
-                    amountSpent == 0.0 -> SpendingStatus.NO_SPEND
+                    amountSpent == 0L -> SpendingStatus.NO_SPEND
                     yearlySafeToSpend > 0 && amountSpent > yearlySafeToSpend -> SpendingStatus.OVER_LIMIT
                     else -> SpendingStatus.WITHIN_LIMIT
                 }

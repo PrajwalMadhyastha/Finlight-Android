@@ -1,22 +1,15 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/RuleCreationViewModel.kt
-// REASON: FEATURE - The ViewModel now fully supports "edit mode". A new
-// `loadRuleForEditing` function fetches an existing rule by its ID and populates
-// the UI state. The `saveRule` logic is updated to check for an active rule ID
-// and calls the DAO's `update` function instead of `insert`, completing the
-// feature's data flow.
-// FIX - The `initializeStateForCreation` function has been updated to pre-fill
-// not just the amount, but also the merchant and account fields if the parser
-// was able to extract them. This restores the intended convenience feature for
-// creating new rules from partially-failed parses.
+// REASON: REFACTOR (Testing) - The ViewModel has been refactored to use
+// constructor dependency injection for the CustomSmsRuleDao. It now extends
+// ViewModel instead of AndroidViewModel, decoupling it from the Android framework
+// and making it fully unit-testable.
 // =================================================================================
 package io.pm.finlight
 
-import android.app.Application
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
@@ -42,18 +35,16 @@ data class RuleCreationUiState(
     val amountSelection: RuleSelection = RuleSelection(),
     val accountSelection: RuleSelection = RuleSelection(),
     val transactionType: String? = null,
-    val ruleIdToEdit: Int? = null // --- NEW: Track the ID of the rule being edited
+    val ruleIdToEdit: Int? = null
 )
 
 /**
  * ViewModel for the RuleCreationScreen.
  */
-class RuleCreationViewModel(application: Application) : AndroidViewModel(application) {
+class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RuleCreationUiState())
     val uiState = _uiState.asStateFlow()
-
-    private val customSmsRuleDao = AppDatabase.getInstance(application).customSmsRuleDao()
 
     fun initializeStateForCreation(potentialTxn: PotentialTransaction) {
         val amountStr = String.format("%.2f", potentialTxn.amount)
@@ -69,7 +60,6 @@ class RuleCreationViewModel(application: Application) : AndroidViewModel(applica
             RuleSelection()
         }
 
-        // --- FIX: Add logic to pre-select merchant and account if found ---
         val merchantSelection = potentialTxn.merchantName?.let {
             val index = potentialTxn.originalMessage.indexOf(it)
             if (index != -1) RuleSelection(it, index, index + it.length) else RuleSelection()
@@ -81,7 +71,6 @@ class RuleCreationViewModel(application: Application) : AndroidViewModel(applica
             if (index != -1) RuleSelection(accountPart, index, index + accountPart.length) else RuleSelection()
         } ?: RuleSelection()
 
-
         _uiState.value = RuleCreationUiState(
             amountSelection = amountSelection,
             merchantSelection = merchantSelection,
@@ -90,7 +79,6 @@ class RuleCreationViewModel(application: Application) : AndroidViewModel(applica
         )
     }
 
-    // --- NEW: Function to load an existing rule for editing ---
     fun loadRuleForEditing(ruleId: Int) {
         viewModelScope.launch {
             val rule = customSmsRuleDao.getRuleById(ruleId).firstOrNull() ?: return@launch
@@ -142,7 +130,7 @@ class RuleCreationViewModel(application: Application) : AndroidViewModel(applica
             } else null
 
             val rule = CustomSmsRule(
-                id = currentState.ruleIdToEdit ?: 0, // Use existing ID if editing
+                id = currentState.ruleIdToEdit ?: 0,
                 triggerPhrase = currentState.triggerSelection.selectedText,
                 merchantRegex = merchantRegex,
                 amountRegex = amountRegex,
@@ -154,7 +142,6 @@ class RuleCreationViewModel(application: Application) : AndroidViewModel(applica
                 sourceSmsBody = fullSmsText
             )
 
-            // --- UPDATED: Check if we are editing or creating ---
             if (currentState.ruleIdToEdit != null) {
                 customSmsRuleDao.update(rule)
             } else {

@@ -1,28 +1,24 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/RecurringTransactionViewModel.kt
-// REASON: FEATURE - The ViewModel is updated to support full CRUD operations.
-// It now includes `getRuleById`, `deleteRule`, and a comprehensive `saveRule`
-// function that handles both creating new rules and updating existing ones.
+// REASON: REFACTOR (Testing) - The ViewModel now uses constructor dependency
+// injection for the Application context and its Repository. This decouples it
+// from AndroidViewModel, making it fully unit-testable.
 // =================================================================================
 package io.pm.finlight
 
 import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
-class RecurringTransactionViewModel(application: Application) : AndroidViewModel(application) {
+class RecurringTransactionViewModel(
+    private val application: Application,
     private val repository: RecurringTransactionRepository
-    val allRecurringTransactions: Flow<List<RecurringTransaction>>
+) : ViewModel() {
 
-    init {
-        val recurringDao = AppDatabase.getInstance(application).recurringTransactionDao()
-        repository = RecurringTransactionRepository(recurringDao)
-        allRecurringTransactions = repository.getAll()
-    }
+    val allRecurringTransactions: Flow<List<RecurringTransaction>> = repository.getAll()
 
     fun getRuleById(id: Int): Flow<RecurringTransaction?> = repository.getById(id)
 
@@ -54,7 +50,7 @@ class RecurringTransactionViewModel(application: Application) : AndroidViewModel
         } else {
             repository.insert(rule)
             // Only schedule the worker when a new rule is added for the first time
-            ReminderManager.scheduleRecurringTransactionWorker(getApplication())
+            ReminderManager.scheduleRecurringTransactionWorker(application)
         }
     }
 

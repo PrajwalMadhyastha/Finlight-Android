@@ -1,13 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FIX (Build) - Passed the NavController instance to the
-// TagManagementScreen composable within the NavHost. This resolves the
-// "No value passed for parameter 'navController'" compilation error that was
-// introduced when adding the screen's TopAppBar.
-// FIX (UI) - Refactored the TopAppBar logic to be truly centralized. This
-// removes the duplicate app bar on settings screens and restores the
-// HelpActionIcon to all settings sub-screens where it was missing.
-// =================================================================================
 package io.pm.finlight
 
 import android.Manifest
@@ -67,6 +57,8 @@ import coil.compose.AsyncImage
 import com.google.gson.Gson
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.IncomeViewModelFactory
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
 import io.pm.finlight.ui.components.DaybreakAnimatedBackground
@@ -77,8 +69,7 @@ import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.ui.theme.PersonalFinanceAppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
-import io.pm.finlight.ui.viewmodel.AnalysisDimension
-import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
+import io.pm.finlight.ui.viewmodel.*
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -103,7 +94,8 @@ class MainActivity : AppCompatActivity() {
         val hasSeenOnboarding = settingsRepository.hasSeenOnboarding()
 
         setContent {
-            val transactionViewModel: TransactionViewModel = viewModel()
+            val application = LocalContext.current.applicationContext as Application
+            val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(application))
             val settingsViewModel: SettingsViewModel = viewModel(
                 factory = SettingsViewModelFactory(application, transactionViewModel)
             )
@@ -234,14 +226,19 @@ fun MainAppScreen() {
     val context = LocalContext.current.applicationContext as Application
 
     val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModelFactory(context))
-    val transactionViewModel: TransactionViewModel = viewModel()
+    val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(context))
     val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context, transactionViewModel))
-    val accountViewModel: AccountViewModel = viewModel()
-    val categoryViewModel: CategoryViewModel = viewModel()
-    val budgetViewModel: BudgetViewModel = viewModel()
-    val profileViewModel: ProfileViewModel = viewModel()
-    val incomeViewModel: IncomeViewModel = viewModel()
-    val goalViewModel: GoalViewModel = viewModel()
+    val accountViewModel: AccountViewModel = viewModel(factory = AccountViewModelFactory(context))
+    val categoryViewModel: CategoryViewModel = viewModel(factory = CategoryViewModelFactory(context))
+    val budgetViewModel: BudgetViewModel = viewModel(factory = BudgetViewModelFactory(context))
+    val profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModelFactory(context))
+    val incomeViewModel: IncomeViewModel = viewModel(factory = IncomeViewModelFactory(context))
+    val goalViewModel: GoalViewModel = viewModel(factory = GoalViewModelFactory(context))
+    val reportsViewModel: ReportsViewModel = viewModel(factory = ReportsViewModelFactory(context))
+    val manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = viewModel(factory = ManageIgnoreRulesViewModelFactory(context))
+    val manageParseRulesViewModel: ManageParseRulesViewModel = viewModel(factory = ManageParseRulesViewModelFactory(context))
+    val tagViewModel: TagViewModel = viewModel(factory = TagViewModelFactory(context))
+
 
     val userName by dashboardViewModel.userName.collectAsState()
     val profilePictureUri by dashboardViewModel.profilePictureUri.collectAsState()
@@ -492,7 +489,11 @@ fun MainAppScreen() {
                 budgetViewModel = budgetViewModel,
                 profileViewModel = profileViewModel,
                 incomeViewModel = incomeViewModel,
-                goalViewModel = goalViewModel
+                goalViewModel = goalViewModel,
+                reportsViewModel = reportsViewModel,
+                manageIgnoreRulesViewModel = manageIgnoreRulesViewModel,
+                manageParseRulesViewModel = manageParseRulesViewModel,
+                tagViewModel = tagViewModel
             )
         }
 
@@ -559,7 +560,11 @@ fun AppNavHost(
     budgetViewModel: BudgetViewModel,
     profileViewModel: ProfileViewModel,
     incomeViewModel: IncomeViewModel,
-    goalViewModel: GoalViewModel
+    goalViewModel: GoalViewModel,
+    reportsViewModel: ReportsViewModel,
+    manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel,
+    manageParseRulesViewModel: ManageParseRulesViewModel,
+    tagViewModel: TagViewModel
 ) {
     NavHost(
         navController = navController,
@@ -660,7 +665,7 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) {
-            ManageParseRulesScreen(navController)
+            ManageParseRulesScreen(navController, manageParseRulesViewModel)
         }
         composable(
             "manage_ignore_rules",
@@ -669,7 +674,7 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) {
-            ManageIgnoreRulesScreen(navController = navController)
+            ManageIgnoreRulesScreen(navController = navController, viewModel = manageIgnoreRulesViewModel)
         }
 
         composable(BottomNavItem.Dashboard.route) {
@@ -704,7 +709,7 @@ fun AppNavHost(
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) { ReportsScreen(navController, viewModel()) }
+        ) { ReportsScreen(navController, reportsViewModel) }
 
         composable(
             BottomNavItem.Profile.route,
@@ -914,7 +919,7 @@ fun AppNavHost(
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) { TagManagementScreen(navController = navController) }
+        ) { TagManagementScreen(navController = navController, viewModel = tagViewModel) }
 
         composable(
             "rule_creation_screen?potentialTransactionJson={potentialTransactionJson}&ruleId={ruleId}",
@@ -1040,8 +1045,10 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) { backStackEntry ->
+            val context = LocalContext.current.applicationContext as Application
             val tripId = backStackEntry.arguments?.getInt("tripId")
-            CurrencyTravelScreen(navController, if (tripId == -1) null else tripId)
+            val currencyViewModel: CurrencyViewModel = viewModel(factory = CurrencyViewModelFactory(context))
+            CurrencyTravelScreen(navController, if (tripId == -1) null else tripId, currencyViewModel)
         }
         composable(
             "category_detail/{categoryName}/{month}/{year}",

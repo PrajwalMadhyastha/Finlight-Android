@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/RuleCreationScreen.kt
-// REASON: FEATURE (Help System - Phase 1) - Integrated the HelpActionIcon into
-// the TopAppBar to provide users with contextual guidance on how to create
-// custom parsing rules.
+// REASON: FIX (Testing) - The screen now uses the correct ViewModel factory to provide
+// the RuleCreationViewModel with its DAO dependency, resolving a build error. The
+// old, incorrect local factory has been removed.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -29,8 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.google.gson.Gson
@@ -38,20 +36,11 @@ import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
+import io.pm.finlight.ui.viewmodel.RuleCreationViewModelFactory
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
-
-class RuleCreationViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(RuleCreationViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return RuleCreationViewModel(application) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +80,6 @@ fun RuleCreationScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                // --- NEW: Add HelpActionIcon ---
                 actions = {
                     HelpActionIcon(helpKey = "rule_creation_screen")
                 },

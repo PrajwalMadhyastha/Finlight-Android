@@ -3,6 +3,9 @@
 // REASON: NEW FILE - This screen serves as the drill-down view for the Spending
 // Analysis feature. It displays a simple, scrollable list of all transactions
 // that match the selected dimension and time period from the previous screen.
+// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
+// provides a centralized TopAppBar, and this change removes the duplicate,
+// resolving a UI bug.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -47,32 +50,17 @@ fun AnalysisDetailScreen(
 
     val transactions by viewModel.transactions.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(transactions, key = { it.transaction.id }) { transaction ->
+            TransactionItem(
+                transactionDetails = transaction,
+                onClick = { navController.navigate("transaction_detail/${transaction.transaction.id}") },
+                onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
             )
-        },
-        containerColor = MaterialTheme.colorScheme.surface
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            items(transactions, key = { it.transaction.id }) { transaction ->
-                TransactionItem(
-                    transactionDetails = transaction,
-                    onClick = { navController.navigate("transaction_detail/${transaction.transaction.id}") },
-                    onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
-                )
-            }
         }
     }
 }
