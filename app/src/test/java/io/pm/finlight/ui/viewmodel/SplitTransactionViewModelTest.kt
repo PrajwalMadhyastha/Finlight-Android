@@ -1,45 +1,30 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/SplitTransactionViewModelTest.kt
-// REASON: NEW FILE - Unit tests for SplitTransactionViewModel, covering logic for
-// initializing the screen for both new and existing splits, handling foreign
-// currency transactions, and validating UI actions like adding, removing, and
-// updating split items.
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
-import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class SplitTransactionViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
+class SplitTransactionViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var transactionRepository: TransactionRepository
@@ -51,14 +36,8 @@ class SplitTransactionViewModelTest {
     private lateinit var viewModel: SplitTransactionViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
+    override fun setup() {
+        super.setup()
     }
 
     @Test

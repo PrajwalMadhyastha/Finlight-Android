@@ -1,40 +1,31 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/ReportsViewModelTest.kt
-// REASON: NEW FILE - Unit tests for ReportsViewModel, covering state
-// observation from its various repository and DAO dependencies.
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.*
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class ReportsViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
+class ReportsViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var transactionRepository: TransactionRepository
@@ -46,9 +37,8 @@ class ReportsViewModelTest {
     private lateinit var viewModel: ReportsViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
 
         // Setup default mocks for initialization
         `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
@@ -61,11 +51,6 @@ class ReportsViewModelTest {
         `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
 
         viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository)
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test

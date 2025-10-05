@@ -1,32 +1,24 @@
+// =================================================================================
+// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/BudgetViewModelTest.kt
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization.
+// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.content.Context
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import io.pm.finlight.Budget
-import io.pm.finlight.BudgetRepository
-import io.pm.finlight.BudgetViewModel
-import io.pm.finlight.BudgetWithSpending
-import io.pm.finlight.Category
-import io.pm.finlight.CategoryRepository
-import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TestApplication
-import kotlinx.coroutines.Dispatchers
+import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
@@ -34,7 +26,6 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.Mockito.`when`
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 import java.util.Calendar
 import kotlin.math.roundToLong
@@ -42,10 +33,7 @@ import kotlin.math.roundToLong
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class BudgetViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
+class BudgetViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var budgetRepository: BudgetRepository
@@ -58,17 +46,9 @@ class BudgetViewModelTest {
 
     private lateinit var viewModel: BudgetViewModel
 
-    private val testDispatcher = UnconfinedTestDispatcher()
-
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
+    override fun setup() {
+        super.setup()
     }
 
     @Test

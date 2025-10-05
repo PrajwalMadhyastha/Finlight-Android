@@ -1,14 +1,14 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/SettingsViewModelTest.kt
-// REASON: NEW FILE - Unit tests for the refactored SettingsViewModel, covering
-// state observation and actions for managing app settings.
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization. The tearDown method is now an override.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.app.backup.BackupManager
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
@@ -16,37 +16,27 @@ import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.theme.AppTheme
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Ignore
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.MockedStatic
 import org.mockito.Mockito.*
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class SettingsViewModelTest {
+class SettingsViewModelTest : BaseViewModelTest() {
 
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
     private val application: Application = ApplicationProvider.getApplicationContext()
 
     @Mock private lateinit var settingsRepository: SettingsRepository
@@ -64,9 +54,8 @@ class SettingsViewModelTest {
     private lateinit var viewModel: SettingsViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
 
         // Mock static DataExportService
         dataExportServiceMock = mockStatic(DataExportService::class.java)
@@ -103,9 +92,9 @@ class SettingsViewModelTest {
     }
 
     @After
-    fun tearDown() {
+    override fun tearDown() {
         dataExportServiceMock.close()
-        Dispatchers.resetMain()
+        super.tearDown()
     }
 
     @Test

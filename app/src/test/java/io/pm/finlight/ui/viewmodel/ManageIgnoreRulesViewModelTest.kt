@@ -1,50 +1,37 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/ManageIgnoreRulesViewModelTest.kt
-// REASON: NEW FILE - Unit tests for ManageIgnoreRulesViewModel, covering state
-// observation and all rule management actions (add, update, delete).
-// FIX - Corrected Mockito verification calls to be compatible with suspend
-// functions and Kotlin's non-null types, resolving all test failures.
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
+import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.IgnoreRule
 import io.pm.finlight.IgnoreRuleDao
 import io.pm.finlight.ManageIgnoreRulesViewModel
 import io.pm.finlight.RuleType
 import io.pm.finlight.TestApplication
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Ignore
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Mock
 import org.mockito.Mockito.*
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class ManageIgnoreRulesViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
+class ManageIgnoreRulesViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var ignoreRuleDao: IgnoreRuleDao
@@ -54,20 +41,14 @@ class ManageIgnoreRulesViewModelTest {
     private lateinit var viewModel: ManageIgnoreRulesViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
+    override fun setup() {
+        super.setup()
         ignoreRuleCaptor = ArgumentCaptor.forClass(IgnoreRule::class.java)
-        Dispatchers.setMain(testDispatcher)
     }
 
     private fun initializeViewModel(initialRules: List<IgnoreRule> = emptyList()) {
         `when`(ignoreRuleDao.getAll()).thenReturn(flowOf(initialRules))
         viewModel = ManageIgnoreRulesViewModel(ignoreRuleDao)
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test

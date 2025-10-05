@@ -1,31 +1,21 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/GoalViewModelTest.kt
-// REASON: NEW FILE - Unit tests for GoalViewModel, covering state
-// observation from the repository and all CRUD actions (save, update, delete).
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
-import io.pm.finlight.Goal
-import io.pm.finlight.GoalRepository
-import io.pm.finlight.GoalViewModel
-import io.pm.finlight.GoalWithAccountName
-import io.pm.finlight.TestApplication
-import kotlinx.coroutines.Dispatchers
+import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Ignore
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
@@ -33,18 +23,12 @@ import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class GoalViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
+class GoalViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var goalRepository: GoalRepository
@@ -55,19 +39,13 @@ class GoalViewModelTest {
     private lateinit var viewModel: GoalViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
     }
 
     private fun initializeViewModel(initialGoals: List<GoalWithAccountName> = emptyList()) {
         `when`(goalRepository.getAllGoalsWithAccountName()).thenReturn(flowOf(initialGoals))
         viewModel = GoalViewModel(goalRepository)
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test
