@@ -1,12 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/DrilldownScreen.kt
-// REASON: NEW FILE - This composable defines the UI for the new drilldown
-// screens. It displays a title, a monthly trend bar chart, and a list of
-// transactions for the specified entity (category or merchant) and month,
-// all styled according to the "Project Aurora" vision.
-// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
-// provides a centralized TopAppBar, and this change removes the duplicate,
-// resolving a UI bug.
+// REASON: FIX (Crash) - Injected TransactionViewModel as a parameter instead of
+// using the default viewModel() constructor. This resolves a crash caused by the
+// ViewModel's complex dependencies not being provided by the default factory.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -49,12 +45,13 @@ fun DrilldownScreen(
     drilldownType: DrilldownType,
     entityName: String,
     month: Int,
-    year: Int
+    year: Int,
+    transactionViewModel: TransactionViewModel // --- FIX: Inject ViewModel ---
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = DrilldownViewModelFactory(application, drilldownType, entityName, month, year)
     val viewModel: DrilldownViewModel = viewModel(factory = factory)
-    val transactionViewModel: TransactionViewModel = viewModel()
+    // val transactionViewModel: TransactionViewModel = viewModel() // --- REMOVED: Buggy line ---
 
     val transactions by viewModel.transactionsForMonth.collectAsState()
     val chartData by viewModel.monthlyTrendChartData.collectAsState()

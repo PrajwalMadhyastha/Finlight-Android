@@ -1,32 +1,27 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/RecurringTransactionViewModelTest.kt
-// REASON: NEW FILE - Unit tests for RecurringTransactionViewModel, covering state
-// observation and all CRUD actions (save, update, delete).
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
+import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.RecurringTransaction
 import io.pm.finlight.RecurringTransactionRepository
 import io.pm.finlight.RecurringTransactionViewModel
 import io.pm.finlight.TestApplication
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Ignore
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
@@ -34,18 +29,13 @@ import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class RecurringTransactionViewModelTest {
+class RecurringTransactionViewModelTest : BaseViewModelTest() {
 
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
     private val application: Application = ApplicationProvider.getApplicationContext()
 
     @Mock
@@ -57,19 +47,13 @@ class RecurringTransactionViewModelTest {
     private lateinit var viewModel: RecurringTransactionViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
     }
 
     private fun initializeViewModel(initialRules: List<RecurringTransaction> = emptyList()) {
         `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(initialRules))
         viewModel = RecurringTransactionViewModel(application, recurringTransactionRepository)
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test

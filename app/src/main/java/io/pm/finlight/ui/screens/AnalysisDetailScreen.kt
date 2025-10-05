@@ -1,11 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AnalysisDetailScreen.kt
-// REASON: NEW FILE - This screen serves as the drill-down view for the Spending
-// Analysis feature. It displays a simple, scrollable list of all transactions
-// that match the selected dimension and time period from the previous screen.
-// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
-// provides a centralized TopAppBar, and this change removes the duplicate,
-// resolving a UI bug.
+// REASON: FIX (Crash) - Injected TransactionViewModel as a parameter instead of
+// using the default viewModel() constructor. This resolves a crash caused by the
+// ViewModel's complex dependencies not being provided by the default factory.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -41,12 +38,13 @@ fun AnalysisDetailScreen(
     dimensionId: String,
     title: String,
     startDate: Long,
-    endDate: Long
+    endDate: Long,
+    transactionViewModel: TransactionViewModel // --- FIX: Inject ViewModel ---
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = AnalysisDetailViewModelFactory(application, dimension, dimensionId, startDate, endDate)
     val viewModel: AnalysisDetailViewModel = viewModel(factory = factory)
-    val transactionViewModel: TransactionViewModel = viewModel()
+    // val transactionViewModel: TransactionViewModel = viewModel() // --- REMOVED: Buggy line ---
 
     val transactions by viewModel.transactions.collectAsState()
 

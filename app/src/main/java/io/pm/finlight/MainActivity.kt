@@ -596,7 +596,12 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) { backStackEntry ->
-            val dimension = backStackEntry.arguments?.getSerializable("dimension", AnalysisDimension::class.java)
+            val dimension = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                backStackEntry.arguments?.getSerializable("dimension", AnalysisDimension::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                backStackEntry.arguments?.getSerializable("dimension") as? AnalysisDimension
+            }
             val dimensionId = backStackEntry.arguments?.getString("dimensionId")
             val title = URLDecoder.decode(backStackEntry.arguments?.getString("title"), "UTF-8")
             val startDate = backStackEntry.arguments?.getLong("startDate")
@@ -609,7 +614,8 @@ fun AppNavHost(
                     dimensionId = dimensionId,
                     title = title,
                     startDate = startDate,
-                    endDate = endDate
+                    endDate = endDate,
+                    transactionViewModel = transactionViewModel
                 )
             }
         }
@@ -1066,7 +1072,8 @@ fun AppNavHost(
                 drilldownType = DrilldownType.CATEGORY,
                 entityName = categoryName,
                 month = month,
-                year = year
+                year = year,
+                transactionViewModel = transactionViewModel
             )
         }
         composable(
@@ -1085,7 +1092,8 @@ fun AppNavHost(
                 drilldownType = DrilldownType.MERCHANT,
                 entityName = merchantName,
                 month = month,
-                year = year
+                year = year,
+                transactionViewModel = transactionViewModel
             )
         }
         composable(

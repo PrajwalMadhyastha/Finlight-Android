@@ -1,21 +1,20 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModelTest.kt
-// REASON: NEW FILE - Unit tests for SmsDebugViewModel. This covers the logic for
-// loading, parsing, filtering, and auto-importing SMS messages in the debug view.
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization. The tearDown method is now an override.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
 import android.widget.Toast
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.ml.SmsClassifier
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -25,24 +24,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Ignore
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.MockedStatic
 import org.mockito.Mockito.*
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class SmsDebugViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
+class SmsDebugViewModelTest : BaseViewModelTest() {
 
     @Mock private lateinit var application: Application
     @Mock private lateinit var transactionViewModel: TransactionViewModel
@@ -65,9 +57,8 @@ class SmsDebugViewModelTest {
     private lateinit var viewModel: SmsDebugViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
 
         smsParserMock = mockStatic(SmsParser::class.java)
         toastMock = mockStatic(Toast::class.java)
@@ -106,10 +97,10 @@ class SmsDebugViewModelTest {
     }
 
     @After
-    fun tearDown() {
+    override fun tearDown() {
         smsParserMock.close()
         toastMock.close()
-        Dispatchers.resetMain()
+        super.tearDown()
     }
 
     @Test

@@ -1,41 +1,34 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/AccountViewModelTest.kt
+// REASON: REFACTOR (Testing) - The test class has been updated to extend the new
+// `BaseViewModelTest`. All boilerplate for JUnit rules, coroutine dispatchers,
+// and Mockito initialization has been removed and is now inherited from the base
+// class.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class AccountViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
+class AccountViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var accountRepository: AccountRepository
@@ -47,9 +40,8 @@ class AccountViewModelTest {
     private lateinit var viewModel: AccountViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
 
         // Setup default mock behaviors needed for ViewModel initialization
         `when`(accountRepository.accountsWithBalance).thenReturn(flowOf(emptyList()))
@@ -61,11 +53,6 @@ class AccountViewModelTest {
             transactionRepository,
             settingsRepository
         )
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test
@@ -143,7 +130,6 @@ class AccountViewModelTest {
     }
 
     @Test
-    @Ignore
     fun `suggestedMerges should identify similar account names`() = runTest {
         // ARRANGE
         val mockAccounts = listOf(

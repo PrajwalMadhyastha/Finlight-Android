@@ -1,37 +1,36 @@
+// =================================================================================
+// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/DashboardViewModelTest.kt
+// REASON: REFACTOR (Testing) - The test class has been updated to extend the new
+// `BaseViewModelTest`. All boilerplate for JUnit rules, coroutine dispatchers,
+// and Mockito initialization has been removed and is now inherited from the base
+// class. The `setup` method is now an override that calls `super.setup()`.
+// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
-import org.junit.Assert
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito
-import org.mockito.MockitoAnnotations
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
 import kotlin.math.roundToLong
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class DashboardViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
+class DashboardViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var transactionRepository: TransactionRepository
@@ -47,46 +46,42 @@ class DashboardViewModelTest {
 
     private lateinit var viewModel: DashboardViewModel
 
-    private val testDispatcher = UnconfinedTestDispatcher()
-
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup() // Initializes mocks and sets the main dispatcher
 
-        // --- FIX: Set up default mock behaviors BEFORE ViewModel initialization ---
-        Mockito.`when`(settingsRepository.getUserName()).thenReturn(flowOf("User"))
-        Mockito.`when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(null))
-        Mockito.`when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
-        Mockito.`when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(emptyList()))
-        Mockito.`when`(settingsRepository.getDashboardVisibleCards()).thenReturn(flowOf(emptySet()))
-        Mockito.`when`(
+        // --- Set up default mock behaviors BEFORE ViewModel initialization ---
+        `when`(settingsRepository.getUserName()).thenReturn(flowOf("User"))
+        `when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(null))
+        `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
+        `when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(emptyList()))
+        `when`(settingsRepository.getDashboardVisibleCards()).thenReturn(flowOf(emptySet()))
+        `when`(
             transactionRepository.getFinancialSummaryForRangeFlow(
                 Mockito.anyLong(),
                 Mockito.anyLong()
             )
         ).thenReturn(flowOf(FinancialSummary(0.0, 0.0)))
-        // --- FIX: Added mock for the new dependency, wrapped in runTest ---
         runTest {
-            Mockito.`when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(0.0)
+            `when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(0.0)
         }
-        Mockito.`when`(
+        `when`(
             settingsRepository.getOverallBudgetForMonth(
                 Mockito.anyInt(),
                 Mockito.anyInt()
             )
         ).thenReturn(flowOf(0f))
-        Mockito.`when`(accountRepository.accountsWithBalance).thenReturn(flowOf(emptyList()))
-        Mockito.`when`(transactionRepository.recentTransactions).thenReturn(flowOf(emptyList()))
-        Mockito.`when`(
+        `when`(accountRepository.accountsWithBalance).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.recentTransactions).thenReturn(flowOf(emptyList()))
+        `when`(
             budgetDao.getBudgetsWithSpendingForMonth(
                 Mockito.anyString(),
                 Mockito.anyInt(),
                 Mockito.anyInt()
             )
         ).thenReturn(flowOf(emptyList()))
-        Mockito.`when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
-        Mockito.`when`(
+        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
+        `when`(
             transactionRepository.getDailySpendingForDateRange(
                 Mockito.anyLong(),
                 Mockito.anyLong()
@@ -103,16 +98,11 @@ class DashboardViewModelTest {
         )
     }
 
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
-    }
-
     @Test
     fun `test monthly income and expenses are loaded correctly`() = runTest {
         // ARRANGE: Mock the repository to return a specific financial summary for this test
         val summary = FinancialSummary(totalIncome = 5000.0, totalExpenses = 1500.0)
-        Mockito.`when`(
+        `when`(
             transactionRepository.getFinancialSummaryForRangeFlow(
                 Mockito.anyLong(),
                 Mockito.anyLong()
@@ -129,8 +119,8 @@ class DashboardViewModelTest {
         advanceUntilIdle() // Let flows emit
 
         // ASSERT: Check if the StateFlows in the ViewModel reflect the mocked data
-        Assert.assertEquals(5000L, viewModel.monthlyIncome.first())
-        Assert.assertEquals(1500L, viewModel.monthlyExpenses.first())
+        assertEquals(5000L, viewModel.monthlyIncome.first())
+        assertEquals(1500L, viewModel.monthlyExpenses.first())
     }
 
     @Test
@@ -138,13 +128,13 @@ class DashboardViewModelTest {
         // ARRANGE
         val budget = 3000f
         val expenses = 1200.0
-        Mockito.`when`(
+        `when`(
             settingsRepository.getOverallBudgetForMonth(
                 Mockito.anyInt(),
                 Mockito.anyInt()
             )
         ).thenReturn(flowOf(budget))
-        Mockito.`when`(
+        `when`(
             transactionRepository.getFinancialSummaryForRangeFlow(
                 Mockito.anyLong(),
                 Mockito.anyLong()
@@ -162,19 +152,19 @@ class DashboardViewModelTest {
 
         // ASSERT
         val expectedRemaining = budget.roundToLong() - expenses.roundToLong()
-        Assert.assertEquals(expectedRemaining, viewModel.amountRemaining.first())
+        assertEquals(expectedRemaining, viewModel.amountRemaining.first())
     }
 
     @Test
     fun `budgetHealthSummary shows 'Set a budget' when budget is zero`() = runTest {
         // ARRANGE
-        Mockito.`when`(
+        `when`(
             settingsRepository.getOverallBudgetForMonth(
                 Mockito.anyInt(),
                 Mockito.anyInt()
             )
         ).thenReturn(flowOf(0f))
-        Mockito.`when`(
+        `when`(
             transactionRepository.getFinancialSummaryForRangeFlow(
                 Mockito.anyLong(),
                 Mockito.anyLong()
@@ -191,25 +181,25 @@ class DashboardViewModelTest {
         advanceUntilIdle()
 
         // ASSERT
-        Assert.assertEquals("Set a budget to see insights", viewModel.budgetHealthSummary.first())
+        assertEquals("Set a budget to see insights", viewModel.budgetHealthSummary.first())
     }
 
     @Test
     fun `budgetHealthSummary shows 'over budget' message when expenses exceed budget`() = runTest {
         // ARRANGE
-        Mockito.`when`(
+        `when`(
             settingsRepository.getOverallBudgetForMonth(
                 Mockito.anyInt(),
                 Mockito.anyInt()
             )
         ).thenReturn(flowOf(1000f))
-        Mockito.`when`(
+        `when`(
             transactionRepository.getFinancialSummaryForRangeFlow(
                 Mockito.anyLong(),
                 Mockito.anyLong()
             )
         ).thenReturn(flowOf(FinancialSummary(0.0, 1200.0)))
-        Mockito.`when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(200.0)
+        `when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(200.0)
 
 
         // ACT
@@ -222,7 +212,6 @@ class DashboardViewModelTest {
         viewModel.refreshBudgetSummary()
         advanceUntilIdle()
 
-        // --- FIX: Removed the trailing periods to match the ViewModel's actual output ---
         val possibleMessages = listOf(
             "Pacing a bit high for this month",
             "Time to ease up on spending",
@@ -235,7 +224,7 @@ class DashboardViewModelTest {
             "Budget is feeling the pressure",
             "Trending to overspend"
         )
-        Assert.assertTrue(
+        assertTrue(
             "Summary message should be one of the 'over budget' phrases.",
             viewModel.budgetHealthSummary.first() in possibleMessages
         )
@@ -256,8 +245,8 @@ class DashboardViewModelTest {
             DashboardCardType.RECENT_TRANSACTIONS
         )
 
-        Mockito.`when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(initialOrder))
-        Mockito.`when`(settingsRepository.getDashboardVisibleCards())
+        `when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(initialOrder))
+        `when`(settingsRepository.getDashboardVisibleCards())
             .thenReturn(flowOf(visibleCards))
 
         viewModel = DashboardViewModel(
@@ -279,7 +268,7 @@ class DashboardViewModelTest {
             DashboardCardType.QUICK_ACTIONS
         )
         // Verify that the repository's save method was called with the new order
-        Mockito.verify(settingsRepository).saveDashboardLayout(expectedNewOrder, visibleCards)
+        verify(settingsRepository).saveDashboardLayout(expectedNewOrder, visibleCards)
     }
 
     @Test
@@ -288,8 +277,8 @@ class DashboardViewModelTest {
         val initialOrder = listOf(DashboardCardType.HERO_BUDGET, DashboardCardType.QUICK_ACTIONS)
         val initialVisible = setOf(DashboardCardType.HERO_BUDGET, DashboardCardType.QUICK_ACTIONS)
 
-        Mockito.`when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(initialOrder))
-        Mockito.`when`(settingsRepository.getDashboardVisibleCards())
+        `when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(initialOrder))
+        `when`(settingsRepository.getDashboardVisibleCards())
             .thenReturn(flowOf(initialVisible))
 
         viewModel = DashboardViewModel(
@@ -307,14 +296,14 @@ class DashboardViewModelTest {
         // ASSERT
         val expectedNewVisible = setOf(DashboardCardType.HERO_BUDGET)
         // Verify that the repository's save method was called with the updated visible set
-        Mockito.verify(settingsRepository).saveDashboardLayout(initialOrder, expectedNewVisible)
+        verify(settingsRepository).saveDashboardLayout(initialOrder, expectedNewVisible)
     }
 
     @Test
     fun `monthlyIncomeAndExpenses are converted to Long and rounded correctly`() = runTest {
         // ARRANGE
         val summaryWithDecimals = FinancialSummary(totalIncome = 5000.75, totalExpenses = 1500.25)
-        Mockito.`when`(
+        `when`(
             transactionRepository.getFinancialSummaryForRangeFlow(
                 Mockito.anyLong(),
                 Mockito.anyLong()
@@ -334,7 +323,7 @@ class DashboardViewModelTest {
         val expectedIncome = 5000.75.roundToLong() // Should be 5001
         val expectedExpenses = 1500.25.roundToLong() // Should be 1500
 
-        Assert.assertEquals(expectedIncome, viewModel.monthlyIncome.first())
-        Assert.assertEquals(expectedExpenses, viewModel.monthlyExpenses.first())
+        assertEquals(expectedIncome, viewModel.monthlyIncome.first())
+        assertEquals(expectedExpenses, viewModel.monthlyExpenses.first())
     }
 }

@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/NotificationHelper.kt
-// REASON: REFACTOR - The expanded notification view has been redesigned. It now
-// prominently displays the amount and merchant as the main title.
-// FEATURE - A random, colorful emoji is now appended to the "visit count" line
-// for a more personalized and dynamic feel.
+// REASON: REFACTOR - The `showDailyReportNotification` function has been
+// simplified. It no longer contains complex logic to build a title string from a
+// percentage. Instead, it now accepts a pre-constructed, intelligent title
+// directly from the `DailyReportWorker`, making this helper cleaner and more
+// focused on its presentation role.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -422,11 +423,11 @@ object NotificationHelper {
 
         val inboxStyle = NotificationCompat.InboxStyle()
             .setBigContentTitle(title)
-            .setSummaryText("Got 2 mins to review?")
+            .setSummaryText("Tap to review the details")
 
         if (topCategories.isNotEmpty()) {
             inboxStyle.addLine("Top spends:")
-            for (category in topCategories) {
+            for (category in topCategories.take(3)) { // Limit to top 3 for clarity
                 inboxStyle.addLine("• ${category.categoryName}: ${currencyFormat.format(category.totalAmount)}")
             }
         } else {
@@ -451,17 +452,11 @@ object NotificationHelper {
 
     fun showDailyReportNotification(
         context: Context,
+        title: String, // --- UPDATED: Receive the intelligent title directly
         totalExpenses: Double,
-        percentageChange: Int?,
         topCategories: List<CategorySpending>,
         dateMillis: Long
     ) {
-        val title = when {
-            percentageChange == null -> "Yesterday's Summary"
-            percentageChange == 0 -> "Spending same as day before"
-            percentageChange > 0 -> "Spending up by $percentageChange% yesterday"
-            else -> "Spending down by ${abs(percentageChange)}% yesterday"
-        }
         val deepLinkUri = "$DEEP_LINK_URI_REPORT_BASE/${TimePeriod.DAILY}?date=$dateMillis"
 
         createEnhancedSummaryNotification(

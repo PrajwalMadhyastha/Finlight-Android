@@ -1,47 +1,33 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/AnalysisViewModelTest.kt
-// REASON: NEW FILE - Unit tests for AnalysisViewModel, covering state
-// changes and data fetching logic with mocked DAOs.
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
-import io.pm.finlight.Category
-import io.pm.finlight.CategoryDao
-import io.pm.finlight.Tag
-import io.pm.finlight.TagDao
-import io.pm.finlight.TestApplication
-import io.pm.finlight.TransactionDao
+import io.pm.finlight.*
 import io.pm.finlight.data.model.SpendingAnalysisItem
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Ignore
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.*
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class AnalysisViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
+class AnalysisViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var transactionDao: TransactionDao
@@ -53,9 +39,8 @@ class AnalysisViewModelTest {
     private lateinit var viewModel: AnalysisViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
 
         // Setup default mocks for initialization
         `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
@@ -68,11 +53,6 @@ class AnalysisViewModelTest {
 
 
         viewModel = AnalysisViewModel(transactionDao, categoryDao, tagDao)
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test
@@ -169,4 +149,3 @@ class AnalysisViewModelTest {
         verify(transactionDao, atLeast(1)).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull())
     }
 }
-
