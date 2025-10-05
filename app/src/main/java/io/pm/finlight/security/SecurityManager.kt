@@ -23,17 +23,19 @@ import javax.crypto.spec.GCMParameterSpec
  * This class uses the Android Keystore system to securely store the key,
  * making the encryption process transparent to the user.
  */
-class SecurityManager(private val context: Context) {
+open class SecurityManager(private val context: Context) {
 
     companion object {
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        private const val KEY_ALIAS = "finlight_db_key"
+        internal const val KEY_ALIAS = "finlight_db_key" // Made internal for test access
         private const val PREFS_NAME = "finlight_secure_prefs"
         private const val PREF_ENCRYPTED_PASSPHRASE = "db_passphrase"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
     }
 
-    private val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+    internal open val keyStoreProvider: String = ANDROID_KEYSTORE
+    internal open val protectionParameter: KeyStore.ProtectionParameter? = null
+    private val keyStore: KeyStore by lazy { getKeyStore() }
     private val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     /**
@@ -51,18 +53,26 @@ class SecurityManager(private val context: Context) {
     }
 
     /**
+     * Lazily gets or creates the KeyStore instance. Made open to allow overriding in tests.
+     */
+    internal open fun getKeyStore(): KeyStore {
+        return KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+    }
+
+    /**
      * Generates a SecretKey for encryption/decryption, creating it if it doesn't already exist.
      */
     private fun getSecretKey(): SecretKey {
-        val existingKey = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
+        val existingKey = keyStore.getEntry(KEY_ALIAS, protectionParameter) as? KeyStore.SecretKeyEntry
         return existingKey?.secretKey ?: generateSecretKey()
     }
 
     /**
      * Generates a new AES key and stores it in the Android Keystore.
+     * Made open to allow overriding in tests.
      */
-    private fun generateSecretKey(): SecretKey {
-        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
+    internal open fun generateSecretKey(): SecretKey {
+        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, keyStoreProvider)
         val parameterSpec = KeyGenParameterSpec.Builder(
             KEY_ALIAS,
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
