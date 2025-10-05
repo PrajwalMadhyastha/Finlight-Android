@@ -1,8 +1,9 @@
 // =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/BaseViewModelTest.kt
-// REASON: NEW FILE - This abstract base class centralizes common setup logic for
-// all ViewModel unit tests. It includes the InstantTaskExecutorRule for LiveData,
-// coroutine test dispatcher management, and Mockito initialization.
+// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/BaseViewModelTest.kt
+// REASON: REFACTOR (Testing) - The helper function `anyNonNull` has been renamed
+// to `anyObject` for better clarity and to align with common Mockito-Kotlin
+// workaround patterns. This consolidates the null-safe `any()` matcher logic
+// into the base test class, removing the need for a separate MockitoHelper file.
 // =================================================================================
 package io.pm.finlight
 
@@ -32,7 +33,7 @@ inline fun <reified T : Any> argumentCaptor(): ArgumentCaptor<T> = ArgumentCapto
  * compiler for the function signature, while Mockito's stubbing mechanism
  * correctly uses the registered 'any' matcher, avoiding a NullPointerException.
  */
-fun <T> anyNonNull(): T {
+fun <T> anyObject(): T {
     Mockito.any<T>()
     @Suppress("UNCHECKED_CAST")
     return null as T

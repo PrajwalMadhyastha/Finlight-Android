@@ -8,6 +8,8 @@
 // will succeed once a new custom rule is introduced. This correctly simulates
 // the "fix and refresh" workflow, ensuring the `autoSaveSmsTransaction` method
 // is called as expected and resolving the assertion failure.
+// FIX (Testing) - Corrected the call from the old `anyNonNull()` to the new,
+// consolidated `anyObject()` helper function, resolving the build error.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -75,8 +77,8 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         `when`(ignoreRuleDao.getEnabledRules()).thenAnswer { DEFAULT_IGNORE_PHRASES }
         `when`(smsParseTemplateDao.getAllTemplates()).thenAnswer { emptyList<SmsParseTemplate>() }
         `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-        // FIX: Use anyNonNull() for the non-nullable String parameter to avoid NPEs.
-        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyNonNull())).thenAnswer { null }
+        // FIX: Use anyObject() for the non-nullable String parameter to avoid NPEs.
+        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyObject())).thenAnswer { null }
     }
 
     private fun initializeViewModel() {
@@ -206,7 +208,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
             // Arrange for the REFRESH scan (with the new custom rule)
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyNonNull())).thenAnswer { invocation ->
+            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject())).thenAnswer { invocation ->
                 capturedTxn = invocation.getArgument(0)
                 true
             }
