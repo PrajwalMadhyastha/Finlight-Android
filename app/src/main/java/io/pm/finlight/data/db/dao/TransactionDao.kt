@@ -12,6 +12,22 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TransactionDao {
 
+    // --- NEW: Query for calculating average daily spending for the new report logic ---
+    @Query("""
+        WITH AtomicExpenses AS (
+            SELECT T.amount FROM transactions AS T
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.date BETWEEN :startDate AND :endDate
+            UNION ALL
+            SELECT S.amount FROM split_transactions AS S
+            JOIN transactions AS P ON S.parentTransactionId = P.id
+            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.date BETWEEN :startDate AND :endDate
+        )
+        SELECT SUM(AE.amount) / (CAST((:endDate - :startDate) AS REAL) / 86400000.0)
+        FROM AtomicExpenses AS AE
+    """)
+    suspend fun getAverageDailySpendingForRange(startDate: Long, endDate: Long): Double?
+
+
     // --- NEW: Query for Spending Velocity ---
     @Query("""
         WITH AtomicExpenses AS (

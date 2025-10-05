@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/DailyReportWorker.kt
-// REASON: BUG FIX - The worker's date calculation logic has been completely
-// corrected. It now calculates a true rolling 24-hour window from the moment
-// it executes. This ensures that the data gathered for the notification
-// perfectly matches the data the user sees when they click the deep link,
-// resolving the "no transactions" bug.
+// REASON: FEATURE (Smart Notifications) - The worker's logic has been completely
+// rewritten to be more intelligent. It now calculates a 7-day rolling average for
+// spending and uses a series of contextual rules to generate a user-friendly,
+// insightful notification title instead of a raw, potentially alarming percentage.
 // =================================================================================
 package io.pm.finlight
 
@@ -18,7 +17,6 @@ import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
-import kotlin.math.roundToInt
 
 class DailyReportWorker(
     private val context: Context,
@@ -29,29 +27,63 @@ class DailyReportWorker(
             try {
                 val transactionDao = AppDatabase.getInstance(context).transactionDao()
 
-                // --- FIX: Calculate a true rolling 24-hour window from now ---
-                val endDate = Calendar.getInstance().timeInMillis
-                val startDate = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, -24) }.timeInMillis
+                // --- Define Date Ranges ---
+                val now = Calendar.getInstance()
 
-                // --- FIX: Calculate the comparison period as the 24 hours prior to the current period ---
-                val previousPeriodEndDate = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, -24) }.timeInMillis
-                val previousPeriodStartDate = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, -48) }.timeInMillis
+                // 1. "Yesterday" period
+                val yesterdayEnd = (now.clone() as Calendar).apply {
+                    add(Calendar.DAY_OF_YEAR, -1)
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                }.timeInMillis
+                val yesterdayStart = (now.clone() as Calendar).apply {
+                    add(Calendar.DAY_OF_YEAR, -1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                }.timeInMillis
 
+                // 2. "Previous 7 Days" period (for calculating the average)
+                val sevenDaysAgoEnd = (now.clone() as Calendar).apply {
+                    add(Calendar.DAY_OF_YEAR, -2)
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                }.timeInMillis
+                val sevenDaysAgoStart = (now.clone() as Calendar).apply {
+                    add(Calendar.DAY_OF_YEAR, -8)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                }.timeInMillis
 
-                val currentPeriodSummary = transactionDao.getFinancialSummaryForRange(startDate, endDate)
-                val currentPeriodExpenses = currentPeriodSummary?.totalExpenses ?: 0.0
+                // --- Fetch Data ---
+                val yesterdaySummary = transactionDao.getFinancialSummaryForRange(yesterdayStart, yesterdayEnd)
+                val yesterdayExpenses = yesterdaySummary?.totalExpenses ?: 0.0
 
-                val previousPeriodSummary = transactionDao.getFinancialSummaryForRange(previousPeriodStartDate, previousPeriodEndDate)
-                val previousPeriodExpenses = previousPeriodSummary?.totalExpenses ?: 0.0
+                val weeklyAverage = transactionDao.getAverageDailySpendingForRange(sevenDaysAgoStart, sevenDaysAgoEnd) ?: 0.0
 
-                val topCategories = transactionDao.getTopSpendingCategoriesForRange(startDate, endDate)
+                val topCategories = transactionDao.getTopSpendingCategoriesForRange(yesterdayStart, yesterdayEnd)
 
-                val percentageChange = if (previousPeriodExpenses > 0) {
-                    ((currentPeriodExpenses - previousPeriodExpenses) / previousPeriodExpenses * 100).roundToInt()
-                } else null
+                // --- Apply Contextual Logic ---
+                val title = when {
+                    // Scenario D: No Spending
+                    yesterdayExpenses == 0.0 -> "No spending recorded yesterday. Keep it up!"
 
-                // --- FIX: Pass the correct end date (now) to the notification helper ---
-                NotificationHelper.showDailyReportNotification(context, currentPeriodExpenses, percentageChange, topCategories, endDate)
+                    // Scenario C: Significant Drop
+                    weeklyAverage > 0 && (yesterdayExpenses / weeklyAverage) < 0.20 ->
+                        "Great job! Spending was well below average yesterday."
+
+                    // Scenario B: Normal Fluctuation
+                    weeklyAverage > 0 && (yesterdayExpenses / weeklyAverage) in 0.90..1.10 ->
+                        "Your spending is on track with your weekly average."
+
+                    // Scenario A: Major Spike
+                    weeklyAverage > 0 && (yesterdayExpenses / weeklyAverage) > 1.50 ->
+                        "Heads up: Spending was higher than usual yesterday."
+
+                    // Default Case (Catch-All)
+                    else -> "Here's your daily summary."
+                }
+
+                NotificationHelper.showDailyReportNotification(context, title, yesterdayExpenses, topCategories, now.timeInMillis)
 
                 ReminderManager.scheduleDailyReport(context)
                 Result.success()
