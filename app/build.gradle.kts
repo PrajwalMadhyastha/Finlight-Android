@@ -242,4 +242,6 @@ dependencies {
     implementation("com.google.ai.edge.litert:litert-api:1.4.0")
     implementation("com.google.ai.edge.litert:litert-support:1.4.0")
     implementation("com.google.ai.edge.litert:litert-metadata:1.4.0")
+    testImplementation(kotlin("test"))
+    testImplementation("org.bouncycastle:bcprov-jdk15on:1.70")
 }
