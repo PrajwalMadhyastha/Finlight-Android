@@ -1,5 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/CategoryViewModelTest.kt
+// REASON: REFACTOR (Testing) - The test class has been updated to extend the new
+// `BaseViewModelTest`. All boilerplate for JUnit rules, coroutine dispatchers,
+// and Mockito initialization has been removed and is now inherited from the base
+// class.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -7,20 +11,16 @@ import android.os.Build
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
+import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.Category
 import io.pm.finlight.CategoryDao
 import io.pm.finlight.CategoryRepository
 import io.pm.finlight.CategoryViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.TransactionRepository
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
@@ -32,18 +32,12 @@ import org.mockito.Mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class CategoryViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
+class CategoryViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var categoryRepository: CategoryRepository
@@ -60,15 +54,9 @@ class CategoryViewModelTest {
     private lateinit var viewModel: CategoryViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
         // ViewModel is instantiated in each test after mocks are configured for clarity.
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test
