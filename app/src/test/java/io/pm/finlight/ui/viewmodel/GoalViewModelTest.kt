@@ -3,6 +3,9 @@
 // REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
 // inheriting all common setup logic and removing boilerplate for rules,
 // dispatchers, and Mockito initialization.
+// FIX (Testing) - Replaced ArgumentCaptor.capture() with the null-safe
+// capture() helper to resolve a "capture() must not be null"
+// NullPointerException when verifying suspend functions.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -12,10 +15,10 @@ import app.cash.turbine.test
 import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
@@ -79,16 +82,16 @@ class GoalViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `saveGoal with null id calls repository insert`() = runTest {
         // Arrange
         initializeViewModel()
 
         // Act
         viewModel.saveGoal(null, "New Car", 200000.0, 50000.0, null, 1)
+        advanceUntilIdle()
 
         // Assert
-        verify(goalRepository).insert(goalCaptor.capture())
+        verify(goalRepository).insert(capture(goalCaptor))
         val capturedGoal = goalCaptor.value
         assertEquals("New Car", capturedGoal.name)
         assertEquals(200000.0, capturedGoal.targetAmount, 0.0)
@@ -96,7 +99,6 @@ class GoalViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `saveGoal with existing id calls repository update`() = runTest {
         // Arrange
         initializeViewModel()
@@ -104,9 +106,10 @@ class GoalViewModelTest : BaseViewModelTest() {
 
         // Act
         viewModel.saveGoal(goalId, "Updated Goal", 1500.0, 500.0, null, 2)
+        advanceUntilIdle()
 
         // Assert
-        verify(goalRepository).update(goalCaptor.capture())
+        verify(goalRepository).update(capture(goalCaptor))
         val capturedGoal = goalCaptor.value
         assertEquals("Updated Goal", capturedGoal.name)
         assertEquals(1500.0, capturedGoal.targetAmount, 0.0)
@@ -121,6 +124,7 @@ class GoalViewModelTest : BaseViewModelTest() {
 
         // Act
         viewModel.deleteGoal(goalToDelete)
+        advanceUntilIdle()
 
         // Assert
         verify(goalRepository).delete(goalToDelete)
