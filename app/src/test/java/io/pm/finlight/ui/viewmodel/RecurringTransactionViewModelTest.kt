@@ -6,6 +6,8 @@
 // FIX (Testing) - Replaced ArgumentCaptor.capture() with the null-safe
 // capture() helper to resolve a "capture() must not be null"
 // NullPointerException when verifying suspend functions.
+// FIX (Testing) - Added manual WorkManager initialization to resolve the
+// "WorkManager is not initialized properly" exception.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -13,6 +15,9 @@ import android.app.Application
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Configuration
+import androidx.work.testing.SynchronousExecutor
+import androidx.work.testing.WorkManagerTestInitHelper
 import app.cash.turbine.test
 import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -48,6 +53,12 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
     @Before
     override fun setup() {
         super.setup()
+        // Manually initialize WorkManager for testing to prevent crash.
+        val config = Configuration.Builder()
+            .setMinimumLoggingLevel(android.util.Log.DEBUG)
+            .setExecutor(SynchronousExecutor())
+            .build()
+        WorkManagerTestInitHelper.initializeTestWorkManager(application, config)
     }
 
     private fun initializeViewModel(initialRules: List<RecurringTransaction> = emptyList()) {
@@ -134,3 +145,4 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
         verify(recurringTransactionRepository).delete(ruleToDelete)
     }
 }
+

@@ -151,6 +151,7 @@ configurations.all {
 dependencies {
     // --- NEW: Add dependency on the core module ---
     implementation(project(":core"))
+    implementation("androidx.work:work-testing:2.10.5")
     testImplementation(project(":core"))
     implementation("androidx.profileinstaller:profileinstaller:1.3.1")
 
