@@ -3,24 +3,27 @@
 // REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
 // inheriting all common setup logic and removing boilerplate for rules,
 // dispatchers, and Mockito initialization.
+// FIX (Testing) - Replaced a potentially problematic `any()` call with the
+// null-safe `anyObject()` helper and re-enabled previously ignored tests.
+// FIX (Testing) - Replaced ArgumentCaptor with argThat to resolve a
+// "capture() must not be null" NullPointerException when verifying mocks with
+// non-nullable Kotlin parameters.
+// FIX (Testing) - Replaced `argThat` with `ArgumentCaptor` and a custom
+// `capture()` helper function. This is the definitive fix for the `NullPointerException`
+// when verifying suspend functions with non-nullable parameters.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
-import io.pm.finlight.BaseViewModelTest
-import io.pm.finlight.IgnoreRule
-import io.pm.finlight.IgnoreRuleDao
-import io.pm.finlight.ManageIgnoreRulesViewModel
-import io.pm.finlight.RuleType
-import io.pm.finlight.TestApplication
+import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
@@ -43,7 +46,8 @@ class ManageIgnoreRulesViewModelTest : BaseViewModelTest() {
     @Before
     override fun setup() {
         super.setup()
-        ignoreRuleCaptor = ArgumentCaptor.forClass(IgnoreRule::class.java)
+        ignoreRuleCaptor = argumentCaptor()
+        initializeViewModel()
     }
 
     private fun initializeViewModel(initialRules: List<IgnoreRule> = emptyList()) {
@@ -65,18 +69,17 @@ class ManageIgnoreRulesViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore("TODO")
     fun `addIgnoreRule calls dao insert with correct non-default rule`() = runTest {
         // Arrange
-        initializeViewModel()
         val pattern = " new rule "
         val type = RuleType.BODY_PHRASE
 
         // Act
         viewModel.addIgnoreRule(pattern, type)
+        advanceUntilIdle()
 
         // Assert
-        verify(ignoreRuleDao).insert(ignoreRuleCaptor.capture())
+        verify(ignoreRuleDao).insert(capture(ignoreRuleCaptor))
         val capturedRule = ignoreRuleCaptor.value
         assertEquals(pattern.trim(), capturedRule.pattern)
         assertEquals(type, capturedRule.type)
@@ -84,26 +87,24 @@ class ManageIgnoreRulesViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore("TODO")
     fun `addIgnoreRule does not insert blank pattern`() = runTest {
-        // Arrange
-        initializeViewModel()
-
         // Act
         viewModel.addIgnoreRule("  ", RuleType.SENDER)
+        advanceUntilIdle()
 
         // Assert
-        verify(ignoreRuleDao, never()).insert(any(IgnoreRule::class.java))
+        verify(ignoreRuleDao, never()).insert(anyObject())
     }
 
     @Test
     fun `updateIgnoreRule calls dao update`() = runTest {
         // Arrange
-        initializeViewModel()
         val ruleToUpdate = IgnoreRule(1, RuleType.BODY_PHRASE, "pattern", isEnabled = false)
 
         // Act
         viewModel.updateIgnoreRule(ruleToUpdate)
+        advanceUntilIdle()
+
 
         // Assert
         verify(ignoreRuleDao).update(ruleToUpdate)
@@ -112,11 +113,11 @@ class ManageIgnoreRulesViewModelTest : BaseViewModelTest() {
     @Test
     fun `deleteIgnoreRule calls dao delete for non-default rule`() = runTest {
         // Arrange
-        initializeViewModel()
         val ruleToDelete = IgnoreRule(1, RuleType.SENDER, "custom", isDefault = false)
 
         // Act
         viewModel.deleteIgnoreRule(ruleToDelete)
+        advanceUntilIdle()
 
         // Assert
         verify(ignoreRuleDao).delete(ruleToDelete)
@@ -125,13 +126,14 @@ class ManageIgnoreRulesViewModelTest : BaseViewModelTest() {
     @Test
     fun `deleteIgnoreRule does NOT call dao delete for default rule`() = runTest {
         // Arrange
-        initializeViewModel()
         val defaultRule = IgnoreRule(1, RuleType.SENDER, "default", isDefault = true)
 
         // Act
         viewModel.deleteIgnoreRule(defaultRule)
+        advanceUntilIdle()
 
         // Assert
         verify(ignoreRuleDao, never()).delete(defaultRule)
     }
 }
+

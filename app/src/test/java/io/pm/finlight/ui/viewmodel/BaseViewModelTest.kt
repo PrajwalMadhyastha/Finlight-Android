@@ -1,9 +1,11 @@
 // =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/BaseViewModelTest.kt
-// REASON: REFACTOR (Testing) - The helper function `anyNonNull` has been renamed
-// to `anyObject` for better clarity and to align with common Mockito-Kotlin
-// workaround patterns. This consolidates the null-safe `any()` matcher logic
-// into the base test class, removing the need for a separate MockitoHelper file.
+// FILE: ./app/src/test/java/io/pm/finlight/BaseViewModelTest.kt
+// REASON: NEW FILE - This abstract base class centralizes common setup logic for
+// all ViewModel unit tests. It includes the InstantTaskExecutorRule for LiveData,
+// coroutine test dispatcher management, and Mockito initialization.
+// FIX (Testing) - Added a new null-safe `capture` helper function. This works
+// around a common NullPointerException when using Mockito's ArgumentCaptor with
+// non-nullable Kotlin parameters, especially in suspend functions.
 // =================================================================================
 package io.pm.finlight
 
@@ -35,6 +37,20 @@ inline fun <reified T : Any> argumentCaptor(): ArgumentCaptor<T> = ArgumentCapto
  */
 fun <T> anyObject(): T {
     Mockito.any<T>()
+    @Suppress("UNCHECKED_CAST")
+    return null as T
+}
+
+/**
+ * A helper function to use Mockito's `ArgumentCaptor.capture()` in a way that is safe
+ * for Kotlin's non-nullable types.
+ *
+ * It calls `captor.capture()` to register the capture with Mockito, but returns a 'null'
+ * cast to the required type `T`. This satisfies the Kotlin compiler for function signatures
+ * with non-nullable parameters, preventing a NullPointerException during verification.
+ */
+fun <T> capture(argumentCaptor: ArgumentCaptor<T>): T {
+    argumentCaptor.capture()
     @Suppress("UNCHECKED_CAST")
     return null as T
 }
