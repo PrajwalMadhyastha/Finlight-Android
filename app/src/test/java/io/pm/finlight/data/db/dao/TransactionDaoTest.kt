@@ -12,6 +12,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -34,6 +35,8 @@ class TransactionDaoTest {
     private val account2 = Account(id = 2, name = "Credit Card", type = "Card")
     private val category1 = Category(id = 1, name = "Food", iconKey = "restaurant", colorKey = "red_light")
     private val category2 = Category(id = 2, name = "Travel", iconKey = "travel", colorKey = "blue_light")
+    private val category3 = Category(id = 3, name = "Salary", iconKey = "work", colorKey = "green_light")
+
     private val tag1 = Tag(id = 1, name = "Work")
     private val tag2 = Tag(id = 2, name = "Vacation")
 
@@ -46,7 +49,7 @@ class TransactionDaoTest {
 
         // Pre-populate database with necessary entities
         accountDao.insertAll(listOf(account1, account2))
-        categoryDao.insertAll(listOf(category1, category2))
+        categoryDao.insertAll(listOf(category1, category2, category3))
         tagDao.insertAll(listOf(tag1, tag2))
     }
 
@@ -189,5 +192,74 @@ class TransactionDaoTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
-}
 
+    @Test
+    fun `getFinancialSummaryForRangeFlow calculates income and expenses correctly`() = runTest {
+        // Arrange
+        val now = System.currentTimeMillis()
+        val startDate = now - TimeUnit.DAYS.toMillis(5)
+
+        transactionDao.insert(Transaction(description = "Salary", amount = 50000.0, date = now - TimeUnit.DAYS.toMillis(1), transactionType = "income", accountId = 1, categoryId = 3, notes = null))
+        transactionDao.insert(Transaction(description = "Rent", amount = 15000.0, date = now - TimeUnit.DAYS.toMillis(2), transactionType = "expense", accountId = 1, categoryId = 1, notes = null))
+        transactionDao.insert(Transaction(description = "Groceries", amount = 3500.0, date = now - TimeUnit.DAYS.toMillis(3), transactionType = "expense", accountId = 1, categoryId = 1, notes = null))
+        transactionDao.insert(Transaction(description = "Excluded Expense", amount = 1000.0, date = now - TimeUnit.DAYS.toMillis(4), transactionType = "expense", accountId = 1, categoryId = 1, notes = null, isExcluded = true))
+
+        // Act & Assert
+        transactionDao.getFinancialSummaryForRangeFlow(startDate, now).test {
+            val summary = awaitItem()
+            assertNotNull(summary)
+            assertEquals(50000.0, summary!!.totalIncome, 0.01)
+            assertEquals(18500.0, summary.totalExpenses, 0.01) // 15000 + 3500
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getSpendingByCategoryForMonth aggregates and orders correctly`() = runTest {
+        // Arrange
+        val now = System.currentTimeMillis()
+        val startDate = now - TimeUnit.DAYS.toMillis(10)
+        transactionDao.insert(Transaction(description = "Flight", amount = 8000.0, date = now, transactionType = "expense", accountId = 1, categoryId = 2, notes = null))
+        transactionDao.insert(Transaction(description = "Lunch", amount = 500.0, date = now, transactionType = "expense", accountId = 1, categoryId = 1, notes = null))
+        transactionDao.insert(Transaction(description = "Hotel", amount = 4000.0, date = now, transactionType = "expense", accountId = 1, categoryId = 2, notes = null))
+        transactionDao.insert(Transaction(description = "Salary", amount = 50000.0, date = now, transactionType = "income", accountId = 1, categoryId = 3, notes = null)) // Should be ignored
+
+        // Act & Assert
+        transactionDao.getSpendingByCategoryForMonth(startDate, now, null, null, null).test {
+            val spendingList = awaitItem()
+            assertEquals(2, spendingList.size)
+
+            // First item should be Travel (8000 + 4000)
+            assertEquals("Travel", spendingList[0].categoryName)
+            assertEquals(12000.0, spendingList[0].totalAmount, 0.01)
+
+            // Second item should be Food
+            assertEquals("Food", spendingList[1].categoryName)
+            assertEquals(500.0, spendingList[1].totalAmount, 0.01)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getAverageDailySpendingForRange calculates average correctly`() = runTest {
+        // Arrange
+        val threeDaysInMillis = TimeUnit.DAYS.toMillis(3)
+        val endDate = System.currentTimeMillis()
+        val startDate = endDate - threeDaysInMillis
+
+        transactionDao.insert(Transaction(description = "Day 1 Spend", amount = 100.0, date = startDate + 1000, transactionType = "expense", accountId = 1, categoryId = 1, notes = null))
+        transactionDao.insert(Transaction(description = "Day 2 Spend", amount = 150.0, date = startDate + TimeUnit.DAYS.toMillis(1), transactionType = "expense", accountId = 1, categoryId = 1, notes = null))
+        transactionDao.insert(Transaction(description = "Day 3 Spend", amount = 50.0, date = endDate - 1000, transactionType = "expense", accountId = 1, categoryId = 1, notes = null))
+
+        // Total spend = 300.0 over 3 days. Average should be 100.0
+        val expectedAverage = 100.0
+
+        // Act
+        val average = transactionDao.getAverageDailySpendingForRange(startDate, endDate)
+
+        // Assert
+        assertNotNull(average)
+        assertEquals(expectedAverage, average!!, 0.01)
+    }
+}
