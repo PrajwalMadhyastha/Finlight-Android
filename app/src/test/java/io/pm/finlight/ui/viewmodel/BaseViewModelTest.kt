@@ -13,7 +13,7 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestDispatcher
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -80,10 +80,9 @@ abstract class BaseViewModelTest {
     var instantTaskExecutorRule = InstantTaskExecutorRule()
 
     /**
-     * A test dispatcher for coroutines that executes them eagerly, allowing tests to
-     * run sequentially without needing to manually advance the clock.
+     * A test dispatcher for coroutines that gives us manual control over execution.
      */
-    protected val testDispatcher: TestDispatcher = UnconfinedTestDispatcher()
+    protected val testDispatcher: TestDispatcher = StandardTestDispatcher()
 
     /**
      * Sets up the test environment before each test case.

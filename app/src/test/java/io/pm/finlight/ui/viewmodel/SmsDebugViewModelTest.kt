@@ -1,15 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModelTest.kt
-// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
-// inheriting all common setup logic and removing boilerplate for rules,
-// dispatchers, and Mockito initialization. The tearDown method is now an override.
-// FIX (Testing) - The `runAutoImportAndRefresh` test has been corrected. It now
-// uses a sample SMS that is guaranteed to fail the initial generic parsing but
-// will succeed once a new custom rule is introduced. This correctly simulates
-// the "fix and refresh" workflow, ensuring the `autoSaveSmsTransaction` method
-// is called as expected and resolving the assertion failure.
-// FIX (Testing) - Corrected the call from the old `anyNonNull()` to the new,
-// consolidated `anyObject()` helper function, resolving the build error.
+// REASON: FIX (Testing) - Corrected the Turbine test logic in
+// `refreshScan loads and parses sms messages correctly`. The test now correctly
+// awaits the single, final state emitted by the StateFlow after `advanceUntilIdle()`
+// has completed the coroutine launched in the ViewModel's `init` block. The
+// previous use of `skipItems(1)` was incorrect for this testing pattern, as it
+// consumed the only available state and caused `awaitItem()` to time out. This
+// resolves the `TurbineTimeoutCancellationException`.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -112,8 +109,8 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
         // Assert
         viewModel.uiState.test {
-            // Skip initial loading state
-            skipItems(1)
+            // The test subscribes AFTER advanceUntilIdle(), so it only receives the FINAL state.
+            // We should await this final state directly without skipping anything.
             val state = awaitItem()
             assertEquals(false, state.isLoading)
             assertEquals(3, state.debugResults.size)
