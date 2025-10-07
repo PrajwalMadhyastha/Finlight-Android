@@ -1,14 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/AccountViewModelTest.kt
-// REASON: REFACTOR (Testing) - The test class has been updated to extend the new
-// `BaseViewModelTest`. All boilerplate for JUnit rules, coroutine dispatchers,
-// and Mockito initialization has been removed and is now inherited from the base
-// class.
-// FIX (Flaky Test) - The `suggestedMerges` test has been made deterministic.
-// It now uses `advanceUntilIdle()` *before* collecting the flow. This ensures
-// the coroutine in the ViewModel's `init` block completes before assertions
-// are made, eliminating a race condition that caused intermittent failures.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
@@ -19,15 +8,15 @@ import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.*
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
-import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when`
+import org.mockito.Mockito.*
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
@@ -51,6 +40,8 @@ class AccountViewModelTest : BaseViewModelTest() {
         // Setup default mock behaviors needed for ViewModel initialization
         `when`(accountRepository.accountsWithBalance).thenReturn(flowOf(emptyList()))
         `when`(settingsRepository.getDismissedMergeSuggestions()).thenReturn(flowOf(emptySet()))
+        `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
+
 
         viewModel = AccountViewModel(
             ApplicationProvider.getApplicationContext(),
@@ -130,6 +121,9 @@ class AccountViewModelTest : BaseViewModelTest() {
         advanceUntilIdle()
 
         // ASSERT
+        viewModel.uiEvent.test {
+            assertEquals("Accounts merged successfully.", awaitItem())
+        }
         verify(accountRepository).mergeAccounts(destinationId, sourceIds)
         assertEquals(false, viewModel.isSelectionModeActive.value)
         assertTrue(viewModel.selectedAccountIds.value.isEmpty())
@@ -164,6 +158,110 @@ class AccountViewModelTest : BaseViewModelTest() {
             assertEquals(setOf(1, 2), setOf(suggestion.first.id, suggestion.second.id))
 
             cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `addAccount with existing name sends error event`() = runTest {
+        // Arrange
+        val accountName = "Existing Account"
+        val existingAccount = Account(1, accountName, "Bank")
+        `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(existingAccount)))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.addAccount(accountName, "Card")
+            advanceUntilIdle()
+
+            assertEquals("An account named '$accountName' already exists.", awaitItem())
+            verify(accountRepository, never()).insert(anyObject())
+        }
+    }
+
+    @Test
+    fun `addAccount failure sends error event`() = runTest {
+        // Arrange
+        val errorMessage = "DB Error"
+        `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
+        `when`(accountRepository.insert(anyObject())).thenThrow(RuntimeException(errorMessage))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.addAccount("New Account", "Bank")
+            advanceUntilIdle()
+
+            assertEquals("Error creating account: $errorMessage", awaitItem())
+        }
+    }
+
+    @Test
+    fun `deleteAccount success sends success event`() = runTest {
+        // Arrange
+        val accountToDelete = Account(1, "Test Account", "Bank")
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.deleteAccount(accountToDelete)
+            advanceUntilIdle()
+
+            verify(accountRepository).delete(accountToDelete)
+            assertEquals("Account '${accountToDelete.name}' deleted.", awaitItem())
+        }
+    }
+
+    @Test
+    fun `deleteAccount failure sends error event`() = runTest {
+        // Arrange
+        val accountToDelete = Account(1, "Test Account", "Bank")
+        val errorMessage = "DB Error"
+        `when`(accountRepository.delete(anyObject())).thenThrow(RuntimeException(errorMessage))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.deleteAccount(accountToDelete)
+            advanceUntilIdle()
+
+            assertEquals("Error deleting account: $errorMessage", awaitItem())
+        }
+    }
+
+    @Test
+    fun `mergeSelectedAccounts with invalid selection sends error event`() = runTest {
+        // Arrange
+        viewModel.enterSelectionMode(1) // Select only one account
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.mergeSelectedAccounts(1)
+            advanceUntilIdle()
+
+            assertEquals("Error: Invalid selection for merge.", awaitItem())
+            verify(accountRepository, never()).mergeAccounts(anyInt(), anyObject())
+        }
+    }
+
+    @Test
+    fun `mergeSelectedAccounts failure sends error event`() = runTest {
+        // Arrange
+        val destinationId = 1
+        val sourceIds = listOf(2)
+        val errorMessage = "DB Error"
+        `when`(accountRepository.mergeAccounts(destinationId, sourceIds)).thenThrow(RuntimeException(errorMessage))
+
+        viewModel.enterSelectionMode(null)
+        viewModel.toggleAccountSelection(destinationId)
+        viewModel.toggleAccountSelection(sourceIds[0])
+        advanceUntilIdle()
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.mergeSelectedAccounts(destinationId)
+            advanceUntilIdle()
+
+            assertEquals("Error merging accounts: $errorMessage", awaitItem())
+            // ViewModel should still clear selection mode even on failure
+            assertEquals(false, viewModel.isSelectionModeActive.value)
+            assertTrue(viewModel.selectedAccountIds.value.isEmpty())
         }
     }
 }
