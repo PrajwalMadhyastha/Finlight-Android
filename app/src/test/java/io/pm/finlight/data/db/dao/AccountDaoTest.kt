@@ -17,6 +17,8 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -78,6 +80,92 @@ class AccountDaoTest {
             assertNotNull(acc2Balance)
             assertEquals(-200.0, acc2Balance!!.balance, 0.01)
 
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getAllAccounts returns all accounts`() = runTest {
+        // Act
+        accountDao.getAllAccounts().test {
+            val accounts = awaitItem()
+            // Assert
+            assertEquals(2, accounts.size)
+            assertTrue(accounts.any { it.name == "HDFC Bank" })
+            assertTrue(accounts.any { it.name == "ICICI Credit Card" })
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getAccountById returns correct account`() = runTest {
+        // Act & Assert
+        accountDao.getAccountById(account1.id).test {
+            val account = awaitItem()
+            assertNotNull(account)
+            assertEquals(account1.name, account?.name)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getAccountByIdBlocking returns correct account`() = runTest {
+        // Act
+        val account = accountDao.getAccountByIdBlocking(account2.id)
+        // Assert
+        assertNotNull(account)
+        assertEquals(account2.name, account?.name)
+    }
+
+    @Test
+    fun `update modifies account correctly`() = runTest {
+        // Arrange
+        val updatedAccount = account1.copy(name = "HDFC Savings")
+
+        // Act
+        accountDao.update(updatedAccount)
+
+        // Assert
+        val fromDb = accountDao.getAccountByIdBlocking(account1.id)
+        assertNotNull(fromDb)
+        assertEquals("HDFC Savings", fromDb?.name)
+    }
+
+    @Test
+    fun `delete removes account`() = runTest {
+        // Act
+        accountDao.delete(account1)
+
+        // Assert
+        val fromDb = accountDao.getAccountByIdBlocking(account1.id)
+        assertNull(fromDb)
+    }
+
+    @Test
+    fun `deleteByIds removes specified accounts`() = runTest {
+        // Arrange
+        val account3 = Account(id = 3, name = "Axis", type = "Bank")
+        accountDao.insert(account3)
+
+        // Act
+        accountDao.deleteByIds(listOf(account1.id, account3.id))
+
+        // Assert
+        accountDao.getAllAccounts().test {
+            val remaining = awaitItem()
+            assertEquals(1, remaining.size)
+            assertEquals(account2.name, remaining.first().name)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `deleteAll removes all accounts`() = runTest {
+        // Act
+        accountDao.deleteAll()
+        // Assert
+        accountDao.getAllAccounts().test {
+            assertTrue(awaitItem().isEmpty())
             cancelAndIgnoreRemainingEvents()
         }
     }

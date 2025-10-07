@@ -18,6 +18,7 @@ import org.robolectric.annotation.Config
 import java.util.Calendar
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -68,5 +69,59 @@ class RecurringTransactionDaoTest {
             assertEquals(newTimestamp, updatedRule?.lastRunDate)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `update modifies rule correctly`() = runTest {
+        // Arrange
+        val id = recurringTransactionDao.insert(RecurringTransaction(description = "Old", amount = 1.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = null)).toInt()
+        val updatedRule = RecurringTransaction(id = id, description = "New", amount = 2.0, transactionType = "income", recurrenceInterval = "Weekly", startDate = 1L, accountId = 1, categoryId = null)
+
+        // Act
+        recurringTransactionDao.update(updatedRule)
+
+        // Assert
+        recurringTransactionDao.getById(id).test {
+            val fromDb = awaitItem()
+            assertEquals("New", fromDb?.description)
+            assertEquals(2.0, fromDb?.amount)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `delete removes a rule`() = runTest {
+        // Arrange
+        val rule = RecurringTransaction(description = "Test", amount = 1.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = null)
+        val id = recurringTransactionDao.insert(rule).toInt()
+
+        // Act
+        recurringTransactionDao.delete(rule.copy(id = id))
+
+        // Assert
+        recurringTransactionDao.getById(id).test {
+            assertNull(awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getAllRulesFlow and getAllRulesList return all rules`() = runTest {
+        // Arrange
+        val rules = listOf(
+            RecurringTransaction(description = "Rule1", amount = 1.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = null),
+            RecurringTransaction(description = "Rule2", amount = 2.0, transactionType = "expense", recurrenceInterval = "Weekly", startDate = 0L, accountId = 1, categoryId = null)
+        )
+        rules.forEach { recurringTransactionDao.insert(it) }
+
+        // Act & Assert for Flow
+        recurringTransactionDao.getAllRulesFlow().test {
+            assertEquals(2, awaitItem().size)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Act & Assert for List
+        val listResult = recurringTransactionDao.getAllRulesList()
+        assertEquals(2, listResult.size)
     }
 }

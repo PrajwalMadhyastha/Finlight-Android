@@ -6,6 +6,7 @@ import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.util.DatabaseTestRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -16,6 +17,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
@@ -121,6 +123,123 @@ class BudgetDaoTest {
             assertNotNull(travelBudget)
             // It should use this month's budget amount
             assertEquals(15000.0, travelBudget!!.budget.amount, 0.01)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getBudgetsForMonth returns budgets for specific month only`() = runTest {
+        // Arrange
+        val cal = Calendar.getInstance()
+        val year = cal.get(Calendar.YEAR)
+        val month = cal.get(Calendar.MONTH) + 1
+        val lastMonth = cal.get(Calendar.MONTH)
+
+        budgetDao.insert(Budget(categoryName = "Food", amount = 5000.0, month = month, year = year))
+        budgetDao.insert(Budget(categoryName = "Travel", amount = 10000.0, month = lastMonth, year = year))
+
+        // Act & Assert
+        budgetDao.getBudgetsForMonth(month, year).test {
+            val budgets = awaitItem()
+            assertEquals(1, budgets.size)
+            assertEquals("Food", budgets.first().categoryName)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getActualSpendingForCategory calculates correctly`() = runTest {
+        // Arrange
+        val cal = Calendar.getInstance()
+        val year = cal.get(Calendar.YEAR)
+        val month = cal.get(Calendar.MONTH) + 1
+        transactionDao.insert(Transaction(description = "Lunch", amount = 300.0, date = cal.timeInMillis, transactionType = "expense", accountId = 1, categoryId = 1, notes = null))
+        transactionDao.insert(Transaction(description = "Dinner", amount = 700.0, date = cal.timeInMillis, transactionType = "expense", accountId = 1, categoryId = 1, notes = null))
+
+        // Act & Assert
+        budgetDao.getActualSpendingForCategory("Food", month, year).test {
+            val spending = awaitItem()
+            assertEquals(1000.0, spending ?: 0.0, 0.01)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getAllBudgets returns all budgets from all months`() = runTest {
+        // Arrange
+        budgetDao.insert(Budget(categoryName = "Food", amount = 1.0, month = 1, year = 2025))
+        budgetDao.insert(Budget(categoryName = "Travel", amount = 2.0, month = 2, year = 2025))
+
+        // Act & Assert
+        budgetDao.getAllBudgets().test {
+            assertEquals(2, awaitItem().size)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getById returns correct budget`() = runTest {
+        // Arrange
+        budgetDao.insert(Budget(categoryName = "Food", amount = 1.0, month = 1, year = 2025))
+        val id = budgetDao.getAllBudgets().first().first().id
+
+        // Act & Assert
+        budgetDao.getById(id).test {
+            val budget = awaitItem()
+            assertNotNull(budget)
+            assertEquals("Food", budget?.categoryName)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `update modifies budget correctly`() = runTest {
+        // Arrange
+        budgetDao.insert(Budget(categoryName = "Food", amount = 100.0, month = 1, year = 2025))
+        val id = budgetDao.getAllBudgets().first().first().id
+        val updatedBudget = Budget(id = id, categoryName = "Food", amount = 200.0, month = 1, year = 2025)
+
+        // Act
+        budgetDao.update(updatedBudget)
+
+        // Assert
+        budgetDao.getById(id).test {
+            assertEquals(200.0, awaitItem()?.amount)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `delete removes budget`() = runTest {
+        // Arrange
+        val budget = Budget(categoryName = "Food", amount = 100.0, month = 1, year = 2025)
+        budgetDao.insert(budget)
+        val id = budgetDao.getAllBudgets().first().first().id
+
+        // Act
+        budgetDao.delete(budget.copy(id=id))
+
+        // Assert
+        budgetDao.getById(id).test {
+            assertNull(awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `deleteAll removes all budgets`() = runTest {
+        // Arrange
+        budgetDao.insertAll(listOf(
+            Budget(categoryName = "Food", amount = 1.0, month = 1, year = 2025),
+            Budget(categoryName = "Travel", amount = 2.0, month = 2, year = 2025)
+        ))
+
+        // Act
+        budgetDao.deleteAll()
+
+        // Assert
+        budgetDao.getAllBudgets().test {
+            assertTrue(awaitItem().isEmpty())
             cancelAndIgnoreRemainingEvents()
         }
     }

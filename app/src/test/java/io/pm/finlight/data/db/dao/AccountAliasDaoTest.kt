@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -46,5 +47,42 @@ class AccountAliasDaoTest {
         // Assert
         assertNotNull(foundAlias)
         assertEquals(destAccountId, foundAlias?.destinationAccountId)
+    }
+
+    @Test
+    fun `getAll returns all inserted aliases`() = runTest {
+        // Arrange
+        val destAccountId1 = accountDao.insert(Account(name = "Account 1", type = "Bank")).toInt()
+        val destAccountId2 = accountDao.insert(Account(name = "Account 2", type = "Bank")).toInt()
+        val aliases = listOf(
+            AccountAlias(aliasName = "Alias 1", destinationAccountId = destAccountId1),
+            AccountAlias(aliasName = "Alias 2", destinationAccountId = destAccountId2)
+        )
+        accountAliasDao.insertAll(aliases)
+
+        // Act
+        val allAliases = accountAliasDao.getAll()
+
+        // Assert
+        assertEquals(2, allAliases.size)
+        assertTrue(allAliases.containsAll(aliases))
+    }
+
+    @Test
+    fun `deleteAll removes all aliases`() = runTest {
+        // Arrange
+        val destAccountId = accountDao.insert(Account(name = "Account 1", type = "Bank")).toInt()
+        val aliases = listOf(
+            AccountAlias(aliasName = "Alias 1", destinationAccountId = destAccountId),
+            AccountAlias(aliasName = "Alias 2", destinationAccountId = destAccountId)
+        )
+        accountAliasDao.insertAll(aliases)
+
+        // Act
+        accountAliasDao.deleteAll()
+
+        // Assert
+        val allAliases = accountAliasDao.getAll()
+        assertTrue(allAliases.isEmpty())
     }
 }

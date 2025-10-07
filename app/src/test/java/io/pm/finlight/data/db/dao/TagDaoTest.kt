@@ -17,6 +17,8 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -68,5 +70,71 @@ class TagDaoTest {
         // Assert
         assertNotNull(foundTag)
         assertEquals("Travel", foundTag?.name)
+    }
+
+    @Test
+    fun `getAllTagsList returns all tags`() = runTest {
+        // Arrange
+        tagDao.insertAll(listOf(Tag(name = "Tag1"), Tag(name = "Tag2")))
+
+        // Act
+        val tags = tagDao.getAllTagsList()
+
+        // Assert
+        assertEquals(2, tags.size)
+    }
+
+    @Test
+    fun `getTagById returns correct tag`() = runTest {
+        // Arrange
+        val id = tagDao.insert(Tag(name = "Test")).toInt()
+
+        // Act
+        val tag = tagDao.getTagById(id)
+
+        // Assert
+        assertNotNull(tag)
+        assertEquals("Test", tag?.name)
+    }
+
+    @Test
+    fun `update modifies a tag`() = runTest {
+        // Arrange
+        val id = tagDao.insert(Tag(name = "Old")).toInt()
+        val updatedTag = Tag(id = id, name = "New")
+
+        // Act
+        tagDao.update(updatedTag)
+
+        // Assert
+        val fromDb = tagDao.getTagById(id)
+        assertEquals("New", fromDb?.name)
+    }
+
+    @Test
+    fun `delete removes a tag`() = runTest {
+        // Arrange
+        val id = tagDao.insert(Tag(name = "ToDelete")).toInt()
+        val toDelete = Tag(id = id, name = "ToDelete")
+
+        // Act
+        tagDao.delete(toDelete)
+
+        // Assert
+        val fromDb = tagDao.getTagById(id)
+        assertNull(fromDb)
+    }
+
+    @Test
+    fun `deleteAll removes all tags`() = runTest {
+        // Arrange
+        tagDao.insertAll(listOf(Tag(name = "Tag1"), Tag(name = "Tag2")))
+
+        // Act
+        tagDao.deleteAll()
+
+        // Assert
+        val tags = tagDao.getAllTagsList()
+        assertTrue(tags.isEmpty())
     }
 }

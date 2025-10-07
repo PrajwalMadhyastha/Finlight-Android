@@ -13,9 +13,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
-import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
@@ -32,6 +32,8 @@ class TripDaoTest {
     private lateinit var accountDao: AccountDao
     private lateinit var categoryDao: CategoryDao
 
+    private var tripTagId: Int = 0
+
     @Before
     fun setup() = runTest {
         tripDao = dbRule.db.tripDao()
@@ -43,12 +45,12 @@ class TripDaoTest {
         accountDao.insert(Account(id = 1, name = "Savings", type = "Bank"))
         categoryDao.insert(Category(id = 1, name = "Food", iconKey = "restaurant", colorKey = "red"))
         categoryDao.insert(Category(id = 2, name = "Shopping", iconKey = "shopping", colorKey = "blue"))
+        tripTagId = tagDao.insert(Tag(name = "Goa Trip")).toInt()
     }
 
     @Test
     fun `getAllTripsWithStats calculates totalSpend and transactionCount correctly`() = runTest {
         // Arrange
-        val tripTagId = tagDao.insert(Tag(name = "Goa Trip")).toInt()
         tripDao.insert(Trip(name = "Goa Trip", startDate = 1000L, endDate = 2000L, tagId = tripTagId, tripType = TripType.DOMESTIC, currencyCode = null, conversionRate = null))
 
         val tx1Id = transactionDao.insert(Transaction(description = "Lunch", amount = 500.0, date = 1100L, transactionType = "expense", accountId = 1, categoryId = 1, notes = null)).toInt()
@@ -76,7 +78,6 @@ class TripDaoTest {
     @Test
     fun `getAllTripsWithStats handles split transactions correctly`() = runTest {
         // Arrange
-        val tripTagId = tagDao.insert(Tag(name = "Europe Trip")).toInt()
         tripDao.insert(Trip(name = "Europe Trip", startDate = 1000L, endDate = 2000L, tagId = tripTagId, tripType = TripType.INTERNATIONAL, currencyCode = "EUR", conversionRate = 90.0f))
 
         val parentTxId = transactionDao.insert(Transaction(description = "Market Visit", amount = 9000.0, date = 1100L, transactionType = "expense", accountId = 1, categoryId = null, notes = null, isSplit = true)).toInt()
@@ -102,16 +103,76 @@ class TripDaoTest {
     @Test
     fun `isTagUsedByTrip returns correct count`() = runTest {
         // Arrange
-        val usedTagId = tagDao.insert(Tag(name = "Used Tag")).toInt()
         val unusedTagId = tagDao.insert(Tag(name = "Unused Tag")).toInt()
-        tripDao.insert(Trip(name = "Test Trip", startDate = 1L, endDate = 2L, tagId = usedTagId, tripType = TripType.DOMESTIC, currencyCode = null, conversionRate = null))
+        tripDao.insert(Trip(name = "Test Trip", startDate = 1L, endDate = 2L, tagId = tripTagId, tripType = TripType.DOMESTIC, currencyCode = null, conversionRate = null))
 
         // Act
-        val isUsed = tripDao.isTagUsedByTrip(usedTagId) > 0
+        val isUsed = tripDao.isTagUsedByTrip(tripTagId) > 0
         val isUnused = tripDao.isTagUsedByTrip(unusedTagId) > 0
 
         // Assert
         assertTrue(isUsed)
         assertEquals(false, isUnused)
+    }
+
+    @Test
+    fun `insertAll and deleteAll work correctly`() = runTest {
+        // Arrange
+        val trips = listOf(
+            Trip(name = "Trip 1", startDate = 1L, endDate = 2L, tagId = tripTagId, tripType = TripType.DOMESTIC, currencyCode = null, conversionRate = null),
+            Trip(name = "Trip 2", startDate = 3L, endDate = 4L, tagId = tagDao.insert(Tag(name = "T2")).toInt(), tripType = TripType.DOMESTIC, currencyCode = null, conversionRate = null)
+        )
+
+        // Act (insert)
+        tripDao.insertAll(trips)
+        // Assert (insert)
+        assertEquals(2, tripDao.getAll().size)
+
+        // Act (delete)
+        tripDao.deleteAll()
+        // Assert (delete)
+        assertTrue(tripDao.getAll().isEmpty())
+    }
+
+    @Test
+    fun `getTripByTagId returns correct trip`() = runTest {
+        // Arrange
+        tripDao.insert(Trip(name = "Test Trip", startDate = 1L, endDate = 2L, tagId = tripTagId, tripType = TripType.DOMESTIC, currencyCode = null, conversionRate = null))
+
+        // Act
+        val trip = tripDao.getTripByTagId(tripTagId)
+
+        // Assert
+        assertNotNull(trip)
+        assertEquals("Test Trip", trip?.name)
+    }
+
+    @Test
+    fun `getTripWithStatsById returns correct trip`() = runTest {
+        // Arrange
+        val tripId = tripDao.insert(Trip(name = "My Trip", startDate = 1L, endDate = 2L, tagId = tripTagId, tripType = TripType.DOMESTIC, currencyCode = null, conversionRate = null)).toInt()
+
+        // Act & Assert
+        tripDao.getTripWithStatsById(tripId).test {
+            val trip = awaitItem()
+            assertNotNull(trip)
+            assertEquals("My Trip", trip?.tripName)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `deleteTripById removes the trip`() = runTest {
+        // Arrange
+        val tripId = tripDao.insert(Trip(name = "To Delete", startDate = 1L, endDate = 2L, tagId = tripTagId, tripType = TripType.DOMESTIC, currencyCode = null, conversionRate = null)).toInt()
+
+        // Act
+        tripDao.deleteTripById(tripId)
+
+        // Assert
+        tripDao.getTripWithStatsById(tripId).test {
+            assertNull(awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

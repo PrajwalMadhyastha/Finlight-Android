@@ -16,6 +16,8 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -61,6 +63,70 @@ class CategoryDaoTest {
             assertEquals("Apple", categories[0].name)
             assertEquals("Microsoft", categories[1].name)
             assertEquals("Zoo", categories[2].name)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getCategoryById returns correct category`() = runTest {
+        // Arrange
+        val id = categoryDao.insert(Category(name = "Test", iconKey = "icon", colorKey = "color")).toInt()
+        // Act
+        val fromDb = categoryDao.getCategoryById(id)
+        // Assert
+        assertNotNull(fromDb)
+        assertEquals("Test", fromDb?.name)
+    }
+
+    @Test
+    fun `update modifies category correctly`() = runTest {
+        // Arrange
+        val id = categoryDao.insert(Category(name = "Old Name", iconKey = "icon", colorKey = "color")).toInt()
+        val updatedCategory = Category(id = id, name = "New Name", iconKey = "new_icon", colorKey = "new_color")
+        // Act
+        categoryDao.update(updatedCategory)
+        // Assert
+        val fromDb = categoryDao.getCategoryById(id)
+        assertEquals("New Name", fromDb?.name)
+        assertEquals("new_icon", fromDb?.iconKey)
+    }
+
+    @Test
+    fun `updateAll modifies all categories`() = runTest {
+        // Arrange
+        val id1 = categoryDao.insert(Category(name = "Cat1", iconKey = "", colorKey = "")).toInt()
+        val id2 = categoryDao.insert(Category(name = "Cat2", iconKey = "", colorKey = "")).toInt()
+        val updatedList = listOf(
+            Category(id = id1, name = "Updated Cat1", iconKey = "", colorKey = ""),
+            Category(id = id2, name = "Updated Cat2", iconKey = "", colorKey = "")
+        )
+        // Act
+        categoryDao.updateAll(updatedList)
+        // Assert
+        assertEquals("Updated Cat1", categoryDao.getCategoryById(id1)?.name)
+        assertEquals("Updated Cat2", categoryDao.getCategoryById(id2)?.name)
+    }
+
+    @Test
+    fun `delete removes category`() = runTest {
+        // Arrange
+        val id = categoryDao.insert(Category(name = "ToDelete", iconKey = "", colorKey = "")).toInt()
+        val toDelete = Category(id = id, name = "ToDelete", iconKey = "", colorKey = "")
+        // Act
+        categoryDao.delete(toDelete)
+        // Assert
+        assertNull(categoryDao.getCategoryById(id))
+    }
+
+    @Test
+    fun `deleteAll removes all categories`() = runTest {
+        // Arrange
+        categoryDao.insertAll(listOf(Category(name = "Cat1", iconKey = "", colorKey = ""), Category(name = "Cat2", iconKey = "", colorKey = "")))
+        // Act
+        categoryDao.deleteAll()
+        // Assert
+        categoryDao.getAllCategories().test {
+            assertTrue(awaitItem().isEmpty())
             cancelAndIgnoreRemainingEvents()
         }
     }

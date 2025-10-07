@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -44,5 +45,38 @@ class MerchantCategoryMappingDaoTest {
         // Assert
         assertEquals(4, categoryId)
         assertNull(nullResult)
+    }
+
+    @Test
+    fun `getAll returns all mappings`() = runTest {
+        // Arrange
+        val mappings = listOf(
+            MerchantCategoryMapping("Zomato", 1),
+            MerchantCategoryMapping("Swiggy", 1)
+        )
+        merchantCategoryMappingDao.insertAll(mappings)
+
+        // Act
+        val result = merchantCategoryMappingDao.getAll()
+
+        // Assert
+        assertEquals(2, result.size)
+    }
+
+    @Test
+    fun `deleteAll removes all mappings`() = runTest {
+        // Arrange
+        val mappings = listOf(
+            MerchantCategoryMapping("Zomato", 1),
+            MerchantCategoryMapping("Swiggy", 1)
+        )
+        merchantCategoryMappingDao.insertAll(mappings)
+
+        // Act
+        merchantCategoryMappingDao.deleteAll()
+
+        // Assert
+        val result = merchantCategoryMappingDao.getAll()
+        assertTrue(result.isEmpty())
     }
 }

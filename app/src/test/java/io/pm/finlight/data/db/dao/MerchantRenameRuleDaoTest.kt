@@ -15,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -48,5 +49,36 @@ class MerchantRenameRuleDaoTest {
             assertEquals("Flipkart", rules.first().newName)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `insert and getAllRulesList works`() = runTest {
+        // Arrange
+        val rule = MerchantRenameRule(originalName = "Test", newName = "Test-Renamed")
+
+        // Act
+        merchantRenameRuleDao.insert(rule)
+        val rules = merchantRenameRuleDao.getAllRulesList()
+
+        // Assert
+        assertEquals(1, rules.size)
+        assertEquals("Test-Renamed", rules.first().newName)
+    }
+
+    @Test
+    fun `deleteAll removes all rules`() = runTest {
+        // Arrange
+        val rules = listOf(
+            MerchantRenameRule("Rule1", "New1"),
+            MerchantRenameRule("Rule2", "New2")
+        )
+        merchantRenameRuleDao.insertAll(rules)
+
+        // Act
+        merchantRenameRuleDao.deleteAll()
+
+        // Assert
+        val result = merchantRenameRuleDao.getAllRulesList()
+        assertTrue(result.isEmpty())
     }
 }

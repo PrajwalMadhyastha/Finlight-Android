@@ -14,6 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -45,4 +46,28 @@ class SmsParseTemplateDaoTest {
         assertEquals(1, allTemplates.size)
         assertEquals("body1", allTemplates.first().originalSmsBody)
     }
+
+    @Test
+    fun `insertAll and deleteAll work correctly`() = runTest {
+        // Arrange
+        val templates = listOf(
+            SmsParseTemplate(templateSignature = "sig1", originalSmsBody = "body1", originalMerchantStartIndex = 0, originalMerchantEndIndex = 1, originalAmountStartIndex = 2, originalAmountEndIndex = 3),
+            SmsParseTemplate(templateSignature = "sig2", originalSmsBody = "body2", originalMerchantStartIndex = 0, originalMerchantEndIndex = 1, originalAmountStartIndex = 2, originalAmountEndIndex = 3)
+        )
+
+        // Act (insertAll)
+        smsParseTemplateDao.insertAll(templates)
+
+        // Assert (insertAll)
+        var allTemplates = smsParseTemplateDao.getAllTemplates()
+        assertEquals(2, allTemplates.size)
+
+        // Act (deleteAll)
+        smsParseTemplateDao.deleteAll()
+
+        // Assert (deleteAll)
+        allTemplates = smsParseTemplateDao.getAllTemplates()
+        assertTrue(allTemplates.isEmpty())
+    }
 }
+

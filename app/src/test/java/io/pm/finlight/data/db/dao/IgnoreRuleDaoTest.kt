@@ -16,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -69,5 +70,81 @@ class IgnoreRuleDaoTest {
             assertEquals("Custom Rule 1", rules.first().pattern)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `getAllList returns all rules as a list`() = runTest {
+        // Arrange
+        val rules = listOf(
+            IgnoreRule(pattern = "Rule 1"),
+            IgnoreRule(pattern = "Rule 2")
+        )
+        ignoreRuleDao.insertAll(rules)
+
+        // Act
+        val result = ignoreRuleDao.getAllList()
+
+        // Assert
+        assertEquals(2, result.size)
+    }
+
+    @Test
+    fun `getEnabledRules returns only enabled rules`() = runTest {
+        // Arrange
+        val rules = listOf(
+            IgnoreRule(pattern = "Enabled", isEnabled = true),
+            IgnoreRule(pattern = "Disabled", isEnabled = false)
+        )
+        ignoreRuleDao.insertAll(rules)
+
+        // Act
+        val result = ignoreRuleDao.getEnabledRules()
+
+        // Assert
+        assertEquals(1, result.size)
+        assertEquals("Enabled", result.first().pattern)
+    }
+
+    @Test
+    fun `update modifies rule correctly`() = runTest {
+        // Arrange
+        ignoreRuleDao.insert(IgnoreRule(id = 1, pattern = "Test", isEnabled = true))
+
+        // Act
+        ignoreRuleDao.update(IgnoreRule(id = 1, pattern = "Test", isEnabled = false))
+
+        // Assert
+        val result = ignoreRuleDao.getEnabledRules()
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `delete removes a rule`() = runTest {
+        // Arrange
+        val ruleToDelete = IgnoreRule(id = 1, pattern = "Test")
+        ignoreRuleDao.insert(ruleToDelete)
+
+        // Act
+        ignoreRuleDao.delete(ruleToDelete)
+
+        // Assert
+        val result = ignoreRuleDao.getAllList()
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `deleteAll removes all rules`() = runTest {
+        // Arrange
+        ignoreRuleDao.insertAll(listOf(
+            IgnoreRule(pattern = "Rule 1"),
+            IgnoreRule(pattern = "Rule 2")
+        ))
+
+        // Act
+        ignoreRuleDao.deleteAll()
+
+        // Assert
+        val result = ignoreRuleDao.getAllList()
+        assertTrue(result.isEmpty())
     }
 }
