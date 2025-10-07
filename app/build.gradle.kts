@@ -31,6 +31,7 @@ val sqlcipherVersion = "4.10.0"
 val turbineVersion = "1.2.0"
 
 val mockitoInlineVersion = "5.2.0"
+val mockitoKotlinVersion = "5.2.1"
 
 
 // Read properties from local.properties
@@ -202,6 +203,8 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
     testImplementation("org.mockito:mockito-inline:$mockitoInlineVersion")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:$mockitoKotlinVersion")
+    testImplementation("io.mockk:mockk:1.13.11")
     testImplementation("androidx.test:core-ktx:$androidxTestVersion")
     testImplementation("androidx.test.ext:junit:$testExtJunitVersion")
     testImplementation("org.robolectric:robolectric:$robolectricVersion")
