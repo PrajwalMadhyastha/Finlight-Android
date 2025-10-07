@@ -89,7 +89,6 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `refreshScan loads and parses sms messages correctly`() = runTest {
         // Arrange
         setupDefaultDaoBehaviors()
@@ -166,7 +165,6 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `runAutoImportAndRefresh imports newly parsed transaction`() = runTest {
         // Arrange
         setupDefaultDaoBehaviors()
