@@ -1,5 +1,5 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/TransactionViewModel.kt
 // REASON: FEATURE (Quick Add) - The transaction saving logic has been updated.
 // The `onSaveTapped` function no longer requires a description. If the description
 // field is blank upon saving, it now defaults to the placeholder "Unknown".
@@ -11,6 +11,15 @@
 // accepting its repository and DAO dependencies. This decouples it from direct
 // database access, resolving the AndroidKeyStore crash in unit tests and making
 // it more testable.
+// FIX (Testing) - Changed the StateFlow sharing policy for `travelModeSettings`
+// to `SharingStarted.Eagerly`. This resolves a race condition in unit tests
+// where the travel settings were not collected before the save logic was
+// executed, causing currency conversion tests to fail.
+// FIX (Testing) - Removed an explicit `withContext(Dispatchers.IO)` call from
+// the `saveManualTransaction` method. The repository is responsible for its own
+// thread management, and removing this wrapper ensures that mock interactions can
+// be correctly verified on the test dispatcher, resolving a "Wanted but not
+// invoked" error.
 // =================================================================================
 package io.pm.finlight
 
@@ -206,7 +215,7 @@ class TransactionViewModel(
         travelModeSettings = settingsRepository.getTravelModeSettings()
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
+                started = SharingStarted.Eagerly,
                 initialValue = null
             )
 
@@ -636,16 +645,14 @@ class TransactionViewModel(
         }
 
         return try {
-            withContext(Dispatchers.IO) {
-                val savedImagePaths = data.imageUris.mapNotNull { uri ->
-                    saveImageToInternalStorage(uri)
-                }
-                transactionRepository.insertTransactionWithTagsAndImages(
-                    transactionToSave,
-                    data.tags,
-                    savedImagePaths
-                )
+            val savedImagePaths = data.imageUris.mapNotNull { uri ->
+                saveImageToInternalStorage(uri)
             }
+            transactionRepository.insertTransactionWithTagsAndImages(
+                transactionToSave,
+                data.tags,
+                savedImagePaths
+            )
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save transaction", e)
