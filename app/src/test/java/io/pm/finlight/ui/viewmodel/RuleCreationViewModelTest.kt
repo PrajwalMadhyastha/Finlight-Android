@@ -1,44 +1,41 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/RuleCreationViewModelTest.kt
-// REASON: FIX - Corrected the assertion in the initializeStateForCreation test
-// to match the ViewModel's expected output for the account selection, resolving
-// a test failure.
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization.
+// FIX (Testing) - Re-enabled all tests by removing the @Ignore annotations, as
+// the root cause of the previous test failures has been resolved in other files.
+// FIX (Testing) - Replaced ArgumentCaptor with argThat to resolve a
+// "capture() must not be null" NullPointerException when verifying mocks with
+// non-nullable Kotlin parameters.
+// FIX (Testing) - Replaced `argThat` with `ArgumentCaptor` and a custom
+// `capture()` helper function. This is the definitive fix for the `NullPointerException`
+// when verifying suspend functions with non-nullable parameters.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
-import org.junit.Ignore
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.Mockito.*
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class RuleCreationViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
+class RuleCreationViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var customSmsRuleDao: CustomSmsRuleDao
@@ -49,15 +46,9 @@ class RuleCreationViewModelTest {
     private lateinit var viewModel: RuleCreationViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
         viewModel = RuleCreationViewModel(customSmsRuleDao)
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test
@@ -107,6 +98,8 @@ class RuleCreationViewModelTest {
 
         // Act
         viewModel.loadRuleForEditing(ruleId)
+        advanceUntilIdle()
+
 
         // Assert
         viewModel.uiState.test {
@@ -121,7 +114,6 @@ class RuleCreationViewModelTest {
     }
 
     @Test
-    @Ignore
     fun `saveRule calls insert for new rule`() = runTest {
         // Arrange
         var onCompleteCalled = false
@@ -133,11 +125,12 @@ class RuleCreationViewModelTest {
         viewModel.onMarkAsTrigger(triggerSelection)
         viewModel.onMarkAsMerchant(merchantSelection)
         viewModel.saveRule(smsBody) { onCompleteCalled = true }
+        advanceUntilIdle()
 
         // Assert
-        verify(customSmsRuleDao).insert(ruleCaptor.capture())
+        verify(customSmsRuleDao).insert(capture(ruleCaptor))
         val capturedRule = ruleCaptor.value
-        assertEquals(0, capturedRule.id) // 0 for new rule
+        assertEquals(0, capturedRule.id)
         assertEquals(triggerSelection.selectedText, capturedRule.triggerPhrase)
         assertEquals(merchantSelection.selectedText, capturedRule.merchantNameExample)
         assertNotNull(capturedRule.merchantRegex)
@@ -145,7 +138,6 @@ class RuleCreationViewModelTest {
     }
 
     @Test
-    @Ignore
     fun `saveRule calls update for existing rule`() = runTest {
         // Arrange
         var onCompleteCalled = false
@@ -154,23 +146,25 @@ class RuleCreationViewModelTest {
         val triggerSelection = RuleSelection("Transaction of", 0, 14)
         val merchantSelection = RuleSelection("Merchant Y", 20, 30) // Updated merchant
 
-        // Load the existing rule first
         val existingRule = CustomSmsRule(ruleId, "old trigger", null, null, null, null, null, null, 10, smsBody)
         `when`(customSmsRuleDao.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
         viewModel.loadRuleForEditing(ruleId)
         viewModel.uiState.test { awaitItem() } // consume initial load
+        advanceUntilIdle()
 
         // Act
         viewModel.onMarkAsTrigger(triggerSelection)
         viewModel.onMarkAsMerchant(merchantSelection)
         viewModel.saveRule(smsBody) { onCompleteCalled = true }
+        advanceUntilIdle()
 
         // Assert
-        verify(customSmsRuleDao).update(ruleCaptor.capture())
+        verify(customSmsRuleDao).update(capture(ruleCaptor))
         val capturedRule = ruleCaptor.value
-        assertEquals(ruleId, capturedRule.id) // Should have the existing ID
+        assertEquals(ruleId, capturedRule.id)
         assertEquals(triggerSelection.selectedText, capturedRule.triggerPhrase)
         assertEquals(merchantSelection.selectedText, capturedRule.merchantNameExample)
         assertEquals(true, onCompleteCalled)
     }
 }
+

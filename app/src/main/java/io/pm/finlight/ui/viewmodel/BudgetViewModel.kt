@@ -1,8 +1,16 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/BudgetViewModel.kt
+// REASON: FEATURE (Error Handling) - Added a UI event channel and wrapped all
+// data modification methods (`addCategoryBudget`, `updateBudget`, `deleteBudget`)
+// in try-catch blocks. This ensures repository exceptions are handled gracefully
+// and communicated to the user, enhancing app stability.
+// =================================================================================
 package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -15,6 +23,9 @@ class BudgetViewModel(
     private val settingsRepository: SettingsRepository,
     categoryRepository: CategoryRepository
 ) : ViewModel() {
+
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
+    val uiEvent = _uiEvent.receiveAsFlow()
 
     private val calendar: Calendar = Calendar.getInstance()
     private val currentMonth: Int
@@ -87,19 +98,25 @@ class BudgetViewModel(
         categoryName: String,
         amountStr: String,
     ) {
-        val amount = amountStr.toDoubleOrNull() ?: return
-        if (amount <= 0 || categoryName.isBlank()) {
-            return
-        }
-        val newBudget =
-            Budget(
-                categoryName = categoryName,
-                amount = amount,
-                month = currentMonth,
-                year = currentYear,
-            )
         viewModelScope.launch {
-            budgetRepository.insert(newBudget)
+            try {
+                val amount = amountStr.toDoubleOrNull()
+                if (amount == null || amount <= 0 || categoryName.isBlank()) {
+                    _uiEvent.send("Please enter a valid amount and select a category.")
+                    return@launch
+                }
+                val newBudget =
+                    Budget(
+                        categoryName = categoryName,
+                        amount = amount,
+                        month = currentMonth,
+                        year = currentYear,
+                    )
+                budgetRepository.insert(newBudget)
+                _uiEvent.send("Budget for '$categoryName' added.")
+            } catch (e: Exception) {
+                _uiEvent.send("Error adding budget: ${e.message}")
+            }
         }
     }
 
@@ -114,11 +131,21 @@ class BudgetViewModel(
 
     fun updateBudget(budget: Budget) =
         viewModelScope.launch {
-            budgetRepository.update(budget)
+            try {
+                budgetRepository.update(budget)
+                _uiEvent.send("Budget for '${budget.categoryName}' updated.")
+            } catch (e: Exception) {
+                _uiEvent.send("Error updating budget: ${e.message}")
+            }
         }
 
     fun deleteBudget(budget: Budget) =
         viewModelScope.launch {
-            budgetRepository.delete(budget)
+            try {
+                budgetRepository.delete(budget)
+                _uiEvent.send("Budget for '${budget.categoryName}' deleted.")
+            } catch (e: Exception) {
+                _uiEvent.send("Error deleting budget: ${e.message}")
+            }
         }
 }

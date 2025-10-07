@@ -2,39 +2,27 @@ package io.pm.finlight.ui.viewmodel
 
 import android.content.Context
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import io.pm.finlight.Budget
-import io.pm.finlight.BudgetRepository
-import io.pm.finlight.BudgetViewModel
-import io.pm.finlight.BudgetWithSpending
-import io.pm.finlight.Category
-import io.pm.finlight.CategoryRepository
-import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TestApplication
-import kotlinx.coroutines.Dispatchers
+import app.cash.turbine.test
+import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mock
 import org.mockito.Mockito
+import org.mockito.Mockito.never
 import org.mockito.Mockito.`when`
-import org.mockito.MockitoAnnotations
+import org.mockito.kotlin.verify
 import org.robolectric.annotation.Config
 import java.util.Calendar
 import kotlin.math.roundToLong
@@ -42,10 +30,7 @@ import kotlin.math.roundToLong
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class BudgetViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
+class BudgetViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var budgetRepository: BudgetRepository
@@ -58,17 +43,17 @@ class BudgetViewModelTest {
 
     private lateinit var viewModel: BudgetViewModel
 
-    private val testDispatcher = UnconfinedTestDispatcher()
-
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
-    }
+    override fun setup() {
+        super.setup()
+        // Setup default mocks for initialization
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
+        `when`(budgetRepository.getBudgetsForMonth(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
+        `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+        `when`(budgetRepository.getActualSpendingForCategory(anyString(), anyInt(), anyInt())).thenReturn(flowOf(0.0))
 
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository)
     }
 
     @Test
@@ -93,9 +78,6 @@ class BudgetViewModelTest {
         `when`(categoryRepository.allCategories).thenReturn(flowOf(allCategories))
         `when`(budgetRepository.getBudgetsForMonth(currentMonth, currentYear)).thenReturn(flowOf(budgetsForCurrentMonth))
         `when`(settingsRepository.getOverallBudgetForMonth(currentMonth, currentYear)).thenReturn(flowOf(10000f))
-        `when`(budgetRepository.getBudgetsForMonthWithSpending(Mockito.anyString(), Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(emptyList()))
-        `when`(budgetRepository.getActualSpendingForCategory(Mockito.anyString(), Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(0.0))
-
 
         // ACT
         // ViewModel logic runs in the init block. We instantiate it directly with mocks.
@@ -167,8 +149,6 @@ class BudgetViewModelTest {
             )
         )))
         `when`(budgetRepository.getActualSpendingForCategory(anyString(), anyInt(), anyInt())).thenReturn(flowOf(spendingPerCategory))
-        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
-        `when`(budgetRepository.getBudgetsForMonth(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
 
         // ACT
@@ -181,5 +161,93 @@ class BudgetViewModelTest {
 
         assertEquals(overallBudgetFloat.roundToLong(), actualBudget)
         assertEquals(spendingPerCategory.roundToLong(), actualSpending)
+    }
+
+    @Test
+    fun `addCategoryBudget with invalid amount sends error event`() = runTest {
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.addCategoryBudget("Food", "0")
+            advanceUntilIdle()
+            assertEquals("Please enter a valid amount and select a category.", awaitItem())
+            verify(budgetRepository, never()).insert(anyObject())
+        }
+    }
+
+    @Test
+    fun `addCategoryBudget failure sends error event`() = runTest {
+        // Arrange
+        val errorMessage = "DB Error"
+        `when`(budgetRepository.insert(anyObject())).thenThrow(RuntimeException(errorMessage))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.addCategoryBudget("Food", "100")
+            advanceUntilIdle()
+
+            assertEquals("Error adding budget: $errorMessage", awaitItem())
+        }
+    }
+
+    @Test
+    fun `updateBudget success sends success event`() = runTest {
+        // Arrange
+        val budget = Budget(1, "Food", 100.0, 1, 2025)
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.updateBudget(budget)
+            advanceUntilIdle()
+
+            verify(budgetRepository).update(budget)
+            assertEquals("Budget for '${budget.categoryName}' updated.", awaitItem())
+        }
+    }
+
+    @Test
+    fun `updateBudget failure sends error event`() = runTest {
+        // Arrange
+        val budget = Budget(1, "Food", 100.0, 1, 2025)
+        val errorMessage = "DB Error"
+        `when`(budgetRepository.update(anyObject())).thenThrow(RuntimeException(errorMessage))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.updateBudget(budget)
+            advanceUntilIdle()
+
+            assertEquals("Error updating budget: $errorMessage", awaitItem())
+        }
+    }
+
+    @Test
+    fun `deleteBudget success sends success event`() = runTest {
+        // Arrange
+        val budget = Budget(1, "Food", 100.0, 1, 2025)
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.deleteBudget(budget)
+            advanceUntilIdle()
+
+            verify(budgetRepository).delete(budget)
+            assertEquals("Budget for '${budget.categoryName}' deleted.", awaitItem())
+        }
+    }
+
+    @Test
+    fun `deleteBudget failure sends error event`() = runTest {
+        // Arrange
+        val budget = Budget(1, "Food", 100.0, 1, 2025)
+        val errorMessage = "DB Error"
+        `when`(budgetRepository.delete(anyObject())).thenThrow(RuntimeException(errorMessage))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.deleteBudget(budget)
+            advanceUntilIdle()
+
+            assertEquals("Error deleting budget: $errorMessage", awaitItem())
+        }
     }
 }

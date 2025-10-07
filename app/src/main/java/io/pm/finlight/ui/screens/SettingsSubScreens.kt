@@ -59,6 +59,7 @@ import io.pm.finlight.ui.components.WeeklyReportTimePicker
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -125,6 +126,12 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
 
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+
+    LaunchedEffect(Unit) {
+        settingsViewModel.uiEvent.collectLatest { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),

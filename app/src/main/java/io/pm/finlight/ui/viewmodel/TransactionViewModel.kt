@@ -1,16 +1,16 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/TransactionViewModel.kt
-// REASON: FEATURE (Quick Add) - The transaction saving logic has been updated.
-// The `onSaveTapped` function no longer requires a description. If the description
-// field is blank upon saving, it now defaults to the placeholder "Unknown".
-// REFINEMENT (Quick Add) - The logic in `onSaveTapped` has been refined. The
-// category selection prompt ("nudge") will now only appear if the user has
-// entered a description. If only an amount is entered, the transaction is saved
-// immediately without prompting for a category, streamlining the quick-add flow.
-// REFACTOR (Testing) - The ViewModel now uses constructor dependency injection,
-// accepting its repository and DAO dependencies. This decouples it from direct
-// database access, resolving the AndroidKeyStore crash in unit tests and making
-// it more testable.
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/TransactionViewModel.kt
+// REASON: FEATURE (Error Handling) - Added a `Channel` for sending one-time UI
+// events, such as error messages from failed operations.
+// REFACTOR (Error Handling) - Wrapped repository calls in `deleteTransaction`,
+// `onConfirmDeleteSelection`, and `updateTransactionDescription` in try-catch
+// blocks to handle exceptions gracefully and report them via the UI event channel.
+// REFACTOR (Error Handling) - Added a `.catch` operator to the `transactionsForSelectedMonth`
+// flow to prevent crashes from database errors, emit an empty list, and send a
+// UI event.
+// REFACTOR (Testing) - Removed the explicit `Dispatchers.IO` from the
+// `updateTransactionDescription` launch block, making the method more testable
+// by aligning with modern practices where the repository manages its own dispatchers.
 // =================================================================================
 package io.pm.finlight
 
@@ -30,6 +30,7 @@ import io.pm.finlight.utils.ShareImageGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -168,6 +169,10 @@ class TransactionViewModel(
     private val _showCategoryNudge = MutableStateFlow<ManualTransactionData?>(null)
     val showCategoryNudge = _showCategoryNudge.asStateFlow()
 
+    // --- NEW: Channel for one-time UI events like errors ---
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
+    val uiEvent = _uiEvent.receiveAsFlow()
+
     // --- NEW: StateFlows for real-time auto-categorization ---
     private val _addTransactionDescription = MutableStateFlow("")
     private val _userManuallySelectedCategory = MutableStateFlow(false)
@@ -206,7 +211,7 @@ class TransactionViewModel(
         travelModeSettings = settingsRepository.getTravelModeSettings()
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
+                started = SharingStarted.Eagerly,
                 initialValue = null
             )
 
@@ -218,6 +223,11 @@ class TransactionViewModel(
             val monthStart = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
             val monthEnd = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, 1); set(Calendar.DAY_OF_MONTH, 1); add(Calendar.DAY_OF_MONTH, -1); set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59) }.timeInMillis
             transactionRepository.getTransactionDetailsForRange(monthStart, monthEnd, filters.keyword.takeIf { it.isNotBlank() }, filters.account?.id, filters.category?.id)
+                .catch { e ->
+                    Log.e(TAG, "Failed to load transactions for month", e)
+                    _uiEvent.send("Failed to load transactions.")
+                    emit(emptyList()) // Emit an empty list on error
+                }
         }.combine(merchantAliases) { transactions, aliases ->
             applyAliases(transactions, aliases)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -383,12 +393,17 @@ class TransactionViewModel(
 
     fun onConfirmDeleteSelection() {
         viewModelScope.launch {
-            val idsToDelete = _selectedTransactionIds.value.toList()
-            if (idsToDelete.isNotEmpty()) {
-                transactionRepository.deleteByIds(idsToDelete)
+            try {
+                val idsToDelete = _selectedTransactionIds.value.toList()
+                if (idsToDelete.isNotEmpty()) {
+                    transactionRepository.deleteByIds(idsToDelete)
+                }
+                _showDeleteConfirmation.value = false
+                clearSelectionMode()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete selected transactions", e)
+                _uiEvent.send("Failed to delete transactions. Please try again.")
             }
-            _showDeleteConfirmation.value = false
-            clearSelectionMode()
         }
     }
 
@@ -636,16 +651,14 @@ class TransactionViewModel(
         }
 
         return try {
-            withContext(Dispatchers.IO) {
-                val savedImagePaths = data.imageUris.mapNotNull { uri ->
-                    saveImageToInternalStorage(uri)
-                }
-                transactionRepository.insertTransactionWithTagsAndImages(
-                    transactionToSave,
-                    data.tags,
-                    savedImagePaths
-                )
+            val savedImagePaths = data.imageUris.mapNotNull { uri ->
+                saveImageToInternalStorage(uri)
             }
+            transactionRepository.insertTransactionWithTagsAndImages(
+                transactionToSave,
+                data.tags,
+                savedImagePaths
+            )
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save transaction", e)
@@ -883,24 +896,29 @@ class TransactionViewModel(
         }
     }
 
-    fun updateTransactionDescription(id: Int, newDescription: String) = viewModelScope.launch(Dispatchers.IO) {
-        if (newDescription.isNotBlank()) {
-            val transaction = transactionRepository.getTransactionById(id).firstOrNull()
-            if (transaction != null) {
-                val original = transaction.originalDescription ?: transaction.description
-                if (original.isNotBlank() && !original.equals(newDescription, ignoreCase = true)) {
-                    val rule = MerchantRenameRule(originalName = original, newName = newDescription)
-                    merchantRenameRuleRepository.insert(rule)
+    fun updateTransactionDescription(id: Int, newDescription: String) = viewModelScope.launch {
+        try {
+            if (newDescription.isNotBlank()) {
+                val transaction = transactionRepository.getTransactionById(id).firstOrNull()
+                if (transaction != null) {
+                    val original = transaction.originalDescription ?: transaction.description
+                    if (original.isNotBlank() && !original.equals(newDescription, ignoreCase = true)) {
+                        val rule = MerchantRenameRule(originalName = original, newName = newDescription)
+                        merchantRenameRuleRepository.insert(rule)
 
-                    if (transaction.sourceSmsId != null && transaction.originalDescription != null) {
-                        val originalSms = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
-                        if (originalSms != null) {
-                            createAndStoreTemplate(originalSms.body, transaction)
+                        if (transaction.sourceSmsId != null && transaction.originalDescription != null) {
+                            val originalSms = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
+                            if (originalSms != null) {
+                                createAndStoreTemplate(originalSms.body, transaction)
+                            }
                         }
                     }
                 }
+                transactionRepository.updateDescription(id, newDescription)
             }
-            transactionRepository.updateDescription(id, newDescription)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update transaction description", e)
+            _uiEvent.send("Failed to update description. Please try again.")
         }
     }
 
@@ -1149,7 +1167,12 @@ class TransactionViewModel(
 
     fun deleteTransaction(transaction: Transaction) =
         viewModelScope.launch {
-            transactionRepository.delete(transaction)
+            try {
+                transactionRepository.delete(transaction)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete transaction", e)
+                _uiEvent.send("Failed to delete transaction. Please try again.")
+            }
         }
 
     fun unsplitTransaction(transaction: Transaction) {

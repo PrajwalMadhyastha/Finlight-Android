@@ -31,6 +31,7 @@ val sqlcipherVersion = "4.10.0"
 val turbineVersion = "1.2.0"
 
 val mockitoInlineVersion = "5.2.0"
+val mockitoKotlinVersion = "5.2.1"
 
 
 // Read properties from local.properties
@@ -151,6 +152,7 @@ configurations.all {
 dependencies {
     // --- NEW: Add dependency on the core module ---
     implementation(project(":core"))
+    implementation("androidx.work:work-testing:2.10.5")
     testImplementation(project(":core"))
     implementation("androidx.profileinstaller:profileinstaller:1.3.1")
 
@@ -201,6 +203,8 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
     testImplementation("org.mockito:mockito-inline:$mockitoInlineVersion")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:$mockitoKotlinVersion")
+    testImplementation("io.mockk:mockk:1.13.11")
     testImplementation("androidx.test:core-ktx:$androidxTestVersion")
     testImplementation("androidx.test.ext:junit:$testExtJunitVersion")
     testImplementation("org.robolectric:robolectric:$robolectricVersion")
@@ -208,6 +212,9 @@ dependencies {
     testImplementation("androidx.arch.core:core-testing:2.2.0")
     testImplementation("net.zetetic:sqlcipher-android:$sqlcipherVersion")
     testImplementation("app.cash.turbine:turbine:$turbineVersion")
+
+    // --- NEW: Add Room Testing dependency ---
+    testImplementation("androidx.room:room-testing:$roomVersion")
 
 
     // Instrumented UI tests
@@ -242,4 +249,6 @@ dependencies {
     implementation("com.google.ai.edge.litert:litert-api:1.4.0")
     implementation("com.google.ai.edge.litert:litert-support:1.4.0")
     implementation("com.google.ai.edge.litert:litert-metadata:1.4.0")
+    testImplementation(kotlin("test"))
+    testImplementation("org.bouncycastle:bcprov-jdk15on:1.70")
 }

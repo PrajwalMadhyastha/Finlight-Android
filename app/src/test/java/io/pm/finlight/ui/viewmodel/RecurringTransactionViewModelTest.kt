@@ -1,32 +1,31 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/RecurringTransactionViewModelTest.kt
-// REASON: NEW FILE - Unit tests for RecurringTransactionViewModel, covering state
-// observation and all CRUD actions (save, update, delete).
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization.
+// FIX (Testing) - Replaced ArgumentCaptor.capture() with the null-safe
+// capture() helper to resolve a "capture() must not be null"
+// NullPointerException when verifying suspend functions.
+// FIX (Testing) - Added manual WorkManager initialization to resolve the
+// "WorkManager is not initialized properly" exception.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Configuration
+import androidx.work.testing.SynchronousExecutor
+import androidx.work.testing.WorkManagerTestInitHelper
 import app.cash.turbine.test
-import io.pm.finlight.RecurringTransaction
-import io.pm.finlight.RecurringTransactionRepository
-import io.pm.finlight.RecurringTransactionViewModel
-import io.pm.finlight.TestApplication
-import kotlinx.coroutines.Dispatchers
+import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
-import org.junit.Ignore
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
@@ -34,18 +33,13 @@ import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class RecurringTransactionViewModelTest {
+class RecurringTransactionViewModelTest : BaseViewModelTest() {
 
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
     private val application: Application = ApplicationProvider.getApplicationContext()
 
     @Mock
@@ -57,19 +51,19 @@ class RecurringTransactionViewModelTest {
     private lateinit var viewModel: RecurringTransactionViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
+        // Manually initialize WorkManager for testing to prevent crash.
+        val config = Configuration.Builder()
+            .setMinimumLoggingLevel(android.util.Log.DEBUG)
+            .setExecutor(SynchronousExecutor())
+            .build()
+        WorkManagerTestInitHelper.initializeTestWorkManager(application, config)
     }
 
     private fun initializeViewModel(initialRules: List<RecurringTransaction> = emptyList()) {
         `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(initialRules))
         viewModel = RecurringTransactionViewModel(application, recurringTransactionRepository)
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test
@@ -103,16 +97,16 @@ class RecurringTransactionViewModelTest {
     }
 
     @Test
-    @Ignore
     fun `saveRule with null id calls repository insert`() = runTest {
         // Arrange
         initializeViewModel()
 
         // Act
         viewModel.saveRule(null, "Spotify", 129.0, "expense", "Monthly", 0L, 1, 1, null)
+        advanceUntilIdle()
 
         // Assert
-        verify(recurringTransactionRepository).insert(recurringTransactionCaptor.capture())
+        verify(recurringTransactionRepository).insert(capture(recurringTransactionCaptor))
         val capturedRule = recurringTransactionCaptor.value
         assertEquals("Spotify", capturedRule.description)
         assertEquals(129.0, capturedRule.amount, 0.0)
@@ -120,7 +114,6 @@ class RecurringTransactionViewModelTest {
     }
 
     @Test
-    @Ignore
     fun `saveRule with existing id calls repository update`() = runTest {
         // Arrange
         initializeViewModel()
@@ -128,9 +121,10 @@ class RecurringTransactionViewModelTest {
 
         // Act
         viewModel.saveRule(ruleId, "Updated Spotify", 199.0, "expense", "Monthly", 0L, 1, 1, null)
+        advanceUntilIdle()
 
         // Assert
-        verify(recurringTransactionRepository).update(recurringTransactionCaptor.capture())
+        verify(recurringTransactionRepository).update(capture(recurringTransactionCaptor))
         val capturedRule = recurringTransactionCaptor.value
         assertEquals("Updated Spotify", capturedRule.description)
         assertEquals(199.0, capturedRule.amount, 0.0)
@@ -145,8 +139,10 @@ class RecurringTransactionViewModelTest {
 
         // Act
         viewModel.deleteRule(ruleToDelete)
+        advanceUntilIdle()
 
         // Assert
         verify(recurringTransactionRepository).delete(ruleToDelete)
     }
 }
+

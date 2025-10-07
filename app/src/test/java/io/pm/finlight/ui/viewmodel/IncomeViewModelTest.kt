@@ -1,41 +1,32 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/IncomeViewModelTest.kt
-// REASON: NEW FILE - Unit tests for the refactored IncomeViewModel. This suite
-// verifies state flow observation, data calculations, and filter state management.
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.*
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 import java.util.Calendar
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class IncomeViewModelTest {
-
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
+class IncomeViewModelTest : BaseViewModelTest() {
 
     @Mock private lateinit var transactionRepository: TransactionRepository
     @Mock private lateinit var accountRepository: AccountRepository
@@ -44,9 +35,8 @@ class IncomeViewModelTest {
     private lateinit var viewModel: IncomeViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
 
         // Setup default mocks for initialization
         `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
@@ -55,11 +45,6 @@ class IncomeViewModelTest {
         `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getIncomeByCategoryForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     private fun initializeViewModel() {

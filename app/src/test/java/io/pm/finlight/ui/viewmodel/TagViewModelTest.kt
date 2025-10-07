@@ -1,51 +1,40 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/TagViewModelTest.kt
-// REASON: NEW FILE - Unit tests for TagViewModel, covering state observation and
-// all tag management actions (add, update, delete), including checks for tags
-// that are in use by transactions or trips.
+// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
+// inheriting all common setup logic and removing boilerplate for rules,
+// dispatchers, and Mockito initialization.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
+import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.Tag
 import io.pm.finlight.TagRepository
 import io.pm.finlight.TagViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.repository.TripRepository
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class TagViewModelTest {
+class TagViewModelTest : BaseViewModelTest() {
 
-    @get:Rule
-    var instantTaskExecutorRule = InstantTaskExecutorRule()
-
-    private val testDispatcher = UnconfinedTestDispatcher()
     private val application: Application = ApplicationProvider.getApplicationContext()
 
     @Mock
@@ -57,19 +46,13 @@ class TagViewModelTest {
     private lateinit var viewModel: TagViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.openMocks(this)
-        Dispatchers.setMain(testDispatcher)
+    override fun setup() {
+        super.setup()
     }
 
     private fun initializeViewModel(initialTags: List<Tag> = emptyList()) {
         `when`(tagRepository.allTags).thenReturn(flowOf(initialTags))
         viewModel = TagViewModel(application, tagRepository, tripRepository)
-    }
-
-    @After
-    fun tearDown() {
-        Dispatchers.resetMain()
     }
 
     @Test
