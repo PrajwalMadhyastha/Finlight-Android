@@ -213,6 +213,9 @@ dependencies {
     testImplementation("net.zetetic:sqlcipher-android:$sqlcipherVersion")
     testImplementation("app.cash.turbine:turbine:$turbineVersion")
 
+    // --- NEW: Add Room Testing dependency ---
+    testImplementation("androidx.room:room-testing:$roomVersion")
+
 
     // Instrumented UI tests
     androidTestImplementation("androidx.tracing:tracing-ktx:$tracingVersion")
