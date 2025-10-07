@@ -165,7 +165,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
     @Test
     fun `runAutoImportAndRefresh imports newly parsed transaction`() = runTest {
-        // Arrange: Initial state where sms1 is problematic, ensuring it fails generic parsing.
+        // Arrange
         setupDefaultDaoBehaviors()
         val sms1 = SmsMessage(1, "SENDER1", "Txn update from MyBank. Order 123 completed. Val: 20.", 1L)
         val sms1Hash = (sms1.sender.filter { it.isDigit() }.takeLast(10) + sms1.body.replace(Regex("\\s+"), " ").trim()).hashCode().toString()
@@ -181,56 +181,50 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             priority = 10,
             sourceSmsBody = sms1.body
         )
+        var capturedTxn: PotentialTransaction? = null
 
         // Mocks for the INITIAL scan (no custom rules)
-        `when`(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms1))
+        `when`(smsRepository.fetchAllSms(any())).thenReturn(listOf(sms1))
         `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
         `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
         `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
 
-        var capturedTxn: PotentialTransaction? = null
-
+        // Act & Assert in one block
         initializeViewModel()
 
-        // Use turbine to correctly await the result of the async init block.
         viewModel.uiState.test {
-            // 1. Await initial loading state from init{}
+            // Phase 1: Let the init{} block run and assert its states.
+            // The StateFlow's default is isLoading=true, which is emitted immediately.
+            assertTrue("Should be loading initially", awaitItem().isLoading)
+
+            // The init{} coroutine then finishes and emits isLoading=false.
             val initialState = awaitItem()
-            assertTrue("Initial state should be loading", initialState.isLoading)
-
-            // 2. Wait for the init{} coroutine to finish.
-            advanceUntilIdle()
-
-            // 3. Await the result of the initial scan.
-            val loadedState = awaitItem()
-            assertFalse("ViewModel should have finished loading", loadedState.isLoading)
-            val initialResult = loadedState.debugResults.find { it.smsMessage.id == 1L }
+            assertFalse("Should finish loading after init", initialState.isLoading)
+            val initialResult = initialState.debugResults.find { it.smsMessage.id == 1L }
             assertTrue(
                 "Initial parse result should be NotParsed, but was ${initialResult?.parseResult}",
                 initialResult?.parseResult is ParseResult.NotParsed
             )
 
-            // Arrange for the REFRESH scan (with the new custom rule)
+            // Phase 2: Arrange mocks for the next action.
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
             `when`(transactionViewModel.autoSaveSmsTransaction(anyObject())).thenAnswer { invocation ->
                 capturedTxn = invocation.getArgument(0)
                 true
             }
 
-            // Act
+            // Act: Call the function to be tested.
             viewModel.runAutoImportAndRefresh()
 
-            // 4. Await the loading state during the refresh.
+            // Assert the loading state for the refresh action.
             val loadingState = awaitItem()
-            assertTrue("ViewModel should be loading during refresh", loadingState.isLoading)
+            assertTrue("Should be loading during refresh", loadingState.isLoading)
 
-            // 5. Explicitly run the launched coroutine to completion.
-            advanceUntilIdle()
-
-            // 6. Await the final state after the refresh.
+            // Assert the final state after the refresh action.
             val finalState = awaitItem()
+            assertFalse("Should be done loading after refresh", finalState.isLoading)
 
-            // 7. Assert the final state and side-effects.
+            // Assert side-effects and content of the final state.
             assertNotNull("autoSaveSmsTransaction should have been called", capturedTxn)
             assertEquals(sms1Hash, capturedTxn!!.sourceSmsHash)
             assertEquals("123", capturedTxn!!.merchantName)
@@ -241,7 +235,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                 finalResult?.parseResult is ParseResult.Success
             )
 
-            // 8. Clean up.
+            // Clean up.
             cancelAndIgnoreRemainingEvents()
         }
     }
