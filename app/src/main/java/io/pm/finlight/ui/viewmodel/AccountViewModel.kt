@@ -1,6 +1,6 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/AccountViewModel.kt
-// REASON: FIX (Testing) - The UI event channel (_uiEvent) has been changed
+// REASON: FIX (Flaky Test) - The UI event channel (_uiEvent) has been changed
 // from a default (Rendezvous) channel to an UNLIMITED buffered channel. This
 // prevents the viewModelScope coroutine from suspending indefinitely on a `send`
 // call when there is no collector, which was causing the `mergeSelectedAccounts`
@@ -17,7 +17,6 @@ import io.pm.finlight.AccountWithBalance
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionRepository
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -48,7 +47,7 @@ class AccountViewModel(
     val suggestedMerges = _suggestedMerges.asStateFlow()
 
     init {
-        viewModelScope.launch(Dispatchers.Default) {
+        viewModelScope.launch {
             combine(
                 repository.accountsWithBalance,
                 settingsRepository.getDismissedMergeSuggestions()

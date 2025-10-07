@@ -4,12 +4,17 @@
 // `BaseViewModelTest`. All boilerplate for JUnit rules, coroutine dispatchers,
 // and Mockito initialization has been removed and is now inherited from the base
 // class.
+// FIX (Flaky Test) - The `suggestedMerges` test has been made deterministic.
+// It now uses `advanceUntilIdle()` *before* collecting the flow. This ensures
+// the coroutine in the ViewModel's `init` block completes before assertions
+// are made, eliminating a race condition that caused intermittent failures.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.cash.turbine.test
 import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -122,6 +127,7 @@ class AccountViewModelTest : BaseViewModelTest() {
 
         // ACT
         viewModel.mergeSelectedAccounts(destinationId)
+        advanceUntilIdle()
 
         // ASSERT
         verify(accountRepository).mergeAccounts(destinationId, sourceIds)
@@ -146,12 +152,18 @@ class AccountViewModelTest : BaseViewModelTest() {
             transactionRepository,
             settingsRepository
         )
+        // Ensure all coroutines launched in init complete before we assert
         advanceUntilIdle()
-        val suggestions = viewModel.suggestedMerges.first()
 
         // ASSERT
-        assertEquals(1, suggestions.size)
-        val suggestion = suggestions.first()
-        assertEquals(setOf(1, 2), setOf(suggestion.first.id, suggestion.second.id))
+        viewModel.suggestedMerges.test {
+            // The flow has already settled on its final value. Await the one and only item.
+            val suggestions = awaitItem()
+            assertEquals(1, suggestions.size)
+            val suggestion = suggestions.first()
+            assertEquals(setOf(1, 2), setOf(suggestion.first.id, suggestion.second.id))
+
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

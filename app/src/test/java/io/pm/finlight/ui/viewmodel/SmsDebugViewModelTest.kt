@@ -1,15 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModelTest.kt
-// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
-// inheriting all common setup logic and removing boilerplate for rules,
-// dispatchers, and Mockito initialization. The tearDown method is now an override.
-// FIX (Testing) - The `runAutoImportAndRefresh` test has been corrected. It now
-// uses a sample SMS that is guaranteed to fail the initial generic parsing but
-// will succeed once a new custom rule is introduced. This correctly simulates
-// the "fix and refresh" workflow, ensuring the `autoSaveSmsTransaction` method
-// is called as expected and resolving the assertion failure.
-// FIX (Testing) - Corrected the call from the old `anyNonNull()` to the new,
-// consolidated `anyObject()` helper function, resolving the build error.
+// REASON: FIX (Flaky Test) - Resolved a race condition that caused intermittent
+// `TurbineTimeoutCancellationException` and `AssertionError` failures when running
+// as part of a large test suite. The test now uses `advanceUntilIdle()` *inside*
+// the `test` block. This ensures the test explicitly waits for the coroutine
+// launched in the ViewModel's `init` block to complete before awaiting the final
+// state, making the test deterministic and robust against timing variations.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -108,19 +104,25 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
         // Act
         initializeViewModel()
-        advanceUntilIdle()
 
         // Assert
         viewModel.uiState.test {
-            // Skip initial loading state
-            skipItems(1)
-            val state = awaitItem()
-            assertEquals(false, state.isLoading)
-            assertEquals(3, state.debugResults.size)
+            // 1. Await the initial state emitted when the ViewModel is created (isLoading=true).
+            val initialState = awaitItem()
+            assertTrue("Initial state should be loading", initialState.isLoading)
 
-            assertTrue(state.debugResults.any { it.parseResult is ParseResult.Success })
-            assertTrue(state.debugResults.any { it.parseResult is ParseResult.IgnoredByClassifier })
-            assertTrue(state.debugResults.any { it.parseResult is ParseResult.NotParsed })
+            // 2. Since the work is launched in a separate coroutine in 'init',
+            // we need to advance the dispatcher to let that work complete.
+            advanceUntilIdle()
+
+            // 3. Now that the work is done, await the final state emission.
+            val finalState = awaitItem()
+            assertFalse("Final state should not be loading", finalState.isLoading)
+            assertEquals(3, finalState.debugResults.size)
+
+            assertTrue(finalState.debugResults.any { it.parseResult is ParseResult.Success })
+            assertTrue(finalState.debugResults.any { it.parseResult is ParseResult.IgnoredByClassifier })
+            assertTrue(finalState.debugResults.any { it.parseResult is ParseResult.NotParsed })
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -192,15 +194,17 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
         // Use turbine to correctly await the result of the async init block.
         viewModel.uiState.test {
-            // 1. Await and discard the initial state (isLoading=true, results=[])
-            awaitItem()
-
-            // 2. Await the state after the init{}'s refreshScan() is complete.
+            // 1. Await initial loading state from init{}
             val initialState = awaitItem()
-            assertFalse("ViewModel should have finished loading", initialState.isLoading)
+            assertTrue("Initial state should be loading", initialState.isLoading)
 
-            // 3. Assert on this initial state.
-            val initialResult = initialState.debugResults.find { it.smsMessage.id == 1L }
+            // 2. Wait for the init{} coroutine to finish.
+            advanceUntilIdle()
+
+            // 3. Await the result of the initial scan.
+            val loadedState = awaitItem()
+            assertFalse("ViewModel should have finished loading", loadedState.isLoading)
+            val initialResult = loadedState.debugResults.find { it.smsMessage.id == 1L }
             assertTrue(
                 "Initial parse result should be NotParsed, but was ${initialResult?.parseResult}",
                 initialResult?.parseResult is ParseResult.NotParsed
@@ -220,10 +224,13 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             val loadingState = awaitItem()
             assertTrue("ViewModel should be loading during refresh", loadingState.isLoading)
 
-            // 5. Await the final state after the refresh.
+            // 5. Explicitly run the launched coroutine to completion.
+            advanceUntilIdle()
+
+            // 6. Await the final state after the refresh.
             val finalState = awaitItem()
 
-            // 6. Assert the final state and side-effects.
+            // 7. Assert the final state and side-effects.
             assertNotNull("autoSaveSmsTransaction should have been called", capturedTxn)
             assertEquals(sms1Hash, capturedTxn!!.sourceSmsHash)
             assertEquals("123", capturedTxn!!.merchantName)
@@ -234,7 +241,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                 finalResult?.parseResult is ParseResult.Success
             )
 
-            // 7. Clean up.
+            // 8. Clean up.
             cancelAndIgnoreRemainingEvents()
         }
     }
