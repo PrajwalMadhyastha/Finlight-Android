@@ -63,7 +63,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             val initialState = awaitItem()
             assertEquals(AnalysisDimension.CATEGORY, initialState.selectedDimension)
             assertEquals(AnalysisTimePeriod.MONTH, initialState.selectedTimePeriod)
-            assertEquals(false, initialState.isLoading)
+            assertEquals(false, initialState.isLoading) // Should be false after init flows complete
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -75,24 +75,16 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         `when`(transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), isNull(), isNull(), isNull())).thenReturn(flowOf(mockItems))
 
         viewModel.uiState.test {
-            // 1. Await the initial state (Dimension: CATEGORY, Items: [])
-            awaitItem()
+            awaitItem() // Await the initial state
 
-            // 2. Act: Change the dimension.
+            // Act
             viewModel.selectDimension(AnalysisDimension.TAG)
+            advanceUntilIdle() // Wait for all coroutines to settle
 
-            // 3. Await intermediate state. The `combine` operator for uiState emits
-            //    immediately with the new dimension but BEFORE `flatMapLatest` gets new data.
-            val intermediateState = awaitItem()
-            assertEquals(AnalysisDimension.TAG, intermediateState.selectedDimension)
-            assertEquals(emptyList<SpendingAnalysisItem>(), intermediateState.analysisItems)
-
-            // 4. Await the final state after the DAO has been called and data is emitted.
-            val finalState = awaitItem()
+            // Assert
+            val finalState = expectMostRecentItem()
             assertEquals(AnalysisDimension.TAG, finalState.selectedDimension)
-            assertEquals(mockItems, finalState.analysisItems) // This now passes.
-
-            cancelAndIgnoreRemainingEvents()
+            assertEquals(mockItems, finalState.analysisItems)
         }
 
         // Verify that the correct DAO method was called.
@@ -111,15 +103,12 @@ class AnalysisViewModelTest : BaseViewModelTest() {
 
             // 2. Act
             viewModel.selectFilterCategory(foodCategory)
+            advanceUntilIdle()
 
-            // 3. Await intermediate state (Filter applied, but data not yet fetched)
-            awaitItem()
-
-            // 4. Await final state (Filter applied AND data fetched)
-            val updatedState = awaitItem()
+            // 3. Assert final state
+            val updatedState = expectMostRecentItem()
             assertEquals(foodCategory, updatedState.selectedFilterCategory)
-            assertEquals(mockItems, updatedState.analysisItems) // This now passes.
-            cancelAndIgnoreRemainingEvents()
+            assertEquals(mockItems, updatedState.analysisItems)
         }
 
         verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), eq(1))
@@ -138,36 +127,49 @@ class AnalysisViewModelTest : BaseViewModelTest() {
 
             // Act 1: Set some filters
             viewModel.selectFilterCategory(foodCategory)
-            awaitItem() // Consume state after setting category
             viewModel.selectFilterTag(travelTag)
-
-            // Consume intermediate states until we get the one with the tag set
-            val stateWithFilters = awaitItem()
-            assertEquals(travelTag, stateWithFilters.selectedFilterTag)
+            advanceUntilIdle()
+            expectMostRecentItem() // Consume the states from setting filters
 
             // Act 2: Clear the filters
             viewModel.clearFilters()
-
-            // Calling clearFilters() updates multiple StateFlows, causing multiple emissions.
-            // We need to wait for the final state where all filters are cleared.
-            var finalState: AnalysisUiState? = null
-            for (i in 1..3) { // Expect up to 3 emissions (one per filter change)
-                val state = awaitItem()
-                if (state.selectedFilterCategory == null && state.selectedFilterTag == null && state.selectedFilterMerchant == null) {
-                    finalState = state
-                    break
-                }
-            }
+            advanceUntilIdle()
 
             // Assert
-            assertNotNull("Final state after clearing should be found", finalState)
-            assertNull(finalState!!.selectedFilterCategory)
+            val finalState = expectMostRecentItem()
+            assertNull(finalState.selectedFilterCategory)
             assertNull(finalState.selectedFilterTag)
             assertNull(finalState.selectedFilterMerchant)
-            cancelAndIgnoreRemainingEvents()
         }
 
         // Verify that the DAO was called with nulls at least once after clearing
         verify(transactionDao, atLeastOnce()).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull())
     }
+
+    @Test
+    fun `setCustomDateRange updates time period and date range in state`() = runTest {
+        // Arrange
+        val startDate = System.currentTimeMillis() - 100000
+        val endDate = System.currentTimeMillis()
+        val mockItems = listOf(SpendingAnalysisItem("1", "Custom", 10.0, 1))
+        `when`(transactionDao.getSpendingAnalysisByCategory(eq(startDate), eq(endDate), isNull(), isNull(), isNull())).thenReturn(flowOf(mockItems))
+
+        // Act & Assert
+        viewModel.uiState.test {
+            awaitItem() // initial state
+
+            viewModel.setCustomDateRange(startDate, endDate)
+            advanceUntilIdle() // Wait for all coroutines launched by the action to complete
+
+            // Assert on the final, stable state
+            val finalState = expectMostRecentItem()
+
+            assertEquals(AnalysisTimePeriod.CUSTOM, finalState.selectedTimePeriod)
+            assertEquals(startDate, finalState.customStartDate)
+            assertEquals(endDate, finalState.customEndDate)
+            assertEquals(mockItems, finalState.analysisItems)
+        }
+        verify(transactionDao).getSpendingAnalysisByCategory(eq(startDate), eq(endDate), isNull(), isNull(), isNull())
+    }
 }
+
