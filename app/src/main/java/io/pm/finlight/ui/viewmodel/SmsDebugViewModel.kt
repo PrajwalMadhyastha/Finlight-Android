@@ -6,9 +6,6 @@
 // FIX (Testing) - Removed the Toast.makeText calls. This UI logic was causing a
 // crash in the Robolectric test environment, which does not have a UI Looper
 // prepared on the test dispatcher, leading to test timeouts.
-// FIX (Testing) - Removed all hardcoded `Dispatchers.IO` calls. This makes the
-// ViewModel more architecturally sound and allows test dispatchers to correctly
-// control coroutine execution, resolving the test timeout issue.
 // =================================================================================
 package io.pm.finlight
 
@@ -18,8 +15,10 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.CategoryIconHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // Data class to hold the result for each SMS
 data class SmsDebugResult(
@@ -91,7 +90,7 @@ class SmsDebugViewModel(
     }
 
     fun refreshScan() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true) }
 
             val currentLimit = _uiState.value.loadCount
@@ -100,7 +99,7 @@ class SmsDebugViewModel(
 
             for (sms in recentSms) {
                 // --- UPDATED: Replicate the full pipeline from SmsReceiver ---
-                val parseResult: ParseResult = run {
+                val parseResult: ParseResult = withContext(Dispatchers.IO) {
                     // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
                     var result: ParseResult? = SmsParser.parseWithOnlyCustomRules(
                         sms = sms,
@@ -160,14 +159,16 @@ class SmsDebugViewModel(
             val currentLimit = _uiState.value.loadCount
 
             // Re-scan to get the new state
-            val recentSms = smsRepository.fetchAllSms(null).take(currentLimit)
+            val recentSms = withContext(Dispatchers.IO) { smsRepository.fetchAllSms(null).take(currentLimit) }
             val newResults = mutableListOf<SmsDebugResult>()
             val transactionsToImport = mutableListOf<PotentialTransaction>()
 
-            val existingSmsHashes = db.transactionDao().getAllSmsHashes().first().toSet()
+            val existingSmsHashes = withContext(Dispatchers.IO) {
+                db.transactionDao().getAllSmsHashes().first().toSet()
+            }
 
             for (sms in recentSms) {
-                val newParseResult = run {
+                val newParseResult = withContext(Dispatchers.IO) {
                     // --- UPDATED: Replicate the full pipeline from SmsReceiver ---
                     // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
                     var result: ParseResult? = SmsParser.parseWithOnlyCustomRules(
