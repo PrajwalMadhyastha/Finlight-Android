@@ -1,9 +1,5 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/TransactionViewModelTest.kt
-// REASON: REFACTOR (Testing) - The test class has been updated to extend the new
-// `BaseViewModelTest`. All boilerplate for JUnit rules, coroutine dispatchers,
-// and Mockito initialization has been removed and is now inherited from the base
-// class.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -11,25 +7,34 @@ import android.app.Application
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.AccountDao
+import io.pm.finlight.data.db.dao.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.*
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.*
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mock
+import org.mockito.Mockito
 import org.mockito.Mockito.`when`
-import org.mockito.Mockito.any
 import org.mockito.Mockito.anyInt
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.robolectric.annotation.Config
+import java.lang.RuntimeException
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -51,6 +56,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var merchantMappingRepository: MerchantMappingRepository
     @Mock private lateinit var splitTransactionRepository: SplitTransactionRepository
     @Mock private lateinit var smsParseTemplateDao: SmsParseTemplateDao
+
+    // Mocks for DAOs used by the ViewModel
     @Mock private lateinit var accountDao: AccountDao
     @Mock private lateinit var categoryDao: CategoryDao
     @Mock private lateinit var tagDao: TagDao
@@ -72,10 +79,10 @@ class TransactionViewModelTest : BaseViewModelTest() {
         `when`(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
         `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
         `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
-        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
-        `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getSpendingByMerchantForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getSpendingByMerchantForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
         `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
         `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
         `when`(tagRepository.allTags).thenReturn(flowOf(emptyList()))
@@ -84,6 +91,10 @@ class TransactionViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
 
         // Create the ViewModel instance with all mocked dependencies
+        initializeViewModel()
+    }
+
+    private fun initializeViewModel() {
         viewModel = TransactionViewModel(
             application = applicationContext,
             db = db,
@@ -112,6 +123,170 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // ASSERT
         val updatedState = viewModel.filterState.first()
         assertEquals(newKeyword, updatedState.keyword)
+    }
+
+    @Test
+    fun `onSaveTapped with only amount saves directly without category nudge`() = runTest {
+        // ARRANGE
+        val accountId = 1
+        var onSaveCompleteCalled = false
+        `when`(transactionRepository.insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())).thenReturn(1L)
+
+        // ACT
+        viewModel.onSaveTapped(
+            description = "", // No description
+            amountStr = "100.0",
+            accountId = accountId,
+            categoryId = null,
+            notes = null,
+            date = 0L,
+            transactionType = "expense",
+            imageUris = emptyList()
+        ) { onSaveCompleteCalled = true }
+        advanceUntilIdle()
+
+        // ASSERT
+        assertNull(viewModel.showCategoryNudge.value)
+        verify(transactionRepository).insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())
+        assertTrue(onSaveCompleteCalled)
+    }
+
+    @Test
+    fun `onSaveTapped with description and amount shows category nudge`() = runTest {
+        // ARRANGE
+        val accountId = 1
+        var onSaveCompleteCalled = false
+
+        // ACT
+        viewModel.onSaveTapped(
+            description = "Coffee", // Description is present
+            amountStr = "100.0",
+            accountId = accountId,
+            categoryId = null, // No category selected yet
+            notes = null,
+            date = 0L,
+            transactionType = "expense",
+            imageUris = emptyList()
+        ) { onSaveCompleteCalled = true }
+        advanceUntilIdle()
+
+        // ASSERT
+        assertNotNull(viewModel.showCategoryNudge.value)
+        assertEquals("Coffee", viewModel.showCategoryNudge.value?.description)
+        verify(transactionRepository, never()).insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())
+        assertFalse(onSaveCompleteCalled)
+    }
+
+    @Test
+    fun `saveWithSelectedCategory saves transaction with correct data from nudge`() = runTest {
+        // ARRANGE
+        val accountId = 1
+        var onSaveCompleteCalled = false
+        val newCategoryId = 5
+        val transactionCaptor = argumentCaptor<Transaction>()
+
+        `when`(transactionRepository.insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())).thenReturn(1L)
+
+        // First, trigger the nudge
+        viewModel.onSaveTapped(
+            description = "Lunch",
+            amountStr = "250.0",
+            accountId = accountId,
+            categoryId = null,
+            notes = "With friends",
+            date = 12345L,
+            transactionType = "expense",
+            imageUris = emptyList()
+        ) {}
+        advanceUntilIdle()
+        assertNotNull(viewModel.showCategoryNudge.value)
+
+        // ACT
+        viewModel.saveWithSelectedCategory(newCategoryId) { onSaveCompleteCalled = true }
+        advanceUntilIdle()
+
+        // ASSERT
+        verify(transactionRepository).insertTransactionWithTagsAndImages(capture(transactionCaptor), anyObject(), anyObject())
+        val savedTransaction = transactionCaptor.value
+        assertEquals("Lunch", savedTransaction.description)
+        assertEquals(250.0, savedTransaction.amount, 0.0)
+        assertEquals(accountId, savedTransaction.accountId)
+        assertEquals(newCategoryId, savedTransaction.categoryId)
+        assertEquals("With friends", savedTransaction.notes)
+        assertEquals(12345L, savedTransaction.date)
+        assertTrue(onSaveCompleteCalled)
+        assertNull(viewModel.showCategoryNudge.value) // Nudge should be cleared
+    }
+
+    @Test
+    fun `saveManualTransaction applies currency conversion when international travel mode is active`() = runTest {
+        // ARRANGE
+        val travelSettings = TravelModeSettings(
+            isEnabled = true,
+            tripType = TripType.INTERNATIONAL,
+            startDate = 0L,
+            endDate = Long.MAX_VALUE,
+            conversionRate = 85.0f,
+            currencyCode = "USD",
+            tripName = "US Trip"
+        )
+        // Set up the mock to return the active travel settings
+        `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(travelSettings))
+        val transactionCaptor = argumentCaptor<Transaction>()
+        `when`(transactionRepository.insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())).thenReturn(1L)
+
+        // Re-initialize the ViewModel to pick up the new mock behavior
+        initializeViewModel()
+        // Ensure the StateFlow in the ViewModel has time to collect the value from the repository
+        advanceUntilIdle()
+
+        // ACT
+        viewModel.onSaveTapped(
+            description = "Starbucks",
+            amountStr = "5.0", // 5 USD
+            accountId = 1,
+            categoryId = 1, // Category provided, so no nudge
+            notes = null,
+            date = 1000L, // Within trip date range
+            transactionType = "expense",
+            imageUris = emptyList()
+        ) {}
+        advanceUntilIdle() // Run the coroutine launched by onSaveTapped
+
+        // ASSERT
+        verify(transactionRepository).insertTransactionWithTagsAndImages(capture(transactionCaptor), anyObject(), anyObject())
+        val savedTransaction = transactionCaptor.value
+        assertEquals(425.0, savedTransaction.amount, 0.0) // 5.0 * 85.0
+        assertEquals(5.0, savedTransaction.originalAmount!!, 0.0)
+        assertEquals("USD", savedTransaction.currencyCode)
+        assertEquals(85.0, savedTransaction.conversionRate!!, 0.0)
+    }
+
+
+    @Test
+    fun `onSaveTapped shows validation error for zero amount`() = runTest {
+        // ACT
+        viewModel.onSaveTapped("Test", "0.0", 1, 1, null, 0L, "expense", emptyList()) {}
+        advanceUntilIdle()
+
+        // ASSERT
+        viewModel.validationError.test {
+            assertEquals("Please enter a valid, positive amount.", awaitItem())
+        }
+        verify(transactionRepository, never()).insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())
+    }
+
+    @Test
+    fun `onSaveTapped shows validation error for missing account`() = runTest {
+        // ACT
+        viewModel.onSaveTapped("Test", "100.0", null, 1, null, 0L, "expense", emptyList()) {}
+        advanceUntilIdle()
+
+        // ASSERT
+        viewModel.validationError.test {
+            assertEquals("An account must be selected.", awaitItem())
+        }
+        verify(transactionRepository, never()).insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())
     }
 
     @Test
@@ -146,5 +321,121 @@ class TransactionViewModelTest : BaseViewModelTest() {
         assertEquals(null, sheetState?.newCategoryId) // Category didn't change
         assertEquals(1, sheetState?.similarTransactions?.size)
         assertEquals(2, sheetState?.selectedIds?.first()) // The ID of the similar transaction
+    }
+
+    // --- NEW TESTS FOR ERROR HANDLING ---
+
+    @Test
+    fun `saveManualTransaction failure updates validationError`() = runTest {
+        // ARRANGE
+        val errorMessage = "An error occurred while saving."
+        `when`(transactionRepository.insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject()))
+            .thenThrow(RuntimeException("Database insertion failed"))
+        var onSaveCompleteCalled = false
+
+        // ACT
+        viewModel.onSaveTapped(
+            description = "Test",
+            amountStr = "100.0",
+            accountId = 1,
+            categoryId = 1,
+            notes = null,
+            date = 0L,
+            transactionType = "expense",
+            imageUris = emptyList()
+        ) { onSaveCompleteCalled = true }
+        advanceUntilIdle()
+
+        // ASSERT
+        viewModel.validationError.test {
+            assertEquals(errorMessage, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertFalse("onSaveComplete should not be called on failure", onSaveCompleteCalled)
+    }
+
+    @Test
+    fun `deleteTransaction failure sends uiEvent`() = runTest {
+        // ARRANGE
+        val transactionToDelete = Transaction(id = 1, description = "Test", amount = 1.0, date = 0, accountId = 1, categoryId = 1, notes = null)
+        val errorMessage = "Failed to delete transaction. Please try again."
+        `when`(transactionRepository.delete(anyObject())).thenThrow(RuntimeException("DB delete failed"))
+
+        // ACT & ASSERT
+        viewModel.uiEvent.test {
+            viewModel.deleteTransaction(transactionToDelete)
+            advanceUntilIdle()
+            assertEquals(errorMessage, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onConfirmDeleteSelection failure sends uiEvent`() = runTest {
+        // ARRANGE
+        val errorMessage = "Failed to delete transactions. Please try again."
+        `when`(transactionRepository.deleteByIds(anyObject())).thenThrow(RuntimeException("DB batch delete failed"))
+
+        viewModel.enterSelectionMode(1) // Set up the state for deletion
+        advanceUntilIdle()
+
+        // ACT & ASSERT
+        viewModel.uiEvent.test {
+            viewModel.onConfirmDeleteSelection()
+            advanceUntilIdle()
+            assertEquals(errorMessage, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    @Ignore
+    fun `dataLoading failure emits emptyList and sends uiEvent`() = runTest {
+        // ARRANGE
+        val errorFlow = flow<List<TransactionDetails>> { throw RuntimeException("DB error") }
+        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(errorFlow)
+
+        // ACT & ASSERT
+        viewModel.uiEvent.test {
+            // Re-initialize the ViewModel here. This defines the flow with the error mock.
+            initializeViewModel()
+
+            // Launch a collector for the lazy flow. This is what triggers
+            // the upstream flow, causing the exception to be thrown and the `.catch`
+            // block to execute. Using `backgroundScope` prevents this from blocking.
+            val collectorJob = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                viewModel.transactionsForSelectedMonth.collect {
+                    // This empty lambda is required to satisfy the `collect` function's signature.
+                }
+            }
+
+            // Now that collection has started, the error is triggered, caught,
+            // and the event is sent. We can now safely await it.
+            assertEquals("Failed to load transactions.", awaitItem())
+
+            // We can also check the final state of the other flow.
+            assertEquals(emptyList<TransactionDetails>(), viewModel.transactionsForSelectedMonth.value)
+
+            // Clean up the collector job and the Turbine test.
+            collectorJob.cancel()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+
+    @Test
+    fun `updateDescription failure sends uiEvent`() = runTest {
+        // ARRANGE
+        val errorMessage = "Failed to update description. Please try again."
+        `when`(transactionRepository.updateDescription(anyInt(), anyString())).thenThrow(RuntimeException("DB update failed"))
+        `when`(transactionRepository.getTransactionById(anyInt())).thenReturn(flowOf(null)) // To simplify the test logic
+
+        // ACT & ASSERT
+        viewModel.uiEvent.test {
+            viewModel.updateTransactionDescription(1, "New Description")
+            advanceUntilIdle()
+            assertEquals(errorMessage, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

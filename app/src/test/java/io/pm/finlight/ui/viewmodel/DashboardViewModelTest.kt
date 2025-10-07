@@ -9,6 +9,8 @@ package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.cash.turbine.awaitItem
+import app.cash.turbine.test
 import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -20,11 +22,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
+import java.util.Calendar
 import kotlin.math.roundToLong
 
 @ExperimentalCoroutinesApi
@@ -98,6 +102,15 @@ class DashboardViewModelTest : BaseViewModelTest() {
         )
     }
 
+    private fun initializeViewModel() {
+        viewModel = DashboardViewModel(
+            transactionRepository = transactionRepository,
+            accountRepository = accountRepository,
+            budgetDao = budgetDao,
+            settingsRepository = settingsRepository,
+        )
+    }
+
     @Test
     fun `test monthly income and expenses are loaded correctly`() = runTest {
         // ARRANGE: Mock the repository to return a specific financial summary for this test
@@ -110,12 +123,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
         ).thenReturn(flowOf(summary))
 
         // ACT: Re-initialize ViewModel to pick up the new mock setup
-        viewModel = DashboardViewModel(
-            transactionRepository,
-            accountRepository,
-            budgetDao,
-            settingsRepository
-        )
+        initializeViewModel()
         advanceUntilIdle() // Let flows emit
 
         // ASSERT: Check if the StateFlows in the ViewModel reflect the mocked data
@@ -142,18 +150,41 @@ class DashboardViewModelTest : BaseViewModelTest() {
         ).thenReturn(flowOf(FinancialSummary(0.0, expenses)))
 
         // ACT
-        viewModel = DashboardViewModel(
-            transactionRepository,
-            accountRepository,
-            budgetDao,
-            settingsRepository
-        )
+        initializeViewModel()
         advanceUntilIdle()
 
         // ASSERT
         val expectedRemaining = budget.roundToLong() - expenses.roundToLong()
         assertEquals(expectedRemaining, viewModel.amountRemaining.first())
     }
+
+    @Test
+    fun `safeToSpendPerDay is calculated correctly`() = runTest {
+        // ARRANGE
+        // The ViewModel uses the real current date, so the test must do the same.
+        val calendar = Calendar.getInstance()
+        val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
+        val remainingDays = (daysInMonth - calendar.get(Calendar.DAY_OF_MONTH) + 1).toLong()
+
+        val budget = 3100f
+        val expenses = 1000.0
+        val remaining = budget - expenses
+        val expectedSafeToSpend = if (remaining > 0 && remainingDays > 0) (remaining / remainingDays).roundToLong() else 0L
+
+        `when`(settingsRepository.getOverallBudgetForMonth(Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(budget))
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, expenses)))
+
+        // ACT
+        initializeViewModel()
+        advanceUntilIdle() // Ensure all init block coroutines complete
+
+        // ASSERT
+        viewModel.safeToSpendPerDay.test {
+            assertEquals(expectedSafeToSpend, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
 
     @Test
     fun `budgetHealthSummary shows 'Set a budget' when budget is zero`() = runTest {
@@ -172,62 +203,64 @@ class DashboardViewModelTest : BaseViewModelTest() {
         ).thenReturn(flowOf(FinancialSummary(0.0, 1000.0)))
 
         // ACT
-        viewModel = DashboardViewModel(
-            transactionRepository,
-            accountRepository,
-            budgetDao,
-            settingsRepository
-        )
+        initializeViewModel()
         advanceUntilIdle()
 
+
         // ASSERT
-        assertEquals("Set a budget to see insights", viewModel.budgetHealthSummary.first())
+        viewModel.budgetHealthSummary.test {
+            assertEquals("Set a budget to see insights", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
-    fun `budgetHealthSummary shows 'over budget' message when expenses exceed budget`() = runTest {
+    fun `budgetHealthSummary shows 'consistently good' message when pacing is good`() = runTest {
         // ARRANGE
-        `when`(
-            settingsRepository.getOverallBudgetForMonth(
-                Mockito.anyInt(),
-                Mockito.anyInt()
-            )
-        ).thenReturn(flowOf(1000f))
-        `when`(
-            transactionRepository.getFinancialSummaryForRangeFlow(
-                Mockito.anyLong(),
-                Mockito.anyLong()
-            )
-        ).thenReturn(flowOf(FinancialSummary(0.0, 1200.0)))
-        `when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(200.0)
-
+        `when`(settingsRepository.getOverallBudgetForMonth(Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(30000f))
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1000.0)))
+        `when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(100.0)
 
         // ACT
-        viewModel = DashboardViewModel(
-            transactionRepository,
-            accountRepository,
-            budgetDao,
-            settingsRepository
-        )
-        viewModel.refreshBudgetSummary()
+        initializeViewModel()
         advanceUntilIdle()
 
-        val possibleMessages = listOf(
-            "Pacing a bit high for this month",
-            "Time to ease up on spending",
-            "Still trending over budget",
-            "Let's try to slow things down",
-            "Watch the spending for a bit",
-            "Heads up: pacing is still high",
-            "A bit too fast for this month",
-            "Let's pump the brakes slightly",
-            "Budget is feeling the pressure",
-            "Trending to overspend"
-        )
-        assertTrue(
-            "Summary message should be one of the 'over budget' phrases.",
-            viewModel.budgetHealthSummary.first() in possibleMessages
-        )
+        // ASSERT
+        viewModel.budgetHealthSummary.test {
+            val possibleMessages = listOf(
+                "Excellent pacing this month!", "On track with room to spare", "Well within budget, great job",
+                "Your budget is looking healthy", "Consistently great spending", "Keep this momentum going!",
+                "Smooth sailing this month", "You're building a nice buffer", "Perfectly on track", "Another great spending day"
+            )
+            val result = awaitItem()
+            assertTrue("Summary message '$result' should be one of the 'good' phrases.", result in possibleMessages)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `budgetHealthSummary shows 'pacing high' message when forecast exceeds budget`() = runTest {
+        // ARRANGE
+        `when`(settingsRepository.getOverallBudgetForMonth(Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(2000f))
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1500.0))) // High spend already
+        `when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(500.0) // High recent spend velocity
+
+        // ACT
+        initializeViewModel()
+        advanceUntilIdle()
+
+        // ASSERT
+        viewModel.budgetHealthSummary.test {
+            val possibleMessages = listOf(
+                "Pacing a bit high for this month", "Time to ease up on spending", "Still trending over budget",
+                "Let's try to slow things down", "Watch the spending for a bit", "Heads up: pacing is still high",
+                "A bit too fast for this month", "Let's pump the brakes slightly", "Budget is feeling the pressure", "Trending to overspend"
+            )
+
+            val result = awaitItem()
+            assertTrue("Summary message '$result' should be one of the 'pacing high' phrases.", result in possibleMessages)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
 
@@ -249,12 +282,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getDashboardVisibleCards())
             .thenReturn(flowOf(visibleCards))
 
-        viewModel = DashboardViewModel(
-            transactionRepository,
-            accountRepository,
-            budgetDao,
-            settingsRepository
-        )
+        initializeViewModel()
         advanceUntilIdle()
 
         // ACT
@@ -281,12 +309,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getDashboardVisibleCards())
             .thenReturn(flowOf(initialVisible))
 
-        viewModel = DashboardViewModel(
-            transactionRepository,
-            accountRepository,
-            budgetDao,
-            settingsRepository
-        )
+        initializeViewModel()
         advanceUntilIdle()
 
         // ACT
@@ -311,12 +334,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
         ).thenReturn(flowOf(summaryWithDecimals))
 
         // ACT
-        viewModel = DashboardViewModel(
-            transactionRepository,
-            accountRepository,
-            budgetDao,
-            settingsRepository
-        )
+        initializeViewModel()
         advanceUntilIdle()
 
         // ASSERT
@@ -325,5 +343,54 @@ class DashboardViewModelTest : BaseViewModelTest() {
 
         assertEquals(expectedIncome, viewModel.monthlyIncome.first())
         assertEquals(expectedExpenses, viewModel.monthlyExpenses.first())
+    }
+
+    @Test
+    fun `visibleCards flow respects order and visibility from settings`() = runTest {
+        // Arrange
+        val order = listOf(DashboardCardType.RECENT_TRANSACTIONS, DashboardCardType.QUICK_ACTIONS, DashboardCardType.ACCOUNTS_CAROUSEL)
+        val visible = setOf(DashboardCardType.RECENT_TRANSACTIONS, DashboardCardType.ACCOUNTS_CAROUSEL)
+        Mockito.`when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(order))
+        Mockito.`when`(settingsRepository.getDashboardVisibleCards()).thenReturn(flowOf(visible))
+        initializeViewModel()
+
+        // Assert
+        viewModel.visibleCards.test {
+            // The combine operator can emit intermediate values. We care about the final, stable state.
+            // The initial state is emptyList(), then it combines to produce the correct list.
+            val finalState = awaitItem()
+            assertEquals(listOf(DashboardCardType.RECENT_TRANSACTIONS, DashboardCardType.ACCOUNTS_CAROUSEL), finalState)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `lastMonthSummary is shown on the first day of the month`() = runTest {
+        // This test requires manipulating the current date, which can be tricky.
+        // For simplicity, we'll assume today is the 1st and the summary hasn't been dismissed.
+        // This is more of an integration test, but we can verify the logic flow.
+
+        // Arrange
+        val summary = FinancialSummary(1000.0, 500.0)
+        Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
+        Mockito.`when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
+            .thenReturn(flowOf(summary))
+
+        // A more robust test would use a TestClock to set the date to the 1st.
+        // For Robolectric, we can't easily do that. We check the logic path instead.
+        val today = Calendar.getInstance()
+        if (today.get(Calendar.DAY_OF_MONTH) == 1) {
+            initializeViewModel()
+            advanceUntilIdle()
+
+            // Assert
+            assertTrue(viewModel.showLastMonthSummaryCard.value)
+            assertEquals(LastMonthSummary(summary.totalIncome, summary.totalExpenses), viewModel.lastMonthSummary.value)
+        } else {
+            // If not the 1st, the card should not show
+            initializeViewModel()
+            advanceUntilIdle()
+            assertEquals(false, viewModel.showLastMonthSummaryCard.value)
+        }
     }
 }

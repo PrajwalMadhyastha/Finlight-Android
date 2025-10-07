@@ -3,6 +3,9 @@
 // REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
 // inheriting all common setup logic and removing boilerplate for rules,
 // dispatchers, and Mockito initialization.
+// FIX (Testing) - Replaced ArgumentCaptor.capture() with the appropriate
+// `any...()` matchers inside `never()` verifications to prevent a
+// NullPointerException.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -16,18 +19,15 @@ import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.CurrencyInfo
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentCaptor
-import org.mockito.Captor
 import org.mockito.Mock
-import org.mockito.Mockito.never
-import org.mockito.Mockito.verify
+import org.mockito.Mockito.*
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
@@ -42,12 +42,6 @@ class OnboardingViewModelTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var settingsRepository: SettingsRepository
-
-    @Captor
-    private lateinit var stringCaptor: ArgumentCaptor<String>
-
-    @Captor
-    private lateinit var floatCaptor: ArgumentCaptor<Float>
 
     private lateinit var viewModel: OnboardingViewModel
 
@@ -123,6 +117,8 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         viewModel.onBudgetChanged(budget)
         viewModel.onHomeCurrencyChanged(currency)
         viewModel.finishOnboarding()
+        advanceUntilIdle()
+
 
         // Assert
         verify(settingsRepository).saveUserName(name)
@@ -132,14 +128,15 @@ class OnboardingViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `finishOnboarding does not save blank user name`() = runTest {
         // Act
         viewModel.onNameChanged("  ")
         viewModel.finishOnboarding()
+        advanceUntilIdle()
+
 
         // Assert
-        verify(settingsRepository, never()).saveUserName(stringCaptor.capture())
+        verify(settingsRepository, never()).saveUserName(anyString())
     }
 
     @Test
@@ -147,13 +144,15 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         // Act
         viewModel.onBudgetChanged("0")
         viewModel.finishOnboarding()
+        advanceUntilIdle()
         // Assert
-        verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(floatCaptor.capture())
+        verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(anyFloat())
 
         // Act
         viewModel.onBudgetChanged("")
         viewModel.finishOnboarding()
+        advanceUntilIdle()
         // Assert
-        verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(floatCaptor.capture())
+        verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(anyFloat())
     }
 }

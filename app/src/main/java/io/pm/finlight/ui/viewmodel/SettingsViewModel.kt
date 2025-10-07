@@ -12,7 +12,6 @@ import android.app.backup.BackupManager
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
-import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -26,6 +25,7 @@ import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,6 +61,9 @@ class SettingsViewModel(
     private val tagDao = db.tagDao()
     private val splitTransactionDao = db.splitTransactionDao()
     private val backupManager = BackupManager(context)
+
+    private val _uiEvent = Channel<String>()
+    val uiEvent = _uiEvent.receiveAsFlow()
 
 
     val smsScanStartDate: StateFlow<Long>
@@ -292,7 +295,7 @@ class SettingsViewModel(
 
     fun startSmsScanAndIdentifyMappings(startDate: Long?, onComplete: (mappingNeeded: Boolean) -> Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(context, "SMS Read permission is required.", Toast.LENGTH_LONG).show()
+            viewModelScope.launch { _uiEvent.send("SMS Read permission is required.") }
             onComplete(false)
             return
         }
@@ -356,10 +359,8 @@ class SettingsViewModel(
                 }
 
                 if (needsMapping.isEmpty()) {
-                    withContext(Dispatchers.Main) {
-                        val message = if (autoImportedCount > 0) "Successfully imported $autoImportedCount new transactions." else "No new transactions found."
-                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                    }
+                    val message = if (autoImportedCount > 0) "Successfully imported $autoImportedCount new transactions." else "No new transactions found."
+                    _uiEvent.send(message)
                     onComplete(false)
                 } else {
                     _potentialTransactions.value = needsMapping
@@ -375,7 +376,7 @@ class SettingsViewModel(
                 }
             } catch (e: Exception) {
                 Log.e("SettingsViewModel", "Error during SMS scan", e)
-                withContext(Dispatchers.Main) { Toast.makeText(context, "An error occurred during scan.", Toast.LENGTH_LONG).show() }
+                _uiEvent.send("An error occurred during scan.")
             } finally {
                 _isScanning.value = false
             }
@@ -419,9 +420,7 @@ class SettingsViewModel(
                 _isScanning.value = false
                 _potentialTransactions.value = emptyList()
                 _sendersToMap.value = emptyList()
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Import complete! $importedCount transactions were added.", Toast.LENGTH_LONG).show()
-                }
+                _uiEvent.send("Import complete! $importedCount transactions were added.")
             }
         }
     }
@@ -839,15 +838,13 @@ class SettingsViewModel(
             val success = withContext(Dispatchers.IO) {
                 DataExportService.createBackupSnapshot(context)
             }
-            withContext(Dispatchers.Main) {
-                val message = if (success) {
-                    backupManager.dataChanged() // Notify the system to schedule a backup
-                    "Backup snapshot created and backup requested."
-                } else {
-                    "Failed to create snapshot."
-                }
-                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            val message = if (success) {
+                backupManager.dataChanged() // Notify the system to schedule a backup
+                "Backup snapshot created and backup requested."
+            } else {
+                "Failed to create snapshot."
             }
+            _uiEvent.send(message)
         }
     }
 }

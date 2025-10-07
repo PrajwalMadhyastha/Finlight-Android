@@ -2,9 +2,10 @@
 // FILE: ./app/src/test/java/io/pm/finlight/BaseViewModelTest.kt
 // REASON: NEW FILE - This abstract base class centralizes common setup logic for
 // all ViewModel unit tests. It includes the InstantTaskExecutorRule for LiveData,
-// coroutine test dispatcher management, and Mockito initialization. All new and
-// refactored ViewModel tests will extend this class to reduce boilerplate and
-// ensure a consistent testing environment.
+// coroutine test dispatcher management, and Mockito initialization.
+// FIX (Testing) - Added a new null-safe `capture` helper function. This works
+// around a common NullPointerException when using Mockito's ArgumentCaptor with
+// non-nullable Kotlin parameters, especially in suspend functions.
 // =================================================================================
 package io.pm.finlight
 
@@ -18,7 +19,42 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
+import org.mockito.ArgumentCaptor
+import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
+
+// Helper function for creating ArgumentCaptor in a more Kotlin-friendly way
+inline fun <reified T : Any> argumentCaptor(): ArgumentCaptor<T> = ArgumentCaptor.forClass(T::class.java)
+
+/**
+ * A helper function to use Mockito's `any()` matcher in a way that is safe
+ * for Kotlin's non-nullable types.
+ *
+ * It calls `Mockito.any()` to register the matcher with Mockito's internal state,
+ * but returns a 'null' cast to the required type `T`. This satisfies the Kotlin
+ * compiler for the function signature, while Mockito's stubbing mechanism
+ * correctly uses the registered 'any' matcher, avoiding a NullPointerException.
+ */
+fun <T> anyObject(): T {
+    Mockito.any<T>()
+    @Suppress("UNCHECKED_CAST")
+    return null as T
+}
+
+/**
+ * A helper function to use Mockito's `ArgumentCaptor.capture()` in a way that is safe
+ * for Kotlin's non-nullable types.
+ *
+ * It calls `captor.capture()` to register the capture with Mockito, but returns a 'null'
+ * cast to the required type `T`. This satisfies the Kotlin compiler for function signatures
+ * with non-nullable parameters, preventing a NullPointerException during verification.
+ */
+fun <T> capture(argumentCaptor: ArgumentCaptor<T>): T {
+    argumentCaptor.capture()
+    @Suppress("UNCHECKED_CAST")
+    return null as T
+}
+
 
 /**
  * An abstract base class for all ViewModel unit tests in the Finlight project.

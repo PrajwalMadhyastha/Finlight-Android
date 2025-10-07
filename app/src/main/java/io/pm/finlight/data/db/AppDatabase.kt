@@ -1,12 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: FIX - The database seeding logic in the `onOpen` callback has been
-// completely replaced with a robust "checksum" strategy. This new approach
-// compares a hash of the current default ignore rules in the code against a
-// stored hash. If they differ (meaning the rules have been updated), it
-// automatically deletes the old default rules from the database and inserts the
-// new set, ensuring the app always uses the latest rules without requiring
-// a manual migration.
+// REASON: FIX - Incremented the database version to 41 and added a new migration
+// (MIGRATION_40_41). This migration adds a unique index to the 'templateSignature'
+// column in the 'sms_parse_templates' table, which is the definitive fix for
+// the failing SmsParseTemplateDaoTest.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -51,7 +48,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         Trip::class,
         AccountAlias::class
     ],
-    version = 40, // --- UPDATED: Incremented version ---
+    version = 41, // --- UPDATED: Incremented version ---
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -77,7 +74,7 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // --- All existing migrations (1-2 through 38-39) remain here ---
+        // --- All existing migrations (1-2 through 39-40) remain here ---
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN transactionType TEXT NOT NULL DEFAULT 'expense'")
@@ -482,6 +479,16 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_date` ON `transactions` (`date`)")
             }
         }
+        // --- NEW: Migration to add a unique index to sms_parse_templates ---
+        val MIGRATION_40_41 = object : Migration(40, 41) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Drop the old, non-unique index if it exists.
+                db.execSQL("DROP INDEX IF EXISTS `index_sms_parse_templates_templateSignature`")
+                // Create the new, unique index.
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_sms_parse_templates_templateSignature` ON `sms_parse_templates` (`templateSignature`)")
+            }
+        }
+
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -503,8 +510,8 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29,
                             MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
                             MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
-                            MIGRATION_37_38, MIGRATION_38_39,
-                            MIGRATION_39_40
+                            MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40,
+                            MIGRATION_40_41 // --- UPDATED: Add the new migration
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

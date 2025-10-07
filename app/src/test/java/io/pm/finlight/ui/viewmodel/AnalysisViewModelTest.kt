@@ -3,6 +3,9 @@
 // REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
 // inheriting all common setup logic and removing boilerplate for rules,
 // dispatchers, and Mockito initialization.
+// FIX (Testing) - Corrected all tests to properly handle intermediate state
+// emissions from the ViewModel's complex `combine` flows. The tests now
+// correctly await the final state after an action, resolving assertion errors.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -15,9 +18,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -46,7 +49,6 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
         `when`(tagDao.getAllTags()).thenReturn(flowOf(emptyList()))
         `when`(transactionDao.getAllExpenseMerchants()).thenReturn(flowOf(emptyList()))
-        // --- FIX: Mock all possible DAO calls in the setup to avoid verification errors ---
         `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
         `when`(transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
         `when`(transactionDao.getSpendingAnalysisByMerchant(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
@@ -61,39 +63,35 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             val initialState = awaitItem()
             assertEquals(AnalysisDimension.CATEGORY, initialState.selectedDimension)
             assertEquals(AnalysisTimePeriod.MONTH, initialState.selectedTimePeriod)
-            // --- FIX: The first emitted state after initialization will have isLoading as false ---
-            assertEquals(false, initialState.isLoading)
+            assertEquals(false, initialState.isLoading) // Should be false after init flows complete
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    @Ignore
     fun `selectDimension updates uiState and calls correct DAO method`() = runTest {
         // Arrange
         val mockItems = listOf(SpendingAnalysisItem("1", "Test", 100.0, 1))
         `when`(transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), isNull(), isNull(), isNull())).thenReturn(flowOf(mockItems))
 
         viewModel.uiState.test {
-            // Await the initial state produced by the ViewModel's init block.
-            awaitItem()
+            awaitItem() // Await the initial state
 
-            // Act: Change the dimension while collecting the flow.
+            // Act
             viewModel.selectDimension(AnalysisDimension.TAG)
+            advanceUntilIdle() // Wait for all coroutines to settle
 
-            // Assert: Await the new state and check its contents.
-            val updatedState = awaitItem()
-            assertEquals(AnalysisDimension.TAG, updatedState.selectedDimension)
-            assertEquals(mockItems, updatedState.analysisItems)
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            val finalState = expectMostRecentItem()
+            assertEquals(AnalysisDimension.TAG, finalState.selectedDimension)
+            assertEquals(mockItems, finalState.analysisItems)
         }
 
-        // Verify that the correct DAO method was called after the flow was collected.
+        // Verify that the correct DAO method was called.
         verify(transactionDao).getSpendingAnalysisByTag(anyLong(), anyLong(), isNull(), isNull(), isNull())
     }
 
     @Test
-    @Ignore
     fun `selectFilterCategory updates uiState and refetches data`() = runTest {
         // Arrange
         val foodCategory = Category(1, "Food", "", "")
@@ -101,23 +99,22 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), eq(1))).thenReturn(flowOf(mockItems))
 
         viewModel.uiState.test {
-            awaitItem() // Consume initial state
+            awaitItem() // 1. Consume initial state
 
-            // Act
+            // 2. Act
             viewModel.selectFilterCategory(foodCategory)
+            advanceUntilIdle()
 
-            // Assert
-            val updatedState = awaitItem()
+            // 3. Assert final state
+            val updatedState = expectMostRecentItem()
             assertEquals(foodCategory, updatedState.selectedFilterCategory)
             assertEquals(mockItems, updatedState.analysisItems)
-            cancelAndIgnoreRemainingEvents()
         }
 
         verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), eq(1))
     }
 
     @Test
-    @Ignore
     fun `clearFilters resets filter state and refetches data`() = runTest {
         // Arrange
         val foodCategory = Category(1, "Food", "", "")
@@ -130,22 +127,49 @@ class AnalysisViewModelTest : BaseViewModelTest() {
 
             // Act 1: Set some filters
             viewModel.selectFilterCategory(foodCategory)
-            awaitItem() // Consume state after setting category
             viewModel.selectFilterTag(travelTag)
-            awaitItem() // Consume state after setting tag
+            advanceUntilIdle()
+            expectMostRecentItem() // Consume the states from setting filters
 
             // Act 2: Clear the filters
             viewModel.clearFilters()
+            advanceUntilIdle()
 
             // Assert
-            val clearedState = awaitItem()
-            assertNull(clearedState.selectedFilterCategory)
-            assertNull(clearedState.selectedFilterTag)
-            assertNull(clearedState.selectedFilterMerchant)
-            cancelAndIgnoreRemainingEvents()
+            val finalState = expectMostRecentItem()
+            assertNull(finalState.selectedFilterCategory)
+            assertNull(finalState.selectedFilterTag)
+            assertNull(finalState.selectedFilterMerchant)
         }
 
         // Verify that the DAO was called with nulls at least once after clearing
-        verify(transactionDao, atLeast(1)).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull())
+        verify(transactionDao, atLeastOnce()).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull())
+    }
+
+    @Test
+    fun `setCustomDateRange updates time period and date range in state`() = runTest {
+        // Arrange
+        val startDate = System.currentTimeMillis() - 100000
+        val endDate = System.currentTimeMillis()
+        val mockItems = listOf(SpendingAnalysisItem("1", "Custom", 10.0, 1))
+        `when`(transactionDao.getSpendingAnalysisByCategory(eq(startDate), eq(endDate), isNull(), isNull(), isNull())).thenReturn(flowOf(mockItems))
+
+        // Act & Assert
+        viewModel.uiState.test {
+            awaitItem() // initial state
+
+            viewModel.setCustomDateRange(startDate, endDate)
+            advanceUntilIdle() // Wait for all coroutines launched by the action to complete
+
+            // Assert on the final, stable state
+            val finalState = expectMostRecentItem()
+
+            assertEquals(AnalysisTimePeriod.CUSTOM, finalState.selectedTimePeriod)
+            assertEquals(startDate, finalState.customStartDate)
+            assertEquals(endDate, finalState.customEndDate)
+            assertEquals(mockItems, finalState.analysisItems)
+        }
+        verify(transactionDao).getSpendingAnalysisByCategory(eq(startDate), eq(endDate), isNull(), isNull(), isNull())
     }
 }
+

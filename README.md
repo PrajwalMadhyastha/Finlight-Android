@@ -1,4 +1,4 @@
-Finlight ✨
+Finlight
 ==========
 
 **Finlight** is a privacy-focused, on-device personal finance management app for Android (7.0+). Built entirely with Jetpack Compose, it features a sophisticated, multi-layered SMS parsing engine, on-device machine learning, and a bespoke glassmorphism design language called **"Project Aurora"**.

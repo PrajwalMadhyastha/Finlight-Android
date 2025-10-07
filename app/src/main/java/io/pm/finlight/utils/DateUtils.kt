@@ -12,10 +12,13 @@ object DateUtils {
 
     /**
      * Calculates the start and end timestamps for the previous full month.
+     * @param currentTimeMillis The timestamp to calculate the previous month relative to. Defaults to the current system time.
      * @return A Pair containing the start (inclusive) and end (inclusive) milliseconds.
      */
-    fun getPreviousMonthDateRange(): Pair<Long, Long> {
-        val calendar = Calendar.getInstance()
+    fun getPreviousMonthDateRange(currentTimeMillis: Long = System.currentTimeMillis()): Pair<Long, Long> {
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = currentTimeMillis
+        }
         // Move calendar to the previous month
         calendar.add(Calendar.MONTH, -1)
 

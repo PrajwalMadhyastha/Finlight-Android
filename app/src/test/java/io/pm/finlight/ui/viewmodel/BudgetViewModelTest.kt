@@ -1,15 +1,10 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/BudgetViewModelTest.kt
-// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
-// inheriting all common setup logic and removing boilerplate for rules,
-// dispatchers, and Mockito initialization.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.content.Context
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.cash.turbine.test
 import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -25,7 +20,9 @@ import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mock
 import org.mockito.Mockito
+import org.mockito.Mockito.never
 import org.mockito.Mockito.`when`
+import org.mockito.kotlin.verify
 import org.robolectric.annotation.Config
 import java.util.Calendar
 import kotlin.math.roundToLong
@@ -49,6 +46,14 @@ class BudgetViewModelTest : BaseViewModelTest() {
     @Before
     override fun setup() {
         super.setup()
+        // Setup default mocks for initialization
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
+        `when`(budgetRepository.getBudgetsForMonth(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
+        `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+        `when`(budgetRepository.getActualSpendingForCategory(anyString(), anyInt(), anyInt())).thenReturn(flowOf(0.0))
+
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository)
     }
 
     @Test
@@ -73,9 +78,6 @@ class BudgetViewModelTest : BaseViewModelTest() {
         `when`(categoryRepository.allCategories).thenReturn(flowOf(allCategories))
         `when`(budgetRepository.getBudgetsForMonth(currentMonth, currentYear)).thenReturn(flowOf(budgetsForCurrentMonth))
         `when`(settingsRepository.getOverallBudgetForMonth(currentMonth, currentYear)).thenReturn(flowOf(10000f))
-        `when`(budgetRepository.getBudgetsForMonthWithSpending(Mockito.anyString(), Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(emptyList()))
-        `when`(budgetRepository.getActualSpendingForCategory(Mockito.anyString(), Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(0.0))
-
 
         // ACT
         // ViewModel logic runs in the init block. We instantiate it directly with mocks.
@@ -147,8 +149,6 @@ class BudgetViewModelTest : BaseViewModelTest() {
             )
         )))
         `when`(budgetRepository.getActualSpendingForCategory(anyString(), anyInt(), anyInt())).thenReturn(flowOf(spendingPerCategory))
-        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
-        `when`(budgetRepository.getBudgetsForMonth(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
 
         // ACT
@@ -161,5 +161,93 @@ class BudgetViewModelTest : BaseViewModelTest() {
 
         assertEquals(overallBudgetFloat.roundToLong(), actualBudget)
         assertEquals(spendingPerCategory.roundToLong(), actualSpending)
+    }
+
+    @Test
+    fun `addCategoryBudget with invalid amount sends error event`() = runTest {
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.addCategoryBudget("Food", "0")
+            advanceUntilIdle()
+            assertEquals("Please enter a valid amount and select a category.", awaitItem())
+            verify(budgetRepository, never()).insert(anyObject())
+        }
+    }
+
+    @Test
+    fun `addCategoryBudget failure sends error event`() = runTest {
+        // Arrange
+        val errorMessage = "DB Error"
+        `when`(budgetRepository.insert(anyObject())).thenThrow(RuntimeException(errorMessage))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.addCategoryBudget("Food", "100")
+            advanceUntilIdle()
+
+            assertEquals("Error adding budget: $errorMessage", awaitItem())
+        }
+    }
+
+    @Test
+    fun `updateBudget success sends success event`() = runTest {
+        // Arrange
+        val budget = Budget(1, "Food", 100.0, 1, 2025)
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.updateBudget(budget)
+            advanceUntilIdle()
+
+            verify(budgetRepository).update(budget)
+            assertEquals("Budget for '${budget.categoryName}' updated.", awaitItem())
+        }
+    }
+
+    @Test
+    fun `updateBudget failure sends error event`() = runTest {
+        // Arrange
+        val budget = Budget(1, "Food", 100.0, 1, 2025)
+        val errorMessage = "DB Error"
+        `when`(budgetRepository.update(anyObject())).thenThrow(RuntimeException(errorMessage))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.updateBudget(budget)
+            advanceUntilIdle()
+
+            assertEquals("Error updating budget: $errorMessage", awaitItem())
+        }
+    }
+
+    @Test
+    fun `deleteBudget success sends success event`() = runTest {
+        // Arrange
+        val budget = Budget(1, "Food", 100.0, 1, 2025)
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.deleteBudget(budget)
+            advanceUntilIdle()
+
+            verify(budgetRepository).delete(budget)
+            assertEquals("Budget for '${budget.categoryName}' deleted.", awaitItem())
+        }
+    }
+
+    @Test
+    fun `deleteBudget failure sends error event`() = runTest {
+        // Arrange
+        val budget = Budget(1, "Food", 100.0, 1, 2025)
+        val errorMessage = "DB Error"
+        `when`(budgetRepository.delete(anyObject())).thenThrow(RuntimeException(errorMessage))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.deleteBudget(budget)
+            advanceUntilIdle()
+
+            assertEquals("Error deleting budget: $errorMessage", awaitItem())
+        }
     }
 }
