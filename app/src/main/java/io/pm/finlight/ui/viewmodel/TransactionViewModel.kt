@@ -732,6 +732,8 @@ class TransactionViewModel(
             }
             val smsParseTemplateProvider = object : SmsParseTemplateProvider {
                 override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
+                // --- NEW: Implement the new provider method ---
+                override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
             }
 
             val potentialTxn = SmsParser.parse(
@@ -909,7 +911,18 @@ class TransactionViewModel(
                         if (transaction.sourceSmsId != null && transaction.originalDescription != null) {
                             val originalSms = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
                             if (originalSms != null) {
-                                createAndStoreTemplate(originalSms.body, transaction)
+                                // --- FIX: Calculate and pass the required merchant indices ---
+                                val originalMerchant = transaction.originalDescription
+                                val merchantIndex = originalSms.body.indexOf(originalMerchant)
+                                if (merchantIndex != -1) {
+                                    createAndStoreTemplate(
+                                        smsBody = originalSms.body,
+                                        transaction = transaction,
+                                        correctedMerchant = newDescription,
+                                        originalMerchantStartIndex = merchantIndex,
+                                        originalMerchantEndIndex = merchantIndex + originalMerchant.length
+                                    )
+                                }
                             }
                         }
                     }
@@ -922,8 +935,13 @@ class TransactionViewModel(
         }
     }
 
-    private suspend fun createAndStoreTemplate(smsBody: String, transaction: Transaction) {
-        val originalMerchant = transaction.originalDescription ?: return
+    private suspend fun createAndStoreTemplate(
+        smsBody: String,
+        transaction: Transaction,
+        correctedMerchant: String,
+        originalMerchantStartIndex: Int,
+        originalMerchantEndIndex: Int
+    ) {
         val amountToFind = transaction.originalAmount ?: transaction.amount
 
         val amountRegex = "([\\d,]+\\.?\\d*)".toRegex()
@@ -939,23 +957,23 @@ class TransactionViewModel(
             it.value.replace(",", "").toDoubleOrNull() == matchingAmountValue
         }?.value ?: return
 
-        val merchantIndex = smsBody.indexOf(originalMerchant)
         val amountIndex = smsBody.indexOf(amountStr)
 
-        if (merchantIndex == -1 || amountIndex == -1) {
-            Log.w(TAG, "Could not find merchant or amount index in SMS body for template creation.")
+        if (amountIndex == -1) {
+            Log.w(TAG, "Could not find amount index in SMS body for template creation.")
             return
         }
 
-        val signature = smsBody.replace(Regex("\\d"), "").replace(Regex("\\s+"), " ").trim()
+        val signature = SmsParser.generateSmsSignature(smsBody)
 
         val template = SmsParseTemplate(
             templateSignature = signature,
+            correctedMerchantName = correctedMerchant,
             originalSmsBody = smsBody,
-            originalMerchantStartIndex = merchantIndex,
-            originalMerchantEndIndex = merchantIndex + originalMerchant.length,
             originalAmountStartIndex = amountIndex,
-            originalAmountEndIndex = amountIndex + amountStr.length
+            originalAmountEndIndex = amountIndex + amountStr.length,
+            originalMerchantStartIndex = originalMerchantStartIndex,
+            originalMerchantEndIndex = originalMerchantEndIndex
         )
 
         smsParseTemplateDao.insert(template)

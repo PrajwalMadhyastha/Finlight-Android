@@ -13,8 +13,8 @@ import kotlinx.serialization.Serializable
  * originally parsed from an SMS. It stores the structure of that SMS, allowing
  * the heuristic engine to parse similar messages in the future.
  *
- * @param id The unique identifier for the template.
- * @param templateSignature A normalized, simplified version of the SMS body used for efficient initial lookups. This is now a unique field.
+ * @param templateSignature A normalized, simplified version of the SMS body used for efficient initial lookups.
+ * @param correctedMerchantName The final, user-corrected merchant name for this specific outcome.
  * @param originalSmsBody The full, unmodified body of the source SMS.
  * @param originalMerchantStartIndex The starting index of the merchant name in the originalSmsBody.
  * @param originalMerchantEndIndex The ending index of the merchant name in the originalSmsBody.
@@ -24,14 +24,13 @@ import kotlinx.serialization.Serializable
 @Serializable
 @Entity(
     tableName = "sms_parse_templates",
-    // --- FIX: Enforce uniqueness on the templateSignature to prevent duplicates ---
-    indices = [Index(value = ["templateSignature"], unique = true)]
+    primaryKeys = ["templateSignature", "correctedMerchantName"]
 )
 data class SmsParseTemplate(
-    @PrimaryKey(autoGenerate = true)
-    val id: Int = 0,
-    @ColumnInfo
+    @ColumnInfo(collate = ColumnInfo.NOCASE)
     val templateSignature: String,
+    @ColumnInfo(collate = ColumnInfo.NOCASE)
+    val correctedMerchantName: String,
     val originalSmsBody: String,
     val originalMerchantStartIndex: Int,
     val originalMerchantEndIndex: Int,

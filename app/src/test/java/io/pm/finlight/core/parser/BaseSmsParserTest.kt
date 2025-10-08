@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.flowOf
 import org.junit.Before
 import org.junit.runner.RunWith
 import org.mockito.Mock
+import org.mockito.Mockito
 import org.mockito.Mockito.`when`
 import org.mockito.junit.MockitoJUnitRunner
 
@@ -74,6 +75,7 @@ abstract class BaseSmsParserTest {
         }
         smsParseTemplateProvider = object : SmsParseTemplateProvider {
             override suspend fun getAllTemplates(): List<SmsParseTemplate> = mockSmsParseTemplateDao.getAllTemplates()
+            override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = mockSmsParseTemplateDao.getTemplatesBySignature(signature)
         }
     }
 
@@ -86,11 +88,9 @@ abstract class BaseSmsParserTest {
         ignoreRules: List<IgnoreRule> = DEFAULT_IGNORE_PHRASES
     ) {
         // Mock the DAO methods. The providers above will then use these mocks.
-        // --- UPDATED: Removed unnecessary stubbing for custom rules. ---
-        // `when`(mockCustomSmsRuleDao.getAllRules()).thenReturn(flowOf(customRules))
+        `when`(mockCustomSmsRuleDao.getAllRules()).thenReturn(flowOf(customRules))
         `when`(mockMerchantRenameRuleDao.getAllRules()).thenReturn(flowOf(renameRules))
         `when`(mockIgnoreRuleDao.getEnabledRules()).thenReturn(ignoreRules.filter { it.isEnabled })
-        // --- UPDATED: The mock is now always set up to prevent NullPointerExceptions ---
-        `when`(mockSmsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+        `when`(mockSmsParseTemplateDao.getTemplatesBySignature(Mockito.anyString())).thenReturn(emptyList())
     }
 }

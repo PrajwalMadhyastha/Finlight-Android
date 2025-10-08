@@ -86,6 +86,7 @@ class SmsReceiver : BroadcastReceiver() {
                         }
                         val smsParseTemplateProvider = object : SmsParseTemplateProvider {
                             override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
+                            override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
                         }
 
                         // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
