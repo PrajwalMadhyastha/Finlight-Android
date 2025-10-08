@@ -57,41 +57,36 @@ class BudgetViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `availableCategoriesForNewBudget only shows categories without a current month budget`() = runTest {
+    fun `availableCategoriesForNewBudget excludes categories with current or carried-over budgets`() = runTest {
         // ARRANGE
-        val calendar = Calendar.getInstance()
-        val currentMonth = calendar.get(Calendar.MONTH) + 1
-        val currentYear = calendar.get(Calendar.YEAR)
-
         val allCategories = listOf(
-            Category(1, "Food", "restaurant", "red_light"),
-            Category(2, "Shopping", "shopping_bag", "blue_light"),
-            Category(3, "Travel", "travel_explore", "green_light")
+            Category(1, "Food", "icon", "color"),
+            Category(2, "Travel", "icon", "color"),
+            Category(3, "Shopping", "icon", "color")
+        )
+        // This list simulates the DAO result from getBudgetsWithSpendingForMonth, which includes carried-over budgets.
+        // Let's say "Food" and "Travel" both have budgets for the current period (either set this month or carried over).
+        val budgetsWithSpending = listOf(
+            BudgetWithSpending(Budget(1, "Food", 5000.0, 10, 2025), 100.0, "icon", "color"),
+            BudgetWithSpending(Budget(2, "Travel", 2000.0, 10, 2025), 200.0, "icon", "color")
         )
 
-        // "Food" already has a budget specifically for this month
-        val budgetsForCurrentMonth = listOf(
-            Budget(101, "Food", 5000.0, currentMonth, currentYear)
-        )
-
-        // Mock the repository calls needed for the ViewModel's init block
+        // Mock the repository calls needed for the ViewModel's init block.
         `when`(categoryRepository.allCategories).thenReturn(flowOf(allCategories))
-        `when`(budgetRepository.getBudgetsForMonth(currentMonth, currentYear)).thenReturn(flowOf(budgetsForCurrentMonth))
-        `when`(settingsRepository.getOverallBudgetForMonth(currentMonth, currentYear)).thenReturn(flowOf(10000f))
+        `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(budgetsWithSpending))
 
-        // ACT
-        // ViewModel logic runs in the init block. We instantiate it directly with mocks.
+        // ACT: Re-initialize ViewModel to pick up new mock setup.
         viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository)
 
-        // ASSERT
-        val availableCategories = viewModel.availableCategoriesForNewBudget.first()
-        val availableCategoryNames = availableCategories.map { it.name }
-
-        assertEquals(2, availableCategories.size)
-        assertTrue("'Shopping' should be available as it has no budget this month", availableCategoryNames.contains("Shopping"))
-        assertTrue("'Travel' should be available as it has no budget this month", availableCategoryNames.contains("Travel"))
-        assertTrue("'Food' should NOT be available as it already has a budget this month", !availableCategoryNames.contains("Food"))
+        // ASSERT: Check that only the "Shopping" category is available for a new budget.
+        viewModel.availableCategoriesForNewBudget.test {
+            val availableCategories = awaitItem()
+            assertEquals(1, availableCategories.size)
+            assertEquals("Shopping", availableCategories.first().name)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
+
 
     @Test
     fun `overallBudget carries forward from older month when immediate previous month is skipped`() = runTest {
