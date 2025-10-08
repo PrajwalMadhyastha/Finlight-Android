@@ -29,11 +29,13 @@ import kotlinx.serialization.Serializable
 data class SmsParseTemplate(
     @ColumnInfo(collate = ColumnInfo.NOCASE)
     val templateSignature: String,
+    // --- FIX: Add default value for backward compatibility during JSON deserialization ---
     @ColumnInfo(collate = ColumnInfo.NOCASE)
-    val correctedMerchantName: String,
+    val correctedMerchantName: String = "",
     val originalSmsBody: String,
-    val originalMerchantStartIndex: Int,
-    val originalMerchantEndIndex: Int,
+    // --- FIX: Add default values for backward compatibility ---
+    val originalMerchantStartIndex: Int = -1,
+    val originalMerchantEndIndex: Int = -1,
     val originalAmountStartIndex: Int,
     val originalAmountEndIndex: Int
 )
