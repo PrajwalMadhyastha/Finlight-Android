@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/BudgetViewModel.kt
-// REASON: FEATURE (Error Handling) - Added a UI event channel and wrapped all
-// data modification methods (`addCategoryBudget`, `updateBudget`, `deleteBudget`)
-// in try-catch blocks. This ensures repository exceptions are handled gracefully
-// and communicated to the user, enhancing app stability.
+// REASON: FEATURE (Budget Carry-over) - The logic to determine available
+// categories for a new budget has been updated. It now correctly excludes
+// categories that already have a budget, including those carried over from
+// previous months. This prevents users from creating duplicate/override budgets
+// and aligns category budget behavior with the overall budget's carry-forward logic.
 // =================================================================================
 package io.pm.finlight
 
@@ -61,13 +62,11 @@ class BudgetViewModel(
                     initialValue = 0L,
                 )
 
-        // --- UPDATED: This logic now correctly determines which categories can have a NEW budget ---
-        // It checks against budgets set specifically for the current month, allowing users
-        // to override a carried-over budget.
-        val budgetsSetInCurrentMonth = budgetRepository.getBudgetsForMonth(currentMonth, currentYear)
+        // --- UPDATED: Logic now correctly excludes categories that have a budget,
+        // including those carried over from previous months. ---
         availableCategoriesForNewBudget =
-            combine(allCategories, budgetsSetInCurrentMonth) { categories, budgets ->
-                val budgetedCategoryNames = budgets.map { it.categoryName }.toSet()
+            combine(allCategories, budgetsForCurrentMonth) { categories, budgetsWithSpending ->
+                val budgetedCategoryNames = budgetsWithSpending.map { it.budget.categoryName }.toSet()
                 categories.filter { category -> category.name !in budgetedCategoryNames }
             }
 
