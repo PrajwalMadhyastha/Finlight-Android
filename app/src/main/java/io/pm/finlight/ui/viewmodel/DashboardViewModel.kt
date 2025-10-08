@@ -1,3 +1,10 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/DashboardViewModel.kt
+// REASON: FIX (Data Consistency) - The ViewModel now fetches and applies the
+// `MerchantRenameRule` map to its `recentTransactions` flow. This ensures that
+// the dashboard and the transaction list screen display merchant names consistently,
+// resolving a UI discrepancy.
+// =================================================================================
 package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
@@ -57,7 +64,6 @@ class DashboardViewModel(
     val showLastMonthSummaryCard: StateFlow<Boolean> = _showLastMonthSummaryCard.asStateFlow()
 
     val privacyModeEnabled: StateFlow<Boolean>
-
     private val merchantAliases: StateFlow<Map<String, String>>
 
 
@@ -82,6 +88,11 @@ class DashboardViewModel(
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = false
             )
+
+        merchantAliases = merchantRenameRuleRepository.getAliasesAsMap()
+            .map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
 
         viewModelScope.launch {
             settingsRepository.getDashboardCardOrder().collect {
@@ -155,7 +166,7 @@ class DashboardViewModel(
                 val lastDayOfMonth = today.getActualMaximum(Calendar.DAY_OF_MONTH)
                 val remainingDays = (lastDayOfMonth - today.get(Calendar.DAY_OF_MONTH) + 1).coerceAtLeast(1)
 
-                if (remaining > 0) (remaining / remainingDays) else 0L
+                if (remaining > 0) (remaining.toDouble() / remainingDays).roundToLong() else 0L
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
         budgetHealthSummary = combine(
@@ -256,15 +267,10 @@ class DashboardViewModel(
                 list.sumOf { it.balance }.roundToLong()
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-        merchantAliases = merchantRenameRuleRepository.getAliasesAsMap()
-            .map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
-
-
         recentTransactions =
             transactionRepository.recentTransactions
-                .combine(merchantAliases) { transactions, aliases ->
-                    applyAliases(transactions, aliases)
+                .combine(merchantAliases) { transactions, aliases -> // NEW
+                    applyAliases(transactions, aliases) // NEW
                 }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

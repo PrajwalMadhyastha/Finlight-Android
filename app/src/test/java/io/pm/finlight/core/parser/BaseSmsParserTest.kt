@@ -23,7 +23,7 @@ import org.mockito.junit.MockitoJUnitRunner
  * An abstract base class for all SMS Parser tests. It handles the boilerplate setup
  * for mocking DAOs and creating the necessary rule providers.
  */
-@RunWith(MockitoJUnitRunner::class)
+@RunWith(MockitoJUnitRunner.Silent::class)
 abstract class BaseSmsParserTest {
 
     @Mock

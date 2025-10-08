@@ -48,6 +48,9 @@ class DashboardViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var settingsRepository: SettingsRepository
 
+    @Mock
+    private lateinit var merchantRenameRuleRepository: MerchantRenameRuleRepository
+
     private lateinit var viewModel: DashboardViewModel
 
     @Before
@@ -91,6 +94,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
                 Mockito.anyLong()
             )
         ).thenReturn(flowOf(emptyList()))
+        `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
 
 
         // Initialize the ViewModel with mocked dependencies
@@ -99,6 +103,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
             accountRepository = accountRepository,
             budgetDao = budgetDao,
             settingsRepository = settingsRepository,
+            merchantRenameRuleRepository = merchantRenameRuleRepository
         )
     }
 
@@ -108,6 +113,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
             accountRepository = accountRepository,
             budgetDao = budgetDao,
             settingsRepository = settingsRepository,
+            merchantRenameRuleRepository = merchantRenameRuleRepository
         )
     }
 
