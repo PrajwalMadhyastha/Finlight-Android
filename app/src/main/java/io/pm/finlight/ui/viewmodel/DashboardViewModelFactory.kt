@@ -25,6 +25,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
             val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
             val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
             val accountRepository = AccountRepository(db)
+            val merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao())
 
             @Suppress("UNCHECKED_CAST")
             return DashboardViewModel(
@@ -32,6 +33,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                 accountRepository = accountRepository,
                 budgetDao = db.budgetDao(),
                 settingsRepository = settingsRepository,
+                merchantRenameRuleRepository = merchantRenameRuleRepository
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

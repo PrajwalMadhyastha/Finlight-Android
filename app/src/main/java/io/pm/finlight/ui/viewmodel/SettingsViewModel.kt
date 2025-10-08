@@ -255,6 +255,7 @@ class SettingsViewModel(
                 }
                 val smsParseTemplateProvider = object : SmsParseTemplateProvider {
                     override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
+                    override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
                 }
 
                 val parsedList = withContext(Dispatchers.Default) {
@@ -328,6 +329,7 @@ class SettingsViewModel(
                 }
                 val smsParseTemplateProvider = object : SmsParseTemplateProvider {
                     override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
+                    override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
                 }
 
 

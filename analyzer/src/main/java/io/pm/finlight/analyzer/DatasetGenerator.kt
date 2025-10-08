@@ -91,6 +91,7 @@ suspend fun main() {
     }
     val mockSmsParseTemplateProvider = object : SmsParseTemplateProvider {
         override suspend fun getAllTemplates(): List<SmsParseTemplate> = emptyList()
+        override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = emptyList()
     }
 
     // --- 3. Process each SMS message ---
@@ -115,7 +116,7 @@ suspend fun main() {
 
         val labeledSms = when (result) {
             is ParseResult.Success -> LabeledSms(text = sms.body, label = 1) // TRANSACTION
-            is ParseResult.Ignored, is ParseResult.NotParsed -> LabeledSms(text = sms.body, label = 0) // NON_TRANSACTION
+            is ParseResult.Ignored, is ParseResult.NotParsed, is ParseResult.IgnoredByClassifier -> LabeledSms(text = sms.body, label = 0) // NON_TRANSACTION
         }
         labeledSmsList.add(labeledSms)
     }

@@ -49,4 +49,6 @@ interface CategoryFinderProvider {
  */
 interface SmsParseTemplateProvider {
     suspend fun getAllTemplates(): List<SmsParseTemplate>
+    // --- NEW: Add a more efficient query for the parser ---
+    suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate>
 }

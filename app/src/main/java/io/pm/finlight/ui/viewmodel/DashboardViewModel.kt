@@ -1,3 +1,10 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/DashboardViewModel.kt
+// REASON: FIX (Data Consistency) - The ViewModel now fetches and applies the
+// `MerchantRenameRule` map to its `recentTransactions` flow. This ensures that
+// the dashboard and the transaction list screen display merchant names consistently,
+// resolving a UI discrepancy.
+// =================================================================================
 package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
@@ -24,6 +31,7 @@ class DashboardViewModel(
     private val accountRepository: AccountRepository,
     private val budgetDao: BudgetDao,
     private val settingsRepository: SettingsRepository,
+    private val merchantRenameRuleRepository: MerchantRenameRuleRepository
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
@@ -56,6 +64,7 @@ class DashboardViewModel(
     val showLastMonthSummaryCard: StateFlow<Boolean> = _showLastMonthSummaryCard.asStateFlow()
 
     val privacyModeEnabled: StateFlow<Boolean>
+    private val merchantAliases: StateFlow<Map<String, String>>
 
 
     init {
@@ -79,6 +88,11 @@ class DashboardViewModel(
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = false
             )
+
+        merchantAliases = merchantRenameRuleRepository.getAliasesAsMap()
+            .map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
 
         viewModelScope.launch {
             settingsRepository.getDashboardCardOrder().collect {
@@ -152,7 +166,7 @@ class DashboardViewModel(
                 val lastDayOfMonth = today.getActualMaximum(Calendar.DAY_OF_MONTH)
                 val remainingDays = (lastDayOfMonth - today.get(Calendar.DAY_OF_MONTH) + 1).coerceAtLeast(1)
 
-                if (remaining > 0) (remaining / remainingDays) else 0L
+                if (remaining > 0) (remaining.toDouble() / remainingDays).roundToLong() else 0L
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
         budgetHealthSummary = combine(
@@ -255,6 +269,9 @@ class DashboardViewModel(
 
         recentTransactions =
             transactionRepository.recentTransactions
+                .combine(merchantAliases) { transactions, aliases -> // NEW
+                    applyAliases(transactions, aliases) // NEW
+                }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         val yearMonthString = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
@@ -296,6 +313,14 @@ class DashboardViewModel(
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = emptyList()
             )
+    }
+
+    private fun applyAliases(transactions: List<TransactionDetails>, aliases: Map<String, String>): List<TransactionDetails> {
+        return transactions.map { details ->
+            val key = (details.transaction.originalDescription ?: details.transaction.description).lowercase(Locale.getDefault())
+            val newDescription = aliases[key] ?: details.transaction.description
+            details.copy(transaction = details.transaction.copy(description = newDescription))
+        }
     }
 
     fun dismissLastMonthSummaryCard() {
