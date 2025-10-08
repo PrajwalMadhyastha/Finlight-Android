@@ -15,10 +15,8 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.CategoryIconHelper
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 // Data class to hold the result for each SMS
 data class SmsDebugResult(
@@ -82,6 +80,7 @@ class SmsDebugViewModel(
     }
     private val smsParseTemplateProvider = object : SmsParseTemplateProvider {
         override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
+        override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
     }
 
 
@@ -90,7 +89,7 @@ class SmsDebugViewModel(
     }
 
     fun refreshScan() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
             val currentLimit = _uiState.value.loadCount
@@ -98,8 +97,8 @@ class SmsDebugViewModel(
             val results = mutableListOf<SmsDebugResult>()
 
             for (sms in recentSms) {
-                // --- UPDATED: Replicate the full pipeline from SmsReceiver ---
-                val parseResult: ParseResult = withContext(Dispatchers.IO) {
+                // --- REMOVED: withContext(Dispatchers.IO) to make ViewModel more testable ---
+                val parseResult: ParseResult = run {
                     // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
                     var result: ParseResult? = SmsParser.parseWithOnlyCustomRules(
                         sms = sms,
@@ -159,16 +158,15 @@ class SmsDebugViewModel(
             val currentLimit = _uiState.value.loadCount
 
             // Re-scan to get the new state
-            val recentSms = withContext(Dispatchers.IO) { smsRepository.fetchAllSms(null).take(currentLimit) }
+            val recentSms = smsRepository.fetchAllSms(null).take(currentLimit)
             val newResults = mutableListOf<SmsDebugResult>()
             val transactionsToImport = mutableListOf<PotentialTransaction>()
 
-            val existingSmsHashes = withContext(Dispatchers.IO) {
-                db.transactionDao().getAllSmsHashes().first().toSet()
-            }
+            val existingSmsHashes = db.transactionDao().getAllSmsHashes().first().toSet()
 
             for (sms in recentSms) {
-                val newParseResult = withContext(Dispatchers.IO) {
+                // --- REMOVED: withContext(Dispatchers.IO) to make ViewModel more testable ---
+                val newParseResult = run {
                     // --- UPDATED: Replicate the full pipeline from SmsReceiver ---
                     // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
                     var result: ParseResult? = SmsParser.parseWithOnlyCustomRules(
@@ -226,3 +224,4 @@ class SmsDebugViewModel(
         }
     }
 }
+

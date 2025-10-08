@@ -22,7 +22,6 @@ sealed class ParseResult {
 
 object SmsParser {
     private const val TAG = "SmsParser"
-    private const val SIMILARITY_THRESHOLD = 0.85 // 85% similar
 
     private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
@@ -282,23 +281,14 @@ object SmsParser {
         var potentialTxn: PotentialTransaction? = null
 
         // --- Stage 2: Attempt Heuristic Template Parsing ---
-        val allTemplates = smsParseTemplateProvider.getAllTemplates()
-        if (allTemplates.isNotEmpty()) {
-            var bestMatch: SmsParseTemplate? = null
-            var highestScore = 0.0
+        val smsSignature = generateSmsSignature(normalizedBody)
+        val matchingTemplates = smsParseTemplateProvider.getTemplatesBySignature(smsSignature)
 
-            for (template in allTemplates) {
-                val score = calculateSimilarity(normalizedBody, template.originalSmsBody)
-                if (score > highestScore) {
-                    highestScore = score
-                    bestMatch = template
-                }
-            }
-
-            if (bestMatch != null && highestScore >= SIMILARITY_THRESHOLD) {
-                potentialTxn = applyTemplate(normalizedBody, bestMatch, sms)
-            }
+        if (matchingTemplates.size == 1) {
+            // Confident match, apply this single template.
+            potentialTxn = applyTemplate(normalizedBody, matchingTemplates.first(), sms)
         }
+        // If size is 0 or > 1, potentialTxn remains null, and we fall through.
 
 
         // --- Stage 3: If still no match, fall back to Generic Regex Parsing ---
@@ -430,7 +420,7 @@ object SmsParser {
         VOLATILE_DATA_REGEX.forEach { regex ->
             signature = regex.replace(signature, "")
         }
-        return signature.replace(Regex("\\s+"), " ").trim().hashCode().toString()
+        return signature.replace(Regex("\\s+"), " ").trim()
     }
 
     private fun findCategoryIdByKeyword(merchantName: String, categoryFinderProvider: CategoryFinderProvider): Int? {
@@ -604,10 +594,9 @@ object SmsParser {
 
     private fun applyTemplate(newSmsBody: String, template: SmsParseTemplate, originalSms: SmsMessage): PotentialTransaction? {
         try {
-            val merchant = newSmsBody.substring(
-                template.originalMerchantStartIndex,
-                min(template.originalMerchantEndIndex, newSmsBody.length)
-            )
+            // The merchant is now the learned outcome from the template
+            val merchant = template.correctedMerchantName
+
             val amountStr = newSmsBody.substring(
                 template.originalAmountStartIndex,
                 min(template.originalAmountEndIndex, newSmsBody.length)
@@ -627,38 +616,5 @@ object SmsParser {
             println("$TAG: Error applying heuristic template: ${e.message}")
             return null
         }
-    }
-
-    private fun calculateSimilarity(s1: String, s2: String): Double {
-        val longer = if (s1.length > s2.length) s1 else s2
-        val shorter = if (s1.length > s2.length) s2 else s1
-        if (longer.isEmpty()) return 1.0
-        val distance = levenshteinDistance(longer, shorter)
-        return (longer.length - distance) / longer.length.toDouble()
-    }
-
-    private fun levenshteinDistance(s1: String, s2: String): Int {
-        val costs = IntArray(s2.length + 1)
-        for (i in 0..s1.length) {
-            var lastValue = i
-            for (j in 0..s2.length) {
-                if (i == 0) {
-                    costs[j] = j
-                } else {
-                    if (j > 0) {
-                        var newValue = costs[j - 1]
-                        if (s1[i - 1] != s2[j - 1]) {
-                            newValue = min(min(newValue, lastValue), costs[j]) + 1
-                        }
-                        costs[j - 1] = lastValue
-                        lastValue = newValue
-                    }
-                }
-            }
-            if (i > 0) {
-                costs[s2.length] = lastValue
-            }
-        }
-        return costs[s2.length]
     }
 }

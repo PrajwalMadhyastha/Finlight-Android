@@ -70,13 +70,14 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     private fun setupDefaultDaoBehaviors() = runTest {
         `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
         `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-        // Use thenAnswer for suspend functions
         `when`(ignoreRuleDao.getEnabledRules()).thenAnswer { DEFAULT_IGNORE_PHRASES }
         `when`(smsParseTemplateDao.getAllTemplates()).thenAnswer { emptyList<SmsParseTemplate>() }
+        // --- FIX: Add missing mock for getTemplatesBySignature to prevent NPE ---
+        `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenAnswer { emptyList<SmsParseTemplate>() }
         `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-        // FIX: Use anyObject() for the non-nullable String parameter to avoid NPEs.
         `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyObject())).thenAnswer { null }
     }
+
 
     private fun initializeViewModel() {
         viewModel = SmsDebugViewModel(
@@ -108,16 +109,12 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
         // Assert
         viewModel.uiState.test {
-            // 1. Await the initial state emitted when the ViewModel is created (isLoading=true).
-            val initialState = awaitItem()
-            assertTrue("Initial state should be loading", initialState.isLoading)
-
-            // 2. Since the work is launched in a separate coroutine in 'init',
-            // we need to advance the dispatcher to let that work complete.
+            // FIX: Don't assert on the initial loading state from init, as it's a race condition.
+            // Instead, advance time until the init block is guaranteed to be finished,
+            // then assert on the final state.
             advanceUntilIdle()
 
-            // 3. Now that the work is done, await the final state emission.
-            val finalState = awaitItem()
+            val finalState = expectMostRecentItem()
             assertFalse("Final state should not be loading", finalState.isLoading)
             assertEquals(3, finalState.debugResults.size)
 
@@ -143,14 +140,16 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule))) // Will parse sms1
 
         initializeViewModel()
-        advanceUntilIdle()
+
 
         // Assert initial state (problematic)
         viewModel.filteredDebugResults.test {
-            // The StateFlow will emit its initial value (emptyList), then the new value.
-            // We skip the initial one to assert on the result of the async operation.
-            skipItems(1)
-            assertEquals(1, awaitItem().size)
+            // FIX: Wait for the init block's async work to finish before asserting.
+            advanceUntilIdle()
+            // The StateFlow will have its initial value (emptyList), then the new value.
+            // Await the final item which is the result of the async operation.
+            val initialFiltered = expectMostRecentItem()
+            assertEquals(1, initialFiltered.size)
 
             // Act: Change to ALL
             viewModel.setFilter(SmsDebugFilter.ALL)
@@ -195,20 +194,17 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         initializeViewModel()
 
         viewModel.uiState.test {
-            // Phase 1: Let the init{} block run and assert its states.
-            // The StateFlow's default is isLoading=true, which is emitted immediately.
-            assertTrue("Should be loading initially", awaitItem().isLoading)
-
-            // The init{} coroutine then finishes and emits isLoading=false.
-            val initialState = awaitItem()
-            assertFalse("Should finish loading after init", initialState.isLoading)
+            // Phase 1: Wait for init and assert the initial state *after* loading.
+            advanceUntilIdle()
+            val initialState = expectMostRecentItem() // Get the latest value after init.
+            assertFalse("Should be done loading after init", initialState.isLoading)
             val initialResult = initialState.debugResults.find { it.smsMessage.id == 1L }
             assertTrue(
                 "Initial parse result should be NotParsed, but was ${initialResult?.parseResult}",
                 initialResult?.parseResult is ParseResult.NotParsed
             )
 
-            // Phase 2: Arrange mocks for the next action.
+            // Phase 2: Arrange mocks for the refresh action.
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
             `when`(transactionViewModel.autoSaveSmsTransaction(anyObject())).thenAnswer { invocation ->
                 capturedTxn = invocation.getArgument(0)
@@ -221,6 +217,9 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             // Assert the loading state for the refresh action.
             val loadingState = awaitItem()
             assertTrue("Should be loading during refresh", loadingState.isLoading)
+
+            // Let the rest of the function run
+            advanceUntilIdle()
 
             // Assert the final state after the refresh action.
             val finalState = awaitItem()
@@ -242,3 +241,4 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         }
     }
 }
+

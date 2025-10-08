@@ -126,6 +126,7 @@ suspend fun main() {
     }
     val mockSmsParseTemplateProvider = object : SmsParseTemplateProvider {
         override suspend fun getAllTemplates(): List<SmsParseTemplate> = emptyList() // No DB access
+        override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = emptyList()
     }
 
     smsList.forEach { sms ->
@@ -174,6 +175,16 @@ suspend fun main() {
             }
             is ParseResult.NotParsed -> {
                 notParsedMessages.add(
+                    IgnoredMessageRecord(
+                        sender = sms.address,
+                        body = sms.body,
+                        date = sms.readable_date,
+                        reason = result.reason
+                    )
+                )
+            }
+            is ParseResult.IgnoredByClassifier -> {
+                ignoredMessages.add(
                     IgnoredMessageRecord(
                         sender = sms.address,
                         body = sms.body,
@@ -248,4 +259,3 @@ private fun printSummary(totalCount: Int, parsedCount: Int, ignoredCount: Int, n
     println("\nFull reports saved to parsed_transactions.csv, ignored_messages.csv, and not_parsed_messages.csv")
     println("================================================")
 }
-

@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: FIX - Incremented the database version to 41 and added a new migration
-// (MIGRATION_40_41). This migration adds a unique index to the 'templateSignature'
-// column in the 'sms_parse_templates' table, which is the definitive fix for
-// the failing SmsParseTemplateDaoTest.
+// REASON: FIX - Incremented the database version to 42 and added new migrations
+// (MIGRATION_40_42 and MIGRATION_41_42). These migrations safely restructure the
+// `sms_parse_templates` table to use a composite primary key, removing the faulty
+// unique index and cleaning up duplicate data to resolve the crash-on-update.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -48,7 +48,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         Trip::class,
         AccountAlias::class
     ],
-    version = 41, // --- UPDATED: Incremented version ---
+    version = 42, // --- UPDATED: Incremented version to 42 ---
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -74,7 +74,7 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // --- All existing migrations (1-2 through 39-40) remain here ---
+        // --- All existing migrations (1-2 through 40-41) remain here ---
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN transactionType TEXT NOT NULL DEFAULT 'expense'")
@@ -479,13 +479,56 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_date` ON `transactions` (`date`)")
             }
         }
-        // --- NEW: Migration to add a unique index to sms_parse_templates ---
+        // --- THIS IS THE FAULTY MIGRATION ---
         val MIGRATION_40_41 = object : Migration(40, 41) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Drop the old, non-unique index if it exists.
+                // This migration cleans up duplicates before applying the unique index.
+                db.execSQL("DELETE FROM sms_parse_templates WHERE id NOT IN (SELECT MIN(id) FROM sms_parse_templates GROUP BY templateSignature)")
                 db.execSQL("DROP INDEX IF EXISTS `index_sms_parse_templates_templateSignature`")
-                // Create the new, unique index.
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_sms_parse_templates_templateSignature` ON `sms_parse_templates` (`templateSignature`)")
+            }
+        }
+
+        // --- NEW: Migration from v40 (pre-crash) to v42 (new schema) ---
+        val MIGRATION_40_42 = object : Migration(40, 42) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // The old templates are not compatible with the new schema as they lack the
+                // 'correctedMerchantName'. The safest approach is to drop the old table
+                // and create the new one. The app will re-learn templates over time.
+                db.execSQL("DROP TABLE IF EXISTS `sms_parse_templates`")
+                db.execSQL("""
+                    CREATE TABLE `sms_parse_templates` (
+                        `templateSignature` TEXT NOT NULL COLLATE NOCASE, 
+                        `correctedMerchantName` TEXT NOT NULL COLLATE NOCASE, 
+                        `originalSmsBody` TEXT NOT NULL, 
+                        `originalAmountStartIndex` INTEGER NOT NULL, 
+                        `originalAmountEndIndex` INTEGER NOT NULL,
+                        `originalMerchantStartIndex` INTEGER NOT NULL,
+                        `originalMerchantEndIndex` INTEGER NOT NULL,
+                        PRIMARY KEY(`templateSignature`, `correctedMerchantName`)
+                    )
+                """)
+            }
+        }
+
+        // --- NEW: Migration from v41 (crashed version) to v42 (new schema) ---
+        val MIGRATION_41_42 = object : Migration(41, 42) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // The logic is identical to 40-42. We drop the old, potentially problematic table
+                // and create the new, corrected one from scratch.
+                db.execSQL("DROP TABLE IF EXISTS `sms_parse_templates`")
+                db.execSQL("""
+                    CREATE TABLE `sms_parse_templates` (
+                        `templateSignature` TEXT NOT NULL COLLATE NOCASE, 
+                        `correctedMerchantName` TEXT NOT NULL COLLATE NOCASE, 
+                        `originalSmsBody` TEXT NOT NULL, 
+                        `originalAmountStartIndex` INTEGER NOT NULL, 
+                        `originalAmountEndIndex` INTEGER NOT NULL,
+                        `originalMerchantStartIndex` INTEGER NOT NULL,
+                        `originalMerchantEndIndex` INTEGER NOT NULL,
+                        PRIMARY KEY(`templateSignature`, `correctedMerchantName`)
+                    )
+                """)
             }
         }
 
@@ -511,7 +554,9 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_29_30, MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
                             MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
                             MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40,
-                            MIGRATION_40_41 // --- UPDATED: Add the new migration
+                            MIGRATION_40_41,
+                            MIGRATION_40_42, // --- ADDED
+                            MIGRATION_41_42  // --- ADDED
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

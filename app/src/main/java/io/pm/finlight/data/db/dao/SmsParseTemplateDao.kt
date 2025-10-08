@@ -11,8 +11,8 @@ import androidx.room.Query
 @Dao
 interface SmsParseTemplateDao {
     /**
-     * Inserts a new template. If a template with the same signature already exists,
-     * the insertion is ignored to avoid duplicates.
+     * Inserts a new template. If a template with the same composite primary key
+     * (signature + corrected name) already exists, it is ignored.
      * @param template The template to insert.
      */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -32,6 +32,15 @@ interface SmsParseTemplateDao {
      */
     @Query("SELECT * FROM sms_parse_templates")
     suspend fun getAllTemplates(): List<SmsParseTemplate>
+
+    /**
+     * Retrieves all templates that match a given signature.
+     * @param signature The signature to search for.
+     * @return A list of matching SmsParseTemplate objects.
+     */
+    @Query("SELECT * FROM sms_parse_templates WHERE templateSignature = :signature")
+    suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate>
+
 
     /**
      * Deletes all SMS parse templates from the database.

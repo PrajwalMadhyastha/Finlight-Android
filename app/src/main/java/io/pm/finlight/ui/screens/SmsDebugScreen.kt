@@ -74,7 +74,7 @@ fun SmsDebugScreen(
                         onClick = { viewModel.setFilter(SmsDebugFilter.PROBLEMATIC) },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                     ) {
-                        Text("Problematic")
+                        Text("Ignored")
                     }
                     SegmentedButton(
                         selected = uiState.selectedFilter == SmsDebugFilter.ALL,
