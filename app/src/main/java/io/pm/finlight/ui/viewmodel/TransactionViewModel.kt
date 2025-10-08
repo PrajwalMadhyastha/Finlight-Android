@@ -902,31 +902,27 @@ class TransactionViewModel(
         try {
             if (newDescription.isNotBlank()) {
                 val transaction = transactionRepository.getTransactionById(id).firstOrNull()
-                if (transaction != null) {
-                    val original = transaction.originalDescription ?: transaction.description
+                // --- BUG FIX: Only create learning templates for SMS-based transactions ---
+                if (transaction != null && transaction.sourceSmsId != null && transaction.originalDescription != null) {
+                    val original = transaction.originalDescription
+                    // Check if a meaningful change was made
                     if (original.isNotBlank() && !original.equals(newDescription, ignoreCase = true)) {
-                        val rule = MerchantRenameRule(originalName = original, newName = newDescription)
-                        merchantRenameRuleRepository.insert(rule)
-
-                        if (transaction.sourceSmsId != null && transaction.originalDescription != null) {
-                            val originalSms = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
-                            if (originalSms != null) {
-                                // --- FIX: Calculate and pass the required merchant indices ---
-                                val originalMerchant = transaction.originalDescription
-                                val merchantIndex = originalSms.body.indexOf(originalMerchant)
-                                if (merchantIndex != -1) {
-                                    createAndStoreTemplate(
-                                        smsBody = originalSms.body,
-                                        transaction = transaction,
-                                        correctedMerchant = newDescription,
-                                        originalMerchantStartIndex = merchantIndex,
-                                        originalMerchantEndIndex = merchantIndex + originalMerchant.length
-                                    )
-                                }
+                        val originalSms = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
+                        if (originalSms != null) {
+                            val merchantIndex = originalSms.body.indexOf(original)
+                            if (merchantIndex != -1) {
+                                createAndStoreTemplate(
+                                    smsBody = originalSms.body,
+                                    transaction = transaction,
+                                    correctedMerchant = newDescription,
+                                    originalMerchantStartIndex = merchantIndex,
+                                    originalMerchantEndIndex = merchantIndex + original.length
+                                )
                             }
                         }
                     }
                 }
+                // Always update the description for the specific transaction
                 transactionRepository.updateDescription(id, newDescription)
             }
         } catch (e: Exception) {
@@ -934,6 +930,7 @@ class TransactionViewModel(
             _uiEvent.send("Failed to update description. Please try again.")
         }
     }
+
 
     private suspend fun createAndStoreTemplate(
         smsBody: String,
@@ -1239,15 +1236,38 @@ class TransactionViewModel(
         viewModelScope.launch {
             val state = _retroUpdateSheetState.value ?: return@launch
             val idsToUpdate = state.selectedIds.toList()
-            if (idsToUpdate.isEmpty()) return@launch
+            // If no items are selected, just dismiss the sheet.
+            if (idsToUpdate.isEmpty()) {
+                dismissRetroUpdateSheet()
+                return@launch
+            }
 
-            state.newDescription?.let {
-                transactionRepository.updateDescriptionForIds(idsToUpdate, it)
+            try {
+                // Create the rename rule when a batch update is confirmed.
+                state.newDescription?.let { newDesc ->
+                    val originalDesc = state.originalDescription
+                    if (originalDesc.isNotBlank() && !originalDesc.equals(newDesc, ignoreCase = true)) {
+                        val rule = MerchantRenameRule(originalName = originalDesc, newName = newDesc)
+                        merchantRenameRuleRepository.insert(rule)
+                    }
+                }
+
+                // Perform the batch updates
+                state.newDescription?.let {
+                    transactionRepository.updateDescriptionForIds(idsToUpdate, it)
+                }
+                state.newCategoryId?.let {
+                    transactionRepository.updateCategoryForIds(idsToUpdate, it)
+                }
+                _uiEvent.send("Updated ${idsToUpdate.size} transaction(s).")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to perform batch update", e)
+                _uiEvent.send("Batch update failed. Please try again.")
+            } finally {
+                // Always dismiss the sheet after the operation.
+                dismissRetroUpdateSheet()
             }
-            state.newCategoryId?.let {
-                transactionRepository.updateCategoryForIds(idsToUpdate, it)
-            }
-            dismissRetroUpdateSheet()
         }
     }
+
 }

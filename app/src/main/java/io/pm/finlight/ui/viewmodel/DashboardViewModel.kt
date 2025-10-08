@@ -24,6 +24,7 @@ class DashboardViewModel(
     private val accountRepository: AccountRepository,
     private val budgetDao: BudgetDao,
     private val settingsRepository: SettingsRepository,
+    private val merchantRenameRuleRepository: MerchantRenameRuleRepository
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
@@ -56,6 +57,8 @@ class DashboardViewModel(
     val showLastMonthSummaryCard: StateFlow<Boolean> = _showLastMonthSummaryCard.asStateFlow()
 
     val privacyModeEnabled: StateFlow<Boolean>
+
+    private val merchantAliases: StateFlow<Map<String, String>>
 
 
     init {
@@ -253,8 +256,16 @@ class DashboardViewModel(
                 list.sumOf { it.balance }.roundToLong()
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
+        merchantAliases = merchantRenameRuleRepository.getAliasesAsMap()
+            .map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+
         recentTransactions =
             transactionRepository.recentTransactions
+                .combine(merchantAliases) { transactions, aliases ->
+                    applyAliases(transactions, aliases)
+                }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         val yearMonthString = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
@@ -296,6 +307,14 @@ class DashboardViewModel(
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = emptyList()
             )
+    }
+
+    private fun applyAliases(transactions: List<TransactionDetails>, aliases: Map<String, String>): List<TransactionDetails> {
+        return transactions.map { details ->
+            val key = (details.transaction.originalDescription ?: details.transaction.description).lowercase(Locale.getDefault())
+            val newDescription = aliases[key] ?: details.transaction.description
+            details.copy(transaction = details.transaction.copy(description = newDescription))
+        }
     }
 
     fun dismissLastMonthSummaryCard() {
