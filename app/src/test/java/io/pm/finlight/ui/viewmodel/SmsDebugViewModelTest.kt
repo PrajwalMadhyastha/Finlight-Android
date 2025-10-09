@@ -164,6 +164,36 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     }
 
     @Test
+    fun `loadMore increases loadCount and refreshes`() = runTest {
+        // Arrange
+        setupDefaultDaoBehaviors()
+        val initialSms = List(100) { SmsMessage(it.toLong(), "Sender", "Body", it.toLong()) }
+        val moreSms = List(200) { SmsMessage(it.toLong(), "Sender", "Body", it.toLong()) }
+        `when`(smsRepository.fetchAllSms(null)).thenReturn(initialSms).thenReturn(moreSms)
+        `when`(smsClassifier.classify(anyString())).thenReturn(0.0f) // Ignore all for simplicity
+        initializeViewModel()
+
+        viewModel.uiState.test {
+            advanceUntilIdle()
+            val initialState = expectMostRecentItem()
+            assertEquals(100, initialState.loadCount) // Assert initial count
+
+            // Act
+            viewModel.loadMore()
+            advanceUntilIdle()
+
+            // Assert
+            val finalState = expectMostRecentItem()
+            assertEquals(200, finalState.loadCount) // Assert updated count
+
+            // Verify that fetchAllSms was called twice (once in init, once in loadMore)
+            verify(smsRepository, times(2)).fetchAllSms(null)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+
+    @Test
     @Ignore
     fun `runAutoImportAndRefresh imports newly parsed transaction`() = runTest {
         // Arrange
@@ -241,4 +271,3 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         }
     }
 }
-
