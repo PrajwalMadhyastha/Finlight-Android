@@ -1,19 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/CurrencyViewModelTest.kt
-// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
-// inheriting all common setup logic and removing boilerplate for rules,
-// dispatchers, and Mockito initialization.
-// FIX (Testing) - Replaced all instances of Mockito's `any()` with the custom,
-// null-safe `anyObject()` helper. This resolves the `NullPointerException` and
-// `Misplaced or misused argument matcher` errors caused by Kotlin's non-nullable
-// types. All previously ignored tests are now enabled and passing.
-// FIX (Testing) - Replaced `anyObject()` with `anyInt()` for mocking methods
-// that accept primitive `Int` types. This resolves a NullPointerException caused
-// by the JVM attempting to unbox a null Integer.
-// FIX (Testing) - Corrected the `updateHistoricTrip` test to properly set
-// ViewModel state via public methods instead of attempting to stub a StateFlow's
-// value directly. This resolves a `WrongTypeOfReturnValue` error from Mockito.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -26,16 +10,20 @@ import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.data.repository.TripRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.*
 import org.robolectric.annotation.Config
+import kotlin.test.assertNull
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -215,6 +203,106 @@ class CurrencyViewModelTest : BaseViewModelTest() {
         verify(tripRepository).deleteTripById(tripRecord.id)
         verify(settingsRepository).saveTravelModeSettings(null)
     }
+
+    @Test
+    fun `loadTripForEditing updates tripToEdit state`() = runTest {
+        // Arrange
+        val tripId = 1
+        val mockTrip = TripWithStats(tripId, "Test Trip", 1L, 2L, 100.0, 2, 1, TripType.DOMESTIC, null, null)
+        `when`(tripRepository.getTripWithStatsById(tripId)).thenReturn(flowOf(mockTrip))
+        initializeViewModel()
+
+        // Act
+        viewModel.loadTripForEditing(tripId)
+
+        // Assert
+        viewModel.tripToEdit.test {
+            assertEquals(mockTrip, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify(tripRepository).getTripWithStatsById(tripId)
+    }
+
+    @Test
+    fun `clearTripToEdit resets tripToEdit state`() = runTest {
+        // Arrange
+        val tripId = 1
+        val mockTrip = TripWithStats(tripId, "Test Trip", 1L, 2L, 100.0, 2, 1, TripType.DOMESTIC, null, null)
+        `when`(tripRepository.getTripWithStatsById(tripId)).thenReturn(flowOf(mockTrip))
+        initializeViewModel()
+        viewModel.loadTripForEditing(tripId) // Pre-load a trip
+
+        // Assert initial state
+        viewModel.tripToEdit.test {
+            assertEquals(mockTrip, awaitItem())
+
+            // Act
+            viewModel.clearTripToEdit()
+
+            // Assert final state
+            assertNull(awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `saveActiveTravelPlan when updating existing plan correctly removes old tags`() = runTest {
+        // Arrange
+        val oldSettings = TravelModeSettings(isEnabled = true, tripName = "Old Trip", tripType = TripType.DOMESTIC, startDate = 100L, endDate = 200L, currencyCode = null, conversionRate = null)
+        val newSettings = TravelModeSettings(isEnabled = true, tripName = "New Trip", tripType = TripType.DOMESTIC, startDate = 1000L, endDate = 2000L, currencyCode = null, conversionRate = null)
+        val oldTag = Tag(id = 1, name = "Old Trip")
+        val newTag = Tag(id = 2, name = "New Trip")
+
+        `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(oldSettings)) // Start with an existing plan
+        `when`(tagRepository.findOrCreateTag("Old Trip")).thenReturn(oldTag)
+        `when`(tagRepository.findOrCreateTag("New Trip")).thenReturn(newTag)
+        // Assume old tag is not used elsewhere so it can be deleted
+        `when`(tripRepository.isTagUsedByTrip(oldTag.id)).thenReturn(false)
+        `when`(transactionRepository.getTransactionsByTagId(oldTag.id)).thenReturn(flowOf(emptyList()))
+
+        initializeViewModel()
+
+        // --- FIX: Eagerly collect the flow to trigger emission from `stateIn` ---
+        val collectionJob = launch { viewModel.travelModeSettings.collect() }
+        advanceUntilIdle()
+
+        // Act
+        viewModel.saveActiveTravelPlan(newSettings)
+        advanceUntilIdle()
+
+        // Assert
+        // Verify old tag cleanup
+        verify(transactionRepository).removeTagForDateRange(oldTag.id, oldSettings.startDate, oldSettings.endDate)
+        verify(tagRepository).delete(oldTag)
+        // Verify new tag setup
+        verify(transactionRepository).addTagForDateRange(newTag.id, newSettings.startDate, newSettings.endDate)
+        verify(tripRepository).insert(anyObject())
+        verify(settingsRepository).saveTravelModeSettings(newSettings)
+
+        collectionJob.cancel() // Clean up the collector
+    }
+
+    @Test
+    fun `historicTrips flow filters out active trip`() = runTest {
+        // Arrange
+        val activeSettings = TravelModeSettings(true, "Active Trip", TripType.DOMESTIC, 1000L, 2000L, null, null)
+        val activeTrip = TripWithStats(1, "Active Trip", 1000L, 2000L, 100.0, 1, 1, TripType.DOMESTIC, null, null)
+        val historicTrip = TripWithStats(2, "Historic Trip", 100L, 200L, 200.0, 2, 2, TripType.DOMESTIC, null, null)
+        val allTrips = listOf(activeTrip, historicTrip)
+
+        `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(activeSettings))
+        `when`(tripRepository.getAllTripsWithStats()).thenReturn(flowOf(allTrips))
+        initializeViewModel()
+
+        // Assert
+        viewModel.historicTrips.test {
+            val filteredList = awaitItem()
+            assertEquals(1, filteredList.size)
+            assertEquals("Historic Trip", filteredList.first().tripName)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
 
     private fun initializeViewModel() {
         viewModel = CurrencyViewModel(
