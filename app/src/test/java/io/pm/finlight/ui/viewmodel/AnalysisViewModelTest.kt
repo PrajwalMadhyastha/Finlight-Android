@@ -1,12 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/AnalysisViewModelTest.kt
-// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
-// inheriting all common setup logic and removing boilerplate for rules,
-// dispatchers, and Mockito initialization.
-// FIX (Testing) - Corrected all tests to properly handle intermediate state
-// emissions from the ViewModel's complex `combine` flows. The tests now
-// correctly await the final state after an action, resolving assertion errors.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
@@ -171,5 +162,66 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         }
         verify(transactionDao).getSpendingAnalysisByCategory(eq(startDate), eq(endDate), isNull(), isNull(), isNull())
     }
-}
 
+    @Test
+    fun `onFilterSheetToggled updates showFilterSheet state`() = runTest {
+        viewModel.uiState.test {
+            // Initial state
+            assertEquals(false, awaitItem().showFilterSheet)
+
+            // Show sheet
+            viewModel.onFilterSheetToggled(true)
+            assertEquals(true, awaitItem().showFilterSheet)
+
+            // Hide sheet
+            viewModel.onFilterSheetToggled(false)
+            assertEquals(false, awaitItem().showFilterSheet)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `selectFilterTag updates uiState and refetches data`() = runTest {
+        // Arrange
+        val workTag = Tag(5, "Work")
+        val mockItems = listOf(SpendingAnalysisItem("5", "Work", 75.0, 2))
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), eq(5), isNull(), isNull())).thenReturn(flowOf(mockItems))
+
+        viewModel.uiState.test {
+            awaitItem() // Consume initial state
+
+            // Act
+            viewModel.selectFilterTag(workTag)
+            advanceUntilIdle()
+
+            // Assert
+            val updatedState = expectMostRecentItem()
+            assertEquals(workTag, updatedState.selectedFilterTag)
+            assertEquals(mockItems, updatedState.analysisItems)
+        }
+        verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), eq(5), isNull(), isNull())
+    }
+
+    @Test
+    fun `selectFilterMerchant updates uiState and refetches data`() = runTest {
+        // Arrange
+        val merchant = "Amazon"
+        val mockItems = listOf(SpendingAnalysisItem("amazon", "Amazon", 200.0, 3))
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), eq(merchant), isNull())).thenReturn(flowOf(mockItems))
+
+        viewModel.uiState.test {
+            awaitItem() // Consume initial state
+
+            // Act
+            viewModel.selectFilterMerchant(merchant)
+            advanceUntilIdle()
+
+            // Assert
+            val updatedState = expectMostRecentItem()
+            assertEquals(merchant, updatedState.selectedFilterMerchant)
+            assertEquals(mockItems, updatedState.analysisItems)
+        }
+        verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), eq(merchant), isNull())
+    }
+}
