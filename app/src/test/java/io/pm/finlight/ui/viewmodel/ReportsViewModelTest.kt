@@ -22,6 +22,7 @@ import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.*
 import org.robolectric.annotation.Config
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 @ExperimentalCoroutinesApi
@@ -163,5 +164,57 @@ class ReportsViewModelTest : BaseViewModelTest() {
 
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `selectPeriod updates selectedPeriod state`() = runTest {
+        // Arrange
+        initializeViewModel()
+
+        // Assert
+        viewModel.selectedPeriod.test {
+            assertEquals(ReportPeriod.MONTH, awaitItem()) // Default
+
+            // Act
+            viewModel.selectPeriod(ReportPeriod.WEEK)
+            assertEquals(ReportPeriod.WEEK, awaitItem())
+
+            viewModel.selectPeriod(ReportPeriod.ALL_TIME)
+            assertEquals(ReportPeriod.ALL_TIME, awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `selectPreviousMonth updates selectedMonth correctly`() = runTest {
+        // Arrange
+        initializeViewModel()
+        val initialMonth = viewModel.selectedMonth.value.get(Calendar.MONTH)
+        val expectedMonth = (initialMonth - 1 + 12) % 12
+
+        // Act
+        viewModel.selectPreviousMonth()
+        advanceUntilIdle()
+
+        // Assert
+        val newMonth = viewModel.selectedMonth.value.get(Calendar.MONTH)
+        assertEquals(expectedMonth, newMonth)
+    }
+
+    @Test
+    fun `selectNextMonth updates selectedMonth correctly`() = runTest {
+        // Arrange
+        initializeViewModel()
+        val initialMonth = viewModel.selectedMonth.value.get(Calendar.MONTH)
+        val expectedMonth = (initialMonth + 1) % 12
+
+        // Act
+        viewModel.selectNextMonth()
+        advanceUntilIdle()
+
+        // Assert
+        val newMonth = viewModel.selectedMonth.value.get(Calendar.MONTH)
+        assertEquals(expectedMonth, newMonth)
     }
 }
