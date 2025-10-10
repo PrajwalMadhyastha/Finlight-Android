@@ -3,6 +3,9 @@
 // REASON: REFACTOR (Testing) - The factory has been updated to instantiate all
 // necessary repository dependencies and inject them into the SettingsViewModel's
 // constructor, supporting the new dependency injection pattern.
+// REASON: FEATURE (SMS Import) - The factory now instantiates and injects the
+// SmsClassifier into the SettingsViewModel. This is a critical step to allow the
+// bulk importer to use the ML model for pre-filtering non-transactional messages.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -13,12 +16,12 @@ import io.pm.finlight.AccountRepository
 import io.pm.finlight.CategoryRepository
 import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.repository.*
 import io.pm.finlight.SmsRepository
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionViewModel
+import io.pm.finlight.ml.SmsClassifier
 
 class SettingsViewModelFactory(
     private val application: Application,
@@ -35,6 +38,7 @@ class SettingsViewModelFactory(
             val accountRepository = AccountRepository(db)
             val categoryRepository = CategoryRepository(db.categoryDao())
             val smsRepository = SmsRepository(application)
+            val smsClassifier = SmsClassifier(application)
 
             @Suppress("UNCHECKED_CAST")
             return SettingsViewModel(
@@ -46,7 +50,8 @@ class SettingsViewModelFactory(
                 accountRepository,
                 categoryRepository,
                 smsRepository,
-                transactionViewModel
+                transactionViewModel,
+                smsClassifier
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

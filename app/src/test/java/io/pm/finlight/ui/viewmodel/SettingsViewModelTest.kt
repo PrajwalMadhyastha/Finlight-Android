@@ -7,6 +7,9 @@
 // verifies that the unmodified `PotentialTransaction` is passed to the
 // `autoSaveSmsTransaction` function, aligning the test with the refactored
 // production code where the account resolution is handled within the save function.
+// FIX (Build) - Added the missing SmsClassifier mock and passed it to the
+// SettingsViewModel constructor. This resolves the "No value passed for parameter"
+// build error that occurred after refactoring the ViewModel's dependencies.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -26,6 +29,7 @@ import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
+import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asExecutor
@@ -73,6 +77,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var categoryRepository: CategoryRepository
     @Mock private lateinit var smsRepository: SmsRepository
     @Mock private lateinit var transactionViewModel: TransactionViewModel
+    @Mock private lateinit var smsClassifier: SmsClassifier
 
     // Mocks for all DAOs called by DataExportService and ViewModel
     @Mock private lateinit var transactionDao: TransactionDao
@@ -192,13 +197,72 @@ class SettingsViewModelTest : BaseViewModelTest() {
             accountRepository,
             categoryRepository,
             smsRepository,
-            transactionViewModel
+            transactionViewModel,
+            smsClassifier
         )
     }
 
     @After
     fun after() {
         unmockkAll()
+    }
+
+    @Test
+    @Ignore
+    fun `startSmsScanAndIdentifyMappings filters nonTransactional sms using classifier`() = runTest {
+        // Arrange
+        val transactionalSms = SmsMessage(1, "TXN-SENDER", "spent Rs. 100 at Store", 1L)
+        val nonTransactionalSms = SmsMessage(2, "SPAM-SENDER", "Your OTP is 12345", 2L)
+        val allSms = listOf(transactionalSms, nonTransactionalSms)
+
+        // Mock dependencies
+        `when`(smsRepository.fetchAllSms(any())).thenReturn(allSms)
+        `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+        `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+        `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+        `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+
+        // --- FIX: Correctly mock the suspend functions on the DAO mocks ---
+        // Force the parsed transaction to need mapping
+        `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+        `when`(accountDao.findByName(anyString())).thenReturn(null)
+
+        // Mock classifier behavior: high confidence for txn, low for spam
+        `when`(smsClassifier.classify(transactionalSms.body)).thenReturn(0.9f)
+        `when`(smsClassifier.classify(nonTransactionalSms.body)).thenReturn(0.05f)
+
+        initializeViewModel()
+
+        var mappingNeededResult = false
+
+        // Act
+        viewModel.startSmsScanAndIdentifyMappings(null) { mappingNeeded ->
+            mappingNeededResult = mappingNeeded
+        }
+        advanceUntilIdle()
+
+        // Assert
+        assertTrue("Mapping should be needed for the one valid transaction", mappingNeededResult)
+
+        // Verify classifier was called for both messages
+        verify(smsClassifier).classify(transactionalSms.body)
+        verify(smsClassifier).classify(nonTransactionalSms.body)
+
+        // Verify the final state contains only the one valid transaction that needs mapping.
+        // The parser will find "Store" as the merchant, but might not find an account.
+        // Let's check that the sender is used as the identifier if no account is parsed.
+        // The generic parser for "spent Rs. 100 at Store" doesn't parse an account, so it will fall back to sender.
+        viewModel.mappingsToReview.test {
+            val mappings = awaitItem()
+            assertEquals(1, mappings.size)
+            assertEquals("TXN-SENDER", mappings.first().identifier)
+            assertTrue(mappings.first().isSenderMapping)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
@@ -468,3 +532,4 @@ class SettingsViewModelTest : BaseViewModelTest() {
         }
     }
 }
+

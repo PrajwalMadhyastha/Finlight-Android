@@ -14,6 +14,9 @@
 // REASON: FIX (Bug) - The `startSmsScanAndIdentifyMappings` and `finalizeImport`
 // functions now call `autoSaveSmsTransaction` with a `source` of "Imported". This
 // ensures transactions created via the bulk importer are correctly labeled.
+// FIX (SMS Import) - The bulk SMS import logic now replicates the full "Hierarchy
+// of Trust" from the SmsReceiver. It uses the SmsClassifier to pre-filter non-
+// transactional messages before parsing, preventing the import of spam and OTPs.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -31,6 +34,7 @@ import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.entity.AccountAlias
+import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.ReminderManager
@@ -70,7 +74,8 @@ class SettingsViewModel(
     private val accountRepository: AccountRepository,
     private val categoryRepository: CategoryRepository,
     private val smsRepository: SmsRepository,
-    private val transactionViewModel: TransactionViewModel
+    private val transactionViewModel: TransactionViewModel,
+    private val smsClassifier: SmsClassifier
 ) : AndroidViewModel(application) {
 
     private val context = application
@@ -203,6 +208,11 @@ class SettingsViewModel(
                     started = SharingStarted.WhileSubscribed(5000),
                     initialValue = 0L,
                 )
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        smsClassifier.close()
     }
 
     fun setPrivacyModeEnabled(enabled: Boolean) {
@@ -348,7 +358,33 @@ class SettingsViewModel(
                 val parsedList = withContext(Dispatchers.Default) {
                     rawMessages.map { sms ->
                         async {
-                            SmsParser.parse(sms, existingMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+                            // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
+                            var parseResult = SmsParser.parseWithOnlyCustomRules(
+                                sms = sms,
+                                customSmsRuleProvider = customSmsRuleProvider,
+                                merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                categoryFinderProvider = categoryFinderProvider
+                            )
+
+                            // --- HIERARCHY STEP 2 & 3: If no custom rule matched, run ML pre-filter and then the main parser ---
+                            if (parseResult == null) {
+                                val transactionConfidence = smsClassifier.classify(sms.body)
+                                if (transactionConfidence >= 0.1) {
+                                    parseResult = SmsParser.parseWithReason(
+                                        sms = sms,
+                                        mappings = existingMappings,
+                                        customSmsRuleProvider = customSmsRuleProvider,
+                                        merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                        ignoreRuleProvider = ignoreRuleProvider,
+                                        merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                        categoryFinderProvider = categoryFinderProvider,
+                                        smsParseTemplateProvider = smsParseTemplateProvider
+                                    )
+                                }
+                            }
+
+                            (parseResult as? ParseResult.Success)?.transaction
                         }
                     }.awaitAll().filterNotNull()
                 }
