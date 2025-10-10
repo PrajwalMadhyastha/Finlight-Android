@@ -696,7 +696,7 @@ class TransactionViewModel(
     }
 
     fun reparseTransactionFromSms(transactionId: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             val logTag = "ReparseLogic"
 
             val transaction = transactionRepository.getTransactionById(transactionId).first()
