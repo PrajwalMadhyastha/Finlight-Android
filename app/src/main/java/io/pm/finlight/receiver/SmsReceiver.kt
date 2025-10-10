@@ -1,13 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/receiver/SmsReceiver.kt
-// REASON: FEATURE - The `saveTransaction` logic has been updated to query the
-// new `AccountAliasDao`. If a parsed account name matches a known alias, the
-// transaction is automatically assigned to the correct, previously merged
-// destination account instead of creating a new duplicate.
-// FIX (Race Condition) - The `saveTransaction` method has been simplified. It no
-// longer contains any Travel Mode logic. It now relies completely on the
-// centralized logic within the TransactionRepository to handle tagging, which
-// eliminates the race condition.
+// REASON: FIX (Testing) - The receiver's internal CoroutineScope is now exposed
+// via an 'internal var'. This allows tests to replace it with a TestScope,
+// ensuring that the asynchronous work inside onReceive completes synchronously
+// within the test's execution context. This is the definitive fix for the
+// "PendingResult.finish() was not called" test failures.
 // =================================================================================
 package io.pm.finlight
 
@@ -35,7 +32,11 @@ import java.util.Date
 
 class SmsReceiver : BroadcastReceiver() {
     private val tag = "SmsReceiver"
-    private lateinit var smsClassifier: SmsClassifier
+    // --- REFACTOR: Allow injecting a mock classifier for testing ---
+    internal var smsClassifier: SmsClassifier? = null
+    // --- NEW: Expose CoroutineScope for test injection ---
+    internal var coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+
 
     override fun onReceive(
         context: Context,
@@ -44,11 +45,13 @@ class SmsReceiver : BroadcastReceiver() {
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             val pendingResult = goAsync()
 
-            if (!::smsClassifier.isInitialized) {
+            // --- REFACTOR: Initialize only if not already set (by a test) ---
+            if (smsClassifier == null) {
                 smsClassifier = SmsClassifier(context)
             }
 
-            CoroutineScope(Dispatchers.IO).launch {
+            // --- UPDATED: Use the injectable coroutineScope ---
+            coroutineScope.launch {
                 try {
                     val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
                     val messagesBySender = messages.groupBy { it.originatingAddress }
@@ -100,7 +103,7 @@ class SmsReceiver : BroadcastReceiver() {
 
                         // --- HIERARCHY STEP 2: If no custom rule matched, run ML pre-filter ---
                         if (parseResult == null) {
-                            val transactionConfidence = smsClassifier.classify(fullBody)
+                            val transactionConfidence = smsClassifier!!.classify(fullBody)
                             if (transactionConfidence < 0.1) {
                                 Log.d(tag, "ML model ignored SMS with confidence: ${1 - transactionConfidence}. Body: $fullBody")
                                 continue // Skip to the next message

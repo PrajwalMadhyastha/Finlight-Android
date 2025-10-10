@@ -1,5 +1,6 @@
 package io.pm.finlight.ui.viewmodel
 
+import android.app.Application
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -15,9 +16,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentCaptor
+import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.Mockito.*
 import org.robolectric.annotation.Config
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToLong
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -32,6 +38,9 @@ class AccountViewModelTest : BaseViewModelTest() {
     private lateinit var settingsRepository: SettingsRepository
 
     private lateinit var viewModel: AccountViewModel
+
+    @Captor
+    private lateinit var accountCaptor: ArgumentCaptor<Account>
 
     @Before
     override fun setup() {
@@ -263,5 +272,135 @@ class AccountViewModelTest : BaseViewModelTest() {
             assertEquals(false, viewModel.isSelectionModeActive.value)
             assertTrue(viewModel.selectedAccountIds.value.isEmpty())
         }
+    }
+
+    @Test
+    fun `getAccountById calls repository`() = runTest {
+        // Arrange
+        val accountId = 1
+        val account = Account(id = accountId, name = "Test", type = "Bank")
+        `when`(accountRepository.getAccountById(accountId)).thenReturn(flowOf(account))
+
+        // Act & Assert
+        viewModel.getAccountById(accountId).test {
+            assertEquals(account, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify(accountRepository).getAccountById(accountId)
+    }
+
+    @Test
+    fun `getAccountBalance correctly calculates from transactions`() = runTest {
+        // Arrange
+        val accountId = 1
+        val transactions = listOf(
+            TransactionDetails(Transaction(id=1, description = "", categoryId = 1, amount = 1000.0, date = 0, accountId = accountId, notes = null, transactionType = "income"), emptyList(), "","","","","",),
+            TransactionDetails(Transaction(id=2, description = "", categoryId = 1, amount = 250.0, date = 0, accountId = accountId, notes = null, transactionType = "expense"), emptyList(), "","","","","",),
+            TransactionDetails(Transaction(id=3, description = "", categoryId = 1, amount = 50.50, date = 0, accountId = accountId, notes = null, transactionType = "expense"), emptyList(), "","","","","",)
+        )
+        `when`(transactionRepository.getTransactionsForAccount(accountId)).thenReturn(flowOf(transactions.map { it.transaction }))
+
+        // Act & Assert
+        viewModel.getAccountBalance(accountId).test {
+            val balance = awaitItem()
+            // 1000.0 - 250.0 - 50.50 = 699.5, rounded to 700
+            assertEquals(700L, balance)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getTransactionsForAccount calls repository`() = runTest {
+        // Arrange
+        val accountId = 1
+        val transactionDetails = listOf(TransactionDetails(Transaction(id=1, description = "Test", categoryId = 1, amount = 100.0, date = 0, accountId = accountId, notes = null), emptyList(), "","","","","",))
+        `when`(transactionRepository.getTransactionsForAccountDetails(accountId)).thenReturn(flowOf(transactionDetails))
+
+        // Act & Assert
+        viewModel.getTransactionsForAccount(accountId).test {
+            assertEquals(transactionDetails, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify(transactionRepository).getTransactionsForAccountDetails(accountId)
+    }
+
+    @Test
+    fun `updateAccount calls repository`() = runTest {
+        // Arrange
+        val account = Account(id = 1, name = "Test", type = "Bank")
+
+        // Act
+        viewModel.updateAccount(account)
+        advanceUntilIdle()
+
+        // Assert
+        verify(accountRepository).update(account)
+    }
+
+    @Test
+    fun `renameAccount finds account and calls repository update`() = runTest {
+        // Arrange
+        val accountId = 1
+        val originalAccount = Account(id = accountId, name = "Old Name", type = "Bank")
+        val newName = "New Name"
+        `when`(accountRepository.getAccountById(accountId)).thenReturn(flowOf(originalAccount))
+
+        // Act
+        viewModel.renameAccount(accountId, newName)
+        advanceUntilIdle()
+
+        // Assert
+        verify(accountRepository).update(capture(accountCaptor))
+        val updatedAccount = accountCaptor.value
+        assertEquals(newName, updatedAccount.name)
+        assertEquals(accountId, updatedAccount.id)
+    }
+
+    @Test
+    fun `dismissMergeSuggestion calls settings repository`() {
+        // Arrange
+        val account1 = Account(id = 1, name = "Acc 1", type = "Bank")
+        val account2 = Account(id = 2, name = "Acc 2", type = "Bank")
+        val suggestion = Pair(account1, account2)
+        val expectedKey = "${min(account1.id, account2.id)}|${max(account1.id, account2.id)}"
+
+        // Act
+        viewModel.dismissMergeSuggestion(suggestion)
+
+        // Assert
+        verify(settingsRepository).addDismissedMergeSuggestion(expectedKey)
+    }
+
+    @Test
+    fun `enterSelectionModeWithSuggestions sets state correctly`() = runTest {
+        // Arrange
+        val accounts = listOf(
+            Account(id = 5, name = "Acc 5", type = "Bank"),
+            Account(id = 10, name = "Acc 10", type = "Bank")
+        )
+
+        // Act
+        viewModel.enterSelectionModeWithSuggestions(accounts)
+
+        // Assert
+        assertTrue(viewModel.isSelectionModeActive.value)
+        assertEquals(setOf(5, 10), viewModel.selectedAccountIds.value)
+    }
+
+    @Test
+    fun `enterSelectionMode sets state correctly`() = runTest {
+        // Act (with ID)
+        viewModel.enterSelectionMode(7)
+
+        // Assert (with ID)
+        assertTrue(viewModel.isSelectionModeActive.value)
+        assertEquals(setOf(7), viewModel.selectedAccountIds.value)
+
+        // Act (with null)
+        viewModel.enterSelectionMode(null)
+
+        // Assert (with null)
+        assertTrue(viewModel.isSelectionModeActive.value)
+        assertTrue(viewModel.selectedAccountIds.value.isEmpty())
     }
 }

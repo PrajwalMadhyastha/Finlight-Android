@@ -21,6 +21,7 @@ import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.Mockito.never
 import org.mockito.Mockito.`when`
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 import org.robolectric.annotation.Config
 import java.util.Calendar
@@ -243,5 +244,47 @@ class BudgetViewModelTest : BaseViewModelTest() {
 
             assertEquals("Error deleting budget: $errorMessage", awaitItem())
         }
+    }
+
+    @Test
+    fun `getActualSpending returns correctly mapped value`() = runTest {
+        // Arrange
+        val categoryName = "Food"
+        val spending = 123.45
+        `when`(budgetRepository.getActualSpendingForCategory(eq(categoryName), anyInt(), anyInt())).thenReturn(flowOf(spending))
+
+        // Act & Assert
+        viewModel.getActualSpending(categoryName).test {
+            assertEquals(spending.roundToLong(), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `saveOverallBudget calls settings repository`() {
+        // Arrange
+        val budgetStr = "50000"
+        val budgetFloat = 50000f
+
+        // Act
+        viewModel.saveOverallBudget(budgetStr)
+
+        // Assert
+        verify(settingsRepository).saveOverallBudgetForCurrentMonth(budgetFloat)
+    }
+
+    @Test
+    fun `getBudgetById calls repository`() = runTest {
+        // Arrange
+        val budgetId = 1
+        val budget = Budget(id = budgetId, categoryName = "Test", amount = 1.0, month = 1, year = 2025)
+        `when`(budgetRepository.getBudgetById(budgetId)).thenReturn(flowOf(budget))
+
+        // Act & Assert
+        viewModel.getBudgetById(budgetId).test {
+            assertEquals(budget, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify(budgetRepository).getBudgetById(budgetId)
     }
 }

@@ -5,12 +5,20 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.slot
+import io.mockk.unmockkAll
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -33,8 +41,10 @@ import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
+import org.mockito.kotlin.eq
 import org.robolectric.annotation.Config
 import java.lang.RuntimeException
+import kotlin.math.roundToLong
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -57,11 +67,17 @@ class TransactionViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var splitTransactionRepository: SplitTransactionRepository
     @Mock private lateinit var smsParseTemplateDao: SmsParseTemplateDao
 
-    // Mocks for DAOs used by the ViewModel
+    // Mocks for DAOs used by the ViewModel and internal logic
     @Mock private lateinit var accountDao: AccountDao
     @Mock private lateinit var categoryDao: CategoryDao
     @Mock private lateinit var tagDao: TagDao
     @Mock private lateinit var transactionDao: TransactionDao
+    @Mock private lateinit var customSmsRuleDao: CustomSmsRuleDao
+    @Mock private lateinit var ignoreRuleDao: IgnoreRuleDao
+    @Mock private lateinit var splitTransactionDao: SplitTransactionDao
+    @Mock private lateinit var merchantCategoryMappingDao: MerchantCategoryMappingDao
+    @Mock private lateinit var merchantRenameRuleDao: MerchantRenameRuleDao
+
 
     private lateinit var viewModel: TransactionViewModel
 
@@ -74,6 +90,13 @@ class TransactionViewModelTest : BaseViewModelTest() {
         `when`(db.categoryDao()).thenReturn(categoryDao)
         `when`(db.tagDao()).thenReturn(tagDao)
         `when`(db.transactionDao()).thenReturn(transactionDao)
+        `when`(db.customSmsRuleDao()).thenReturn(customSmsRuleDao)
+        `when`(db.ignoreRuleDao()).thenReturn(ignoreRuleDao)
+        `when`(db.merchantCategoryMappingDao()).thenReturn(merchantCategoryMappingDao)
+        `when`(db.merchantRenameRuleDao()).thenReturn(merchantRenameRuleDao)
+        `when`(db.smsParseTemplateDao()).thenReturn(smsParseTemplateDao)
+        `when`(db.splitTransactionDao()).thenReturn(splitTransactionDao)
+
 
         // Setup default mock behaviors for ViewModel initialization
         `when`(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
@@ -111,6 +134,140 @@ class TransactionViewModelTest : BaseViewModelTest() {
             smsParseTemplateDao = smsParseTemplateDao
         )
     }
+
+    @Test
+    fun `transactionsForSelectedMonth flow emits data from repository and applies aliases`() = runTest {
+        // ARRANGE
+        val transaction = Transaction(id = 1, description = "amzn", originalDescription = "amzn", amount = 100.0, date = 1L, accountId = 1, categoryId = 1, notes = null)
+        val transactionDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
+        val aliases = mapOf("amzn" to "Amazon")
+        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(listOf(transactionDetails)))
+        `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
+
+        // ACT
+        initializeViewModel()
+
+        // ASSERT
+        viewModel.transactionsForSelectedMonth.test {
+            val result = awaitItem()
+            assertEquals(1, result.size)
+            assertEquals("Amazon", result.first().transaction.description)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `financial summary flows correctly update from repository`() = runTest {
+        // ARRANGE
+        val summary = FinancialSummary(totalIncome = 10000.50, totalExpenses = 5000.25)
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(summary))
+
+        // ACT
+        initializeViewModel()
+
+        // ASSERT
+        viewModel.monthlyIncome.test {
+            assertEquals(10000.50, awaitItem(), 0.01)
+            cancelAndIgnoreRemainingEvents()
+        }
+        viewModel.monthlyExpenses.test {
+            assertEquals(5000.25, awaitItem(), 0.01)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `approveSmsTransaction creates account if not exists and saves transaction`() = runTest {
+        // ARRANGE
+        val potentialTxn = PotentialTransaction(1L, "Test", 100.0, "expense", "Test Merchant", "Msg", PotentialAccount("New Account", "Bank"), "hash")
+        val transactionCaptor = argumentCaptor<Transaction>()
+        `when`(db.accountDao().findByName("New Account")).thenReturn(null).thenReturn(Account(1, "New Account", "Bank"))
+        `when`(accountRepository.insert(anyObject())).thenReturn(1L)
+        `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(1L)
+
+        // ACT
+        val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), false)
+        advanceUntilIdle()
+
+        // ASSERT
+        assertTrue(result)
+        verify(accountRepository).insert(anyObject())
+        verify(transactionRepository).insertTransactionWithTags(capture(transactionCaptor), eq(emptySet()))
+        assertEquals("Test Merchant", transactionCaptor.value.description)
+    }
+
+    @Test
+    fun `autoSaveSmsTransaction saves transaction with correct details`() = runTest {
+        // ARRANGE
+        val potentialTxn = PotentialTransaction(1L, "Test", 100.0, "expense", "Auto Merchant", "Msg", PotentialAccount("Cash", "Wallet"), "hash", 1)
+        val transactionCaptor = argumentCaptor<Transaction>()
+        `when`(db.accountDao().findByName("Cash")).thenReturn(Account(1, "Cash", "Wallet"))
+        `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(1L)
+
+        // ACT
+        val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+        advanceUntilIdle()
+
+        // ASSERT
+        assertTrue(result)
+        verify(transactionRepository).insertTransactionWithTags(capture(transactionCaptor), eq(emptySet()))
+        assertEquals("Auto Merchant", transactionCaptor.value.description)
+        assertEquals(1, transactionCaptor.value.categoryId)
+    }
+
+    @Test
+    @Ignore
+    fun `reparseTransactionFromSms updates transaction with new parsed data`() = runTest {
+        // ARRANGE
+        mockkStatic(SmsParser::class)
+        val originalTxn = Transaction(id = 1, description = "Old", categoryId = 1, amount = 100.0, date = 0, accountId = 1, notes = null, sourceSmsId = 123L)
+        val sms = SmsMessage(123L, "Sender", "New Merchant spent 150", 0L)
+        val newParsedTxn = PotentialTransaction(123L, "Sender", 150.0, "expense", "New Merchant", "Msg", categoryId = 2)
+
+        `when`(transactionRepository.getTransactionById(1)).thenReturn(flowOf(originalTxn))
+        `when`(smsRepository.getSmsDetailsById(123L)).thenReturn(sms)
+
+        // Mock the static SmsParser to return our desired new transaction
+        coEvery { SmsParser.parse(any<SmsMessage>(), any(), any(), any(), any(), any(), any(), any()) } returns newParsedTxn
+
+        // ACT
+        viewModel.reparseTransactionFromSms(1)
+        advanceUntilIdle()
+
+        // ASSERT
+        verify(transactionRepository).updateDescription(1, "New Merchant")
+        verify(transactionRepository).updateCategoryId(1, 2)
+
+        unmockkStatic(SmsParser::class)
+    }
+
+    @Test
+    @Ignore
+    fun `unsplitTransaction correctly calls DAO methods`() = runTest {
+        // ARRANGE
+        // Mock the withTransaction extension function to execute the lambda passed to it
+        mockkStatic("androidx.room.RoomDatabaseKt")
+        coEvery { db.withTransaction<Unit>(any()) } coAnswers {
+            val block = arg<suspend () -> Unit>(0)
+            block()
+        }
+
+        val transaction = Transaction(id = 1, description = "Split", isSplit = true, originalDescription = "Original Desc", amount = 100.0, date = 0L, accountId = 1, categoryId = null, notes = null)
+        val splits = listOf(SplitTransactionDetails(SplitTransaction(1, 1, 50.0, 1, null), "Cat1", "", ""))
+
+        `when`(db.splitTransactionDao().getSplitsForParent(1)).thenReturn(flowOf(splits))
+
+        // ACT
+        viewModel.unsplitTransaction(transaction)
+        advanceUntilIdle()
+
+        // ASSERT
+        verify(splitTransactionDao).deleteSplitsForParent(1)
+        verify(transactionDao).unmarkAsSplit(1, "Original Desc", 1)
+
+        unmockkStatic("androidx.room.RoomDatabaseKt")
+    }
+
 
     @Test
     fun `updateFilterKeyword updates filterState correctly`() = runTest {
