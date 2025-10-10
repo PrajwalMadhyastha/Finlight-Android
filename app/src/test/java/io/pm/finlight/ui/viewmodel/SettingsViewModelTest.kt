@@ -209,7 +209,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         val txnToImport = PotentialTransaction(1, "", 1.0, "", "Amazon", "")
         val txnToKeep = PotentialTransaction(2, "", 1.0, "", "Flipkart", "")
         setPotentialTransactions(viewModel, listOf(txnToImport, txnToKeep))
-        `when`(transactionViewModel.autoSaveSmsTransaction(any())).thenReturn(true)
+        `when`(transactionViewModel.autoSaveSmsTransaction(any(), anyString())).thenReturn(true)
 
         // Act
         val importCount = viewModel.applyLearningAndAutoImport(mapping)
@@ -218,7 +218,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         assertEquals(1, importCount)
         assertEquals(1, viewModel.potentialTransactions.value.size)
         assertEquals("Flipkart", viewModel.potentialTransactions.value.first().merchantName)
-        verify(transactionViewModel).autoSaveSmsTransaction(txnToImport.copy(categoryId = 1))
+        verify(transactionViewModel).autoSaveSmsTransaction(eq(txnToImport.copy(categoryId = 1)), eq("Imported"))
     }
 
     @Test
@@ -241,14 +241,14 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
 
         `when`(accountRepository.getAccountById(1)).thenReturn(flowOf(mappedAccount))
-        `when`(transactionViewModel.autoSaveSmsTransaction(any())).thenReturn(true)
+        `when`(transactionViewModel.autoSaveSmsTransaction(any(), anyString())).thenReturn(true)
 
         // Act
         viewModel.finalizeImport(userMappings)
         advanceUntilIdle()
 
         // Assert
-        verify(transactionViewModel).autoSaveSmsTransaction(potentialTxn)
+        verify(transactionViewModel).autoSaveSmsTransaction(eq(potentialTxn), eq("Imported"))
         verify(merchantMappingDao).insertAll(listOf(MerchantMapping(sender, "HDFC")))
         assertTrue(viewModel.potentialTransactions.value.isEmpty())
         assertTrue(viewModel.mappingsToReview.value.isEmpty())
@@ -364,8 +364,8 @@ class SettingsViewModelTest : BaseViewModelTest() {
         `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(Account(1, "Savings", "Bank"))))
         `when`(tagDao.findByName("Work")).thenReturn(Tag(1, "Work"))
         `when`(tagDao.findByName("Personal")).thenReturn(null)
-        `when`(tagDao.insert(any())).thenReturn(2L)
-        `when`(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
+        `when`(tagDao.insert(anyObject())).thenReturn(2L)
+        `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(1L)
 
         // Act
         viewModel.commitCsvImport(rowsToImport)

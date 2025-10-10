@@ -11,6 +11,9 @@
 // `potentialAccount` property, which is from a different module, into a local
 // variable before performing null checks and accessing its members. This guarantees
 // type safety for the compiler.
+// REASON: FIX (Bug) - The `startSmsScanAndIdentifyMappings` and `finalizeImport`
+// functions now call `autoSaveSmsTransaction` with a `source` of "Imported". This
+// ensures transactions created via the bulk importer are correctly labeled.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -38,8 +41,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -216,7 +217,7 @@ class SettingsViewModel(
 
         for (txn in currentList) {
             if (txn.merchantName != null && txn.merchantName.equals(mapping.parsedName, ignoreCase = true)) {
-                val success = transactionViewModel.autoSaveSmsTransaction(txn.copy(categoryId = mapping.categoryId))
+                val success = transactionViewModel.autoSaveSmsTransaction(txn.copy(categoryId = mapping.categoryId), source = "Imported")
                 if (success) {
                     autoImportedCount++
                 }
@@ -369,7 +370,7 @@ class SettingsViewModel(
                 }
 
                 for (txn in canAutoImport) {
-                    if (transactionViewModel.autoSaveSmsTransaction(txn)) {
+                    if (transactionViewModel.autoSaveSmsTransaction(txn, source = "Imported")) {
                         autoImportedCount++
                     }
                 }
@@ -438,7 +439,7 @@ class SettingsViewModel(
                 }
 
                 for (txn in transactionsToProcess) {
-                    if (transactionViewModel.autoSaveSmsTransaction(txn)) {
+                    if (transactionViewModel.autoSaveSmsTransaction(txn, source = "Imported")) {
                         importedCount++
                     }
                 }

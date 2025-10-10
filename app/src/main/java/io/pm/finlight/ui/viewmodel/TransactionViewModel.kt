@@ -6,6 +6,10 @@
 // account. This centralizes the account resolution logic, making it the single
 // source of truth for saving parsed transactions and enabling the bulk importer
 // to learn from user mappings.
+// REASON: FIX (Bug) - The `autoSaveSmsTransaction` function now accepts a `source`
+// parameter. This allows callers like the bulk importer to specify the correct
+// source ("Imported") instead of using the default ("Auto-Captured"), fixing a
+// data inconsistency bug.
 // =================================================================================
 package io.pm.finlight
 
@@ -1116,7 +1120,7 @@ class TransactionViewModel(
         }
     }
 
-    suspend fun autoSaveSmsTransaction(potentialTxn: PotentialTransaction): Boolean {
+    suspend fun autoSaveSmsTransaction(potentialTxn: PotentialTransaction, source: String = "Auto-Captured"): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
@@ -1157,7 +1161,7 @@ class TransactionViewModel(
                     transactionType = potentialTxn.transactionType,
                     sourceSmsId = potentialTxn.sourceSmsId,
                     sourceSmsHash = potentialTxn.sourceSmsHash,
-                    source = "Auto-Captured"
+                    source = source
                 )
 
                 transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
