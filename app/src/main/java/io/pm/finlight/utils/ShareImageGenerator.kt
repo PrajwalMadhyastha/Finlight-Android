@@ -8,6 +8,10 @@
 // columns with variable content length like Description and Category.
 // FIX - Replaced `intent.setType()` with the correct Kotlin property access
 // syntax: `intent.apply { type = ... }`.
+// FIX (Layout) - The composable now iterates over an ordered list of fields
+// instead of an unordered set. This guarantees a stable and logical column
+// order in the generated image, resolving the issue where columns like
+// "Amount" and "Category" appeared jumbled.
 // =================================================================================
 package io.pm.finlight.utils // <-- UPDATED PACKAGE
 
@@ -135,10 +139,8 @@ object ShareImageGenerator {
 private fun getFieldWeight(field: ShareableField): Float {
     return when (field) {
         ShareableField.Description -> 2.5f
-        ShareableField.Notes -> 2.0f
         ShareableField.Tags -> 1.8f
         ShareableField.Category -> 1.5f
-        ShareableField.Account -> 1.5f
         ShareableField.Date -> 1.2f
         ShareableField.Amount -> 1.0f
     }
@@ -157,6 +159,11 @@ private fun TransactionSnapshotContent(
     }
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     val dateFormat = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
+
+    // --- FIX: Create an ordered list of fields to display ---
+    val orderedFields = remember(fields) {
+        ShareableField.entries.filter { it in fields }
+    }
 
     Column(
         modifier = Modifier
@@ -181,7 +188,8 @@ private fun TransactionSnapshotContent(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            fields.forEach { field ->
+            // --- UPDATED: Iterate over the ordered list ---
+            orderedFields.forEach { field ->
                 Text(
                     text = field.displayName,
                     style = MaterialTheme.typography.labelMedium,
@@ -203,14 +211,13 @@ private fun TransactionSnapshotContent(
                     .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                fields.forEach { field ->
+                // --- UPDATED: Iterate over the ordered list ---
+                orderedFields.forEach { field ->
                     val text = when (field) {
                         ShareableField.Date -> dateFormat.format(Date(details.transaction.date))
                         ShareableField.Description -> details.transaction.description
                         ShareableField.Amount -> currencyFormat.format(details.transaction.amount)
                         ShareableField.Category -> details.categoryName ?: "N/A"
-                        ShareableField.Account -> details.accountName ?: "N/A"
-                        ShareableField.Notes -> details.transaction.notes ?: ""
                         ShareableField.Tags -> tags.joinToString(", ") { it.name }.ifEmpty { "-" }
                     }
                     Text(

@@ -16,6 +16,9 @@
 // reflecting its new role as a permanent feature.
 // FIX (UI) - Removed the local Scaffold and TopAppBar from AutomationSettingsScreen
 // to resolve a duplicate toolbar bug.
+// FIX (UX) - Added a LaunchedEffect to the DataSettingsScreen to observe UI
+// events from the ViewModel. This restores the Toast notification that was
+// missing after clicking "Create Backup Now".
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -397,6 +400,13 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
     var showAutoBackupTimePicker by remember { mutableStateOf(false) }
 
     val isPrivacyModeEnabled by settingsViewModel.privacyModeEnabled.collectAsState()
+
+    // --- NEW: LaunchedEffect to handle UI events from the ViewModel ---
+    LaunchedEffect(Unit) {
+        settingsViewModel.uiEvent.collectLatest { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
 
     val jsonFileSaverLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json"),
