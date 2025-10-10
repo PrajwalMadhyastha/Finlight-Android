@@ -1,11 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AccountMappingScreen.kt
-// REASON: FEATURE (Help System - Phase 1) - Integrated the HelpActionIcon into
-// the TopAppBar to provide users with contextual guidance on why and how to
-// map their accounts.
-// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
-// provides a centralized TopAppBar, and this change removes the duplicate,
-// resolving a UI bug while preserving the BottomBar.
+// REASON: FEATURE (Account Learning) - The screen has been completely rewritten
+// to support the new `AccountAlias` learning flow. It now receives a list of
+// `AccountMappingRequest` objects and displays a clear, descriptive prompt for
+// each item, indicating whether the user is mapping an unparsed account
+// identifier (e.g., "A/c xx1234") or a generic SMS sender.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -14,8 +13,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -26,11 +23,10 @@ import androidx.navigation.NavController
 import io.pm.finlight.Account
 import io.pm.finlight.ui.components.CreateAccountDialog
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.AccountMappingRequest
 import io.pm.finlight.ui.viewmodel.AccountViewModel
-import io.pm.finlight.ui.viewmodel.SenderToMap
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,13 +36,12 @@ fun AccountMappingScreen(
     settingsViewModel: SettingsViewModel,
     accountViewModel: AccountViewModel = viewModel()
 ) {
-    val sendersToMap by settingsViewModel.sendersToMap.collectAsState()
+    val mappingsToReview by settingsViewModel.mappingsToReview.collectAsState()
     val allAccounts by accountViewModel.accountsWithBalance.collectAsState(initial = emptyList())
     val accountsList = allAccounts.map { it.account }
 
     var userMappings by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var showCreateAccountDialog by remember { mutableStateOf(false) }
-    var senderForNewAccount by remember { mutableStateOf<String?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -58,27 +53,25 @@ fun AccountMappingScreen(
         ) {
             item {
                 Text(
-                    "We found transactions from some new senders.",
+                    "Map New Accounts",
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    "Map them to your accounts to import them correctly. You only have to do this once per sender.",
+                    "We found transactions from new accounts or senders. Map them once, and we'll remember your choice for future imports.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            items(sendersToMap, key = { it.sender }) { senderInfo ->
+            items(mappingsToReview, key = { it.identifier }) { request ->
                 MappingItem(
-                    senderInfo = senderInfo,
+                    request = request,
                     accounts = accountsList,
-                    onAccountSelected = { sender, accountId ->
-                        userMappings = userMappings + (sender to accountId)
+                    onAccountSelected = { identifier, accountId ->
+                        userMappings = userMappings + (identifier to accountId)
                     },
-                    onCreateNew = { sender ->
-                        senderForNewAccount = sender
-                        showCreateAccountDialog = true
-                    }
+                    onCreateNew = { showCreateAccountDialog = true }
                 )
             }
         }
@@ -108,14 +101,12 @@ fun AccountMappingScreen(
     }
 
 
-    if (showCreateAccountDialog && senderForNewAccount != null) {
+    if (showCreateAccountDialog) {
         CreateAccountDialog(
             onDismiss = { showCreateAccountDialog = false },
             onConfirm = { name, type ->
                 accountViewModel.addAccount(name, type)
-                // We don't map it here directly, the user can select it from the dropdown after creation
                 showCreateAccountDialog = false
-                senderForNewAccount = null
             }
         )
     }
@@ -124,13 +115,15 @@ fun AccountMappingScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MappingItem(
-    senderInfo: SenderToMap,
+    request: AccountMappingRequest,
     accounts: List<Account>,
-    onAccountSelected: (sender: String, accountId: Int) -> Unit,
-    onCreateNew: (sender: String) -> Unit
+    onAccountSelected: (identifier: String, accountId: Int) -> Unit,
+    onCreateNew: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     var selectedAccountName by remember { mutableStateOf("Select Account") }
+
+    val title = if (request.isSenderMapping) "Unknown Sender" else "New Account Found"
 
     GlassPanel {
         Column(
@@ -140,12 +133,19 @@ private fun MappingItem(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                "Sender: ${senderInfo.sender}",
+                title,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Text(
+                request.identifier,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                "Found ${senderInfo.transactionCount} transactions (e.g., for '${senderInfo.sampleMerchant}')",
+                "Found ${request.transactionCount} transaction(s) (e.g., for '${request.sampleMerchant}')",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -158,7 +158,7 @@ private fun MappingItem(
                     value = selectedAccountName,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Map to Account") },
+                    label = { Text("Map to Your Account") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -176,7 +176,7 @@ private fun MappingItem(
                             text = { Text(account.name) },
                             onClick = {
                                 selectedAccountName = account.name
-                                onAccountSelected(senderInfo.sender, account.id)
+                                onAccountSelected(request.identifier, account.id)
                                 expanded = false
                             }
                         )
@@ -185,7 +185,7 @@ private fun MappingItem(
                     DropdownMenuItem(
                         text = { Text("Create New Account...") },
                         onClick = {
-                            onCreateNew(senderInfo.sender)
+                            onCreateNew()
                             expanded = false
                         }
                     )

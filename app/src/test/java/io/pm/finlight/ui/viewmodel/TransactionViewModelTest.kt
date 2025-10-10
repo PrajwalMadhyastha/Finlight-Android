@@ -1,5 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/TransactionViewModelTest.kt
+// REASON: FIX (Test) - The `autoSaveSmsTransaction` test has been updated. It
+// now correctly mocks the new `accountAliasDao.findByAlias` dependency, resolving
+// a test failure caused by the recent refactoring of the account resolution logic.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -77,6 +80,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var splitTransactionDao: SplitTransactionDao
     @Mock private lateinit var merchantCategoryMappingDao: MerchantCategoryMappingDao
     @Mock private lateinit var merchantRenameRuleDao: MerchantRenameRuleDao
+    @Mock private lateinit var accountAliasDao: AccountAliasDao
 
 
     private lateinit var viewModel: TransactionViewModel
@@ -96,6 +100,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         `when`(db.merchantRenameRuleDao()).thenReturn(merchantRenameRuleDao)
         `when`(db.smsParseTemplateDao()).thenReturn(smsParseTemplateDao)
         `when`(db.splitTransactionDao()).thenReturn(splitTransactionDao)
+        `when`(db.accountAliasDao()).thenReturn(accountAliasDao)
 
 
         // Setup default mock behaviors for ViewModel initialization
@@ -201,7 +206,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // ARRANGE
         val potentialTxn = PotentialTransaction(1L, "Test", 100.0, "expense", "Auto Merchant", "Msg", PotentialAccount("Cash", "Wallet"), "hash", 1)
         val transactionCaptor = argumentCaptor<Transaction>()
-        `when`(db.accountDao().findByName("Cash")).thenReturn(Account(1, "Cash", "Wallet"))
+        `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+        `when`(accountDao.findByName("Cash")).thenReturn(Account(1, "Cash", "Wallet"))
         `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(1L)
 
         // ACT
