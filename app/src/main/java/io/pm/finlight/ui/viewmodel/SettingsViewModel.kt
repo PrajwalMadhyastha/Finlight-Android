@@ -1,22 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: FEATURE (Account Learning) - Rewrote the bulk import logic. The
-// ViewModel now partitions transactions based on whether an account can be
-// resolved via an existing `AccountAlias` or exact name match. Unresolved
-// transactions are now grouped by their parsed account identifier (e.g., "A/c
-// xx1234") instead of the SMS sender. The `finalizeImport` function now correctly
-// saves the user's mapping choice as a new `AccountAlias`, teaching the system
-// for future imports.
-// FIX (Build) - Resolved a "smart cast impossible" error by capturing the
-// `potentialAccount` property, which is from a different module, into a local
-// variable before performing null checks and accessing its members. This guarantees
-// type safety for the compiler.
-// REASON: FIX (Bug) - The `startSmsScanAndIdentifyMappings` and `finalizeImport`
-// functions now call `autoSaveSmsTransaction` with a `source` of "Imported". This
-// ensures transactions created via the bulk importer are correctly labeled.
-// FIX (SMS Import) - The bulk SMS import logic now replicates the full "Hierarchy
-// of Trust" from the SmsReceiver. It uses the SmsClassifier to pre-filter non-
-// transactional messages before parsing, preventing the import of spam and OTPs.
+// REASON: FEATURE (Backup Time) - The ViewModel now exposes a `lastBackupTimestamp`
+// StateFlow. This collects the timestamp from the SettingsRepository, making it
+// available for the UI to display.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -198,6 +184,14 @@ class SettingsViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = false,
+        )
+
+    // --- NEW: Expose the last backup timestamp ---
+    val lastBackupTimestamp: StateFlow<Long> =
+        settingsRepository.getLastBackupTimestamp().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0L
         )
 
     init {
