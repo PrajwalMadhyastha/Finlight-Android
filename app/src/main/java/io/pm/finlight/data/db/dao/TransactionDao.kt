@@ -1,5 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
+// REASON: FIX (Analysis) - The WHERE clause for `getTransactionsForMerchantInRange`
+// has been updated to use `LOWER(T.description)`. This makes the merchant name
+// comparison case-insensitive, resolving the bug where the Analysis Details
+// screen appeared blank because it was receiving a lowercase merchant ID from
+// the previous screen and failing to match it against the original-cased
+// description in the database.
 // =================================================================================
 package io.pm.finlight
 
@@ -169,7 +175,7 @@ interface TransactionDao {
         FROM transactions AS T
         LEFT JOIN accounts AS A ON T.accountId = A.id
         LEFT JOIN categories AS C ON T.categoryId = C.id
-        WHERE T.description = :merchantName AND T.date BETWEEN :startDate AND :endDate
+        WHERE LOWER(T.description) = :merchantName AND T.date BETWEEN :startDate AND :endDate
         ORDER BY T.date DESC
     """)
     fun getTransactionsForMerchantInRange(merchantName: String, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
