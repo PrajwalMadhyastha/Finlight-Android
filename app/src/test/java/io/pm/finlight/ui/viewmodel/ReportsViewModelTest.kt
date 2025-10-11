@@ -16,7 +16,6 @@ import kotlinx.coroutines.test.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -117,21 +116,21 @@ class ReportsViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `setReportView updates view type and displayed stats`() = runTest {
         // Arrange
         `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(3000f))
+        // Provide a valid start date for transaction history
+        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(365)))
 
-        // FIX: Use thenAnswer to provide specific data based on the date range, avoiding race conditions.
         `when`(transactionRepository.getDailySpendingForDateRange(anyLong(), anyLong())).thenAnswer { invocation ->
             val startDate = invocation.getArgument<Long>(0)
             val endDate = invocation.getArgument<Long>(1)
             val durationDays = TimeUnit.MILLISECONDS.toDays(endDate - startDate)
 
             if (durationDays > 31) { // Heuristic: A long range is for the yearly calendar
-                flowOf(listOf(DailyTotal("2025-10-07", 120.0)))
+                flowOf(listOf(DailyTotal("2025-10-07", 120.0))) // Causes 1 bad day
             } else { // A short range is for the monthly calendar
-                flowOf(listOf(DailyTotal("2025-10-07", 80.0)))
+                flowOf(listOf(DailyTotal("2025-10-07", 80.0))) // Causes 1 good day
             }
         }
 
@@ -139,28 +138,28 @@ class ReportsViewModelTest : BaseViewModelTest() {
 
         // Act & Assert
         viewModel.displayedConsistencyStats.test {
-            // Initial state is YEARLY. The yearly call to getDailySpending gets 120.0.
-            // Budget logic will calculate this as a bad day.
-            val initialStats = awaitItem()
-            assertEquals(0, initialStats.goodDays)
-            assertEquals(1, initialStats.badDays)
+            // 1. Consume the initial value from stateIn which is always (0,0,0,0).
+            assertEquals("Initial value should be empty stats", ConsistencyStats(0, 0, 0, 0), awaitItem())
 
+            // 2. Await the first calculated value for the default YEARLY view.
+            // This is emitted after the ViewModel's init block coroutines complete.
+            val yearlyStats1 = awaitItem()
+            assertEquals("Initial YEARLY stats should have 0 good days", 0, yearlyStats1.goodDays)
+            assertEquals("Initial YEARLY stats should have 1 bad day", 1, yearlyStats1.badDays)
 
-            // Switch to MONTHLY and check stats
+            // 3. Switch to MONTHLY and check stats. This triggers a new emission.
             viewModel.setReportView(ReportViewType.MONTHLY)
-            advanceUntilIdle()
             val monthlyStats = awaitItem()
-            // Daily safe to spend = 3000/31 ~= 96. Spend = 80. So, 1 good day.
-            assertEquals(1, monthlyStats.goodDays)
-            assertEquals(0, monthlyStats.badDays)
+            // Daily safe to spend = 3000 / days_in_month ~= 96. Spend = 80. So, 1 good day.
+            assertEquals("MONTHLY stats should have 1 good day", 1, monthlyStats.goodDays)
+            assertEquals("MONTHLY stats should have 0 bad days", 0, monthlyStats.badDays)
 
-            // Switch to YEARLY and check stats
+            // 4. Switch back to YEARLY and check stats.
             viewModel.setReportView(ReportViewType.YEARLY)
-            advanceUntilIdle()
-            val yearlyStats = awaitItem()
+            val yearlyStats2 = awaitItem()
             // The data for the yearly view hasn't changed. It should still be a bad day.
-            assertEquals(0, yearlyStats.goodDays)
-            assertEquals(1, yearlyStats.badDays)
+            assertEquals("Second YEARLY stats should have 0 good days", 0, yearlyStats2.goodDays)
+            assertEquals("Second YEARLY stats should have 1 bad day", 1, yearlyStats2.badDays)
 
             cancelAndIgnoreRemainingEvents()
         }
