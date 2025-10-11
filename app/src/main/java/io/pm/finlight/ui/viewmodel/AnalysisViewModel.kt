@@ -9,6 +9,11 @@
 // `combine` operators. This resolves all build errors related to argument type
 // mismatches and failed type inference by breaking down the complex combination
 // of 11 flows into manageable, type-safe steps.
+// FEATURE (Search) - The ViewModel now manages the state for the new search bar.
+// It includes a StateFlow for the search query and a function to update it. The
+// main reactive flow has been updated to pass this query to the DAO, and the logic
+// now correctly resets the search query when the user switches between analysis
+// dimensions (e.g., from Category to Tag).
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -17,6 +22,7 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
 import io.pm.finlight.data.model.SpendingAnalysisItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import java.util.*
 
@@ -43,7 +49,9 @@ data class AnalysisUiState(
     val selectedFilterMerchant: String? = null,
     val allCategories: List<Category> = emptyList(),
     val allTags: List<Tag> = emptyList(),
-    val allMerchants: List<String> = emptyList()
+    val allMerchants: List<String> = emptyList(),
+    // --- NEW: State for search ---
+    val searchQuery: String = ""
 )
 
 // --- NEW: Helper data class for combining flows ---
@@ -53,7 +61,8 @@ private data class AnalysisInputs(
     val dateRange: Pair<Long?, Long?>,
     val filterCat: Category?,
     val filterTag: Tag?,
-    val filterMerchant: String?
+    val filterMerchant: String?,
+    val searchQuery: String?
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -74,6 +83,10 @@ class AnalysisViewModel(
     private val _selectedFilterTag = MutableStateFlow<Tag?>(null)
     private val _selectedFilterMerchant = MutableStateFlow<String?>(null)
 
+    // --- NEW: Input flow for search query ---
+    private val _searchQuery = MutableStateFlow("")
+
+
     // --- DATA: Flows for filter dropdowns ---
     private val allCategories = categoryDao.getAllCategories()
     private val allTags = tagDao.getAllTags()
@@ -84,7 +97,8 @@ class AnalysisViewModel(
     // 1. Combine all user inputs into a single flow of a data class.
     private val analysisInputsFlow = combine(
         _selectedDimension, _selectedTimePeriod, _customDateRange,
-        _selectedFilterCategory, _selectedFilterTag, _selectedFilterMerchant
+        _selectedFilterCategory, _selectedFilterTag, _selectedFilterMerchant,
+        _searchQuery
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         AnalysisInputs(
@@ -93,19 +107,23 @@ class AnalysisViewModel(
             dateRange = args[2] as Pair<Long?, Long?>,
             filterCat = args[3] as? Category,
             filterTag = args[4] as? Tag,
-            filterMerchant = args[5] as? String
+            filterMerchant = args[5] as? String,
+            searchQuery = (args[6] as? String)?.takeIf { it.isNotBlank() }
         )
     }
 
     // 2. Use that single input flow to trigger the database query.
-    private val analysisResultFlow = analysisInputsFlow.flatMapLatest { inputs ->
-        val (start, end) = calculateDateRange(inputs.period, inputs.dateRange.first, inputs.dateRange.second)
-        when (inputs.dimension) {
-            AnalysisDimension.CATEGORY -> transactionDao.getSpendingAnalysisByCategory(start, end, inputs.filterTag?.id, inputs.filterMerchant, inputs.filterCat?.id)
-            AnalysisDimension.TAG -> transactionDao.getSpendingAnalysisByTag(start, end, inputs.filterCat?.id, inputs.filterMerchant, inputs.filterTag?.id)
-            AnalysisDimension.MERCHANT -> transactionDao.getSpendingAnalysisByMerchant(start, end, inputs.filterCat?.id, inputs.filterTag?.id, inputs.filterMerchant)
+    @OptIn(FlowPreview::class)
+    private val analysisResultFlow = analysisInputsFlow
+        .debounce(300) // Debounce search input
+        .flatMapLatest { inputs ->
+            val (start, end) = calculateDateRange(inputs.period, inputs.dateRange.first, inputs.dateRange.second)
+            when (inputs.dimension) {
+                AnalysisDimension.CATEGORY -> transactionDao.getSpendingAnalysisByCategory(start, end, inputs.filterTag?.id, inputs.filterMerchant, inputs.filterCat?.id, inputs.searchQuery)
+                AnalysisDimension.TAG -> transactionDao.getSpendingAnalysisByTag(start, end, inputs.filterCat?.id, inputs.filterMerchant, inputs.filterTag?.id, inputs.searchQuery)
+                AnalysisDimension.MERCHANT -> transactionDao.getSpendingAnalysisByMerchant(start, end, inputs.filterCat?.id, inputs.filterTag?.id, inputs.filterMerchant, inputs.searchQuery)
+            }
         }
-    }
 
     // 3. Combine the input flow, data flows, and result flow into the final UI state.
     val uiState: StateFlow<AnalysisUiState> = combine(
@@ -144,7 +162,8 @@ class AnalysisViewModel(
             selectedFilterMerchant = inputs.filterMerchant,
             allCategories = cats,
             allTags = tags,
-            allMerchants = merchants
+            allMerchants = merchants,
+            searchQuery = inputs.searchQuery ?: ""
         )
     }.stateIn(
         scope = viewModelScope,
@@ -154,6 +173,7 @@ class AnalysisViewModel(
 
     fun selectDimension(dimension: AnalysisDimension) {
         _selectedDimension.value = dimension
+        _searchQuery.value = "" // Clear search on dimension change
     }
 
     fun selectTimePeriod(period: AnalysisTimePeriod) {
@@ -189,6 +209,11 @@ class AnalysisViewModel(
         _selectedFilterCategory.value = null
         _selectedFilterTag.value = null
         _selectedFilterMerchant.value = null
+    }
+
+    // --- NEW: Function to handle search query changes ---
+    fun onSearchQueryChanged(query: String) {
+        _searchQuery.value = query
     }
 
     private fun calculateDateRange(period: AnalysisTimePeriod, customStart: Long?, customEnd: Long?): Pair<Long, Long> {
