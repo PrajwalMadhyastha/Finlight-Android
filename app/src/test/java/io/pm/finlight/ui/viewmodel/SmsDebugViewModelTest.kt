@@ -24,7 +24,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -194,7 +193,6 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
 
     @Test
-    @Ignore
     fun `runAutoImportAndRefresh imports newly parsed transaction`() = runTest {
         // Arrange
         setupDefaultDaoBehaviors()
@@ -213,61 +211,51 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             sourceSmsBody = sms1.body
         )
         var capturedTxn: PotentialTransaction? = null
+        var capturedSource: String? = null
 
         // Mocks for the INITIAL scan (no custom rules)
         `when`(smsRepository.fetchAllSms(any())).thenReturn(listOf(sms1))
         `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
         `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
         `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer { invocation ->
+            capturedTxn = invocation.getArgument(0)
+            capturedSource = invocation.getArgument(1)
+            true
+        }
 
-        // Act & Assert in one block
         initializeViewModel()
 
-        viewModel.uiState.test {
-            // Phase 1: Wait for init and assert the initial state *after* loading.
-            advanceUntilIdle()
-            val initialState = expectMostRecentItem() // Get the latest value after init.
-            assertFalse("Should be done loading after init", initialState.isLoading)
-            val initialResult = initialState.debugResults.find { it.smsMessage.id == 1L }
-            assertTrue(
-                "Initial parse result should be NotParsed, but was ${initialResult?.parseResult}",
-                initialResult?.parseResult is ParseResult.NotParsed
-            )
+        // Assert initial state before the action
+        advanceUntilIdle() // let init finish
+        val initialState = viewModel.uiState.value
+        assertFalse("Should not be loading after init", initialState.isLoading)
+        val initialResult = initialState.debugResults.find { it.smsMessage.id == 1L }
+        assertTrue(
+            "Initial parse result should be NotParsed, but was ${initialResult?.parseResult}",
+            initialResult?.parseResult is ParseResult.NotParsed
+        )
 
-            // Phase 2: Arrange mocks for the refresh action.
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject())).thenAnswer { invocation ->
-                capturedTxn = invocation.getArgument(0)
-                true
-            }
+        // Arrange mocks for the refresh action.
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
 
-            // Act: Call the function to be tested.
-            viewModel.runAutoImportAndRefresh()
+        // Act: Call the function to be tested.
+        viewModel.runAutoImportAndRefresh()
+        advanceUntilIdle() // Ensure the entire action completes
 
-            // Assert the loading state for the refresh action.
-            val loadingState = awaitItem()
-            assertTrue("Should be loading during refresh", loadingState.isLoading)
+        // Assert side effects
+        assertNotNull("autoSaveSmsTransaction should have been called", capturedTxn)
+        assertEquals("Imported", capturedSource)
+        assertEquals(sms1Hash, capturedTxn!!.sourceSmsHash)
+        assertEquals("123", capturedTxn!!.merchantName)
 
-            // Let the rest of the function run
-            advanceUntilIdle()
-
-            // Assert the final state after the refresh action.
-            val finalState = awaitItem()
-            assertFalse("Should be done loading after refresh", finalState.isLoading)
-
-            // Assert side-effects and content of the final state.
-            assertNotNull("autoSaveSmsTransaction should have been called", capturedTxn)
-            assertEquals(sms1Hash, capturedTxn!!.sourceSmsHash)
-            assertEquals("123", capturedTxn!!.merchantName)
-
-            val finalResult = finalState.debugResults.find { it.smsMessage.id == 1L }
-            assertTrue(
-                "Final parse result should be Success, but was ${finalResult?.parseResult}",
-                finalResult?.parseResult is ParseResult.Success
-            )
-
-            // Clean up.
-            cancelAndIgnoreRemainingEvents()
-        }
+        // Assert final state
+        val finalState = viewModel.uiState.value
+        assertFalse("Should be done loading after refresh", finalState.isLoading)
+        val finalResult = finalState.debugResults.find { it.smsMessage.id == 1L }
+        assertTrue(
+            "Final parse result should be Success, but was ${finalResult?.parseResult}",
+            finalResult?.parseResult is ParseResult.Success
+        )
     }
 }

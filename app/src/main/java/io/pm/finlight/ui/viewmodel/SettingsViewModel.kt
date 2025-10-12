@@ -300,7 +300,7 @@ class SettingsViewModel(
                 }
 
                 for (potentialTxn in newPotentialTransactions) {
-                    val success = transactionViewModel.autoSaveSmsTransaction(potentialTxn)
+                    val success = transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")
                     if (success) {
                         newTransactionsFound++
                     }
