@@ -1,13 +1,11 @@
 // =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/BaseViewModelTest.kt
+// FILE: ./app/src/test/java/io/pm/finlight/BaseViewModelTest.kt
 // REASON: NEW FILE - This abstract base class centralizes common setup logic for
 // all ViewModel unit tests. It includes the InstantTaskExecutorRule for LiveData,
 // coroutine test dispatcher management, and Mockito initialization.
 // FIX (Testing) - Added a new null-safe `capture` helper function. This works
 // around a common NullPointerException when using Mockito's ArgumentCaptor with
 // non-nullable Kotlin parameters, especially in suspend functions.
-// FIX (Testing) - Switched from UnconfinedTestDispatcher to StandardTestDispatcher
-// to enable reliable testing of time-based coroutine operators like `debounce`.
 // =================================================================================
 package io.pm.finlight
 
@@ -15,7 +13,7 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestDispatcher
-import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -82,10 +80,10 @@ abstract class BaseViewModelTest {
     var instantTaskExecutorRule = InstantTaskExecutorRule()
 
     /**
-     * A standard test dispatcher that provides control over the virtual clock,
-     * crucial for testing time-based operators like debounce and delay.
+     * A test dispatcher for coroutines that executes them eagerly, allowing tests to
+     * run sequentially without needing to manually advance the clock.
      */
-    protected val testDispatcher: TestDispatcher = StandardTestDispatcher()
+    protected val testDispatcher: TestDispatcher = UnconfinedTestDispatcher()
 
     /**
      * Sets up the test environment before each test case.
