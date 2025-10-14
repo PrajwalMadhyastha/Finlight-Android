@@ -54,6 +54,30 @@ class CategoryViewModelTest : BaseViewModelTest() {
     }
 
     @Test
+    fun `addCategory success sends success event and inserts correct category`() = runTest {
+        // Arrange
+        val categoryName = "New Category"
+        `when`(categoryDao.findByName(categoryName)).thenReturn(null)
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList())) // For getNextAvailableColor
+        val categoryCaptor = argumentCaptor<Category>()
+        viewModel = CategoryViewModel(categoryRepository, transactionRepository, categoryDao)
+
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.addCategory(categoryName, "test_icon", "blue_light")
+            advanceUntilIdle()
+
+            verify(categoryRepository).insert(capture(categoryCaptor))
+            assertEquals(categoryName, categoryCaptor.value.name)
+            assertEquals("test_icon", categoryCaptor.value.iconKey)
+            assertEquals("blue_light", categoryCaptor.value.colorKey)
+            assertEquals("Category '$categoryName' created.", awaitItem())
+        }
+    }
+
+
+    @Test
     fun `updateCategory calls repository update`() = runTest {
         // ARRANGE
         val categoryToUpdate = Category(1, "Updated Name", "icon", "color")

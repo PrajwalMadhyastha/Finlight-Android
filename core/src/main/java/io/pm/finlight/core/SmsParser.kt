@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./core/src/main/java/io/pm/finlight/core/SmsParser.kt
-// REASON: FIX - Corrected a regex pattern for ICICI Bank messages by making it
-// more specific (requiring a period after the word "credited") and increasing
-// its priority in the pattern list. This resolves a bug where the merchant name
-// was being parsed incorrectly for certain debit transactions.
+// REASON: FIX (Logic) - Refactored the `enrichTransaction` helper function to
+// correct the order of operations. The parser now checks for a learned category
+// using the original, raw merchant name *before* applying any merchant rename
+// rules. This restores the intended "Hierarchy of Trust" and fixes the bug where
+// category learning was failing for transactions with learned merchant names.
 // =================================================================================
 package io.pm.finlight
 
@@ -369,49 +370,44 @@ object SmsParser {
         sender: String
     ): PotentialTransaction {
         val renameRules = merchantRenameRuleProvider.getAllRules().associateBy({ it.originalName.lowercase() }, { it.newName })
-        var finalCategoryId: Int? = null
 
-        // --- FIX: Perform category lookup on the ORIGINAL merchant name FIRST ---
-        txn.merchantName?.let { originalMerchant ->
+        val originalMerchant = txn.merchantName
+        var finalCategoryId: Int? = txn.categoryId
+
+        // --- Step 1: Prioritize Category Learning (using original merchant name) ---
+        if (finalCategoryId == null && originalMerchant != null) {
+            // First, try direct mapping.
             finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(originalMerchant)
-            // Fallback to keyword if no direct mapping exists
+            // If no mapping, try keyword-based heuristic.
             if (finalCategoryId == null) {
                 finalCategoryId = findCategoryIdByKeyword(originalMerchant, categoryFinderProvider)
             }
         }
 
-        // --- Now, apply the rename rule ---
-        val txnAfterRename = txn.merchantName?.let { currentMerchantName ->
-            renameRules[currentMerchantName.lowercase()]?.let { newMerchantName ->
-                txn.copy(merchantName = newMerchantName)
-            }
-        } ?: txn
+        // --- Step 2: Apply Merchant Rename Rule (After Category Lookup) ---
+        val finalMerchantName = originalMerchant?.let {
+            renameRules[it.lowercase()]
+        } ?: originalMerchant
 
-        // --- If we haven't found a category yet, try again with the RENAMED merchant name ---
-        if (finalCategoryId == null) {
-            txnAfterRename.merchantName?.let { renamedMerchant ->
-                finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(renamedMerchant)
-            }
+        // --- Step 3: If we still haven't found a category, try again with the RENAMED merchant name ---
+        if (finalCategoryId == null && finalMerchantName != null) {
+            finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(finalMerchantName)
         }
 
-
-        // --- Finally, build the transaction, applying the category ID we found earlier ---
-        val txnAfterCategorization = if (finalCategoryId != null) {
-            txnAfterRename.copy(categoryId = finalCategoryId)
-        } else {
-            txnAfterRename
-        }
-
-        val finalAccount = txnAfterCategorization.potentialAccount ?: parseAccount(normalizedBody, sender)
+        // --- Step 4: Construct the final transaction object with all enrichments ---
+        val finalAccount = txn.potentialAccount ?: parseAccount(normalizedBody, sender)
         val smsHash = (sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
         val smsSignature = generateSmsSignature(normalizedBody)
 
-        return txnAfterCategorization.copy(
+        return txn.copy(
+            merchantName = finalMerchantName,
+            categoryId = finalCategoryId,
             potentialAccount = finalAccount,
             sourceSmsHash = smsHash,
             smsSignature = smsSignature
         )
     }
+
 
     // --- Private Helper Functions ---
 

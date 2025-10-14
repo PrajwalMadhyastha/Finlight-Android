@@ -1,16 +1,15 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/TransactionViewModel.kt
-// REASON: FEATURE (Error Handling) - Added a `Channel` for sending one-time UI
-// events, such as error messages from failed operations.
-// REFACTOR (Error Handling) - Wrapped repository calls in `deleteTransaction`,
-// `onConfirmDeleteSelection`, and `updateTransactionDescription` in try-catch
-// blocks to handle exceptions gracefully and report them via the UI event channel.
-// REFACTOR (Error Handling) - Added a `.catch` operator to the `transactionsForSelectedMonth`
-// flow to prevent crashes from database errors, emit an empty list, and send a
-// UI event.
-// REFACTOR (Testing) - Removed the explicit `Dispatchers.IO` from the
-// `updateTransactionDescription` launch block, making the method more testable
-// by aligning with modern practices where the repository manages its own dispatchers.
+// REASON: FEATURE (Account Learning) - The `autoSaveSmsTransaction` function has
+// been rewritten. It now replicates the robust logic from the SmsReceiver,
+// including checking for an `AccountAlias` before falling back to creating a new
+// account. This centralizes the account resolution logic, making it the single
+// source of truth for saving parsed transactions and enabling the bulk importer
+// to learn from user mappings.
+// REASON: FIX (Bug) - The `autoSaveSmsTransaction` function now accepts a `source`
+// parameter. This allows callers like the bulk importer to specify the correct
+// source ("Imported") instead of using the default ("Auto-Captured"), fixing a
+// data inconsistency bug.
 // =================================================================================
 package io.pm.finlight
 
@@ -169,16 +168,14 @@ class TransactionViewModel(
     private val _showCategoryNudge = MutableStateFlow<ManualTransactionData?>(null)
     val showCategoryNudge = _showCategoryNudge.asStateFlow()
 
-    // --- NEW: Channel for one-time UI events like errors ---
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
-    // --- NEW: StateFlows for real-time auto-categorization ---
     private val _addTransactionDescription = MutableStateFlow("")
     private val _userManuallySelectedCategory = MutableStateFlow(false)
 
     val suggestedCategory: StateFlow<Category?> = _addTransactionDescription
-        .debounce(400) // Wait for the user to stop typing
+        .debounce(400)
         .combine(_userManuallySelectedCategory) { description, manualSelect ->
             description to manualSelect
         }
@@ -189,7 +186,7 @@ class TransactionViewModel(
                     emit(HeuristicCategorizer.findCategoryForDescription(description, allCategoriesList))
                 }
             } else {
-                flowOf<Category?>(null) // --- FIX: Explicitly type the null flow ---
+                flowOf<Category?>(null)
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -226,7 +223,7 @@ class TransactionViewModel(
                 .catch { e ->
                     Log.e(TAG, "Failed to load transactions for month", e)
                     _uiEvent.send("Failed to load transactions.")
-                    emit(emptyList()) // Emit an empty list on error
+                    emit(emptyList())
                 }
         }.combine(merchantAliases) { transactions, aliases ->
             applyAliases(transactions, aliases)
@@ -327,12 +324,6 @@ class TransactionViewModel(
                 return@launch
             }
 
-            // --- FIX: Use a case-insensitive comparison for the description. ---
-            // The original check (initial.description != current.description) was too sensitive.
-            // It triggered the retro-update prompt for simple case corrections (e.g., "amzn" -> "Amazon")
-            // which the user does not consider a "new" merchant change.
-            // This now aligns with the case-insensitive logic used when creating a MerchantRenameRule,
-            // ensuring the prompt only appears for meaningful changes.
             val descriptionChanged = !initial.description.equals(current.description, ignoreCase = true)
             val categoryChanged = initial.categoryId != current.categoryId
 
@@ -535,7 +526,6 @@ class TransactionViewModel(
         _userManuallySelectedCategory.value = true
     }
 
-    // --- UPDATED: Refined Quick Add Logic ---
     fun onSaveTapped(
         description: String,
         amountStr: String,
@@ -572,14 +562,9 @@ class TransactionViewModel(
                 tags = _selectedTags.value
             )
 
-            // The condition to show the category nudge is now more specific.
-            // It should only appear if the user has provided a description but not yet chosen a category.
             if (categoryId == null && description.isNotBlank()) {
                 _showCategoryNudge.value = transactionData
             } else {
-                // Either a category is already selected, or it's a "Quick Add" with no description.
-                // In both cases, save the transaction directly.
-                // For a Quick Add, categoryId will be null, which is the desired behavior.
                 val success = saveManualTransaction(transactionData, categoryId)
                 if (success) {
                     onSaveComplete()
@@ -696,7 +681,7 @@ class TransactionViewModel(
     }
 
     fun reparseTransactionFromSms(transactionId: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             val logTag = "ReparseLogic"
 
             val transaction = transactionRepository.getTransactionById(transactionId).first()
@@ -732,7 +717,6 @@ class TransactionViewModel(
             }
             val smsParseTemplateProvider = object : SmsParseTemplateProvider {
                 override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
-                // --- NEW: Implement the new provider method ---
                 override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
             }
 
@@ -902,10 +886,8 @@ class TransactionViewModel(
         try {
             if (newDescription.isNotBlank()) {
                 val transaction = transactionRepository.getTransactionById(id).firstOrNull()
-                // --- BUG FIX: Only create learning templates for SMS-based transactions ---
                 if (transaction != null && transaction.sourceSmsId != null && transaction.originalDescription != null) {
                     val original = transaction.originalDescription
-                    // Check if a meaningful change was made
                     if (original.isNotBlank() && !original.equals(newDescription, ignoreCase = true)) {
                         val originalSms = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
                         if (originalSms != null) {
@@ -922,7 +904,6 @@ class TransactionViewModel(
                         }
                     }
                 }
-                // Always update the description for the specific transaction
                 transactionRepository.updateDescription(id, newDescription)
             }
         } catch (e: Exception) {
@@ -1139,20 +1120,32 @@ class TransactionViewModel(
         }
     }
 
-    suspend fun autoSaveSmsTransaction(potentialTxn: PotentialTransaction): Boolean {
+    suspend fun autoSaveSmsTransaction(potentialTxn: PotentialTransaction, source: String = "Auto-Captured"): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
-                var account = db.accountDao().findByName(accountName)
-                if (account == null) {
-                    val newAccount = Account(name = accountName, type = accountType)
-                    accountRepository.insert(newAccount)
-                    account = db.accountDao().findByName(accountName)
+                var finalAccountId: Int? = null
+
+                // 1. Check for an alias
+                val alias = db.accountAliasDao().findByAlias(accountName)
+                if (alias != null) {
+                    finalAccountId = alias.destinationAccountId
+                } else {
+                    // 2. No alias, check for an exact account name match
+                    var account = db.accountDao().findByName(accountName)
+                    if (account == null) {
+                        // 3. No exact match, create a new account
+                        val newAccount = Account(name = accountName, type = accountType)
+                        val newId = accountRepository.insert(newAccount)
+                        account = db.accountDao().getAccountById(newId.toInt()).first()
+                    }
+                    finalAccountId = account?.id
                 }
 
-                if (account == null) {
+
+                if (finalAccountId == null) {
                     Log.e(TAG, "Auto-save failed: Could not find or create account '$accountName'")
                     return@withContext false
                 }
@@ -1163,12 +1156,12 @@ class TransactionViewModel(
                     categoryId = potentialTxn.categoryId,
                     amount = potentialTxn.amount,
                     date = potentialTxn.date,
-                    accountId = account.id,
+                    accountId = finalAccountId,
                     notes = null,
                     transactionType = potentialTxn.transactionType,
                     sourceSmsId = potentialTxn.sourceSmsId,
                     sourceSmsHash = potentialTxn.sourceSmsHash,
-                    source = "Auto-Captured"
+                    source = source
                 )
 
                 transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
@@ -1236,14 +1229,12 @@ class TransactionViewModel(
         viewModelScope.launch {
             val state = _retroUpdateSheetState.value ?: return@launch
             val idsToUpdate = state.selectedIds.toList()
-            // If no items are selected, just dismiss the sheet.
             if (idsToUpdate.isEmpty()) {
                 dismissRetroUpdateSheet()
                 return@launch
             }
 
             try {
-                // Create the rename rule when a batch update is confirmed.
                 state.newDescription?.let { newDesc ->
                     val originalDesc = state.originalDescription
                     if (originalDesc.isNotBlank() && !originalDesc.equals(newDesc, ignoreCase = true)) {
@@ -1252,7 +1243,6 @@ class TransactionViewModel(
                     }
                 }
 
-                // Perform the batch updates
                 state.newDescription?.let {
                     transactionRepository.updateDescriptionForIds(idsToUpdate, it)
                 }
@@ -1264,7 +1254,6 @@ class TransactionViewModel(
                 Log.e(TAG, "Failed to perform batch update", e)
                 _uiEvent.send("Batch update failed. Please try again.")
             } finally {
-                // Always dismiss the sheet after the operation.
                 dismissRetroUpdateSheet()
             }
         }

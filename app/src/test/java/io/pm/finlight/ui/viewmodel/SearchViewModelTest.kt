@@ -1,10 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/SearchViewModelTest.kt
-// REASON: REFACTOR (Testing) - The test class has been updated to extend the new
-// `BaseViewModelTest`. All boilerplate for JUnit rules, coroutine dispatchers,
-// and Mockito initialization has been removed and is now inherited from the base
-// class.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
@@ -12,13 +5,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.AccountDao
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
-import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -132,5 +123,127 @@ class SearchViewModelTest : BaseViewModelTest() {
         assertNotNull(state.endDate)
         assertEquals(cal.get(Calendar.DAY_OF_YEAR), Calendar.getInstance().apply { timeInMillis = state.startDate!! }.get(Calendar.DAY_OF_YEAR))
     }
-}
 
+    @Test
+    fun `onAccountChange updates uiState`() = runTest {
+        // Arrange
+        initializeViewModel()
+        val account = Account(1, "Test Account", "Bank")
+
+        // Act & Assert
+        viewModel.uiState.test {
+            awaitItem() // initial
+            viewModel.onAccountChange(account)
+            val updated = awaitItem()
+            assertEquals(account, updated.selectedAccount)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onCategoryChange updates uiState`() = runTest {
+        // Arrange
+        initializeViewModel()
+        val category = Category(1, "Test Category", "", "")
+
+        // Act & Assert
+        viewModel.uiState.test {
+            awaitItem() // initial
+            viewModel.onCategoryChange(category)
+            assertEquals(category, awaitItem().selectedCategory)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onTagChange updates uiState`() = runTest {
+        // Arrange
+        initializeViewModel()
+        val tag = Tag(1, "Test Tag")
+
+        // Act & Assert
+        viewModel.uiState.test {
+            awaitItem() // initial
+            viewModel.onTagChange(tag)
+            assertEquals(tag, awaitItem().selectedTag)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onTypeChange updates uiState`() = runTest {
+        // Arrange
+        initializeViewModel()
+        val type = "Income"
+
+        // Act & Assert
+        viewModel.uiState.test {
+            awaitItem() // initial
+            viewModel.onTypeChange(type)
+            assertEquals(type, awaitItem().transactionType)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onStartDateSelected and onClearStartDate update uiState`() = runTest {
+        // Arrange
+        initializeViewModel()
+        val date = 123456789L
+
+        // Act & Assert
+        viewModel.uiState.test {
+            awaitItem() // initial
+            viewModel.onStartDateSelected(date)
+            assertEquals(date, awaitItem().startDate)
+
+            viewModel.onClearStartDate()
+            assertNull(awaitItem().startDate)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onEndDateSelected and onClearEndDate update uiState`() = runTest {
+        // Arrange
+        initializeViewModel()
+        val date = 987654321L
+
+        // Act & Assert
+        viewModel.uiState.test {
+            awaitItem() // initial
+            viewModel.onEndDateSelected(date)
+            assertNotNull(awaitItem().endDate) // Date is adjusted to end of day
+
+            viewModel.onClearEndDate()
+            assertNull(awaitItem().endDate)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onShowStartDatePicker and onShowEndDatePicker update uiState`() = runTest {
+        // Arrange
+        initializeViewModel()
+
+        // Act & Assert for Start Date Picker
+        viewModel.uiState.test {
+            assertFalse(awaitItem().showStartDatePicker)
+            viewModel.onShowStartDatePicker(true)
+            assertTrue(awaitItem().showStartDatePicker)
+            viewModel.onShowStartDatePicker(false)
+            assertFalse(awaitItem().showStartDatePicker)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Act & Assert for End Date Picker
+        viewModel.uiState.test {
+            assertFalse(awaitItem().showEndDatePicker)
+            viewModel.onShowEndDatePicker(true)
+            assertTrue(awaitItem().showEndDatePicker)
+            viewModel.onShowEndDatePicker(false)
+            assertFalse(awaitItem().showEndDatePicker)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+}

@@ -230,24 +230,62 @@ object DataExportService {
                     val escapedTags = escapeCsvField(tagsString)
 
                     if (transaction.isSplit) {
-                        val category = "Split Transaction" // Parent has a special category
-                        csvBuilder.append("${transaction.id},,$date,$description,$amount,$type,$category,$account,$notes,$isExcluded,$escapedTags\n")
+                        val parentRow = listOf(
+                            transaction.id.toString(),
+                            "", // ParentId
+                            date,
+                            description,
+                            amount,
+                            type,
+                            "Split Transaction", // Category for parent
+                            account,
+                            notes,
+                            isExcluded,
+                            escapedTags
+                        ).joinToString(",")
+                        csvBuilder.appendLine(parentRow)
 
                         // Now fetch and append its children
                         val splits = splitTransactionDao.getSplitsForParentSimple(transaction.id)
                         splits.forEach { splitDetails ->
                             val split = splitDetails.splitTransaction
-                            // Use notes as description for splits, fallback to category name
                             val splitDescription = escapeCsvField(split.notes ?: splitDetails.categoryName ?: "")
                             val splitAmount = split.amount.toString()
                             val splitCategory = escapeCsvField(splitDetails.categoryName ?: "N/A")
+
                             // Child rows have no ID of their own in this context, but link to the parent
-                            csvBuilder.append(",${transaction.id},${dateFormat.format(Date(transaction.date))},$splitDescription,$splitAmount,$type,$splitCategory,$account,${escapeCsvField(split.notes ?: "")},$isExcluded,\n")
+                            val childRow = listOf(
+                                "", // Id
+                                transaction.id.toString(), // ParentId
+                                dateFormat.format(Date(transaction.date)),
+                                splitDescription,
+                                splitAmount,
+                                type,
+                                splitCategory,
+                                account,
+                                escapeCsvField(split.notes ?: ""),
+                                isExcluded,
+                                "" // <-- THE FIX: Add an empty string for the missing Tags column
+                            ).joinToString(",")
+                            csvBuilder.appendLine(childRow)
                         }
                     } else {
                         // This is a standard, non-split transaction
                         val category = escapeCsvField(details.categoryName ?: "N/A")
-                        csvBuilder.append("${transaction.id},,$date,$description,$amount,$type,$category,$account,$notes,$isExcluded,$escapedTags\n")
+                        val row = listOf(
+                            transaction.id.toString(),
+                            "", // ParentId
+                            date,
+                            description,
+                            amount,
+                            type,
+                            category,
+                            account,
+                            notes,
+                            isExcluded,
+                            escapedTags
+                        ).joinToString(",")
+                        csvBuilder.appendLine(row)
                     }
                 }
                 csvBuilder.toString()

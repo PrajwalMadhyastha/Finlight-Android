@@ -31,8 +31,6 @@ enum class ShareableField(val displayName: String) {
     Description("Description"),
     Amount("Amount"),
     Category("Category"),
-    Account("Account"),
-    Notes("Notes"),
     Tags("Tags")
 }
 
@@ -47,7 +45,7 @@ fun ShareSnapshotSheet(
 
     // The root Column now fills the entire height of the bottom sheet.
     Column(
-        modifier = Modifier.Companion
+        modifier = Modifier
             .fillMaxHeight()
             .padding(16.dp)
             .navigationBarsPadding()
@@ -55,25 +53,25 @@ fun ShareSnapshotSheet(
         Text(
             "Customize Your Snapshot",
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.Companion.padding(bottom = 8.dp),
+            modifier = Modifier.padding(bottom = 8.dp),
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             "Select the fields you want to include in the shared image.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.Companion.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 16.dp)
         )
 
         // The LazyColumn now takes up all available vertical space.
         LazyColumn(
-            modifier = Modifier.Companion.weight(1f),
+            modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(allFields) { field ->
                 Row(
-                    verticalAlignment = Alignment.Companion.CenterVertically,
-                    modifier = Modifier.Companion
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onFieldToggle(field) }
                         .padding(vertical = 4.dp)
@@ -89,28 +87,28 @@ fun ShareSnapshotSheet(
                     )
                     Text(
                         text = field.displayName,
-                        modifier = Modifier.Companion.padding(start = 8.dp),
+                        modifier = Modifier.padding(start = 8.dp),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.Companion.height(24.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         Row(
-            modifier = Modifier.Companion.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             OutlinedButton(
                 onClick = onCancelClick,
-                modifier = Modifier.Companion.weight(1f)
+                modifier = Modifier.weight(1f)
             ) {
                 Text("Cancel")
             }
             Button(
                 onClick = onGenerateClick,
-                modifier = Modifier.Companion.weight(1f),
+                modifier = Modifier.weight(1f),
                 enabled = selectedFields.isNotEmpty()
             ) {
                 Text("Generate Image")

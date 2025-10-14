@@ -87,9 +87,9 @@ class AnalysisDetailViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `when dimension is MERCHANT, it calls getTransactionsForMerchantInRange`() = runTest {
+    fun `when dimension is MERCHANT, it calls getTransactionsForMerchantInRange with lowercase name`() = runTest {
         // Arrange
-        val merchantName = "Amazon"
+        val merchantName = "amazon" // Simulate lowercase name from navigation
         val startDate = 1000L
         val endDate = 2000L
         `when`(transactionDao.getTransactionsForMerchantInRange(merchantName, startDate, endDate)).thenReturn(flowOf(mockTransactionDetails))
@@ -102,6 +102,8 @@ class AnalysisDetailViewModelTest : BaseViewModelTest() {
             assertEquals(mockTransactionDetails, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
+        // Verify that the DAO is called with the same lowercase name the ViewModel received.
+        // This confirms the ViewModel logic is correct. The DAO test will confirm the query itself works.
         verify(transactionDao).getTransactionsForMerchantInRange(merchantName, startDate, endDate)
     }
 }

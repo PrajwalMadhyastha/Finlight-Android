@@ -72,6 +72,13 @@ class ParserLearningLogicTest : BaseSmsParserTest() {
         assertEquals(expectedFinalMerchant, result?.merchantName)
     }
 
+    // =================================================================================
+    // REGRESSION TEST FOR HIERARCHY OF TRUST BUG
+    // This test specifically verifies the fix for the merchant category learning bug.
+    // It ensures that the parser attempts to find a learned category using the
+    // ORIGINAL merchant name ("AMZN") *before* it applies any rename rules
+    // (which would change it to "Amazon").
+    // =================================================================================
     @Test
     fun `test_combinedLogic_learnsCategoryBeforeApplyingRename`() = runBlocking {
         // ARRANGE

@@ -1,21 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SettingsSubScreens.kt
-// REASON: FEATURE - Added a new "Debug SMS Parsing" SettingsActionItem to the
-// AutomationSettingsScreen. This provides the user with a clear entry point to
-// the new SMS debugger tool.
-// REFACTOR - Removed the user-configurable time picker for the monthly summary
-// notification. It is now fixed to run on the 1st of each month, simplifying the UI.
-// FEATURE - Added a "Create Backup Snapshot" button to the Data Settings screen
-// to allow for manual triggering of the snapshot creation process, which is
-// essential for reliably testing the backup and restore workflow.
-// FEATURE - Added a "Verify Snapshot File" button for testing purposes. It checks
-// for the existence of the snapshot file and displays a toast, allowing verification
-// on non-debuggable builds where 'adb run-as' is not available.
-// REFACTOR (Cleanup) - Removed the test-only "Verify Snapshot" button and
-// updated the text of the "Create Snapshot" button to be more user-friendly,
-// reflecting its new role as a permanent feature.
-// FIX (UI) - Removed the local Scaffold and TopAppBar from AutomationSettingsScreen
-// to resolve a duplicate toolbar bug.
+// REASON: FEATURE (Backup Time) - Added a new `SettingsActionItem` to display
+// the last backup timestamp. It formats the timestamp from the ViewModel into a
+// human-readable string and shows "Never" if a backup hasn't occurred yet.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -398,6 +385,24 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
 
     val isPrivacyModeEnabled by settingsViewModel.privacyModeEnabled.collectAsState()
 
+    // --- NEW: Observe the last backup timestamp ---
+    val lastBackupTimestamp by settingsViewModel.lastBackupTimestamp.collectAsState()
+    val lastBackupFormatted = remember(lastBackupTimestamp) {
+        if (lastBackupTimestamp > 0L) {
+            val sdf = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+            sdf.format(Date(lastBackupTimestamp))
+        } else {
+            "Never"
+        }
+    }
+
+    // --- NEW: LaunchedEffect to handle UI events from the ViewModel ---
+    LaunchedEffect(Unit) {
+        settingsViewModel.uiEvent.collectLatest { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
     val jsonFileSaverLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json"),
         onResult = { uri ->
@@ -574,6 +579,13 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                         subtitle = "Manually create a snapshot & request a backup",
                         icon = Icons.Default.Save,
                         onClick = { settingsViewModel.createBackupSnapshot() }
+                    )
+                    // --- NEW: Display the last backup timestamp ---
+                    SettingsActionItem(
+                        text = "Last Backup",
+                        subtitle = lastBackupFormatted,
+                        icon = Icons.Default.History,
+                        onClick = {} // Not clickable
                     )
                 }
             }
