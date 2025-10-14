@@ -9,6 +9,9 @@
 // and an anchored numpad at the bottom. This resolves a bug where the numpad
 // would be pushed off-screen on devices with 3-button navigation enabled when
 // the validation checklist appeared.
+// REFACTOR (UI) - The layout is now a non-scrolling Column. The ValidationChecklist
+// has been redesigned as a compact set of indicators directly below the amount
+// display, saving vertical space and eliminating the need for scrolling.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -252,77 +255,55 @@ fun AddTransactionScreen(
             },
             containerColor = Color.Transparent
         ) { innerPadding ->
-            // --- FIX: Parent Column to anchor the numpad ---
+            // --- REFACTOR: Main layout is now a non-scrolling Column ---
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
+                    .padding(horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // --- FIX: Scrollable content area ---
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Spacer(Modifier.height(16.dp)) // Replaced weighted spacer
-                    AmountComposer(
-                        amount = amount,
-                        description = description,
-                        onDescriptionClick = { activeSheet = ComposerSheet.Merchant },
-                        isTravelMode = isTravelModeActive,
-                        travelModeSettings = travelModeSettings,
-                        highlightDescription = hasInteracted && !isDescriptionEntered,
-                        isDescriptionEntered = isDescriptionEntered,
-                        hasInteractedWithNumpad = hasInteracted
-                    )
-                    Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(16.dp))
+                AmountComposer(
+                    amount = amount,
+                    description = description,
+                    onDescriptionClick = { activeSheet = ComposerSheet.Merchant },
+                    isTravelMode = isTravelModeActive,
+                    travelModeSettings = travelModeSettings,
+                    highlightDescription = hasInteracted && !isDescriptionEntered,
+                    isDescriptionEntered = isDescriptionEntered,
+                    hasInteractedWithNumpad = hasInteracted,
+                    isAmountEntered = isAmountEntered // --- FIX: Pass the state down ---
+                )
+                Spacer(Modifier.height(24.dp))
 
-                    TransactionTypeToggle(
-                        selectedType = transactionType,
-                        onTypeSelected = { transactionType = it }
-                    )
+                TransactionTypeToggle(
+                    selectedType = transactionType,
+                    onTypeSelected = { transactionType = it }
+                )
 
-                    Spacer(Modifier.height(24.dp))
-                    OrbitalChips(
-                        selectedCategory = selectedCategory,
-                        selectedAccount = selectedAccount,
-                        selectedDateTime = selectedDateTime.time,
-                        onCategoryClick = {
-                            viewModel.onUserManuallySelectedCategory() // User is taking control
-                            activeSheet = ComposerSheet.Category
-                        },
-                        onAccountClick = { activeSheet = ComposerSheet.Account },
-                        onDateClick = { showDatePicker = true }
-                    )
-                    Spacer(Modifier.height(24.dp)) // Replaced weighted spacer
-                    ActionRow(
-                        notes = notes,
-                        tags = selectedTags,
-                        imageCount = attachedImageUris.size,
-                        onNotesClick = { activeSheet = ComposerSheet.Notes },
-                        onTagsClick = { activeSheet = ComposerSheet.Tags },
-                        onAttachmentClick = { imagePickerLauncher.launch("image/*") }
-                    )
-
-                    Spacer(Modifier.height(16.dp))
-
-                    AnimatedVisibility(
-                        visible = hasInteracted,
-                        enter = fadeIn(animationSpec = tween(200)),
-                        exit = fadeOut(animationSpec = tween(200))
-                    ) {
-                        ValidationChecklist(
-                            isAmountEntered = isAmountEntered,
-                            isDescriptionEntered = isDescriptionEntered,
-                            isDescriptionRequired = false
-                        )
-                    }
-                    Spacer(Modifier.height(16.dp))
-                }
-
-                // --- FIX: Numpad is now outside the scrollable area ---
+                Spacer(Modifier.height(24.dp))
+                OrbitalChips(
+                    selectedCategory = selectedCategory,
+                    selectedAccount = selectedAccount,
+                    selectedDateTime = selectedDateTime.time,
+                    onCategoryClick = {
+                        viewModel.onUserManuallySelectedCategory() // User is taking control
+                        activeSheet = ComposerSheet.Category
+                    },
+                    onAccountClick = { activeSheet = ComposerSheet.Account },
+                    onDateClick = { showDatePicker = true }
+                )
+                // --- REFACTOR: Use a weighted spacer to push content to top and bottom ---
+                Spacer(Modifier.weight(1f))
+                ActionRow(
+                    notes = notes,
+                    tags = selectedTags,
+                    imageCount = attachedImageUris.size,
+                    onNotesClick = { activeSheet = ComposerSheet.Notes },
+                    onTagsClick = { activeSheet = ComposerSheet.Tags },
+                    onAttachmentClick = { imagePickerLauncher.launch("image/*") }
+                )
                 GlassmorphicNumpad(
                     onDigitClick = { digit ->
                         if (!hasInteracted) hasInteracted = true
@@ -334,7 +315,7 @@ fun AddTransactionScreen(
                             description = description,
                             amountStr = amount,
                             accountId = selectedAccount?.id,
-                            categoryId = selectedCategory?.id, // Pass category ID
+                            categoryId = selectedCategory?.id,
                             notes = notes,
                             date = selectedDateTime.timeInMillis,
                             transactionType = transactionType,
@@ -522,46 +503,6 @@ fun AddTransactionScreen(
     }
 }
 
-// --- UPDATED: Checklist now handles optional items ---
-@Composable
-private fun ValidationChecklist(
-    isAmountEntered: Boolean,
-    isDescriptionEntered: Boolean,
-    isDescriptionRequired: Boolean = true
-) {
-    GlassPanel {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            ChecklistItem(label = "Enter an amount", isChecked = isAmountEntered, isRequired = true)
-            ChecklistItem(label = "Add a description", isChecked = isDescriptionEntered, isRequired = isDescriptionRequired)
-        }
-    }
-}
-
-@Composable
-private fun ChecklistItem(label: String, isChecked: Boolean, isRequired: Boolean) {
-    val color = when {
-        isChecked -> MaterialTheme.colorScheme.primary
-        !isRequired -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-        else -> MaterialTheme.colorScheme.error
-    }
-    val icon = if (isChecked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(text = label, color = color)
-    }
-}
-
 @Composable
 private fun SpotlightBackground(color: Color) {
     val animatedAlpha by animateFloatAsState(
@@ -598,7 +539,8 @@ private fun AmountComposer(
     travelModeSettings: TravelModeSettings?,
     highlightDescription: Boolean,
     isDescriptionEntered: Boolean,
-    hasInteractedWithNumpad: Boolean
+    hasInteractedWithNumpad: Boolean,
+    isAmountEntered: Boolean // --- FIX: Add missing parameter ---
 ) {
     val currentTravelSettings = travelModeSettings
     val currencySymbol = if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
@@ -660,6 +602,18 @@ private fun AmountComposer(
                 text = "≈ $homeSymbol${NumberFormat.getInstance().format(convertedAmount)}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        // --- NEW: Integrated compact validation checklist ---
+        AnimatedVisibility(
+            visible = hasInteractedWithNumpad,
+            enter = fadeIn(animationSpec = tween(200)) + slideInVertically(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(200)) + slideOutVertically(animationSpec = tween(200))
+        ) {
+            ValidationChecklist(
+                isAmountEntered = isAmountEntered,
+                isDescriptionEntered = isDescriptionEntered,
+                isDescriptionRequired = false
             )
         }
     }
@@ -1145,5 +1099,47 @@ fun TransactionTypeToggle(
         ) {
             Text("Income", fontWeight = FontWeight.Bold)
         }
+    }
+}
+
+// --- NEW: Compact checklist composable ---
+@Composable
+private fun ValidationChecklist(
+    isAmountEntered: Boolean,
+    isDescriptionEntered: Boolean,
+    isDescriptionRequired: Boolean
+) {
+    Row(
+        modifier = Modifier.padding(top = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ChecklistItem(label = "Amount", isChecked = isAmountEntered, isRequired = true)
+        ChecklistItem(label = "Description", isChecked = isDescriptionEntered, isRequired = isDescriptionRequired)
+    }
+}
+
+// --- NEW: Compact checklist item composable ---
+@Composable
+private fun ChecklistItem(label: String, isChecked: Boolean, isRequired: Boolean) {
+    val color = when {
+        isChecked -> MaterialTheme.colorScheme.primary
+        !isRequired -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        else -> MaterialTheme.colorScheme.error
+    }
+    val icon = if (isChecked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(16.dp) // Smaller icon
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = label,
+            color = color,
+            style = MaterialTheme.typography.bodySmall // Smaller text
+        )
     }
 }
