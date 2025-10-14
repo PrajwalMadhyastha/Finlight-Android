@@ -1,5 +1,15 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
+// REASON: FIX (Analysis) - The WHERE clause for `getTransactionsForMerchantInRange`
+// has been updated to use `LOWER(T.description)`. This makes the merchant name
+// comparison case-insensitive, resolving the bug where the Analysis Details
+// screen appeared blank because it was receiving a lowercase merchant ID from
+// the previous screen and failing to match it against the original-cased
+// description in the database.
+// FEATURE (Search) - The three main spending analysis queries have been updated
+// to accept a `searchQuery` parameter. This adds a `LIKE` clause to each query,
+// enabling efficient, real-time searching within the selected dimension directly
+// at the database level.
 // =================================================================================
 package io.pm.finlight
 
@@ -67,6 +77,7 @@ interface TransactionDao {
         FROM AllExpenses AE
         JOIN categories C ON AE.categoryId = C.id
         WHERE AE.categoryId IS NOT NULL
+          AND (:searchQuery IS NULL OR C.name LIKE '%' || :searchQuery || '%')
           AND (:filterMerchantName IS NULL OR AE.description = :filterMerchantName)
           AND (:filterTagId IS NULL OR EXISTS (
               SELECT 1 FROM transaction_tag_cross_ref ttcr
@@ -76,7 +87,7 @@ interface TransactionDao {
         GROUP BY C.id, C.name
         ORDER BY totalAmount DESC
     """)
-    fun getSpendingAnalysisByCategory(startDate: Long, endDate: Long, filterTagId: Int?, filterMerchantName: String?, filterCategoryId: Int?): Flow<List<SpendingAnalysisItem>>
+    fun getSpendingAnalysisByCategory(startDate: Long, endDate: Long, filterTagId: Int?, filterMerchantName: String?, filterCategoryId: Int?, searchQuery: String?): Flow<List<SpendingAnalysisItem>>
 
     @Query("""
         WITH AllExpenses AS (
@@ -98,13 +109,14 @@ interface TransactionDao {
         JOIN transaction_tag_cross_ref TTCR ON AE.id = TTCR.transactionId
         JOIN tags TG ON TTCR.tagId = TG.id
         WHERE
-            (:filterCategoryId IS NULL OR AE.categoryId = :filterCategoryId)
+            (:searchQuery IS NULL OR TG.name LIKE '%' || :searchQuery || '%')
+            AND (:filterCategoryId IS NULL OR AE.categoryId = :filterCategoryId)
             AND (:filterMerchantName IS NULL OR AE.description = :filterMerchantName)
             AND (:filterTagId IS NULL OR TG.id = :filterTagId)
         GROUP BY TG.id, TG.name
         ORDER BY totalAmount DESC
     """)
-    fun getSpendingAnalysisByTag(startDate: Long, endDate: Long, filterCategoryId: Int?, filterMerchantName: String?, filterTagId: Int?): Flow<List<SpendingAnalysisItem>>
+    fun getSpendingAnalysisByTag(startDate: Long, endDate: Long, filterCategoryId: Int?, filterMerchantName: String?, filterTagId: Int?, searchQuery: String?): Flow<List<SpendingAnalysisItem>>
 
     @Query("""
         WITH AllExpenses AS (
@@ -125,6 +137,7 @@ interface TransactionDao {
         FROM AllExpenses AE
         WHERE
             AE.description IS NOT NULL
+            AND (:searchQuery IS NULL OR AE.description LIKE '%' || :searchQuery || '%')
             AND (:filterCategoryId IS NULL OR AE.categoryId = :filterCategoryId)
             AND (:filterTagId IS NULL OR EXISTS (
                 SELECT 1 FROM transaction_tag_cross_ref ttcr
@@ -134,7 +147,7 @@ interface TransactionDao {
         GROUP BY dimensionName
         ORDER BY totalAmount DESC
     """)
-    fun getSpendingAnalysisByMerchant(startDate: Long, endDate: Long, filterCategoryId: Int?, filterTagId: Int?, filterMerchantName: String?): Flow<List<SpendingAnalysisItem>>
+    fun getSpendingAnalysisByMerchant(startDate: Long, endDate: Long, filterCategoryId: Int?, filterTagId: Int?, filterMerchantName: String?, searchQuery: String?): Flow<List<SpendingAnalysisItem>>
 
 
     @androidx.room.Transaction
@@ -169,7 +182,7 @@ interface TransactionDao {
         FROM transactions AS T
         LEFT JOIN accounts AS A ON T.accountId = A.id
         LEFT JOIN categories AS C ON T.categoryId = C.id
-        WHERE T.description = :merchantName AND T.date BETWEEN :startDate AND :endDate
+        WHERE LOWER(T.description) = :merchantName AND T.date BETWEEN :startDate AND :endDate
         ORDER BY T.date DESC
     """)
     fun getTransactionsForMerchantInRange(merchantName: String, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
@@ -326,12 +339,12 @@ interface TransactionDao {
 
     @Query("""
         WITH AtomicIncomes AS (
-            SELECT T.categoryId, T.amount, T.description, T.notes
+            SELECT T.categoryId, T.amount, T.description, T.notes, T.accountId
             FROM transactions AS T
             WHERE T.isSplit = 0 AND T.transactionType = 'income' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
               AND (:accountId IS NULL OR T.accountId = :accountId)
             UNION ALL
-            SELECT S.categoryId, S.amount, P.description, S.notes
+            SELECT S.categoryId, S.amount, P.description, S.notes, P.accountId
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'income' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
               AND (:accountId IS NULL OR P.accountId = :accountId)

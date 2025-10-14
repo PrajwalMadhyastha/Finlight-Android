@@ -210,7 +210,7 @@ class SmsDebugViewModel(
             var importedCount = 0
             if (transactionsToImport.isNotEmpty()) {
                 for (txn in transactionsToImport) {
-                    val success = transactionViewModel.autoSaveSmsTransaction(txn)
+                    val success = transactionViewModel.autoSaveSmsTransaction(txn, source = "Imported")
                     if (success) {
                         importedCount++
                     }

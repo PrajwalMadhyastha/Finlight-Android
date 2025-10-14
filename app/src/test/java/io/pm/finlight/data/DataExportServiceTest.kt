@@ -261,5 +261,74 @@ class DataExportServiceTest : BaseViewModelTest() {
         // Assert
         assertFalse("Restore should fail if no snapshot file exists", success)
     }
-}
 
+    @Test
+    fun `exportToCsvString handles split transactions correctly`() = runTest {
+        // Arrange
+        val parentTxId = 1
+        val tagId1 = 10
+        val tagId2 = 11
+
+        // 1. Parent Transaction Details
+        val parentTransaction = Transaction(id = parentTxId, description = "Market Visit", amount = 150.0, date = 1672531200000L, accountId = 1, categoryId = null, notes = "Parent Note", isSplit = true, transactionType = "expense", isExcluded = false)
+        val parentDetails = TransactionDetails(
+            transaction = parentTransaction,
+            images = emptyList(),
+            accountName = "Savings",
+            categoryName = null, // Is split
+            categoryIconKey = null,
+            categoryColorKey = null,
+            tagNames = "Groceries|Weekend" // This is what the GROUP_CONCAT in the DAO query would produce
+        )
+
+        // 2. Split Transaction Details
+        val splits = listOf(
+            SplitTransaction(id = 1, parentTransactionId = parentTxId, amount = 100.0, categoryId = 1, notes = "Vegetables"),
+            SplitTransaction(id = 2, parentTransactionId = parentTxId, amount = 50.0, categoryId = 2, notes = "Snacks")
+        )
+        val splitDetails = listOf(
+            SplitTransactionDetails(splits[0], "Food", "restaurant", "red"),
+            SplitTransactionDetails(splits[1], "Shopping", "shopping_bag", "blue")
+        )
+
+        // 3. Tags
+        val tags = listOf(
+            Tag(id = tagId1, name = "Groceries"),
+            Tag(id = tagId2, name = "Weekend")
+        )
+
+        // 4. Mock DAO calls
+        coEvery { transactionDao.getAllTransactions() } returns flowOf(listOf(parentDetails))
+        coEvery { transactionDao.getTagsForTransactionSimple(parentTxId) } returns tags
+        coEvery { splitTransactionDao.getSplitsForParentSimple(parentTxId) } returns splitDetails
+
+        // Act
+        val csvString = DataExportService.exportToCsvString(context)
+
+        // Assert
+        assertNotNull("CSV string should not be null", csvString)
+        val lines = csvString!!.lines().filter { it.isNotBlank() }
+
+        assertEquals("Should be 4 lines (header + parent + 2 children)", 4, lines.size)
+
+        // Header validation
+        val header = lines[0].split(',')
+        assertEquals(11, header.size)
+        assertEquals("Tags", header[10])
+
+        // Parent row validation
+        val parentRow = lines[1].split(',')
+        assertEquals(11, parentRow.size)
+        assertEquals("Groceries|Weekend", parentRow[10]) // Check tags column is correctly formatted and escaped
+
+        // Child row 1 validation
+        val childRow1 = lines[2].split(',')
+        assertEquals(11, childRow1.size)
+        assertEquals("", childRow1[10]) // Tags column should be present but empty
+
+        // Child row 2 validation
+        val childRow2 = lines[3].split(',')
+        assertEquals(11, childRow2.size)
+        assertEquals("", childRow2[10]) // Tags column should be present but empty
+    }
+}

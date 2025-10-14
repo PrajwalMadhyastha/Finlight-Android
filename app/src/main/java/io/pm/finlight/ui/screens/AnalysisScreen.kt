@@ -6,6 +6,11 @@
 // FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
 // provides a centralized TopAppBar, and this change removes the duplicate,
 // resolving a UI bug.
+// FEATURE (Search) - An OutlinedTextField has been added below the dimension tabs
+// to act as a search bar. It's styled to match the "Project Aurora" aesthetic,
+// with its value and onValueChange connected to the AnalysisViewModel to drive
+// the real-time, database-level filtering. The placeholder text dynamically
+// updates based on the selected dimension.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -24,6 +29,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -87,11 +93,37 @@ fun AnalysisScreen(
             }
         }
 
+        // --- NEW: Search Bar ---
+        GlassPanel(modifier = Modifier.padding(16.dp)) {
+            val placeholderText = "Search ${uiState.selectedDimension.name.lowercase()}s..."
+            OutlinedTextField(
+                value = uiState.searchQuery,
+                onValueChange = { viewModel.onSearchQueryChanged(it) },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text(placeholderText) },
+                leadingIcon = { Icon(Icons.Default.Search, "Search") },
+                trailingIcon = {
+                    if (uiState.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                            Icon(Icons.Default.Clear, "Clear search")
+                        }
+                    }
+                },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    cursorColor = MaterialTheme.colorScheme.primary
+                )
+            )
+        }
+
+
         // --- NEW: Filter Bar ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
+                .padding(bottom = 8.dp, start = 16.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TimePeriodFilter(
@@ -126,7 +158,7 @@ fun AnalysisScreen(
             }
         } else {
             LazyColumn(
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
@@ -264,7 +296,7 @@ private fun TimePeriodFilter(
     onCustomRangeClick: () -> Unit
 ) {
     LazyRow(
-        modifier = modifier.padding(start = 16.dp),
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(AnalysisTimePeriod.entries.filter { it != AnalysisTimePeriod.CUSTOM }) { period ->

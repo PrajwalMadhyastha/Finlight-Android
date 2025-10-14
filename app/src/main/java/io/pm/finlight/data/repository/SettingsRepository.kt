@@ -1,9 +1,8 @@
-// FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
 // =================================================================================
-// REASON: FIX - Added functions to save and retrieve a checksum for the default
-// ignore rules. This provides the persistence layer needed for the new "checksum"
-// seeding strategy, allowing the AppDatabase callback to detect when the rules
-// in the source code have been updated.
+// FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
+// REASON: FEATURE (Backup Time) - Added functions to save and retrieve the
+// timestamp of the last successful backup operation. This provides the persistence
+// layer needed to display this information to the user.
 // =================================================================================
 package io.pm.finlight
 
@@ -87,7 +86,30 @@ class SettingsRepository(context: Context) {
         private const val KEY_IS_FIRST_LAUNCH_COMPLETE = "is_first_launch_complete"
         // --- NEW: Key for the ignore rules checksum ---
         private const val KEY_IGNORE_RULES_CHECKSUM = "ignore_rules_checksum"
+        // --- NEW: Key for the last backup timestamp ---
+        private const val KEY_LAST_BACKUP_TIMESTAMP = "last_backup_timestamp"
     }
+
+    // --- NEW: Functions to manage the last backup timestamp ---
+    fun saveLastBackupTimestamp(timestamp: Long) {
+        prefs.edit {
+            putLong(KEY_LAST_BACKUP_TIMESTAMP, timestamp)
+        }
+    }
+
+    fun getLastBackupTimestamp(): Flow<Long> {
+        return callbackFlow {
+            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                if (key == KEY_LAST_BACKUP_TIMESTAMP) {
+                    trySend(sp.getLong(key, 0L))
+                }
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(prefs.getLong(KEY_LAST_BACKUP_TIMESTAMP, 0L))
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+    }
+
 
     // --- NEW: Functions to manage the ignore rules checksum ---
     fun saveIgnoreRulesChecksum(checksum: Int) {

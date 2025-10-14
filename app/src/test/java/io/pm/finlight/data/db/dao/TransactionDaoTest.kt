@@ -54,6 +54,35 @@ class TransactionDaoTest {
     }
 
     @Test
+    fun `getTransactionsForMerchantInRange is case-insensitive`() = runTest {
+        // Arrange
+        val transactionTime = System.currentTimeMillis()
+        val transaction = Transaction(
+            id = 1,
+            description = "Amazon", // Original-cased merchant name
+            amount = 500.0,
+            date = transactionTime,
+            accountId = 1,
+            categoryId = 2,
+            notes = null
+        )
+        transactionDao.insert(transaction)
+
+        // Act & Assert
+        // Query with a lowercase version of the merchant name
+        transactionDao.getTransactionsForMerchantInRange("amazon", transactionTime - 1000, transactionTime + 1000).test {
+            val results = awaitItem()
+
+            // The query should still find the transaction, proving the fix works.
+            assertEquals(1, results.size)
+            assertEquals("Amazon", results.first().transaction.description)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+
+    @Test
     fun `insert and get transaction by id`() = runTest {
         // Arrange
         val transaction = Transaction(id = 1, description = "Coffee", amount = 150.0, date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = "Morning coffee")

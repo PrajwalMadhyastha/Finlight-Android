@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: REFACTOR (Testing) - The ViewModel has been refactored to use
-// constructor dependency injection for its repository dependencies. This decouples
-// it from direct instantiation of its data sources, making it fully unit-testable.
+// REASON: FEATURE (Backup Time) - The ViewModel now exposes a `lastBackupTimestamp`
+// StateFlow. This collects the timestamp from the SettingsRepository, making it
+// available for the UI to display.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -19,6 +19,8 @@ import androidx.room.withTransaction
 import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.entity.AccountAlias
+import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.ReminderManager
@@ -29,8 +31,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -39,11 +39,17 @@ sealed class ScanResult {
     object Error : ScanResult()
 }
 
-data class SenderToMap(
-    val sender: String,
+/**
+ * Data class to represent an item on the Account Mapping screen.
+ * It holds the unique identifier that needs mapping and contextual info.
+ */
+data class AccountMappingRequest(
+    val identifier: String, // The string to be mapped, e.g., "AM-HDFCBK" or "A/c xx1234"
+    val isSenderMapping: Boolean, // True if the identifier is an SMS sender, false if it's a parsed account string
     val sampleMerchant: String,
     val transactionCount: Int
 )
+
 
 class SettingsViewModel(
     application: Application,
@@ -54,7 +60,8 @@ class SettingsViewModel(
     private val accountRepository: AccountRepository,
     private val categoryRepository: CategoryRepository,
     private val smsRepository: SmsRepository,
-    private val transactionViewModel: TransactionViewModel
+    private val transactionViewModel: TransactionViewModel,
+    private val smsClassifier: SmsClassifier
 ) : AndroidViewModel(application) {
 
     private val context = application
@@ -119,8 +126,9 @@ class SettingsViewModel(
     private val _isScanning = MutableStateFlow<Boolean>(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
-    private val _sendersToMap = MutableStateFlow<List<SenderToMap>>(emptyList())
-    val sendersToMap: StateFlow<List<SenderToMap>> = _sendersToMap.asStateFlow()
+    private val _mappingsToReview = MutableStateFlow<List<AccountMappingRequest>>(emptyList())
+    val mappingsToReview: StateFlow<List<AccountMappingRequest>> = _mappingsToReview.asStateFlow()
+
 
     val dailyReportTime: StateFlow<Pair<Int, Int>> =
         settingsRepository.getDailyReportTime().stateIn(
@@ -178,6 +186,14 @@ class SettingsViewModel(
             initialValue = false,
         )
 
+    // --- NEW: Expose the last backup timestamp ---
+    val lastBackupTimestamp: StateFlow<Long> =
+        settingsRepository.getLastBackupTimestamp().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0L
+        )
+
     init {
         smsScanStartDate =
             settingsRepository.getSmsScanStartDate()
@@ -186,6 +202,11 @@ class SettingsViewModel(
                     started = SharingStarted.WhileSubscribed(5000),
                     initialValue = 0L,
                 )
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        smsClassifier.close()
     }
 
     fun setPrivacyModeEnabled(enabled: Boolean) {
@@ -200,7 +221,7 @@ class SettingsViewModel(
 
         for (txn in currentList) {
             if (txn.merchantName != null && txn.merchantName.equals(mapping.parsedName, ignoreCase = true)) {
-                val success = transactionViewModel.autoSaveSmsTransaction(txn.copy(categoryId = mapping.categoryId))
+                val success = transactionViewModel.autoSaveSmsTransaction(txn.copy(categoryId = mapping.categoryId), source = "Imported")
                 if (success) {
                     autoImportedCount++
                 }
@@ -235,7 +256,6 @@ class SettingsViewModel(
                     transactionRepository.getAllSmsHashes().first().toSet()
                 }
 
-                // Create provider implementations
                 val categoryFinderProvider = object : CategoryFinderProvider {
                     override fun getCategoryIdByName(name: String): Int? {
                         return CategoryIconHelper.getCategoryIdByName(name)
@@ -280,7 +300,7 @@ class SettingsViewModel(
                 }
 
                 for (potentialTxn in newPotentialTransactions) {
-                    val success = transactionViewModel.autoSaveSmsTransaction(potentialTxn)
+                    val success = transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")
                     if (success) {
                         newTransactionsFound++
                     }
@@ -309,11 +329,8 @@ class SettingsViewModel(
                 val existingMappings = withContext(Dispatchers.IO) { merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName }) }
                 val existingSmsHashes = withContext(Dispatchers.IO) { transactionRepository.getAllSmsHashes().first().toSet() }
 
-                // Create provider implementations
                 val categoryFinderProvider = object : CategoryFinderProvider {
-                    override fun getCategoryIdByName(name: String): Int? {
-                        return CategoryIconHelper.getCategoryIdByName(name)
-                    }
+                    override fun getCategoryIdByName(name: String): Int? = CategoryIconHelper.getCategoryIdByName(name)
                 }
                 val customSmsRuleProvider = object : CustomSmsRuleProvider {
                     override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
@@ -332,30 +349,58 @@ class SettingsViewModel(
                     override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
                 }
 
-
                 val parsedList = withContext(Dispatchers.Default) {
                     rawMessages.map { sms ->
                         async {
-                            SmsParser.parse(
-                                sms,
-                                existingMappings,
-                                customSmsRuleProvider,
-                                merchantRenameRuleProvider,
-                                ignoreRuleProvider,
-                                merchantCategoryMappingProvider,
-                                categoryFinderProvider,
-                                smsParseTemplateProvider
+                            // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
+                            var parseResult = SmsParser.parseWithOnlyCustomRules(
+                                sms = sms,
+                                customSmsRuleProvider = customSmsRuleProvider,
+                                merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                categoryFinderProvider = categoryFinderProvider
                             )
+
+                            // --- HIERARCHY STEP 2 & 3: If no custom rule matched, run ML pre-filter and then the main parser ---
+                            if (parseResult == null) {
+                                val transactionConfidence = smsClassifier.classify(sms.body)
+                                if (transactionConfidence >= 0.1) {
+                                    parseResult = SmsParser.parseWithReason(
+                                        sms = sms,
+                                        mappings = existingMappings,
+                                        customSmsRuleProvider = customSmsRuleProvider,
+                                        merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                        ignoreRuleProvider = ignoreRuleProvider,
+                                        merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                        categoryFinderProvider = categoryFinderProvider,
+                                        smsParseTemplateProvider = smsParseTemplateProvider
+                                    )
+                                }
+                            }
+
+                            (parseResult as? ParseResult.Success)?.transaction
                         }
                     }.awaitAll().filterNotNull()
                 }
 
                 val newPotentialTransactions = parsedList.filter { !existingSmsHashes.contains(it.sourceSmsHash) }
 
-                val (parsedWithAccount, needsMapping) = newPotentialTransactions.partition { it.potentialAccount != null }
+                val (needsMapping, canAutoImport) = newPotentialTransactions.partition { txn ->
+                    val potentialAccount = txn.potentialAccount // --- FIX: Capture property locally
+                    if (potentialAccount?.formattedName == null) {
+                        true
+                    } else {
+                        val accountIdentifier = potentialAccount.formattedName
+                        val alias = db.accountAliasDao().findByAlias(accountIdentifier)
+                        if (alias != null) return@partition false
 
-                for (txn in parsedWithAccount) {
-                    if (transactionViewModel.autoSaveSmsTransaction(txn)) {
+                        val existingAccount = db.accountDao().findByName(accountIdentifier)
+                        existingAccount == null
+                    }
+                }
+
+                for (txn in canAutoImport) {
+                    if (transactionViewModel.autoSaveSmsTransaction(txn, source = "Imported")) {
                         autoImportedCount++
                     }
                 }
@@ -366,10 +411,18 @@ class SettingsViewModel(
                     onComplete(false)
                 } else {
                     _potentialTransactions.value = needsMapping
-                    val groupedBySender = needsMapping.groupBy { it.smsSender }
-                    _sendersToMap.value = groupedBySender.map { (sender, txns) ->
-                        SenderToMap(
-                            sender = sender,
+                    val groupedForReview = needsMapping.groupBy {
+                        val potentialAccount = it.potentialAccount // --- FIX: Capture property locally
+                        if (potentialAccount?.formattedName != null) {
+                            Pair(potentialAccount.formattedName, false)
+                        } else {
+                            Pair(it.smsSender, true)
+                        }
+                    }
+                    _mappingsToReview.value = groupedForReview.map { (key, txns) ->
+                        AccountMappingRequest(
+                            identifier = key.first,
+                            isSenderMapping = key.second,
                             sampleMerchant = txns.first().merchantName ?: "Unknown",
                             transactionCount = txns.size
                         )
@@ -391,29 +444,34 @@ class SettingsViewModel(
             var importedCount = 0
             try {
                 val transactionsToProcess = _potentialTransactions.value
-                val newDbMappings = mutableListOf<MerchantMapping>()
+                val newAliases = mutableListOf<AccountAlias>()
+                val newMappings = mutableListOf<MerchantMapping>()
 
-                for (txn in transactionsToProcess) {
-                    val userMappedAccountId = userMappings[txn.smsSender]
-                    val transactionToSave = if (userMappedAccountId != null) {
-                        val account = accountRepository.getAccountById(userMappedAccountId).first()
-                        if (account != null) {
-                            newDbMappings.add(MerchantMapping(smsSender = txn.smsSender, merchantName = account.name))
-                            txn.copy(potentialAccount = PotentialAccount(account.name, account.type))
+                for ((identifier, accountId) in userMappings) {
+                    val request = _mappingsToReview.value.find { it.identifier == identifier }
+                    if (request != null) {
+                        if (request.isSenderMapping) {
+                            val account = accountRepository.getAccountById(accountId).first()
+                            if (account != null) {
+                                newMappings.add(MerchantMapping(smsSender = identifier, merchantName = account.name))
+                            }
                         } else {
-                            txn
+                            newAliases.add(AccountAlias(aliasName = identifier, destinationAccountId = accountId))
                         }
-                    } else {
-                        txn
-                    }
-
-                    if (transactionViewModel.autoSaveSmsTransaction(transactionToSave)) {
-                        importedCount++
                     }
                 }
 
-                if (newDbMappings.isNotEmpty()) {
-                    db.merchantMappingDao().insertAll(newDbMappings)
+                if (newAliases.isNotEmpty()) {
+                    db.accountAliasDao().insertAll(newAliases)
+                }
+                if (newMappings.isNotEmpty()) {
+                    db.merchantMappingDao().insertAll(newMappings)
+                }
+
+                for (txn in transactionsToProcess) {
+                    if (transactionViewModel.autoSaveSmsTransaction(txn, source = "Imported")) {
+                        importedCount++
+                    }
                 }
 
             } catch (e: Exception) {
@@ -421,7 +479,7 @@ class SettingsViewModel(
             } finally {
                 _isScanning.value = false
                 _potentialTransactions.value = emptyList()
-                _sendersToMap.value = emptyList()
+                _mappingsToReview.value = emptyList()
                 _uiEvent.send("Import complete! $importedCount transactions were added.")
             }
         }
@@ -841,7 +899,7 @@ class SettingsViewModel(
                 DataExportService.createBackupSnapshot(context)
             }
             val message = if (success) {
-                backupManager.dataChanged() // Notify the system to schedule a backup
+                backupManager.dataChanged()
                 "Backup snapshot created and backup requested."
             } else {
                 "Failed to create snapshot."

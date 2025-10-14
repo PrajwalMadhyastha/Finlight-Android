@@ -9,6 +9,9 @@
 // FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
 // provides a centralized TopAppBar, and this change removes the duplicate,
 // resolving a UI bug.
+// FIX (Build) - Removed the local, private definition of TransactionTypeToggle
+// to resolve an overload resolution ambiguity error. The screen now uses the
+// public version from AddTransactionScreen.kt.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -247,62 +250,6 @@ fun AddRecurringTransactionScreen(
                     Text(if (isEditMode) "Update Rule" else "Save Rule")
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun TransactionTypeToggle(
-    selectedType: String,
-    onTypeSelected: (String) -> Unit
-) {
-    val glassFillColor = if (MaterialTheme.colorScheme.background.isDark()) {
-        Color.White.copy(alpha = 0.08f)
-    } else {
-        Color.Black.copy(alpha = 0.04f)
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(CircleShape)
-            .background(glassFillColor)
-            .border(1.dp, GlassPanelBorder, CircleShape)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val expenseSelected = selectedType == "expense"
-        val incomeSelected = selectedType == "income"
-
-        Button(
-            onClick = { onTypeSelected("expense") },
-            modifier = Modifier
-                .weight(1f)
-                .height(48.dp),
-            shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (expenseSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                contentColor = if (expenseSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-            ),
-            elevation = null
-        ) {
-            Text("Expense", fontWeight = FontWeight.Bold)
-        }
-
-        Button(
-            onClick = { onTypeSelected("income") },
-            modifier = Modifier
-                .weight(1f)
-                .height(48.dp),
-            shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (incomeSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                contentColor = if (incomeSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-            ),
-            elevation = null
-        ) {
-            Text("Income", fontWeight = FontWeight.Bold)
         }
     }
 }

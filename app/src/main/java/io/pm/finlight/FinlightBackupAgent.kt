@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/FinlightBackupAgent.kt
-// REASON: NEW FILE - This custom BackupAgent gives us direct control and, more
-// importantly, logging visibility into the Android Auto Backup process. By
-// overriding onCreate, onBackup, and onRestore, we can log exactly which
-// helpers are being used and when the backup/restore operations are triggered,
-// allowing us to definitively debug why transaction data was not being restored.
+// REASON: FEATURE (Backup Time) - The `onBackup` method now saves the current
+// timestamp to SharedPreferences. This provides a reliable signal that the Android
+// Backup Manager has initiated the backup process, giving the user high confidence
+// that their data has been recently backed up.
 // =================================================================================
 package io.pm.finlight
 
@@ -13,6 +12,7 @@ import android.app.backup.BackupDataInput
 import android.app.backup.BackupDataOutput
 import android.app.backup.FileBackupHelper
 import android.app.backup.SharedPreferencesBackupHelper
+import android.content.Context
 import android.os.ParcelFileDescriptor
 import android.util.Log
 
@@ -50,6 +50,11 @@ class FinlightBackupAgent : BackupAgentHelper() {
 
     override fun onBackup(oldState: ParcelFileDescriptor?, data: BackupDataOutput?, newState: ParcelFileDescriptor?) {
         Log.d(TAG, "onBackup: Starting backup process...")
+        // --- NEW: Save the timestamp of this backup operation ---
+        val settingsRepository = SettingsRepository(applicationContext)
+        settingsRepository.saveLastBackupTimestamp(System.currentTimeMillis())
+        Log.i(TAG, "onBackup: Last backup timestamp saved.")
+        // --- End of new code ---
         super.onBackup(oldState, data, newState)
         Log.d(TAG, "onBackup: Backup process finished.")
     }
