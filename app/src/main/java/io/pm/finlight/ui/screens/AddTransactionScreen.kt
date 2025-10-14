@@ -5,6 +5,10 @@
 // valid amount is entered, removing the requirement to enter a description first.
 // The guidance checklist has been updated to reflect that the description is now
 // an optional (but recommended) field.
+// FIX (UI) - The layout has been restructured with a scrollable content column
+// and an anchored numpad at the bottom. This resolves a bug where the numpad
+// would be pushed off-screen on devices with 3-button navigation enabled when
+// the validation checklist appeared.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -28,9 +32,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Backspace
@@ -53,6 +59,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -245,68 +252,77 @@ fun AddTransactionScreen(
             },
             containerColor = Color.Transparent
         ) { innerPadding ->
+            // --- FIX: Parent Column to anchor the numpad ---
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(horizontal = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(Modifier.weight(0.5f))
-                AmountComposer(
-                    amount = amount,
-                    description = description,
-                    onDescriptionClick = { activeSheet = ComposerSheet.Merchant },
-                    isTravelMode = isTravelModeActive,
-                    travelModeSettings = travelModeSettings,
-                    highlightDescription = hasInteracted && !isDescriptionEntered,
-                    isDescriptionEntered = isDescriptionEntered,
-                    hasInteractedWithNumpad = hasInteracted
-                )
-                Spacer(Modifier.height(24.dp))
-
-                TransactionTypeToggle(
-                    selectedType = transactionType,
-                    onTypeSelected = { transactionType = it }
-                )
-
-                Spacer(Modifier.height(24.dp))
-                OrbitalChips(
-                    selectedCategory = selectedCategory,
-                    selectedAccount = selectedAccount,
-                    selectedDateTime = selectedDateTime.time,
-                    onCategoryClick = {
-                        viewModel.onUserManuallySelectedCategory() // User is taking control
-                        activeSheet = ComposerSheet.Category
-                    },
-                    onAccountClick = { activeSheet = ComposerSheet.Account },
-                    onDateClick = { showDatePicker = true }
-                )
-                Spacer(Modifier.weight(1f))
-
-                ActionRow(
-                    notes = notes,
-                    tags = selectedTags,
-                    imageCount = attachedImageUris.size,
-                    onNotesClick = { activeSheet = ComposerSheet.Notes },
-                    onTagsClick = { activeSheet = ComposerSheet.Tags },
-                    onAttachmentClick = { imagePickerLauncher.launch("image/*") }
-                )
-
-                // --- UPDATED: Guidance Checklist is now always visible after interaction ---
-                AnimatedVisibility(
-                    visible = hasInteracted,
-                    enter = fadeIn(animationSpec = tween(200)),
-                    exit = fadeOut(animationSpec = tween(200))
+                // --- FIX: Scrollable content area ---
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    ValidationChecklist(
-                        isAmountEntered = isAmountEntered,
+                    Spacer(Modifier.height(16.dp)) // Replaced weighted spacer
+                    AmountComposer(
+                        amount = amount,
+                        description = description,
+                        onDescriptionClick = { activeSheet = ComposerSheet.Merchant },
+                        isTravelMode = isTravelModeActive,
+                        travelModeSettings = travelModeSettings,
+                        highlightDescription = hasInteracted && !isDescriptionEntered,
                         isDescriptionEntered = isDescriptionEntered,
-                        isDescriptionRequired = false // Description is now optional
+                        hasInteractedWithNumpad = hasInteracted
                     )
+                    Spacer(Modifier.height(24.dp))
+
+                    TransactionTypeToggle(
+                        selectedType = transactionType,
+                        onTypeSelected = { transactionType = it }
+                    )
+
+                    Spacer(Modifier.height(24.dp))
+                    OrbitalChips(
+                        selectedCategory = selectedCategory,
+                        selectedAccount = selectedAccount,
+                        selectedDateTime = selectedDateTime.time,
+                        onCategoryClick = {
+                            viewModel.onUserManuallySelectedCategory() // User is taking control
+                            activeSheet = ComposerSheet.Category
+                        },
+                        onAccountClick = { activeSheet = ComposerSheet.Account },
+                        onDateClick = { showDatePicker = true }
+                    )
+                    Spacer(Modifier.height(24.dp)) // Replaced weighted spacer
+                    ActionRow(
+                        notes = notes,
+                        tags = selectedTags,
+                        imageCount = attachedImageUris.size,
+                        onNotesClick = { activeSheet = ComposerSheet.Notes },
+                        onTagsClick = { activeSheet = ComposerSheet.Tags },
+                        onAttachmentClick = { imagePickerLauncher.launch("image/*") }
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    AnimatedVisibility(
+                        visible = hasInteracted,
+                        enter = fadeIn(animationSpec = tween(200)),
+                        exit = fadeOut(animationSpec = tween(200))
+                    ) {
+                        ValidationChecklist(
+                            isAmountEntered = isAmountEntered,
+                            isDescriptionEntered = isDescriptionEntered,
+                            isDescriptionRequired = false
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
                 }
 
-
+                // --- FIX: Numpad is now outside the scrollable area ---
                 GlassmorphicNumpad(
                     onDigitClick = { digit ->
                         if (!hasInteracted) hasInteracted = true
@@ -1077,7 +1093,7 @@ fun TextInputSheet(
 }
 
 @Composable
-private fun TransactionTypeToggle(
+fun TransactionTypeToggle(
     selectedType: String,
     onTypeSelected: (String) -> Unit
 ) {
