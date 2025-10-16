@@ -12,6 +12,8 @@
 // REFACTOR (UI) - The layout is now a non-scrolling Column. The ValidationChecklist
 // has been redesigned as a compact set of indicators directly below the amount
 // display, saving vertical space and eliminating the need for scrolling.
+// CLEANUP - The compact ValidationChecklist and its related logic have been
+// completely removed from the screen as requested to simplify the UI.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -110,7 +112,6 @@ fun AddTransactionScreen(
     var notes by remember { mutableStateOf("") }
     var attachedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
-    // --- NEW: State for guidance system ---
     var hasInteracted by remember { mutableStateOf(false) }
     val isAmountEntered = amount.isNotBlank() && (amount.toDoubleOrNull() ?: 0.0) > 0.0
     val isDescriptionEntered = description.isNotBlank()
@@ -146,7 +147,6 @@ fun AddTransactionScreen(
     var showCreateAccountDialog by remember { mutableStateOf(false) }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
 
-    // --- UPDATED: Save is now enabled once an amount is entered ---
     val isSaveEnabled = isAmountEntered
 
     var isDefaultAccountApplied by remember { mutableStateOf(false) }
@@ -157,7 +157,6 @@ fun AddTransactionScreen(
         }
     }
 
-    // --- NEW: Effect to update the local category state when a suggestion is made ---
     LaunchedEffect(suggestedCategory) {
         suggestedCategory?.let {
             selectedCategory = it
@@ -200,7 +199,6 @@ fun AddTransactionScreen(
         }
     }
 
-    // --- NEW: Effect to trigger the Category Nudge bottom sheet ---
     LaunchedEffect(categoryNudgeData) {
         if (categoryNudgeData != null) {
             activeSheet = ComposerSheet.Category
@@ -246,7 +244,6 @@ fun AddTransactionScreen(
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },
-                    // --- NEW: Add HelpActionIcon ---
                     actions = {
                         HelpActionIcon(helpKey = "add_transaction")
                     },
@@ -255,7 +252,6 @@ fun AddTransactionScreen(
             },
             containerColor = Color.Transparent
         ) { innerPadding ->
-            // --- REFACTOR: Main layout is now a non-scrolling Column ---
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -272,8 +268,7 @@ fun AddTransactionScreen(
                     travelModeSettings = travelModeSettings,
                     highlightDescription = hasInteracted && !isDescriptionEntered,
                     isDescriptionEntered = isDescriptionEntered,
-                    hasInteractedWithNumpad = hasInteracted,
-                    isAmountEntered = isAmountEntered // --- FIX: Pass the state down ---
+                    hasInteractedWithNumpad = hasInteracted
                 )
                 Spacer(Modifier.height(24.dp))
 
@@ -294,7 +289,6 @@ fun AddTransactionScreen(
                     onAccountClick = { activeSheet = ComposerSheet.Account },
                     onDateClick = { showDatePicker = true }
                 )
-                // --- REFACTOR: Use a weighted spacer to push content to top and bottom ---
                 Spacer(Modifier.weight(1f))
                 ActionRow(
                     notes = notes,
@@ -539,8 +533,7 @@ private fun AmountComposer(
     travelModeSettings: TravelModeSettings?,
     highlightDescription: Boolean,
     isDescriptionEntered: Boolean,
-    hasInteractedWithNumpad: Boolean,
-    isAmountEntered: Boolean // --- FIX: Add missing parameter ---
+    hasInteractedWithNumpad: Boolean
 ) {
     val currentTravelSettings = travelModeSettings
     val currencySymbol = if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
@@ -558,7 +551,7 @@ private fun AmountComposer(
 
     val descriptionText = when {
         isDescriptionEntered -> description
-        hasInteractedWithNumpad -> "Add a description"
+        hasInteractedWithNumpad -> "What did you spend on?"
         else -> "Paid to..."
     }
 
@@ -602,18 +595,6 @@ private fun AmountComposer(
                 text = "≈ $homeSymbol${NumberFormat.getInstance().format(convertedAmount)}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        // --- NEW: Integrated compact validation checklist ---
-        AnimatedVisibility(
-            visible = hasInteractedWithNumpad,
-            enter = fadeIn(animationSpec = tween(200)) + slideInVertically(animationSpec = tween(200)),
-            exit = fadeOut(animationSpec = tween(200)) + slideOutVertically(animationSpec = tween(200))
-        ) {
-            ValidationChecklist(
-                isAmountEntered = isAmountEntered,
-                isDescriptionEntered = isDescriptionEntered,
-                isDescriptionRequired = false
             )
         }
     }
@@ -1102,44 +1083,3 @@ fun TransactionTypeToggle(
     }
 }
 
-// --- NEW: Compact checklist composable ---
-@Composable
-private fun ValidationChecklist(
-    isAmountEntered: Boolean,
-    isDescriptionEntered: Boolean,
-    isDescriptionRequired: Boolean
-) {
-    Row(
-        modifier = Modifier.padding(top = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        ChecklistItem(label = "Amount", isChecked = isAmountEntered, isRequired = true)
-        ChecklistItem(label = "Description", isChecked = isDescriptionEntered, isRequired = isDescriptionRequired)
-    }
-}
-
-// --- NEW: Compact checklist item composable ---
-@Composable
-private fun ChecklistItem(label: String, isChecked: Boolean, isRequired: Boolean) {
-    val color = when {
-        isChecked -> MaterialTheme.colorScheme.primary
-        !isRequired -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-        else -> MaterialTheme.colorScheme.error
-    }
-    val icon = if (isChecked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(16.dp) // Smaller icon
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            text = label,
-            color = color,
-            style = MaterialTheme.typography.bodySmall // Smaller text
-        )
-    }
-}
