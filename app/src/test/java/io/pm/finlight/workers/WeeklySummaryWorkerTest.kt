@@ -1,3 +1,11 @@
+// =================================================================================
+// FILE: ./app/src/test/java/io/pm/finlight/workers/WeeklySummaryWorkerTest.kt
+// REASON: FIX (Test) - The `doWork calls DAO with correct date ranges` test has
+// been rewritten to be precise. It now calculates the *exact* expected
+// millisecond timestamps for the date ranges and uses `coVerify` with `eq()`
+// to ensure the DAO is called with the correct, zeroed-out time boundaries.
+// This fixes the original test's flawed logic.
+// =================================================================================
 package io.pm.finlight.workers
 
 import android.content.Context
@@ -24,9 +32,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
-import java.util.concurrent.TimeUnit
-import kotlin.test.DefaultAsserter.assertTrue
-import kotlin.test.assertTrue
+import java.util.Calendar
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -78,35 +84,48 @@ class WeeklySummaryWorkerTest : BaseViewModelTest() {
         coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
         val worker = TestListenableWorkerBuilder<WeeklySummaryWorker>(context).build()
-        val capturedArgs = mutableListOf<Long>()
+
+        // Calculate expected ranges EXACTLY as the worker does
+        val now = Calendar.getInstance()
+        val thisWeekEnd = (now.clone() as Calendar).apply {
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+        val thisWeekStart = (now.clone() as Calendar).apply {
+            add(Calendar.DAY_OF_YEAR, -7)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val lastWeekEnd = (now.clone() as Calendar).apply {
+            add(Calendar.DAY_OF_YEAR, -8)
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+        val lastWeekStart = (now.clone() as Calendar).apply {
+            add(Calendar.DAY_OF_YEAR, -14)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
 
         // Act
         val result = worker.doWork()
         assertEquals(ListenableWorker.Result.success(), result)
 
         // Assert
-        coVerify(exactly = 2) {
-            transactionDao.getFinancialSummaryForRange(capture(capturedArgs), capture(capturedArgs))
+        // Verify the DAO was called with the *exact* calculated timestamps
+        coVerifyOrder {
+            transactionDao.getFinancialSummaryForRange(eq(thisWeekStart), eq(thisWeekEnd))
+            transactionDao.getFinancialSummaryForRange(eq(lastWeekStart), eq(lastWeekEnd))
+            transactionDao.getTopSpendingCategoriesForRange(eq(thisWeekStart), eq(thisWeekEnd))
         }
-
-        assertEquals("Should have captured 4 arguments (2 calls * 2 args)", 4, capturedArgs.size)
-
-        val thisWeekStart = capturedArgs[0]
-        val thisWeekEnd = capturedArgs[1]
-        val lastWeekStart = capturedArgs[2]
-        val lastWeekEnd = capturedArgs[3]
-
-        // Verify the first range (last 7 days)
-        val now = System.currentTimeMillis()
-        val sevenDaysAgo = now - TimeUnit.DAYS.toMillis(7)
-        assertTrue("Start of 'this week' range should be ~7 days ago", kotlin.math.abs(thisWeekStart - sevenDaysAgo) < 1000)
-        assertTrue("End of 'this week' range should be ~now", kotlin.math.abs(thisWeekEnd - now) < 1000)
-
-        // Verify the second range (8-14 days ago)
-        val eightDaysAgo = now - TimeUnit.DAYS.toMillis(8)
-        val fourteenDaysAgo = now - TimeUnit.DAYS.toMillis(14)
-        assertTrue("Start of 'last week' range should be ~14 days ago", kotlin.math.abs(lastWeekStart - fourteenDaysAgo) < 1000)
-        assertTrue("End of 'last week' range should be ~8 days ago", kotlin.math.abs(lastWeekEnd - eightDaysAgo) < 1000)
     }
 
     @Test

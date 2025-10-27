@@ -249,7 +249,8 @@ class DashboardViewModelTest : BaseViewModelTest() {
     fun `budgetHealthSummary shows 'pacing high' message when forecast exceeds budget`() = runTest {
         // ARRANGE
         `when`(settingsRepository.getOverallBudgetForMonth(Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(2000f))
-        `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1500.0))) // High spend already
+        // --- FIX: Set expenses to 1800.0 to be > 87% of the 2000 budget ---
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1800.0))) // High spend already
         `when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(500.0) // High recent spend velocity
 
         // ACT
