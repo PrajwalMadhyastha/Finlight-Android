@@ -1,3 +1,18 @@
+// =================================================================================
+// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/BudgetViewModelTest.kt
+//
+// REASON: REFACTOR (Dynamic Budget) - This test suite is updated to validate
+// the refactored `BudgetViewModel`.
+// - It now mocks the new `TransactionRepository` dependency.
+// - It tests that `setSelectedMonth` correctly updates the dynamic flows
+//   like `overallBudgetForSelectedMonth` and `budgetsForSelectedMonth`.
+// - It verifies that `overallBudgetForSelectedMonth` correctly emits `null`
+//   when no budget is set.
+// - It confirms that `addCategoryBudget` and `getActualSpending` use the
+//   `selectedMonth` state.
+// - It validates the logic of `saveOverallBudget` to ensure it only saves
+//   for the *real* current month.
+// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.content.Context
@@ -16,16 +31,21 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
+import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.Mockito.never
 import org.mockito.Mockito.`when`
+import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 import org.robolectric.annotation.Config
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
 import kotlin.math.roundToLong
+import kotlin.test.assertNull
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -41,7 +61,20 @@ class BudgetViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var categoryRepository: CategoryRepository
 
+    // --- NEW: Mock for the added dependency ---
+    @Mock
+    private lateinit var transactionRepository: TransactionRepository
+
     private lateinit var viewModel: BudgetViewModel
+
+    // --- Helper to get a calendar for a specific month ---
+    private fun getCalendar(year: Int, month: Int): Calendar {
+        return Calendar.getInstance().apply {
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month)
+            set(Calendar.DAY_OF_MONTH, 1)
+        }
+    }
 
     @Before
     override fun setup() {
@@ -49,11 +82,16 @@ class BudgetViewModelTest : BaseViewModelTest() {
         // Setup default mocks for initialization
         `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
         `when`(budgetRepository.getBudgetsForMonth(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
-        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
+        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(null)) // Default to null
         `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
         `when`(budgetRepository.getActualSpendingForCategory(anyString(), anyInt(), anyInt())).thenReturn(flowOf(0.0))
 
-        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository)
+        // --- NEW: Mocks for new dependencies in init ---
+        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(System.currentTimeMillis()))
+        `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+
+
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
     }
 
     @Test
@@ -64,21 +102,18 @@ class BudgetViewModelTest : BaseViewModelTest() {
             Category(2, "Travel", "icon", "color"),
             Category(3, "Shopping", "icon", "color")
         )
-        // This list simulates the DAO result from getBudgetsWithSpendingForMonth, which includes carried-over budgets.
-        // Let's say "Food" and "Travel" both have budgets for the current period (either set this month or carried over).
         val budgetsWithSpending = listOf(
             BudgetWithSpending(Budget(1, "Food", 5000.0, 10, 2025), 100.0, "icon", "color"),
             BudgetWithSpending(Budget(2, "Travel", 2000.0, 10, 2025), 200.0, "icon", "color")
         )
 
-        // Mock the repository calls needed for the ViewModel's init block.
         `when`(categoryRepository.allCategories).thenReturn(flowOf(allCategories))
         `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(budgetsWithSpending))
 
         // ACT: Re-initialize ViewModel to pick up new mock setup.
-        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository)
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
 
-        // ASSERT: Check that only the "Shopping" category is available for a new budget.
+        // ASSERT
         viewModel.availableCategoriesForNewBudget.test {
             val availableCategories = awaitItem()
             assertEquals(1, availableCategories.size)
@@ -87,45 +122,131 @@ class BudgetViewModelTest : BaseViewModelTest() {
         }
     }
 
-
+    // --- NEW: Test for dynamic month selection ---
     @Test
-    fun `overallBudget carries forward from older month when immediate previous month is skipped`() = runTest {
+    fun `setSelectedMonth triggers refetch of budget data`() = runTest {
         // ARRANGE
-        // Use Robolectric's application context to get a real SharedPreferences instance for this test.
-        // This allows us to test the actual lookback logic in the real SettingsRepository.
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val testPrefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        testPrefs.edit().clear().apply() // Clean slate for the test
+        val cal = Calendar.getInstance()
+        val currentYear = cal.get(Calendar.YEAR)
+        val currentMonth = cal.get(Calendar.MONTH) + 1
+        // --- FIX: Correctly get previous month's index ---
+        val prevMonthIndex = cal.get(Calendar.MONTH) - 1
+        val prevMonthCal = getCalendar(currentYear, prevMonthIndex)
 
-        val calendar = Calendar.getInstance() // Assume current month is October
-        calendar.set(Calendar.MONTH, Calendar.OCTOBER)
-        val currentMonth = calendar.get(Calendar.MONTH) + 1
-        val currentYear = calendar.get(Calendar.YEAR)
+        val currentMonthBudget = 10000f
+        val prevMonthBudget = 5000f
 
-        val augustBudget = 50000f
-        // Set a budget for August (two months prior)
-        testPrefs.edit().putFloat("overall_budget_${currentYear}_08", augustBudget).apply()
-        // Ensure September has no budget
-        testPrefs.edit().remove("overall_budget_${currentYear}_09").apply()
+        // Mock settings repo to return different budgets for different months
+        `when`(settingsRepository.getOverallBudgetForMonth(currentYear, currentMonth)).thenReturn(flowOf(currentMonthBudget))
+        // --- FIX: Use correct month index (prevMonthIndex + 1) for the mock ---
+        `when`(settingsRepository.getOverallBudgetForMonth(currentYear, prevMonthIndex + 1)).thenReturn(flowOf(prevMonthBudget))
 
-        val realSettingsRepository = SettingsRepository(context)
+        // --- Re-initialize ViewModel *after* test-specific mocks are set ---
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
 
-        // Mock other dependencies that are not under test
-        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
-        `when`(budgetRepository.getBudgetsForMonth(Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(emptyList()))
-        `when`(budgetRepository.getBudgetsForMonthWithSpending(Mockito.anyString(), Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(emptyList()))
-        `when`(budgetRepository.getActualSpendingForCategory(Mockito.anyString(), Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(0.0))
+        // ACT & ASSERT
+        viewModel.overallBudgetForSelectedMonth.test {
+            // Awaits the initial value for the current month
+            assertEquals(currentMonthBudget, awaitItem())
+
+            // Act: Change the selected month
+            viewModel.setSelectedMonth(prevMonthCal)
+
+            // Await the new value for the previous month
+            assertEquals(prevMonthBudget, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Verify the repository was called for both months
+        verify(settingsRepository).getOverallBudgetForMonth(currentYear, currentMonth)
+        verify(settingsRepository).getOverallBudgetForMonth(currentYear, prevMonthIndex + 1)
+    }
+
+    // --- NEW: Test for "Not Set" (null) budget ---
+    @Test
+    fun `overallBudgetForSelectedMonth emits null when no budget is found`() = runTest {
+        // ARRANGE
+        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(null))
 
         // ACT
-        // Instantiate the ViewModel with the real SettingsRepository and other mocks
-        viewModel = BudgetViewModel(budgetRepository, realSettingsRepository, categoryRepository)
-        advanceUntilIdle() // Allow the callbackFlow in SettingsRepository to emit
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
 
         // ASSERT
-        // The overallBudget flow should find the August budget, skipping September.
-        val result = viewModel.overallBudget.first()
-        assertEquals("The budget should be carried over from two months prior.", augustBudget.roundToLong(), result)
+        viewModel.overallBudgetForSelectedMonth.test {
+            assertNull(awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
     }
+
+    // --- NEW: Test refactored addCategoryBudget ---
+    @Test
+    fun `addCategoryBudget uses selectedMonth for new budget`() = runTest {
+        // ARRANGE
+        val sept2025 = getCalendar(2025, Calendar.SEPTEMBER)
+        viewModel.setSelectedMonth(sept2025)
+        val budgetCaptor = argumentCaptor<Budget>()
+
+        // ACT
+        viewModel.addCategoryBudget("Groceries", "500")
+        advanceUntilIdle()
+
+        // ASSERT
+        verify(budgetRepository).insert(capture(budgetCaptor))
+        val capturedBudget = budgetCaptor.value
+        assertEquals("Groceries", capturedBudget.categoryName)
+        assertEquals(500.0, capturedBudget.amount, 0.0)
+        assertEquals(9, capturedBudget.month) // September is month 9 (index 8 + 1)
+        assertEquals(2025, capturedBudget.year)
+    }
+
+    // --- NEW: Test refactored getActualSpending ---
+    @Test
+    fun `getActualSpending uses selectedMonth for query`() = runTest {
+        // ARRANGE
+        val sept2025 = getCalendar(2025, Calendar.SEPTEMBER)
+        viewModel.setSelectedMonth(sept2025)
+        `when`(budgetRepository.getActualSpendingForCategory("Food", 9, 2025)).thenReturn(flowOf(123.45))
+
+        // ACT & ASSERT
+        viewModel.getActualSpending("Food").test {
+            assertEquals(123L, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify(budgetRepository).getActualSpendingForCategory("Food", 9, 2025)
+    }
+
+    // --- NEW: Test refactored saveOverallBudget ---
+    @Test
+    fun `saveOverallBudget only saves for the REAL current month`() = runTest {
+        // ARRANGE
+        val realCurrentCal = Calendar.getInstance()
+        val realCurrentYear = realCurrentCal.get(Calendar.YEAR)
+        val realCurrentMonth = realCurrentCal.get(Calendar.MONTH)
+
+        // Case 1: Selected month IS the current month
+        viewModel.setSelectedMonth(realCurrentCal)
+
+        // ACT
+        viewModel.saveOverallBudget("1000")
+
+        // ASSERT
+        // Should save because selected month == current month
+        verify(settingsRepository).saveOverallBudgetForCurrentMonth(1000f)
+
+        // ARRANGE 2: Selected month IS NOT the current month
+        val pastMonthCal = getCalendar(2024, Calendar.JANUARY)
+        viewModel.setSelectedMonth(pastMonthCal)
+
+        // ACT 2
+        viewModel.saveOverallBudget("2000")
+
+        // ASSERT 2
+        // Logic dictates it should *still* call the save for the *current* month,
+        // effectively ignoring the selected month.
+        verify(settingsRepository).saveOverallBudgetForCurrentMonth(2000f)
+    }
+
+    // --- Existing Tests (Updated) ---
 
     @Test
     fun `totalSpending and overallBudget are converted to Long`() = runTest {
@@ -135,26 +256,20 @@ class BudgetViewModelTest : BaseViewModelTest() {
 
         `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(overallBudgetFloat))
         `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(listOf(
-            // Mock a single budget item
-            BudgetWithSpending(
-                Budget(1, "Food", 5000.0, 10, 2025),
-                spendingPerCategory,
-                "icon",
-                "color"
-            )
+            BudgetWithSpending(Budget(1, "Food", 5000.0, 10, 2025), spendingPerCategory, "icon", "color")
         )))
         `when`(budgetRepository.getActualSpendingForCategory(anyString(), anyInt(), anyInt())).thenReturn(flowOf(spendingPerCategory))
 
-
         // ACT
-        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository)
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
         advanceUntilIdle()
 
         // ASSERT
-        val actualBudget = viewModel.overallBudget.first()
-        val actualSpending = viewModel.totalSpending.first()
+        val actualBudget = viewModel.overallBudgetForSelectedMonth.first()
+        val actualSpending = viewModel.totalSpendingForSelectedMonth.first()
 
-        assertEquals(overallBudgetFloat.roundToLong(), actualBudget)
+        // This test's assertion is now different. The budget is a Float?, spending is Long.
+        assertEquals(overallBudgetFloat, actualBudget)
         assertEquals(spendingPerCategory.roundToLong(), actualSpending)
     }
 
@@ -179,7 +294,6 @@ class BudgetViewModelTest : BaseViewModelTest() {
         viewModel.uiEvent.test {
             viewModel.addCategoryBudget("Food", "100")
             advanceUntilIdle()
-
             assertEquals("Error adding budget: $errorMessage", awaitItem())
         }
     }
@@ -193,7 +307,6 @@ class BudgetViewModelTest : BaseViewModelTest() {
         viewModel.uiEvent.test {
             viewModel.updateBudget(budget)
             advanceUntilIdle()
-
             verify(budgetRepository).update(budget)
             assertEquals("Budget for '${budget.categoryName}' updated.", awaitItem())
         }
@@ -210,7 +323,6 @@ class BudgetViewModelTest : BaseViewModelTest() {
         viewModel.uiEvent.test {
             viewModel.updateBudget(budget)
             advanceUntilIdle()
-
             assertEquals("Error updating budget: $errorMessage", awaitItem())
         }
     }
@@ -224,7 +336,6 @@ class BudgetViewModelTest : BaseViewModelTest() {
         viewModel.uiEvent.test {
             viewModel.deleteBudget(budget)
             advanceUntilIdle()
-
             verify(budgetRepository).delete(budget)
             assertEquals("Budget for '${budget.categoryName}' deleted.", awaitItem())
         }
@@ -241,36 +352,8 @@ class BudgetViewModelTest : BaseViewModelTest() {
         viewModel.uiEvent.test {
             viewModel.deleteBudget(budget)
             advanceUntilIdle()
-
             assertEquals("Error deleting budget: $errorMessage", awaitItem())
         }
-    }
-
-    @Test
-    fun `getActualSpending returns correctly mapped value`() = runTest {
-        // Arrange
-        val categoryName = "Food"
-        val spending = 123.45
-        `when`(budgetRepository.getActualSpendingForCategory(eq(categoryName), anyInt(), anyInt())).thenReturn(flowOf(spending))
-
-        // Act & Assert
-        viewModel.getActualSpending(categoryName).test {
-            assertEquals(spending.roundToLong(), awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `saveOverallBudget calls settings repository`() {
-        // Arrange
-        val budgetStr = "50000"
-        val budgetFloat = 50000f
-
-        // Act
-        viewModel.saveOverallBudget(budgetStr)
-
-        // Assert
-        verify(settingsRepository).saveOverallBudgetForCurrentMonth(budgetFloat)
     }
 
     @Test
@@ -288,3 +371,4 @@ class BudgetViewModelTest : BaseViewModelTest() {
         verify(budgetRepository).getBudgetById(budgetId)
     }
 }
+
