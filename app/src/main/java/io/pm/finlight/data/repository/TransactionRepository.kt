@@ -6,6 +6,19 @@
 // FIX (Bug) - The new function uses `(budget.toDouble() / daysInMonth).roundToLong()`
 // to calculate the daily safe-to-spend amount, fixing the integer truncation
 // bug that existed in the old ViewModel implementations.
+//
+// REASON: FIX (Consistency) - The `getMonthlyConsistencyData` function is
+// updated to handle a nullable `Float?` budget. If the budget received from
+// `SettingsRepository` is `null`, this function now generates all daily
+// statuses as `SpendingStatus.NO_DATA`, fixing the "No Budget" bug that
+// incorrectly showed days as blue.
+//
+// REASON: FIX (Consistency) - Corrected the logic in `getMonthlyConsistencyData`
+// to handle all edge cases:
+// 1. If `budget == null`, all past days are now `NO_DATA` (gray), even if
+//    `amountSpent` was 0. This fixes the "green day" bug.
+// 2. If `budget == 0f`, any spending (`amountSpent > 0`) is now correctly
+//    marked as `OVER_LIMIT` (red). This fixes the original "blue day" bug.
 // =================================================================================
 package io.pm.finlight
 
@@ -18,7 +31,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.Dispatchers
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
+import kotlin.math.min
 import kotlin.math.roundToLong
 
 class TransactionRepository(
@@ -311,40 +326,64 @@ class TransactionRepository(
         val daysInMonth = monthStartCal.getActualMaximum(Calendar.DAY_OF_MONTH)
 
         // Combine the three flows we need
+        // --- UPDATED: The budget flow is now nullable (Flow<Float?>) ---
         return combine(
             settingsRepository.getOverallBudgetForMonth(year, month),
             transactionDao.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
             transactionDao.getFirstTransactionDate()
-        ) { budget, dailyTotals, firstTransactionDate ->
+        ) { budget: Float?, dailyTotals: List<DailyTotal>, firstTransactionDate: Long? ->
             val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
             val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
-
-            // This is the CRITICAL FIX: Use .roundToLong() to prevent integer truncation
-            val safeToSpend = if (budget > 0 && daysInMonth > 0) (budget.toDouble() / daysInMonth).roundToLong() else 0L
-
             val resultList = mutableListOf<CalendarDayStatus>()
             val dayIterator = (monthStartCal.clone() as Calendar)
             val today = Calendar.getInstance()
 
-            for (i in 1..daysInMonth) {
-                dayIterator.set(Calendar.DAY_OF_MONTH, i)
+            // --- UPDATED LOGIC (Fix for "green day" and "blue day" bugs) ---
+            if (budget == null) {
+                // CASE 1: NO BUDGET SET (null)
+                // All past days are NO_DATA (gray).
+                for (i in 1..daysInMonth) {
+                    dayIterator.set(Calendar.DAY_OF_MONTH, i)
+                    val date = dayIterator.time
 
-                // Check if day is in the future or before any data exists
-                if (dayIterator.after(today) || (firstDataCal != null && isBeforeDay(dayIterator, firstDataCal))) {
-                    resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
-                    continue
+                    if (dayIterator.after(today) || (firstDataCal != null && isBeforeDay(dayIterator, firstDataCal))) {
+                        resultList.add(CalendarDayStatus(date, SpendingStatus.NO_DATA, 0L, 0L))
+                    } else {
+                        // Any past day with NO BUDGET is NO_DATA, even if there was no spending.
+                        val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
+                        val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
+                        resultList.add(CalendarDayStatus(date, SpendingStatus.NO_DATA, amountSpent, 0L))
+                    }
                 }
+            } else {
+                // CASE 2: A BUDGET IS SET (e.g., 0f or 145000f)
+                val safeToSpend = if (budget > 0 && daysInMonth > 0) (budget.toDouble() / daysInMonth).roundToLong() else 0L
 
-                val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
-                val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
-                val status = when {
-                    amountSpent == 0L -> SpendingStatus.NO_SPEND
-                    safeToSpend > 0 && amountSpent > safeToSpend -> SpendingStatus.OVER_LIMIT
-                    else -> SpendingStatus.WITHIN_LIMIT // 0 spend vs 0 budget is WITHIN_LIMIT
+                for (i in 1..daysInMonth) {
+                    dayIterator.set(Calendar.DAY_OF_MONTH, i)
+                    val date = dayIterator.time
+
+                    if (dayIterator.after(today) || (firstDataCal != null && isBeforeDay(dayIterator, firstDataCal))) {
+                        resultList.add(CalendarDayStatus(date, SpendingStatus.NO_DATA, 0L, 0L))
+                        continue
+                    }
+
+                    val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
+                    val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
+
+                    // This is the new, more robust 'when' block that fixes the original bug
+                    val status = when {
+                        amountSpent == 0L && safeToSpend == 0L -> SpendingStatus.WITHIN_LIMIT // Met 0 budget (blue)
+                        amountSpent == 0L && safeToSpend > 0L -> SpendingStatus.NO_SPEND     // No spend on a day with a budget (green)
+                        amountSpent > 0L && safeToSpend == 0L -> SpendingStatus.OVER_LIMIT   // Spent > 0 on a 0 budget (red)
+                        amountSpent > safeToSpend -> SpendingStatus.OVER_LIMIT               // Spent > budget (red)
+                        else -> SpendingStatus.WITHIN_LIMIT // Spent <= budget (and not 0) (blue)
+                    }
+                    resultList.add(CalendarDayStatus(date, status, amountSpent, safeToSpend))
                 }
-                resultList.add(CalendarDayStatus(dayIterator.time, status, amountSpent, safeToSpend))
             }
             resultList // This is the value emitted by the combine
         }.flowOn(Dispatchers.Default) // Run the calculation on a background thread
     }
 }
+

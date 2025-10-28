@@ -7,6 +7,11 @@
 // "Monthly-First" logic as all other consistency views.
 // FIX (Bug) - The old, buggy `generateYearlyConsistencyData` function has been
 // completely removed, eliminating the data inconsistency and truncation bug.
+//
+// REASON: FIX (Consistency) - The `overallMonthlyBudget` collector is updated
+// to handle the new nullable `Float?` from `SettingsRepository`. It now uses
+// `map { (it ?: 0f).roundToLong() }`. This safely displays "₹0" in the hero card
+// if no budget is set for the current month, preventing a crash.
 // =================================================================================
 package io.pm.finlight
 
@@ -14,6 +19,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.utils.DateUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -29,6 +35,7 @@ data class LastMonthSummary(
     val totalExpenses: Double
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel(
     private val transactionRepository: TransactionRepository,
     private val accountRepository: AccountRepository,
@@ -155,7 +162,8 @@ class DashboardViewModel(
 
         overallMonthlyBudget =
             settingsRepository.getOverallBudgetForMonth(currentYear, currentMonth)
-                .map { it.roundToLong() }
+                // --- UPDATED: Handle nullable Float? and map null to 0f for this display ---
+                .map { (it ?: 0f).roundToLong() }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
         amountRemaining =
@@ -380,4 +388,3 @@ class DashboardViewModel(
         }
     }
 }
-

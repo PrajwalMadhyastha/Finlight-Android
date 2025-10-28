@@ -5,6 +5,11 @@
 // categories that already have a budget, including those carried over from
 // previous months. This prevents users from creating duplicate/override budgets
 // and aligns category budget behavior with the overall budget's carry-forward logic.
+//
+// REASON: FIX (Consistency) - The `overallBudget` collector is updated to
+// handle the new nullable `Float?` from `SettingsRepository`. It now uses
+// `map { (it ?: 0f).roundToLong() }` to safely convert the nullable value to a
+// non-null `Long` for the UI, resolving a build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -55,7 +60,8 @@ class BudgetViewModel(
 
         overallBudget =
             settingsRepository.getOverallBudgetForMonth(currentYear, currentMonth)
-                .map { it.roundToLong() }
+                // --- UPDATED: Handle nullable Float? and map null to 0f ---
+                .map { (it ?: 0f).roundToLong() }
                 .stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(5000),
