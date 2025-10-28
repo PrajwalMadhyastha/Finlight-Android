@@ -1,3 +1,15 @@
+// =================================================================================
+// FILE: ./app/src/test/java/io/pm/finlight/workers/DailyReportWorkerTest.kt
+// REASON: FIX (Test) - The tests in this file have been rewritten to
+// correctly validate the worker's time-bound logic. The tests now calculate
+// the *exact* expected start/end timestamps (zeroed-out) and use MockK's
+// `coVerify` with `eq()` to ensure the DAO is called with those precise values,
+// fixing the blind spot that allowed the original bug.
+// FIX (Test) - Removed Mockito's `@Mock` annotations from `db` and
+// `transactionDao` and initialized them with MockK's `mockk()` function
+// instead. This resolves the "Missing mocked calls" `MockKException` caused
+// by mixing Mockito-initialized mocks with MockK's `every` block.
+// =================================================================================
 package io.pm.finlight.workers
 
 import android.content.Context
@@ -22,10 +34,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentMatchers.anyLong
-import org.mockito.Mock
-import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
+import java.util.Calendar
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -34,9 +44,8 @@ class DailyReportWorkerTest : BaseViewModelTest() {
 
     private lateinit var context: Context
 
-    @Mock
+    // --- FIX: Remove @Mock annotations ---
     private lateinit var db: AppDatabase
-    @Mock
     private lateinit var transactionDao: TransactionDao
 
     @Before
@@ -44,11 +53,15 @@ class DailyReportWorkerTest : BaseViewModelTest() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
 
+        // --- FIX: Initialize as MockK mocks ---
+        db = mockk()
+        transactionDao = mockk()
+
         // Mock the static AppDatabase companion object to return our mock db instance.
         // This is the key to preventing the UnsatisfiedLinkError.
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
-        `when`(db.transactionDao()).thenReturn(transactionDao)
+        every { db.transactionDao() } returns transactionDao
 
         // Initialize WorkManager for testing. This is required for TestListenableWorkerBuilder.
         val config = Configuration.Builder()
@@ -71,12 +84,56 @@ class DailyReportWorkerTest : BaseViewModelTest() {
         super.tearDown()
     }
 
+    private fun getExpectedTimeRanges(): Map<String, Long> {
+        val now = Calendar.getInstance()
+
+        val yesterdayStart = (now.clone() as Calendar).apply {
+            add(Calendar.DAY_OF_YEAR, -1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val yesterdayEnd = (now.clone() as Calendar).apply {
+            add(Calendar.DAY_OF_YEAR, -1)
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+
+        val sevenDaysAgoStart = (now.clone() as Calendar).apply {
+            add(Calendar.DAY_OF_YEAR, -8)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val sevenDaysAgoEnd = (now.clone() as Calendar).apply {
+            add(Calendar.DAY_OF_YEAR, -2)
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+
+        return mapOf(
+            "yesterdayStart" to yesterdayStart,
+            "yesterdayEnd" to yesterdayEnd,
+            "sevenDaysAgoStart" to sevenDaysAgoStart,
+            "sevenDaysAgoEnd" to sevenDaysAgoEnd
+        )
+    }
+
     @Test
-    fun `doWork with higher spending generates 'higher than usual' title`() = runTest {
+    fun `doWork with higher spending generates 'higher than usual' title and uses correct time-bounds`() = runTest {
         // Arrange
-        `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenReturn(FinancialSummary(0.0, 200.0)) // Yesterday's expense
-        `when`(transactionDao.getAverageDailySpendingForRange(anyLong(), anyLong())).thenReturn(100.0) // 7-day average
-        `when`(transactionDao.getTopSpendingCategoriesForRange(anyLong(), anyLong())).thenReturn(emptyList())
+        val ranges = getExpectedTimeRanges()
+        coEvery { transactionDao.getFinancialSummaryForRange(ranges["yesterdayStart"]!!, ranges["yesterdayEnd"]!!) } returns FinancialSummary(0.0, 200.0)
+        coEvery { transactionDao.getAverageDailySpendingForRange(ranges["sevenDaysAgoStart"]!!, ranges["sevenDaysAgoEnd"]!!) } returns 100.0
+        coEvery { transactionDao.getTopSpendingCategoriesForRange(ranges["yesterdayStart"]!!, ranges["yesterdayEnd"]!!) } returns emptyList()
 
         val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
         val titleCaptor = slot<String>()
@@ -86,6 +143,12 @@ class DailyReportWorkerTest : BaseViewModelTest() {
 
         // Assert
         assertEquals(ListenableWorker.Result.success(), result)
+        // Verify all DAO calls used the exact, correct time ranges
+        coVerify { transactionDao.getFinancialSummaryForRange(eq(ranges["yesterdayStart"]!!), eq(ranges["yesterdayEnd"]!!)) }
+        coVerify { transactionDao.getAverageDailySpendingForRange(eq(ranges["sevenDaysAgoStart"]!!), eq(ranges["sevenDaysAgoEnd"]!!)) }
+        coVerify { transactionDao.getTopSpendingCategoriesForRange(eq(ranges["yesterdayStart"]!!), eq(ranges["yesterdayEnd"]!!)) }
+
+        // Verify the notification logic is correct
         verify {
             NotificationHelper.showDailyReportNotification(
                 context = any(),
@@ -102,9 +165,10 @@ class DailyReportWorkerTest : BaseViewModelTest() {
     @Test
     fun `doWork with lower spending generates 'well below average' title`() = runTest {
         // Arrange
-        `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenReturn(FinancialSummary(0.0, 10.0)) // Yesterday's expense
-        `when`(transactionDao.getAverageDailySpendingForRange(anyLong(), anyLong())).thenReturn(100.0) // 7-day average
-        `when`(transactionDao.getTopSpendingCategoriesForRange(anyLong(), anyLong())).thenReturn(emptyList())
+        val ranges = getExpectedTimeRanges()
+        coEvery { transactionDao.getFinancialSummaryForRange(ranges["yesterdayStart"]!!, ranges["yesterdayEnd"]!!) } returns FinancialSummary(0.0, 10.0)
+        coEvery { transactionDao.getAverageDailySpendingForRange(ranges["sevenDaysAgoStart"]!!, ranges["sevenDaysAgoEnd"]!!) } returns 100.0
+        coEvery { transactionDao.getTopSpendingCategoriesForRange(ranges["yesterdayStart"]!!, ranges["yesterdayEnd"]!!) } returns emptyList()
 
         val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
         val titleCaptor = slot<String>()
@@ -129,9 +193,10 @@ class DailyReportWorkerTest : BaseViewModelTest() {
     @Test
     fun `doWork with no spending generates 'no spending' title`() = runTest {
         // Arrange
-        `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenReturn(FinancialSummary(0.0, 0.0))
-        `when`(transactionDao.getAverageDailySpendingForRange(anyLong(), anyLong())).thenReturn(100.0)
-        `when`(transactionDao.getTopSpendingCategoriesForRange(anyLong(), anyLong())).thenReturn(emptyList())
+        val ranges = getExpectedTimeRanges()
+        coEvery { transactionDao.getFinancialSummaryForRange(ranges["yesterdayStart"]!!, ranges["yesterdayEnd"]!!) } returns FinancialSummary(0.0, 0.0)
+        coEvery { transactionDao.getAverageDailySpendingForRange(ranges["sevenDaysAgoStart"]!!, ranges["sevenDaysAgoEnd"]!!) } returns 100.0
+        coEvery { transactionDao.getTopSpendingCategoriesForRange(ranges["yesterdayStart"]!!, ranges["yesterdayEnd"]!!) } returns emptyList()
 
         val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
         val titleCaptor = slot<String>()
@@ -156,7 +221,8 @@ class DailyReportWorkerTest : BaseViewModelTest() {
     @Test
     fun `doWork returns retry on failure`() = runTest {
         // Arrange
-        `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenThrow(RuntimeException("DB error"))
+        val ranges = getExpectedTimeRanges()
+        coEvery { transactionDao.getFinancialSummaryForRange(ranges["yesterdayStart"]!!, ranges["yesterdayEnd"]!!) } throws RuntimeException("DB error")
         val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
 
         // Act
@@ -167,3 +233,4 @@ class DailyReportWorkerTest : BaseViewModelTest() {
         coVerify(exactly = 0) { ReminderManager.scheduleDailyReport(any()) }
     }
 }
+

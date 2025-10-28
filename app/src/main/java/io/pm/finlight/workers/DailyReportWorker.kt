@@ -4,6 +4,9 @@
 // rewritten to be more intelligent. It now calculates a 7-day rolling average for
 // spending and uses a series of contextual rules to generate a user-friendly,
 // insightful notification title instead of a raw, potentially alarming percentage.
+// FIX (Time-bound) - All Calendar instances now explicitly set SECOND and
+// MILLISECOND to their boundaries (0 or 59/999). This prevents calculation
+// errors caused by partial-day time ranges.
 // =================================================================================
 package io.pm.finlight
 
@@ -35,11 +38,15 @@ class DailyReportWorker(
                     add(Calendar.DAY_OF_YEAR, -1)
                     set(Calendar.HOUR_OF_DAY, 23)
                     set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59) // --- FIX
+                    set(Calendar.MILLISECOND, 999) // --- FIX
                 }.timeInMillis
                 val yesterdayStart = (now.clone() as Calendar).apply {
                     add(Calendar.DAY_OF_YEAR, -1)
                     set(Calendar.HOUR_OF_DAY, 0)
                     set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0) // --- FIX
+                    set(Calendar.MILLISECOND, 0) // --- FIX
                 }.timeInMillis
 
                 // 2. "Previous 7 Days" period (for calculating the average)
@@ -47,11 +54,15 @@ class DailyReportWorker(
                     add(Calendar.DAY_OF_YEAR, -2)
                     set(Calendar.HOUR_OF_DAY, 23)
                     set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59) // --- FIX
+                    set(Calendar.MILLISECOND, 999) // --- FIX
                 }.timeInMillis
                 val sevenDaysAgoStart = (now.clone() as Calendar).apply {
                     add(Calendar.DAY_OF_YEAR, -8)
                     set(Calendar.HOUR_OF_DAY, 0)
                     set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0) // --- FIX
+                    set(Calendar.MILLISECOND, 0) // --- FIX
                 }.timeInMillis
 
                 // --- Fetch Data ---

@@ -57,7 +57,6 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Receipt will be sent shortly",
     "Insurance claim u/s",
     "RT-PCR sample collected",
-    "will be debited from your account",
     "OTP for online purchase",
     "UPI mandate collect",
     "Thank you for applying",
@@ -122,7 +121,8 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Card.*has been activated", "Order Cancelled", "Dispatched.*Courier", "Return Picked Up", "EMI Received",
     "CIBIL report", "Namma Metro card recharge", "Rummy", "Gujjadi Swarna",
     "Contribution of.*has been received", // --- NEW: For passbook/PF/NPS updates
-    "will be deducted", "Reward Points Credited"
+    "will be deducted", "Reward Points Credited",
+    "Statement is sent to"
 
 ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders

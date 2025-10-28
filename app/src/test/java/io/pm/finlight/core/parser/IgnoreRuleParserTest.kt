@@ -1133,5 +1133,26 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
         assertNull("Should ignore messages from HDFC Reward Points credit", result)
     }
+
+    @Test
+    fun `test ignores HDFC future debit message`() = runBlocking {
+        setupTest()
+        val smsBody = "Alert:\n" +
+                "INR.1950.00 will be debited on 27/10/2025 from HDFC Bank Card 1122 for Google Play - Conten..\n" +
+                "ID:Xr61pEDASo\n" +
+                "Act:https://hdfcbk.io/HDFCBK/a/1410ENb"
+        val mockSms = SmsMessage(id = 9691L, sender = "JD-HDFCB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+        assertNull("Should ignore messages from HDFC for future debit", result)
+    }
+
+    @Test
+    fun `test ignores ICICI Credit Card Statement`() = runBlocking {
+        setupTest()
+        val smsBody = "ICICI Bank Credit Card XX8008 Statement is sent to lk****************33@gmail.com. Total of Rs 691.60 or minimum of Rs 100.00 is due by 07-NOV-25."
+        val mockSms = SmsMessage(id = 9611L, sender = "JD-HDFCB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+        assertNull("Should ignore messages from ICICI Credit Card STatement", result)
+    }
 }
 

@@ -32,6 +32,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     private lateinit var transactionDao: TransactionDao
     @Mock
     private lateinit var settingsRepository: SettingsRepository
+    @Mock // --- NEW: Add mock for the new dependency ---
+    private lateinit var transactionRepository: TransactionRepository
 
     @Before
     override fun setup() {
@@ -49,6 +51,9 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         `when`(transactionDao.getWeeklySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionDao.getMonthlySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionDao.getFirstTransactionDate()).thenReturn(flowOf(0L))
+
+        // --- NEW: Mock the new repository dependency ---
+        `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
     }
 
     @Test
@@ -63,7 +68,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
 
         // ACT
-        val viewModel = TimePeriodReportViewModel(transactionDao, settingsRepository, TimePeriod.MONTHLY, null, false)
+        // --- FIX: Pass transactionRepository ---
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.MONTHLY, null, false)
         advanceUntilIdle()
 
         // ASSERT
@@ -76,7 +82,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     @Test
     fun `selectPreviousPeriod updates selectedDate correctly for MONTHLY`() = runTest {
         // Arrange
-        val viewModel = TimePeriodReportViewModel(transactionDao, settingsRepository, TimePeriod.MONTHLY, null, false)
+        // --- FIX: Pass transactionRepository ---
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.MONTHLY, null, false)
         val initialMonth = viewModel.selectedDate.first().get(Calendar.MONTH)
 
         // Act
@@ -92,7 +99,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     @Test
     fun `selectNextPeriod updates selectedDate correctly for YEARLY`() = runTest {
         // Arrange
-        val viewModel = TimePeriodReportViewModel(transactionDao, settingsRepository, TimePeriod.YEARLY, null, false)
+        // --- FIX: Pass transactionRepository ---
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.YEARLY, null, false)
         val initialYear = viewModel.selectedDate.first().get(Calendar.YEAR)
 
         // Act
@@ -112,7 +120,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong()))
             .thenReturn(currentSummary) // First call for current
             .thenReturn(previousSummary) // Second call for previous
-        val viewModel = TimePeriodReportViewModel(transactionDao, settingsRepository, TimePeriod.WEEKLY, null, false)
+        // --- FIX: Pass transactionRepository ---
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.WEEKLY, null, false)
         advanceUntilIdle()
 
         // Assert
@@ -131,7 +140,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         val expectedYear = if (today.get(Calendar.MONTH) == Calendar.JANUARY) today.get(Calendar.YEAR) - 1 else today.get(Calendar.YEAR)
 
         // Act
-        val viewModel = TimePeriodReportViewModel(transactionDao, settingsRepository, TimePeriod.MONTHLY, null, true)
+        // --- FIX: Pass transactionRepository ---
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.MONTHLY, null, true)
         advanceUntilIdle()
 
         // Assert
@@ -143,45 +153,56 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     @Test
     fun `consistencyStats are correctly calculated for monthly view`() = runTest {
         // Arrange
+        // We MUST use a fixed "today" for a reliable test, as the VM uses Calendar.getInstance()
+        // We can't easily mock Calendar.getInstance(), so we'll run the test *as if* it's running
+        // on a specific date by mocking the relevant data based on that date.
+        // Let's assume today is Oct 9th, 2025 for this test's logic.
         val testCal = Calendar.getInstance().apply { set(2025, Calendar.OCTOBER, 9) }
         val year = testCal.get(Calendar.YEAR)
-        val month = testCal.get(Calendar.MONTH) + 1
-        val daysInMonth = testCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+        val month = testCal.get(Calendar.MONTH) + 1 // 10
         val firstDayOfMonth = (testCal.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1) }.timeInMillis
 
-        // Budget: 3100 -> SafeToSpend: 100/day
-        `when`(settingsRepository.getOverallBudgetForMonthBlocking(year, month)).thenReturn(3100f)
-        `when`(transactionDao.getFirstTransactionDate()).thenReturn(flowOf(firstDayOfMonth))
-
-        val dailyTotals = listOf(
-            DailyTotal(date = "2025-10-01", totalAmount = 0.0),      // No Spend
-            DailyTotal(date = "2025-10-02", totalAmount = 50.0),     // Good Day
-            DailyTotal(date = "2025-10-03", totalAmount = 150.0)     // Bad Day
-        )
-        `when`(transactionDao.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(dailyTotals))
+        // --- NEW: Mock the repository call for consistency data ---
+        val mockData = mutableListOf<CalendarDayStatus>()
+        val safeToSpend = 100L
+        // We only mock the first 7 days.
+        for (i in 1..7) {
+            val date = (testCal.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, i) }.time
+            val (status, amount) = when (i) {
+                1 -> SpendingStatus.NO_DATA to 0L      // Day 1
+                2 -> SpendingStatus.NO_SPEND to 0L     // Day 2
+                3 -> SpendingStatus.WITHIN_LIMIT to 50L // Day 3
+                4 -> SpendingStatus.OVER_LIMIT to 150L  // Day 4
+                else -> SpendingStatus.NO_SPEND to 0L // Days 5, 6, 7
+            }
+            mockData.add(CalendarDayStatus(date, status, amount, safeToSpend))
+        }
+        `when`(transactionRepository.getMonthlyConsistencyData(year, month)).thenReturn(flowOf(mockData))
+        `when`(transactionDao.getFirstTransactionDate()).thenReturn(flowOf(firstDayOfMonth)) // Mock this for legacy code paths
 
         // Act
-        val viewModel = TimePeriodReportViewModel(transactionDao, settingsRepository, TimePeriod.MONTHLY, testCal.timeInMillis, false)
+        // --- FIX: Pass transactionRepository ---
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.MONTHLY, testCal.timeInMillis, false)
         advanceUntilIdle()
 
         // Assert
         viewModel.consistencyStats.test {
-            // The flow first emits its initial value (0,0,0,0) from stateIn. We consume it.
-            val initialStats = awaitItem()
-            assertEquals(0, initialStats.noSpendDays)
-
-            // Await the second, calculated value.
+            // Await the calculated value.
             val stats = awaitItem()
 
-            // The production code loops through all days in the month (31 for October).
-            // Days not in `dailyTotals` are counted as NO_SPEND.
-            // Day 1 is explicit NO_SPEND. Days 4-31 are implicit NO_SPEND.
-            val expectedNoSpendDays = 1 + (daysInMonth - dailyTotals.size) // 1 + (31 - 3) = 29
-
-            assertEquals(expectedNoSpendDays, stats.noSpendDays)
+            // The ViewModel's `consistencyStats` flow uses the *real* `Calendar.getInstance()`
+            // to filter `relevantData`. My system time is Oct 28, 2025.
+            // The mock data is for Oct 1-7, 2025. All 7 days are before Oct 28, so all are relevant.
+            // Stats from the 7 mocked days:
+            // 1 GOOD (Day 3)
+            // 1 BAD (Day 4)
+            // 4 NO_SPEND (Day 2, 5, 6, 7)
+            // 1 NO_DATA (Day 1)
             assertEquals(1, stats.goodDays)
             assertEquals(1, stats.badDays)
-            assertEquals(0, stats.noDataDays) // First transaction is on day 1.
+            // --- FIX: The assertion was 6 (based on old logic), but the new logic + mock data correctly produces 4.
+            assertEquals(4, stats.noSpendDays)
+            assertEquals(1, stats.noDataDays)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -196,7 +217,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         `when`(transactionDao.getWeeklySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(weeklyTotals))
 
         // Act
-        val viewModel = TimePeriodReportViewModel(transactionDao, settingsRepository, TimePeriod.WEEKLY, null, false)
+        // --- FIX: Pass transactionRepository ---
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.WEEKLY, null, false)
         advanceUntilIdle()
 
         // Assert
@@ -215,7 +237,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         `when`(transactionDao.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
 
         // Act
-        val viewModel = TimePeriodReportViewModel(transactionDao, settingsRepository, TimePeriod.DAILY, null, false)
+        // --- FIX: Pass transactionRepository ---
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.DAILY, null, false)
         advanceUntilIdle()
 
         // Assert
@@ -233,7 +256,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         }.timeInMillis
 
         // Act
-        val viewModel = TimePeriodReportViewModel(transactionDao, settingsRepository, TimePeriod.MONTHLY, specificDate, false)
+        // --- FIX: Pass transactionRepository ---
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.MONTHLY, specificDate, false)
         advanceUntilIdle()
 
         // Assert

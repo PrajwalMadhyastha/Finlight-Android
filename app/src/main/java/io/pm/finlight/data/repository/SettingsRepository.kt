@@ -3,6 +3,13 @@
 // REASON: FEATURE (Backup Time) - Added functions to save and retrieve the
 // timestamp of the last successful backup operation. This provides the persistence
 // layer needed to display this information to the user.
+//
+// REASON: FIX (Consistency) - `getOverallBudgetForMonth` and
+// `getOverallBudgetForMonthBlocking` now return `Float?` instead of `Float`.
+// If no budget is found for the given month or a prior month (carry-over),
+// this function now correctly returns `null` instead of `0f`. This allows the
+// app to distinguish between "No Budget Set" (`null`) and "Budget is Zero" (`0f`),
+// fixing the "No Budget" bug.
 // =================================================================================
 package io.pm.finlight
 
@@ -274,7 +281,8 @@ class SettingsRepository(context: Context) {
         }
     }
 
-    fun getOverallBudgetForMonthBlocking(year: Int, month: Int): Float {
+    // --- UPDATED: Return type is now nullable Float? ---
+    fun getOverallBudgetForMonthBlocking(year: Int, month: Int): Float? {
         val currentMonthKey = getBudgetKey(year, month)
 
         if (prefs.contains(currentMonthKey)) {
@@ -296,7 +304,7 @@ class SettingsRepository(context: Context) {
             }
         }
 
-        return 0f
+        return null // --- UPDATED: Return null if no budget is found ---
     }
 
     fun saveSelectedTheme(theme: AppTheme) {
@@ -543,12 +551,12 @@ class SettingsRepository(context: Context) {
         return prefs.getBoolean(KEY_APP_LOCK_ENABLED, false)
     }
 
-    // --- BUG FIX: Replaced the flawed logic with the robust, looping carry-forward logic ---
-    fun getOverallBudgetForMonth(year: Int, month: Int): Flow<Float> {
+    // --- UPDATED: Return type is now nullable Flow<Float?> ---
+    fun getOverallBudgetForMonth(year: Int, month: Int): Flow<Float?> {
         return callbackFlow {
             // Helper function to find the correct carried-over budget.
             // This is the same logic as the blocking version.
-            fun findCarriedOverBudget(): Float {
+            fun findCarriedOverBudget(): Float? { // --- UPDATED: Return type is now nullable ---
                 val currentMonthKey = getBudgetKey(year, month)
                 if (prefs.contains(currentMonthKey)) {
                     return prefs.getFloat(currentMonthKey, 0f)
@@ -566,7 +574,7 @@ class SettingsRepository(context: Context) {
                         return prefs.getFloat(prevKey, 0f)
                     }
                 }
-                return 0f
+                return null // --- UPDATED: Return null if no budget is found ---
             }
 
             // The listener now re-runs the entire lookback logic whenever ANY budget key changes.

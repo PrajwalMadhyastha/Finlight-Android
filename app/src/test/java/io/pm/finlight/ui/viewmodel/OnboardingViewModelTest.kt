@@ -13,14 +13,25 @@ import android.app.Application
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Configuration
+import androidx.work.testing.SynchronousExecutor
+import androidx.work.testing.WorkManagerTestInitHelper
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.CurrencyInfo
+import io.pm.finlight.utils.ReminderManager
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockkObject
+import io.mockk.runs
+import io.mockk.unmockkObject
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
@@ -48,8 +59,25 @@ class OnboardingViewModelTest : BaseViewModelTest() {
     @Before
     override fun setup() {
         super.setup()
+        // --- FIX: Manually initialize WorkManager for testing ---
+        // This is required because the OnboardingViewModel now triggers WorkManager
+        // tasks via ReminderManager.
+        val config = Configuration.Builder()
+            .setMinimumLoggingLevel(android.util.Log.DEBUG)
+            .setExecutor(SynchronousExecutor())
+            .build()
+        WorkManagerTestInitHelper.initializeTestWorkManager(application, config)
+
         viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
     }
+
+    @After
+    override fun tearDown() {
+        // Clean up static mocks after tests
+        unmockkObject(ReminderManager)
+        super.tearDown()
+    }
+
 
     @Test
     fun `initial state detects a home currency`() = runTest {
@@ -154,5 +182,19 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         advanceUntilIdle()
         // Assert
         verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(anyFloat())
+    }
+
+    @Test
+    fun `finishOnboarding schedules default workers via ReminderManager`() = runTest {
+        // Arrange
+        mockkObject(ReminderManager)
+        every { ReminderManager.rescheduleAllWork(any()) } just runs
+
+        // Act
+        viewModel.finishOnboarding()
+        advanceUntilIdle() // Ensure the coroutine in finishOnboarding completes
+
+        // Assert
+        verify(exactly = 1) { ReminderManager.rescheduleAllWork(application) }
     }
 }
