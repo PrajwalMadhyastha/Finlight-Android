@@ -1,10 +1,26 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/ui/screens/BudgetScreen.kt
+//
+// REASON: REFACTOR (Dynamic Budget) - The BudgetScreen is now dynamic.
+// - It adds the `MonthlySummaryHeader` (from TransactionListScreen) to allow
+//   users to navigate between different months.
+// - It collects the new dynamic state from `BudgetViewModel` (e.g.,
+//   `overallBudgetForSelectedMonth`, `budgetsForSelectedMonth`).
+// - `OverallBudgetHub` is updated to accept a nullable `Float?` and
+//   correctly displays "Not Set" when the budget is `null`.
+// - `EditOverallBudgetDialog` is also updated to handle the nullable budget.
+// =================================================================================
 package io.pm.finlight.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +28,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -34,13 +52,16 @@ import androidx.navigation.NavController
 import io.pm.finlight.Budget
 import io.pm.finlight.BudgetViewModel
 import io.pm.finlight.BudgetWithSpending
+import io.pm.finlight.MonthlySummaryItem
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.min
+import kotlin.math.roundToLong
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -51,9 +72,13 @@ fun BudgetScreen(
     navController: NavController,
     viewModel: BudgetViewModel = viewModel(),
 ) {
-    val categoryBudgets by viewModel.budgetsForCurrentMonth.collectAsState()
-    val overallBudget by viewModel.overallBudget.collectAsState()
-    val totalSpending by viewModel.totalSpending.collectAsState()
+    // --- REFACTORED: Collect dynamic state from ViewModel ---
+    val budgetsForSelectedMonth by viewModel.budgetsForSelectedMonth.collectAsState()
+    val overallBudgetForSelectedMonth by viewModel.overallBudgetForSelectedMonth.collectAsState()
+    val totalSpendingForSelectedMonth by viewModel.totalSpendingForSelectedMonth.collectAsState()
+    val selectedMonth by viewModel.selectedMonth.collectAsState()
+    val monthlySummaries by viewModel.monthlySummaries.collectAsState()
+
     var showDeleteDialog by remember { mutableStateOf(false) }
     var budgetToDelete by remember { mutableStateOf<Budget?>(null) }
     var showOverallBudgetDialog by remember { mutableStateOf(false) }
@@ -66,10 +91,20 @@ fun BudgetScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // --- NEW: Add MonthlySummaryHeader for navigation ---
+        item {
+            MonthlySummaryHeader(
+                selectedMonth = selectedMonth,
+                monthlySummaries = monthlySummaries,
+                onMonthSelected = { viewModel.setSelectedMonth(it) }
+            )
+        }
+
         item {
             OverallBudgetHub(
-                totalBudget = overallBudget,
-                totalSpent = totalSpending,
+                // --- REFACTORED: Pass dynamic state ---
+                totalBudget = overallBudgetForSelectedMonth,
+                totalSpent = totalSpendingForSelectedMonth,
                 onEditClick = { showOverallBudgetDialog = true }
             )
         }
@@ -95,7 +130,8 @@ fun BudgetScreen(
             }
         }
 
-        if (categoryBudgets.isEmpty()) {
+        // --- REFACTORED: Use dynamic state ---
+        if (budgetsForSelectedMonth.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier
@@ -111,7 +147,7 @@ fun BudgetScreen(
                 }
             }
         } else {
-            items(categoryBudgets, key = { it.budget.id }) { budgetWithSpending ->
+            items(budgetsForSelectedMonth, key = { it.budget.id }) { budgetWithSpending ->
                 CategoryBudgetItem(
                     budgetWithSpending = budgetWithSpending,
                     onEdit = { navController.navigate("edit_budget/${budgetWithSpending.budget.id}") },
@@ -145,7 +181,8 @@ fun BudgetScreen(
 
     if (showOverallBudgetDialog) {
         EditOverallBudgetDialog(
-            currentBudget = overallBudget,
+            // --- REFACTORED: Pass nullable Float? ---
+            currentBudget = overallBudgetForSelectedMonth,
             onDismiss = { showOverallBudgetDialog = false },
             onConfirm = { newAmount ->
                 viewModel.saveOverallBudget(newAmount)
@@ -155,14 +192,116 @@ fun BudgetScreen(
     }
 }
 
+// --- NEW: Copied from TransactionListScreen.kt ---
+@Composable
+private fun MonthlySummaryHeader(
+    selectedMonth: Calendar,
+    monthlySummaries: List<MonthlySummaryItem>,
+    onMonthSelected: (Calendar) -> Unit
+) {
+    val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
+    val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
+    var showMonthScroller by remember { mutableStateOf(false) }
+
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
+    }
+
+    val selectedTabIndex = monthlySummaries.indexOfFirst {
+        it.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
+                it.calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
+    }.coerceAtLeast(0)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showMonthScroller = !showMonthScroller }
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = monthYearFormat.format(selectedMonth.time),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Icon(
+                    imageVector = if (showMonthScroller) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                    contentDescription = if (showMonthScroller) "Hide month selector" else "Show month selector",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = showMonthScroller,
+            enter = expandVertically(animationSpec = tween(200)),
+            exit = shrinkVertically(animationSpec = tween(200))
+        ) {
+            ScrollableTabRow(
+                selectedTabIndex = selectedTabIndex,
+                edgePadding = 16.dp,
+                indicator = {},
+                divider = {}
+            ) {
+                monthlySummaries.forEach { summaryItem ->
+                    val isSelected = summaryItem.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
+                            summaryItem.calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
+                    Tab(
+                        selected = isSelected,
+                        onClick = {
+                            onMonthSelected(summaryItem.calendar)
+                            showMonthScroller = false
+                        },
+                        text = {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = monthFormat.format(summaryItem.calendar.time),
+                                    style = if (isSelected) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                                Text(
+                                    text = formatAmountInLakhs(summaryItem.totalSpent.roundToLong()),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// --- NEW: Copied from TransactionListScreen.kt ---
+private fun formatAmountInLakhs(amount: Long): String {
+    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+        .apply { maximumFractionDigits = 0 }
+    if (amount < 1000) return currencyFormat.format(amount)
+    if (amount < 100000) return "${currencyFormat.format(amount / 1000)}K"
+    return "${NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 2 }.format(amount / 100000.0)}L"
+}
+
+
 @Composable
 private fun OverallBudgetHub(
-    totalBudget: Long,
+    // --- REFACTORED: Accept nullable Float? ---
+    totalBudget: Float?,
     totalSpent: Long,
     onEditClick: () -> Unit
 ) {
-    val progress = if (totalBudget > 0) (totalSpent.toFloat() / totalBudget.toFloat()) else 0f
-    val remaining = totalBudget - totalSpent
+    // --- REFACTORED: Handle null budget ---
+    val budgetValue = totalBudget ?: 0f
+    val progress = if (budgetValue > 0) (totalSpent.toFloat() / budgetValue) else 0f
+    val remaining = budgetValue - totalSpent
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 1500), label = "OverallBudgetProgress"
@@ -192,12 +331,22 @@ private fun OverallBudgetHub(
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        currencyFormat.format(remaining),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    // --- REFACTORED: Handle null budget display ---
+                    if (totalBudget == null) {
+                        Text(
+                            "Not Set",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            currencyFormat.format(remaining),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
 
@@ -210,8 +359,10 @@ private fun OverallBudgetHub(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // --- REFACTORED: Handle null budget display ---
+                val budgetText = if (totalBudget == null) "Not Set" else currencyFormat.format(budgetValue)
                 Text(
-                    "Budget: ${currencyFormat.format(totalBudget)}",
+                    "Budget: $budgetText",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -339,11 +490,21 @@ private fun CategoryBudgetItem(
 
 @Composable
 fun EditOverallBudgetDialog(
-    currentBudget: Long,
+    // --- REFACTORED: Accept nullable Float? ---
+    currentBudget: Float?,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
-    var budgetInput by remember { mutableStateOf(if (currentBudget > 0) currentBudget.toString() else "") }
+    // --- REFACTORED: Handle null/0f for initial display ---
+    var budgetInput by remember {
+        mutableStateOf(
+            if (currentBudget != null && currentBudget > 0f) {
+                currentBudget.roundToLong().toString()
+            } else {
+                ""
+            }
+        )
+    }
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
