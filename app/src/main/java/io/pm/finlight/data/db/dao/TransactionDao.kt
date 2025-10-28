@@ -118,6 +118,12 @@ interface TransactionDao {
     """)
     fun getSpendingAnalysisByTag(startDate: Long, endDate: Long, filterCategoryId: Int?, filterMerchantName: String?, filterTagId: Int?, searchQuery: String?): Flow<List<SpendingAnalysisItem>>
 
+    // =============================================================================
+    // --- FIX: Corrected the merchant analysis query to prevent crashes. ---
+    // The query now groups by a case-insensitive `dimensionId` to merge merchants
+    // like "Amazon" and "amazon". It also uses `MIN(AE.description)` to select a
+    // consistent display name for the grouped results.
+    // =============================================================================
     @Query("""
         WITH AllExpenses AS (
             SELECT T.id, T.categoryId, T.amount, T.description
@@ -131,7 +137,7 @@ interface TransactionDao {
         )
         SELECT
             LOWER(AE.description) as dimensionId,
-            AE.description as dimensionName,
+            MIN(AE.description) as dimensionName,
             SUM(AE.amount) as totalAmount,
             COUNT(AE.id) as transactionCount
         FROM AllExpenses AE
@@ -144,7 +150,7 @@ interface TransactionDao {
                 WHERE ttcr.transactionId = AE.id AND ttcr.tagId = :filterTagId
             ))
             AND (:filterMerchantName IS NULL OR AE.description = :filterMerchantName)
-        GROUP BY dimensionName
+        GROUP BY dimensionId
         ORDER BY totalAmount DESC
     """)
     fun getSpendingAnalysisByMerchant(startDate: Long, endDate: Long, filterCategoryId: Int?, filterTagId: Int?, filterMerchantName: String?, searchQuery: String?): Flow<List<SpendingAnalysisItem>>

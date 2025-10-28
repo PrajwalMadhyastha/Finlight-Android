@@ -51,6 +51,9 @@ class ReportsViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
         `when`(transactionRepository.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
+        // --- ADDED: Mock the new dependency for consistency flows ---
+        `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+
 
         viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository)
     }
@@ -118,48 +121,54 @@ class ReportsViewModelTest : BaseViewModelTest() {
     @Test
     fun `setReportView updates view type and displayed stats`() = runTest {
         // Arrange
-        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(3000f))
-        // Provide a valid start date for transaction history
-        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(365)))
+        val yearlyData: List<CalendarDayStatus> = listOf(CalendarDayStatus(Calendar.getInstance().time, SpendingStatus.OVER_LIMIT, 120, 100))
+        val monthlyData: List<CalendarDayStatus> = listOf(CalendarDayStatus(Calendar.getInstance().time, SpendingStatus.WITHIN_LIMIT, 80, 100))
 
-        `when`(transactionRepository.getDailySpendingForDateRange(anyLong(), anyLong())).thenAnswer { invocation ->
-            val startDate = invocation.getArgument<Long>(0)
-            val endDate = invocation.getArgument<Long>(1)
-            val durationDays = TimeUnit.MILLISECONDS.toDays(endDate - startDate)
+        val currentMonth = Calendar.getInstance().get(Calendar.MONTH) + 1
+        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
 
-            if (durationDays > 31) { // Heuristic: A long range is for the yearly calendar
-                flowOf(listOf(DailyTotal("2025-10-07", 120.0))) // Causes 1 bad day
-            } else { // A short range is for the monthly calendar
-                flowOf(listOf(DailyTotal("2025-10-07", 80.0))) // Causes 1 good day
+        // Mock all 12 calls for the YEARLY view. One month (current) returns monthlyData, the rest return yearlyData.
+        `when`(transactionRepository.getMonthlyConsistencyData(eq(currentYear), anyInt())).thenAnswer { invocation ->
+            val month = invocation.getArgument<Int>(1)
+            if (month == currentMonth) {
+                flowOf(monthlyData)
+            } else {
+                flowOf(yearlyData)
             }
         }
+        // This mock is for the MONTHLY view (detailedMonthData flow)
+        `when`(transactionRepository.getMonthlyConsistencyData(eq(currentYear), eq(currentMonth))).thenReturn(flowOf(monthlyData))
 
+        // Act
         initializeViewModel()
+        advanceUntilIdle() // Let the init block's flows finish
 
-        // Act & Assert
+        // Assert
         viewModel.displayedConsistencyStats.test {
-            // 1. Consume the initial value from stateIn which is always (0,0,0,0).
-            assertEquals("Initial value should be empty stats", ConsistencyStats(0, 0, 0, 0), awaitItem())
+            // 1. Consume the initial value (0,0,0,0).
+            assertEquals(ConsistencyStats(0, 0, 0, 0), awaitItem())
 
-            // 2. Await the first calculated value for the default YEARLY view.
-            // This is emitted after the ViewModel's init block coroutines complete.
-            val yearlyStats1 = awaitItem()
-            assertEquals("Initial YEARLY stats should have 0 good days", 0, yearlyStats1.goodDays)
-            assertEquals("Initial YEARLY stats should have 1 bad day", 1, yearlyStats1.badDays)
+            // 2. Await the first calculated value (default YEARLY view).
+            // It will have 1 good day (from the current month) and 11 bad days.
+            val yearlyStats = awaitItem()
+            assertEquals(1, yearlyStats.goodDays)
+            assertEquals(11, yearlyStats.badDays)
 
-            // 3. Switch to MONTHLY and check stats. This triggers a new emission.
+            // 3. Switch to MONTHLY and check stats.
             viewModel.setReportView(ReportViewType.MONTHLY)
-            val monthlyStats = awaitItem()
-            // Daily safe to spend = 3000 / days_in_month ~= 96. Spend = 80. So, 1 good day.
-            assertEquals("MONTHLY stats should have 1 good day", 1, monthlyStats.goodDays)
-            assertEquals("MONTHLY stats should have 0 bad days", 0, monthlyStats.badDays)
+            advanceUntilIdle()
+            val monthlyStats = awaitItem() // This should now emit a new value
+            // The monthlyData has 1 good day.
+            assertEquals(1, monthlyStats.goodDays)
+            assertEquals(0, monthlyStats.badDays)
 
-            // 4. Switch back to YEARLY and check stats.
+            // 4. Switch back to YEARLY.
             viewModel.setReportView(ReportViewType.YEARLY)
-            val yearlyStats2 = awaitItem()
-            // The data for the yearly view hasn't changed. It should still be a bad day.
-            assertEquals("Second YEARLY stats should have 0 good days", 0, yearlyStats2.goodDays)
-            assertEquals("Second YEARLY stats should have 1 bad day", 1, yearlyStats2.badDays)
+            advanceUntilIdle()
+            val yearlyStats2 = awaitItem() // This will be distinct from monthlyStats
+            // It should be the same as the first yearly stats.
+            assertEquals(1, yearlyStats2.goodDays)
+            assertEquals(11, yearlyStats2.badDays)
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -217,3 +226,4 @@ class ReportsViewModelTest : BaseViewModelTest() {
         assertEquals(expectedMonth, newMonth)
     }
 }
+

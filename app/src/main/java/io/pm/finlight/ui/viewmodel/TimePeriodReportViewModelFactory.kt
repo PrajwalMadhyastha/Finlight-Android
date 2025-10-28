@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/TimePeriodReportViewModelFactory.kt
-// REASON: FIX - The factory now accepts a `showPreviousMonth` boolean parameter.
-// This allows it to correctly instantiate the ViewModel with the necessary flag
-// to display the previous month's data when navigated to from a monthly summary
-// notification.
+// REASON: REFACTOR (Consistency) - The factory now instantiates and injects the
+// `TransactionRepository` into the `TimePeriodReportViewModel`, replacing the
+// direct DAO/SettingsRepo injection. This aligns it with the app's standard
+// dependency injection pattern and provides access to the new centralized
+// consistency logic.
 // =================================================================================
 package io.pm.finlight
 
@@ -22,14 +23,19 @@ class TimePeriodReportViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TimePeriodReportViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
+            // --- NEW: Instantiate all repositories ---
             val settingsRepository = SettingsRepository(application)
+            val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
+
             @Suppress("UNCHECKED_CAST")
             return TimePeriodReportViewModel(
-                transactionDao = db.transactionDao(),
-                settingsRepository = settingsRepository,
+                // --- UPDATED: Pass repositories instead of DAOs ---
+                transactionDao = db.transactionDao(), // Still needed for charts/insights
+                transactionRepository = transactionRepository,
                 timePeriod = timePeriod,
                 initialDateMillis = initialDateMillis,
-                showPreviousMonth = showPreviousMonth // --- UPDATED: Pass to ViewModel
+                showPreviousMonth = showPreviousMonth
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

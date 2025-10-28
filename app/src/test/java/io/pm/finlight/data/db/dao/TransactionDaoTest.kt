@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.test.junit.JUnitAsserter.assertNotNull
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -290,5 +291,48 @@ class TransactionDaoTest {
         // Assert
         assertNotNull(average)
         assertEquals(expectedAverage, average!!, 0.01)
+    }
+
+    @Test
+    fun `getSpendingAnalysisByMerchant groups case-insensitive merchants correctly`() = runTest {
+        // Arrange: Insert transactions for the same merchant with different casing.
+        val transactionTime = System.currentTimeMillis()
+        val startTime = transactionTime - TimeUnit.HOURS.toMillis(1)
+        val endTime = transactionTime + TimeUnit.HOURS.toMillis(1)
+
+        transactionDao.insert(Transaction(description = "Amazon", amount = 100.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null))
+        transactionDao.insert(Transaction(description = "amazon", amount = 50.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null))
+        transactionDao.insert(Transaction(description = "AMAZON", amount = 25.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null))
+        // Add another distinct merchant for control
+        transactionDao.insert(Transaction(description = "Flipkart", amount = 200.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null))
+
+        // Act & Assert
+        transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null).test {
+            val results = awaitItem()
+
+            // Assert: There should be only two groups: one for all "Amazon" variations and one for "Flipkart".
+            assertEquals(2, results.size)
+
+            // Assert: Find the aggregated "Amazon" item. Its dimensionId MUST be lowercase.
+            val amazonItem = results.find { it.dimensionId == "amazon" }
+            assertNotNull("Aggregated item for 'amazon' should exist", amazonItem)
+
+            // Assert: The total amount should be the sum of all three "Amazon" transactions.
+            assertEquals(175.0, amazonItem!!.totalAmount, 0.01) // 100 + 50 + 25
+
+            // Assert: The transaction count should be 3.
+            assertEquals(3, amazonItem.transactionCount)
+
+            // Assert: The dimensionName should be one of the original casings (MIN picks 'AMAZON').
+            assertEquals("AMAZON", amazonItem.dimensionName)
+
+            // Assert: The Flipkart item is also present and correct.
+            val flipkartItem = results.find { it.dimensionId == "flipkart" }
+            assertNotNull("Aggregated item for 'flipkart' should exist", flipkartItem)
+            assertEquals(200.0, flipkartItem!!.totalAmount, 0.01)
+            assertEquals(1, flipkartItem.transactionCount)
+
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

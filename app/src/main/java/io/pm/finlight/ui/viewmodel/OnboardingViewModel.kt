@@ -19,6 +19,7 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.CurrencyInfo
+import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -126,6 +127,9 @@ class OnboardingViewModel(
             if (budgetFloat > 0) {
                 settingsRepository.saveOverallBudgetForCurrentMonth(budgetFloat)
             }
+
+            // --- FIX: Schedule all default-enabled background workers ---
+            ReminderManager.rescheduleAllWork(application)
         }
     }
 }

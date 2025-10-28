@@ -1,8 +1,10 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ReportsViewModel.kt
-// REASON: REFACTOR (Testing) - The ViewModel now uses constructor dependency
-// injection for its repositories and DAO. It also extends ViewModel instead of
-// AndroidViewModel, decoupling it from the Android framework for easier unit testing.
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/ReportsViewModel.kt
+// REASON: REFACTOR (Consistency) - This ViewModel now uses the new, centralized
+// `transactionRepository.getMonthlyConsistencyData` function for both its monthly
+// and yearly calendar flows. The old, duplicated, and buggy local functions
+// (`generateConsistencyCalendarData`, `generateConsistencyDataForMonth`) have been
+// completely removed.
 // =================================================================================
 package io.pm.finlight
 
@@ -144,26 +146,27 @@ class ReportsViewModel(
             initialValue = ReportScreenData(null, null, "This Month", null)
         )
 
-        // --- UPDATED: Make yearly consistency data reactive to budget changes ---
-        val today = Calendar.getInstance()
-        val year = today.get(Calendar.YEAR)
-        val currentMonthIndex = today.get(Calendar.MONTH)
-        val monthlyBudgetFlows = (0..currentMonthIndex).map { month ->
-            settingsRepository.getOverallBudgetForMonth(year, month + 1)
-        }
-        val totalBudgetSoFarFlow = combine(monthlyBudgetFlows) { budgets ->
-            budgets.sum()
-        }
+        // --- REFACTORED: Use the new "Monthly-First" centralized logic ---
+        consistencyCalendarData = flow {
+            val today = Calendar.getInstance()
+            val year = today.get(Calendar.YEAR)
 
-        consistencyCalendarData = combine(
-            totalBudgetSoFarFlow,
-            transactionRepository.getDailySpendingForDateRange(
-                Calendar.getInstance().apply { set(Calendar.DAY_OF_YEAR, 1) }.timeInMillis,
-                today.timeInMillis
-            ),
-            transactionRepository.getFirstTransactionDate()
-        ) { totalBudget, dailyTotals, firstTransactionDate ->
-            generateConsistencyCalendarData(totalBudget, dailyTotals, firstTransactionDate)
+            // Create a flow for each month of the current year
+            // --- FIX: Add explicit types to resolve build error ---
+            val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> = (1..12).map { month ->
+                transactionRepository.getMonthlyConsistencyData(year, month)
+            }
+
+            // Combine all 12 flows
+            // --- FIX: This is the corrected logic ---
+            val combinedFlow = combine(monthlyDataFlows) { monthlyDataArray: Array<List<CalendarDayStatus>> ->
+                monthlyDataArray.toList().flatten() // Flatten the Array<List> into a single List
+            }
+
+            // Collect the combined flow and emit its single list result
+            combinedFlow.collect { combinedYearlyData: List<CalendarDayStatus> ->
+                emit(combinedYearlyData)
+            }
         }.flowOn(Dispatchers.Default)
             .stateIn(
                 scope = viewModelScope,
@@ -171,24 +174,16 @@ class ReportsViewModel(
                 initialValue = emptyList()
             )
 
-        // --- UPDATED: Make detailed monthly data reactive to budget changes ---
+        // --- REFACTORED: Use the new centralized repository function ---
         detailedMonthData = _selectedMonth.flatMapLatest { monthCal ->
             val month = monthCal.get(Calendar.MONTH) + 1
             val year = monthCal.get(Calendar.YEAR)
-            val monthStartCal = (monthCal.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0) }
-            val monthEndCal = (monthCal.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH)); set(Calendar.HOUR_OF_DAY, 23) }
-
-            combine(
-                settingsRepository.getOverallBudgetForMonth(year, month),
-                transactionRepository.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
-                transactionRepository.getFirstTransactionDate()
-            ) { budget, dailyTotals, firstTransactionDate ->
-                generateConsistencyDataForMonth(monthCal, budget, dailyTotals, firstTransactionDate)
-            }
+            transactionRepository.getMonthlyConsistencyData(year, month)
         }.flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
+        val today = Calendar.getInstance()
         displayedConsistencyStats = combine(
             reportViewType,
             consistencyCalendarData,
@@ -197,13 +192,15 @@ class ReportsViewModel(
             val dataToProcess = if (viewType == ReportViewType.YEARLY) {
                 yearlyData
             } else {
-                monthlyData.filter { !it.date.after(today.time) }
+                monthlyData
             }
+            // Filter out future days from stats calculation
+            val relevantData = dataToProcess.filter { !it.date.after(today.time) }
 
-            val goodDays = dataToProcess.count { it.status == SpendingStatus.WITHIN_LIMIT }
-            val badDays = dataToProcess.count { it.status == SpendingStatus.OVER_LIMIT }
-            val noSpendDays = dataToProcess.count { it.status == SpendingStatus.NO_SPEND }
-            val noDataDays = dataToProcess.count { it.status == SpendingStatus.NO_DATA }
+            val goodDays = relevantData.count { it.status == SpendingStatus.WITHIN_LIMIT }
+            val badDays = relevantData.count { it.status == SpendingStatus.OVER_LIMIT }
+            val noSpendDays = relevantData.count { it.status == SpendingStatus.NO_SPEND }
+            val noDataDays = relevantData.count { it.status == SpendingStatus.NO_DATA }
             ConsistencyStats(goodDays, badDays, noSpendDays, noDataDays)
         }.stateIn(
             scope = viewModelScope,
@@ -212,100 +209,9 @@ class ReportsViewModel(
         )
     }
 
-    private suspend fun generateConsistencyCalendarData(
-        totalBudgetSoFar: Float,
-        dailyTotals: List<DailyTotal>,
-        firstTransactionDate: Long?
-    ): List<CalendarDayStatus> = withContext(Dispatchers.IO) {
-        val today = Calendar.getInstance()
-        val year = today.get(Calendar.YEAR)
+    // --- DELETED: generateConsistencyCalendarData function ---
 
-        if (firstTransactionDate == null) {
-            val resultList = mutableListOf<CalendarDayStatus>()
-            val dayIterator = Calendar.getInstance().apply {
-                set(Calendar.YEAR, year)
-                set(Calendar.DAY_OF_YEAR, 1)
-            }
-            while (!dayIterator.after(today)) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
-                dayIterator.add(Calendar.DAY_OF_YEAR, 1)
-            }
-            return@withContext resultList
-        }
-
-        val daysSoFar = today.get(Calendar.DAY_OF_YEAR)
-        // --- FIX: Changed .toLong() to .roundToLong() to prevent truncation ---
-        val yearlySafeToSpend = if (totalBudgetSoFar > 0 && daysSoFar > 0) (totalBudgetSoFar / daysSoFar).roundToLong() else 0L
-
-        val firstDataCal = Calendar.getInstance().apply { timeInMillis = firstTransactionDate }
-        val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
-
-        val resultList = mutableListOf<CalendarDayStatus>()
-        val dayIterator = Calendar.getInstance().apply {
-            set(Calendar.YEAR, year)
-            set(Calendar.DAY_OF_YEAR, 1)
-        }
-
-        while (!dayIterator.after(today)) {
-            if (dayIterator.before(firstDataCal)) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
-                dayIterator.add(Calendar.DAY_OF_YEAR, 1)
-                continue
-            }
-
-            val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", dayIterator.get(Calendar.YEAR), dayIterator.get(Calendar.MONTH) + 1, dayIterator.get(Calendar.DAY_OF_MONTH))
-            val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
-
-            val status = when {
-                amountSpent == 0L -> SpendingStatus.NO_SPEND
-                yearlySafeToSpend > 0 && amountSpent > yearlySafeToSpend -> SpendingStatus.OVER_LIMIT
-                else -> SpendingStatus.WITHIN_LIMIT
-            }
-
-            resultList.add(CalendarDayStatus(dayIterator.time, status, amountSpent, yearlySafeToSpend))
-            dayIterator.add(Calendar.DAY_OF_YEAR, 1)
-        }
-        resultList
-    }
-
-    private suspend fun generateConsistencyDataForMonth(
-        calendar: Calendar,
-        budget: Float,
-        dailyTotals: List<DailyTotal>,
-        firstTransactionDate: Long?
-    ): List<CalendarDayStatus> = withContext(Dispatchers.IO) {
-        val year = calendar.get(Calendar.YEAR)
-        val month = calendar.get(Calendar.MONTH) + 1
-
-        val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
-        val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
-
-        val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
-        val safeToSpend = if (budget > 0) (budget.toDouble() / daysInMonth).roundToLong() else 0L
-
-        val resultList = mutableListOf<CalendarDayStatus>()
-        val dayIterator = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1) }
-        val today = Calendar.getInstance()
-
-        for (i in 1..daysInMonth) {
-            dayIterator.set(Calendar.DAY_OF_MONTH, i)
-            val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
-
-            if (dayIterator.after(today) || (firstDataCal != null && dayIterator.before(firstDataCal))) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
-                continue
-            }
-
-            val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
-            val status = when {
-                amountSpent == 0L -> SpendingStatus.NO_SPEND
-                safeToSpend > 0 && amountSpent > safeToSpend -> SpendingStatus.OVER_LIMIT
-                else -> SpendingStatus.WITHIN_LIMIT
-            }
-            resultList.add(CalendarDayStatus(dayIterator.time, status, amountSpent, safeToSpend))
-        }
-        resultList
-    }
+    // --- DELETED: generateConsistencyDataForMonth function ---
 
 
     fun selectPeriod(period: ReportPeriod) {
@@ -372,3 +278,4 @@ class ReportsViewModel(
         }
     }
 }
+

@@ -3,6 +3,11 @@
 // REASON: REFACTOR - The dialog has been updated to use GlassPanel components
 // and align with the Project Aurora aesthetic, ensuring a consistent and modern
 // look for adding and editing budgets.
+//
+// REASON: REFACTOR (Dynamic Budget) - This screen now reads the `selectedMonth`
+// from the `BudgetViewModel`. This ensures that new budgets are created for the
+// month the user is currently viewing, rather than always defaulting to the
+// *real* current month.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -22,6 +27,7 @@ import io.pm.finlight.Category
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,9 +137,22 @@ fun AddEditBudgetScreen(
                     if (selectedCategory != null && amountDouble != null && amountDouble > 0) {
                         if (isEditMode) {
                             budgetToEdit?.let { currentBudget ->
-                                viewModel.updateBudget(currentBudget.copy(amount = amountDouble))
+                                // --- REFACTORED: Use the selected month's info for an update ---
+                                val selectedMonth = viewModel.selectedMonth.value
+                                val month = selectedMonth.get(Calendar.MONTH) + 1
+                                val year = selectedMonth.get(Calendar.YEAR)
+                                viewModel.updateBudget(
+                                    currentBudget.copy(
+                                        amount = amountDouble,
+                                        // Update month/year in case the user is editing a *carried-over* budget
+                                        // This pins it to the currently selected month.
+                                        month = month,
+                                        year = year
+                                    )
+                                )
                             }
                         } else {
+                            // --- This now correctly uses the selectedMonth from the VM ---
                             viewModel.addCategoryBudget(selectedCategory!!.name, amount)
                         }
                         navController.popBackStack()

@@ -10,6 +10,11 @@
 // parameter. This allows callers like the bulk importer to specify the correct
 // source ("Imported") instead of using the default ("Auto-Captured"), fixing a
 // data inconsistency bug.
+//
+// REASON: FIX (Consistency) - The `overallMonthlyBudget` collector is updated to
+// handle the new nullable `Float?` from `SettingsRepository`. It now uses
+// `map { it ?: 0f }` to safely convert the nullable value to a non-null `Float`
+// for the UI, resolving a build error.
 // =================================================================================
 package io.pm.finlight
 
@@ -293,7 +298,13 @@ class TransactionViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
-        overallMonthlyBudget = _selectedMonth.flatMapLatest { settingsRepository.getOverallBudgetForMonth(it.get(Calendar.YEAR), it.get(Calendar.MONTH) + 1) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+        overallMonthlyBudget = _selectedMonth.flatMapLatest {
+            settingsRepository.getOverallBudgetForMonth(it.get(Calendar.YEAR), it.get(Calendar.MONTH) + 1)
+        }
+            // --- UPDATED: Handle nullable Float? and map null to 0f ---
+            .map { it ?: 0f }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+
         amountRemaining = combine(overallMonthlyBudget, monthlyExpenses) { budget, expenses -> budget - expenses.toFloat() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
 
         viewModelScope.launch {

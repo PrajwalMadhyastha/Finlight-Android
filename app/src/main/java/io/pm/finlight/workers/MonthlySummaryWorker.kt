@@ -2,6 +2,9 @@
 // FILE: ./app/src/main/java/io/pm/finlight/MonthlySummaryWorker.kt
 // REASON: Added a call to ReminderManager.scheduleMonthlySummary at the end of the
 // worker's execution to create a continuous chain of precisely scheduled tasks.
+// FIX (Time-bound) - All Calendar instances now explicitly set SECOND and
+// MILLISECOND to their boundaries (0 or 59/999). This prevents calculation
+// errors caused by partial-day time ranges.
 // =================================================================================
 package io.pm.finlight
 
@@ -29,12 +32,41 @@ class MonthlySummaryWorker(
 
                 // --- Date range for LAST MONTH ---
                 val lastMonthCalendar = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
-                val lastMonthEnd = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1); add(Calendar.DAY_OF_MONTH, -1); set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59) }.timeInMillis
-                val lastMonthStart = Calendar.getInstance().apply { add(Calendar.MONTH, -1); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0) }.timeInMillis
+                val lastMonthEnd = Calendar.getInstance().apply {
+                    set(Calendar.DAY_OF_MONTH, 1)
+                    add(Calendar.DAY_OF_MONTH, -1)
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59) // --- FIX
+                    set(Calendar.MILLISECOND, 999) // --- FIX
+                }.timeInMillis
+                val lastMonthStart = Calendar.getInstance().apply {
+                    add(Calendar.MONTH, -1)
+                    set(Calendar.DAY_OF_MONTH, 1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0) // --- FIX
+                    set(Calendar.MILLISECOND, 0) // --- FIX
+                }.timeInMillis
 
                 // --- Date range for PREVIOUS-TO-LAST MONTH ---
-                val prevMonthEnd = Calendar.getInstance().apply { add(Calendar.MONTH, -1); set(Calendar.DAY_OF_MONTH, 1); add(Calendar.DAY_OF_MONTH, -1); set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59) }.timeInMillis
-                val prevMonthStart = Calendar.getInstance().apply { add(Calendar.MONTH, -2); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0) }.timeInMillis
+                val prevMonthEnd = Calendar.getInstance().apply {
+                    add(Calendar.MONTH, -1)
+                    set(Calendar.DAY_OF_MONTH, 1)
+                    add(Calendar.DAY_OF_MONTH, -1)
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59) // --- FIX
+                    set(Calendar.MILLISECOND, 999) // --- FIX
+                }.timeInMillis
+                val prevMonthStart = Calendar.getInstance().apply {
+                    add(Calendar.MONTH, -2)
+                    set(Calendar.DAY_OF_MONTH, 1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0) // --- FIX
+                    set(Calendar.MILLISECOND, 0) // --- FIX
+                }.timeInMillis
 
 
                 val lastMonthSummary = transactionDao.getFinancialSummaryForRange(lastMonthStart, lastMonthEnd)
