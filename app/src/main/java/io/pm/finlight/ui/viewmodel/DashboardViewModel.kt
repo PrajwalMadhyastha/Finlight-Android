@@ -1,9 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/DashboardViewModel.kt
-// REASON: FIX (Data Consistency) - The ViewModel now fetches and applies the
-// `MerchantRenameRule` map to its `recentTransactions` flow. This ensures that
-// the dashboard and the transaction list screen display merchant names consistently,
-// resolving a UI discrepancy.
+// REASON: REFACTOR (Consistency) - The `yearlyConsistencyData` flow has been
+// rewritten to use the new centralized `transactionRepository
+// .getMonthlyConsistencyData` function. It now combines the data for all 12
+// months of the current year, ensuring the dashboard heatmap uses the same
+// "Monthly-First" logic as all other consistency views.
+// FIX (Bug) - The old, buggy `generateYearlyConsistencyData` function has been
+// completely removed, eliminating the data inconsistency and truncation bug.
 // =================================================================================
 package io.pm.finlight
 
@@ -286,27 +289,27 @@ class DashboardViewModel(
                     initialValue = emptyList(),
                 )
 
-        val today = Calendar.getInstance()
-        val year = today.get(Calendar.YEAR)
-        val currentMonthIndex = today.get(Calendar.MONTH)
+        // --- REFACTORED: Use the new "Monthly-First" centralized logic ---
+        yearlyConsistencyData = flow {
+            val today = Calendar.getInstance()
+            val year = today.get(Calendar.YEAR)
 
-        val monthlyBudgetFlows = (0..currentMonthIndex).map { month ->
-            settingsRepository.getOverallBudgetForMonth(year, month + 1)
-        }
+            // Create a flow for each month of the current year
+            // --- FIX: Add explicit types to resolve build error ---
+            val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> = (1..12).map { month ->
+                transactionRepository.getMonthlyConsistencyData(year, month)
+            }
 
-        val totalBudgetSoFarFlow = combine(monthlyBudgetFlows) { budgets ->
-            budgets.sum()
-        }
+            // Combine all 12 flows
+            // --- FIX: This is the corrected logic ---
+            val combinedFlow: Flow<List<CalendarDayStatus>> = combine(monthlyDataFlows) { monthlyDataArray: Array<List<CalendarDayStatus>> ->
+                monthlyDataArray.toList().flatten() // Flatten the Array<List> into a single List
+            }
 
-        yearlyConsistencyData = combine(
-            totalBudgetSoFarFlow,
-            transactionRepository.getDailySpendingForDateRange(
-                Calendar.getInstance().apply { set(Calendar.DAY_OF_YEAR, 1) }.timeInMillis,
-                today.timeInMillis
-            ),
-            transactionRepository.getFirstTransactionDate()
-        ) { totalBudget, dailyTotals, firstTransactionDate ->
-            generateYearlyConsistencyData(totalBudget, dailyTotals, firstTransactionDate)
+            // Collect the combined flow and emit its single list result
+            combinedFlow.collect { combinedYearlyData: List<CalendarDayStatus> ->
+                emit(combinedYearlyData)
+            }
         }.flowOn(Dispatchers.Default)
             .stateIn(
                 scope = viewModelScope,
@@ -351,60 +354,7 @@ class DashboardViewModel(
         _summaryRefreshTrigger.value = System.currentTimeMillis()
     }
 
-    private suspend fun generateYearlyConsistencyData(
-        totalBudgetSoFar: Float,
-        dailyTotals: List<DailyTotal>,
-        firstTransactionDate: Long?
-    ): List<CalendarDayStatus> = withContext(Dispatchers.IO) {
-        val today = Calendar.getInstance()
-        val year = today.get(Calendar.YEAR)
-
-        if (firstTransactionDate == null) {
-            val resultList = mutableListOf<CalendarDayStatus>()
-            val dayIterator = Calendar.getInstance().apply {
-                set(Calendar.YEAR, year)
-                set(Calendar.DAY_OF_YEAR, 1)
-            }
-            while (!dayIterator.after(today)) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
-                dayIterator.add(Calendar.DAY_OF_YEAR, 1)
-            }
-            return@withContext resultList
-        }
-
-        val daysSoFar = today.get(Calendar.DAY_OF_YEAR)
-        val yearlySafeToSpend = if (totalBudgetSoFar > 0 && daysSoFar > 0) (totalBudgetSoFar / daysSoFar).toLong() else 0L
-
-        val firstDataCal = Calendar.getInstance().apply { timeInMillis = firstTransactionDate }
-        val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
-
-        val resultList = mutableListOf<CalendarDayStatus>()
-        val dayIterator = Calendar.getInstance().apply {
-            set(Calendar.YEAR, year)
-            set(Calendar.DAY_OF_YEAR, 1)
-        }
-
-        while (!dayIterator.after(today)) {
-            if (dayIterator.before(firstDataCal)) {
-                resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
-                dayIterator.add(Calendar.DAY_OF_YEAR, 1)
-                continue
-            }
-
-            val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", dayIterator.get(Calendar.YEAR), dayIterator.get(Calendar.MONTH) + 1, dayIterator.get(Calendar.DAY_OF_MONTH))
-            val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
-
-            val status = when {
-                amountSpent == 0L -> SpendingStatus.NO_SPEND
-                yearlySafeToSpend > 0 && amountSpent > yearlySafeToSpend -> SpendingStatus.OVER_LIMIT
-                else -> SpendingStatus.WITHIN_LIMIT
-            }
-
-            resultList.add(CalendarDayStatus(dayIterator.time, status, amountSpent, yearlySafeToSpend))
-            dayIterator.add(Calendar.DAY_OF_YEAR, 1)
-        }
-        resultList
-    }
+    // --- DELETED: generateYearlyConsistencyData function ---
 
     fun updateCardOrder(from: Int, to: Int) {
         _cardOrder.update { currentList ->
@@ -430,3 +380,4 @@ class DashboardViewModel(
         }
     }
 }
+

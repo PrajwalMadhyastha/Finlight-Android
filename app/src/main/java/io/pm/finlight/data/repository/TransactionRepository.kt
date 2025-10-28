@@ -1,14 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TransactionRepository.kt
-// REASON: FEATURE - Added `removeAllTransactionsForTag` to expose the new DAO
-// method to the ViewModel layer. This is required for the new "Cancel Trip" action.
-// FIX (Race Condition) - The responsibility for applying Travel Mode tags has been
-// centralized here. All insert/update methods now check the active travel plan
-// from SettingsRepository and apply the correct tag atomically, eliminating race
-// conditions between the SmsReceiver and the UI.
-// FEATURE - Added the `getTotalExpensesSince` function. This exposes the new
-// DAO query to the ViewModel layer, enabling the "Spending Velocity" feature on
-// the dashboard.
+// REASON: FEATURE (Consistency) - Added the new `getMonthlyConsistencyData`
+// function. This centralizes the logic for the "Monthly-First" consistency
+// calculation, making it the single source of truth for all heatmaps.
+// FIX (Bug) - The new function uses `(budget.toDouble() / daysInMonth).roundToLong()`
+// to calculate the daily safe-to-spend amount, fixing the integer truncation
+// bug that existed in the old ViewModel implementations.
 // =================================================================================
 package io.pm.finlight
 
@@ -17,6 +14,12 @@ import io.pm.finlight.data.model.MerchantPrediction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
+import java.util.Calendar
+import java.util.Locale
+import kotlin.math.roundToLong
 
 class TransactionRepository(
     private val transactionDao: TransactionDao,
@@ -273,5 +276,75 @@ class TransactionRepository(
     // --- NEW: Expose the function to remove all tags ---
     suspend fun removeAllTransactionsForTag(tagId: Int) {
         transactionDao.removeAllTransactionsForTag(tagId)
+    }
+
+    // --- NEW: Centralized "Monthly-First" Consistency Logic ---
+
+    /**
+     * Helper to check if cal1 is on a day *before* cal2, ignoring time.
+     */
+    private fun isBeforeDay(cal1: Calendar, cal2: Calendar): Boolean {
+        return cal1.get(Calendar.YEAR) < cal2.get(Calendar.YEAR) ||
+                (cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+                        cal1.get(Calendar.DAY_OF_YEAR) < cal2.get(Calendar.DAY_OF_YEAR))
+    }
+
+    /**
+     * Generates the consistency data for a single month, based on that month's budget.
+     * This is the new single source of truth for all heatmap/calendar logic.
+     */
+    fun getMonthlyConsistencyData(year: Int, month: Int): Flow<List<CalendarDayStatus>> {
+        // Calculate start and end of the given month
+        val monthStartCal = Calendar.getInstance().apply {
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month - 1) // Calendar.MONTH is 0-indexed
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val monthEndCal = (monthStartCal.clone() as Calendar).apply {
+            add(Calendar.MONTH, 1)
+            add(Calendar.MILLISECOND, -1)
+        }
+        val daysInMonth = monthStartCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+
+        // Combine the three flows we need
+        return combine(
+            settingsRepository.getOverallBudgetForMonth(year, month),
+            transactionDao.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
+            transactionDao.getFirstTransactionDate()
+        ) { budget, dailyTotals, firstTransactionDate ->
+            val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
+            val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
+
+            // This is the CRITICAL FIX: Use .roundToLong() to prevent integer truncation
+            val safeToSpend = if (budget > 0 && daysInMonth > 0) (budget.toDouble() / daysInMonth).roundToLong() else 0L
+
+            val resultList = mutableListOf<CalendarDayStatus>()
+            val dayIterator = (monthStartCal.clone() as Calendar)
+            val today = Calendar.getInstance()
+
+            for (i in 1..daysInMonth) {
+                dayIterator.set(Calendar.DAY_OF_MONTH, i)
+
+                // Check if day is in the future or before any data exists
+                if (dayIterator.after(today) || (firstDataCal != null && isBeforeDay(dayIterator, firstDataCal))) {
+                    resultList.add(CalendarDayStatus(dayIterator.time, SpendingStatus.NO_DATA, 0L, 0L))
+                    continue
+                }
+
+                val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
+                val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
+                val status = when {
+                    amountSpent == 0L -> SpendingStatus.NO_SPEND
+                    safeToSpend > 0 && amountSpent > safeToSpend -> SpendingStatus.OVER_LIMIT
+                    else -> SpendingStatus.WITHIN_LIMIT // 0 spend vs 0 budget is WITHIN_LIMIT
+                }
+                resultList.add(CalendarDayStatus(dayIterator.time, status, amountSpent, safeToSpend))
+            }
+            resultList // This is the value emitted by the combine
+        }.flowOn(Dispatchers.Default) // Run the calculation on a background thread
     }
 }

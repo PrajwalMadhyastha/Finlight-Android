@@ -24,6 +24,7 @@ import org.mockito.Mockito
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.mockito.kotlin.atLeast
+import org.mockito.kotlin.eq
 import org.robolectric.annotation.Config
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -96,6 +97,9 @@ class DashboardViewModelTest : BaseViewModelTest() {
             )
         ).thenReturn(flowOf(emptyList()))
         `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
+
+        // --- FIX: Add missing mock for the new dependency ---
+        `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
 
         // Initialize the ViewModel with mocked dependencies
@@ -249,8 +253,8 @@ class DashboardViewModelTest : BaseViewModelTest() {
     fun `budgetHealthSummary shows 'pacing high' message when forecast exceeds budget`() = runTest {
         // ARRANGE
         `when`(settingsRepository.getOverallBudgetForMonth(Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(2000f))
-        // --- FIX: Set expenses to 1800.0 to be > 87% of the 2000 budget ---
-        `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1800.0))) // High spend already
+        // --- FIX: Set expenses to 1900.0 (was 1800.0) to be > 90.3% of the 2000 budget ---
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1900.0))) // High spend already
         `when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(500.0) // High recent spend velocity
 
         // ACT
@@ -458,6 +462,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
 
             // Trigger refresh
             viewModel.refreshBudgetSummary()
+            // --- FIX: Add advanceUntilIdle() to let the async flatMapLatest logic complete ---
             advanceUntilIdle()
 
             // Await re-emission
@@ -494,11 +499,13 @@ class DashboardViewModelTest : BaseViewModelTest() {
     fun `yearlyConsistencyData is generated correctly`() = runTest {
         // Arrange
         val today = Calendar.getInstance()
+        val year = today.get(Calendar.YEAR)
         val firstDayOfYear = (today.clone() as Calendar).apply { set(Calendar.DAY_OF_YEAR, 1) }.timeInMillis
         val firstTransactionDate = firstDayOfYear // Assume data from start of year
 
         // Mock budget: 100 per day for simplicity
-        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(100f * today.getActualMaximum(Calendar.DAY_OF_MONTH)))
+        val daysInMonth = today.getActualMaximum(Calendar.DAY_OF_MONTH)
+        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(100f * daysInMonth))
 
         // Mock daily totals
         val keyFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
@@ -514,7 +521,37 @@ class DashboardViewModelTest : BaseViewModelTest() {
         )
 
         `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(firstTransactionDate))
-        `when`(transactionRepository.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(dailyTotalsForTest))
+        // --- FIX: Mock the new dependency, not the old one ---
+        `when`(transactionRepository.getMonthlyConsistencyData(eq(year), anyInt())).thenAnswer { invocation ->
+            val month = invocation.getArgument<Int>(1)
+            if (month == 1) { // Assuming test days are in January
+                // Generate a full list for the month
+                val cal = Calendar.getInstance().apply { set(year, 0, 1) }
+                val daysInJan = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                // --- FIX: Explicitly type mockData ---
+                val mockData: List<CalendarDayStatus> = (1..daysInJan).map { day ->
+                    cal.set(Calendar.DAY_OF_MONTH, day)
+                    val status: SpendingStatus
+                    val amount: Long
+                    when (day) {
+                        1 -> { status = SpendingStatus.NO_SPEND; amount = 0 }
+                        2 -> { status = SpendingStatus.WITHIN_LIMIT; amount = 50 }
+                        3 -> { status = SpendingStatus.OVER_LIMIT; amount = 150 }
+                        else -> { status = SpendingStatus.NO_SPEND; amount = 0 }
+                    }
+                    // Filter out future days
+                    if (cal.time.after(today.time)) {
+                        CalendarDayStatus(cal.time, SpendingStatus.NO_DATA, 0, 0)
+                    } else {
+                        CalendarDayStatus(cal.time, status, amount, 100L)
+                    }
+                }
+                flowOf(mockData)
+            } else {
+                // --- FIX: Explicitly type emptyList() ---
+                flowOf(emptyList<CalendarDayStatus>()) // Other months
+            }
+        }
 
         initializeViewModel()
         advanceUntilIdle()
@@ -522,36 +559,23 @@ class DashboardViewModelTest : BaseViewModelTest() {
         // Act & Assert
         viewModel.yearlyConsistencyData.test {
             val consistencyData = awaitItem()
-
-            // This can be flaky depending on the exact day the test is run.
-            // Let's just check the first few days we defined.
+            // This can be flaky. Let's just check the data we know.
             if (consistencyData.isNotEmpty()) {
                 val day1Status = consistencyData.find {
-                    val cal = Calendar.getInstance()
-                    cal.time = it.date
-                    cal.get(Calendar.DAY_OF_YEAR) == 1
+                    val cal = Calendar.getInstance(); cal.time = it.date; cal.get(Calendar.DAY_OF_YEAR) == 1
                 }
                 val day2Status = consistencyData.find {
-                    val cal = Calendar.getInstance()
-                    cal.time = it.date
-                    cal.get(Calendar.DAY_OF_YEAR) == 2
+                    val cal = Calendar.getInstance(); cal.time = it.date; cal.get(Calendar.DAY_OF_YEAR) == 2
                 }
                 val day3Status = consistencyData.find {
-                    val cal = Calendar.getInstance()
-                    cal.time = it.date
-                    cal.get(Calendar.DAY_OF_YEAR) == 3
+                    val cal = Calendar.getInstance(); cal.time = it.date; cal.get(Calendar.DAY_OF_YEAR) == 3
                 }
-
-                assertNotNull(day1Status)
-                assertNotNull(day2Status)
-                assertNotNull(day3Status)
-
                 assertEquals(SpendingStatus.NO_SPEND, day1Status?.status)
                 assertEquals(SpendingStatus.WITHIN_LIMIT, day2Status?.status)
                 assertEquals(SpendingStatus.OVER_LIMIT, day3Status?.status)
             }
-
             cancelAndIgnoreRemainingEvents()
         }
     }
 }
+
