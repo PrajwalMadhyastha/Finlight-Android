@@ -1,20 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/SearchViewModel.kt
-// REASON: FIX - The ViewModel has been refactored to be fully reactive. It now
-// uses a `flatMapLatest` operator on the UI state flow. This directly calls the
-// new Flow-based DAO method, ensuring that `searchResults` is a "live" stream
-// that automatically updates whenever the search criteria or the underlying
-// transaction data changes, thus fixing the stale data bug.
-// FEATURE - The ViewModel now supports filtering by tags. The UI state includes
-// the list of all tags and the currently selected tag. The logic has been updated
-// to fetch all tags and pass the selected tag's ID to the DAO's search query.
-// FIX - The UI state now includes boolean flags (`showStartDatePicker`, `showEndDatePicker`)
-// to control the visibility of the date pickers. The state management has been
-// hoisted from the screen to the ViewModel to resolve a bug where the pickers
-// would not appear on click. New functions have been added to manage this state.
-// FIX - The logic for setting the end date now adjusts the timestamp to the end
-// of the selected day (23:59:59). This ensures that the date range is inclusive
-// and correctly includes transactions from the selected end date.
+// REASON: FEATURE (Date Display) - The `SearchUiState` data class now
+// includes a `displayDate: String?`. The `init` block has been updated
+// to format the `initialDateMillis` into this user-friendly string
+// (e.g., "October 29, 2025") if it's provided.
 // =================================================================================
 package io.pm.finlight
 
@@ -25,7 +14,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
 
 data class SearchUiState(
     val keyword: String = "",
@@ -40,7 +31,8 @@ data class SearchUiState(
     val tags: List<Tag> = emptyList(),
     val hasSearched: Boolean = false,
     val showStartDatePicker: Boolean = false,
-    val showEndDatePicker: Boolean = false
+    val showEndDatePicker: Boolean = false,
+    val displayDate: String? = null
 )
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -123,7 +115,15 @@ class SearchViewModel(
             cal.set(Calendar.SECOND, 59)
             val end = cal.timeInMillis
 
-            _uiState.update { it.copy(startDate = start, endDate = end) }
+            // --- NEW: Format the date for display ---
+            val dateFormatter = SimpleDateFormat("MMMM d, yyyy", Locale.getDefault())
+            val formattedDate = dateFormatter.format(cal.time)
+
+            _uiState.update { it.copy(
+                startDate = start,
+                endDate = end,
+                displayDate = formattedDate // <-- Set the display date
+            ) }
         }
     }
 

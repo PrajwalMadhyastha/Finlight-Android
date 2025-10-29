@@ -1,11 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SearchScreen.kt
-// REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon by
-// wrapping the screen's content in a Scaffold and adding a TopAppBar. This
-// provides users with contextual guidance and improves UI consistency.
-// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
-// provides a centralized TopAppBar, and this change removes the duplicate,
-// resolving a UI bug.
+// REASON: FEATURE (Date Display) - Added an `AnimatedVisibility` block that
+// displays the `searchUiState.displayDate` in a `GlassPanel` when a user
+// navigates from a heatmap. This provides clear context for the search results.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -34,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.*
@@ -183,6 +181,41 @@ fun SearchScreen(
                 }
             }
         }
+
+        // --- NEW: Display the selected date if provided ---
+        AnimatedVisibility(
+            visible = searchUiState.displayDate != null,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+            ) {
+                GlassPanel {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp, horizontal = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Showing results for",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = searchUiState.displayDate ?: "",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+        // --- END NEW UI ---
 
         HorizontalDivider()
 
