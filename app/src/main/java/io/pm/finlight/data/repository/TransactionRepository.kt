@@ -352,7 +352,8 @@ class TransactionRepository(
                         // Any past day with NO BUDGET is NO_DATA, even if there was no spending.
                         val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
                         val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
-                        resultList.add(CalendarDayStatus(date, SpendingStatus.NO_DATA, amountSpent, 0L))
+                        val status = SpendingStatus.NO_DATA
+                        resultList.add(CalendarDayStatus(date, status, amountSpent, 0L))
                     }
                 }
             } else {

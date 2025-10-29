@@ -86,6 +86,23 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         assertEquals(budget, repository.getOverallBudgetForMonthBlocking(year, month))
     }
 
+    // --- NEW TEST ---
+    @Test
+    fun `saveOverallBudgetForMonth saves to correct dynamic key`() = runTest {
+        val year = 2024
+        val month = 5 // May
+        val budget = 12345f
+        val expectedKey = "overall_budget_2024_05"
+
+        // Act
+        repository.saveOverallBudgetForMonth(year, month, budget)
+
+        // Assert
+        assertTrue(prefs.contains(expectedKey))
+        assertEquals(budget, prefs.getFloat(expectedKey, 0f))
+    }
+    // --- END NEW TEST ---
+
     @Test
     fun `getOverallBudgetForMonth carries over from previous month`() = runTest {
         val cal = Calendar.getInstance()

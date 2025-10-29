@@ -1,6 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/BudgetViewModelTest.kt
 //
+// REASON: FEATURE (Historical Budgets) - The test `saveOverallBudget
+// only saves for the REAL current month` is obsolete and has been replaced with
+// `saveOverallBudget calls repository with correct year and month from calendar`.
+// This new test validates the refactored function that allows saving budgets
+// for any selected month.
+//
 // REASON: REFACTOR (Dynamic Budget) - This test suite is updated to validate
 // the refactored `BudgetViewModel`.
 // - It now mocks the new `TransactionRepository` dependency.
@@ -10,8 +16,10 @@
 //   when no budget is set.
 // - It confirms that `addCategoryBudget` and `getActualSpending` use the
 //   `selectedMonth` state.
-// - It validates the logic of `saveOverallBudget` to ensure it only saves
-//   for the *real* current month.
+//
+// REASON: FIX (Test) - Added new test `monthlySummaries flow emits correct
+// list of budgets` to validate the bug fix for the monthly budget scroller.
+// This test confirms the flow now emits the set budget, not the spent amount.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -42,8 +50,7 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 import org.robolectric.annotation.Config
 import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
+import java.util.*
 import kotlin.math.roundToLong
 import kotlin.test.assertNull
 
@@ -215,36 +222,85 @@ class BudgetViewModelTest : BaseViewModelTest() {
         verify(budgetRepository).getActualSpendingForCategory("Food", 9, 2025)
     }
 
-    // --- NEW: Test refactored saveOverallBudget ---
+    // --- UPDATED TEST ---
     @Test
-    fun `saveOverallBudget only saves for the REAL current month`() = runTest {
+    fun `saveOverallBudget calls repository with correct year and month from calendar`() = runTest {
         // ARRANGE
-        val realCurrentCal = Calendar.getInstance()
-        val realCurrentYear = realCurrentCal.get(Calendar.YEAR)
-        val realCurrentMonth = realCurrentCal.get(Calendar.MONTH)
-
-        // Case 1: Selected month IS the current month
-        viewModel.setSelectedMonth(realCurrentCal)
+        val budgetStr = "12345"
+        val budgetFloat = 12345f
+        val testCalendar = Calendar.getInstance().apply {
+            set(Calendar.YEAR, 2023)
+            set(Calendar.MONTH, Calendar.JULY) // July is 6
+        }
+        val expectedYear = 2023
+        val expectedMonth = 7 // July is 6 + 1
 
         // ACT
-        viewModel.saveOverallBudget("1000")
+        viewModel.saveOverallBudget(budgetStr, testCalendar)
 
         // ASSERT
-        // Should save because selected month == current month
-        verify(settingsRepository).saveOverallBudgetForCurrentMonth(1000f)
-
-        // ARRANGE 2: Selected month IS NOT the current month
-        val pastMonthCal = getCalendar(2024, Calendar.JANUARY)
-        viewModel.setSelectedMonth(pastMonthCal)
-
-        // ACT 2
-        viewModel.saveOverallBudget("2000")
-
-        // ASSERT 2
-        // Logic dictates it should *still* call the save for the *current* month,
-        // effectively ignoring the selected month.
-        verify(settingsRepository).saveOverallBudgetForCurrentMonth(2000f)
+        // Verify the new repository function was called with the *exact* year and month.
+        verify(settingsRepository).saveOverallBudgetForMonth(expectedYear, expectedMonth, budgetFloat)
+        // Verify the old function was NOT called.
+        verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(any())
     }
+
+    // --- NEW: Test for the bug fix in monthlySummaries ---
+    @Test
+    fun `monthlySummaries flow emits correct list of budgets`() = runTest {
+        // Arrange
+        val cal = Calendar.getInstance()
+        val currentYear = cal.get(Calendar.YEAR)
+        val currentMonth = cal.get(Calendar.MONTH) + 1 // e.g., 10 for Oct
+
+        cal.add(Calendar.MONTH, -1)
+        val prevYear = cal.get(Calendar.YEAR)
+        val prevMonth = cal.get(Calendar.MONTH) + 1 // e.g., 9 for Sep
+
+        cal.add(Calendar.MONTH, -1)
+        val twoMonthsAgoYear = cal.get(Calendar.YEAR)
+        val twoMonthsAgoMonth = cal.get(Calendar.MONTH) + 1 // e.g., 8 for Aug
+        val firstTxDate = cal.timeInMillis // Start date is 2 months ago
+
+        val currentBudget = 1000f
+        val prevBudget = 500f
+        // No budget (null) for two months ago
+
+        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(firstTxDate))
+        `when`(settingsRepository.getOverallBudgetForMonth(currentYear, currentMonth)).thenReturn(flowOf(currentBudget))
+        `when`(settingsRepository.getOverallBudgetForMonth(prevYear, prevMonth)).thenReturn(flowOf(prevBudget))
+        `when`(settingsRepository.getOverallBudgetForMonth(twoMonthsAgoYear, twoMonthsAgoMonth)).thenReturn(flowOf(null))
+
+        // Act
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+        advanceUntilIdle() // Let the flow combine and emit
+
+        // Assert
+        viewModel.monthlySummaries.test {
+            val summaries = awaitItem()
+
+            // Summaries are reversed (most recent first)
+            assertEquals(3, summaries.size)
+
+            // 1. Current Month
+            assertEquals(currentYear, summaries[0].first.get(Calendar.YEAR))
+            assertEquals(currentMonth - 1, summaries[0].first.get(Calendar.MONTH)) // Calendar month is 0-indexed
+            assertEquals(currentBudget, summaries[0].second)
+
+            // 2. Previous Month
+            assertEquals(prevYear, summaries[1].first.get(Calendar.YEAR))
+            assertEquals(prevMonth - 1, summaries[1].first.get(Calendar.MONTH))
+            assertEquals(prevBudget, summaries[1].second)
+
+            // 3. Two Months Ago
+            assertEquals(twoMonthsAgoYear, summaries[2].first.get(Calendar.YEAR))
+            assertEquals(twoMonthsAgoMonth - 1, summaries[2].first.get(Calendar.MONTH))
+            assertNull(summaries[2].second) // Should be null
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
 
     // --- Existing Tests (Updated) ---
 
@@ -371,4 +427,3 @@ class BudgetViewModelTest : BaseViewModelTest() {
         verify(budgetRepository).getBudgetById(budgetId)
     }
 }
-

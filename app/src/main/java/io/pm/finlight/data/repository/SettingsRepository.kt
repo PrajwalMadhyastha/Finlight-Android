@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
-// REASON: FEATURE (Backup Time) - Added functions to save and retrieve the
-// timestamp of the last successful backup operation. This provides the persistence
-// layer needed to display this information to the user.
+// REASON: FEATURE (Historical Budgets) - Added the new
+// `saveOverallBudgetForMonth` function. This allows saving a budget to a
+// dynamically-generated preference key (e.g., "overall_budget_2025_09"),
+// enabling the app to store distinct budgets for any given month.
 //
 // REASON: FIX (Consistency) - `getOverallBudgetForMonth` and
 // `getOverallBudgetForMonthBlocking` now return `Float?` instead of `Float`.
@@ -483,6 +484,14 @@ class SettingsRepository(context: Context) {
         val calendar = Calendar.getInstance()
         val year = calendar.get(Calendar.YEAR)
         val month = calendar.get(Calendar.MONTH) + 1
+        val key = getBudgetKey(year, month)
+        prefs.edit {
+            putFloat(key, amount)
+        }
+    }
+
+    // --- NEW: Function to save budget for a specific month ---
+    fun saveOverallBudgetForMonth(year: Int, month: Int, amount: Float) {
         val key = getBudgetKey(year, month)
         prefs.edit {
             putFloat(key, amount)
