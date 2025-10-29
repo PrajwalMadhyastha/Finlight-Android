@@ -7,6 +7,12 @@
 // FIX (Time-bound) - All Calendar instances now explicitly set SECOND and
 // MILLISECOND to their boundaries (0 or 59/999). This prevents calculation
 // errors caused by partial-day time ranges.
+//
+// REASON: BUG FIX (Report Mismatch) - The worker's date logic has been updated.
+// Instead of a literal calendar "yesterday" (00:00 to 23:59), it now calculates
+// a rolling "last 24 hours" window based on the current time. This perfectly
+// matches the logic in `TimePeriodReportScreen` and ensures the number in the
+// notification matches the number in the report it links to.
 // =================================================================================
 package io.pm.finlight
 
@@ -33,20 +39,11 @@ class DailyReportWorker(
                 // --- Define Date Ranges ---
                 val now = Calendar.getInstance()
 
-                // 1. "Yesterday" period
-                val yesterdayEnd = (now.clone() as Calendar).apply {
-                    add(Calendar.DAY_OF_YEAR, -1)
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59) // --- FIX
-                    set(Calendar.MILLISECOND, 999) // --- FIX
-                }.timeInMillis
-                val yesterdayStart = (now.clone() as Calendar).apply {
-                    add(Calendar.DAY_OF_YEAR, -1)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0) // --- FIX
-                    set(Calendar.MILLISECOND, 0) // --- FIX
+                // 1. "Last 24 Hours" period (The Fix)
+                // This now matches the logic in TimePeriodReportScreen.kt for TimePeriod.DAILY
+                val reportEndTime = now.timeInMillis
+                val reportStartTime = (now.clone() as Calendar).apply {
+                    add(Calendar.HOUR_OF_DAY, -24)
                 }.timeInMillis
 
                 // 2. "Previous 7 Days" period (for calculating the average)
@@ -66,12 +63,14 @@ class DailyReportWorker(
                 }.timeInMillis
 
                 // --- Fetch Data ---
-                val yesterdaySummary = transactionDao.getFinancialSummaryForRange(yesterdayStart, yesterdayEnd)
-                val yesterdayExpenses = yesterdaySummary?.totalExpenses ?: 0.0
+                // --- UPDATED: Use the new rolling 24-hour window ---
+                val reportSummary = transactionDao.getFinancialSummaryForRange(reportStartTime, reportEndTime)
+                val yesterdayExpenses = reportSummary?.totalExpenses ?: 0.0
 
                 val weeklyAverage = transactionDao.getAverageDailySpendingForRange(sevenDaysAgoStart, sevenDaysAgoEnd) ?: 0.0
 
-                val topCategories = transactionDao.getTopSpendingCategoriesForRange(yesterdayStart, yesterdayEnd)
+                // --- UPDATED: Use the new rolling 24-hour window ---
+                val topCategories = transactionDao.getTopSpendingCategoriesForRange(reportStartTime, reportEndTime)
 
                 // --- Apply Contextual Logic ---
                 val title = when {
