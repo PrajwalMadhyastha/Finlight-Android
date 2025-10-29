@@ -19,6 +19,9 @@
 //    `amountSpent` was 0. This fixes the "green day" bug.
 // 2. If `budget == 0f`, any spending (`amountSpent > 0`) is now correctly
 //    marked as `OVER_LIMIT` (red). This fixes the original "blue day" bug.
+//
+// REASON: DEBUG (Consistency) - Added detailed logging to trace the daily
+// calculation for the heatmap.
 // =================================================================================
 package io.pm.finlight
 
@@ -41,6 +44,9 @@ class TransactionRepository(
     private val settingsRepository: SettingsRepository,
     private val tagRepository: TagRepository
 ) {
+
+    // --- NEW: Add log tag for debugging ---
+    private val TAG = "ConsistencyDebug"
 
     // --- NEW: Function for Spending Velocity feature ---
     suspend fun getTotalExpensesSince(startDate: Long): Double {
@@ -309,6 +315,9 @@ class TransactionRepository(
      * This is the new single source of truth for all heatmap/calendar logic.
      */
     fun getMonthlyConsistencyData(year: Int, month: Int): Flow<List<CalendarDayStatus>> {
+        // --- DEBUG: Log the year and month being processed ---
+        Log.d(TAG, "Processing $year-$month")
+
         // Calculate start and end of the given month
         val monthStartCal = Calendar.getInstance().apply {
             set(Calendar.YEAR, year)
@@ -340,6 +349,8 @@ class TransactionRepository(
 
             // --- UPDATED LOGIC (Fix for "green day" and "blue day" bugs) ---
             if (budget == null) {
+                // --- DEBUG: Log budget and safeToSpend ---
+                Log.d(TAG, "$year-$month: Budget is NULL. safeToSpend = 0")
                 // CASE 1: NO BUDGET SET (null)
                 // All past days are NO_DATA (gray).
                 for (i in 1..daysInMonth) {
@@ -352,12 +363,17 @@ class TransactionRepository(
                         // Any past day with NO BUDGET is NO_DATA, even if there was no spending.
                         val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
                         val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
-                        resultList.add(CalendarDayStatus(date, SpendingStatus.NO_DATA, amountSpent, 0L))
+                        val status = SpendingStatus.NO_DATA
+                        resultList.add(CalendarDayStatus(date, status, amountSpent, 0L))
+                        // --- DEBUG: Log daily calculation ---
+                        Log.d(TAG, "$dateKey: amountSpent=$amountSpent, status=$status")
                     }
                 }
             } else {
                 // CASE 2: A BUDGET IS SET (e.g., 0f or 145000f)
                 val safeToSpend = if (budget > 0 && daysInMonth > 0) (budget.toDouble() / daysInMonth).roundToLong() else 0L
+                // --- DEBUG: Log budget and safeToSpend ---
+                Log.d(TAG, "$year-$month: Budget is $budget. safeToSpend = $safeToSpend")
 
                 for (i in 1..daysInMonth) {
                     dayIterator.set(Calendar.DAY_OF_MONTH, i)
@@ -380,10 +396,11 @@ class TransactionRepository(
                         else -> SpendingStatus.WITHIN_LIMIT // Spent <= budget (and not 0) (blue)
                     }
                     resultList.add(CalendarDayStatus(date, status, amountSpent, safeToSpend))
+                    // --- DEBUG: Log daily calculation ---
+                    Log.d(TAG, "$dateKey: amountSpent=$amountSpent, status=$status")
                 }
             }
             resultList // This is the value emitted by the combine
         }.flowOn(Dispatchers.Default) // Run the calculation on a background thread
     }
 }
-

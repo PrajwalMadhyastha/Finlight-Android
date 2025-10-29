@@ -10,6 +10,11 @@
 // to accept a `searchQuery` parameter. This adds a `LIKE` clause to each query,
 // enabling efficient, real-time searching within the selected dimension directly
 // at the database level.
+//
+// REASON: FIX (Consistency) - The `getDailySpendingForDateRange` query was
+// incorrectly grouping by the full `date` timestamp instead of the formatted
+// date string. This caused it to return individual transactions instead of a
+// daily sum. The `GROUP BY` clause has been corrected to use the formatted date.
 // =================================================================================
 package io.pm.finlight
 
@@ -771,7 +776,7 @@ interface TransactionDao {
             SUM(amount) as totalAmount
         FROM AtomicExpenses
         WHERE date BETWEEN :startDate AND :endDate
-        GROUP BY date
+        GROUP BY strftime('%Y-%m-%d', date / 1000, 'unixepoch', 'localtime')
         ORDER BY date ASC
     """)
     fun getDailySpendingForDateRange(startDate: Long, endDate: Long): Flow<List<DailyTotal>>
