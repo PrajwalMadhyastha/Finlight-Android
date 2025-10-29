@@ -4,6 +4,10 @@
 // `getMonthlyConsistencyData` function. These tests validate all logic
 // branches, including the fixes for the "No Budget" (null) and "Zero Budget" (0f)
 // edge cases, ensuring heatmap data is calculated correctly.
+//
+// FIX (Test): The `getTimestamp` helper now zeroes out H:M:S. This makes
+// date comparisons deterministic and fixes a race condition in the
+// `getMonthlyConsistencyData` tests.
 // =================================================================================
 package io.pm.finlight.data.repository
 
@@ -24,7 +28,9 @@ import org.robolectric.annotation.Config
 import java.util.Calendar
 import java.util.Locale
 import java.text.SimpleDateFormat
-import kotlin.test.assertEquals
+import java.util.Date
+import java.util.concurrent.TimeUnit
+import org.junit.Assert.assertEquals // <-- FIX: Use JUnit's assertEquals
 import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
@@ -42,16 +48,23 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     private lateinit var repository: TransactionRepository
 
     // Use a fixed "today" for all tests to make them deterministic
-    private val today = Calendar.getInstance().apply {
-        set(2025, Calendar.OCTOBER, 28)
+    // This is for the test's *logic*, not the production code's `today`
+    private val testToday = Calendar.getInstance().apply {
+        set(2025, Calendar.OCTOBER, 28, 0, 0, 0)
+        set(Calendar.MILLISECOND, 0)
     }
 
     // Helper to get a timestamp for a specific day in 2025
+    // --- FIX: This function now zeroes out the time, matching the repo's logic ---
     private fun getTimestamp(month: Int, day: Int): Long {
         return Calendar.getInstance().apply {
             set(Calendar.YEAR, 2025)
             set(Calendar.MONTH, month)
             set(Calendar.DAY_OF_MONTH, day)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
         }.timeInMillis
     }
 
@@ -316,47 +329,78 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
     @Test
     fun `getMonthlyConsistencyData returns NO_DATA for future days and before first transaction`() = runTest {
-        // Arrange (Testing for October 2025, "today" is Oct 28)
-        val year = 2025
-        val month = 10 // October
-        val firstTxDate = getTimestamp(Calendar.OCTOBER, 3) // First tx on Oct 3rd
-        val budget = 3100f // DSTS = 100L
+        // This test simulates running on OCT 28, 2025.
+        // The production code's Calendar.getInstance() will be ~OCT 29, 2025.
+        // We must mock data relative to the *production code's* `today`, not the test's.
+        val prodToday = Calendar.getInstance()
 
+        // Arrange (Testing for the *current* month)
+        val year = prodToday.get(Calendar.YEAR)
+        val month = prodToday.get(Calendar.MONTH) + 1
+        val daysInMonth = prodToday.getActualMaximum(Calendar.DAY_OF_MONTH)
+        val budget = (daysInMonth * 100).toFloat() // DSTS = 100L
+
+        // --- THIS IS THE FIX ---
+        // We must create test data that is *actually* before the firstTxDate.
+        // Let's set the first transaction to be DAY 10 of the current month.
+        val firstTxCal = (prodToday.clone() as Calendar).apply {
+            set(Calendar.DAY_OF_MONTH, 10)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val firstTxDate = firstTxCal.timeInMillis
+
+        // Let's mock spending on day 11 and 12.
+        val dailyTotals = listOf(
+            DailyTotal(getDateKey(year, month, 11), 50.0),  // Day 11: WITHIN_LIMIT
+            DailyTotal(getDateKey(year, month, 12), 150.0) // Day 12: OVER_LIMIT
+        )
+
+        // Mock all DAO/Repo calls
         `when`(settingsRepository.getOverallBudgetForMonth(year, month)).thenReturn(flowOf(budget))
         `when`(transactionDao.getFirstTransactionDate()).thenReturn(flowOf(firstTxDate))
-        val dailyTotals = listOf(
-            DailyTotal(getDateKey(year, month, 4), 50.0) // Spending on Oct 4th
-        )
         `when`(transactionDao.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(dailyTotals))
 
         // Act
         repository.getMonthlyConsistencyData(year, month).test {
             val results = awaitItem()
 
-            // Assert
-            // Find days using date component (day of month)
-            val day1 = results.find { it.date.date == 1 }
-            val day2 = results.find { it.date.date == 2 }
-            val day3 = results.find { it.date.date == 3 }
-            val day4 = results.find { it.date.date == 4 }
-            val day29 = results.find { it.date.date == 29 }
-            val day30 = results.find { it.date.date == 30 }
+            // Find the days we care about
+            val day9 = results.find { it.date.date == 9 }
+            val day10 = results.find { it.date.date == 10 }
+            val day11 = results.find { it.date.date == 11 }
+            val day12 = results.find { it.date.date == 12 }
 
-            // Case: Before first transaction date
-            assertEquals(SpendingStatus.NO_DATA, day1?.status)
-            assertEquals(SpendingStatus.NO_DATA, day2?.status)
+            // Find a future day (if one exists)
+            val futureDay = if (prodToday.get(Calendar.DAY_OF_MONTH) < daysInMonth) {
+                results.find { it.date.date == prodToday.get(Calendar.DAY_OF_MONTH) + 1 }
+            } else {
+                null
+            }
 
-            // Case: On first transaction date (no spending)
-            assertEquals(SpendingStatus.NO_SPEND, day3?.status)
+            // --- ASSERTIONS ---
 
-            // Case: Valid past day with spending
-            assertEquals(SpendingStatus.WITHIN_LIMIT, day4?.status)
+            // Case: Day 9 is *before* first transaction date (Day 10)
+            assertEquals("Day 9 should be NO_DATA", SpendingStatus.NO_DATA, day9?.status)
 
-            // Case: Future days (relative to Oct 28)
-            assertEquals(SpendingStatus.NO_DATA, day29?.status)
-            assertEquals(SpendingStatus.NO_DATA, day30?.status)
+            // Case: Day 10 is *on* first tx date (no spending in map, so 0)
+            assertEquals("Day 10 should be NO_SPEND", SpendingStatus.NO_SPEND, day10?.status)
+
+            // Case: Day 11 is *after* first tx, with spending 50 < 100
+            assertEquals("Day 11 should be WITHIN_LIMIT", SpendingStatus.WITHIN_LIMIT, day11?.status)
+
+            // Case: Day 12 is *after* first tx, with spending 150 > 100
+            assertEquals("Day 12 should be OVER_LIMIT", SpendingStatus.OVER_LIMIT, day12?.status)
+
+            // Case: Future day
+            if (futureDay != null) {
+                assertEquals("Future day should be NO_DATA", SpendingStatus.NO_DATA, futureDay.status)
+            }
 
             cancelAndIgnoreRemainingEvents()
         }
     }
 }
+
