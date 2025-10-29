@@ -55,6 +55,27 @@ class DashboardViewModelTest : BaseViewModelTest() {
 
     private lateinit var viewModel: DashboardViewModel
 
+    // --- List of possible messages from ViewModel for assertions ---
+    private val goodPacingMessages = listOf(
+        "Excellent pacing this month!", "On track with room to spare", "Well within budget, great job",
+        "Your budget is looking healthy", "Consistently great spending", "Keep this momentum going!",
+        "Smooth sailing this month", "You're building a nice buffer", "Perfectly on track", "Another great spending day"
+    )
+    private val highPacingMessages = listOf(
+        "Pacing a bit high for this month", "Time to ease up on spending", "Still trending over budget",
+        "Let's try to slow things down", "Watch the spending for a bit", "Heads up: pacing is still high",
+        "A bit too fast for this month", "Let's pump the brakes slightly", "Budget is feeling the pressure", "Trending to overspend"
+    )
+    private val allPossibleMessages = goodPacingMessages + highPacingMessages + listOf(
+        "Nice recovery! You're on pace now", "Spending slowed, looking good", "Back on track for the month!",
+        "Great adjustment on spending", "You've course-corrected perfectly", "Well done reining it in",
+        "Pacing is now under control", "The rest of the month looks good", "Good save! Keep it up",
+        "Back within your monthly plan", "Spending has picked up recently", "Careful, you're trending over",
+        "Watch the recent spending", "You were on track, pace has increased", "A recent slip-up in spending",
+        "Let's get back to that great pace", "Trending high the last few days", "A little adjustment will help",
+        "Let's avoid a spending spree", "Back on the brakes for a bit"
+    )
+
     @Before
     override fun setup() {
         super.setup() // Initializes mocks and sets the main dispatcher
@@ -215,11 +236,11 @@ class DashboardViewModelTest : BaseViewModelTest() {
 
         // ACT
         initializeViewModel()
-        advanceUntilIdle()
-
 
         // ASSERT
         viewModel.budgetHealthSummary.test {
+            // FIX: Advance time INSIDE the test block to resolve the deadlock
+            advanceUntilIdle()
             assertEquals("Set a budget to see insights", awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
@@ -234,17 +255,13 @@ class DashboardViewModelTest : BaseViewModelTest() {
 
         // ACT
         initializeViewModel()
-        advanceUntilIdle()
 
         // ASSERT
         viewModel.budgetHealthSummary.test {
-            val possibleMessages = listOf(
-                "Excellent pacing this month!", "On track with room to spare", "Well within budget, great job",
-                "Your budget is looking healthy", "Consistently great spending", "Keep this momentum going!",
-                "Smooth sailing this month", "You're building a nice buffer", "Perfectly on track", "Another great spending day"
-            )
+            // FIX: Advance time INSIDE the test block to resolve the deadlock
+            advanceUntilIdle()
             val result = awaitItem()
-            assertTrue("Summary message '$result' should be one of the 'good' phrases.", result in possibleMessages)
+            assertTrue("Summary message '$result' should be one of the 'good' phrases.", result in goodPacingMessages)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -253,24 +270,18 @@ class DashboardViewModelTest : BaseViewModelTest() {
     fun `budgetHealthSummary shows 'pacing high' message when forecast exceeds budget`() = runTest {
         // ARRANGE
         `when`(settingsRepository.getOverallBudgetForMonth(Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(2000f))
-        // --- FIX: Set expenses to 1900.0 (was 1800.0) to be > 90.3% of the 2000 budget ---
         `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1900.0))) // High spend already
         `when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(500.0) // High recent spend velocity
 
         // ACT
         initializeViewModel()
-        advanceUntilIdle()
 
         // ASSERT
         viewModel.budgetHealthSummary.test {
-            val possibleMessages = listOf(
-                "Pacing a bit high for this month", "Time to ease up on spending", "Still trending over budget",
-                "Let's try to slow things down", "Watch the spending for a bit", "Heads up: pacing is still high",
-                "A bit too fast for this month", "Let's pump the brakes slightly", "Budget is feeling the pressure", "Trending to overspend"
-            )
-
+            // FIX: Advance time INSIDE the test block to resolve the deadlock
+            advanceUntilIdle()
             val result = awaitItem()
-            assertTrue("Summary message '$result' should be one of the 'pacing high' phrases.", result in possibleMessages)
+            assertTrue("Summary message '$result' should be one of the 'pacing high' phrases.", result in highPacingMessages)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -368,8 +379,8 @@ class DashboardViewModelTest : BaseViewModelTest() {
 
         // Assert
         viewModel.visibleCards.test {
-            // The combine operator can emit intermediate values. We care about the final, stable state.
-            // The initial state is emptyList(), then it combines to produce the correct list.
+            // FIX: Advance time INSIDE the test block to resolve the deadlock
+            advanceUntilIdle()
             val finalState = awaitItem()
             assertEquals(listOf(DashboardCardType.RECENT_TRANSACTIONS, DashboardCardType.ACCOUNTS_CAROUSEL), finalState)
             cancelAndIgnoreRemainingEvents()
@@ -446,32 +457,31 @@ class DashboardViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `refreshBudgetSummary triggers recalculation of budgetHealthSummary`() = runTest {
+    fun `refreshBudgetSummary triggers recalculation of budgetHealthSummary`() = runTest(testDispatcher) {
         // Arrange
         `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(30000f))
         `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1000.0)))
         // First call returns 100, second call (after refresh) returns 200
         `when`(transactionRepository.getTotalExpensesSince(anyLong())).thenReturn(100.0).thenReturn(200.0)
         initializeViewModel()
-        advanceUntilIdle()
 
         // Act & Assert
         viewModel.budgetHealthSummary.test {
-            // Initial emission
-            awaitItem()
-
-            // Trigger refresh
-            viewModel.refreshBudgetSummary()
-            // --- FIX: Add advanceUntilIdle() to let the async flatMapLatest logic complete ---
+            // 1. FIX: Advance time INSIDE the test block to resolve the deadlock
             advanceUntilIdle()
+            val initialMessage = awaitItem()
+            assertTrue("Initial message '$initialMessage' should be valid", allPossibleMessages.contains(initialMessage))
 
-            // Await re-emission
-            // The value may or may not change depending on the random message,
-            // but the fact that it emits again proves the trigger worked.
-            awaitItem()
+            // 2. Trigger refresh
+            viewModel.refreshBudgetSummary()
+            advanceUntilIdle() // Let the refresh logic run.
+
+            // 3. Use expectMostRecentItem() to handle the conflation case.
+            val finalMessage = expectMostRecentItem()
+            assertTrue("Final message '$finalMessage' should be valid", allPossibleMessages.contains(finalMessage))
         }
 
-        // Verify that the dependency was called multiple times, once for init and once for refresh.
+        // 4. The verification is the most important part, proving the logic re-ran.
         verify(transactionRepository, atLeast(2)).getTotalExpensesSince(anyLong())
     }
 
@@ -488,6 +498,8 @@ class DashboardViewModelTest : BaseViewModelTest() {
 
         // Assert
         viewModel.recentTransactions.test {
+            // FIX: Advance time INSIDE the test block to resolve the deadlock
+            advanceUntilIdle()
             val result = awaitItem()
             assertEquals(1, result.size)
             assertEquals("Amazon", result.first().transaction.description)
@@ -554,10 +566,11 @@ class DashboardViewModelTest : BaseViewModelTest() {
         }
 
         initializeViewModel()
-        advanceUntilIdle()
 
         // Act & Assert
         viewModel.yearlyConsistencyData.test {
+            // FIX: Advance time INSIDE the test block to resolve the deadlock
+            advanceUntilIdle()
             val consistencyData = awaitItem()
             // This can be flaky. Let's just check the data we know.
             if (consistencyData.isNotEmpty()) {
