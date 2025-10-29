@@ -9,6 +9,11 @@
 // - `OverallBudgetHub` is updated to accept a nullable `Float?` and
 //   correctly displays "Not Set" when the budget is `null`.
 // - `EditOverallBudgetDialog` is also updated to handle the nullable budget.
+//
+// REASON: FIX (Bug) - The `MonthlySummaryHeader` has been refactored to consume
+// the new `List<Pair<Calendar, Float?>>` from the ViewModel. It now correctly
+// displays the *budget* for each month (or "Not Set") instead of the *spent*
+// amount, fixing the bug reported by the user.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -52,7 +57,6 @@ import androidx.navigation.NavController
 import io.pm.finlight.Budget
 import io.pm.finlight.BudgetViewModel
 import io.pm.finlight.BudgetWithSpending
-import io.pm.finlight.MonthlySummaryItem
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
@@ -65,6 +69,16 @@ import kotlin.math.roundToLong
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
+
+// --- NEW: Copied from TransactionListScreen for the header ---
+private fun formatAmountInLakhs(amount: Long): String {
+    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+        .apply { maximumFractionDigits = 0 }
+    if (amount < 1000) return currencyFormat.format(amount)
+    if (amount < 100000) return "${currencyFormat.format(amount / 1000)}K"
+    return "${NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 2 }.format(amount / 100000.0)}L"
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -192,25 +206,20 @@ fun BudgetScreen(
     }
 }
 
-// --- NEW: Copied from TransactionListScreen.kt ---
+// --- REFACTORED: This composable is now updated to show budget, not spending ---
 @Composable
 private fun MonthlySummaryHeader(
     selectedMonth: Calendar,
-    monthlySummaries: List<MonthlySummaryItem>,
+    monthlySummaries: List<Pair<Calendar, Float?>>,
     onMonthSelected: (Calendar) -> Unit
 ) {
     val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
     val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
     var showMonthScroller by remember { mutableStateOf(false) }
 
-    val currencyFormat = remember {
-        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            .apply { maximumFractionDigits = 0 }
-    }
-
-    val selectedTabIndex = monthlySummaries.indexOfFirst {
-        it.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
-                it.calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
+    val selectedTabIndex = monthlySummaries.indexOfFirst { (calendar, _) ->
+        calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
+                calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
     }.coerceAtLeast(0)
 
     Column(
@@ -251,26 +260,29 @@ private fun MonthlySummaryHeader(
                 indicator = {},
                 divider = {}
             ) {
-                monthlySummaries.forEach { summaryItem ->
-                    val isSelected = summaryItem.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
-                            summaryItem.calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
+                monthlySummaries.forEach { (calendar, totalBudget) ->
+                    val isSelected = calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
+                            calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
                     Tab(
                         selected = isSelected,
                         onClick = {
-                            onMonthSelected(summaryItem.calendar)
+                            onMonthSelected(calendar)
                             showMonthScroller = false
                         },
                         text = {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = monthFormat.format(summaryItem.calendar.time),
+                                    text = monthFormat.format(calendar.time),
                                     style = if (isSelected) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
+                                // --- THIS IS THE FIX ---
+                                val budgetText = totalBudget?.let { formatAmountInLakhs(it.roundToLong()) } ?: "Not Set"
+                                val budgetColor = if (totalBudget != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 Text(
-                                    text = formatAmountInLakhs(summaryItem.totalSpent.roundToLong()),
+                                    text = budgetText,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isSelected) budgetColor else budgetColor.copy(alpha = 0.7f)
                                 )
                             }
                         }
@@ -279,15 +291,6 @@ private fun MonthlySummaryHeader(
             }
         }
     }
-}
-
-// --- NEW: Copied from TransactionListScreen.kt ---
-private fun formatAmountInLakhs(amount: Long): String {
-    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-        .apply { maximumFractionDigits = 0 }
-    if (amount < 1000) return currencyFormat.format(amount)
-    if (amount < 100000) return "${currencyFormat.format(amount / 1000)}K"
-    return "${NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 2 }.format(amount / 100000.0)}L"
 }
 
 
@@ -531,3 +534,4 @@ fun EditOverallBudgetDialog(
         containerColor = popupContainerColor
     )
 }
+

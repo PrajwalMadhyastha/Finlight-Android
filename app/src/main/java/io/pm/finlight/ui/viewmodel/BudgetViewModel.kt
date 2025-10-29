@@ -21,6 +21,11 @@
 //
 // REASON: FIX (Build) - Corrected `receiveAsStateFlow()` to `receiveAsFlow()`
 // to resolve an "Unresolved reference" compilation error.
+//
+// REASON: FIX (Bug) - The `monthlySummaries` flow was incorrectly showing
+// total *spent* for each month. It has been rewritten to be a
+// `StateFlow<List<Pair<Calendar, Float?>>>` that correctly fetches the
+// *budget* for each month from the SettingsRepository, including carry-over logic.
 // =================================================================================
 package io.pm.finlight
 
@@ -51,8 +56,7 @@ class BudgetViewModel(
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
     val selectedMonth: StateFlow<Calendar> = _selectedMonth.asStateFlow()
 
-    // --- NEW: Add monthly summaries for the scroller ---
-    val monthlySummaries: StateFlow<List<MonthlySummaryItem>>
+    val monthlySummaries: StateFlow<List<Pair<Calendar, Float?>>>
 
     // --- REFACTORED: All flows are now dynamic based on selectedMonth ---
     val budgetsForSelectedMonth: StateFlow<List<BudgetWithSpending>>
@@ -62,31 +66,35 @@ class BudgetViewModel(
     val totalSpendingForSelectedMonth: StateFlow<Long>
 
     init {
-        // --- NEW: Copied from TransactionViewModel ---
+        // --- REFACTORED: Logic to fetch monthly budgets for the scroller ---
         monthlySummaries = transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
             val startDate = firstTransactionDate ?: System.currentTimeMillis()
+            val monthList = mutableListOf<Calendar>()
+            val startCal = Calendar.getInstance().apply { timeInMillis = startDate; set(Calendar.DAY_OF_MONTH, 1) }
+            val endCal = Calendar.getInstance()
 
-            transactionRepository.getMonthlyTrends(startDate)
-                .map { trends ->
-                    val dateFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-                    val monthMap = trends.associate {
-                        val cal = Calendar.getInstance().apply { time = dateFormat.parse(it.monthYear) ?: Date() }
-                        (cal.get(Calendar.YEAR) * 100 + cal.get(Calendar.MONTH)) to it.totalExpenses
-                    }
+            while (startCal.before(endCal) || (startCal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && startCal.get(Calendar.MONTH) == endCal.get(Calendar.MONTH))) {
+                monthList.add(startCal.clone() as Calendar)
+                startCal.add(Calendar.MONTH, 1)
+            }
 
-                    val monthList = mutableListOf<MonthlySummaryItem>()
-                    val startCal = Calendar.getInstance().apply { timeInMillis = startDate }
-                    startCal.set(Calendar.DAY_OF_MONTH, 1)
-                    val endCal = Calendar.getInstance()
-
-                    while (startCal.before(endCal) || (startCal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && startCal.get(Calendar.MONTH) == endCal.get(Calendar.MONTH))) {
-                        val key = startCal.get(Calendar.YEAR) * 100 + startCal.get(Calendar.MONTH)
-                        val spent = monthMap[key] ?: 0.0
-                        monthList.add(MonthlySummaryItem(calendar = startCal.clone() as Calendar, totalSpent = spent))
-                        startCal.add(Calendar.MONTH, 1)
-                    }
-                    monthList.reversed()
+            // Create a list of flows, one for each month's budget
+            val budgetFlows: List<Flow<Pair<Calendar, Float?>>> = monthList.map { cal ->
+                val year = cal.get(Calendar.YEAR)
+                val month = cal.get(Calendar.MONTH) + 1
+                settingsRepository.getOverallBudgetForMonth(year, month).map { budget ->
+                    Pair(cal, budget) // Pair the calendar with its fetched budget
                 }
+            }
+
+            if (budgetFlows.isEmpty()) {
+                flowOf(emptyList())
+            } else {
+                // Combine all budget flows into a single flow that emits the full list
+                combine(budgetFlows) { summaries ->
+                    summaries.toList().reversed() // Reverse to show most recent first
+                }
+            }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
@@ -250,4 +258,3 @@ class BudgetViewModel(
             }
         }
 }
-
