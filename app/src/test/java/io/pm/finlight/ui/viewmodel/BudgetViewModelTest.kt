@@ -12,6 +12,10 @@
 //   `selectedMonth` state.
 // - It validates the logic of `saveOverallBudget` to ensure it only saves
 //   for the *real* current month.
+//
+// REASON: FIX (Test) - Added new test `monthlySummaries flow emits correct
+// list of budgets` to validate the bug fix for the monthly budget scroller.
+// This test confirms the flow now emits the set budget, not the spent amount.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -246,6 +250,63 @@ class BudgetViewModelTest : BaseViewModelTest() {
         verify(settingsRepository).saveOverallBudgetForCurrentMonth(2000f)
     }
 
+    // --- NEW: Test for the bug fix in monthlySummaries ---
+    @Test
+    fun `monthlySummaries flow emits correct list of budgets`() = runTest {
+        // Arrange
+        val cal = Calendar.getInstance()
+        val currentYear = cal.get(Calendar.YEAR)
+        val currentMonth = cal.get(Calendar.MONTH) + 1 // e.g., 10 for Oct
+
+        cal.add(Calendar.MONTH, -1)
+        val prevYear = cal.get(Calendar.YEAR)
+        val prevMonth = cal.get(Calendar.MONTH) + 1 // e.g., 9 for Sep
+
+        cal.add(Calendar.MONTH, -1)
+        val twoMonthsAgoYear = cal.get(Calendar.YEAR)
+        val twoMonthsAgoMonth = cal.get(Calendar.MONTH) + 1 // e.g., 8 for Aug
+        val firstTxDate = cal.timeInMillis // Start date is 2 months ago
+
+        val currentBudget = 1000f
+        val prevBudget = 500f
+        // No budget (null) for two months ago
+
+        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(firstTxDate))
+        `when`(settingsRepository.getOverallBudgetForMonth(currentYear, currentMonth)).thenReturn(flowOf(currentBudget))
+        `when`(settingsRepository.getOverallBudgetForMonth(prevYear, prevMonth)).thenReturn(flowOf(prevBudget))
+        `when`(settingsRepository.getOverallBudgetForMonth(twoMonthsAgoYear, twoMonthsAgoMonth)).thenReturn(flowOf(null))
+
+        // Act
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+        advanceUntilIdle() // Let the flow combine and emit
+
+        // Assert
+        viewModel.monthlySummaries.test {
+            val summaries = awaitItem()
+
+            // Summaries are reversed (most recent first)
+            assertEquals(3, summaries.size)
+
+            // 1. Current Month
+            assertEquals(currentYear, summaries[0].first.get(Calendar.YEAR))
+            assertEquals(currentMonth - 1, summaries[0].first.get(Calendar.MONTH)) // Calendar month is 0-indexed
+            assertEquals(currentBudget, summaries[0].second)
+
+            // 2. Previous Month
+            assertEquals(prevYear, summaries[1].first.get(Calendar.YEAR))
+            assertEquals(prevMonth - 1, summaries[1].first.get(Calendar.MONTH))
+            assertEquals(prevBudget, summaries[1].second)
+
+            // 3. Two Months Ago
+            assertEquals(twoMonthsAgoYear, summaries[2].first.get(Calendar.YEAR))
+            assertEquals(twoMonthsAgoMonth - 1, summaries[2].first.get(Calendar.MONTH))
+            assertNull(summaries[2].second) // Should be null
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+
     // --- Existing Tests (Updated) ---
 
     @Test
@@ -371,4 +432,3 @@ class BudgetViewModelTest : BaseViewModelTest() {
         verify(budgetRepository).getBudgetById(budgetId)
     }
 }
-
