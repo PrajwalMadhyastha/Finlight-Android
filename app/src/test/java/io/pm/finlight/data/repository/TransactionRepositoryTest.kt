@@ -402,5 +402,17 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             cancelAndIgnoreRemainingEvents()
         }
     }
-}
 
+    @Test
+    fun `updateTransactionType calls DAO`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newType = "income"
+
+        // Act
+        repository.updateTransactionType(transactionId, newType)
+
+        // Assert
+        verify(transactionDao).updateTransactionType(transactionId, newType)
+    }
+}

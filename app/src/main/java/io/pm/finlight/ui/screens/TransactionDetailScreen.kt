@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TransactionDetailScreen.kt
-// REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon into
-// the TopAppBar to provide users with contextual guidance on how to edit and
-// manage a transaction's details.
+// REASON: FEATURE (Transaction Type Toggle) - Completed the feature by
+// wiring the onTypeSelected lambda in the TransactionPropertiesCard to the
+// viewModel.updateTransactionType function. This connects the UI switch
+// to the backend logic.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -82,6 +83,8 @@ import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.utils.BankLogoHelper
+// --- NEW: Import the public TransactionTypeToggle ---
+import io.pm.finlight.ui.screens.TransactionTypeToggle
 
 private const val TAG = "DetailScreenDebug"
 
@@ -335,14 +338,28 @@ fun TransactionDetailScreen(
                         }
                     }
 
+                    // --- NEW: Transaction Properties Card ---
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            AccountCardWithSwitch(
+                            TransactionPropertiesCard(
                                 details = details,
-                                onAccountClick = { activeSheetContent = SheetContent.Account },
-                                onExcludeToggled = { isChecked ->
-                                    viewModel.updateTransactionExclusion(details.transaction.id, !isChecked)
+                                onTypeSelected = { newType ->
+                                    // --- UPDATED: Connect the UI to the ViewModel ---
+                                    viewModel.updateTransactionType(details.transaction.id, newType)
+                                },
+                                onExcludeToggled = { newIsExcludedValue ->
+                                    viewModel.updateTransactionExclusion(details.transaction.id, newIsExcludedValue)
                                 }
+                            )
+                        }
+                    }
+
+                    // --- UPDATED: Renamed to AccountCard ---
+                    item {
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            AccountCard(
+                                details = details,
+                                onAccountClick = { activeSheetContent = SheetContent.Account }
                             )
                         }
                     }
@@ -611,6 +628,64 @@ fun TransactionDetailScreen(
         }
     }
 }
+
+// --- NEW: Card for Transaction Properties ---
+@Composable
+private fun TransactionPropertiesCard(
+    details: TransactionDetails,
+    onTypeSelected: (String) -> Unit,
+    onExcludeToggled: (Boolean) -> Unit
+) {
+    GlassPanel {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp), // Padding applied to items instead
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // 1. Add the TransactionTypeToggle (with its own padding)
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                TransactionTypeToggle(
+                    selectedType = details.transaction.transactionType,
+                    onTypeSelected = onTypeSelected,
+                    enabled = !details.transaction.isSplit
+                )
+            }
+
+            // 2. Add the divider
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+            // 3. Add the "Exclude" switch
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onExcludeToggled(!details.transaction.isExcluded) } // Click row to toggle
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Exclude from Totals",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "Will not affect budgets or reports.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Switch(
+                    checked = details.transaction.isExcluded,
+                    onCheckedChange = onExcludeToggled
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun SplitSummaryCard(splits: List<SplitTransactionDetails>) {
@@ -947,18 +1022,18 @@ private fun TransactionSpotlightHeader(
 }
 
 
+// --- REFACTORED: Renamed to AccountCard, removed switch logic ---
 @Composable
-private fun AccountCardWithSwitch(
+private fun AccountCard(
     details: TransactionDetails,
-    onAccountClick: () -> Unit,
-    onExcludeToggled: (Boolean) -> Unit
+    onAccountClick: () -> Unit
 ) {
-    val isExcluded = details.transaction.isExcluded
-    val switchLabel = details.transaction.transactionType.replaceFirstChar { it.titlecase(Locale.getDefault()) }
-
     GlassPanel {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onAccountClick)
+                .padding(horizontal = 16.dp, vertical = 16.dp), // Increased padding
             verticalAlignment = Alignment.CenterVertically
         ) {
             Image(
@@ -968,12 +1043,7 @@ private fun AccountCardWithSwitch(
             )
             Spacer(Modifier.width(16.dp))
 
-            Column(
-                modifier = Modifier
-                    .weight(0.7f)
-                    .clickable(onClick = onAccountClick)
-                    .padding(vertical = 8.dp)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Account",
                     style = MaterialTheme.typography.bodySmall,
@@ -989,23 +1059,12 @@ private fun AccountCardWithSwitch(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-
-            Column(
-                modifier = Modifier.weight(0.3f),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = switchLabel,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(Modifier.height(4.dp))
-                Switch(
-                    checked = !isExcluded,
-                    onCheckedChange = onExcludeToggled
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = "Edit Account",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

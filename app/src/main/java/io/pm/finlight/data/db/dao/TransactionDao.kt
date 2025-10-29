@@ -1,20 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FIX (Analysis) - The WHERE clause for `getTransactionsForMerchantInRange`
-// has been updated to use `LOWER(T.description)`. This makes the merchant name
-// comparison case-insensitive, resolving the bug where the Analysis Details
-// screen appeared blank because it was receiving a lowercase merchant ID from
-// the previous screen and failing to match it against the original-cased
-// description in the database.
-// FEATURE (Search) - The three main spending analysis queries have been updated
-// to accept a `searchQuery` parameter. This adds a `LIKE` clause to each query,
-// enabling efficient, real-time searching within the selected dimension directly
-// at the database level.
-//
-// REASON: FIX (Consistency) - The `getDailySpendingForDateRange` query was
-// incorrectly grouping by the full `date` timestamp instead of the formatted
-// date string. This caused it to return individual transactions instead of a
-// daily sum. The `GROUP BY` clause has been corrected to use the formatted date.
+// REASON: FEATURE (Transaction Type Toggle) - Added the
+// `updateTransactionType` query to allow changing a transaction's type.
 // =================================================================================
 package io.pm.finlight
 
@@ -291,6 +278,10 @@ interface TransactionDao {
 
     @Query("UPDATE transactions SET isExcluded = :isExcluded WHERE id = :id")
     suspend fun updateExclusionStatus(id: Int, isExcluded: Boolean)
+
+    // --- NEW: Query to update transaction type ---
+    @Query("UPDATE transactions SET transactionType = :transactionType WHERE id = :id")
+    suspend fun updateTransactionType(id: Int, transactionType: String)
 
     @androidx.room.Transaction
     @Query(
@@ -607,13 +598,13 @@ interface TransactionDao {
         )
         SELECT 
             C.name as categoryName, 
-            SUM(AE.amount) as totalAmount,
+            SUM(AI.amount) as totalAmount,
             C.iconKey as iconKey,
             C.colorKey as colorKey
-        FROM AtomicExpenses AS AE
-        JOIN categories AS C ON AE.categoryId = C.id
-        WHERE AE.categoryId IS NOT NULL
-          AND (:keyword IS NULL OR LOWER(AE.description) LIKE '%' || LOWER(:keyword) || '%' OR LOWER(AE.notes) LIKE '%' || LOWER(:keyword) || '%')
+        FROM AtomicExpenses AS AI
+        JOIN categories AS C ON AI.categoryId = C.id
+        WHERE AI.categoryId IS NOT NULL
+          AND (:keyword IS NULL OR LOWER(AI.description) LIKE '%' || LOWER(:keyword) || '%' OR LOWER(AI.notes) LIKE '%' || LOWER(:keyword) || '%')
           AND (:categoryId IS NULL OR C.id = :categoryId)
         GROUP BY C.name
         ORDER BY totalAmount DESC

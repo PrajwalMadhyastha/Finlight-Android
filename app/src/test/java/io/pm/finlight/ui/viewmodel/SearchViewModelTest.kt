@@ -1,3 +1,13 @@
+// =================================================================================
+// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/SearchViewModelTest.kt
+// REASON: FEATURE (Test) - Added new tests for the `displayDate` feature.
+// - `init with initialDateMillis sets date range and displayDate` now
+//   verifies the user-friendly formatted date string is correctly set.
+// - `init without initialDateMillis leaves displayDate null` ensures the
+//   date display doesn't appear on a normal search.
+// - `clearFilters resets uiState` is updated to confirm `displayDate` is
+//   reset to null.
+// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
@@ -16,7 +26,9 @@ import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.*
 import org.robolectric.annotation.Config
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -52,12 +64,21 @@ class SearchViewModelTest : BaseViewModelTest() {
     @Test
     fun `clearFilters resets uiState and search results`() = runTest {
         // ARRANGE
-        initializeViewModel()
+        // Set up a viewmodel with an initial date to ensure displayDate is populated
+        val cal = Calendar.getInstance()
+        initializeViewModel(initialDateMillis = cal.timeInMillis)
+        advanceUntilIdle()
 
         // Set some filters
         viewModel.onKeywordChange("Test")
         viewModel.onCategoryChange(Category(1, "Food", "icon", "color"))
         advanceUntilIdle()
+
+        // Pre-condition check
+        val populatedState = viewModel.uiState.first()
+        assertEquals("Test", populatedState.keyword)
+        assertNotNull(populatedState.selectedCategory)
+        assertNotNull(populatedState.displayDate) // Ensure displayDate was set
 
         // ACT
         viewModel.clearFilters()
@@ -68,6 +89,7 @@ class SearchViewModelTest : BaseViewModelTest() {
         assertEquals("", state.keyword)
         assertNull(state.selectedCategory)
         assertNull(state.selectedAccount)
+        assertNull(state.displayDate) // Verify displayDate is also reset to null
         assertEquals(emptyList<TransactionDetails>(), viewModel.searchResults.first())
     }
 
@@ -110,7 +132,7 @@ class SearchViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `init with initialDateMillis sets date range`() = runTest {
+    fun `init with initialDateMillis sets date range and displayDate`() = runTest {
         // Arrange
         val cal = Calendar.getInstance()
         val dateMillis = cal.timeInMillis
@@ -122,6 +144,24 @@ class SearchViewModelTest : BaseViewModelTest() {
         assertNotNull(state.startDate)
         assertNotNull(state.endDate)
         assertEquals(cal.get(Calendar.DAY_OF_YEAR), Calendar.getInstance().apply { timeInMillis = state.startDate!! }.get(Calendar.DAY_OF_YEAR))
+
+        // --- NEW ASSERTION ---
+        val dateFormatter = SimpleDateFormat("MMMM d, yyyy", Locale.getDefault())
+        val expectedDate = dateFormatter.format(cal.time)
+        assertEquals(expectedDate, state.displayDate)
+    }
+
+    @Test
+    fun `init without initialDateMillis leaves displayDate null`() = runTest {
+        // Arrange
+        initializeViewModel(initialDateMillis = null)
+        advanceUntilIdle()
+
+        // Assert
+        val state = viewModel.uiState.value
+        assertNull(state.startDate)
+        assertNull(state.endDate)
+        assertNull(state.displayDate)
     }
 
     @Test

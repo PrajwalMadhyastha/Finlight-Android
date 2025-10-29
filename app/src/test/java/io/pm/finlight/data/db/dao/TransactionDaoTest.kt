@@ -392,4 +392,23 @@ class TransactionDaoTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `updateTransactionType_modifiesTypeInDatabase`() = runTest {
+        // Arrange
+        val transaction = Transaction(id = 1, description = "Test", amount = 100.0, date = 1L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")
+        transactionDao.insert(transaction)
+        val newType = "income"
+
+        // Act
+        transactionDao.updateTransactionType(1, newType)
+
+        // Assert
+        transactionDao.getTransactionById(1).test {
+            val updatedTx = awaitItem()
+            assertNotNull(updatedTx)
+            assertEquals("Transaction type should be updated", newType, updatedTx?.transactionType)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

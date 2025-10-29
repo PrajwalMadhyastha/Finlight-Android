@@ -601,4 +601,40 @@ class TransactionViewModelTest : BaseViewModelTest() {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `updateTransactionType calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newType = "income"
+        // No exception mocked, so the suspend function will just return (simulating success)
+
+        // Act
+        viewModel.updateTransactionType(transactionId, newType)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateTransactionType(transactionId, newType)
+        // Ensure no error event was sent on success
+        viewModel.uiEvent.test {
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `updateTransactionType on repository failure sends uiEvent`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newType = "income"
+        val errorMessage = "DB Error"
+        `when`(transactionRepository.updateTransactionType(anyInt(), anyString())).thenThrow(RuntimeException(errorMessage))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.updateTransactionType(transactionId, newType)
+            advanceUntilIdle()
+            assertEquals("Failed to update transaction type.", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
