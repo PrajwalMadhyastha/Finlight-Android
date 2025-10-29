@@ -1,5 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/BudgetScreen.kt
+// REASON: FEATURE (Historical Budgets) - The `EditOverallBudgetDialog`'s
+// `onConfirm` lambda is updated. It now passes the `viewModel.selectedMonth.value`
+// to the refactored `saveOverallBudget` function, enabling the user to set
+// a budget for the specific month they are currently viewing.
 //
 // REASON: REFACTOR (Dynamic Budget) - The BudgetScreen is now dynamic.
 // - It adds the `MonthlySummaryHeader` (from TransactionListScreen) to allow
@@ -199,7 +203,8 @@ fun BudgetScreen(
             currentBudget = overallBudgetForSelectedMonth,
             onDismiss = { showOverallBudgetDialog = false },
             onConfirm = { newAmount ->
-                viewModel.saveOverallBudget(newAmount)
+                // --- UPDATED: Pass the selectedMonth to the save function ---
+                viewModel.saveOverallBudget(newAmount, selectedMonth)
                 showOverallBudgetDialog = false
             }
         )
@@ -534,4 +539,3 @@ fun EditOverallBudgetDialog(
         containerColor = popupContainerColor
     )
 }
-
