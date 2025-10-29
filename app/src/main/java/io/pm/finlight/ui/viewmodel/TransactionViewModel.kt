@@ -1,20 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/TransactionViewModel.kt
-// REASON: FEATURE (Account Learning) - The `autoSaveSmsTransaction` function has
-// been rewritten. It now replicates the robust logic from the SmsReceiver,
-// including checking for an `AccountAlias` before falling back to creating a new
-// account. This centralizes the account resolution logic, making it the single
-// source of truth for saving parsed transactions and enabling the bulk importer
-// to learn from user mappings.
-// REASON: FIX (Bug) - The `autoSaveSmsTransaction` function now accepts a `source`
-// parameter. This allows callers like the bulk importer to specify the correct
-// source ("Imported") instead of using the default ("Auto-Captured"), fixing a
-// data inconsistency bug.
-//
-// REASON: FIX (Consistency) - The `overallMonthlyBudget` collector is updated to
-// handle the new nullable `Float?` from `SettingsRepository`. It now uses
-// `map { it ?: 0f }` to safely convert the nullable value to a non-null `Float`
-// for the UI, resolving a build error.
+// REASON: FEATURE (Transaction Type Toggle) - Added the
+// `updateTransactionType` function to call the repository and added error
+// handling.
 // =================================================================================
 package io.pm.finlight
 
@@ -1007,6 +995,16 @@ class TransactionViewModel(
 
     fun updateTransactionExclusion(id: Int, isExcluded: Boolean) = viewModelScope.launch {
         transactionRepository.updateExclusionStatus(id, isExcluded)
+    }
+
+    // --- NEW: Function to update transaction type ---
+    fun updateTransactionType(id: Int, transactionType: String) = viewModelScope.launch {
+        try {
+            transactionRepository.updateTransactionType(id, transactionType)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update transaction type", e)
+            _uiEvent.send("Failed to update transaction type.")
+        }
     }
 
     fun updateTagsForTransaction(transactionId: Int) = viewModelScope.launch {

@@ -1,19 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FEATURE (Quick Add) - The screen logic has been updated to enable the
-// "Quick Add" feature. The save button on the numpad is now enabled as soon as a
-// valid amount is entered, removing the requirement to enter a description first.
-// The guidance checklist has been updated to reflect that the description is now
-// an optional (but recommended) field.
-// FIX (UI) - The layout has been restructured with a scrollable content column
-// and an anchored numpad at the bottom. This resolves a bug where the numpad
-// would be pushed off-screen on devices with 3-button navigation enabled when
-// the validation checklist appeared.
-// REFACTOR (UI) - The layout is now a non-scrolling Column. The ValidationChecklist
-// has been redesigned as a compact set of indicators directly below the amount
-// display, saving vertical space and eliminating the need for scrolling.
-// CLEANUP - The compact ValidationChecklist and its related logic have been
-// completely removed from the screen as requested to simplify the UI.
+// REASON: FEATURE (Transaction Type Toggle) - The `TransactionTypeToggle`
+// composable is now public (modifier removed) so it can be reused in
+// TransactionDetailScreen.kt.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -1030,7 +1019,9 @@ fun TextInputSheet(
 @Composable
 fun TransactionTypeToggle(
     selectedType: String,
-    onTypeSelected: (String) -> Unit
+    onTypeSelected: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     val glassFillColor = if (isSystemInDarkTheme()) {
         Color.White.copy(alpha = 0.08f)
@@ -1039,7 +1030,7 @@ fun TransactionTypeToggle(
     }
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(CircleShape)
             .background(glassFillColor)
@@ -1053,13 +1044,16 @@ fun TransactionTypeToggle(
 
         Button(
             onClick = { onTypeSelected("expense") },
+            enabled = enabled,
             modifier = Modifier
                 .weight(1f)
                 .height(48.dp),
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (expenseSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                contentColor = if (expenseSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                contentColor = if (expenseSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                disabledContainerColor = if (expenseSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f) else Color.Transparent,
+                disabledContentColor = if (expenseSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
             ),
             elevation = null
         ) {
@@ -1068,13 +1062,16 @@ fun TransactionTypeToggle(
 
         Button(
             onClick = { onTypeSelected("income") },
+            enabled = enabled,
             modifier = Modifier
                 .weight(1f)
                 .height(48.dp),
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (incomeSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                contentColor = if (incomeSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                contentColor = if (incomeSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                disabledContainerColor = if (incomeSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f) else Color.Transparent,
+                disabledContentColor = if (incomeSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
             ),
             elevation = null
         ) {
@@ -1082,4 +1079,3 @@ fun TransactionTypeToggle(
         }
     }
 }
-

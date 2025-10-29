@@ -1,24 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TransactionRepository.kt
-// REASON: FEATURE (Consistency) - Added the new `getMonthlyConsistencyData`
-// function. This centralizes the logic for the "Monthly-First" consistency
-// calculation, making it the single source of truth for all heatmaps.
-// FIX (Bug) - The new function uses `(budget.toDouble() / daysInMonth).roundToLong()`
-// to calculate the daily safe-to-spend amount, fixing the integer truncation
-// bug that existed in the old ViewModel implementations.
-//
-// REASON: FIX (Consistency) - The `getMonthlyConsistencyData` function is
-// updated to handle a nullable `Float?` budget. If the budget received from
-// `SettingsRepository` is `null`, this function now generates all daily
-// statuses as `SpendingStatus.NO_DATA`, fixing the "No Budget" bug that
-// incorrectly showed days as blue.
-//
-// REASON: FIX (Consistency) - Corrected the logic in `getMonthlyConsistencyData`
-// to handle all edge cases:
-// 1. If `budget == null`, all past days are now `NO_DATA` (gray), even if
-//    `amountSpent` was 0. This fixes the "green day" bug.
-// 2. If `budget == 0f`, any spending (`amountSpent > 0`) is now correctly
-//    marked as `OVER_LIMIT` (red). This fixes the original "blue day" bug.
+// REASON: FEATURE (Transaction Type Toggle) - Added the
+// `updateTransactionType` function to call the new DAO query.
 // =================================================================================
 package io.pm.finlight
 
@@ -113,6 +96,11 @@ class TransactionRepository(
     suspend fun updateAccountId(id: Int, accountId: Int) = transactionDao.updateAccountId(id, accountId)
     suspend fun updateDate(id: Int, date: Long) = transactionDao.updateDate(id, date)
     suspend fun updateExclusionStatus(id: Int, isExcluded: Boolean) = transactionDao.updateExclusionStatus(id, isExcluded)
+
+    // --- NEW: Function to update transaction type ---
+    suspend fun updateTransactionType(id: Int, transactionType: String) {
+        transactionDao.updateTransactionType(id, transactionType)
+    }
 
     fun getTransactionDetailsById(id: Int): Flow<TransactionDetails?> {
         return transactionDao.getTransactionDetailsById(id)
@@ -387,4 +375,3 @@ class TransactionRepository(
         }.flowOn(Dispatchers.Default) // Run the calculation on a background thread
     }
 }
-
