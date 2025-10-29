@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.util.DatabaseTestRule
+import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -12,6 +13,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.text.SimpleDateFormat
+import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -30,6 +33,7 @@ class TransactionDaoTest {
     private lateinit var accountDao: AccountDao
     private lateinit var categoryDao: CategoryDao
     private lateinit var tagDao: TagDao
+    private lateinit var splitTransactionDao: SplitTransactionDao // --- ADDED ---
 
     // Test data
     private val account1 = Account(id = 1, name = "Savings", type = "Bank")
@@ -47,12 +51,65 @@ class TransactionDaoTest {
         accountDao = dbRule.db.accountDao()
         categoryDao = dbRule.db.categoryDao()
         tagDao = dbRule.db.tagDao()
+        splitTransactionDao = dbRule.db.splitTransactionDao() // --- ADDED ---
 
         // Pre-populate database with necessary entities
         accountDao.insertAll(listOf(account1, account2))
         categoryDao.insertAll(listOf(category1, category2, category3))
         tagDao.insertAll(listOf(tag1, tag2))
     }
+
+    // --- NEW TEST CASE TO VERIFY THE FIX ---
+    @Test
+    fun `getDailySpendingForDateRange correctly groups by day and sums amounts`() = runTest {
+        // Arrange
+        val cal = Calendar.getInstance()
+        val todayStart = cal.apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
+        val todayEnd = cal.apply { set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59); set(Calendar.MILLISECOND, 999) }.timeInMillis
+
+        val yesterday = cal.apply { add(Calendar.DAY_OF_YEAR, -1) }.timeInMillis
+
+        // 1. Regular expense (100.0)
+        transactionDao.insert(Transaction(description = "Coffee", amount = 100.0, date = todayStart + 1000, transactionType = "expense", accountId = 1, categoryId = 1, notes = null))
+
+        // 2. Another regular expense (200.0)
+        transactionDao.insert(Transaction(description = "Lunch", amount = 200.0, date = todayStart + 2000, transactionType = "expense", accountId = 1, categoryId = 1, notes = null))
+
+        // 3. Excluded expense (50.0) - SHOULD BE IGNORED
+        transactionDao.insert(Transaction(description = "Excluded", amount = 50.0, date = todayStart + 3000, transactionType = "expense", accountId = 1, categoryId = 1, notes = null, isExcluded = true))
+
+        // 4. Income (1000.0) - SHOULD BE IGNORED
+        transactionDao.insert(Transaction(description = "Salary", amount = 1000.0, date = todayStart + 4000, transactionType = "income", accountId = 1, categoryId = 3, notes = null))
+
+        // 5. Transaction from another day - SHOULD BE IGNORED
+        transactionDao.insert(Transaction(description = "Yesterday", amount = 75.0, date = yesterday, transactionType = "expense", accountId = 1, categoryId = 1, notes = null))
+
+        // 6. Split transaction (300.0 + 400.0 = 700.0)
+        val parentId = transactionDao.insert(Transaction(description = "Split", amount = 700.0, date = todayStart + 5000, transactionType = "expense", accountId = 1, categoryId = null, notes = null, isSplit = true)).toInt()
+        splitTransactionDao.insertAll(listOf(
+            SplitTransaction(parentTransactionId = parentId, amount = 300.0, categoryId = 1, notes = null),
+            SplitTransaction(parentTransactionId = parentId, amount = 400.0, categoryId = 2, notes = null)
+        ))
+
+        // Expected total for today: 100.0 + 200.0 + 300.0 + 400.0 = 1000.0
+
+        // Act & Assert
+        transactionDao.getDailySpendingForDateRange(todayStart, todayEnd).test {
+            val dailyTotals = awaitItem()
+
+            // Assert: We should have exactly one record for today.
+            assertEquals(1, dailyTotals.size)
+
+            val todayTotal = dailyTotals.first()
+            assertEquals("Total amount should be the sum of all non-excluded expenses (regular + split)", 1000.0, todayTotal.totalAmount, 0.01)
+
+            val expectedDateKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(todayStart))
+            assertEquals("The date key should be the formatted date string", expectedDateKey, todayTotal.date)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
 
     @Test
     fun `getTransactionsForMerchantInRange is case-insensitive`() = runTest {

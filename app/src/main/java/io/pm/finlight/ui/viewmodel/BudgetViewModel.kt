@@ -1,10 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/BudgetViewModel.kt
-// REASON: FEATURE (Budget Carry-over) - The logic to determine available
-// categories for a new budget has been updated. It now correctly excludes
-// categories that already have a budget, including those carried over from
-// previous months. This prevents users from creating duplicate/override budgets
-// and aligns category budget behavior with the overall budget's carry-forward logic.
+// REASON: FEATURE (Historical Budgets) - The `saveOverallBudget` function has
+// been refactored. It now takes a `Calendar` object, extracts the year and
+// month, and calls the new `settingsRepository.saveOverallBudgetForMonth`
+// function. This allows the ViewModel to save a budget for *any* month the
+// user has selected.
 //
 // REASON: FIX (Consistency) - The `overallBudget` collector is updated to
 // handle the new nullable `Float?` from `SettingsRepository`. It now uses
@@ -21,6 +21,11 @@
 //
 // REASON: FIX (Build) - Corrected `receiveAsStateFlow()` to `receiveAsFlow()`
 // to resolve an "Unresolved reference" compilation error.
+//
+// REASON: FIX (Bug) - The `monthlySummaries` flow was incorrectly showing
+// total *spent* for each month. It has been rewritten to be a
+// `StateFlow<List<Pair<Calendar, Float?>>>` that correctly fetches the
+// *budget* for each month from the SettingsRepository, including carry-over logic.
 // =================================================================================
 package io.pm.finlight
 
@@ -51,8 +56,7 @@ class BudgetViewModel(
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
     val selectedMonth: StateFlow<Calendar> = _selectedMonth.asStateFlow()
 
-    // --- NEW: Add monthly summaries for the scroller ---
-    val monthlySummaries: StateFlow<List<MonthlySummaryItem>>
+    val monthlySummaries: StateFlow<List<Pair<Calendar, Float?>>>
 
     // --- REFACTORED: All flows are now dynamic based on selectedMonth ---
     val budgetsForSelectedMonth: StateFlow<List<BudgetWithSpending>>
@@ -62,31 +66,35 @@ class BudgetViewModel(
     val totalSpendingForSelectedMonth: StateFlow<Long>
 
     init {
-        // --- NEW: Copied from TransactionViewModel ---
+        // --- REFACTORED: Logic to fetch monthly budgets for the scroller ---
         monthlySummaries = transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
             val startDate = firstTransactionDate ?: System.currentTimeMillis()
+            val monthList = mutableListOf<Calendar>()
+            val startCal = Calendar.getInstance().apply { timeInMillis = startDate; set(Calendar.DAY_OF_MONTH, 1) }
+            val endCal = Calendar.getInstance()
 
-            transactionRepository.getMonthlyTrends(startDate)
-                .map { trends ->
-                    val dateFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-                    val monthMap = trends.associate {
-                        val cal = Calendar.getInstance().apply { time = dateFormat.parse(it.monthYear) ?: Date() }
-                        (cal.get(Calendar.YEAR) * 100 + cal.get(Calendar.MONTH)) to it.totalExpenses
-                    }
+            while (startCal.before(endCal) || (startCal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && startCal.get(Calendar.MONTH) == endCal.get(Calendar.MONTH))) {
+                monthList.add(startCal.clone() as Calendar)
+                startCal.add(Calendar.MONTH, 1)
+            }
 
-                    val monthList = mutableListOf<MonthlySummaryItem>()
-                    val startCal = Calendar.getInstance().apply { timeInMillis = startDate }
-                    startCal.set(Calendar.DAY_OF_MONTH, 1)
-                    val endCal = Calendar.getInstance()
-
-                    while (startCal.before(endCal) || (startCal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && startCal.get(Calendar.MONTH) == endCal.get(Calendar.MONTH))) {
-                        val key = startCal.get(Calendar.YEAR) * 100 + startCal.get(Calendar.MONTH)
-                        val spent = monthMap[key] ?: 0.0
-                        monthList.add(MonthlySummaryItem(calendar = startCal.clone() as Calendar, totalSpent = spent))
-                        startCal.add(Calendar.MONTH, 1)
-                    }
-                    monthList.reversed()
+            // Create a list of flows, one for each month's budget
+            val budgetFlows: List<Flow<Pair<Calendar, Float?>>> = monthList.map { cal ->
+                val year = cal.get(Calendar.YEAR)
+                val month = cal.get(Calendar.MONTH) + 1
+                settingsRepository.getOverallBudgetForMonth(year, month).map { budget ->
+                    Pair(cal, budget) // Pair the calendar with its fetched budget
                 }
+            }
+
+            if (budgetFlows.isEmpty()) {
+                flowOf(emptyList())
+            } else {
+                // Combine all budget flows into a single flow that emits the full list
+                combine(budgetFlows) { summaries ->
+                    summaries.toList().reversed() // Reverse to show most recent first
+                }
+            }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
@@ -184,46 +192,14 @@ class BudgetViewModel(
         }
     }
 
-    fun saveOverallBudget(budgetStr: String) {
+    // --- REFACTORED: Function signature changed and logic updated ---
+    fun saveOverallBudget(budgetStr: String, forCalendar: Calendar) {
         val budgetFloat = budgetStr.toFloatOrNull() ?: 0f
-        // --- REFACTORED: Use selectedMonth state ---
-        val calendar = _selectedMonth.value
-        val year = calendar.get(Calendar.YEAR)
-        val month = calendar.get(Calendar.MONTH) + 1
-        val key = String.format(Locale.ROOT, "overall_budget_%d_%02d", year, month)
-        // This is a bit of a workaround; ideally, SettingsRepository would have a
-        // function that takes year/month. Let's just save for the *current* month
-        // as the logic for `saveOverallBudgetForCurrentMonth` is simple.
-        // We'll assume the user can only edit the *current* month's budget for now.
-        // Let's check...
-        // Ah, `saveOverallBudgetForCurrentMonth` *always* saves for the *actual* current month.
-        // This is a discrepancy.
-        // For now, let's stick to the existing logic. `saveOverallBudget` will only
-        // save for the *real* current month, not the selected one.
-        // This aligns with "Option 1: Display-Only".
-        //
-        // **Correction**: The user query implies they *can* set a budget for the
-        // selected month. `saveOverallBudgetForCurrentMonth` is the wrong method.
-        // I need to update `SettingsRepository` to have a `saveOverallBudgetForMonth(year, month, amount)`.
-        //
-        // ...Rethink... The user said "display for now... we'll take the call whether to implement CRUD".
-        // This means `saveOverallBudget` *should* only work for the current month.
-        // The dialog to *set* the budget should only appear if the selected month
-        // *is* the current month.
-        //
-        // Let's stick to the simplest path: `saveOverallBudget` saves for the *real* current month.
-        // The UI will be updated to reflect this.
-        val realCurrentCal = Calendar.getInstance()
-        if (calendar.get(Calendar.YEAR) == realCurrentCal.get(Calendar.YEAR) &&
-            calendar.get(Calendar.MONTH) == realCurrentCal.get(Calendar.MONTH)) {
-            settingsRepository.saveOverallBudgetForCurrentMonth(budgetFloat)
-        } else {
-            // In a real app, we'd probably show a toast, but for now, we just
-            // update the *specific* month the user is viewing.
-            // This requires a change to SettingsRepository.
-            // ...Let's just stick to the current month's save logic.
-            settingsRepository.saveOverallBudgetForCurrentMonth(budgetFloat)
-        }
+        val year = forCalendar.get(Calendar.YEAR)
+        val month = forCalendar.get(Calendar.MONTH) + 1
+
+        // Call the new repository function to save for the specific month
+        settingsRepository.saveOverallBudgetForMonth(year, month, budgetFloat)
     }
 
     fun getBudgetById(id: Int): Flow<Budget?> {
@@ -250,4 +226,3 @@ class BudgetViewModel(
             }
         }
 }
-
