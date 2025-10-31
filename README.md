@@ -85,7 +85,7 @@ Getting Started
 How to Contribute
 -----------------
 
-We welcome all contributions! Please read our [**CONTRIBUTING.md**](https://www.google.com/search?q=CONTRIBUTING.md) to get started.
+We welcome all contributions! Please read our [**CONTRIBUTING.md**](CONTRIBUTING.md) to get started.
 
 License
 -------
