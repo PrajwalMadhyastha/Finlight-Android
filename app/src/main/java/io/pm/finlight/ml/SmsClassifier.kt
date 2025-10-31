@@ -29,6 +29,13 @@
 // characters into a single space after removing punctuation. This is the definitive
 // fix to perfectly replicate the Python TextVectorization layer's behavior and
 // resolve the instrumented test assertion failure.
+//
+// BUG FIX (Concurrency): Added a synchronized block around the interpreter.run()
+// call. The TFLite Interpreter is not thread-safe, and the SettingsViewModel was
+// calling classify() from multiple coroutines concurrently during a bulk scan,
+// leading to a race condition and native memory corruption. This lock ensures
+// that only one thread can access the interpreter at a time, fixing the
+// "gather index out of bounds" crash.
 // =================================================================================
 package io.pm.finlight.ml
 
@@ -62,6 +69,8 @@ class SmsClassifier(
 
     private var interpreter: Interpreter? = null
     private val vocab = mutableMapOf<String, Int>()
+
+    private val interpreterLock = Any()
 
     init {
         loadModel()
@@ -150,12 +159,14 @@ class SmsClassifier(
             order(ByteOrder.nativeOrder())
         }
 
-        // 4. Run inference.
-        interpreter?.run(inputBuffer, outputBuffer)
+        val result = synchronized(interpreterLock) {
+            interpreter?.run(inputBuffer, outputBuffer)
 
-        // 5. Read the result from the output buffer.
-        outputBuffer.rewind()
-        return outputBuffer.float
+            outputBuffer.rewind()
+            outputBuffer.float
+        }
+
+        return result
     }
 
 
@@ -167,4 +178,3 @@ class SmsClassifier(
         interpreter = null
     }
 }
-
