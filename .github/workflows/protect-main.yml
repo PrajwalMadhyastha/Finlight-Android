@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Check if source branch is 'develop'"
-        # This step only runs IF the source branch is NOT 'develop'
         if: github.head_ref != 'develop'
         run: |
           echo "ERROR: Pull Requests to 'main' can only be made from the 'develop' branch."
@@ -21,7 +20,6 @@ jobs:
           exit 1 # Fails the status check
 
       - name: "Source branch is 'develop'"
-        # This step only runs IF the source branch IS 'develop'
         if: github.head_ref == 'develop'
         run: |
           echo "SUCCESS: This PR is from 'develop' and is allowed to merge into 'main'."
