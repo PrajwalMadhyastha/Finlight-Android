@@ -81,6 +81,7 @@ import java.util.concurrent.Executor
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 class MainActivity : AppCompatActivity() {
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -122,6 +123,7 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 fun FinanceAppWithLockScreen(isInitiallyLocked: Boolean) {
     val context = LocalContext.current
@@ -662,7 +664,11 @@ fun AppNavHost(
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) { backStackEntry ->
             val transactionId = backStackEntry.arguments!!.getInt("transactionId")
-            SplitTransactionScreen(navController = navController, transactionId = transactionId)
+            SplitTransactionScreen(
+                navController = navController,
+                transactionId = transactionId,
+                transactionViewModel = transactionViewModel
+            )
         }
 
         composable(

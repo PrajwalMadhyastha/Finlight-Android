@@ -3,6 +3,9 @@
 // REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon into
 // the TopAppBar to provide users with contextual guidance on how to split a
 // transaction.
+// REASON: FIX (Crash) - The composable signature now accepts the
+// TransactionViewModel as a parameter. The local `viewModel()` call has been
+// removed, fixing the `NoSuchMethodException` crash.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -29,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -51,12 +53,14 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun SplitTransactionScreen(
     navController: NavController,
-    transactionId: Int
+    transactionId: Int,
+    transactionViewModel: TransactionViewModel // --- FIX: Accept shared ViewModel
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = SplitTransactionViewModelFactory(application, transactionId)
     val viewModel: SplitTransactionViewModel = viewModel(factory = factory)
-    val transactionViewModel: TransactionViewModel = viewModel()
+    // --- FIX: Remove the local viewModel() call that was crashing ---
+    // val transactionViewModel: TransactionViewModel = viewModel()
 
     val uiState by viewModel.uiState.collectAsState()
     val categories by viewModel.categoryRepository.allCategories.collectAsState(initial = emptyList())
