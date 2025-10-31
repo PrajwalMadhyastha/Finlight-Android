@@ -3,6 +3,17 @@
 // REASON: FEATURE (Help System - Phase 2) - Integrated the HelpActionIcon into
 // the TopAppBar to provide users with contextual guidance on how to split a
 // transaction.
+// REASON: FIX (Crash) - The composable signature now accepts the
+// TransactionViewModel as a parameter. The local `viewModel()` call has been
+// removed, fixing the `NoSuchMethodException` crash.
+// REASON: FIX (UI) - Replaced the bottom bar's shadowElevation and incorrect
+// color with the proper transparent glassmorphism fill color to match the
+// "Project Aurora" aesthetic and remove the visible "box" on light themes.
+// REASON: FIX (UI) - Added `verticalAlignment = Alignment.CenterVertically`
+// to the bottom button bar's Row to ensure the "Cancel" and "Save" buttons
+// are perfectly aligned.
+// REASON: FIX (UI) - Enforced a uniform height on the bottom bar buttons to
+// fix visual misalignment when one is disabled.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -51,12 +62,14 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun SplitTransactionScreen(
     navController: NavController,
-    transactionId: Int
+    transactionId: Int,
+    transactionViewModel: TransactionViewModel // --- FIX: Accept shared ViewModel
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = SplitTransactionViewModelFactory(application, transactionId)
     val viewModel: SplitTransactionViewModel = viewModel(factory = factory)
-    val transactionViewModel: TransactionViewModel = viewModel()
+    // --- FIX: Remove the local viewModel() call that was crashing ---
+    // val transactionViewModel: TransactionViewModel = viewModel()
 
     val uiState by viewModel.uiState.collectAsState()
     val categories by viewModel.categoryRepository.allCategories.collectAsState(initial = emptyList())
@@ -131,15 +144,27 @@ fun SplitTransactionScreen(
                 }
             }
 
-            Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.background.copy(alpha = 0.5f)) {
+            val glassFillColor = if (MaterialTheme.colorScheme.background.isDark()) {
+                Color.White.copy(alpha = 0.08f)
+            } else {
+                Color.Black.copy(alpha = 0.04f)
+            }
+            Surface(
+                shadowElevation = 0.dp,
+                color = glassFillColor
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp)
                         .navigationBarsPadding(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(onClick = { navController.popBackStack() }, modifier = Modifier.weight(1f)) {
+                    OutlinedButton(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier.weight(1f).height(48.dp)
+                    ) {
                         Text("Cancel")
                     }
                     Button(
@@ -149,7 +174,7 @@ fun SplitTransactionScreen(
                                 navController.popBackStack()
                             }
                         },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).height(48.dp),
                         enabled = isSaveEnabled
                     ) { Text("Save Splits") }
                 }
@@ -336,3 +361,4 @@ private fun ConversionInfoCard(transaction: Transaction) {
         }
     }
 }
+

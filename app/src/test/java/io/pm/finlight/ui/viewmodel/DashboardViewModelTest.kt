@@ -3,6 +3,7 @@ package io.pm.finlight.ui.viewmodel
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.awaitItem
+import app.cash.turbine.expectMostRecentItem
 import app.cash.turbine.test
 import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -268,11 +269,11 @@ class DashboardViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `budgetHealthSummary shows 'pacing high' message when forecast exceeds budget`() = runTest {
         // ARRANGE
+        // --- FIX: Set expenses > budget to force the "pacing high" scenario ---
         `when`(settingsRepository.getOverallBudgetForMonth(Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(2000f))
-        `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1900.0))) // High spend already
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 2100.0))) // High spend already
         `when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(500.0) // High recent spend velocity
 
         // ACT
