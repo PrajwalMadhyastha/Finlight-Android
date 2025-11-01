@@ -7,6 +7,10 @@
 //   date display doesn't appear on a normal search.
 // - `clearFilters resets uiState` is updated to confirm `displayDate` is
 //   reset to null.
+//
+// REASON: FIX (Test) - Added a mock for `transactionDao.getFinancialSummaryForRangeFlow`
+// in the `setup` block. This new dependency was added to the ViewModel's `init`
+// block but was not mocked in the test, causing a NullPointerException.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -55,6 +59,8 @@ class SearchViewModelTest : BaseViewModelTest() {
         `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
         `when`(tagDao.getAllTags()).thenReturn(flowOf(emptyList()))
         `when`(transactionDao.searchTransactions(anyString(), any(), any(), any(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+        // --- FIX: Add mock for the new dependency in the init block ---
+        `when`(transactionDao.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
     }
 
     private fun initializeViewModel(initialCategoryId: Int? = null, initialDateMillis: Long? = null) {
