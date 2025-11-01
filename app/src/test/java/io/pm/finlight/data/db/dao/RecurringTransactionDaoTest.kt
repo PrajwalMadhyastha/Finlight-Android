@@ -9,6 +9,7 @@ import io.pm.finlight.RecurringTransactionDao
 import io.pm.finlight.TestApplication
 import io.pm.finlight.util.DatabaseTestRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -123,5 +124,35 @@ class RecurringTransactionDaoTest {
         // Act & Assert for List
         val listResult = recurringTransactionDao.getAllRulesList()
         assertEquals(2, listResult.size)
+    }
+
+    @Test
+    fun `getById returns correct rule`() = runTest {
+        // Arrange
+        val rule = RecurringTransaction(description = "Netflix", amount = 149.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = null)
+        val id = recurringTransactionDao.insert(rule).toInt()
+
+        // Act & Assert
+        recurringTransactionDao.getById(id).test {
+            val fromDb = awaitItem()
+            assertNotNull(fromDb)
+            assertEquals(id, fromDb?.id)
+            assertEquals("Netflix", fromDb?.description)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `getById returns null for non-existent id`() = runTest {
+        // Arrange
+        val rule = RecurringTransaction(description = "Netflix", amount = 149.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = null)
+        recurringTransactionDao.insert(rule)
+
+        // Act & Assert
+        recurringTransactionDao.getById(999).test { // A non-existent ID
+            val fromDb = awaitItem()
+            assertNull(fromDb)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }
