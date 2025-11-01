@@ -7,6 +7,13 @@
 // REASON: FEATURE (Test) - Updated the `createBackupSnapshot` tests to check
 // the new `showBackupSuccessDialog` StateFlow instead of the `uiEvent` channel
 // for success, and added a test for the new `dismissBackupSuccessDialog` logic.
+//
+// REASON: REFACTOR (Import-First) - Removed all tests, helper functions, and
+// references related to `AccountMappingRequest`, `_mappingsToReview`, and
+// `finalizeImport`, as these have been removed from the ViewModel. The
+
+// `startSmsScanAndIdentifyMappings` test has been updated to verify the new
+// `importedCount` value in its `onComplete` lambda.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -103,14 +110,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         mutableStateFlow.value = report
     }
 
-    // Helper function to set the private mappingsToReview StateFlow using reflection
-    private fun setMappingsToReview(viewModel: SettingsViewModel, requests: List<AccountMappingRequest>) {
-        val field = viewModel.javaClass.getDeclaredField("_mappingsToReview")
-        field.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        val mutableStateFlow = field.get(viewModel) as MutableStateFlow<List<AccountMappingRequest>>
-        mutableStateFlow.value = requests
-    }
+    // --- DELETED: setMappingsToReview function ---
 
     @Before
     override fun setup() {
@@ -223,34 +223,27 @@ class SettingsViewModelTest : BaseViewModelTest() {
         `when`(smsClassifier.classify(transactionalSms.body)).thenReturn(0.9f)
         `when`(smsClassifier.classify(nonTransactionalSms.body)).thenReturn(0.05f)
 
+        // --- NEW: Mock the autoSave call ---
+        `when`(transactionViewModel.autoSaveSmsTransaction(any(), anyString())).thenReturn(true)
+
         initializeViewModel()
 
-        var mappingNeededResult = false
+        var importedCountResult = -1 // --- REFACTORED ---
 
         // Act
-        viewModel.startSmsScanAndIdentifyMappings(null) { mappingNeeded ->
-            mappingNeededResult = mappingNeeded
+        viewModel.startSmsScanAndIdentifyMappings(null) { importedCount -> // --- REFACTORED ---
+            importedCountResult = importedCount
         }
         advanceUntilIdle()
 
         // Assert
-        assertTrue("Mapping should be needed for the one valid transaction", mappingNeededResult)
+        assertEquals("Should have imported 1 transaction", 1, importedCountResult) // --- REFACTORED ---
 
         // Verify classifier was called for both messages
         verify(smsClassifier).classify(transactionalSms.body)
         verify(smsClassifier).classify(nonTransactionalSms.body)
 
-        // Verify the final state contains only the one valid transaction that needs mapping.
-        // The parser will find "Store" as the merchant, but might not find an account.
-        // Let's check that the sender is used as the identifier if no account is parsed.
-        // The generic parser for "spent Rs. 100 at Store" doesn't parse an account, so it will fall back to sender.
-        viewModel.mappingsToReview.test {
-            val mappings = awaitItem()
-            assertEquals(1, mappings.size)
-            assertEquals("TXN-SENDER", mappings.first().identifier)
-            assertTrue(mappings.first().isSenderMapping)
-            cancelAndIgnoreRemainingEvents()
-        }
+        // --- DELETED: `mappingsToReview` test block ---
     }
 
     @Test
@@ -273,38 +266,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         verify(transactionViewModel).autoSaveSmsTransaction(eq(txnToImport.copy(categoryId = 1)), eq("Imported"))
     }
 
-    @Test
-    fun `finalizeImport calls autoSave and inserts new mappings`() = runTest {
-        // Arrange
-        initializeViewModel()
-        val sender = "AM-HDFCBK"
-        val userMappings = mapOf(sender to 1)
-        val potentialTxn = PotentialTransaction(1, sender, 1.0, "", "Amazon", "")
-        val mappedAccount = Account(1, "HDFC", "Bank")
-
-        setPotentialTransactions(viewModel, listOf(potentialTxn))
-        val mappingRequest = AccountMappingRequest(
-            identifier = sender,
-            isSenderMapping = true,
-            sampleMerchant = "Amazon",
-            transactionCount = 1
-        )
-        setMappingsToReview(viewModel, listOf(mappingRequest))
-
-
-        `when`(accountRepository.getAccountById(1)).thenReturn(flowOf(mappedAccount))
-        `when`(transactionViewModel.autoSaveSmsTransaction(any(), anyString())).thenReturn(true)
-
-        // Act
-        viewModel.finalizeImport(userMappings)
-        advanceUntilIdle()
-
-        // Assert
-        verify(transactionViewModel).autoSaveSmsTransaction(eq(potentialTxn), eq("Imported"))
-        verify(merchantMappingDao).insertAll(listOf(MerchantMapping(sender, "HDFC")))
-        assertTrue(viewModel.potentialTransactions.value.isEmpty())
-        assertTrue(viewModel.mappingsToReview.value.isEmpty())
-    }
+    // --- DELETED: `finalizeImport` test ---
 
     @Test
     @Ignore
