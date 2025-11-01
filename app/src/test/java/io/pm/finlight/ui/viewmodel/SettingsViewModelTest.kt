@@ -1,28 +1,22 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/SettingsViewModelTest.kt
-// REASON: FIX (Build) - Updated the `finalizeImport` test to use the refactored
-// `mappingsToReview` property instead of the old `sendersToMap`, resolving the
-// "Unresolved reference" build error.
-// FIX (Test) - Corrected the `finalizeImport` test logic. It now correctly
-// verifies that the unmodified `PotentialTransaction` is passed to the
-// `autoSaveSmsTransaction` function, aligning the test with the refactored
-// production code where the account resolution is handled within the save function.
-// FIX (Build) - Added the missing SmsClassifier mock and passed it to the
-// SettingsViewModel constructor. This resolves the "No value passed for parameter"
-// build error that occurred after refactoring the ViewModel's dependencies.
+// REASON: FIX (Test) - Removed the verification for `getAutoBackupTime()`
+// in the `initial state is correct` test, as this flow no longer exists
+// in the ViewModel.
+//
+// REASON: FEATURE (Test) - Updated the `createBackupSnapshot` tests to check
+// the new `showBackupSuccessDialog` StateFlow instead of the `uiEvent` channel
+// for success, and added a test for the new `dismissBackupSuccessDialog` logic.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.net.Uri
 import android.os.Build
-import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
-import com.google.gson.Gson
 import io.mockk.coEvery
-import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
 import io.pm.finlight.*
@@ -34,10 +28,8 @@ import io.pm.finlight.ui.theme.AppTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -46,21 +38,15 @@ import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentCaptor
 import org.mockito.Mock
-import org.mockito.Mockito
 import org.mockito.Mockito.`when`
-import org.mockito.Mockito.anyInt
-import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
-import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.robolectric.annotation.Config
 import org.robolectric.Shadows.shadowOf
 import java.io.ByteArrayInputStream
-import java.lang.RuntimeException
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -182,9 +168,11 @@ class SettingsViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getMonthlyReportTime()).thenReturn(flowOf(Triple(1, 9, 0)))
         `when`(settingsRepository.getSelectedTheme()).thenReturn(flowOf(AppTheme.SYSTEM_DEFAULT))
         `when`(settingsRepository.getAutoBackupEnabled()).thenReturn(flowOf(true))
-        `when`(settingsRepository.getAutoBackupTime()).thenReturn(flowOf(Pair(2, 0)))
+        // --- DELETED: `getAutoBackupTime` mock ---
         `when`(settingsRepository.getAutoBackupNotificationEnabled()).thenReturn(flowOf(true))
         `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
+        // --- ADDED: Mock for `getLastBackupTimestamp` ---
+        `when`(settingsRepository.getLastBackupTimestamp()).thenReturn(flowOf(0L))
     }
 
     private fun initializeViewModel() {
@@ -496,9 +484,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
         verify(settingsRepository).saveAppLockEnabled(true)
     }
 
+    // --- UPDATED: Test for backup success dialog ---
     @Test
-    fun `createBackupSnapshot success sends success message to uiEvent channel`() = runTest {
-        val expectedMessage = "Backup snapshot created and backup requested."
+    fun `createBackupSnapshot success sets showBackupSuccessDialog to true`() = runTest {
         // Arrange
         mockkObject(DataExportService)
         coEvery { DataExportService.createBackupSnapshot(applicationContext) } returns true
@@ -506,14 +494,16 @@ class SettingsViewModelTest : BaseViewModelTest() {
         initializeViewModel()
 
         // Act & Assert
-        viewModel.uiEvent.test {
+        viewModel.showBackupSuccessDialog.test {
+            assertFalse("Dialog should be hidden initially", awaitItem())
             viewModel.createBackupSnapshot()
             advanceUntilIdle() // Ensure the coroutine completes
-            assertEquals(expectedMessage, awaitItem())
+            assertTrue("Dialog should be shown on success", awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }
 
+    // --- UPDATED: Test for backup failure event ---
     @Test
     fun `createBackupSnapshot failure sends failure message to uiEvent channel`() = runTest {
         val expectedMessage = "Failed to create snapshot."
@@ -530,6 +520,30 @@ class SettingsViewModelTest : BaseViewModelTest() {
             assertEquals(expectedMessage, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
+        // Also assert the dialog state *doesn't* change
+        assertFalse(viewModel.showBackupSuccessDialog.value)
+    }
+
+    // --- NEW: Test for dismissing the dialog ---
+    @Test
+    fun `dismissBackupSuccessDialog sets flow to false`() = runTest {
+        // Arrange
+        mockkObject(DataExportService)
+        coEvery { DataExportService.createBackupSnapshot(applicationContext) } returns true
+        initializeViewModel()
+
+        // Act & Assert
+        viewModel.showBackupSuccessDialog.test {
+            assertFalse("Dialog hidden initially", awaitItem())
+
+            viewModel.createBackupSnapshot()
+            advanceUntilIdle()
+            assertTrue("Dialog shown on success", awaitItem())
+
+            viewModel.dismissBackupSuccessDialog()
+            assertFalse("Dialog hidden after dismiss", awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }
-

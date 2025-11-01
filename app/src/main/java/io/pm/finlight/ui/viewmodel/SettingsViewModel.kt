@@ -1,8 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: FEATURE (Backup Time) - The ViewModel now exposes a `lastBackupTimestamp`
-// StateFlow. This collects the timestamp from the SettingsRepository, making it
-// available for the UI to display.
+// REASON: CLEANUP - Removed the `autoBackupTime` StateFlow and the
+// `saveAutoBackupTime` function. This logic is no longer needed as the backup
+// time is hardcoded to 2 AM in the ReminderManager.
+//
+// REASON: FEATURE (Backup) - Added a new StateFlow `showBackupSuccessDialog` to
+// trigger a modal dialog from the UI instead of just sending a snackbar event.
+// The `createBackupSnapshot` function now sets this state on success.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -71,6 +75,10 @@ class SettingsViewModel(
 
     private val _uiEvent = Channel<String>()
     val uiEvent = _uiEvent.receiveAsFlow()
+
+    // --- NEW: StateFlow to control the backup success dialog ---
+    private val _showBackupSuccessDialog = MutableStateFlow(false)
+    val showBackupSuccessDialog = _showBackupSuccessDialog.asStateFlow()
 
 
     val smsScanStartDate: StateFlow<Long>
@@ -165,12 +173,7 @@ class SettingsViewModel(
             initialValue = true
         )
 
-    val autoBackupTime: StateFlow<Pair<Int, Int>> =
-        settingsRepository.getAutoBackupTime().stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = Pair(2, 0)
-        )
+    // --- DELETED: autoBackupTime StateFlow ---
 
     val autoBackupNotificationEnabled: StateFlow<Boolean> =
         settingsRepository.getAutoBackupNotificationEnabled().stateIn(
@@ -207,6 +210,11 @@ class SettingsViewModel(
     override fun onCleared() {
         super.onCleared()
         smsClassifier.close()
+    }
+
+    // --- NEW: Function to dismiss the success dialog ---
+    fun dismissBackupSuccessDialog() {
+        _showBackupSuccessDialog.value = false
     }
 
     fun setPrivacyModeEnabled(enabled: Boolean) {
@@ -495,12 +503,7 @@ class SettingsViewModel(
         if (enabled) ReminderManager.scheduleAutoBackup(context) else ReminderManager.cancelAutoBackup(context)
     }
 
-    fun saveAutoBackupTime(hour: Int, minute: Int) {
-        settingsRepository.saveAutoBackupTime(hour, minute)
-        if (autoBackupEnabled.value) {
-            ReminderManager.scheduleAutoBackup(context)
-        }
-    }
+    // --- DELETED: saveAutoBackupTime function ---
 
     fun setAutoBackupNotificationEnabled(enabled: Boolean) {
         settingsRepository.saveAutoBackupNotificationEnabled(enabled)
@@ -893,18 +896,18 @@ class SettingsViewModel(
         _csvValidationReport.value = null
     }
 
+    // --- UPDATED: createBackupSnapshot function test ---
     fun createBackupSnapshot() {
         viewModelScope.launch {
             val success = withContext(Dispatchers.IO) {
                 DataExportService.createBackupSnapshot(context)
             }
-            val message = if (success) {
+            if (success) {
                 backupManager.dataChanged()
-                "Backup snapshot created and backup requested."
+                _showBackupSuccessDialog.value = true // <-- UPDATED
             } else {
-                "Failed to create snapshot."
+                _uiEvent.send("Failed to create snapshot.")
             }
-            _uiEvent.send(message)
         }
     }
 }
