@@ -634,13 +634,7 @@ fun AppNavHost(
                 transactionViewModel = transactionViewModel
             )
         }
-        composable("account_mapping_screen") {
-            AccountMappingScreen(
-                navController = navController,
-                settingsViewModel = settingsViewModel,
-                accountViewModel = accountViewModel
-            )
-        }
+        // --- DELETED: "account_mapping_screen" route ---
         composable(
             "customize_dashboard",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
@@ -677,9 +671,7 @@ fun AppNavHost(
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) {
-            ManageParseRulesScreen(navController, manageParseRulesViewModel)
-        }
+        ) { ManageParseRulesScreen(navController, manageParseRulesViewModel) }
         composable(
             "manage_ignore_rules",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },

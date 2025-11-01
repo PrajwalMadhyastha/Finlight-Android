@@ -151,10 +151,9 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                         icon = Icons.AutoMirrored.Filled.ManageSearch,
                         onClick = {
                             if (!isScanning) {
-                                settingsViewModel.startSmsScanAndIdentifyMappings(null) { mappingNeeded ->
-                                    if (mappingNeeded) {
-                                        navController.navigate("account_mapping_screen")
-                                    }
+                                settingsViewModel.startSmsScanAndIdentifyMappings(null) { importedCount ->
+                                    // The lambda now just returns the count.
+                                    // The navigation logic is removed.
                                 }
                             }
                         },
@@ -176,10 +175,9 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                             Button(
                                 onClick = {
                                     if (!isScanning) {
-                                        settingsViewModel.startSmsScanAndIdentifyMappings(smsScanStartDate) { mappingNeeded ->
-                                            if (mappingNeeded) {
-                                                navController.navigate("account_mapping_screen")
-                                            }
+                                        settingsViewModel.startSmsScanAndIdentifyMappings(smsScanStartDate) { importedCount ->
+                                            // The lambda now just returns the count.
+                                            // The navigation logic is removed.
                                         }
                                     }
                                 },
