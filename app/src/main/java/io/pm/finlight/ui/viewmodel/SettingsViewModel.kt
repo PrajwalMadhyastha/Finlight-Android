@@ -3,6 +3,10 @@
 // REASON: CLEANUP - Removed the `autoBackupTime` StateFlow and the
 // `saveAutoBackupTime` function. This logic is no longer needed as the backup
 // time is hardcoded to 2 AM in the ReminderManager.
+//
+// REASON: FEATURE (Backup) - Added a new StateFlow `showBackupSuccessDialog` to
+// trigger a modal dialog from the UI instead of just sending a snackbar event.
+// The `createBackupSnapshot` function now sets this state on success.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -71,6 +75,10 @@ class SettingsViewModel(
 
     private val _uiEvent = Channel<String>()
     val uiEvent = _uiEvent.receiveAsFlow()
+
+    // --- NEW: StateFlow to control the backup success dialog ---
+    private val _showBackupSuccessDialog = MutableStateFlow(false)
+    val showBackupSuccessDialog = _showBackupSuccessDialog.asStateFlow()
 
 
     val smsScanStartDate: StateFlow<Long>
@@ -202,6 +210,11 @@ class SettingsViewModel(
     override fun onCleared() {
         super.onCleared()
         smsClassifier.close()
+    }
+
+    // --- NEW: Function to dismiss the success dialog ---
+    fun dismissBackupSuccessDialog() {
+        _showBackupSuccessDialog.value = false
     }
 
     fun setPrivacyModeEnabled(enabled: Boolean) {
@@ -883,18 +896,18 @@ class SettingsViewModel(
         _csvValidationReport.value = null
     }
 
+    // --- UPDATED: createBackupSnapshot function test ---
     fun createBackupSnapshot() {
         viewModelScope.launch {
             val success = withContext(Dispatchers.IO) {
                 DataExportService.createBackupSnapshot(context)
             }
-            val message = if (success) {
+            if (success) {
                 backupManager.dataChanged()
-                "Backup snapshot created and backup requested."
+                _showBackupSuccessDialog.value = true // <-- UPDATED
             } else {
-                "Failed to create snapshot."
+                _uiEvent.send("Failed to create snapshot.")
             }
-            _uiEvent.send(message)
         }
     }
 }

@@ -3,6 +3,10 @@
 // REASON: FIX (Test) - Removed the verification for `getAutoBackupTime()`
 // in the `initial state is correct` test, as this flow no longer exists
 // in the ViewModel.
+//
+// REASON: FEATURE (Test) - Updated the `createBackupSnapshot` tests to check
+// the new `showBackupSuccessDialog` StateFlow instead of the `uiEvent` channel
+// for success, and added a test for the new `dismissBackupSuccessDialog` logic.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -24,6 +28,7 @@ import io.pm.finlight.ui.theme.AppTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -479,9 +484,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
         verify(settingsRepository).saveAppLockEnabled(true)
     }
 
+    // --- UPDATED: Test for backup success dialog ---
     @Test
-    fun `createBackupSnapshot success sends success message to uiEvent channel`() = runTest {
-        val expectedMessage = "Backup snapshot created and backup requested."
+    fun `createBackupSnapshot success sets showBackupSuccessDialog to true`() = runTest {
         // Arrange
         mockkObject(DataExportService)
         coEvery { DataExportService.createBackupSnapshot(applicationContext) } returns true
@@ -489,14 +494,16 @@ class SettingsViewModelTest : BaseViewModelTest() {
         initializeViewModel()
 
         // Act & Assert
-        viewModel.uiEvent.test {
+        viewModel.showBackupSuccessDialog.test {
+            assertFalse("Dialog should be hidden initially", awaitItem())
             viewModel.createBackupSnapshot()
             advanceUntilIdle() // Ensure the coroutine completes
-            assertEquals(expectedMessage, awaitItem())
+            assertTrue("Dialog should be shown on success", awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }
 
+    // --- UPDATED: Test for backup failure event ---
     @Test
     fun `createBackupSnapshot failure sends failure message to uiEvent channel`() = runTest {
         val expectedMessage = "Failed to create snapshot."
@@ -511,6 +518,31 @@ class SettingsViewModelTest : BaseViewModelTest() {
             viewModel.createBackupSnapshot()
             advanceUntilIdle() // Ensure the coroutine completes
             assertEquals(expectedMessage, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        // Also assert the dialog state *doesn't* change
+        assertFalse(viewModel.showBackupSuccessDialog.value)
+    }
+
+    // --- NEW: Test for dismissing the dialog ---
+    @Test
+    fun `dismissBackupSuccessDialog sets flow to false`() = runTest {
+        // Arrange
+        mockkObject(DataExportService)
+        coEvery { DataExportService.createBackupSnapshot(applicationContext) } returns true
+        initializeViewModel()
+
+        // Act & Assert
+        viewModel.showBackupSuccessDialog.test {
+            assertFalse("Dialog hidden initially", awaitItem())
+
+            viewModel.createBackupSnapshot()
+            advanceUntilIdle()
+            assertTrue("Dialog shown on success", awaitItem())
+
+            viewModel.dismissBackupSuccessDialog()
+            assertFalse("Dialog hidden after dismiss", awaitItem())
+
             cancelAndIgnoreRemainingEvents()
         }
     }
