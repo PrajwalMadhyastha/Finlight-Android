@@ -7,6 +7,16 @@
 // REASON: FEATURE (Backup) - Added a new StateFlow `showBackupSuccessDialog` to
 // trigger a modal dialog from the UI instead of just sending a snackbar event.
 // The `createBackupSnapshot` function now sets this state on success.
+//
+// REASON: REFACTOR (Import-First) - The `startSmsScanAndIdentifyMappings`
+// function has been refactored. It no longer partitions transactions or
+// requires a mapping step. It now calls `autoSaveSmsTransaction` for *all*
+// newly parsed transactions, allowing the ViewModel to handle the creation
+// of new accounts automatically. This implements the "Import-First" strategy.
+//
+// REASON: REFACTOR (Import-First) - Removed the `_mappingsToReview` StateFlow,
+// the `finalizeImport` function, and the `AccountMappingRequest` data class
+// as they are no longer needed by the new zero-friction import flow.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -43,17 +53,7 @@ sealed class ScanResult {
     object Error : ScanResult()
 }
 
-/**
- * Data class to represent an item on the Account Mapping screen.
- * It holds the unique identifier that needs mapping and contextual info.
- */
-data class AccountMappingRequest(
-    val identifier: String, // The string to be mapped, e.g., "AM-HDFCBK" or "A/c xx1234"
-    val isSenderMapping: Boolean, // True if the identifier is an SMS sender, false if it's a parsed account string
-    val sampleMerchant: String,
-    val transactionCount: Int
-)
-
+// --- DELETED: AccountMappingRequest data class ---
 
 class SettingsViewModel(
     application: Application,
@@ -134,9 +134,7 @@ class SettingsViewModel(
     private val _isScanning = MutableStateFlow<Boolean>(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
-    private val _mappingsToReview = MutableStateFlow<List<AccountMappingRequest>>(emptyList())
-    val mappingsToReview: StateFlow<List<AccountMappingRequest>> = _mappingsToReview.asStateFlow()
-
+    // --- DELETED: _mappingsToReview StateFlow ---
 
     val dailyReportTime: StateFlow<Pair<Int, Int>> =
         settingsRepository.getDailyReportTime().stateIn(
@@ -322,10 +320,11 @@ class SettingsViewModel(
         }
     }
 
-    fun startSmsScanAndIdentifyMappings(startDate: Long?, onComplete: (mappingNeeded: Boolean) -> Unit) {
+    // --- REFACTORED: This function now implements the "Import-First" V3 strategy ---
+    fun startSmsScanAndIdentifyMappings(startDate: Long?, onComplete: (importedCount: Int) -> Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             viewModelScope.launch { _uiEvent.send("SMS Read permission is required.") }
-            onComplete(false)
+            onComplete(0) // Return 0 imported
             return
         }
 
@@ -393,106 +392,32 @@ class SettingsViewModel(
 
                 val newPotentialTransactions = parsedList.filter { !existingSmsHashes.contains(it.sourceSmsHash) }
 
-                val (needsMapping, canAutoImport) = newPotentialTransactions.partition { txn ->
-                    val potentialAccount = txn.potentialAccount // --- FIX: Capture property locally
-                    if (potentialAccount?.formattedName == null) {
-                        true
-                    } else {
-                        val accountIdentifier = potentialAccount.formattedName
-                        val alias = db.accountAliasDao().findByAlias(accountIdentifier)
-                        if (alias != null) return@partition false
-
-                        val existingAccount = db.accountDao().findByName(accountIdentifier)
-                        existingAccount == null
-                    }
-                }
-
-                for (txn in canAutoImport) {
-                    if (transactionViewModel.autoSaveSmsTransaction(txn, source = "Imported")) {
+                // --- V3 "Import-First" Logic ---
+                // Auto-save *all* new transactions. The autoSaveSmsTransaction
+                // will automatically create new accounts for unknown identifiers.
+                for (potentialTxn in newPotentialTransactions) {
+                    if (transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")) {
                         autoImportedCount++
                     }
                 }
 
-                if (needsMapping.isEmpty()) {
-                    val message = if (autoImportedCount > 0) "Successfully imported $autoImportedCount new transactions." else "No new transactions found."
-                    _uiEvent.send(message)
-                    onComplete(false)
-                } else {
-                    _potentialTransactions.value = needsMapping
-                    val groupedForReview = needsMapping.groupBy {
-                        val potentialAccount = it.potentialAccount // --- FIX: Capture property locally
-                        if (potentialAccount?.formattedName != null) {
-                            Pair(potentialAccount.formattedName, false)
-                        } else {
-                            Pair(it.smsSender, true)
-                        }
-                    }
-                    _mappingsToReview.value = groupedForReview.map { (key, txns) ->
-                        AccountMappingRequest(
-                            identifier = key.first,
-                            isSenderMapping = key.second,
-                            sampleMerchant = txns.first().merchantName ?: "Unknown",
-                            transactionCount = txns.size
-                        )
-                    }
-                    onComplete(true)
-                }
+                // Report final count and finish.
+                val message = if (autoImportedCount > 0) "Successfully imported $autoImportedCount new transactions." else "No new transactions found."
+                _uiEvent.send(message)
+                onComplete(autoImportedCount) // `mappingNeeded` is no longer relevant.
+                // --- End V3 Logic ---
+
             } catch (e: Exception) {
                 Log.e("SettingsViewModel", "Error during SMS scan", e)
                 _uiEvent.send("An error occurred during scan.")
+                onComplete(0) // Return 0 imported on error
             } finally {
                 _isScanning.value = false
             }
         }
     }
 
-    fun finalizeImport(userMappings: Map<String, Int>) {
-        viewModelScope.launch {
-            _isScanning.value = true
-            var importedCount = 0
-            try {
-                val transactionsToProcess = _potentialTransactions.value
-                val newAliases = mutableListOf<AccountAlias>()
-                val newMappings = mutableListOf<MerchantMapping>()
-
-                for ((identifier, accountId) in userMappings) {
-                    val request = _mappingsToReview.value.find { it.identifier == identifier }
-                    if (request != null) {
-                        if (request.isSenderMapping) {
-                            val account = accountRepository.getAccountById(accountId).first()
-                            if (account != null) {
-                                newMappings.add(MerchantMapping(smsSender = identifier, merchantName = account.name))
-                            }
-                        } else {
-                            newAliases.add(AccountAlias(aliasName = identifier, destinationAccountId = accountId))
-                        }
-                    }
-                }
-
-                if (newAliases.isNotEmpty()) {
-                    db.accountAliasDao().insertAll(newAliases)
-                }
-                if (newMappings.isNotEmpty()) {
-                    db.merchantMappingDao().insertAll(newMappings)
-                }
-
-                for (txn in transactionsToProcess) {
-                    if (transactionViewModel.autoSaveSmsTransaction(txn, source = "Imported")) {
-                        importedCount++
-                    }
-                }
-
-            } catch (e: Exception) {
-                Log.e("SettingsViewModel", "Error during final import", e)
-            } finally {
-                _isScanning.value = false
-                _potentialTransactions.value = emptyList()
-                _mappingsToReview.value = emptyList()
-                _uiEvent.send("Import complete! $importedCount transactions were added.")
-            }
-        }
-    }
-
+    // --- DELETED: finalizeImport function ---
 
     fun setAutoCaptureNotificationEnabled(enabled: Boolean) {
         settingsRepository.saveAutoCaptureNotificationEnabled(enabled)
