@@ -1,3 +1,11 @@
+// =================================================================================
+// FILE: ./app/src/test/java/io/pm/finlight/utils/ReminderManagerTest.kt
+// REASON: CLEANUP - Removed the import for the deleted `SnapshotWorker`.
+// - Removed the test case `scheduleSnapshotWorker schedules SnapshotWorker`.
+// - Removed assertions for `snapshot_worker_tag` from both
+//   `rescheduleAllWork` tests, as this worker is no longer scheduled
+//   by this method.
+// =================================================================================
 package io.pm.finlight.utils
 
 import android.content.Context
@@ -10,7 +18,6 @@ import androidx.work.*
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import io.pm.finlight.*
-import io.pm.finlight.workers.SnapshotWorker
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -19,7 +26,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
@@ -132,10 +138,7 @@ class ReminderManagerTest : BaseViewModelTest() {
     @Test
     fun `scheduleAutoBackup schedules BackupWorker correctly`() {
         // Arrange
-        prefs.edit()
-            .putInt("auto_backup_hour", Calendar.getInstance().get(Calendar.HOUR_OF_DAY) + 1)
-            .putInt("auto_backup_minute", Calendar.getInstance().get(Calendar.MINUTE))
-            .apply()
+        // --- UPDATED: No longer need to set prefs, time is hardcoded ---
 
         // Act
         ReminderManager.scheduleAutoBackup(context)
@@ -144,17 +147,7 @@ class ReminderManagerTest : BaseViewModelTest() {
         assertWorkIsEnqueued("auto_backup_work", BackupWorker::class.java)
     }
 
-    @Test
-    fun `scheduleSnapshotWorker schedules SnapshotWorker for the next day`() {
-        // Act
-        ReminderManager.scheduleSnapshotWorker(context)
-
-        // Assert
-        assertWorkIsEnqueued("snapshot_worker_tag", SnapshotWorker::class.java)
-        // Note: We cannot directly assert the initialDelay as the 'workSpec' property on WorkInfo
-        // is internal to the WorkManager library. The assertion that the work is ENQUEUED
-        // is sufficient for this test's purpose.
-    }
+    // --- DELETED: `scheduleSnapshotWorker schedules SnapshotWorker for the next day` test ---
 
     @Test
     fun `rescheduleAllWork schedules enabled workers`() {
@@ -177,7 +170,7 @@ class ReminderManagerTest : BaseViewModelTest() {
         // Always scheduled workers
         assertWorkIsEnqueued("recurring_transaction_work", RecurringTransactionWorker::class.java)
         assertWorkIsEnqueued("recurring_pattern_work", RecurringPatternWorker::class.java)
-        assertWorkIsEnqueued("snapshot_worker_tag", SnapshotWorker::class.java)
+        // --- DELETED: snapshot_worker_tag assertion ---
     }
 
     @Test
@@ -202,6 +195,6 @@ class ReminderManagerTest : BaseViewModelTest() {
         // Assert: Always-on workers are still scheduled
         assertWorkIsEnqueued("recurring_transaction_work", RecurringTransactionWorker::class.java)
         assertWorkIsEnqueued("recurring_pattern_work", RecurringPatternWorker::class.java)
-        assertWorkIsEnqueued("snapshot_worker_tag", SnapshotWorker::class.java)
+        // --- DELETED: snapshot_worker_tag assertion ---
     }
 }
