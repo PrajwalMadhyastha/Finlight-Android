@@ -1,14 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/utils/ReminderManager.kt
-// REASON: FEATURE - Added a new SnapshotWorker to the scheduling logic. The
-// manager now schedules a daily background task to create a compressed JSON
-// backup of the database, which is included in Android's Auto Backup. This is
-// also added to the rescheduleAllWork function to ensure it persists after reboots.
-// FIX - The scheduling logic for the weekly summary has been made more robust.
-// It no longer relies on a simple `set(DAY_OF_WEEK)`, which can be ambiguous
-// depending on locale. Instead, it now iterates day-by-day to find the next
-// correct instance of the target day, ensuring notifications are triggered
-// on the correct day of the week.
+// REASON: REFACTOR - The `scheduleAutoBackup` function has been hardcoded to run
+// at 2:00 AM, removing its dependency on SharedPreferences.
+// CLEANUP: The `scheduleSnapshotWorker` function and its associated tag
+// and `rescheduleAllWork` entry have been completely removed.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -23,7 +18,6 @@ import io.pm.finlight.MonthlySummaryWorker
 import io.pm.finlight.RecurringPatternWorker
 import io.pm.finlight.RecurringTransactionWorker
 import io.pm.finlight.WeeklySummaryWorker
-import io.pm.finlight.workers.SnapshotWorker
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -34,7 +28,7 @@ object ReminderManager {
     private const val RECURRING_TRANSACTION_WORK_TAG = "recurring_transaction_work"
     private const val RECURRING_PATTERN_WORK_TAG = "recurring_pattern_work"
     private const val AUTO_BACKUP_WORK_TAG = "auto_backup_work"
-    private const val SNAPSHOT_WORKER_TAG = "snapshot_worker_tag"
+    // --- DELETED: SNAPSHOT_WORKER_TAG ---
 
 
     fun rescheduleAllWork(context: Context) {
@@ -56,35 +50,15 @@ object ReminderManager {
 
         scheduleRecurringTransactionWorker(context)
         scheduleRecurringPatternWorker(context)
-        scheduleSnapshotWorker(context)
+        // --- DELETED: scheduleSnapshotWorker(context) ---
     }
 
-    fun scheduleSnapshotWorker(context: Context) {
-        val now = Calendar.getInstance()
-        val nextRun = Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, 1) // Run tomorrow
-            set(Calendar.HOUR_OF_DAY, 3) // At 3 AM
-            set(Calendar.MINUTE, 30)
-            set(Calendar.SECOND, 0)
-        }
-
-        val initialDelay = nextRun.timeInMillis - now.timeInMillis
-        val snapshotRequest = OneTimeWorkRequestBuilder<SnapshotWorker>()
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .build()
-
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            SNAPSHOT_WORKER_TAG,
-            ExistingWorkPolicy.REPLACE,
-            snapshotRequest
-        )
-        Log.d("ReminderManager", "Database snapshot worker scheduled for ${nextRun.time}")
-    }
+    // --- DELETED: scheduleSnapshotWorker function ---
 
     fun scheduleAutoBackup(context: Context) {
-        val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        val hour = prefs.getInt("auto_backup_hour", 2)
-        val minute = prefs.getInt("auto_backup_minute", 0)
+        // --- UPDATED: Logic is now hardcoded to 2:00 AM ---
+        val hour = 2
+        val minute = 0
 
         val now = Calendar.getInstance()
         val nextRun = Calendar.getInstance().apply {

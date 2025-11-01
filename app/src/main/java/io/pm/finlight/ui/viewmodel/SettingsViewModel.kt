@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: FEATURE (Backup Time) - The ViewModel now exposes a `lastBackupTimestamp`
-// StateFlow. This collects the timestamp from the SettingsRepository, making it
-// available for the UI to display.
+// REASON: CLEANUP - Removed the `autoBackupTime` StateFlow and the
+// `saveAutoBackupTime` function. This logic is no longer needed as the backup
+// time is hardcoded to 2 AM in the ReminderManager.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -165,12 +165,7 @@ class SettingsViewModel(
             initialValue = true
         )
 
-    val autoBackupTime: StateFlow<Pair<Int, Int>> =
-        settingsRepository.getAutoBackupTime().stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = Pair(2, 0)
-        )
+    // --- DELETED: autoBackupTime StateFlow ---
 
     val autoBackupNotificationEnabled: StateFlow<Boolean> =
         settingsRepository.getAutoBackupNotificationEnabled().stateIn(
@@ -495,12 +490,7 @@ class SettingsViewModel(
         if (enabled) ReminderManager.scheduleAutoBackup(context) else ReminderManager.cancelAutoBackup(context)
     }
 
-    fun saveAutoBackupTime(hour: Int, minute: Int) {
-        settingsRepository.saveAutoBackupTime(hour, minute)
-        if (autoBackupEnabled.value) {
-            ReminderManager.scheduleAutoBackup(context)
-        }
-    }
+    // --- DELETED: saveAutoBackupTime function ---
 
     fun setAutoBackupNotificationEnabled(enabled: Boolean) {
         settingsRepository.saveAutoBackupNotificationEnabled(enabled)

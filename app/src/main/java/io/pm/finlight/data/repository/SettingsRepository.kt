@@ -1,16 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
-// REASON: FEATURE (Historical Budgets) - Added the new
-// `saveOverallBudgetForMonth` function. This allows saving a budget to a
-// dynamically-generated preference key (e.g., "overall_budget_2025_09"),
-// enabling the app to store distinct budgets for any given month.
-//
-// REASON: FIX (Consistency) - `getOverallBudgetForMonth` and
-// `getOverallBudgetForMonthBlocking` now return `Float?` instead of `Float`.
-// If no budget is found for the given month or a prior month (carry-over),
-// this function now correctly returns `null` instead of `0f`. This allows the
-// app to distinguish between "No Budget Set" (`null`) and "Budget is Zero" (`0f`),
-// fixing the "No Budget" bug.
+// REASON: CLEANUP - Removed all keys and functions related to the user-settable
+// auto-backup time (`KEY_AUTO_BACKUP_HOUR`, `KEY_AUTO_BACKUP_MINUTE`,
+// `saveAutoBackupTime`, `getAutoBackupTime`). The schedule is now hardcoded to 2 AM
+// in the ReminderManager.
 // =================================================================================
 package io.pm.finlight
 
@@ -83,8 +76,8 @@ class SettingsRepository(context: Context) {
         private const val KEY_HOME_CURRENCY = "home_currency_code"
         private const val KEY_TRAVEL_MODE_SETTINGS = "travel_mode_settings"
         private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
-        private const val KEY_AUTO_BACKUP_HOUR = "auto_backup_hour"
-        private const val KEY_AUTO_BACKUP_MINUTE = "auto_backup_minute"
+        // --- DELETED: KEY_AUTO_BACKUP_HOUR ---
+        // --- DELETED: KEY_AUTO_BACKUP_MINUTE ---
         private const val KEY_AUTO_BACKUP_NOTIFICATION_ENABLED = "auto_backup_notification_enabled"
         private const val KEY_AUTOCAPTURE_NOTIFICATION_ENABLED = "autocapture_notification_enabled"
         private const val KEY_LAST_MONTH_SUMMARY_DISMISSED = "last_month_summary_dismissed_"
@@ -219,25 +212,9 @@ class SettingsRepository(context: Context) {
         }
     }
 
-    fun saveAutoBackupTime(hour: Int, minute: Int) {
-        prefs.edit {
-            putInt(KEY_AUTO_BACKUP_HOUR, hour)
-            putInt(KEY_AUTO_BACKUP_MINUTE, minute)
-        }
-    }
+    // --- DELETED: saveAutoBackupTime function ---
 
-    fun getAutoBackupTime(): Flow<Pair<Int, Int>> {
-        return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_AUTO_BACKUP_HOUR || key == KEY_AUTO_BACKUP_MINUTE) {
-                    trySend(Pair(sp.getInt(KEY_AUTO_BACKUP_HOUR, 2), sp.getInt(KEY_AUTO_BACKUP_MINUTE, 0)))
-                }
-            }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(Pair(prefs.getInt(KEY_AUTO_BACKUP_HOUR, 2), prefs.getInt(KEY_AUTO_BACKUP_MINUTE, 0)))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
-    }
+    // --- DELETED: getAutoBackupTime function ---
 
     fun saveHomeCurrency(currencyCode: String) {
         prefs.edit {

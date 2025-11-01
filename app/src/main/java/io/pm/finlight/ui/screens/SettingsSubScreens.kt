@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SettingsSubScreens.kt
-// REASON: FEATURE (Backup Time) - Added a new `SettingsActionItem` to display
-// the last backup timestamp. It formats the timestamp from the ViewModel into a
-// human-readable string and shows "Never" if a backup hasn't occurred yet.
+// REASON: CLEANUP - Removed the `SettingsActionItem` for "Backup Time" as well
+// as the now-unused `showAutoBackupTimePicker` state and its associated
+// `TimePicker` dialog. This aligns the UI with the new hardcoded 2 AM schedule.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.automirrored.filled.Rule
@@ -380,8 +379,8 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
 
     val isAutoBackupEnabled by settingsViewModel.autoBackupEnabled.collectAsState()
     val isAutoBackupNotificationEnabled by settingsViewModel.autoBackupNotificationEnabled.collectAsState()
-    val autoBackupTime by settingsViewModel.autoBackupTime.collectAsState()
-    var showAutoBackupTimePicker by remember { mutableStateOf(false) }
+    // --- DELETED: autoBackupTime state ---
+    // --- DELETED: showAutoBackupTimePicker state ---
 
     val isPrivacyModeEnabled by settingsViewModel.privacyModeEnabled.collectAsState()
 
@@ -517,18 +516,12 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsToggleItem(
                         title = "Automatic Daily Backup",
-                        subtitle = "Backup your data to Google Drive daily",
+                        subtitle = "Backup your data to Google Drive daily at 2 AM",
                         icon = Icons.Default.CloudUpload,
                         checked = isAutoBackupEnabled,
                         onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) }
                     )
-                    SettingsActionItem(
-                        text = "Backup Time",
-                        subtitle = "Current: ${String.format("%02d:%02d", autoBackupTime.first, autoBackupTime.second)}",
-                        icon = Icons.Default.Schedule,
-                        onClick = { showAutoBackupTimePicker = true },
-                        enabled = isAutoBackupEnabled
-                    )
+                    // --- DELETED: SettingsActionItem for "Backup Time" ---
                     SettingsToggleItem(
                         title = "Backup Notification",
                         subtitle = "Notify when a backup is complete",
@@ -627,34 +620,7 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
         )
     }
 
-    if (showAutoBackupTimePicker) {
-        val timePickerState = rememberTimePickerState(
-            initialHour = autoBackupTime.first,
-            initialMinute = autoBackupTime.second,
-            is24Hour = false
-        )
-        AlertDialog(
-            onDismissRequest = { showAutoBackupTimePicker = false },
-            title = { Text("Select Backup Time") },
-            text = {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    TimePicker(state = timePickerState)
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        settingsViewModel.saveAutoBackupTime(timePickerState.hour, timePickerState.minute)
-                        showAutoBackupTimePicker = false
-                    }
-                ) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAutoBackupTimePicker = false }) { Text("Cancel") }
-            },
-            containerColor = popupContainerColor
-        )
-    }
+    // --- DELETED: showAutoBackupTimePicker and its AlertDialog ---
 }
 
 @Composable
