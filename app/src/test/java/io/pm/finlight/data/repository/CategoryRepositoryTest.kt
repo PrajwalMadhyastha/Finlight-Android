@@ -57,6 +57,22 @@ class CategoryRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
+    fun `insertAll calls DAO`() = runTest {
+        // Arrange
+        val repository = CategoryRepository(categoryDao)
+        val categoriesToInsert = listOf(
+            Category(name = "Travel", iconKey = "flight", colorKey = "blue"),
+            Category(name = "Bills", iconKey = "receipt", colorKey = "red")
+        )
+
+        // Act
+        repository.insertAll(categoriesToInsert)
+
+        // Assert
+        verify(categoryDao).insertAll(categoriesToInsert)
+    }
+
+    @Test
     fun `insert calls DAO`() = runTest {
         // Arrange
         val repository = CategoryRepository(categoryDao)
