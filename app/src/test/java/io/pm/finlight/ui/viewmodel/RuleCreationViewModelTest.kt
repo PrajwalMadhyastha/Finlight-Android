@@ -166,5 +166,68 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
         assertEquals(merchantSelection.selectedText, capturedRule.merchantNameExample)
         assertEquals(true, onCompleteCalled)
     }
-}
 
+    @Test
+    fun `onMarkAsTrigger updates triggerSelection in uiState`() = runTest {
+        // Arrange
+        val selection = RuleSelection("Trigger", 0, 7)
+
+        // Act
+        viewModel.onMarkAsTrigger(selection)
+
+        // Assert
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals(selection, state.triggerSelection)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onMarkAsMerchant updates merchantSelection in uiState`() = runTest {
+        // Arrange
+        val selection = RuleSelection("Merchant", 8, 16)
+
+        // Act
+        viewModel.onMarkAsMerchant(selection)
+
+        // Assert
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals(selection, state.merchantSelection)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onMarkAsAmount updates amountSelection in uiState`() = runTest {
+        // Arrange
+        val selection = RuleSelection("100.00", 17, 23)
+
+        // Act
+        viewModel.onMarkAsAmount(selection)
+
+        // Assert
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals(selection, state.amountSelection)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onMarkAsAccount updates accountSelection in uiState`() = runTest {
+        // Arrange
+        val selection = RuleSelection("xx1234", 24, 30)
+
+        // Act
+        viewModel.onMarkAsAccount(selection)
+
+        // Assert
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals(selection, state.accountSelection)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+}

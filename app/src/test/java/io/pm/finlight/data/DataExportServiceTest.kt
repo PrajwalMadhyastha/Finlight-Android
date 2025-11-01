@@ -24,8 +24,13 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+// --- FIX: Add missing kotlin.test import ---
+import kotlin.test.assertEquals
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -262,15 +267,81 @@ class DataExportServiceTest : BaseViewModelTest() {
         assertFalse("Restore should fail if no snapshot file exists", success)
     }
 
+    // --- NEW: Test for regular transactions ---
+    @Test
+    fun `exportToCsvString handles regular transactions correctly`() = runTest {
+        // Arrange
+        val txId = 1
+        val tagId = 1
+        val transactionTime = 1672531200000L // 2023-01-01 00:00:00 GMT
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val formattedDate = sdf.format(Date(transactionTime))
+
+        val transaction = Transaction(
+            id = txId,
+            description = "Regular Coffee",
+            amount = 150.0,
+            date = transactionTime,
+            accountId = 1,
+            categoryId = 1,
+            notes = "Work expense",
+            isSplit = false, // This is a regular transaction
+            transactionType = "expense",
+            isExcluded = false
+        )
+        val details = TransactionDetails(
+            transaction = transaction,
+            images = emptyList(),
+            accountName = "Savings",
+            categoryName = "Food",
+            categoryIconKey = "restaurant",
+            categoryColorKey = "red",
+            tagNames = null // This field isn't used by the exporter
+        )
+        val tags = listOf(Tag(id = tagId, name = "Work"))
+
+        coEvery { transactionDao.getAllTransactions() } returns flowOf(listOf(details))
+        coEvery { transactionDao.getTagsForTransactionSimple(txId) } returns tags
+        // No need to mock splitTransactionDao as isSplit is false
+
+        // Act
+        val csvString = DataExportService.exportToCsvString(context)
+
+        // Assert
+        assertNotNull("CSV string should not be null", csvString)
+        val lines = csvString!!.lines().filter { it.isNotBlank() }
+
+        assertEquals("Should be 2 lines (header + 1 transaction)", 2, lines.size)
+        assertEquals("Id,ParentId,Date,Description,Amount,Type,Category,Account,Notes,IsExcluded,Tags", lines[0])
+
+        val dataRow = lines[1].split(',')
+        assertEquals(11, dataRow.size)
+        assertEquals(txId.toString(), dataRow[0])
+        assertEquals("", dataRow[1]) // ParentId
+        assertEquals(formattedDate, dataRow[2])
+        assertEquals("Regular Coffee", dataRow[3])
+        assertEquals("150.0", dataRow[4])
+        assertEquals("expense", dataRow[5])
+        assertEquals("Food", dataRow[6])
+        assertEquals("Savings", dataRow[7])
+        // --- FIX: Remove quotes. escapeCsvField only quotes for comma, newline, or double-quote ---
+        assertEquals("Work expense", dataRow[8]) // Notes will NOT be quoted
+        assertEquals("false", dataRow[9])
+        assertEquals("Work", dataRow[10])
+    }
+
     @Test
     fun `exportToCsvString handles split transactions correctly`() = runTest {
         // Arrange
         val parentTxId = 1
         val tagId1 = 10
         val tagId2 = 11
+        val transactionTime = 1672531200000L // 2023-01-01 00:00:00 GMT
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val formattedDate = sdf.format(Date(transactionTime))
 
         // 1. Parent Transaction Details
-        val parentTransaction = Transaction(id = parentTxId, description = "Market Visit", amount = 150.0, date = 1672531200000L, accountId = 1, categoryId = null, notes = "Parent Note", isSplit = true, transactionType = "expense", isExcluded = false)
+        val parentTransaction = Transaction(id = parentTxId, description = "Market Visit", amount = 150.0, date = transactionTime, accountId = 1, categoryId = null, notes = "Parent Note", isSplit = true, transactionType = "expense", isExcluded = false)
         val parentDetails = TransactionDetails(
             transaction = parentTransaction,
             images = emptyList(),
@@ -319,7 +390,10 @@ class DataExportServiceTest : BaseViewModelTest() {
         // Parent row validation
         val parentRow = lines[1].split(',')
         assertEquals(11, parentRow.size)
-        assertEquals("Groceries|Weekend", parentRow[10]) // Check tags column is correctly formatted and escaped
+        // --- FIX: Use the formattedDate string for a stable comparison ---
+        assertEquals(formattedDate, parentRow[2])
+        // --- FIX: Remove quotes. escapeCsvField only quotes for comma, newline, or double-quote ---
+        assertEquals("Groceries|Weekend", parentRow[10]) // Tags column will NOT be quoted
 
         // Child row 1 validation
         val childRow1 = lines[2].split(',')
@@ -332,3 +406,4 @@ class DataExportServiceTest : BaseViewModelTest() {
         assertEquals("", childRow2[10]) // Tags column should be present but empty
     }
 }
+

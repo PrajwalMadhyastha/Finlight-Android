@@ -25,6 +25,10 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
+// --- FIX: Add missing kotlin.test imports ---
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -129,6 +133,9 @@ class SmsReceiverTest : BaseViewModelTest() {
         coEvery { accountAliasDao.findByAlias(any()) } returns null
         coEvery { tagDao.findByName(any()) } returns null
         coEvery { tagDao.insert(any()) } returns 1L
+        // --- FIX: This mock was incorrect (method not on DAO) and has been removed ---
+        // coEvery { tagDao.findOrCreateTag(any()) } returns Tag(1, "Test Tag")
+        coEvery { transactionDao.addTagsToTransaction(any()) } just runs
     }
 
     @After
@@ -245,4 +252,65 @@ class SmsReceiverTest : BaseViewModelTest() {
         coVerify(exactly = 1) { transactionDao.insert(any()) }
         verify(exactly = 1) { mockPendingResult.finish() }
     }
+
+    @Test
+    fun `travel mode international SMS is saved with currency conversion`() = runTest {
+        // Arrange
+        val sender = "AM-CITI"
+        val body = "Spent USD 10.00 at Starbucks"
+        val intent = createSmsIntent(sender, body)
+        val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 80.0f)
+        val transactionCaptor = slot<Transaction>()
+
+        every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
+        every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
+        coEvery { transactionDao.insert(capture(transactionCaptor)) } returns 1L
+        receiver.coroutineScope = this
+
+        // Act
+        receiver.onReceive(context, intent)
+        advanceUntilIdle()
+
+        // Assert
+        coVerify(exactly = 1) { transactionDao.insert(any()) }
+        val savedTx = transactionCaptor.captured
+        assertEquals(800.0, savedTx.amount, 0.0) // 10.0 * 80.0
+        // --- FIX: Assert non-null first, then use !! for the type-safe assertEquals ---
+        assertNotNull(savedTx.originalAmount)
+        assertEquals(10.0, savedTx.originalAmount!!, 0.0)
+        assertEquals("USD", savedTx.currencyCode)
+        // --- FIX: Assert non-null first, then use !! for the type-safe assertEquals ---
+        assertNotNull(savedTx.conversionRate)
+        assertEquals(80.0, savedTx.conversionRate!!, 0.0)
+        coVerify(exactly = 1) { transactionDao.addTagsToTransaction(any()) } // Travel tag was added
+    }
+
+    @Test
+    fun `travel mode SMS matching home currency is saved without conversion`() = runTest {
+        // Arrange
+        val sender = "AM-HDFCBK"
+        val body = "Spent Rs. 500 at Airport Lounge"
+        val intent = createSmsIntent(sender, body)
+        val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 80.0f)
+        val transactionCaptor = slot<Transaction>()
+
+        every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
+        every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
+        coEvery { transactionDao.insert(capture(transactionCaptor)) } returns 1L
+        receiver.coroutineScope = this
+
+        // Act
+        receiver.onReceive(context, intent)
+        advanceUntilIdle()
+
+        // Assert
+        coVerify(exactly = 1) { transactionDao.insert(any()) }
+        val savedTx = transactionCaptor.captured
+        assertEquals(500.0, savedTx.amount, 0.0) // Amount is the original INR amount
+        assertNull(savedTx.originalAmount) // No conversion
+        assertNull(savedTx.currencyCode)
+        assertNull(savedTx.conversionRate)
+        coVerify(exactly = 1) { transactionDao.addTagsToTransaction(any()) } // Travel tag was added
+    }
 }
+

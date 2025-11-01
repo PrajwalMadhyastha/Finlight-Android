@@ -182,17 +182,163 @@ class TransactionDaoTest {
         }
     }
 
+    // --- NEW: Test cases for specific update methods ---
+
     @Test
-    fun `searchTransactions by keyword matches description`() = runTest {
+    fun `updateDescription correctly updates description`() = runTest {
+        val id = transactionDao.insert(Transaction(description = "Old", amount = 1.0, date = 1L, accountId = 1, categoryId = 1, notes = null)).toInt()
+        val newDescription = "New Description"
+        transactionDao.updateDescription(id, newDescription)
+        transactionDao.getTransactionById(id).test {
+            assertEquals(newDescription, awaitItem()?.description)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `updateAmount correctly updates amount`() = runTest {
+        val id = transactionDao.insert(Transaction(description = "Test", amount = 1.0, date = 1L, accountId = 1, categoryId = 1, notes = null)).toInt()
+        val newAmount = 123.45
+        transactionDao.updateAmount(id, newAmount)
+        transactionDao.getTransactionById(id).test {
+            assertEquals(newAmount, awaitItem()?.amount)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `updateNotes correctly updates notes`() = runTest {
+        val id = transactionDao.insert(Transaction(description = "Test", amount = 1.0, date = 1L, accountId = 1, categoryId = 1, notes = "Old Note")).toInt()
+        val newNotes = "New Note"
+        transactionDao.updateNotes(id, newNotes)
+        transactionDao.getTransactionById(id).test {
+            assertEquals(newNotes, awaitItem()?.notes)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `updateCategoryId correctly updates categoryId`() = runTest {
+        val id = transactionDao.insert(Transaction(description = "Test", amount = 1.0, date = 1L, accountId = 1, categoryId = 1, notes = null)).toInt()
+        val newCategoryId = 2
+        transactionDao.updateCategoryId(id, newCategoryId)
+        transactionDao.getTransactionById(id).test {
+            assertEquals(newCategoryId, awaitItem()?.categoryId)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `updateAccountId correctly updates accountId`() = runTest {
+        val id = transactionDao.insert(Transaction(description = "Test", amount = 1.0, date = 1L, accountId = 1, categoryId = 1, notes = null)).toInt()
+        val newAccountId = 2
+        transactionDao.updateAccountId(id, newAccountId)
+        transactionDao.getTransactionById(id).test {
+            assertEquals(newAccountId, awaitItem()?.accountId)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `updateDate correctly updates date`() = runTest {
+        val id = transactionDao.insert(Transaction(description = "Test", amount = 1.0, date = 1L, accountId = 1, categoryId = 1, notes = null)).toInt()
+        val newDate = 9999L
+        transactionDao.updateDate(id, newDate)
+        transactionDao.getTransactionById(id).test {
+            assertEquals(newDate, awaitItem()?.date)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `updateExclusionStatus correctly updates isExcluded`() = runTest {
+        val id = transactionDao.insert(Transaction(description = "Test", amount = 1.0, date = 1L, accountId = 1, categoryId = 1, notes = null, isExcluded = false)).toInt()
+        transactionDao.updateExclusionStatus(id, true)
+        transactionDao.getTransactionById(id).test {
+            assertEquals(true, awaitItem()?.isExcluded)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `updateTransactionType correctly updates transactionType`() = runTest {
+        val id = transactionDao.insert(Transaction(description = "Test", amount = 1.0, date = 1L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")).toInt()
+        val newType = "income"
+        transactionDao.updateTransactionType(id, newType)
+        transactionDao.getTransactionById(id).test {
+            assertEquals(newType, awaitItem()?.transactionType)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Test cases for search permutations ---
+
+    @Test
+    fun `searchTransactions by keyword and accountId`() = runTest {
         // Arrange
-        val transaction = Transaction(id = 1, description = "Lunch at Cafe", amount = 500.0, date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = "Team lunch")
-        transactionDao.insert(transaction)
+        transactionDao.insert(Transaction(id = 1, description = "Coffee at Cafe", amount = 100.0, date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null))
+        transactionDao.insert(Transaction(id = 2, description = "Coffee at Starbucks", amount = 200.0, date = System.currentTimeMillis(), accountId = 2, categoryId = 1, notes = null))
 
         // Act & Assert
-        transactionDao.searchTransactions(keyword = "Cafe", null, null, null, null, null, null).test {
+        transactionDao.searchTransactions(keyword = "Coffee", accountId = 1, null, null, null, null, null).test {
             val results = awaitItem()
             assertEquals(1, results.size)
-            assertEquals("Lunch at Cafe", results.first().transaction.description)
+            assertEquals("Coffee at Cafe", results.first().transaction.description)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `searchTransactions by categoryId and transactionType`() = runTest {
+        // Arrange
+        transactionDao.insert(Transaction(id = 1, description = "Lunch", amount = 500.0, date = System.currentTimeMillis(), accountId = 1, categoryId = 1, transactionType = "expense", notes = null))
+        transactionDao.insert(Transaction(id = 2, description = "Salary", amount = 50000.0, date = System.currentTimeMillis(), accountId = 1, categoryId = 3, transactionType = "income", notes = null))
+        transactionDao.insert(Transaction(id = 3, description = "Bonus", amount = 5000.0, date = System.currentTimeMillis(), accountId = 1, categoryId = 3, transactionType = "income", notes = null))
+
+        // Act & Assert
+        transactionDao.searchTransactions(keyword = "", null, categoryId = 3, transactionType = "income", null, null, null).test {
+            val results = awaitItem()
+            assertEquals(2, results.size)
+            assertTrue(results.all { it.transaction.transactionType == "income" && it.transaction.categoryId == 3 })
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `searchTransactions by dateRange and tagId`() = runTest {
+        // Arrange
+        val now = System.currentTimeMillis()
+        val yesterday = now - 86400000
+        val tx1Id = transactionDao.insert(Transaction(id = 1, description = "Work Lunch", amount = 300.0, date = now, accountId = 1, categoryId = 1, notes = null)).toInt()
+        val tx2Id = transactionDao.insert(Transaction(id = 2, description = "Vacation Flight", amount = 8000.0, date = yesterday, accountId = 1, categoryId = 2, notes = null)).toInt()
+        transactionDao.addTagsToTransaction(listOf(TransactionTagCrossRef(tx1Id, tag1.id))) // Tag "Work"
+        transactionDao.addTagsToTransaction(listOf(TransactionTagCrossRef(tx2Id, tag2.id))) // Tag "Vacation"
+
+        // Act & Assert
+        transactionDao.searchTransactions(keyword = "", null, null, null, startDate = yesterday - 1000, endDate = yesterday + 1000, tagId = tag2.id).test {
+            val results = awaitItem()
+            assertEquals(1, results.size)
+            assertEquals("Vacation Flight", results.first().transaction.description)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `searchTransactions by keyword, accountId, and tagId`() = runTest {
+        // Arrange
+        val now = System.currentTimeMillis()
+        // Target transaction
+        val tx1Id = transactionDao.insert(Transaction(id = 1, description = "Work Project Dinner", amount = 1200.0, date = now, accountId = 1, categoryId = 1, notes = "Client meeting")).toInt()
+        transactionDao.addTagsToTransaction(listOf(TransactionTagCrossRef(tx1Id, tag1.id))) // Tag "Work"
+        // Decoy transactions
+        transactionDao.insert(Transaction(id = 2, description = "Work Lunch", amount = 300.0, date = now, accountId = 2, categoryId = 1, notes = null)) // Wrong account
+        transactionDao.insert(Transaction(id = 3, description = "Project Snacks", amount = 150.0, date = now, accountId = 1, categoryId = 1, notes = null)) // Wrong keyword/tag
+
+        // Act & Assert
+        transactionDao.searchTransactions(keyword = "Project", accountId = 1, null, null, null, null, tagId = tag1.id).test {
+            val results = awaitItem()
+            assertEquals(1, results.size)
+            assertEquals("Work Project Dinner", results.first().transaction.description)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -211,6 +357,7 @@ class TransactionDaoTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+    // --- End of new search tests ---
 
     @Test
     fun `searchTransactions by accountId filters correctly`() = runTest {
