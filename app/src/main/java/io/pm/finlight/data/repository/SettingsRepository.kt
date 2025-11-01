@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
-// REASON: CLEANUP - Removed all keys and functions related to the user-settable
-// auto-backup time (`KEY_AUTO_BACKUP_HOUR`, `KEY_AUTO_BACKUP_MINUTE`,
-// `saveAutoBackupTime`, `getAutoBackupTime`). The schedule is now hardcoded to 2 AM
-// in the ReminderManager.
+// REASON: FEATURE (Backup) - Added a new blocking function
+// `isAutoBackupNotificationEnabledBlocking()`. This is required by the
+// `FinlightBackupAgent` which runs in a context where collecting a `Flow`
+// is not feasible.
 // =================================================================================
 package io.pm.finlight
 
@@ -210,6 +210,11 @@ class SettingsRepository(context: Context) {
             trySend(prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, false))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
+    }
+
+    // --- NEW: Blocking version for FinlightBackupAgent ---
+    fun isAutoBackupNotificationEnabledBlocking(): Boolean {
+        return prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, true)
     }
 
     // --- DELETED: saveAutoBackupTime function ---
@@ -424,6 +429,7 @@ class SettingsRepository(context: Context) {
         }
     }
 
+    // --- FIX: Restored missing functions ---
     fun saveProfilePictureUri(uriString: String?) {
         prefs.edit {
             putString(KEY_PROFILE_PICTURE_URI, uriString)
@@ -442,6 +448,7 @@ class SettingsRepository(context: Context) {
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
+    // --- End of restored functions ---
 
     fun hasSeenOnboarding(): Boolean {
         return prefs.getBoolean(KEY_HAS_SEEN_ONBOARDING, false)
@@ -768,3 +775,4 @@ class SettingsRepository(context: Context) {
         }
     }
 }
+

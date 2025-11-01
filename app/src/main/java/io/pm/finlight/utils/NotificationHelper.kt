@@ -5,6 +5,9 @@
 // percentage. Instead, it now accepts a pre-constructed, intelligent title
 // directly from the `DailyReportWorker`, making this helper cleaner and more
 // focused on its presentation role.
+//
+// REASON: FEATURE (Backup) - The `showAutoBackupNotification` function now
+// accepts a timestamp and includes it in the notification body for clarity.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -30,7 +33,9 @@ import io.pm.finlight.*
 import io.pm.finlight.data.model.TimePeriod
 import java.net.URLEncoder
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 import androidx.core.graphics.createBitmap
@@ -44,7 +49,7 @@ object NotificationHelper {
     const val BACKUP_NOTIFICATION_ID = 99
 
 
-    fun showAutoBackupNotification(context: Context) {
+    fun showAutoBackupNotification(context: Context, backupTimestamp: Long) {
         if (ActivityCompat.checkSelfPermission(
                 context,
                 Manifest.permission.POST_NOTIFICATIONS
@@ -53,10 +58,17 @@ object NotificationHelper {
             return
         }
 
+        // --- NEW: Format the timestamp ---
+        val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+        val formattedTime = sdf.format(Date(backupTimestamp))
+        val contentText = "Your Finlight data was successfully backed up at $formattedTime."
+
+
         val builder = NotificationCompat.Builder(context, MainApplication.BACKUP_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_logo)
             .setContentTitle("Backup Complete")
-            .setContentText("Your Finlight data was successfully backed up.")
+            // --- UPDATED: Use the new content text ---
+            .setContentText(contentText)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setAutoCancel(true)
 

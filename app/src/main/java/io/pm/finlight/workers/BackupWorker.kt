@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/workers/BackupWorker.kt
-// REASON: REFACTOR - This worker now contains the database snapshot logic
-// previously held by the (now deleted) SnapshotWorker. This consolidates all
-// backup-related logic into a single worker that runs at the hardcoded 2 AM time.
+// REASON: REFACTOR - This worker's sole responsibility is now to create the
+// snapshot, notify the system, and reschedule itself. The user-facing
+// notification logic has been removed and moved to the FinlightBackupAgent,
+// which runs *after* the system backup is complete.
 // =================================================================================
 package io.pm.finlight
 
@@ -22,12 +23,10 @@ class BackupWorker(
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
-        val settingsRepository = SettingsRepository(context)
-
         return try {
             Log.d("BackupWorker", "Starting daily database snapshot...")
 
-            // --- NEW: Logic moved from SnapshotWorker ---
+            // --- Logic moved from SnapshotWorker ---
             // 1. Create the compressed JSON snapshot
             val success = DataExportService.createBackupSnapshot(context)
             if (success) {
@@ -38,16 +37,10 @@ class BackupWorker(
             } else {
                 Log.e("BackupWorker", "Failed to create database snapshot.")
             }
-            // --- End of new logic ---
+            // --- End of moved logic ---
 
 
-            // TODO: Implement Google Drive backup logic here.
-
-
-            val notificationsEnabled = settingsRepository.getAutoBackupNotificationEnabled().first()
-            if (notificationsEnabled) {
-                NotificationHelper.showAutoBackupNotification(context)
-            }
+            // --- DELETED: Notification logic was removed from this worker ---
 
             // Re-schedule the next backup
             ReminderManager.scheduleAutoBackup(context)

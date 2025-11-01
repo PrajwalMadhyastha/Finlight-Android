@@ -1,10 +1,6 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/FinlightBackupAgent.kt
-// REASON: FEATURE (Backup Time) - The `onBackup` method now saves the current
-// timestamp to SharedPreferences. This provides a reliable signal that the Android
-// Backup Manager has initiated the backup process, giving the user high confidence
-// that their data has been recently backed up.
-// =================================================================================
+//=================================================================
 package io.pm.finlight
 
 import android.app.backup.BackupAgentHelper
@@ -12,9 +8,9 @@ import android.app.backup.BackupDataInput
 import android.app.backup.BackupDataOutput
 import android.app.backup.FileBackupHelper
 import android.app.backup.SharedPreferencesBackupHelper
-import android.content.Context
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import io.pm.finlight.utils.NotificationHelper
 
 class FinlightBackupAgent : BackupAgentHelper() {
 
@@ -50,12 +46,29 @@ class FinlightBackupAgent : BackupAgentHelper() {
 
     override fun onBackup(oldState: ParcelFileDescriptor?, data: BackupDataOutput?, newState: ParcelFileDescriptor?) {
         Log.d(TAG, "onBackup: Starting backup process...")
-        // --- NEW: Save the timestamp of this backup operation ---
         val settingsRepository = SettingsRepository(applicationContext)
-        settingsRepository.saveLastBackupTimestamp(System.currentTimeMillis())
+
+        // --- UPDATED: Capture timestamp to use for both saving and notification ---
+        val backupTime = System.currentTimeMillis()
+
+        // 1. Save the timestamp
+        settingsRepository.saveLastBackupTimestamp(backupTime)
         Log.i(TAG, "onBackup: Last backup timestamp saved.")
-        // --- End of new code ---
+
+        // 2. Let the system helpers do their work
         super.onBackup(oldState, data, newState)
+
+        // 3. (NEW) Trigger notification AFTER the backup is complete
+        try {
+            val notificationsEnabled = settingsRepository.isAutoBackupNotificationEnabledBlocking()
+            if (notificationsEnabled) {
+                // --- UPDATED: Pass the timestamp to the notification helper ---
+                NotificationHelper.showAutoBackupNotification(applicationContext, backupTime)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send backup notification", e)
+        }
+
         Log.d(TAG, "onBackup: Backup process finished.")
     }
 
@@ -65,3 +78,4 @@ class FinlightBackupAgent : BackupAgentHelper() {
         Log.d(TAG, "onRestore: Restore process finished.")
     }
 }
+
