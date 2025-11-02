@@ -457,7 +457,7 @@ class SettingsViewModel(
 
     fun saveMerchantRenameRule(originalName: String, newName: String) {
         if (originalName.isBlank() || newName.isBlank()) return
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             if (originalName.equals(newName, ignoreCase = true)) {
                 db.merchantRenameRuleDao().deleteByOriginalName(originalName)
             } else {

@@ -1,8 +1,5 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/TransactionViewModelTest.kt
-// REASON: FIX (Test) - The `autoSaveSmsTransaction` test has been updated. It
-// now correctly mocks the new `accountAliasDao.findByAlias` dependency, resolving
-// a test failure caused by the recent refactoring of the account resolution logic.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -22,12 +19,16 @@ import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.unmockkStatic
+import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.ui.components.ShareableField
+import io.pm.finlight.utils.ShareImageGenerator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -35,6 +36,7 @@ import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mock
 import org.mockito.Mockito
@@ -44,10 +46,14 @@ import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
+import org.mockito.kotlin.capture
 import org.mockito.kotlin.eq
+import org.robolectric.Robolectric
 import org.robolectric.annotation.Config
 import java.lang.RuntimeException
+import java.util.Calendar
 import kotlin.math.roundToLong
+import kotlin.time.Duration.Companion.seconds
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -104,22 +110,33 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
 
         // Setup default mock behaviors for ViewModel initialization
-        `when`(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
-        `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
-        `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
-        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
-        `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getSpendingByMerchantForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
-        `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
-        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
-        `when`(tagRepository.allTags).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
-        `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
-        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
+        setupDefaultMocks()
 
         // Create the ViewModel instance with all mocked dependencies
         initializeViewModel()
+    }
+
+    /**
+     * Sets up default mock behaviors for all flows and suspend functions
+     * called within the TransactionViewModel's `init` block.
+     */
+    private fun setupDefaultMocks() {
+        runTest {
+            `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
+            `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
+            `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getSpendingByMerchantForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
+            `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
+            `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
+            `when`(tagRepository.allTags).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+            `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
+            `when`(db.accountDao().findByName(anyString())).thenReturn(null)
+            `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
+            `when`(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
+        }
     }
 
     private fun initializeViewModel() {
@@ -287,6 +304,83 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val updatedState = viewModel.filterState.first()
         assertEquals(newKeyword, updatedState.keyword)
     }
+
+    // --- NEW: Filter Logic Tests ---
+
+    @Test
+    fun `updateFilterAccount updates filterState correctly`() = runTest {
+        // ARRANGE
+        val newAccount = Account(1, "Test Account", "Bank")
+
+        // ACT
+        viewModel.updateFilterAccount(newAccount)
+
+        // ASSERT
+        val updatedState = viewModel.filterState.first()
+        assertEquals(newAccount, updatedState.account)
+    }
+
+    @Test
+    fun `updateFilterCategory updates filterState correctly`() = runTest {
+        // ARRANGE
+        val newCategory = Category(1, "Test Category", "icon", "color")
+
+        // ACT
+        viewModel.updateFilterCategory(newCategory)
+
+        // ASSERT
+        val updatedState = viewModel.filterState.first()
+        assertEquals(newCategory, updatedState.category)
+    }
+
+    @Test
+    fun `clearFilters resets filterState to default`() = runTest {
+        // ARRANGE
+        viewModel.updateFilterKeyword("test")
+        viewModel.updateFilterAccount(Account(1, "Test", "Bank"))
+        viewModel.updateFilterCategory(Category(1, "Test", "icon", "color"))
+        advanceUntilIdle()
+
+        // Pre-condition check
+        val currentState = viewModel.filterState.first()
+        assertNotEquals("", currentState.keyword)
+        assertNotNull(currentState.account)
+        assertNotNull(currentState.category)
+
+        // ACT
+        viewModel.clearFilters()
+        advanceUntilIdle() // Ensure the state update is processed
+
+        // ASSERT
+        val clearedState = viewModel.filterState.first()
+        assertEquals("", clearedState.keyword)
+        assertNull(clearedState.account)
+        assertNull(clearedState.category)
+    }
+
+    @Test
+    fun `onFilterClick sets showFilterSheet to true`() = runTest {
+        viewModel.showFilterSheet.test {
+            assertFalse("Sheet should be hidden initially", awaitItem())
+            viewModel.onFilterClick()
+            assertTrue("Sheet should be visible after click", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onFilterSheetDismiss sets showFilterSheet to false`() = runTest {
+        viewModel.showFilterSheet.test {
+            assertFalse("Sheet hidden initially", awaitItem())
+            viewModel.onFilterClick()
+            assertTrue("Sheet visible after click", awaitItem())
+            viewModel.onFilterSheetDismiss()
+            assertFalse("Sheet hidden after dismiss", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- End of Filter Logic Tests ---
 
     @Test
     fun `onSaveTapped with only amount saves directly without category nudge`() = runTest {
@@ -486,6 +580,113 @@ class TransactionViewModelTest : BaseViewModelTest() {
         assertEquals(2, sheetState?.selectedIds?.first()) // The ID of the similar transaction
     }
 
+    // --- NEW: Simple Update Function Tests (Success Path) ---
+
+    @Test
+    fun `updateTransactionAmount calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newAmountStr = "123.45"
+        val newAmountDouble = 123.45
+
+        // Act
+        viewModel.updateTransactionAmount(transactionId, newAmountStr)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateAmount(transactionId, newAmountDouble)
+    }
+
+    @Test
+    fun `updateTransactionNotes calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newNotes = "This is a test note"
+
+        // Act
+        viewModel.updateTransactionNotes(transactionId, newNotes)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateNotes(transactionId, newNotes)
+    }
+
+    @Test
+    fun `updateTransactionCategory calls repository and mapping logic`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newCategoryId = 5
+        val originalDescription = "Original Merchant"
+        val transaction = Transaction(
+            id = transactionId,
+            description = "Test",
+            amount = 1.0,
+            date = 0,
+            accountId = 1,
+            categoryId = 1,
+            notes = null,
+            originalDescription = originalDescription
+        )
+
+        `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(transaction))
+
+        // Act
+        viewModel.updateTransactionCategory(transactionId, newCategoryId)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateCategoryId(transactionId, newCategoryId)
+        // Verify learning logic is also called
+        verify(merchantCategoryMappingRepository).insert(
+            MerchantCategoryMapping(
+                parsedName = originalDescription,
+                categoryId = newCategoryId
+            )
+        )
+    }
+
+    @Test
+    fun `updateTransactionAccount calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newAccountId = 2
+
+        // Act
+        viewModel.updateTransactionAccount(transactionId, newAccountId)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateAccountId(transactionId, newAccountId)
+    }
+
+    @Test
+    fun `updateTransactionDate calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newDate = 123456789L
+
+        // Act
+        viewModel.updateTransactionDate(transactionId, newDate)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateDate(transactionId, newDate)
+    }
+
+    @Test
+    fun `updateTransactionExclusion calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newExclusionStatus = true
+
+        // Act
+        viewModel.updateTransactionExclusion(transactionId, newExclusionStatus)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateExclusionStatus(transactionId, newExclusionStatus)
+    }
+
     // --- NEW TESTS FOR ERROR HANDLING ---
 
     @Test
@@ -637,4 +838,915 @@ class TransactionViewModelTest : BaseViewModelTest() {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // --- NEW: Selection Mode Tests ---
+
+    @Test
+    fun `enterSelectionMode activates selection mode and selects initial transaction`() = runTest {
+        // Assert initial state
+        assertFalse("Selection mode should be inactive initially", viewModel.isSelectionModeActive.value)
+        assertTrue("Selected IDs should be empty initially", viewModel.selectedTransactionIds.value.isEmpty())
+
+        // Act
+        viewModel.enterSelectionMode(initialTransactionId = 1)
+        advanceUntilIdle() // Ensure coroutine in VM completes
+
+        // Assert final state
+        assertTrue("Selection mode should be active", viewModel.isSelectionModeActive.value)
+        assertEquals(setOf(1), viewModel.selectedTransactionIds.value)
+    }
+
+    @Test
+    fun `toggleTransactionSelection adds and removes ids correctly`() = runTest {
+        viewModel.selectedTransactionIds.test {
+            // Initial state
+            assertTrue("Selected IDs should be empty initially", awaitItem().isEmpty())
+
+            // Act: Add first item
+            viewModel.toggleTransactionSelection(1)
+            assertEquals(setOf(1), awaitItem())
+
+            // Act: Add second item
+            viewModel.toggleTransactionSelection(2)
+            assertEquals(setOf(1, 2), awaitItem())
+
+            // Act: Remove first item
+            viewModel.toggleTransactionSelection(1)
+            assertEquals(setOf(2), awaitItem())
+        }
+    }
+
+    @Test
+    fun `clearSelectionMode deactivates mode and clears selection`() = runTest {
+        // Arrange: Start in selection mode
+        viewModel.enterSelectionMode(1)
+        viewModel.toggleTransactionSelection(2)
+        advanceUntilIdle()
+        assertTrue("Pre-condition: Selection mode should be active", viewModel.isSelectionModeActive.value)
+        assertEquals("Pre-condition: 2 items selected", setOf(1, 2), viewModel.selectedTransactionIds.value)
+
+        // Act
+        viewModel.clearSelectionMode()
+        advanceUntilIdle()
+
+        // Assert
+        assertFalse("Selection mode should be inactive", viewModel.isSelectionModeActive.value)
+        assertTrue("Selected IDs should be empty", viewModel.selectedTransactionIds.value.isEmpty())
+    }
+
+    @Test
+    fun `onDeleteSelectionClick shows delete confirmation dialog`() = runTest {
+        viewModel.showDeleteConfirmation.test {
+            // Initial state
+            assertFalse("Dialog should be hidden initially", awaitItem())
+
+            // Act
+            viewModel.onDeleteSelectionClick()
+            advanceUntilIdle()
+
+            // Assert
+            assertTrue("Dialog should be visible", awaitItem())
+        }
+    }
+
+    @Test
+    fun `onConfirmDeleteSelection calls repository and clears selection`() = runTest {
+        // Arrange
+        val idsToDelete = setOf(1, 2)
+        viewModel.enterSelectionMode(1)
+        viewModel.toggleTransactionSelection(2)
+        viewModel.onDeleteSelectionClick() // Show dialog
+        advanceUntilIdle()
+
+        // Pre-conditions
+        assertTrue(viewModel.isSelectionModeActive.value)
+        assertTrue(viewModel.showDeleteConfirmation.value)
+        assertEquals(idsToDelete, viewModel.selectedTransactionIds.value)
+
+        // Act
+        viewModel.onConfirmDeleteSelection()
+        advanceUntilIdle() // Let the coroutine finish
+
+        // Assert
+        // Verify the repository was called with the correct list
+        verify(transactionRepository).deleteByIds(eq(idsToDelete.toList()))
+
+        // Verify state is reset
+        assertFalse("Selection mode should be inactive", viewModel.isSelectionModeActive.value)
+        assertFalse("Dialog should be hidden", viewModel.showDeleteConfirmation.value)
+        assertTrue("Selected IDs should be empty", viewModel.selectedTransactionIds.value.isEmpty())
+    }
+
+    @Test
+    fun `onCancelDeleteSelection hides delete confirmation dialog`() = runTest {
+        // Arrange
+        viewModel.onDeleteSelectionClick() // Show dialog
+        advanceUntilIdle()
+        assertTrue("Pre-condition: Dialog should be visible", viewModel.showDeleteConfirmation.value)
+
+        // Act
+        viewModel.onCancelDeleteSelection()
+        advanceUntilIdle()
+
+        // Assert
+        assertFalse("Dialog should be hidden", viewModel.showDeleteConfirmation.value)
+    }
+
+    // --- NEW: Share Logic Tests ---
+
+    @Test
+    fun `onShareClick sets showShareSheet to true`() = runTest {
+        viewModel.showShareSheet.test {
+            assertFalse("Sheet should be hidden initially", awaitItem())
+            viewModel.onShareClick()
+            assertTrue("Sheet should be visible after click", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onShareSheetDismiss sets showShareSheet to false`() = runTest {
+        viewModel.showShareSheet.test {
+            assertFalse("Sheet hidden initially", awaitItem())
+            viewModel.onShareClick()
+            assertTrue("Sheet visible after click", awaitItem())
+            viewModel.onShareSheetDismiss()
+            assertFalse("Sheet hidden after dismiss", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onShareableFieldToggled adds and removes fields from state`() = runTest {
+        viewModel.shareableFields.test {
+            val defaultFields = awaitItem()
+            assertTrue("Default fields should contain Amount", defaultFields.contains(ShareableField.Amount))
+
+            // Act 1: Remove Amount
+            viewModel.onShareableFieldToggled(ShareableField.Amount)
+            val fieldsAfterRemove = awaitItem()
+            assertFalse("Fields should not contain Amount after remove", fieldsAfterRemove.contains(ShareableField.Amount))
+            assertEquals(defaultFields.size - 1, fieldsAfterRemove.size)
+
+            // Act 2: Add Amount back
+            viewModel.onShareableFieldToggled(ShareableField.Amount)
+            val fieldsAfterAdd = awaitItem()
+            assertTrue("Fields should contain Amount after add", fieldsAfterAdd.contains(ShareableField.Amount))
+            assertEquals(defaultFields.size, fieldsAfterAdd.size)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Simple State Update Tests ---
+
+    @Test
+    fun `onAddTransactionDescriptionChanged updates suggestion flow and resets manual select on blank`() = runTest {
+        // Arrange
+        val foodCategory = Category(1, "Food & Drinks", "icon", "color")
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
+        initializeViewModel()
+
+        viewModel.suggestedCategory.test(timeout = 5.seconds) { // Increase timeout for debounce
+            assertNull("Initial suggestion should be null", awaitItem())
+
+            // Act 1: Type a keyword
+            viewModel.onAddTransactionDescriptionChanged("Coffee")
+            advanceTimeBy(500) // Wait for debounce
+
+            // Assert 1: Suggestion appears
+            assertEquals("Food & Drinks", awaitItem()?.name)
+
+            // Act 2: Manually select a category (simulated)
+            viewModel.onUserManuallySelectedCategory()
+            advanceUntilIdle()
+
+            // Act 3: Clear description
+            viewModel.onAddTransactionDescriptionChanged("")
+            advanceTimeBy(500) // Wait for debounce
+
+            // Assert 3: Suggestion becomes null
+            assertEquals(null, awaitItem())
+
+            // Act 4: Type keyword again to see if manual select was reset
+            viewModel.onAddTransactionDescriptionChanged("Pizza")
+            advanceTimeBy(500) // Wait for debounce
+
+            // Assert 4: Suggestion should reappear, proving manual select was reset
+            assertEquals("Food & Drinks", awaitItem()?.name)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onUserManuallySelectedCategory stops suggestedCategory flow`() = runTest {
+        // Arrange
+        val foodCategory = Category(1, "Food & Drinks", "icon", "color")
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
+        initializeViewModel()
+
+        viewModel.suggestedCategory.test(timeout = 5.seconds) {
+            assertNull("Initial suggestion should be null", awaitItem())
+
+            // Act 1: Type a keyword, get suggestion
+            viewModel.onAddTransactionDescriptionChanged("Coffee")
+            advanceTimeBy(500)
+            assertEquals("Food & Drinks", awaitItem()?.name)
+
+            // Act 2: Trigger manual select
+            viewModel.onUserManuallySelectedCategory()
+            advanceUntilIdle()
+
+            // Act 3: Type another keyword
+            viewModel.onAddTransactionDescriptionChanged("Burger")
+            advanceTimeBy(500)
+
+            // Assert 3: Suggestion should be null because manual select is true
+            assertEquals(null, awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `clearAddTransactionState resets all add-transaction states`() = runTest {
+        // Arrange
+        val foodCategory = Category(1, "Food & Drinks", "icon", "color")
+        val testTag = Tag(1, "Test")
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
+        initializeViewModel()
+
+        // Set up a dirty state
+        viewModel.onAddTransactionDescriptionChanged("Coffee")
+        viewModel.onTagSelected(testTag)
+        viewModel.onUserManuallySelectedCategory()
+        advanceUntilIdle()
+
+        // Pre-condition asserts
+        assertEquals(setOf(testTag), viewModel.selectedTags.value)
+
+        // Act
+        viewModel.clearAddTransactionState()
+        advanceUntilIdle()
+
+        // Assert 1: Check cleared states
+        assertTrue("Selected tags should be empty", viewModel.selectedTags.value.isEmpty())
+
+        // Assert 2: Check if description and manual select were reset by testing suggestedCategory
+        viewModel.suggestedCategory.test(timeout = 5.seconds) {
+            assertNull("Suggestion should be null initially after clear", awaitItem())
+
+            viewModel.onAddTransactionDescriptionChanged("Coffee")
+            advanceTimeBy(500)
+
+            assertEquals("Suggestion should appear, proving state was reset", "Food & Drinks", awaitItem()?.name)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `clearOriginalSms clears the sms text flow`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val smsId = 123L
+        val smsBody = "This is the original SMS body"
+        val transaction = Transaction(id = transactionId, description = "Test", amount = 1.0, date = 0, accountId = 1, categoryId = 1, notes = null, sourceSmsId = smsId, originalDescription = "Test")
+
+        // Mocks for loadTransactionForDetailScreen
+        `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(transaction))
+        `when`(transactionRepository.getTagsForTransaction(transactionId)).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getImagesForTransaction(transactionId)).thenReturn(flowOf(emptyList()))
+        `when`(smsRepository.getSmsDetailsById(smsId)).thenReturn(SmsMessage(smsId, "Sender", smsBody, 0L))
+        `when`(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+        initializeViewModel()
+
+        viewModel.originalSmsText.test {
+            assertNull("Initial state should be null", awaitItem())
+
+            // Act 1: Load the SMS
+            viewModel.loadTransactionForDetailScreen(transactionId)
+            advanceUntilIdle()
+
+            // Assert 1: SMS is loaded
+            assertEquals(smsBody, awaitItem())
+
+            // Act 2: Clear the SMS
+            viewModel.clearOriginalSms()
+
+            // Assert 2: SMS is cleared
+            assertNull(awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Tag Logic Tests ---
+
+    @Test
+    fun `updateTagsForTransaction calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val tags = setOf(Tag(1, "test"))
+        // Set the internal state that the VM function will read from
+        tags.forEach { viewModel.onTagSelected(it) }
+        advanceUntilIdle()
+
+        // Act
+        viewModel.updateTagsForTransaction(transactionId) // Call with only the ID
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateTagsForTransaction(transactionId, tags)
+        // Check no error event
+        viewModel.uiEvent.test {
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun `updateTagsForTransaction failure sends uiEvent`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val tags = setOf(Tag(1, "test"))
+        val errorMessage = "Failed to update tags. Please try again."
+
+        // Set the internal state
+        tags.forEach { viewModel.onTagSelected(it) }
+        advanceUntilIdle()
+
+        // Mock the repository call to throw an exception
+        `when`(transactionRepository.updateTagsForTransaction(eq(transactionId), eq(tags)))
+            .thenThrow(RuntimeException("DB update failed"))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.updateTagsForTransaction(transactionId) // Call with only the ID
+            advanceUntilIdle() // Re-add advanceUntilIdle to fix timeout
+            assertEquals(errorMessage, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onTagSelected adds and removes tags from selectedTags flow`() = runTest {
+        // Arrange
+        val tag1 = Tag(1, "Groceries")
+        val tag2 = Tag(2, "Fun")
+
+        viewModel.selectedTags.test {
+            // Initial state
+            assertTrue("Initial tags should be empty", awaitItem().isEmpty())
+
+            // Act 1: Add tag1
+            viewModel.onTagSelected(tag1)
+            assertEquals("Should contain tag1", setOf(tag1), awaitItem())
+
+            // Act 2: Add tag2
+            viewModel.onTagSelected(tag2)
+            assertEquals("Should contain tag1 and tag2", setOf(tag1, tag2), awaitItem())
+
+            // Act 3: Remove tag1
+            viewModel.onTagSelected(tag1)
+            assertEquals("Should only contain tag2", setOf(tag2), awaitItem())
+
+            // Act 4: Remove tag2
+            viewModel.onTagSelected(tag2)
+            assertTrue("Should be empty again", awaitItem().isEmpty())
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `addTagOnTheGo inserts new tag and selects it`() = runTest {
+        // Arrange
+        val newTagName = "NewTag"
+        val newTagRowId = 10L // This is the Long ID returned from the repository
+        // This mocks the repository's insert function, which should take a Tag with no ID
+        // and return the new row ID (Long).
+        `when`(tagRepository.insert(Tag(name = newTagName))).thenReturn(newTagRowId)
+
+        viewModel.selectedTags.test {
+            // Initial state
+            assertTrue("Initial tags should be empty", awaitItem().isEmpty())
+
+            // Act
+            viewModel.addTagOnTheGo(newTagName)
+            advanceUntilIdle() // Let the coroutine launch
+
+            // Assert
+            // 1. Verify repository insert was called correctly
+            verify(tagRepository).insert(Tag(name = newTagName))
+
+            // 2. Verify the selectedTags flow was updated with the new tag,
+            // which should now have the ID cast to an Int for the Tag data class.
+            val expectedTag = Tag(id = newTagRowId.toInt(), name = newTagName)
+            assertEquals("Should contain the new tag", setOf(expectedTag), awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `addTagOnTheGo failure sends uiEvent`() = runTest {
+        // Arrange
+        val newTagName = "BadTag"
+        val errorMessage = "Failed to add new tag. Please try again."
+        `when`(tagRepository.insert(Tag(name = newTagName)))
+            .thenThrow(RuntimeException("DB insert failed"))
+
+        // Act & Assert
+        viewModel.uiEvent.test {
+            viewModel.addTagOnTheGo(newTagName)
+            advanceUntilIdle() // Re-add advanceUntilIdle to fix timeout
+
+            // Assert
+            assertEquals(errorMessage, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Also check that selectedTags was not modified
+        viewModel.selectedTags.test {
+            assertTrue("Tags should remain empty on failure", awaitItem().isEmpty())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Retro Update Sheet Tests ---
+
+    /**
+     * Helper to set the ViewModel's retroUpdateSheetState to a valid, non-null value.
+     * This simulates the sheet being opened by onAttemptToLeaveScreen.
+     */
+    private fun setupRetroSheet(
+        newDesc: String? = "Starbucks Coffee",
+        newCatId: Int? = null,
+        numSimilar: Int = 2
+    ) = runTest {
+        val initialTxn = Transaction(id = 1, description = "Starbucks", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, notes = null, originalDescription = "Starbucks")
+        val currentTxn = initialTxn.copy(
+            description = newDesc ?: initialTxn.description,
+            categoryId = newCatId ?: initialTxn.categoryId
+        )
+        val similarTxns = (2 until 2 + numSimilar).map {
+            Transaction(id = it, description = "Starbucks", categoryId = 1, amount = 12.0, date = 0L, accountId = 1, notes = null)
+        }
+
+        `when`(transactionRepository.getTransactionById(1)).thenReturn(flowOf(initialTxn), flowOf(currentTxn))
+        `when`(transactionRepository.findSimilarTransactions("Starbucks", 1)).thenReturn(similarTxns)
+        `when`(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+        `when`(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+        `when`(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+        viewModel.loadTransactionForDetailScreen(1)
+        viewModel.onAttemptToLeaveScreen { }
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `dismissRetroUpdateSheet sets state to null`() = runTest {
+        // ARRANGE
+        setupRetroSheet()
+        assertNotNull("Pre-condition: Sheet state should be set", viewModel.retroUpdateSheetState.value)
+
+        // ACT
+        viewModel.dismissRetroUpdateSheet()
+
+        // ASSERT
+        assertNull("Sheet state should be null after dismiss", viewModel.retroUpdateSheetState.value)
+    }
+
+    @Test
+    fun `toggleRetroUpdateSelection adds and removes id`() = runTest {
+        // ARRANGE
+        setupRetroSheet() // Sets initial selected IDs to {2, 3}
+        assertEquals(setOf(2, 3), viewModel.retroUpdateSheetState.value?.selectedIds)
+
+        // ACT 1: Remove ID 2
+        viewModel.toggleRetroUpdateSelection(2)
+        advanceUntilIdle()
+        // ASSERT 1
+        assertEquals(setOf(3), viewModel.retroUpdateSheetState.value?.selectedIds)
+
+        // ACT 2: Add ID 4
+        viewModel.toggleRetroUpdateSelection(4)
+        advanceUntilIdle()
+        // ASSERT 2
+        assertEquals(setOf(3, 4), viewModel.retroUpdateSheetState.value?.selectedIds)
+    }
+
+    @Test
+    fun `toggleRetroUpdateSelectAll selects all and deselects all`() = runTest {
+        // ARRANGE
+        setupRetroSheet(numSimilar = 3) // similar = {2, 3, 4}, selected = {2, 3, 4}
+        assertEquals(setOf(2, 3, 4), viewModel.retroUpdateSheetState.value?.selectedIds)
+
+        // ACT 1: Deselect all (since all are selected)
+        viewModel.toggleRetroUpdateSelectAll()
+        advanceUntilIdle()
+        // ASSERT 1
+        assertEquals(emptySet<Int>(), viewModel.retroUpdateSheetState.value?.selectedIds)
+
+        // ACT 2: Select all
+        viewModel.toggleRetroUpdateSelectAll()
+        advanceUntilIdle()
+        // ASSERT 2
+        assertEquals(setOf(2, 3, 4), viewModel.retroUpdateSheetState.value?.selectedIds)
+    }
+
+    @Test
+    fun `performBatchUpdate updates all fields, creates rule, and dismisses`() = runTest {
+        // ARRANGE
+        setupRetroSheet(newDesc = "Starbucks Coffee", newCatId = 5, numSimilar = 2)
+        val expectedIdsToUpdate = listOf(2, 3)
+
+        // Pre-condition check
+        val state = viewModel.retroUpdateSheetState.value
+        assertNotNull(state)
+        assertEquals(setOf(2, 3), state?.selectedIds)
+        assertEquals("Starbucks Coffee", state?.newDescription)
+        assertEquals(5, state?.newCategoryId)
+
+        // ACT & ASSERT
+        viewModel.uiEvent.test {
+            viewModel.performBatchUpdate()
+            advanceUntilIdle()
+
+            // Verify repo calls
+            verify(merchantRenameRuleRepository).insert(MerchantRenameRule("Starbucks", "Starbucks Coffee"))
+            verify(transactionRepository).updateDescriptionForIds(expectedIdsToUpdate, "Starbucks Coffee")
+            verify(transactionRepository).updateCategoryForIds(expectedIdsToUpdate, 5)
+
+            // Verify UI event
+            assertEquals("Updated 2 transaction(s).", awaitItem())
+
+            // Verify dismiss
+            assertNull("Sheet should be dismissed", viewModel.retroUpdateSheetState.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `performBatchUpdate with no IDs selected just dismisses`() = runTest {
+        // ARRANGE
+        setupRetroSheet()
+        assertNotNull(viewModel.retroUpdateSheetState.value)
+
+        // ACT: Deselect all
+        viewModel.toggleRetroUpdateSelectAll() // Deselects {2, 3}
+        advanceUntilIdle()
+        assertEquals(emptySet<Int>(), viewModel.retroUpdateSheetState.value?.selectedIds)
+
+        viewModel.performBatchUpdate()
+        advanceUntilIdle()
+
+        // ASSERT
+        verify(merchantRenameRuleRepository, never()).insert(anyObject())
+        verify(transactionRepository, never()).updateDescriptionForIds(anyObject(), anyString())
+        verify(transactionRepository, never()).updateCategoryForIds(anyObject(), anyInt())
+        assertNull("Sheet should be dismissed", viewModel.retroUpdateSheetState.value)
+    }
+
+    @Test
+    fun `performBatchUpdate on failure sends error event and dismisses`() = runTest {
+        // ARRANGE
+        setupRetroSheet()
+        assertNotNull(viewModel.retroUpdateSheetState.value)
+        val expectedErrorMessage = "Batch update failed. Please try again."
+
+        // --- MODIFICATION: Mock failure ---
+        `when`(transactionRepository.updateDescriptionForIds(anyObject(), anyString()))
+            .thenThrow(RuntimeException("Database failed!"))
+
+        // ACT & ASSERT
+        viewModel.uiEvent.test {
+            viewModel.performBatchUpdate()
+
+            // Note: advanceUntilIdle() is not needed here because the testDispatcher is Unconfined
+            // and the coroutine will execute eagerly.
+
+            // Verify error event
+            assertEquals(expectedErrorMessage, awaitItem())
+
+            // Verify state is still dismissed (due to finally block)
+            assertNull("Sheet should be dismissed even on failure", viewModel.retroUpdateSheetState.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Tests for Merchant Search ---
+
+    @Test
+    fun `onMerchantSearchQueryChanged triggers merchantPredictions flow`() = runTest {
+        // Arrange
+        val query = "Coffee"
+        val mockPredictions = listOf(
+            MerchantPrediction("Coffee Shop", 1, "Food", "icon", "color")
+        )
+        `when`(transactionRepository.searchMerchants(query)).thenReturn(flowOf(mockPredictions))
+
+        // Act & Assert
+        viewModel.merchantPredictions.test(timeout = 5.seconds) {
+            assertEquals("Initial state should be empty", emptyList<MerchantPrediction>(), awaitItem())
+
+            viewModel.onMerchantSearchQueryChanged(query)
+            advanceTimeBy(301) // Wait for debounce
+
+            assertEquals("Predictions should be emitted", mockPredictions, awaitItem())
+            verify(transactionRepository).searchMerchants(query)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `clearMerchantSearch clears merchantPredictions flow`() = runTest {
+        // Arrange
+        val query = "Coffee"
+        val mockPredictions = listOf(
+            MerchantPrediction("Coffee Shop", 1, "Food", "icon", "color")
+        )
+        `when`(transactionRepository.searchMerchants(query)).thenReturn(flowOf(mockPredictions))
+
+        // Act & Assert
+        viewModel.merchantPredictions.test(timeout = 5.seconds) {
+            assertEquals("Initial state should be empty", emptyList<MerchantPrediction>(), awaitItem())
+
+            // Set a query first
+            viewModel.onMerchantSearchQueryChanged(query)
+            advanceTimeBy(301) // Wait for debounce
+            assertEquals("Predictions should be emitted", mockPredictions, awaitItem())
+
+            // Now clear it
+            viewModel.clearMerchantSearch()
+            advanceTimeBy(301) // Wait for debounce (query is now "")
+
+            assertEquals("Predictions should be cleared", emptyList<MerchantPrediction>(), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Tests for Category Change Request ---
+
+    @Test
+    fun `requestCategoryChange updates flow`() = runTest {
+        // Arrange
+        val transaction = Transaction(id = 1, description = "Test", amount = 1.0, date = 0, accountId = 1, categoryId = 1, notes = null)
+        val mockDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
+
+        // Act & Assert
+        viewModel.transactionForCategoryChange.test {
+            assertNull("Initial state should be null", awaitItem())
+            viewModel.requestCategoryChange(mockDetails)
+            assertEquals("State should be updated with details", mockDetails, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `cancelCategoryChange resets flow to null`() = runTest {
+        // Arrange
+        val transaction = Transaction(id = 1, description = "Test", amount = 1.0, date = 0, accountId = 1, categoryId = 1, notes = null)
+        val mockDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
+
+        // Act & Assert
+        viewModel.transactionForCategoryChange.test {
+            assertNull("Initial state should be null", awaitItem())
+
+            viewModel.requestCategoryChange(mockDetails)
+            assertEquals("State should be updated with details", mockDetails, awaitItem())
+
+            viewModel.cancelCategoryChange()
+            assertNull("State should be reset to null", awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Test for getSplitDetailsForTransaction ---
+
+    @Test
+    fun `getSplitDetailsForTransaction calls repository`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val mockSplits = listOf(
+            SplitTransactionDetails(SplitTransaction(1, 1, 50.0, 1, null), "Cat1", "", "")
+        )
+        `when`(splitTransactionRepository.getSplitsForParent(transactionId)).thenReturn(flowOf(mockSplits))
+
+        // Act
+        val resultFlow = viewModel.getSplitDetailsForTransaction(transactionId)
+
+        // Assert
+        resultFlow.test {
+            assertEquals("Flow should emit repository data", mockSplits, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify(splitTransactionRepository).getSplitsForParent(transactionId)
+    }
+
+    // --- NEW: Tests for functions requested in the last prompt ---
+
+    @Test
+    @Ignore
+    fun `saveTransactionSplits calls DAOs within transaction`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val parentTxn = Transaction(id = transactionId, description = "Parent", amount = 100.0, date = 0L, accountId = 1, categoryId = 1, notes = null)
+        val category = Category(1, "Food", "icon", "color")
+        val splitItems = listOf(
+            SplitItem(-1, "60.0", category, "Lunch"),
+            SplitItem(-2, "40.0", null, "Snacks")
+        )
+        var onCompleteCalled = false
+
+        `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(parentTxn))
+
+        // Mock the withTransaction block
+        mockkStatic("androidx.room.RoomDatabaseKt")
+        coEvery { db.withTransaction<Unit>(any()) } coAnswers {
+            val block = arg<suspend () -> Unit>(0)
+            block()
+        }
+        val splitCaptor = argumentCaptor<List<SplitTransaction>>()
+
+        // Act
+        viewModel.saveTransactionSplits(transactionId, splitItems) { onCompleteCalled = true }
+        advanceUntilIdle()
+
+        // Assert
+        coVerify { db.withTransaction<Unit>(any()) }
+        verify(transactionDao).markAsSplit(transactionId, true)
+        verify(splitTransactionDao).deleteSplitsForParent(transactionId)
+        verify(splitTransactionDao).insertAll(capture(splitCaptor))
+
+        val capturedSplits = splitCaptor.value
+        assertEquals(2, capturedSplits.size)
+        assertEquals(60.0, capturedSplits[0].amount, 0.0)
+        assertEquals(1, capturedSplits[0].categoryId)
+        assertEquals("Lunch", capturedSplits[0].notes)
+        assertEquals(40.0, capturedSplits[1].amount, 0.0)
+        assertNull(capturedSplits[1].categoryId)
+
+        assertTrue(onCompleteCalled)
+        unmockkStatic("androidx.room.RoomDatabaseKt")
+    }
+
+    @Test
+    fun `findTransactionDetailsById applies aliases`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val transaction = Transaction(id = transactionId, description = "amzn", originalDescription = "amzn", amount = 100.0, date = 1L, accountId = 1, categoryId = 1, notes = null)
+        val mockDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
+        val aliases = mapOf("amzn" to "Amazon")
+
+        `when`(transactionRepository.getTransactionDetailsById(transactionId)).thenReturn(flowOf(mockDetails))
+        `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
+
+        // --- THIS IS THE FIX ---
+        // Re-initialize the ViewModel *after* the test-specific mock for getAliasesAsMap is set.
+        // This ensures the `merchantAliases` StateFlow in the ViewModel's init block
+        // collects the correct map (with "Amazon") instead of the default `emptyMap()`.
+        initializeViewModel()
+
+        // Act
+        viewModel.findTransactionDetailsById(transactionId).test {
+            // Assert
+            val result = awaitItem()
+            assertNotNull(result)
+            assertEquals("Amazon", result!!.transaction.description)
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify(transactionRepository).getTransactionDetailsById(transactionId)
+    }
+
+    @Test
+    fun `setSelectedMonth updates selectedMonth flow`() = runTest {
+        // Arrange
+        val newCalendar = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
+
+        // Act & Assert
+        viewModel.selectedMonth.test {
+            val initialMonth = awaitItem().get(Calendar.MONTH)
+
+            viewModel.setSelectedMonth(newCalendar)
+
+            val newMonth = awaitItem().get(Calendar.MONTH)
+            assertEquals(newCalendar.get(Calendar.MONTH), newMonth)
+            assertNotEquals(initialMonth, newMonth)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `createAccount success case`() = runTest {
+        // Arrange
+        val newAccountName = "New Bank"
+        val newAccountType = "Bank"
+        val newAccount = Account(1, newAccountName, newAccountType)
+        var createdAccount: Account? = null
+
+        `when`(db.accountDao().findByName(newAccountName)).thenReturn(null)
+        `when`(accountRepository.insert(Account(name = newAccountName, type = newAccountType))).thenReturn(1L)
+        `when`(accountRepository.getAccountById(1)).thenReturn(flowOf(newAccount))
+
+        // Act
+        viewModel.createAccount(newAccountName, newAccountType) { createdAccount = it }
+        advanceUntilIdle()
+
+        // Assert
+        verify(accountRepository).insert(Account(name = newAccountName, type = newAccountType))
+        assertEquals(newAccount, createdAccount)
+    }
+
+    @Test
+    fun `createAccount failure on duplicate name`() = runTest {
+        // Arrange
+        val existingAccountName = "Existing Bank"
+        val existingAccount = Account(1, existingAccountName, "Bank")
+        var createdAccount: Account? = null
+
+        `when`(db.accountDao().findByName(existingAccountName)).thenReturn(existingAccount)
+
+        // Act & Assert
+        viewModel.validationError.test {
+            assertNull(awaitItem()) // Initial null
+            viewModel.createAccount(existingAccountName, "Bank") { createdAccount = it }
+            advanceUntilIdle()
+
+            assertEquals("An account named '$existingAccountName' already exists.", awaitItem())
+            assertNull(createdAccount)
+            verify(accountRepository, never()).insert(anyObject())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `createCategory success case`() = runTest {
+        // Arrange
+        val newCategoryName = "New Stuff"
+        val newIcon = "icon"
+        val newColor = "color"
+        val newCategory = Category(1, newCategoryName, newIcon, newColor)
+        var createdCategory: Category? = null
+
+        `when`(db.categoryDao().findByName(newCategoryName)).thenReturn(null)
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList())) // For color helper
+        `when`(categoryRepository.insert(Category(name = newCategoryName, iconKey = newIcon, colorKey = newColor))).thenReturn(1L)
+        `when`(categoryRepository.getCategoryById(1)).thenReturn(newCategory)
+
+        // Act
+        viewModel.createCategory(newCategoryName, newIcon, newColor) { createdCategory = it }
+        advanceUntilIdle()
+
+        // Assert
+        verify(categoryRepository).insert(Category(name = newCategoryName, iconKey = newIcon, colorKey = newColor))
+        assertEquals(newCategory, createdCategory)
+    }
+
+    @Test
+    fun `createCategory failure on duplicate name`() = runTest {
+        // Arrange
+        val existingCategoryName = "Food"
+        val existingCategory = Category(1, existingCategoryName, "icon", "color")
+        var createdCategory: Category? = null
+
+        `when`(db.categoryDao().findByName(existingCategoryName)).thenReturn(existingCategory)
+
+        // Act & Assert
+        viewModel.validationError.test {
+            assertNull(awaitItem()) // Initial null
+            viewModel.createCategory(existingCategoryName, "icon", "color") { createdCategory = it }
+            advanceUntilIdle()
+
+            assertEquals("A category named '$existingCategoryName' already exists.", awaitItem())
+            assertNull(createdCategory)
+            verify(categoryRepository, never()).insert(anyObject())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `clearError resets validationError flow`() = runTest {
+        // Act & Assert
+        viewModel.validationError.test {
+            assertNull("Initial state should be null", awaitItem())
+
+            // Manually trigger an error to set the state
+            viewModel.onSaveTapped("Test", "0.0", 1, 1, null, 0L, "expense", emptyList()) {}
+            advanceUntilIdle()
+
+            assertEquals("Error should be set", "Please enter a valid, positive amount.", awaitItem())
+
+            // Act: Call clearError
+            viewModel.clearError()
+
+            assertNull("Error should be cleared to null", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
+

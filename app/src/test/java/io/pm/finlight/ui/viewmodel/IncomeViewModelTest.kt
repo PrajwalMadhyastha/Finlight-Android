@@ -129,6 +129,50 @@ class IncomeViewModelTest : BaseViewModelTest() {
     }
 
     @Test
+    fun `updateFilterAccount updates filter state`() = runTest {
+        // Arrange
+        initializeViewModel()
+        val account = Account(1, "Test Account", "Bank")
+
+        // Assert
+        viewModel.filterState.test {
+            // 1. Await the initial default state
+            assertEquals(TransactionFilterState(), awaitItem())
+
+            // 2. Perform the action
+            viewModel.updateFilterAccount(account)
+
+            // 3. Await the updated state
+            val updatedState = awaitItem()
+            assertEquals(account, updatedState.account)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `updateFilterCategory updates filter state`() = runTest {
+        // Arrange
+        initializeViewModel()
+        val category = Category(1, "Test Category", "", "")
+
+        // Assert
+        viewModel.filterState.test {
+            // 1. Await the initial default state
+            assertEquals(TransactionFilterState(), awaitItem())
+
+            // 2. Perform the action
+            viewModel.updateFilterCategory(category)
+
+            // 3. Await the updated state
+            val updatedState = awaitItem()
+            assertEquals(category, updatedState.category)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `clearFilters resets filter state to default`() = runTest {
         // Arrange
         initializeViewModel()

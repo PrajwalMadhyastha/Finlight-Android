@@ -283,7 +283,27 @@ class CurrencyViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `historicTrips flow filters out active trip`() = runTest {
+    fun `historicTrips flow emits all trips when no travel mode is active`() = runTest {
+        // Arrange
+        val historicTrip1 = TripWithStats(1, "Historic Trip 1", 100L, 200L, 100.0, 1, 1, TripType.DOMESTIC, null, null)
+        val historicTrip2 = TripWithStats(2, "Historic Trip 2", 300L, 400L, 200.0, 2, 2, TripType.DOMESTIC, null, null)
+        val allTrips = listOf(historicTrip1, historicTrip2)
+
+        `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null)) // No active trip
+        `when`(tripRepository.getAllTripsWithStats()).thenReturn(flowOf(allTrips))
+        initializeViewModel()
+
+        // Assert
+        viewModel.historicTrips.test {
+            val filteredList = awaitItem()
+            assertEquals("When no trip is active, all trips should be returned", 2, filteredList.size)
+            assertEquals(allTrips, filteredList)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `historicTrips flow filters out the active trip`() = runTest {
         // Arrange
         val activeSettings = TravelModeSettings(true, "Active Trip", TripType.DOMESTIC, 1000L, 2000L, null, null)
         val activeTrip = TripWithStats(1, "Active Trip", 1000L, 2000L, 100.0, 1, 1, TripType.DOMESTIC, null, null)
@@ -297,7 +317,7 @@ class CurrencyViewModelTest : BaseViewModelTest() {
         // Assert
         viewModel.historicTrips.test {
             val filteredList = awaitItem()
-            assertEquals(1, filteredList.size)
+            assertEquals("Active trip should be filtered out", 1, filteredList.size)
             assertEquals("Historic Trip", filteredList.first().tripName)
             cancelAndIgnoreRemainingEvents()
         }
