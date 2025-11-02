@@ -6,6 +6,9 @@
 // ADDED: Tests for selection mode.
 // ADDED: Tests for sharing logic.
 // ADDED: Tests for filter logic.
+// ADDED: Tests for simple state update functions (e.g., onAddTransactionDescriptionChanged).
+// FIX (Test): Updated Turbine's `test` function call to use `timeout = 5.seconds`
+// instead of the deprecated `test(5000)`, resolving build errors.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -33,6 +36,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -54,6 +58,7 @@ import org.robolectric.Robolectric
 import org.robolectric.annotation.Config
 import java.lang.RuntimeException
 import kotlin.math.roundToLong
+import kotlin.time.Duration.Companion.seconds
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -886,6 +891,151 @@ class TransactionViewModelTest : BaseViewModelTest() {
             val fieldsAfterAdd = awaitItem()
             assertTrue("Fields should contain Amount after add", fieldsAfterAdd.contains(ShareableField.Amount))
             assertEquals(defaultFields.size, fieldsAfterAdd.size)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Simple State Update Tests ---
+
+    @Test
+    fun `onAddTransactionDescriptionChanged updates suggestion flow and resets manual select on blank`() = runTest {
+        // Arrange
+        val foodCategory = Category(1, "Food & Drinks", "icon", "color")
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
+        initializeViewModel()
+
+        viewModel.suggestedCategory.test(timeout = 5.seconds) { // Increase timeout for debounce
+            assertNull("Initial suggestion should be null", awaitItem())
+
+            // Act 1: Type a keyword
+            viewModel.onAddTransactionDescriptionChanged("Coffee")
+            advanceTimeBy(500) // Wait for debounce
+
+            // Assert 1: Suggestion appears
+            assertEquals("Food & Drinks", awaitItem()?.name)
+
+            // Act 2: Manually select a category (simulated)
+            viewModel.onUserManuallySelectedCategory()
+            advanceUntilIdle()
+
+            // Act 3: Clear description
+            viewModel.onAddTransactionDescriptionChanged("")
+            advanceTimeBy(500) // Wait for debounce
+
+            // Assert 3: Suggestion becomes null
+            assertEquals(null, awaitItem())
+
+            // Act 4: Type keyword again to see if manual select was reset
+            viewModel.onAddTransactionDescriptionChanged("Pizza")
+            advanceTimeBy(500) // Wait for debounce
+
+            // Assert 4: Suggestion should reappear, proving manual select was reset
+            assertEquals("Food & Drinks", awaitItem()?.name)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onUserManuallySelectedCategory stops suggestedCategory flow`() = runTest {
+        // Arrange
+        val foodCategory = Category(1, "Food & Drinks", "icon", "color")
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
+        initializeViewModel()
+
+        viewModel.suggestedCategory.test(timeout = 5.seconds) {
+            assertNull("Initial suggestion should be null", awaitItem())
+
+            // Act 1: Type a keyword, get suggestion
+            viewModel.onAddTransactionDescriptionChanged("Coffee")
+            advanceTimeBy(500)
+            assertEquals("Food & Drinks", awaitItem()?.name)
+
+            // Act 2: Trigger manual select
+            viewModel.onUserManuallySelectedCategory()
+            advanceUntilIdle()
+
+            // Act 3: Type another keyword
+            viewModel.onAddTransactionDescriptionChanged("Burger")
+            advanceTimeBy(500)
+
+            // Assert 3: Suggestion should be null because manual select is true
+            assertEquals(null, awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `clearAddTransactionState resets all add-transaction states`() = runTest {
+        // Arrange
+        val foodCategory = Category(1, "Food & Drinks", "icon", "color")
+        val testTag = Tag(1, "Test")
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
+        initializeViewModel()
+
+        // Set up a dirty state
+        viewModel.onAddTransactionDescriptionChanged("Coffee")
+        viewModel.onTagSelected(testTag)
+        viewModel.onUserManuallySelectedCategory()
+        advanceUntilIdle()
+
+        // Pre-condition asserts
+        assertEquals(setOf(testTag), viewModel.selectedTags.value)
+
+        // Act
+        viewModel.clearAddTransactionState()
+        advanceUntilIdle()
+
+        // Assert 1: Check cleared states
+        assertTrue("Selected tags should be empty", viewModel.selectedTags.value.isEmpty())
+
+        // Assert 2: Check if description and manual select were reset by testing suggestedCategory
+        viewModel.suggestedCategory.test(timeout = 5.seconds) {
+            assertNull("Suggestion should be null initially after clear", awaitItem())
+
+            viewModel.onAddTransactionDescriptionChanged("Coffee")
+            advanceTimeBy(500)
+
+            assertEquals("Suggestion should appear, proving state was reset", "Food & Drinks", awaitItem()?.name)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `clearOriginalSms clears the sms text flow`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val smsId = 123L
+        val smsBody = "This is the original SMS body"
+        val transaction = Transaction(id = transactionId, description = "Test", amount = 1.0, date = 0, accountId = 1, categoryId = 1, notes = null, sourceSmsId = smsId, originalDescription = "Test")
+
+        // Mocks for loadTransactionForDetailScreen
+        `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(transaction))
+        `when`(transactionRepository.getTagsForTransaction(transactionId)).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getImagesForTransaction(transactionId)).thenReturn(flowOf(emptyList()))
+        `when`(smsRepository.getSmsDetailsById(smsId)).thenReturn(SmsMessage(smsId, "Sender", smsBody, 0L))
+        `when`(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+        initializeViewModel()
+
+        viewModel.originalSmsText.test {
+            assertNull("Initial state should be null", awaitItem())
+
+            // Act 1: Load the SMS
+            viewModel.loadTransactionForDetailScreen(transactionId)
+            advanceUntilIdle()
+
+            // Assert 1: SMS is loaded
+            assertEquals(smsBody, awaitItem())
+
+            // Act 2: Clear the SMS
+            viewModel.clearOriginalSms()
+
+            // Assert 2: SMS is cleared
+            assertNull(awaitItem())
 
             cancelAndIgnoreRemainingEvents()
         }
