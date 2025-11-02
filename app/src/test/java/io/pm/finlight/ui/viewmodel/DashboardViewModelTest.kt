@@ -465,13 +465,9 @@ class DashboardViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(30000f))
         `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1000.0)))
 
-        // --- THIS IS THE FIX ---
-        // Mock the suspend function sequentially using .thenAnswer()
         `when`(transactionRepository.getTotalExpensesSince(anyLong()))
             .thenAnswer { 100.0 } // 1st call
             .thenAnswer { 90000.0 } // 2nd call (forces a "pacing high" scenario)
-        // --- END OF FIX ---
-
         initializeViewModel()
 
         // Act & Assert
