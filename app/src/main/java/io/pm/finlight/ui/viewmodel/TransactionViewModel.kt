@@ -3,6 +3,12 @@
 // REASON: FEATURE (Transaction Type Toggle) - Added the
 // `updateTransactionType` function to call the repository and added error
 // handling.
+//
+// FIX (Test): Removed explicit `Dispatchers.IO` from `updateTransactionCategory`
+// launch block. This was causing a race condition in unit tests, as the
+// TestDispatcher could not control the coroutine's execution.
+// The ViewModel should run on the Main dispatcher; the repository is
+// responsible for moving work off the main thread.
 // =================================================================================
 package io.pm.finlight
 
@@ -970,7 +976,9 @@ class TransactionViewModel(
         transactionRepository.updateNotes(id, notes.takeIf { it.isNotBlank() })
     }
 
-    fun updateTransactionCategory(id: Int, categoryId: Int?) = viewModelScope.launch(Dispatchers.IO) {
+    // --- THIS IS THE FIX ---
+    // Removed `(Dispatchers.IO)` from the coroutine launch.
+    fun updateTransactionCategory(id: Int, categoryId: Int?) = viewModelScope.launch {
         val transaction = transactionRepository.getTransactionById(id).first() ?: return@launch
         transactionRepository.updateCategoryId(id, categoryId)
 
