@@ -1,25 +1,5 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/TransactionViewModelTest.kt
-// REASON: FIX (Test) - Correcting build errors in new tag logic tests.
-// - `updateTagsForTransaction` now correctly reads tags from the
-//   `selectedTags` state flow, so the tests are updated to set this state
-//   before calling the VM function with only the transaction ID.
-// - `addTagOnTheGo` test fixed to handle the `Long` row ID returned from
-//   the repository and cast it to an `Int` for the `Tag` data class constructor,
-//   resolving the type mismatch.
-// REASON: FIX (Test) - Resolving `Unresolved reference 'conversationId'` build
-//   error in `clearOriginalSms` test. Replaced with `transactionId`.
-// REASON: FIX (Test) - Removing `advanceUntilIdle()` from Turbine `test` blocks
-//   for failure cases. With an UnconfinedTestDispatcher, the coroutine
-//   executes eagerly, and `advanceUntilIdle()` is unnecessary and may
-//   interfere with the test scheduler, causing the timeout.
-//
-// REASON: REFACTOR (Test) - Added new tests for merchant search, category
-// change requests, and split details logic to improve test coverage.
-//
-// REASON: REFACTOR (Test) - Added tests for saveTransactionSplits,
-// findTransactionDetailsById, setSelectedMonth, createAccount, createCategory,
-// and clearError to finalize coverage.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
