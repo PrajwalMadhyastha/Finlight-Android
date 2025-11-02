@@ -10,6 +10,9 @@
 // "Recurring Transactions" features.
 // FIX (UI) - Changed the title for 'automation_settings' from "Automation & AI"
 // to simply "Automation" to resolve a UI inconsistency.
+//
+// REASON: REFACTOR (Import-First) - Removed the screen title mapping for
+// "account_mapping_screen" as this route is being deleted.
 // =================================================================================
 package io.pm.finlight.ui
 
@@ -62,7 +65,6 @@ val screenTitles = mapOf(
     "category_detail/{categoryName}/{month}/{year}" to "Category Details",
     "merchant_detail/{merchantName}/{month}/{year}" to "Merchant Details",
     "customize_dashboard" to "Customize Dashboard",
-    "account_mapping_screen" to "Map New Accounts",
     "trip_detail/{tripId}/{tagId}" to "Trip Details",
     "analysis_screen" to "Spending Analysis",
     "analysis_detail_screen/{dimension}/{dimensionId}/{startDate}/{endDate}?title={title}" to "Analysis Details"

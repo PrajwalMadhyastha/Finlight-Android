@@ -12,6 +12,12 @@
 // to handle the new nullable `Float?` from `SettingsRepository`. It now uses
 // `map { (it ?: 0f).roundToLong() }`. This safely displays "₹0" in the hero card
 // if no budget is set for the current month, preventing a crash.
+//
+// REASON: FIX (Flaky Test) - The `_summaryRefreshTrigger` is now a `Long`
+// counter instead of a `System.currentTimeMillis()` timestamp. This fixes a
+// race condition in unit tests where the trigger could be updated with the
+// same millisecond value, preventing the StateFlow from emitting a new value
+// and causing the test to time out.
 // =================================================================================
 package io.pm.finlight
 
@@ -65,7 +71,8 @@ class DashboardViewModel(
 
     val yearlyConsistencyData: StateFlow<List<CalendarDayStatus>>
     val budgetHealthSummary: StateFlow<String>
-    private val _summaryRefreshTrigger = MutableStateFlow(System.currentTimeMillis())
+    // --- FIX: Use a counter instead of a timestamp to avoid race conditions in tests ---
+    private val _summaryRefreshTrigger = MutableStateFlow(0L)
 
     private val _lastMonthSummary = MutableStateFlow<LastMonthSummary?>(null)
     val lastMonthSummary: StateFlow<LastMonthSummary?> = _lastMonthSummary.asStateFlow()
@@ -359,7 +366,8 @@ class DashboardViewModel(
 
 
     fun refreshBudgetSummary() {
-        _summaryRefreshTrigger.value = System.currentTimeMillis()
+        // --- FIX: Use a counter to guarantee a new value ---
+        _summaryRefreshTrigger.value = _summaryRefreshTrigger.value + 1
     }
 
     // --- DELETED: generateYearlyConsistencyData function ---

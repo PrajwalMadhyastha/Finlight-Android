@@ -3,6 +3,12 @@
 // REASON: FEATURE (Transaction Type Toggle) - Added the
 // `updateTransactionType` function to call the repository and added error
 // handling.
+//
+// FIX (Test): Removed explicit `Dispatchers.IO` from `updateTransactionCategory`
+// launch block. This was causing a race condition in unit tests, as the
+// TestDispatcher could not control the coroutine's execution.
+// The ViewModel should run on the Main dispatcher; the repository is
+// responsible for moving work off the main thread.
 // =================================================================================
 package io.pm.finlight
 
@@ -970,7 +976,9 @@ class TransactionViewModel(
         transactionRepository.updateNotes(id, notes.takeIf { it.isNotBlank() })
     }
 
-    fun updateTransactionCategory(id: Int, categoryId: Int?) = viewModelScope.launch(Dispatchers.IO) {
+    // --- THIS IS THE FIX ---
+    // Removed `(Dispatchers.IO)` from the coroutine launch.
+    fun updateTransactionCategory(id: Int, categoryId: Int?) = viewModelScope.launch {
         val transaction = transactionRepository.getTransactionById(id).first() ?: return@launch
         transactionRepository.updateCategoryId(id, categoryId)
 
@@ -1008,7 +1016,12 @@ class TransactionViewModel(
     }
 
     fun updateTagsForTransaction(transactionId: Int) = viewModelScope.launch {
-        transactionRepository.updateTagsForTransaction(transactionId, _selectedTags.value)
+        try {
+            transactionRepository.updateTagsForTransaction(transactionId, _selectedTags.value)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update tags", e)
+            _uiEvent.send("Failed to update tags. Please try again.")
+        }
     }
 
     fun onTagSelected(tag: Tag) {
@@ -1018,15 +1031,20 @@ class TransactionViewModel(
     fun addTagOnTheGo(tagName: String) {
         if (tagName.isNotBlank()) {
             viewModelScope.launch {
-                val existingTag = db.tagDao().findByName(tagName)
-                if (existingTag != null) {
-                    _validationError.value = "A tag named '$tagName' already exists."
-                    return@launch
-                }
-                val newTag = Tag(name = tagName)
-                val newId = tagRepository.insert(newTag)
-                if (newId != -1L) {
-                    _selectedTags.update { it + newTag.copy(id = newId.toInt()) }
+                try {
+                    val existingTag = db.tagDao().findByName(tagName)
+                    if (existingTag != null) {
+                        _validationError.value = "A tag named '$tagName' already exists."
+                        return@launch
+                    }
+                    val newTag = Tag(name = tagName)
+                    val newId = tagRepository.insert(newTag)
+                    if (newId != -1L) {
+                        _selectedTags.update { it + newTag.copy(id = newId.toInt()) }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to add new tag", e)
+                    _uiEvent.send("Failed to add new tag. Please try again.")
                 }
             }
         }

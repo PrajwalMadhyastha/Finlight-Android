@@ -1,3 +1,10 @@
+// =================================================================================
+// FILE: ./app/src/test/java/io/pm/finlight/utils/NotificationHelperTest.kt
+//
+// REASON: FIX (Test) - Updated the `showAutoBackupNotification` test to pass
+// a mock timestamp to the function, aligning it with the new method signature
+// and resolving the build error.
+// =================================================================================
 package io.pm.finlight.utils
 
 import android.Manifest
@@ -29,10 +36,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import org.robolectric.shadows.ShadowApplication
 import org.robolectric.shadows.ShadowNotificationManager
 import org.robolectric.shadows.ShadowPendingIntent
 import java.net.URLDecoder
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
@@ -67,11 +76,16 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showAutoBackupNotification creates and posts a notification correctly`() {
         // Arrange
         val expectedTitle = "Backup Complete"
-        val expectedText = "Your Finlight data was successfully backed up."
         val notificationId = NotificationHelper.BACKUP_NOTIFICATION_ID
+        // --- FIX: Pass a mock timestamp ---
+        val backupTime = System.currentTimeMillis()
+        val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+        val formattedTime = sdf.format(Date(backupTime))
+        val expectedText = "Your Finlight data was successfully backed up at $formattedTime."
+
 
         // Act
-        NotificationHelper.showAutoBackupNotification(context)
+        NotificationHelper.showAutoBackupNotification(context, backupTime)
 
         // Assert
         val postedNotification = shadowNotificationManager.getNotification(notificationId)

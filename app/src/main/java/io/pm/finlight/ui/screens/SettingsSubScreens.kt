@@ -1,8 +1,15 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SettingsSubScreens.kt
-// REASON: FEATURE (Backup Time) - Added a new `SettingsActionItem` to display
-// the last backup timestamp. It formats the timestamp from the ViewModel into a
-// human-readable string and shows "Never" if a backup hasn't occurred yet.
+// REASON: CLEANUP - Removed the `SettingsActionItem` for "Backup Time" as well
+// as the now-unused `showAutoBackupTimePicker` state and its associated
+// `TimePicker` dialog. This aligns the UI with the new hardcoded 2 AM schedule.
+//
+// REASON: FEATURE (Backup) - Reworked the "Create Backup" section.
+// - Renamed to "Create Backup Snapshot".
+// - Added a new subtitle that collects and displays the `lastBackupTimestamp`.
+// - Added a new `BackupSnapshotSuccessDialog` that is triggered by the
+//   `showBackupSuccessDialog` state from the ViewModel.
+// - Added a `formatBackupTimestamp` helper function.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -18,9 +25,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.automirrored.filled.Rule
@@ -39,7 +47,6 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.SettingsActionItem
 import io.pm.finlight.ui.components.SettingsToggleItem
 import io.pm.finlight.ui.components.WeeklyReportTimePicker
@@ -51,6 +58,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -58,6 +66,15 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 private fun hasSmsPermission(context: Context): Boolean {
     return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
 }
+
+// --- NEW: Helper function to format the backup timestamp ---
+@Composable
+private fun formatBackupTimestamp(timestamp: Long): String {
+    if (timestamp == 0L) return "Never"
+    val sdf = remember { SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()) }
+    return sdf.format(Date(timestamp))
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,10 +151,9 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                         icon = Icons.AutoMirrored.Filled.ManageSearch,
                         onClick = {
                             if (!isScanning) {
-                                settingsViewModel.startSmsScanAndIdentifyMappings(null) { mappingNeeded ->
-                                    if (mappingNeeded) {
-                                        navController.navigate("account_mapping_screen")
-                                    }
+                                settingsViewModel.startSmsScanAndIdentifyMappings(null) { importedCount ->
+                                    // The lambda now just returns the count.
+                                    // The navigation logic is removed.
                                 }
                             }
                         },
@@ -159,10 +175,9 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                             Button(
                                 onClick = {
                                     if (!isScanning) {
-                                        settingsViewModel.startSmsScanAndIdentifyMappings(smsScanStartDate) { mappingNeeded ->
-                                            if (mappingNeeded) {
-                                                navController.navigate("account_mapping_screen")
-                                            }
+                                        settingsViewModel.startSmsScanAndIdentifyMappings(smsScanStartDate) { importedCount ->
+                                            // The lambda now just returns the count.
+                                            // The navigation logic is removed.
                                         }
                                     }
                                 },
@@ -380,21 +395,17 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
 
     val isAutoBackupEnabled by settingsViewModel.autoBackupEnabled.collectAsState()
     val isAutoBackupNotificationEnabled by settingsViewModel.autoBackupNotificationEnabled.collectAsState()
-    val autoBackupTime by settingsViewModel.autoBackupTime.collectAsState()
-    var showAutoBackupTimePicker by remember { mutableStateOf(false) }
+    // --- DELETED: autoBackupTime state ---
+    // --- DELETED: showAutoBackupTimePicker state ---
 
     val isPrivacyModeEnabled by settingsViewModel.privacyModeEnabled.collectAsState()
 
     // --- NEW: Observe the last backup timestamp ---
     val lastBackupTimestamp by settingsViewModel.lastBackupTimestamp.collectAsState()
-    val lastBackupFormatted = remember(lastBackupTimestamp) {
-        if (lastBackupTimestamp > 0L) {
-            val sdf = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
-            sdf.format(Date(lastBackupTimestamp))
-        } else {
-            "Never"
-        }
-    }
+    val lastBackupFormatted = formatBackupTimestamp(lastBackupTimestamp)
+
+    // --- NEW: Observe the dialog state ---
+    val showBackupSuccessDialog by settingsViewModel.showBackupSuccessDialog.collectAsState()
 
     // --- NEW: LaunchedEffect to handle UI events from the ViewModel ---
     LaunchedEffect(Unit) {
@@ -517,18 +528,12 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsToggleItem(
                         title = "Automatic Daily Backup",
-                        subtitle = "Backup your data to Google Drive daily",
+                        subtitle = "Backup your data to Google Drive daily at 2 AM",
                         icon = Icons.Default.CloudUpload,
                         checked = isAutoBackupEnabled,
                         onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) }
                     )
-                    SettingsActionItem(
-                        text = "Backup Time",
-                        subtitle = "Current: ${String.format("%02d:%02d", autoBackupTime.first, autoBackupTime.second)}",
-                        icon = Icons.Default.Schedule,
-                        onClick = { showAutoBackupTimePicker = true },
-                        enabled = isAutoBackupEnabled
-                    )
+                    // --- DELETED: SettingsActionItem for "Backup Time" ---
                     SettingsToggleItem(
                         title = "Backup Notification",
                         subtitle = "Notify when a backup is complete",
@@ -574,22 +579,23 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                         onClick = { showCsvInfoDialog = true },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    // --- UPDATED: Button text and subtitle ---
                     SettingsActionItem(
-                        text = "Create Backup Now",
-                        subtitle = "Manually create a snapshot & request a backup",
+                        text = "Create Backup Snapshot",
+                        subtitle = "Last cloud backup: $lastBackupFormatted",
                         icon = Icons.Default.Save,
                         onClick = { settingsViewModel.createBackupSnapshot() }
-                    )
-                    // --- NEW: Display the last backup timestamp ---
-                    SettingsActionItem(
-                        text = "Last Backup",
-                        subtitle = lastBackupFormatted,
-                        icon = Icons.Default.History,
-                        onClick = {} // Not clickable
                     )
                 }
             }
         }
+    }
+
+    // --- NEW: Backup Success Dialog ---
+    if (showBackupSuccessDialog) {
+        BackupSnapshotSuccessDialog(
+            onDismiss = { settingsViewModel.dismissBackupSuccessDialog() }
+        )
     }
 
 
@@ -627,35 +633,46 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
         )
     }
 
-    if (showAutoBackupTimePicker) {
-        val timePickerState = rememberTimePickerState(
-            initialHour = autoBackupTime.first,
-            initialMinute = autoBackupTime.second,
-            is24Hour = false
-        )
-        AlertDialog(
-            onDismissRequest = { showAutoBackupTimePicker = false },
-            title = { Text("Select Backup Time") },
-            text = {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    TimePicker(state = timePickerState)
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        settingsViewModel.saveAutoBackupTime(timePickerState.hour, timePickerState.minute)
-                        showAutoBackupTimePicker = false
-                    }
-                ) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAutoBackupTimePicker = false }) { Text("Cancel") }
-            },
-            containerColor = popupContainerColor
-        )
-    }
+    // --- DELETED: showAutoBackupTimePicker and its AlertDialog ---
 }
+
+// --- NEW: Dialog composable for backup success ---
+@Composable
+private fun BackupSnapshotSuccessDialog(onDismiss: () -> Unit) {
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = popupContainerColor,
+        icon = { Icon(Icons.Default.CloudDone, contentDescription = "Success", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary) },
+        title = { Text("Local Snapshot Created!", color = MaterialTheme.colorScheme.onSurface) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    "Your secure local snapshot is ready. We've notified the Android Backup Manager to back this file up to your Google Drive.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    buildString {
+                        append("Please Note: We don't control *when* this cloud backup happens. To force it immediately:\n")
+                        append("1. Go to your phone's Settings.\n")
+                        append("2. Search for 'Backup'.\n")
+                        append("3. Find and tap the 'Back up now' button.")
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 22.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Got It")
+            }
+        }
+    )
+}
+
 
 @Composable
 private fun SettingsSection(
@@ -742,7 +759,7 @@ private fun CsvInfoDialog(
         containerColor = popupContainerColor,
         title = { Text("CSV Import Format") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text("Please ensure your CSV file has the following columns in this exact order:")
                 Text(
                     text = "Id,ParentId,Date,Description,Amount,Type,Category,Account,Notes,IsExcluded,Tags",

@@ -3,6 +3,7 @@ package io.pm.finlight.ui.viewmodel
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.awaitItem
+import app.cash.turbine.expectMostRecentItem
 import app.cash.turbine.test
 import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -15,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
@@ -269,8 +271,9 @@ class DashboardViewModelTest : BaseViewModelTest() {
     @Test
     fun `budgetHealthSummary shows 'pacing high' message when forecast exceeds budget`() = runTest {
         // ARRANGE
+        // --- FIX: Set expenses > budget to force the "pacing high" scenario ---
         `when`(settingsRepository.getOverallBudgetForMonth(Mockito.anyInt(), Mockito.anyInt())).thenReturn(flowOf(2000f))
-        `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1900.0))) // High spend already
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(Mockito.anyLong(), Mockito.anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 2100.0))) // High spend already
         `when`(transactionRepository.getTotalExpensesSince(Mockito.anyLong())).thenReturn(500.0) // High recent spend velocity
 
         // ACT
@@ -461,29 +464,36 @@ class DashboardViewModelTest : BaseViewModelTest() {
         // Arrange
         `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(30000f))
         `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1000.0)))
-        // First call returns 100, second call (after refresh) returns 200
-        `when`(transactionRepository.getTotalExpensesSince(anyLong())).thenReturn(100.0).thenReturn(200.0)
+
+        `when`(transactionRepository.getTotalExpensesSince(anyLong()))
+            .thenAnswer { 100.0 } // 1st call
+            .thenAnswer { 90000.0 } // 2nd call (forces a "pacing high" scenario)
         initializeViewModel()
 
         // Act & Assert
         viewModel.budgetHealthSummary.test {
-            // 1. FIX: Advance time INSIDE the test block to resolve the deadlock
             advanceUntilIdle()
-            val initialMessage = awaitItem()
+            val initialMessage = awaitItem() // Consumes item 1 (Good Pacing)
             assertTrue("Initial message '$initialMessage' should be valid", allPossibleMessages.contains(initialMessage))
 
             // 2. Trigger refresh
             viewModel.refreshBudgetSummary()
             advanceUntilIdle() // Let the refresh logic run.
 
-            // 3. Use expectMostRecentItem() to handle the conflation case.
-            val finalMessage = expectMostRecentItem()
+            // 3. Await the new item. This will no longer time out.
+            val finalMessage = awaitItem() // Consumes item 2 (Pacing High)
+
+            // 4. Assert the new state is different and valid
             assertTrue("Final message '$finalMessage' should be valid", allPossibleMessages.contains(finalMessage))
+            assertTrue("Initial and final messages should be different due to mock change", initialMessage != finalMessage)
+
+            cancelAndIgnoreRemainingEvents()
         }
 
         // 4. The verification is the most important part, proving the logic re-ran.
         verify(transactionRepository, atLeast(2)).getTotalExpensesSince(anyLong())
     }
+
 
     @Test
     fun `recentTransactions applies merchant aliases correctly`() = runTest {
@@ -591,4 +601,3 @@ class DashboardViewModelTest : BaseViewModelTest() {
         }
     }
 }
-

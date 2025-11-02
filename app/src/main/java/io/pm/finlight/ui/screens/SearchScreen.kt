@@ -3,6 +3,11 @@
 // REASON: FEATURE (Date Display) - Added an `AnimatedVisibility` block that
 // displays the `searchUiState.displayDate` in a `GlassPanel` when a user
 // navigates from a heatmap. This provides clear context for the search results.
+//
+// REASON: FEATURE (Heatmap Summary) - The screen now collects the new
+// `daySummary` flow. When populated, it displays a new `DaySummaryCard`
+// composable directly below the date card, showing total income and expenses
+// for the selected day.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -42,6 +47,11 @@ import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import java.text.SimpleDateFormat
 import java.util.*
+// --- NEW IMPORTS ---
+import kotlin.math.roundToLong
+import java.text.NumberFormat
+import io.pm.finlight.FinancialSummary
+// --- END NEW IMPORTS ---
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
@@ -56,6 +66,8 @@ fun SearchScreen(
 ) {
     val searchUiState by searchViewModel.uiState.collectAsState()
     val searchResults by searchViewModel.searchResults.collectAsState()
+    // --- NEW: Collect the day summary ---
+    val daySummary by searchViewModel.daySummary.collectAsState()
 
     var showFilters by rememberSaveable { mutableStateOf(false) }
     var filtersAlreadyExpanded by rememberSaveable { mutableStateOf(false) }
@@ -182,7 +194,7 @@ fun SearchScreen(
             }
         }
 
-        // --- NEW: Display the selected date if provided ---
+        // --- UPDATED: This block now contains a Column for the date AND the summary ---
         AnimatedVisibility(
             visible = searchUiState.displayDate != null,
             enter = expandVertically(),
@@ -191,8 +203,10 @@ fun SearchScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // 1. Original Date Card
                 GlassPanel {
                     Column(
                         modifier = Modifier
@@ -213,9 +227,14 @@ fun SearchScreen(
                         )
                     }
                 }
+
+                // 2. NEW Day Summary Card
+                if (daySummary != null && (daySummary!!.totalIncome > 0 || daySummary!!.totalExpenses > 0)) {
+                    DaySummaryCard(summary = daySummary!!)
+                }
             }
         }
-        // --- END NEW UI ---
+        // --- END OF UPDATED BLOCK ---
 
         HorizontalDivider()
 
@@ -391,5 +410,54 @@ fun DateTextField(
                 disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         )
+    }
+}
+
+// --- NEW COMPOSABLE FOR THE DAY'S SUMMARY ---
+@Composable
+private fun DaySummaryCard(summary: FinancialSummary) {
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
+    }
+
+    val incomeColor = MaterialTheme.colorScheme.primary
+    val expenseColor = MaterialTheme.colorScheme.error
+
+    GlassPanel {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Total Income",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = currencyFormat.format(summary.totalIncome.roundToLong()),
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = incomeColor
+                )
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Total Expense",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = currencyFormat.format(summary.totalExpenses.roundToLong()),
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = expenseColor
+                )
+            }
+        }
     }
 }

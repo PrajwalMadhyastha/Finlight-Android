@@ -81,13 +81,15 @@ import java.util.concurrent.Executor
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 class MainActivity : AppCompatActivity() {
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
+        // Temporarily disable FLAG_SECURE
+//        window.setFlags(
+//            WindowManager.LayoutParams.FLAG_SECURE,
+//            WindowManager.LayoutParams.FLAG_SECURE
+//        )
 
 
         val settingsRepository = SettingsRepository(this)
@@ -121,6 +123,7 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 fun FinanceAppWithLockScreen(isInitiallyLocked: Boolean) {
     val context = LocalContext.current
@@ -631,13 +634,7 @@ fun AppNavHost(
                 transactionViewModel = transactionViewModel
             )
         }
-        composable("account_mapping_screen") {
-            AccountMappingScreen(
-                navController = navController,
-                settingsViewModel = settingsViewModel,
-                accountViewModel = accountViewModel
-            )
-        }
+        // --- DELETED: "account_mapping_screen" route ---
         composable(
             "customize_dashboard",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
@@ -661,7 +658,11 @@ fun AppNavHost(
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) { backStackEntry ->
             val transactionId = backStackEntry.arguments!!.getInt("transactionId")
-            SplitTransactionScreen(navController = navController, transactionId = transactionId)
+            SplitTransactionScreen(
+                navController = navController,
+                transactionId = transactionId,
+                transactionViewModel = transactionViewModel
+            )
         }
 
         composable(
@@ -670,9 +671,7 @@ fun AppNavHost(
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
-        ) {
-            ManageParseRulesScreen(navController, manageParseRulesViewModel)
-        }
+        ) { ManageParseRulesScreen(navController, manageParseRulesViewModel) }
         composable(
             "manage_ignore_rules",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
