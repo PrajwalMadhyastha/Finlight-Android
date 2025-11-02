@@ -3,6 +3,7 @@
 // REASON: FIX (Test) - The `autoSaveSmsTransaction` test has been updated. It
 // now correctly mocks the new `accountAliasDao.findByAlias` dependency, resolving
 // a test failure caused by the recent refactoring of the account resolution logic.
+// ADDED: Tests for selection mode.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -104,22 +105,33 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
 
         // Setup default mock behaviors for ViewModel initialization
-        `when`(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
-        `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
-        `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
-        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
-        `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getSpendingByMerchantForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
-        `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
-        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
-        `when`(tagRepository.allTags).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
-        `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
-        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
+        setupDefaultMocks()
 
         // Create the ViewModel instance with all mocked dependencies
         initializeViewModel()
+    }
+
+    /**
+     * Sets up default mock behaviors for all flows and suspend functions
+     * called within the TransactionViewModel's `init` block.
+     */
+    private fun setupDefaultMocks() {
+        runTest {
+            `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
+            `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
+            `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getSpendingByMerchantForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
+            `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
+            `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
+            `when`(tagRepository.allTags).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+            `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
+            `when`(db.accountDao().findByName(anyString())).thenReturn(null)
+            `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
+            `when`(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
+        }
     }
 
     private fun initializeViewModel() {
@@ -637,4 +649,118 @@ class TransactionViewModelTest : BaseViewModelTest() {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // --- NEW: Selection Mode Tests ---
+
+    @Test
+    fun `enterSelectionMode activates selection mode and selects initial transaction`() = runTest {
+        // Assert initial state
+        assertFalse("Selection mode should be inactive initially", viewModel.isSelectionModeActive.value)
+        assertTrue("Selected IDs should be empty initially", viewModel.selectedTransactionIds.value.isEmpty())
+
+        // Act
+        viewModel.enterSelectionMode(initialTransactionId = 1)
+        advanceUntilIdle() // Ensure coroutine in VM completes
+
+        // Assert final state
+        assertTrue("Selection mode should be active", viewModel.isSelectionModeActive.value)
+        assertEquals(setOf(1), viewModel.selectedTransactionIds.value)
+    }
+
+    @Test
+    fun `toggleTransactionSelection adds and removes ids correctly`() = runTest {
+        viewModel.selectedTransactionIds.test {
+            // Initial state
+            assertTrue("Selected IDs should be empty initially", awaitItem().isEmpty())
+
+            // Act: Add first item
+            viewModel.toggleTransactionSelection(1)
+            assertEquals(setOf(1), awaitItem())
+
+            // Act: Add second item
+            viewModel.toggleTransactionSelection(2)
+            assertEquals(setOf(1, 2), awaitItem())
+
+            // Act: Remove first item
+            viewModel.toggleTransactionSelection(1)
+            assertEquals(setOf(2), awaitItem())
+        }
+    }
+
+    @Test
+    fun `clearSelectionMode deactivates mode and clears selection`() = runTest {
+        // Arrange: Start in selection mode
+        viewModel.enterSelectionMode(1)
+        viewModel.toggleTransactionSelection(2)
+        advanceUntilIdle()
+        assertTrue("Pre-condition: Selection mode should be active", viewModel.isSelectionModeActive.value)
+        assertEquals("Pre-condition: 2 items selected", setOf(1, 2), viewModel.selectedTransactionIds.value)
+
+        // Act
+        viewModel.clearSelectionMode()
+        advanceUntilIdle()
+
+        // Assert
+        assertFalse("Selection mode should be inactive", viewModel.isSelectionModeActive.value)
+        assertTrue("Selected IDs should be empty", viewModel.selectedTransactionIds.value.isEmpty())
+    }
+
+    @Test
+    fun `onDeleteSelectionClick shows delete confirmation dialog`() = runTest {
+        viewModel.showDeleteConfirmation.test {
+            // Initial state
+            assertFalse("Dialog should be hidden initially", awaitItem())
+
+            // Act
+            viewModel.onDeleteSelectionClick()
+            advanceUntilIdle()
+
+            // Assert
+            assertTrue("Dialog should be visible", awaitItem())
+        }
+    }
+
+    @Test
+    fun `onConfirmDeleteSelection calls repository and clears selection`() = runTest {
+        // Arrange
+        val idsToDelete = setOf(1, 2)
+        viewModel.enterSelectionMode(1)
+        viewModel.toggleTransactionSelection(2)
+        viewModel.onDeleteSelectionClick() // Show dialog
+        advanceUntilIdle()
+
+        // Pre-conditions
+        assertTrue(viewModel.isSelectionModeActive.value)
+        assertTrue(viewModel.showDeleteConfirmation.value)
+        assertEquals(idsToDelete, viewModel.selectedTransactionIds.value)
+
+        // Act
+        viewModel.onConfirmDeleteSelection()
+        advanceUntilIdle() // Let the coroutine finish
+
+        // Assert
+        // Verify the repository was called with the correct list
+        verify(transactionRepository).deleteByIds(eq(idsToDelete.toList()))
+
+        // Verify state is reset
+        assertFalse("Selection mode should be inactive", viewModel.isSelectionModeActive.value)
+        assertFalse("Dialog should be hidden", viewModel.showDeleteConfirmation.value)
+        assertTrue("Selected IDs should be empty", viewModel.selectedTransactionIds.value.isEmpty())
+    }
+
+    @Test
+    fun `onCancelDeleteSelection hides delete confirmation dialog`() = runTest {
+        // Arrange
+        viewModel.onDeleteSelectionClick() // Show dialog
+        advanceUntilIdle()
+        assertTrue("Pre-condition: Dialog should be visible", viewModel.showDeleteConfirmation.value)
+
+        // Act
+        viewModel.onCancelDeleteSelection()
+        advanceUntilIdle()
+
+        // Assert
+        assertFalse("Dialog should be hidden", viewModel.showDeleteConfirmation.value)
+    }
 }
+
