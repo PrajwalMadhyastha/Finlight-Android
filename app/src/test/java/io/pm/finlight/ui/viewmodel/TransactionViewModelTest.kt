@@ -590,6 +590,113 @@ class TransactionViewModelTest : BaseViewModelTest() {
         assertEquals(2, sheetState?.selectedIds?.first()) // The ID of the similar transaction
     }
 
+    // --- NEW: Simple Update Function Tests (Success Path) ---
+
+    @Test
+    fun `updateTransactionAmount calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newAmountStr = "123.45"
+        val newAmountDouble = 123.45
+
+        // Act
+        viewModel.updateTransactionAmount(transactionId, newAmountStr)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateAmount(transactionId, newAmountDouble)
+    }
+
+    @Test
+    fun `updateTransactionNotes calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newNotes = "This is a test note"
+
+        // Act
+        viewModel.updateTransactionNotes(transactionId, newNotes)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateNotes(transactionId, newNotes)
+    }
+
+    @Test
+    fun `updateTransactionCategory calls repository and mapping logic`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newCategoryId = 5
+        val originalDescription = "Original Merchant"
+        val transaction = Transaction(
+            id = transactionId,
+            description = "Test",
+            amount = 1.0,
+            date = 0,
+            accountId = 1,
+            categoryId = 1,
+            notes = null,
+            originalDescription = originalDescription
+        )
+
+        `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(transaction))
+
+        // Act
+        viewModel.updateTransactionCategory(transactionId, newCategoryId)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateCategoryId(transactionId, newCategoryId)
+        // Verify learning logic is also called
+        verify(merchantCategoryMappingRepository).insert(
+            MerchantCategoryMapping(
+                parsedName = originalDescription,
+                categoryId = newCategoryId
+            )
+        )
+    }
+
+    @Test
+    fun `updateTransactionAccount calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newAccountId = 2
+
+        // Act
+        viewModel.updateTransactionAccount(transactionId, newAccountId)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateAccountId(transactionId, newAccountId)
+    }
+
+    @Test
+    fun `updateTransactionDate calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newDate = 123456789L
+
+        // Act
+        viewModel.updateTransactionDate(transactionId, newDate)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateDate(transactionId, newDate)
+    }
+
+    @Test
+    fun `updateTransactionExclusion calls repository successfully`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val newExclusionStatus = true
+
+        // Act
+        viewModel.updateTransactionExclusion(transactionId, newExclusionStatus)
+        advanceUntilIdle()
+
+        // Assert
+        verify(transactionRepository).updateExclusionStatus(transactionId, newExclusionStatus)
+    }
+
     // --- NEW TESTS FOR ERROR HANDLING ---
 
     @Test
@@ -1344,3 +1451,4 @@ class TransactionViewModelTest : BaseViewModelTest() {
     }
 
 }
+
