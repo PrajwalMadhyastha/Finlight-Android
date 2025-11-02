@@ -1177,7 +1177,6 @@ class TransactionViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `updateTagsForTransaction failure sends uiEvent`() = runTest {
         // Arrange
         val transactionId = 1
@@ -1195,7 +1194,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // Act & Assert
         viewModel.uiEvent.test {
             viewModel.updateTagsForTransaction(transactionId) // Call with only the ID
-            // advanceUntilIdle() // Removed this
+            advanceUntilIdle() // Re-add advanceUntilIdle to fix timeout
             assertEquals(errorMessage, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
@@ -1262,7 +1261,6 @@ class TransactionViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `addTagOnTheGo failure sends uiEvent`() = runTest {
         // Arrange
         val newTagName = "BadTag"
@@ -1273,7 +1271,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // Act & Assert
         viewModel.uiEvent.test {
             viewModel.addTagOnTheGo(newTagName)
-            // advanceUntilIdle() // Removed this
+            advanceUntilIdle() // Re-add advanceUntilIdle to fix timeout
 
             // Assert
             assertEquals(errorMessage, awaitItem())
