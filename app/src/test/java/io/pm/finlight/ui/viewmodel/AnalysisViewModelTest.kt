@@ -1,44 +1,5 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/AnalysisViewModelTest.kt
-// REASON: FIX (Build) - All mock calls to the DAO's analysis functions have been
-// updated to include the new `searchQuery` parameter, resolving all build errors.
-// The existing tests now pass `isNull()` for this parameter to maintain their
-// original logic.
-// FEATURE (Test) - Added new unit tests to validate the search functionality.
-// These tests confirm that updating the search query correctly filters the
-// analysis results and that the query is properly cleared when the user switches
-// between analysis dimensions.
-// FIX (Test) - Corrected two failing tests. The `initial uiState is correct` test
-// now properly handles the initial loading state caused by the debounce operator.
-// The `updating searchQuery calls DAO` test now uses the correct dispatcher context
-// and test structure to allow `debounce` to work as expected.
-//
-// REASON: FIX (Flaky/Hanging Test) - Overrode the setup/tearDown methods to
-// use a class-local StandardTestDispatcher. This ensures that the runTest
-// block and the ViewModel's debounce operator share the same virtual clock,
-// fixing all debounce-related test failures and hangs.
-//
-// REASON: FEATURE (Test) - Added new unit tests for the `selectTimePeriod`
-// function. These tests verify that changing the time period updates the
-// `uiState`, clears the custom date range if necessary, and triggers a
-// new data fetch from the DAO.
-//
-// REASON: FIX (Flaky/Hanging Test) - Corrected `selectTimePeriod` tests.
-// Replaced fragile mocks with chained `thenReturn()` calls. This fixes a race
-// condition where the test's mock was being consumed by the ViewModel's `init`
-// block, leading to incorrect state assertions and Turbine timeouts.
-//
-// REASON: FIX (NPE / Timeout) - Made default mocks in `setup()` more specific
-// to prevent Mockito from returning null on un-mocked argument combinations
-// (which caused the NPE).
-// Added chained `thenReturn()` to the `selectTimePeriod clears custom date`
-// test to ensure Turbine receives a new, distinct item, fixing the timeout.
-//
-// REASON: FIX (Test) - Corrected the failing assertion in
-// `selectTimePeriod clears custom date range when not CUSTOM`. The chained
-// mock was not set up correctly, causing the `setCustomDateRange` call to
-// consume a mock intended for the `init` block. The mock chain is now
-// properly defined to account for all calls in the test (init, custom, week).
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
