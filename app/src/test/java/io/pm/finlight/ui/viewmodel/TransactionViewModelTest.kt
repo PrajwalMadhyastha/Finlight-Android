@@ -1180,5 +1180,167 @@ class TransactionViewModelTest : BaseViewModelTest() {
         }
     }
 
-}
+    // --- NEW: Retro Update Sheet Tests ---
 
+    /**
+     * Helper to set the ViewModel's retroUpdateSheetState to a valid, non-null value.
+     * This simulates the sheet being opened by onAttemptToLeaveScreen.
+     */
+    private fun setupRetroSheet(
+        newDesc: String? = "Starbucks Coffee",
+        newCatId: Int? = null,
+        numSimilar: Int = 2
+    ) = runTest {
+        val initialTxn = Transaction(id = 1, description = "Starbucks", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, notes = null, originalDescription = "Starbucks")
+        val currentTxn = initialTxn.copy(
+            description = newDesc ?: initialTxn.description,
+            categoryId = newCatId ?: initialTxn.categoryId
+        )
+        val similarTxns = (2 until 2 + numSimilar).map {
+            Transaction(id = it, description = "Starbucks", categoryId = 1, amount = 12.0, date = 0L, accountId = 1, notes = null)
+        }
+
+        `when`(transactionRepository.getTransactionById(1)).thenReturn(flowOf(initialTxn), flowOf(currentTxn))
+        `when`(transactionRepository.findSimilarTransactions("Starbucks", 1)).thenReturn(similarTxns)
+        `when`(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+        `when`(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+        `when`(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+        viewModel.loadTransactionForDetailScreen(1)
+        viewModel.onAttemptToLeaveScreen { }
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `dismissRetroUpdateSheet sets state to null`() = runTest {
+        // ARRANGE
+        setupRetroSheet()
+        assertNotNull("Pre-condition: Sheet state should be set", viewModel.retroUpdateSheetState.value)
+
+        // ACT
+        viewModel.dismissRetroUpdateSheet()
+
+        // ASSERT
+        assertNull("Sheet state should be null after dismiss", viewModel.retroUpdateSheetState.value)
+    }
+
+    @Test
+    fun `toggleRetroUpdateSelection adds and removes id`() = runTest {
+        // ARRANGE
+        setupRetroSheet() // Sets initial selected IDs to {2, 3}
+        assertEquals(setOf(2, 3), viewModel.retroUpdateSheetState.value?.selectedIds)
+
+        // ACT 1: Remove ID 2
+        viewModel.toggleRetroUpdateSelection(2)
+        advanceUntilIdle()
+        // ASSERT 1
+        assertEquals(setOf(3), viewModel.retroUpdateSheetState.value?.selectedIds)
+
+        // ACT 2: Add ID 4
+        viewModel.toggleRetroUpdateSelection(4)
+        advanceUntilIdle()
+        // ASSERT 2
+        assertEquals(setOf(3, 4), viewModel.retroUpdateSheetState.value?.selectedIds)
+    }
+
+    @Test
+    fun `toggleRetroUpdateSelectAll selects all and deselects all`() = runTest {
+        // ARRANGE
+        setupRetroSheet(numSimilar = 3) // similar = {2, 3, 4}, selected = {2, 3, 4}
+        assertEquals(setOf(2, 3, 4), viewModel.retroUpdateSheetState.value?.selectedIds)
+
+        // ACT 1: Deselect all (since all are selected)
+        viewModel.toggleRetroUpdateSelectAll()
+        advanceUntilIdle()
+        // ASSERT 1
+        assertEquals(emptySet<Int>(), viewModel.retroUpdateSheetState.value?.selectedIds)
+
+        // ACT 2: Select all
+        viewModel.toggleRetroUpdateSelectAll()
+        advanceUntilIdle()
+        // ASSERT 2
+        assertEquals(setOf(2, 3, 4), viewModel.retroUpdateSheetState.value?.selectedIds)
+    }
+
+    @Test
+    fun `performBatchUpdate updates all fields, creates rule, and dismisses`() = runTest {
+        // ARRANGE
+        setupRetroSheet(newDesc = "Starbucks Coffee", newCatId = 5, numSimilar = 2)
+        val expectedIdsToUpdate = listOf(2, 3)
+
+        // Pre-condition check
+        val state = viewModel.retroUpdateSheetState.value
+        assertNotNull(state)
+        assertEquals(setOf(2, 3), state?.selectedIds)
+        assertEquals("Starbucks Coffee", state?.newDescription)
+        assertEquals(5, state?.newCategoryId)
+
+        // ACT & ASSERT
+        viewModel.uiEvent.test {
+            viewModel.performBatchUpdate()
+            advanceUntilIdle()
+
+            // Verify repo calls
+            verify(merchantRenameRuleRepository).insert(MerchantRenameRule("Starbucks", "Starbucks Coffee"))
+            verify(transactionRepository).updateDescriptionForIds(expectedIdsToUpdate, "Starbucks Coffee")
+            verify(transactionRepository).updateCategoryForIds(expectedIdsToUpdate, 5)
+
+            // Verify UI event
+            assertEquals("Updated 2 transaction(s).", awaitItem())
+
+            // Verify dismiss
+            assertNull("Sheet should be dismissed", viewModel.retroUpdateSheetState.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `performBatchUpdate with no IDs selected just dismisses`() = runTest {
+        // ARRANGE
+        setupRetroSheet()
+        assertNotNull(viewModel.retroUpdateSheetState.value)
+
+        // ACT: Deselect all
+        viewModel.toggleRetroUpdateSelectAll() // Deselects {2, 3}
+        advanceUntilIdle()
+        assertEquals(emptySet<Int>(), viewModel.retroUpdateSheetState.value?.selectedIds)
+
+        viewModel.performBatchUpdate()
+        advanceUntilIdle()
+
+        // ASSERT
+        verify(merchantRenameRuleRepository, never()).insert(anyObject())
+        verify(transactionRepository, never()).updateDescriptionForIds(anyObject(), anyString())
+        verify(transactionRepository, never()).updateCategoryForIds(anyObject(), anyInt())
+        assertNull("Sheet should be dismissed", viewModel.retroUpdateSheetState.value)
+    }
+
+    @Test
+    fun `performBatchUpdate on failure sends error event and dismisses`() = runTest {
+        // ARRANGE
+        setupRetroSheet()
+        assertNotNull(viewModel.retroUpdateSheetState.value)
+        val expectedErrorMessage = "Batch update failed. Please try again."
+
+        // --- MODIFICATION: Mock failure ---
+        `when`(transactionRepository.updateDescriptionForIds(anyObject(), anyString()))
+            .thenThrow(RuntimeException("Database failed!"))
+
+        // ACT & ASSERT
+        viewModel.uiEvent.test {
+            viewModel.performBatchUpdate()
+
+            // Note: advanceUntilIdle() is not needed here because the testDispatcher is Unconfined
+            // and the coroutine will execute eagerly.
+
+            // Verify error event
+            assertEquals(expectedErrorMessage, awaitItem())
+
+            // Verify state is still dismissed (due to finally block)
+            assertNull("Sheet should be dismissed even on failure", viewModel.retroUpdateSheetState.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+}
