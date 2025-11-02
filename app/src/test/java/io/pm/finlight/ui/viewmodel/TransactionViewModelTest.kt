@@ -5,6 +5,7 @@
 // a test failure caused by the recent refactoring of the account resolution logic.
 // ADDED: Tests for selection mode.
 // ADDED: Tests for sharing logic.
+// ADDED: Tests for filter logic.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -303,6 +304,83 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val updatedState = viewModel.filterState.first()
         assertEquals(newKeyword, updatedState.keyword)
     }
+
+    // --- NEW: Filter Logic Tests ---
+
+    @Test
+    fun `updateFilterAccount updates filterState correctly`() = runTest {
+        // ARRANGE
+        val newAccount = Account(1, "Test Account", "Bank")
+
+        // ACT
+        viewModel.updateFilterAccount(newAccount)
+
+        // ASSERT
+        val updatedState = viewModel.filterState.first()
+        assertEquals(newAccount, updatedState.account)
+    }
+
+    @Test
+    fun `updateFilterCategory updates filterState correctly`() = runTest {
+        // ARRANGE
+        val newCategory = Category(1, "Test Category", "icon", "color")
+
+        // ACT
+        viewModel.updateFilterCategory(newCategory)
+
+        // ASSERT
+        val updatedState = viewModel.filterState.first()
+        assertEquals(newCategory, updatedState.category)
+    }
+
+    @Test
+    fun `clearFilters resets filterState to default`() = runTest {
+        // ARRANGE
+        viewModel.updateFilterKeyword("test")
+        viewModel.updateFilterAccount(Account(1, "Test", "Bank"))
+        viewModel.updateFilterCategory(Category(1, "Test", "icon", "color"))
+        advanceUntilIdle()
+
+        // Pre-condition check
+        val currentState = viewModel.filterState.first()
+        assertNotEquals("", currentState.keyword)
+        assertNotNull(currentState.account)
+        assertNotNull(currentState.category)
+
+        // ACT
+        viewModel.clearFilters()
+        advanceUntilIdle() // Ensure the state update is processed
+
+        // ASSERT
+        val clearedState = viewModel.filterState.first()
+        assertEquals("", clearedState.keyword)
+        assertNull(clearedState.account)
+        assertNull(clearedState.category)
+    }
+
+    @Test
+    fun `onFilterClick sets showFilterSheet to true`() = runTest {
+        viewModel.showFilterSheet.test {
+            assertFalse("Sheet should be hidden initially", awaitItem())
+            viewModel.onFilterClick()
+            assertTrue("Sheet should be visible after click", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onFilterSheetDismiss sets showFilterSheet to false`() = runTest {
+        viewModel.showFilterSheet.test {
+            assertFalse("Sheet hidden initially", awaitItem())
+            viewModel.onFilterClick()
+            assertTrue("Sheet visible after click", awaitItem())
+            viewModel.onFilterSheetDismiss()
+            assertFalse("Sheet hidden after dismiss", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- End of Filter Logic Tests ---
 
     @Test
     fun `onSaveTapped with only amount saves directly without category nudge`() = runTest {
