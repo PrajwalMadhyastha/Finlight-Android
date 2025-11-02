@@ -4,6 +4,7 @@
 // now correctly mocks the new `accountAliasDao.findByAlias` dependency, resolving
 // a test failure caused by the recent refactoring of the account resolution logic.
 // ADDED: Tests for selection mode.
+// ADDED: Tests for sharing logic.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -23,6 +24,8 @@ import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.unmockkStatic
+import io.pm.finlight.ui.components.ShareableField
+import io.pm.finlight.utils.ShareImageGenerator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -46,6 +49,7 @@ import org.mockito.Mockito.anyString
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.kotlin.eq
+import org.robolectric.Robolectric
 import org.robolectric.annotation.Config
 import java.lang.RuntimeException
 import kotlin.math.roundToLong
@@ -762,5 +766,52 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // Assert
         assertFalse("Dialog should be hidden", viewModel.showDeleteConfirmation.value)
     }
+
+    // --- NEW: Share Logic Tests ---
+
+    @Test
+    fun `onShareClick sets showShareSheet to true`() = runTest {
+        viewModel.showShareSheet.test {
+            assertFalse("Sheet should be hidden initially", awaitItem())
+            viewModel.onShareClick()
+            assertTrue("Sheet should be visible after click", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onShareSheetDismiss sets showShareSheet to false`() = runTest {
+        viewModel.showShareSheet.test {
+            assertFalse("Sheet hidden initially", awaitItem())
+            viewModel.onShareClick()
+            assertTrue("Sheet visible after click", awaitItem())
+            viewModel.onShareSheetDismiss()
+            assertFalse("Sheet hidden after dismiss", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `onShareableFieldToggled adds and removes fields from state`() = runTest {
+        viewModel.shareableFields.test {
+            val defaultFields = awaitItem()
+            assertTrue("Default fields should contain Amount", defaultFields.contains(ShareableField.Amount))
+
+            // Act 1: Remove Amount
+            viewModel.onShareableFieldToggled(ShareableField.Amount)
+            val fieldsAfterRemove = awaitItem()
+            assertFalse("Fields should not contain Amount after remove", fieldsAfterRemove.contains(ShareableField.Amount))
+            assertEquals(defaultFields.size - 1, fieldsAfterRemove.size)
+
+            // Act 2: Add Amount back
+            viewModel.onShareableFieldToggled(ShareableField.Amount)
+            val fieldsAfterAdd = awaitItem()
+            assertTrue("Fields should contain Amount after add", fieldsAfterAdd.contains(ShareableField.Amount))
+            assertEquals(defaultFields.size, fieldsAfterAdd.size)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
 }
 
