@@ -16,6 +16,10 @@
 //
 // REASON: REFACTOR (Test) - Added new tests for merchant search, category
 // change requests, and split details logic to improve test coverage.
+//
+// REASON: REFACTOR (Test) - Added tests for saveTransactionSplits,
+// findTransactionDetailsById, setSelectedMonth, createAccount, createCategory,
+// and clearError to finalize coverage.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -52,6 +56,7 @@ import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mock
 import org.mockito.Mockito
@@ -66,6 +71,7 @@ import org.mockito.kotlin.eq
 import org.robolectric.Robolectric
 import org.robolectric.annotation.Config
 import java.lang.RuntimeException
+import java.util.Calendar
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.seconds
 
@@ -1560,6 +1566,207 @@ class TransactionViewModelTest : BaseViewModelTest() {
             cancelAndIgnoreRemainingEvents()
         }
         verify(splitTransactionRepository).getSplitsForParent(transactionId)
+    }
+
+    // --- NEW: Tests for functions requested in the last prompt ---
+
+    @Test
+    @Ignore
+    fun `saveTransactionSplits calls DAOs within transaction`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val parentTxn = Transaction(id = transactionId, description = "Parent", amount = 100.0, date = 0L, accountId = 1, categoryId = 1, notes = null)
+        val category = Category(1, "Food", "icon", "color")
+        val splitItems = listOf(
+            SplitItem(-1, "60.0", category, "Lunch"),
+            SplitItem(-2, "40.0", null, "Snacks")
+        )
+        var onCompleteCalled = false
+
+        `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(parentTxn))
+
+        // Mock the withTransaction block
+        mockkStatic("androidx.room.RoomDatabaseKt")
+        coEvery { db.withTransaction<Unit>(any()) } coAnswers {
+            val block = arg<suspend () -> Unit>(0)
+            block()
+        }
+        val splitCaptor = argumentCaptor<List<SplitTransaction>>()
+
+        // Act
+        viewModel.saveTransactionSplits(transactionId, splitItems) { onCompleteCalled = true }
+        advanceUntilIdle()
+
+        // Assert
+        coVerify { db.withTransaction<Unit>(any()) }
+        verify(transactionDao).markAsSplit(transactionId, true)
+        verify(splitTransactionDao).deleteSplitsForParent(transactionId)
+        verify(splitTransactionDao).insertAll(capture(splitCaptor))
+
+        val capturedSplits = splitCaptor.value
+        assertEquals(2, capturedSplits.size)
+        assertEquals(60.0, capturedSplits[0].amount, 0.0)
+        assertEquals(1, capturedSplits[0].categoryId)
+        assertEquals("Lunch", capturedSplits[0].notes)
+        assertEquals(40.0, capturedSplits[1].amount, 0.0)
+        assertNull(capturedSplits[1].categoryId)
+
+        assertTrue(onCompleteCalled)
+        unmockkStatic("androidx.room.RoomDatabaseKt")
+    }
+
+    @Test
+    fun `findTransactionDetailsById applies aliases`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val transaction = Transaction(id = transactionId, description = "amzn", originalDescription = "amzn", amount = 100.0, date = 1L, accountId = 1, categoryId = 1, notes = null)
+        val mockDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
+        val aliases = mapOf("amzn" to "Amazon")
+
+        `when`(transactionRepository.getTransactionDetailsById(transactionId)).thenReturn(flowOf(mockDetails))
+        `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
+
+        // --- THIS IS THE FIX ---
+        // Re-initialize the ViewModel *after* the test-specific mock for getAliasesAsMap is set.
+        // This ensures the `merchantAliases` StateFlow in the ViewModel's init block
+        // collects the correct map (with "Amazon") instead of the default `emptyMap()`.
+        initializeViewModel()
+
+        // Act
+        viewModel.findTransactionDetailsById(transactionId).test {
+            // Assert
+            val result = awaitItem()
+            assertNotNull(result)
+            assertEquals("Amazon", result!!.transaction.description)
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify(transactionRepository).getTransactionDetailsById(transactionId)
+    }
+
+    @Test
+    fun `setSelectedMonth updates selectedMonth flow`() = runTest {
+        // Arrange
+        val newCalendar = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
+
+        // Act & Assert
+        viewModel.selectedMonth.test {
+            val initialMonth = awaitItem().get(Calendar.MONTH)
+
+            viewModel.setSelectedMonth(newCalendar)
+
+            val newMonth = awaitItem().get(Calendar.MONTH)
+            assertEquals(newCalendar.get(Calendar.MONTH), newMonth)
+            assertNotEquals(initialMonth, newMonth)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `createAccount success case`() = runTest {
+        // Arrange
+        val newAccountName = "New Bank"
+        val newAccountType = "Bank"
+        val newAccount = Account(1, newAccountName, newAccountType)
+        var createdAccount: Account? = null
+
+        `when`(db.accountDao().findByName(newAccountName)).thenReturn(null)
+        `when`(accountRepository.insert(Account(name = newAccountName, type = newAccountType))).thenReturn(1L)
+        `when`(accountRepository.getAccountById(1)).thenReturn(flowOf(newAccount))
+
+        // Act
+        viewModel.createAccount(newAccountName, newAccountType) { createdAccount = it }
+        advanceUntilIdle()
+
+        // Assert
+        verify(accountRepository).insert(Account(name = newAccountName, type = newAccountType))
+        assertEquals(newAccount, createdAccount)
+    }
+
+    @Test
+    fun `createAccount failure on duplicate name`() = runTest {
+        // Arrange
+        val existingAccountName = "Existing Bank"
+        val existingAccount = Account(1, existingAccountName, "Bank")
+        var createdAccount: Account? = null
+
+        `when`(db.accountDao().findByName(existingAccountName)).thenReturn(existingAccount)
+
+        // Act & Assert
+        viewModel.validationError.test {
+            assertNull(awaitItem()) // Initial null
+            viewModel.createAccount(existingAccountName, "Bank") { createdAccount = it }
+            advanceUntilIdle()
+
+            assertEquals("An account named '$existingAccountName' already exists.", awaitItem())
+            assertNull(createdAccount)
+            verify(accountRepository, never()).insert(anyObject())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `createCategory success case`() = runTest {
+        // Arrange
+        val newCategoryName = "New Stuff"
+        val newIcon = "icon"
+        val newColor = "color"
+        val newCategory = Category(1, newCategoryName, newIcon, newColor)
+        var createdCategory: Category? = null
+
+        `when`(db.categoryDao().findByName(newCategoryName)).thenReturn(null)
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList())) // For color helper
+        `when`(categoryRepository.insert(Category(name = newCategoryName, iconKey = newIcon, colorKey = newColor))).thenReturn(1L)
+        `when`(categoryRepository.getCategoryById(1)).thenReturn(newCategory)
+
+        // Act
+        viewModel.createCategory(newCategoryName, newIcon, newColor) { createdCategory = it }
+        advanceUntilIdle()
+
+        // Assert
+        verify(categoryRepository).insert(Category(name = newCategoryName, iconKey = newIcon, colorKey = newColor))
+        assertEquals(newCategory, createdCategory)
+    }
+
+    @Test
+    fun `createCategory failure on duplicate name`() = runTest {
+        // Arrange
+        val existingCategoryName = "Food"
+        val existingCategory = Category(1, existingCategoryName, "icon", "color")
+        var createdCategory: Category? = null
+
+        `when`(db.categoryDao().findByName(existingCategoryName)).thenReturn(existingCategory)
+
+        // Act & Assert
+        viewModel.validationError.test {
+            assertNull(awaitItem()) // Initial null
+            viewModel.createCategory(existingCategoryName, "icon", "color") { createdCategory = it }
+            advanceUntilIdle()
+
+            assertEquals("A category named '$existingCategoryName' already exists.", awaitItem())
+            assertNull(createdCategory)
+            verify(categoryRepository, never()).insert(anyObject())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `clearError resets validationError flow`() = runTest {
+        // Act & Assert
+        viewModel.validationError.test {
+            assertNull("Initial state should be null", awaitItem())
+
+            // Manually trigger an error to set the state
+            viewModel.onSaveTapped("Test", "0.0", 1, 1, null, 0L, "expense", emptyList()) {}
+            advanceUntilIdle()
+
+            assertEquals("Error should be set", "Please enter a valid, positive amount.", awaitItem())
+
+            // Act: Call clearError
+            viewModel.clearError()
+
+            assertNull("Error should be cleared to null", awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }
 
