@@ -13,6 +13,9 @@
 //   for failure cases. With an UnconfinedTestDispatcher, the coroutine
 //   executes eagerly, and `advanceUntilIdle()` is unnecessary and may
 //   interfere with the test scheduler, causing the timeout.
+//
+// REASON: REFACTOR (Test) - Added new tests for merchant search, category
+// change requests, and split details logic to improve test coverage.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -32,6 +35,7 @@ import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.unmockkStatic
+import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.utils.ShareImageGenerator
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -1448,5 +1452,114 @@ class TransactionViewModelTest : BaseViewModelTest() {
         }
     }
 
+    // --- NEW: Tests for Merchant Search ---
+
+    @Test
+    fun `onMerchantSearchQueryChanged triggers merchantPredictions flow`() = runTest {
+        // Arrange
+        val query = "Coffee"
+        val mockPredictions = listOf(
+            MerchantPrediction("Coffee Shop", 1, "Food", "icon", "color")
+        )
+        `when`(transactionRepository.searchMerchants(query)).thenReturn(flowOf(mockPredictions))
+
+        // Act & Assert
+        viewModel.merchantPredictions.test(timeout = 5.seconds) {
+            assertEquals("Initial state should be empty", emptyList<MerchantPrediction>(), awaitItem())
+
+            viewModel.onMerchantSearchQueryChanged(query)
+            advanceTimeBy(301) // Wait for debounce
+
+            assertEquals("Predictions should be emitted", mockPredictions, awaitItem())
+            verify(transactionRepository).searchMerchants(query)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `clearMerchantSearch clears merchantPredictions flow`() = runTest {
+        // Arrange
+        val query = "Coffee"
+        val mockPredictions = listOf(
+            MerchantPrediction("Coffee Shop", 1, "Food", "icon", "color")
+        )
+        `when`(transactionRepository.searchMerchants(query)).thenReturn(flowOf(mockPredictions))
+
+        // Act & Assert
+        viewModel.merchantPredictions.test(timeout = 5.seconds) {
+            assertEquals("Initial state should be empty", emptyList<MerchantPrediction>(), awaitItem())
+
+            // Set a query first
+            viewModel.onMerchantSearchQueryChanged(query)
+            advanceTimeBy(301) // Wait for debounce
+            assertEquals("Predictions should be emitted", mockPredictions, awaitItem())
+
+            // Now clear it
+            viewModel.clearMerchantSearch()
+            advanceTimeBy(301) // Wait for debounce (query is now "")
+
+            assertEquals("Predictions should be cleared", emptyList<MerchantPrediction>(), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Tests for Category Change Request ---
+
+    @Test
+    fun `requestCategoryChange updates flow`() = runTest {
+        // Arrange
+        val transaction = Transaction(id = 1, description = "Test", amount = 1.0, date = 0, accountId = 1, categoryId = 1, notes = null)
+        val mockDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
+
+        // Act & Assert
+        viewModel.transactionForCategoryChange.test {
+            assertNull("Initial state should be null", awaitItem())
+            viewModel.requestCategoryChange(mockDetails)
+            assertEquals("State should be updated with details", mockDetails, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `cancelCategoryChange resets flow to null`() = runTest {
+        // Arrange
+        val transaction = Transaction(id = 1, description = "Test", amount = 1.0, date = 0, accountId = 1, categoryId = 1, notes = null)
+        val mockDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
+
+        // Act & Assert
+        viewModel.transactionForCategoryChange.test {
+            assertNull("Initial state should be null", awaitItem())
+
+            viewModel.requestCategoryChange(mockDetails)
+            assertEquals("State should be updated with details", mockDetails, awaitItem())
+
+            viewModel.cancelCategoryChange()
+            assertNull("State should be reset to null", awaitItem())
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Test for getSplitDetailsForTransaction ---
+
+    @Test
+    fun `getSplitDetailsForTransaction calls repository`() = runTest {
+        // Arrange
+        val transactionId = 1
+        val mockSplits = listOf(
+            SplitTransactionDetails(SplitTransaction(1, 1, 50.0, 1, null), "Cat1", "", "")
+        )
+        `when`(splitTransactionRepository.getSplitsForParent(transactionId)).thenReturn(flowOf(mockSplits))
+
+        // Act
+        val resultFlow = viewModel.getSplitDetailsForTransaction(transactionId)
+
+        // Assert
+        resultFlow.test {
+            assertEquals("Flow should emit repository data", mockSplits, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify(splitTransactionRepository).getSplitsForParent(transactionId)
+    }
 }
 
