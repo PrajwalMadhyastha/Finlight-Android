@@ -53,7 +53,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -241,13 +240,16 @@ fun AddTransactionScreen(
             },
             containerColor = Color.Transparent
         ) { innerPadding ->
+            // --- FIX: Root column is now the single scrollable container ---
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()), // <-- SCROLL ADDED HERE
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // --- FIX: Inner weighted Column removed ---
                 Spacer(Modifier.height(16.dp))
                 AmountComposer(
                     amount = amount,
@@ -278,7 +280,7 @@ fun AddTransactionScreen(
                     onAccountClick = { activeSheet = ComposerSheet.Account },
                     onDateClick = { showDatePicker = true }
                 )
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(24.dp)) // Added space
                 ActionRow(
                     notes = notes,
                     tags = selectedTags,
@@ -287,6 +289,9 @@ fun AddTransactionScreen(
                     onTagsClick = { activeSheet = ComposerSheet.Tags },
                     onAttachmentClick = { imagePickerLauncher.launch("image/*") }
                 )
+                Spacer(Modifier.height(16.dp)) // Space before numpad
+
+                // --- FIX: Numpad is now *inside* the scrollable Column ---
                 GlassmorphicNumpad(
                     onDigitClick = { digit ->
                         if (!hasInteracted) hasInteracted = true
