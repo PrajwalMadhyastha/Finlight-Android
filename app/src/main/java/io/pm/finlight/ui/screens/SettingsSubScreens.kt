@@ -528,7 +528,7 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsToggleItem(
                         title = "Automatic Daily Backup",
-                        subtitle = "Backup your data to Google Drive daily at 2 AM",
+                        subtitle = "Backup your data to Google Drive daily",
                         icon = Icons.Default.CloudUpload,
                         checked = isAutoBackupEnabled,
                         onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) }
