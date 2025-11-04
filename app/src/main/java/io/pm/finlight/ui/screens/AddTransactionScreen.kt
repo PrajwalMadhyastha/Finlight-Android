@@ -3,6 +3,18 @@
 // REASON: FEATURE (Transaction Type Toggle) - The `TransactionTypeToggle`
 // composable is now public (modifier removed) so it can be reused in
 // TransactionDetailScreen.kt.
+//
+// REASON: FIX (Layout) - The screen's root layout is refactored to support
+// small screens. The content area is now wrapped in a scrollable Column with
+// a weight of 1f, ensuring it takes up available space and scrolls if
+// content overflows. The GlassmorphicNumpad is placed *outside* this
+// scrollable region, pinning it to the bottom of the screen. This fixes the
+// bug where the numpad was truncated or invisible on smaller devices.
+//
+// REASON: FIX (Layout V2) - Reverted the "sticky numpad" fix. The root
+// Column inside the Scaffold is now the single scrollable container for *all*
+// content, including the numpad. This ensures all elements are accessible
+// on small screens via scrolling.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -241,13 +253,16 @@ fun AddTransactionScreen(
             },
             containerColor = Color.Transparent
         ) { innerPadding ->
+            // --- FIX: Root column is now the single scrollable container ---
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState()), // <-- SCROLL ADDED HERE
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // --- FIX: Inner weighted Column removed ---
                 Spacer(Modifier.height(16.dp))
                 AmountComposer(
                     amount = amount,
@@ -278,7 +293,7 @@ fun AddTransactionScreen(
                     onAccountClick = { activeSheet = ComposerSheet.Account },
                     onDateClick = { showDatePicker = true }
                 )
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(24.dp)) // Added space
                 ActionRow(
                     notes = notes,
                     tags = selectedTags,
@@ -287,6 +302,9 @@ fun AddTransactionScreen(
                     onTagsClick = { activeSheet = ComposerSheet.Tags },
                     onAttachmentClick = { imagePickerLauncher.launch("image/*") }
                 )
+                Spacer(Modifier.height(16.dp)) // Space before numpad
+
+                // --- FIX: Numpad is now *inside* the scrollable Column ---
                 GlassmorphicNumpad(
                     onDigitClick = { digit ->
                         if (!hasInteracted) hasInteracted = true
@@ -1079,3 +1097,4 @@ fun TransactionTypeToggle(
         }
     }
 }
+
