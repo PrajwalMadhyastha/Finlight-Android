@@ -82,7 +82,8 @@ fun ShareSnapshotSheet(
                         colors = CheckboxDefaults.colors(
                             checkedColor = MaterialTheme.colorScheme.primary,
                             uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            checkmarkColor = MaterialTheme.colorScheme.surface
+                            // --- FIX: Use onPrimary for the checkmark color, not surface ---
+                            checkmarkColor = MaterialTheme.colorScheme.onPrimary
                         )
                     )
                     Text(

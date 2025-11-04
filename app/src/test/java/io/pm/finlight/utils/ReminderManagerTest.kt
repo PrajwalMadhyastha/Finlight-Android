@@ -5,6 +5,10 @@
 // - Removed assertions for `snapshot_worker_tag` from both
 //   `rescheduleAllWork` tests, as this worker is no longer scheduled
 //   by this method.
+//
+// REASON: FIX (Test) - The `assertWorkIsEnqueued` assertion is now more
+// flexible, accepting either ENQUEUED or RUNNING. This fixes a test
+// failure caused by the SynchronousExecutor running periodic work immediately.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -62,7 +66,11 @@ class ReminderManagerTest : BaseViewModelTest() {
         val workInfos = workManager.getWorkInfosForUniqueWork(uniqueWorkName).get()
         assertEquals("Work request should be enqueued for $uniqueWorkName", 1, workInfos.size)
         val workInfo = workInfos[0]
-        assertEquals(WorkInfo.State.ENQUEUED, workInfo.state)
+        // --- FIX: Periodic work can be ENQUEUED or RUNNING immediately in tests ---
+        assertTrue(
+            "Work state should be ENQUEUED or RUNNING, but was ${workInfo.state}",
+            workInfo.state == WorkInfo.State.ENQUEUED || workInfo.state == WorkInfo.State.RUNNING
+        )
         assertTrue(
             "Worker class name should contain ${workerClass.simpleName}",
             workInfo.tags.any { it.contains(workerClass.simpleName) }
@@ -147,8 +155,6 @@ class ReminderManagerTest : BaseViewModelTest() {
         assertWorkIsEnqueued("auto_backup_work", BackupWorker::class.java)
     }
 
-    // --- DELETED: `scheduleSnapshotWorker schedules SnapshotWorker for the next day` test ---
-
     @Test
     fun `rescheduleAllWork schedules enabled workers`() {
         // Arrange: Enable everything
@@ -170,7 +176,6 @@ class ReminderManagerTest : BaseViewModelTest() {
         // Always scheduled workers
         assertWorkIsEnqueued("recurring_transaction_work", RecurringTransactionWorker::class.java)
         assertWorkIsEnqueued("recurring_pattern_work", RecurringPatternWorker::class.java)
-        // --- DELETED: snapshot_worker_tag assertion ---
     }
 
     @Test
@@ -195,6 +200,6 @@ class ReminderManagerTest : BaseViewModelTest() {
         // Assert: Always-on workers are still scheduled
         assertWorkIsEnqueued("recurring_transaction_work", RecurringTransactionWorker::class.java)
         assertWorkIsEnqueued("recurring_pattern_work", RecurringPatternWorker::class.java)
-        // --- DELETED: snapshot_worker_tag assertion ---
     }
 }
+

@@ -4,6 +4,8 @@
 // messages from HDFC Bank, refactored from the original SmsParserTest.
 // FIX - All calls to SmsParser.parse now include the required
 // categoryFinderProvider, resolving build errors.
+// REASON: TEST - Added unit test for HDFC UPI debit with 'Txn' keyword and
+// VPA merchant.
 // =================================================================================
 package io.pm.finlight.core.parser
 
@@ -384,5 +386,34 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
         assertNotNull(result?.potentialAccount)
         assertEquals("HDFC Bank A/c XXXX1736", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
+
+    @Test
+    fun `test parses HDFC UPI debit with 'Txn' keyword and VPA merchant`() = runBlocking {
+        setupTest()
+        val smsBody = """
+            Txn Rs.1118.00
+            On HDFC Bank Card 1240
+            At paytmqr2810050501011g5070gzn6zb@paytm
+            by UPI 506896333065
+            On 02-11
+            Not You?
+            Call 18002586161/SMS BLOCK CC 7340 to 7308080808
+        """.trimIndent()
+        val mockSms = SmsMessage(
+            id = 9016L,
+            sender = "AM-HDFCBK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(1118.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("paytmqr2810050501011g5070gzn6zb@paytm", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank - xx1240", result?.potentialAccount?.formattedName)
+        assertEquals("Card", result?.potentialAccount?.accountType)
     }
 }

@@ -9,8 +9,10 @@ package io.pm.finlight.utils
 
 import android.content.Context
 import android.util.Log
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import io.pm.finlight.BackupWorker
 import io.pm.finlight.DailyReportWorker
@@ -56,32 +58,19 @@ object ReminderManager {
     // --- DELETED: scheduleSnapshotWorker function ---
 
     fun scheduleAutoBackup(context: Context) {
-        // --- UPDATED: Logic is now hardcoded to 2:00 AM ---
-        val hour = 2
-        val minute = 0
+        // --- REFACTORED: Changed to an 8-hour periodic worker ---
+        // This removes the 2 AM hardcoding and runs the backup snapshot
+        // 3 times per day to reduce data staleness, per our discussion.
 
-        val now = Calendar.getInstance()
-        val nextRun = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-        }
-
-        if (nextRun.before(now)) {
-            nextRun.add(Calendar.DAY_OF_YEAR, 1)
-        }
-
-        val initialDelay = nextRun.timeInMillis - now.timeInMillis
-        val backupRequest = OneTimeWorkRequestBuilder<BackupWorker>()
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+        val backupRequest = PeriodicWorkRequestBuilder<BackupWorker>(8, TimeUnit.HOURS)
             .build()
 
-        WorkManager.getInstance(context).enqueueUniqueWork(
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             AUTO_BACKUP_WORK_TAG,
-            ExistingWorkPolicy.REPLACE,
-            backupRequest,
+            ExistingPeriodicWorkPolicy.KEEP, // Keep the existing work if it's already scheduled
+            backupRequest
         )
-        Log.d("ReminderManager", "Auto backup (WorkManager) scheduled for ${nextRun.time}")
+        Log.d("ReminderManager", "Auto backup (WorkManager) scheduled to run periodically every 8 hours.")
     }
 
     fun cancelAutoBackup(context: Context) {

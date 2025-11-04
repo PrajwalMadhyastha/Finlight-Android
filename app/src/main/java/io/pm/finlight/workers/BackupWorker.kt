@@ -4,6 +4,10 @@
 // snapshot, notify the system, and reschedule itself. The user-facing
 // notification logic has been removed and moved to the FinlightBackupAgent,
 // which runs *after* the system backup is complete.
+//
+// REFACTOR (8-Hour Periodic): Removed the manual rescheduling call
+// to `ReminderManager.scheduleAutoBackup`. This worker is now a
+// PeriodicWorkRequest, so the system handles rescheduling automatically.
 // =================================================================================
 package io.pm.finlight
 
@@ -24,7 +28,7 @@ class BackupWorker(
 
     override suspend fun doWork(): Result {
         return try {
-            Log.d("BackupWorker", "Starting daily database snapshot...")
+            Log.d("BackupWorker", "Starting periodic database snapshot...")
 
             // --- Logic moved from SnapshotWorker ---
             // 1. Create the compressed JSON snapshot
@@ -42,8 +46,7 @@ class BackupWorker(
 
             // --- DELETED: Notification logic was removed from this worker ---
 
-            // Re-schedule the next backup
-            ReminderManager.scheduleAutoBackup(context)
+            // The worker is now periodic, so it does not need to reschedule itself.
             Result.success()
         } catch (e: Exception) {
             Log.e("BackupWorker", "Automatic backup worker failed", e)

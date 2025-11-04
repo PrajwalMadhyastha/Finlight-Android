@@ -1154,5 +1154,18 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
         assertNull("Should ignore messages from ICICI Credit Card STatement", result)
     }
+
+    @Test
+    fun `test ignores HDFC split EMI`() = runBlocking {
+        setupTest()
+        val smsBody = "Hurry! Split Rs.1234 spent on HDFC\n" +
+                "Bank Credit Card x1234 into SmartEMIS.\n" +
+                "Lower monthly outgo, easy approval!\n" +
+                "https://hdfcbk.io/HDFCBK/s/1JE9lLLn\n" +
+                "T&C"
+        val mockSms = SmsMessage(id = 9621L, sender = "JD-HDFCB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+        assertNull("Should ignore messages from HDFC to split EMIs", result)
+    }
 }
 

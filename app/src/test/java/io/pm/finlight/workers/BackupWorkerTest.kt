@@ -16,6 +16,10 @@
 // REASON: FIX (Test) - Removed verification for `saveLastBackupTimestamp`
 // from all tests. This method is now called by `FinlightBackupAgent`, not
 // this worker. This change fixes the failing tests.
+//
+// REASON: FIX (Test) - Removed verification for `ReminderManager.scheduleAutoBackup`
+// from all tests. The worker is now a PeriodicWorkRequest and no longer
+// reschedules itself. This fixes the verification failures.
 // =================================================================================
 package io.pm.finlight.workers
 
@@ -39,7 +43,6 @@ import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -109,10 +112,10 @@ class BackupWorkerTest : BaseViewModelTest() {
         assertEquals(ListenableWorker.Result.success(), result)
         coVerify(exactly = 1) { DataExportService.createBackupSnapshot(context) }
         verify(exactly = 1) { anyConstructed<BackupManager>().dataChanged() }
-        // --- FIX: Verify the new function signature ---
         // --- NOTE: Notification is no longer sent from this worker ---
         verify(exactly = 0) { NotificationHelper.showAutoBackupNotification(context, any()) }
-        coVerify(exactly = 1) { ReminderManager.scheduleAutoBackup(context) }
+        // --- FIX: This worker is periodic and does not reschedule itself. ---
+        coVerify(exactly = 0) { ReminderManager.scheduleAutoBackup(context) }
         // --- FIX: This worker does not save the timestamp ---
         verify(exactly = 0) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) }
     }
@@ -134,7 +137,8 @@ class BackupWorkerTest : BaseViewModelTest() {
         verify(exactly = 1) { anyConstructed<BackupManager>().dataChanged() }
         // --- FIX: Verify the new function signature is NOT called ---
         verify(exactly = 0) { NotificationHelper.showAutoBackupNotification(any(), any()) }
-        coVerify(exactly = 1) { ReminderManager.scheduleAutoBackup(context) }
+        // --- FIX: This worker is periodic and does not reschedule itself. ---
+        coVerify(exactly = 0) { ReminderManager.scheduleAutoBackup(context) }
         // --- FIX: This worker does not save the timestamp ---
         verify(exactly = 0) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) }
     }
@@ -156,7 +160,8 @@ class BackupWorkerTest : BaseViewModelTest() {
         assertEquals(ListenableWorker.Result.success(), result) // Worker itself succeeds
         coVerify(exactly = 1) { DataExportService.createBackupSnapshot(context) }
         verify(exactly = 0) { anyConstructed<BackupManager>().dataChanged() } // <-- Not called
-        coVerify(exactly = 1) { ReminderManager.scheduleAutoBackup(context) } // Reschedule still happens
+        // --- FIX: This worker is periodic and does not reschedule itself. ---
+        coVerify(exactly = 0) { ReminderManager.scheduleAutoBackup(context) } // Reschedule still happens
         // --- FIX: Timestamp should NOT be saved if snapshot fails ---
         verify(exactly = 0) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) }
     }

@@ -1,15 +1,15 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SettingsSubScreens.kt
-// REASON: CLEANUP - Removed the `SettingsActionItem` for "Backup Time" as well
-// as the now-unused `showAutoBackupTimePicker` state and its associated
-// `TimePicker` dialog. This aligns the UI with the new hardcoded 2 AM schedule.
 //
-// REASON: FEATURE (Backup) - Reworked the "Create Backup" section.
-// - Renamed to "Create Backup Snapshot".
-// - Added a new subtitle that collects and displays the `lastBackupTimestamp`.
-// - Added a new `BackupSnapshotSuccessDialog` that is triggered by the
-//   `showBackupSuccessDialog` state from the ViewModel.
-// - Added a `formatBackupTimestamp` helper function.
+// REASON: FEATURE (Bulk Import Progress)
+// - `AutomationSettingsScreen` now collects the new `totalSmsToScan` and
+//   `processedSmsCount` state flows from the `SettingsViewModel`.
+// - The `isScanning` UI logic is now enhanced.
+// - If `isScanning` is true AND `totalSmsToScan` > 0, it displays a non-dismissible
+//   `AlertDialog` with a `LinearProgressIndicator` and text showing the
+//   determinate progress (e.g., "Scanning: 300 / 1500").
+// - If `isScanning` is true but `totalSmsToScan` is 0 (i.e., the scan is
+//   still initializing), it shows the old indeterminate spinner as a fallback.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -67,7 +67,6 @@ private fun hasSmsPermission(context: Context): Boolean {
     return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
 }
 
-// --- NEW: Helper function to format the backup timestamp ---
 @Composable
 private fun formatBackupTimestamp(timestamp: Long): String {
     if (timestamp == 0L) return "Never"
@@ -130,6 +129,10 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
 
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+
+    // --- NEW: Collect progress state ---
+    val totalSms by settingsViewModel.totalSmsToScan.collectAsState()
+    val processedSms by settingsViewModel.processedSmsCount.collectAsState()
 
     LaunchedEffect(Unit) {
         settingsViewModel.uiEvent.collectLatest { message ->
@@ -200,7 +203,6 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                         onClick = { navController.navigate("manage_ignore_rules") },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    // --- NEW: Entry point for the SMS Debugger ---
                     SettingsActionItem(
                         text = "Debug SMS Parsing",
                         subtitle = "See why recent messages were parsed or ignored",
@@ -244,7 +246,39 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
         }
     }
 
-    if (isScanning) {
+    // --- REPLACED: This block now handles both indeterminate and determinate progress ---
+    if (isScanning && totalSms > 0) {
+        // --- Determinate Progress Dialog ---
+        AlertDialog(
+            onDismissRequest = { /* Non-dismissible */ },
+            containerColor = popupContainerColor,
+            title = { Text("Scanning Your Messages") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(Modifier.height(16.dp))
+                    LinearProgressIndicator(
+                        progress = { (processedSms.toFloat() / totalSms.toFloat()).coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(CircleShape)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Scanning: $processedSms / $totalSms messages",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = { /* No button, non-dismissible */ }
+        )
+    } else if (isScanning) {
+        // --- Indeterminate Fallback Scrim ---
+        // (This shows briefly before totalSms is updated)
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f),
@@ -253,7 +287,7 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator()
                     Spacer(Modifier.height(16.dp))
-                    Text("Scanning SMS Inbox...", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                    Text("Starting scan...", style = MaterialTheme.typography.titleMedium, color = Color.White)
                 }
             }
         }
@@ -395,19 +429,14 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
 
     val isAutoBackupEnabled by settingsViewModel.autoBackupEnabled.collectAsState()
     val isAutoBackupNotificationEnabled by settingsViewModel.autoBackupNotificationEnabled.collectAsState()
-    // --- DELETED: autoBackupTime state ---
-    // --- DELETED: showAutoBackupTimePicker state ---
 
     val isPrivacyModeEnabled by settingsViewModel.privacyModeEnabled.collectAsState()
 
-    // --- NEW: Observe the last backup timestamp ---
     val lastBackupTimestamp by settingsViewModel.lastBackupTimestamp.collectAsState()
     val lastBackupFormatted = formatBackupTimestamp(lastBackupTimestamp)
 
-    // --- NEW: Observe the dialog state ---
     val showBackupSuccessDialog by settingsViewModel.showBackupSuccessDialog.collectAsState()
 
-    // --- NEW: LaunchedEffect to handle UI events from the ViewModel ---
     LaunchedEffect(Unit) {
         settingsViewModel.uiEvent.collectLatest { message ->
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
@@ -528,12 +557,11 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsToggleItem(
                         title = "Automatic Daily Backup",
-                        subtitle = "Backup your data to Google Drive daily at 2 AM",
+                        subtitle = "Backup your data to Google Drive daily",
                         icon = Icons.Default.CloudUpload,
                         checked = isAutoBackupEnabled,
                         onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) }
                     )
-                    // --- DELETED: SettingsActionItem for "Backup Time" ---
                     SettingsToggleItem(
                         title = "Backup Notification",
                         subtitle = "Notify when a backup is complete",
@@ -579,7 +607,6 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                         onClick = { showCsvInfoDialog = true },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    // --- UPDATED: Button text and subtitle ---
                     SettingsActionItem(
                         text = "Create Backup Snapshot",
                         subtitle = "Last cloud backup: $lastBackupFormatted",
@@ -591,7 +618,6 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
         }
     }
 
-    // --- NEW: Backup Success Dialog ---
     if (showBackupSuccessDialog) {
         BackupSnapshotSuccessDialog(
             onDismiss = { settingsViewModel.dismissBackupSuccessDialog() }
@@ -632,11 +658,8 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
             containerColor = popupContainerColor
         )
     }
-
-    // --- DELETED: showAutoBackupTimePicker and its AlertDialog ---
 }
 
-// --- NEW: Dialog composable for backup success ---
 @Composable
 private fun BackupSnapshotSuccessDialog(onDismiss: () -> Unit) {
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()

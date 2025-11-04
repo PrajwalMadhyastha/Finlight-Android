@@ -1,22 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModel.kt
-// REASON: CLEANUP - Removed the `autoBackupTime` StateFlow and the
-// `saveAutoBackupTime` function. This logic is no longer needed as the backup
-// time is hardcoded to 2 AM in the ReminderManager.
 //
-// REASON: FEATURE (Backup) - Added a new StateFlow `showBackupSuccessDialog` to
-// trigger a modal dialog from the UI instead of just sending a snackbar event.
-// The `createBackupSnapshot` function now sets this state on success.
-//
-// REASON: REFACTOR (Import-First) - The `startSmsScanAndIdentifyMappings`
-// function has been refactored. It no longer partitions transactions or
-// requires a mapping step. It now calls `autoSaveSmsTransaction` for *all*
-// newly parsed transactions, allowing the ViewModel to handle the creation
-// of new accounts automatically. This implements the "Import-First" strategy.
-//
-// REASON: REFACTOR (Import-First) - Removed the `_mappingsToReview` StateFlow,
-// the `finalizeImport` function, and the `AccountMappingRequest` data class
-// as they are no longer needed by the new zero-friction import flow.
+// REASON: FEATURE (Bulk Import Progress)
+// - Added `_totalSmsToScan` and `_processedSmsCount` StateFlows to track import progress.
+// - Refactored `startSmsScanAndIdentifyMappings` to process messages in chunks of 100.
+// - The function now updates the progress flows after each chunk, allowing the UI
+//   to display a determinate progress bar (e.g., "Scanning 300 / 1500").
+// - The `finally` block is updated to reset these new state flows.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -53,8 +43,6 @@ sealed class ScanResult {
     object Error : ScanResult()
 }
 
-// --- DELETED: AccountMappingRequest data class ---
-
 class SettingsViewModel(
     application: Application,
     private val settingsRepository: SettingsRepository,
@@ -76,7 +64,6 @@ class SettingsViewModel(
     private val _uiEvent = Channel<String>()
     val uiEvent = _uiEvent.receiveAsFlow()
 
-    // --- NEW: StateFlow to control the backup success dialog ---
     private val _showBackupSuccessDialog = MutableStateFlow(false)
     val showBackupSuccessDialog = _showBackupSuccessDialog.asStateFlow()
 
@@ -134,7 +121,13 @@ class SettingsViewModel(
     private val _isScanning = MutableStateFlow<Boolean>(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
-    // --- DELETED: _mappingsToReview StateFlow ---
+    // --- NEW: StateFlows for bulk import progress ---
+    private val _totalSmsToScan = MutableStateFlow(0)
+    val totalSmsToScan: StateFlow<Int> = _totalSmsToScan.asStateFlow()
+
+    private val _processedSmsCount = MutableStateFlow(0)
+    val processedSmsCount: StateFlow<Int> = _processedSmsCount.asStateFlow()
+
 
     val dailyReportTime: StateFlow<Pair<Int, Int>> =
         settingsRepository.getDailyReportTime().stateIn(
@@ -171,8 +164,6 @@ class SettingsViewModel(
             initialValue = true
         )
 
-    // --- DELETED: autoBackupTime StateFlow ---
-
     val autoBackupNotificationEnabled: StateFlow<Boolean> =
         settingsRepository.getAutoBackupNotificationEnabled().stateIn(
             scope = viewModelScope,
@@ -187,7 +178,6 @@ class SettingsViewModel(
             initialValue = false,
         )
 
-    // --- NEW: Expose the last backup timestamp ---
     val lastBackupTimestamp: StateFlow<Long> =
         settingsRepository.getLastBackupTimestamp().stateIn(
             scope = viewModelScope,
@@ -210,7 +200,6 @@ class SettingsViewModel(
         smsClassifier.close()
     }
 
-    // --- NEW: Function to dismiss the success dialog ---
     fun dismissBackupSuccessDialog() {
         _showBackupSuccessDialog.value = false
     }
@@ -320,7 +309,7 @@ class SettingsViewModel(
         }
     }
 
-    // --- REFACTORED: This function now implements the "Import-First" V3 strategy ---
+    // --- REFACTORED: This function now implements chunked processing with progress reporting ---
     fun startSmsScanAndIdentifyMappings(startDate: Long?, onComplete: (importedCount: Int) -> Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             viewModelScope.launch { _uiEvent.send("SMS Read permission is required.") }
@@ -329,10 +318,24 @@ class SettingsViewModel(
         }
 
         viewModelScope.launch {
+            // 1. Set initial state
             _isScanning.value = true
+            _processedSmsCount.value = 0
+            _totalSmsToScan.value = 0
             var autoImportedCount = 0
             try {
+                // 2. Fetch all messages
                 val rawMessages = withContext(Dispatchers.IO) { smsRepository.fetchAllSms(startDate) }
+
+                // 3. Update total count to show the UI
+                _totalSmsToScan.value = rawMessages.size
+                if (rawMessages.isEmpty()) {
+                    _uiEvent.send("No SMS messages found to scan.")
+                    onComplete(0)
+                    return@launch // Exit early
+                }
+
+                // 4. Get all DB lookups *before* the loop
                 val existingMappings = withContext(Dispatchers.IO) { merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName }) }
                 val existingSmsHashes = withContext(Dispatchers.IO) { transactionRepository.getAllSmsHashes().first().toSet() }
 
@@ -356,68 +359,74 @@ class SettingsViewModel(
                     override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
                 }
 
-                val parsedList = withContext(Dispatchers.Default) {
-                    rawMessages.map { sms ->
-                        async {
-                            // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
-                            var parseResult = SmsParser.parseWithOnlyCustomRules(
-                                sms = sms,
-                                customSmsRuleProvider = customSmsRuleProvider,
-                                merchantRenameRuleProvider = merchantRenameRuleProvider,
-                                merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                                categoryFinderProvider = categoryFinderProvider
-                            )
+                // 5. Chunk the list
+                val chunks = rawMessages.chunked(100) // Process 100 messages at a time
 
-                            // --- HIERARCHY STEP 2 & 3: If no custom rule matched, run ML pre-filter and then the main parser ---
-                            if (parseResult == null) {
-                                val transactionConfidence = smsClassifier.classify(sms.body)
-                                if (transactionConfidence >= 0.1) {
-                                    parseResult = SmsParser.parseWithReason(
-                                        sms = sms,
-                                        mappings = existingMappings,
-                                        customSmsRuleProvider = customSmsRuleProvider,
-                                        merchantRenameRuleProvider = merchantRenameRuleProvider,
-                                        ignoreRuleProvider = ignoreRuleProvider,
-                                        merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                                        categoryFinderProvider = categoryFinderProvider,
-                                        smsParseTemplateProvider = smsParseTemplateProvider
-                                    )
+                // 6. Loop through chunks
+                for (chunk in chunks) {
+                    // Process one chunk in parallel
+                    val parsedList = withContext(Dispatchers.Default) {
+                        chunk.map { sms ->
+                            async {
+                                // Run the full parsing pipeline (Custom Rules, ML, Heuristics)
+                                var parseResult = SmsParser.parseWithOnlyCustomRules(
+                                    sms = sms,
+                                    customSmsRuleProvider = customSmsRuleProvider,
+                                    merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                    categoryFinderProvider = categoryFinderProvider
+                                )
+
+                                if (parseResult == null) {
+                                    val transactionConfidence = smsClassifier.classify(sms.body)
+                                    if (transactionConfidence >= 0.1) {
+                                        parseResult = SmsParser.parseWithReason(
+                                            sms = sms,
+                                            mappings = existingMappings,
+                                            customSmsRuleProvider = customSmsRuleProvider,
+                                            merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                            ignoreRuleProvider = ignoreRuleProvider,
+                                            merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                            categoryFinderProvider = categoryFinderProvider,
+                                            smsParseTemplateProvider = smsParseTemplateProvider
+                                        )
+                                    }
                                 }
+                                (parseResult as? ParseResult.Success)?.transaction
                             }
-
-                            (parseResult as? ParseResult.Success)?.transaction
-                        }
-                    }.awaitAll().filterNotNull()
-                }
-
-                val newPotentialTransactions = parsedList.filter { !existingSmsHashes.contains(it.sourceSmsHash) }
-
-                // --- V3 "Import-First" Logic ---
-                // Auto-save *all* new transactions. The autoSaveSmsTransaction
-                // will automatically create new accounts for unknown identifiers.
-                for (potentialTxn in newPotentialTransactions) {
-                    if (transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")) {
-                        autoImportedCount++
+                        }.awaitAll().filterNotNull()
                     }
+
+                    // Filter and Save this chunk
+                    val newPotentialTransactions = parsedList.filter { !existingSmsHashes.contains(it.sourceSmsHash) }
+
+                    for (potentialTxn in newPotentialTransactions) {
+                        if (transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")) {
+                            autoImportedCount++
+                        }
+                    }
+
+                    // --- !! REPORT PROGRESS !! ---
+                    _processedSmsCount.update { it + chunk.size }
                 }
 
-                // Report final count and finish.
+                // Report final count
                 val message = if (autoImportedCount > 0) "Successfully imported $autoImportedCount new transactions." else "No new transactions found."
                 _uiEvent.send(message)
-                onComplete(autoImportedCount) // `mappingNeeded` is no longer relevant.
-                // --- End V3 Logic ---
+                onComplete(autoImportedCount)
 
             } catch (e: Exception) {
                 Log.e("SettingsViewModel", "Error during SMS scan", e)
                 _uiEvent.send("An error occurred during scan.")
                 onComplete(0) // Return 0 imported on error
             } finally {
+                // 7. Reset state
                 _isScanning.value = false
+                _totalSmsToScan.value = 0
+                _processedSmsCount.value = 0
             }
         }
     }
-
-    // --- DELETED: finalizeImport function ---
 
     fun setAutoCaptureNotificationEnabled(enabled: Boolean) {
         settingsRepository.saveAutoCaptureNotificationEnabled(enabled)
@@ -427,8 +436,6 @@ class SettingsViewModel(
         settingsRepository.saveAutoBackupEnabled(enabled)
         if (enabled) ReminderManager.scheduleAutoBackup(context) else ReminderManager.cancelAutoBackup(context)
     }
-
-    // --- DELETED: saveAutoBackupTime function ---
 
     fun setAutoBackupNotificationEnabled(enabled: Boolean) {
         settingsRepository.saveAutoBackupNotificationEnabled(enabled)
@@ -821,7 +828,6 @@ class SettingsViewModel(
         _csvValidationReport.value = null
     }
 
-    // --- UPDATED: createBackupSnapshot function test ---
     fun createBackupSnapshot() {
         viewModelScope.launch {
             val success = withContext(Dispatchers.IO) {
@@ -829,7 +835,7 @@ class SettingsViewModel(
             }
             if (success) {
                 backupManager.dataChanged()
-                _showBackupSuccessDialog.value = true // <-- UPDATED
+                _showBackupSuccessDialog.value = true
             } else {
                 _uiEvent.send("Failed to create snapshot.")
             }
