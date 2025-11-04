@@ -6,6 +6,12 @@
 // the `test` block. This ensures the test explicitly waits for the coroutine
 // launched in the ViewModel's `init` block to complete before awaiting the final
 // state, making the test deterministic and robust against timing variations.
+//
+// REASON: FIX (Test) - The `runAutoImportAndRefresh` test was failing because
+// a recent parser improvement (adding "Txn" as a keyword) caused the generic
+// parser to get a false positive. The test's SMS data has been modified
+// (removed "Txn") to ensure the generic parser fails as intended, allowing
+// the test to correctly validate the custom rule logic.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -196,11 +202,14 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     fun `runAutoImportAndRefresh imports newly parsed transaction`() = runTest {
         // Arrange
         setupDefaultDaoBehaviors()
-        val sms1 = SmsMessage(1, "SENDER1", "Txn update from MyBank. Order 123 completed. Val: 20.", 1L)
+        // --- TEST FIX: Removed "Txn" from the start of the message body ---
+        val sms1Body = "Update from MyBank. Order 123 completed. Val: 20."
+        val sms1 = SmsMessage(1, "SENDER1", sms1Body, 1L)
         val sms1Hash = (sms1.sender.filter { it.isDigit() }.takeLast(10) + sms1.body.replace(Regex("\\s+"), " ").trim()).hashCode().toString()
         val successTxnRule = CustomSmsRule(
             id = 1,
-            triggerPhrase = "Txn update from MyBank",
+            // --- TEST FIX: Updated trigger phrase to match new body ---
+            triggerPhrase = "Update from MyBank",
             amountRegex = "Val: ([\\d,.]+)",
             merchantRegex = "Order (\\d+)",
             accountRegex = null,
@@ -248,6 +257,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         assertEquals("Imported", capturedSource)
         assertEquals(sms1Hash, capturedTxn!!.sourceSmsHash)
         assertEquals("123", capturedTxn!!.merchantName)
+        assertEquals(20.0, capturedTxn!!.amount, 0.0) // --- ADDED: Assert correct amount
 
         // Assert final state
         val finalState = viewModel.uiState.value
