@@ -1,3 +1,14 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/ui/components/GlassmorphismComponents.kt
+// REASON: FIX (Navigation) - The "View All" button's onClick logic in
+// `AuroraRecentTransactionsCard` has been updated. It now uses
+// `popUpTo(BottomNavItem.Dashboard.route)` instead of
+// `popUpTo(navController.graph.findStartDestination().id)`.
+//
+// This change aligns its behavior with the main Bottom Navigation Bar,
+// ensuring that navigating from the dashboard to the transaction list correctly
+// highlights the "Transactions" tab and maintains a clean, predictable back stack.
+// =================================================================================
 package io.pm.finlight.ui.components
 
 import androidx.compose.animation.core.EaseOutCubic
@@ -511,7 +522,10 @@ fun AuroraRecentTransactionsCard(
                 TextButton(
                     onClick = {
                         navController.navigate(BottomNavItem.Transactions.route) {
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            // --- FIX: This is the correct popUpTo logic ---
+                            popUpTo(BottomNavItem.Dashboard.route) {
+                                saveState = true
+                            }
                             launchSingleTop = true
                             restoreState = true
                         }

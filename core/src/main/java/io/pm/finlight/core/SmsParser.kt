@@ -5,6 +5,9 @@
 // using the original, raw merchant name *before* applying any merchant rename
 // rules. This restores the intended "Hierarchy of Trust" and fixes the bug where
 // category learning was failing for transactions with learned merchant names.
+// REASON: FIX (Bug) - Added 'Txn' to the expense keywords and updated a
+// merchant regex to support UPI addresses with '@' and 'by UPI' text. This
+// fixes a bug where certain HDFC UPI messages were not being parsed.
 // =================================================================================
 package io.pm.finlight
 
@@ -26,7 +29,8 @@ object SmsParser {
 
     private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with|debit of|debit)\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
+    // --- FIX: Added 'Txn' to the list of expense keywords ---
+    val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|Txn|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with|debit of|debit)\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
     val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     private val ACCOUNT_PATTERNS =
@@ -139,7 +143,8 @@ object SmsParser {
             "to:(UPI/[\\d/]+)".toRegex(RegexOption.IGNORE_CASE),
             "at\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\.\\s+Txn no)".toRegex(RegexOption.IGNORE_CASE),
             "\\d{2}-\\d{2}-\\d{2,4}\\s+\\d{2}:\\d{2}:\\d{2}\\s+([A-Za-z0-9\\s.&'-]+?)\\s+Avl Lmt".toRegex(RegexOption.IGNORE_CASE),
-            "At\\s+([A-Za-z0-9*.'-]+?)(?:\\s+on|\\.{3}|\\.)".toRegex(RegexOption.IGNORE_CASE),
+            // --- FIX: Added '@', '_', and 'by UPI' to support UPI VPAs and fix merchant parsing ---
+            "At\\s+([A-Za-z0-9*.'@_-]+?)(?:\\s+by\\s+UPI|\\s+on|\\.{3}|\\.)".toRegex(RegexOption.IGNORE_CASE),
             "at\\s*\\.\\.\\s*([A-Za-z0-9_\\s]+)\\s*on".toRegex(RegexOption.IGNORE_CASE),
             "as (reversal of transaction)".toRegex(RegexOption.IGNORE_CASE),
             "(?:credited|received).*from\\s+([A-Za-z0-9\\s.&'@-]+?)(?:\\.|\\s*\\()".toRegex(RegexOption.IGNORE_CASE),
@@ -521,7 +526,7 @@ object SmsParser {
                     "on your (SBI) (Credit Card) ending with (\\d{4})" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[3].trim()}", accountType = match.groupValues[2].trim())
                     "On (HDFC Bank) (Card) (\\d{4})" ->
-                        PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[3].trim()}", accountType = "Card")
+                        PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[3].trim()}", accountType = match.groupValues[2].trim())
                     "(ICICI Bank) Acc(?:t)? X*(\\d{3,4}) debited" ->
                         PotentialAccount(formattedName = "${match.groupValues[1].trim()} - xx${match.groupValues[2].trim()}", accountType = "Savings Account")
                     "Acc(?:t)? X*(\\d{3,4}) is credited.*-(ICICI Bank)" ->
