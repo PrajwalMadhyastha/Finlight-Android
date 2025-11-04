@@ -448,7 +448,7 @@ fun MainAppScreen() {
                         containerColor = Color.Transparent
                     ) {
                         bottomNavItems.forEach { screen ->
-                            val isSelected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                            val isSelected = baseCurrentRoute == screen.route
                             NavigationBarItem(
                                 icon = { Icon(screen.icon, contentDescription = screen.label) },
                                 label = { Text(screen.label) },
