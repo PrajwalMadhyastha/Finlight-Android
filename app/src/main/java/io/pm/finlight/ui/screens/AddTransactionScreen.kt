@@ -1,20 +1,5 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: FEATURE (Transaction Type Toggle) - The `TransactionTypeToggle`
-// composable is now public (modifier removed) so it can be reused in
-// TransactionDetailScreen.kt.
-//
-// REASON: FIX (Layout) - The screen's root layout is refactored to support
-// small screens. The content area is now wrapped in a scrollable Column with
-// a weight of 1f, ensuring it takes up available space and scrolls if
-// content overflows. The GlassmorphicNumpad is placed *outside* this
-// scrollable region, pinning it to the bottom of the screen. This fixes the
-// bug where the numpad was truncated or invisible on smaller devices.
-//
-// REASON: FIX (Layout V2) - Reverted the "sticky numpad" fix. The root
-// Column inside the Scaffold is now the single scrollable container for *all*
-// content, including the numpad. This ensures all elements are accessible
-// on small screens via scrolling.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -41,11 +26,11 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -57,6 +42,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -81,6 +67,8 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -114,8 +102,8 @@ fun AddTransactionScreen(
     var attachedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
     var hasInteracted by remember { mutableStateOf(false) }
-    val isAmountEntered = amount.isNotBlank() && (amount.toDoubleOrNull() ?: 0.0) > 0.0
-    val isDescriptionEntered = description.isNotBlank()
+    val isAmountEntered by remember(amount) { derivedStateOf { (amount.toDoubleOrNull() ?: 0.0) > 0.0 } }
+    val isDescriptionEntered by remember(description) { derivedStateOf { description.isNotBlank() } }
 
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -233,6 +221,14 @@ fun AddTransactionScreen(
         } ?: false
     }
 
+    // --- NEW: Focus Requester for Amount Field ---
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        delay(300) // Give UI time to draw
+        focusRequester.requestFocus()
+    }
+
+
     Box(modifier = Modifier.fillMaxSize()) {
         SpotlightBackground(color = animatedCategoryColor)
 
@@ -253,19 +249,30 @@ fun AddTransactionScreen(
             },
             containerColor = Color.Transparent
         ) { innerPadding ->
-            // --- FIX: Root column is now the single scrollable container ---
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
                     .padding(horizontal = 16.dp)
-                    .verticalScroll(rememberScrollState()), // <-- SCROLL ADDED HERE
+                    .verticalScroll(rememberScrollState()), // Screen is scrollable
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // --- FIX: Inner weighted Column removed ---
                 Spacer(Modifier.height(16.dp))
+
+                // --- REFACTORED: AmountComposer now uses BasicTextField ---
                 AmountComposer(
                     amount = amount,
+                    onAmountChange = { newValue ->
+                        if (!hasInteracted) hasInteracted = true
+                        if (newValue.length > 9) return@AmountComposer
+
+                        // Regex to match a valid decimal number (up to 2 decimal places)
+                        val regex = Regex("^\\d*\\.?\\d{0,2}\$")
+                        if (newValue.isEmpty() || regex.matches(newValue)) {
+                            amount = newValue
+                        }
+                    },
+                    focusRequester = focusRequester,
                     description = description,
                     onDescriptionClick = { activeSheet = ComposerSheet.Merchant },
                     isTravelMode = isTravelModeActive,
@@ -282,6 +289,7 @@ fun AddTransactionScreen(
                 )
 
                 Spacer(Modifier.height(24.dp))
+                // --- REFACTORED: Now a Column ---
                 OrbitalChips(
                     selectedCategory = selectedCategory,
                     selectedAccount = selectedAccount,
@@ -293,7 +301,7 @@ fun AddTransactionScreen(
                     onAccountClick = { activeSheet = ComposerSheet.Account },
                     onDateClick = { showDatePicker = true }
                 )
-                Spacer(Modifier.height(24.dp)) // Added space
+                Spacer(Modifier.height(24.dp))
                 ActionRow(
                     notes = notes,
                     tags = selectedTags,
@@ -302,16 +310,15 @@ fun AddTransactionScreen(
                     onTagsClick = { activeSheet = ComposerSheet.Tags },
                     onAttachmentClick = { imagePickerLauncher.launch("image/*") }
                 )
-                Spacer(Modifier.height(16.dp)) // Space before numpad
+                Spacer(Modifier.height(16.dp))
 
-                // --- FIX: Numpad is now *inside* the scrollable Column ---
-                GlassmorphicNumpad(
-                    onDigitClick = { digit ->
-                        if (!hasInteracted) hasInteracted = true
-                        if (amount.length < 9) amount += digit
-                    },
-                    onBackspaceClick = { if (amount.isNotEmpty()) amount = amount.dropLast(1) },
-                    onConfirm = {
+                // --- REMOVED: TransactionChecklistCard ---
+
+
+                // --- NEW: Save Button ---
+                Spacer(Modifier.height(24.dp))
+                Button(
+                    onClick = {
                         viewModel.onSaveTapped(
                             description = description,
                             amountStr = amount,
@@ -324,9 +331,14 @@ fun AddTransactionScreen(
                             onSaveComplete = { navController.popBackStack() }
                         )
                     },
-                    isConfirmEnabled = isSaveEnabled
-                )
-                Spacer(Modifier.height(16.dp))
+                    enabled = isSaveEnabled,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text("Save Transaction", style = MaterialTheme.typography.titleMedium)
+                }
+                Spacer(Modifier.height(16.dp)) // Padding at the bottom
             }
         }
     }
@@ -530,10 +542,11 @@ private fun SpotlightBackground(color: Color) {
     }
 }
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 private fun AmountComposer(
     amount: String,
+    onAmountChange: (String) -> Unit,
+    focusRequester: FocusRequester,
     description: String,
     onDescriptionClick: () -> Unit,
     isTravelMode: Boolean,
@@ -564,6 +577,7 @@ private fun AmountComposer(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth() // This is OK
     ) {
         Text(
             text = descriptionText,
@@ -579,21 +593,50 @@ private fun AmountComposer(
         )
 
         Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = currencySymbol,
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.Top)
-            )
-            Text(
-                text = if (amount.isEmpty()) "0" else amount,
-                style = MaterialTheme.typography.displayLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
-        }
+
+        // --- REFACTORED SECTION ---
+        val textStyle = MaterialTheme.typography.displayLarge.copy(
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center // <-- FIX 1: Set to Center
+        )
+
+        BasicTextField(
+            value = amount,
+            onValueChange = onAmountChange,
+            modifier = Modifier
+                .fillMaxWidth() // <-- FIX 2: Add fillMaxWidth
+                .focusRequester(focusRequester),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            textStyle = textStyle, // <-- Pass Center-aligned style
+            singleLine = true,
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            decorationBox = { innerTextField ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(), // <-- FIX 3: Add fillMaxWidth
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center // <-- FIX 4: Add Arrangement.Center
+                ) {
+                    Text(
+                        text = currencySymbol,
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
+                    Box(contentAlignment = Alignment.Center) { // <-- FIX 5: Change to Alignment.Center
+                        if (amount.isEmpty()) {
+                            Text(
+                                "0",
+                                style = textStyle.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)),
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
+            }
+        )
+        // --- END REFACTORED SECTION ---
+
         if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
             val enteredAmount = amount.toDoubleOrNull() ?: 0.0
             val convertedAmount = enteredAmount * (currentTravelSettings.conversionRate?.toDouble() ?: 1.0)
@@ -607,6 +650,7 @@ private fun AmountComposer(
     }
 }
 
+
 @Composable
 private fun OrbitalChips(
     selectedCategory: Category?,
@@ -616,10 +660,11 @@ private fun OrbitalChips(
     onAccountClick: () -> Unit,
     onDateClick: () -> Unit
 ) {
-    Row(
+    // --- REFACTORED: Changed from Row to Column ---
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         DetailChip(
             icon = selectedCategory?.let { CategoryIconHelper.getIcon(it.iconKey) } ?: Icons.Default.Category,
@@ -642,7 +687,9 @@ private fun OrbitalChips(
 @Composable
 private fun DetailChip(icon: ImageVector, text: String, onClick: () -> Unit) {
     GlassPanel(
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier
+            .fillMaxWidth(0.8f) // Take up 80% of width to look substantial
+            .clickable(onClick = onClick)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -703,6 +750,7 @@ private fun ActionRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ActionIcon(
     icon: ImageVector,
@@ -736,104 +784,10 @@ private fun ActionIcon(
     }
 }
 
-@Composable
-private fun GlassmorphicNumpad(
-    onDigitClick: (String) -> Unit,
-    onBackspaceClick: () -> Unit,
-    onConfirm: () -> Unit,
-    isConfirmEnabled: Boolean
-) {
-    val buttons = listOf(
-        "1", "2", "3",
-        "4", "5", "6",
-        "7", "8", "9",
-        ".", "0"
-    )
+// --- REMOVED: TransactionChecklistCard ---
 
-    GlassPanel(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            buttons.chunked(3).forEach { row ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    row.forEach { digit ->
-                        NumpadButton(text = digit, modifier = Modifier.weight(1f)) {
-                            onDigitClick(digit)
-                        }
-                    }
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                NumpadButton(icon = Icons.AutoMirrored.Filled.Backspace, modifier = Modifier.weight(1f)) {
-                    onBackspaceClick()
-                }
-                Button(
-                    onClick = onConfirm,
-                    enabled = isConfirmEnabled,
-                    modifier = Modifier
-                        .weight(2f)
-                        .height(64.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = "Confirm", modifier = Modifier.size(32.dp))
-                }
-            }
-        }
-    }
-}
+// --- REMOVED: ChecklistItem ---
 
-@Composable
-private fun NumpadButton(
-    modifier: Modifier = Modifier,
-    text: String? = null,
-    icon: ImageVector? = null,
-    onClick: () -> Unit
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val backgroundColor = if (isPressed) AuroraNumpadHighlight else Color.Transparent
-
-    Surface(
-        onClick = onClick,
-        modifier = modifier.height(64.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = backgroundColor,
-        interactionSource = interactionSource
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (text != null) {
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun AccountPickerSheet(
@@ -887,7 +841,7 @@ private fun AccountGridItem(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            account.name,
+            account.name.toString(), // <--- FIX: Explicit .toString() to resolve compiler ambiguity
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             maxLines = 2,
@@ -1097,4 +1051,3 @@ fun TransactionTypeToggle(
         }
     }
 }
-
