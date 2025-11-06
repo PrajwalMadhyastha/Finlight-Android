@@ -1,30 +1,5 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-//
-// REASON: REFACTOR (Numpad)
-// - Removed the custom `GlassmorphicNumpad` and `NumpadButton` composables.
-// - Refactored `AmountComposer` to be backed by a `BasicTextField` with a
-//   decimal `KeyboardOptions`. This brings up the system's native numpad.
-// - Added validation to the `BasicTextField`'s `onValueChange` to only allow
-//   valid decimal input (up to 9 digits, 2 decimal places).
-// - Added a `FocusRequester` and `LaunchedEffect` to automatically focus the
-//   amount field when the screen opens.
-// - Added a standard "Save Transaction" `Button` at the bottom of the
-//   `verticalScroll` column.
-//
-// REASON: FEATURE (Creative)
-// - Added a new `TransactionChecklistCard` composable to fill the empty
-//   space left by the numpad.
-// - This card dynamically updates with checkmarks as the user fills in the
-//   Amount, Description, Category, and Account, providing real-time
-//   validation and guidance.
-//
-// REASON: FIX (Layout & UX)
-// - Removed the `TransactionChecklistCard` to free up space.
-// - Refactored `OrbitalChips` from a `Row` to a `Column` to stack the
-//   pills vertically, fixing layout issues on narrow screens.
-// - Fixed `AmountComposer` to correctly center the currency symbol
-//   alongside the amount text.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -602,6 +577,7 @@ private fun AmountComposer(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth() // This is OK
     ) {
         Text(
             text = descriptionText,
@@ -622,24 +598,24 @@ private fun AmountComposer(
         val textStyle = MaterialTheme.typography.displayLarge.copy(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
-            // --- REMOVED: textAlign = TextAlign.Center ---
+            textAlign = TextAlign.Center // <-- FIX 1: Set to Center
         )
 
         BasicTextField(
             value = amount,
             onValueChange = onAmountChange,
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth() // <-- FIX 2: Add fillMaxWidth
                 .focusRequester(focusRequester),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            textStyle = textStyle,
+            textStyle = textStyle, // <-- Pass Center-aligned style
             singleLine = true,
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             decorationBox = { innerTextField ->
                 Row(
-                    modifier = Modifier.fillMaxWidth(), // Make Row fill width
+                    modifier = Modifier.fillMaxWidth(), // <-- FIX 3: Add fillMaxWidth
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center // Center content of Row
+                    horizontalArrangement = Arrangement.Center // <-- FIX 4: Add Arrangement.Center
                 ) {
                     Text(
                         text = currencySymbol,
@@ -647,13 +623,13 @@ private fun AmountComposer(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(end = 4.dp)
                     )
-                    // --- REMOVED: The extra Box ---
-                    if (amount.isEmpty()) {
-                        Text(
-                            "0",
-                            style = textStyle.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)),
-                        )
-                    } else {
+                    Box(contentAlignment = Alignment.Center) { // <-- FIX 5: Change to Alignment.Center
+                        if (amount.isEmpty()) {
+                            Text(
+                                "0",
+                                style = textStyle.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)),
+                            )
+                        }
                         innerTextField()
                     }
                 }
@@ -865,7 +841,7 @@ private fun AccountGridItem(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            account.name,
+            account.name.toString(), // <--- FIX: Explicit .toString() to resolve compiler ambiguity
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             maxLines = 2,
