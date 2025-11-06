@@ -3,6 +3,10 @@
 // REASON: FIX (Testing) - The screen now uses the correct ViewModel factory to provide
 // the RuleCreationViewModel with its DAO dependency, resolving a build error. The
 // old, incorrect local factory has been removed.
+//
+// REASON: MODIFIED - Added a 3-state `SingleChoiceSegmentedButtonRow` to
+// allow the user to select "Expense", "Income", or "Auto-Detect". This
+// calls the new `viewModel.onTransactionTypeChanged` function.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -236,6 +240,49 @@ fun RuleCreationScreen(
                         label = "Account",
                         value = uiState.accountSelection.selectedText.ifBlank { "Not set" }
                     )
+
+                    // --- NEW: Transaction Type Toggle ---
+                    Spacer(Modifier.height(0.dp)) // No extra space needed due to divider
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.SwapVert,
+                            contentDescription = "Transaction Type",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            "Type",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        val selectedType = uiState.transactionType
+                        SegmentedButton(
+                            selected = selectedType == "expense",
+                            onClick = { viewModel.onTransactionTypeChanged("expense") },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
+                        ) {
+                            Text("Expense")
+                        }
+                        SegmentedButton(
+                            selected = selectedType == "income",
+                            onClick = { viewModel.onTransactionTypeChanged("income") },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
+                        ) {
+                            Text("Income")
+                        }
+                        SegmentedButton(
+                            selected = selectedType == null,
+                            onClick = { viewModel.onTransactionTypeChanged(null) },
+                            shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3)
+                        ) {
+                            Text("Auto-Detect")
+                        }
+                    }
+                    // --- END NEW SECTION ---
                 }
             }
 

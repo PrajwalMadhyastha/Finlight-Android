@@ -20,6 +20,8 @@ import kotlinx.serialization.Serializable
  * @param accountNameExample The user-selected text for the account, for display purposes.
  * @param priority The execution priority. Higher numbers are checked first.
  * @param sourceSmsBody The original SMS text this rule was created from.
+ * @param transactionType The explicit transaction type ("expense" or "income").
+ * If null, the type will be auto-detected from keywords.
  */
 @Serializable
 @Entity(
@@ -37,5 +39,6 @@ data class CustomSmsRule(
     val amountExample: String?,
     val accountNameExample: String?,
     val priority: Int,
-    val sourceSmsBody: String
+    val sourceSmsBody: String,
+    val transactionType: String? = null // <-- NEW FIELD
 )

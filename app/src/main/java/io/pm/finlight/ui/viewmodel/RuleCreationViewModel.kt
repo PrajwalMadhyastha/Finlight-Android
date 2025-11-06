@@ -4,6 +4,12 @@
 // constructor dependency injection for the CustomSmsRuleDao. It now extends
 // ViewModel instead of AndroidViewModel, decoupling it from the Android framework
 // and making it fully unit-testable.
+//
+// REASON: MODIFIED - Added `onTransactionTypeChanged` function to handle
+// UI state updates from the new 3-state toggle.
+// - `loadRuleForEditing` now populates the `transactionType` in the state.
+// - `saveRule` now saves the `transactionType` from the state into the
+//   `CustomSmsRule` entity.
 // =================================================================================
 package io.pm.finlight
 
@@ -87,6 +93,7 @@ class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : Vi
                 merchantSelection = RuleSelection(selectedText = rule.merchantNameExample ?: ""),
                 amountSelection = RuleSelection(selectedText = rule.amountExample ?: ""),
                 accountSelection = RuleSelection(selectedText = rule.accountNameExample ?: ""),
+                transactionType = rule.transactionType, // <-- UPDATED
                 ruleIdToEdit = rule.id
             )
         }
@@ -106,6 +113,11 @@ class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : Vi
 
     fun onMarkAsAccount(selection: RuleSelection) {
         _uiState.update { it.copy(accountSelection = selection) }
+    }
+
+    // --- NEW: Function to handle UI state change from the toggle ---
+    fun onTransactionTypeChanged(newType: String?) {
+        _uiState.update { it.copy(transactionType = newType) }
     }
 
     fun saveRule(fullSmsText: String, onComplete: () -> Unit) {
@@ -139,7 +151,8 @@ class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : Vi
                 amountExample = currentState.amountSelection.selectedText.takeIf { it.isNotBlank() },
                 accountNameExample = currentState.accountSelection.selectedText.takeIf { it.isNotBlank() },
                 priority = 10,
-                sourceSmsBody = fullSmsText
+                sourceSmsBody = fullSmsText,
+                transactionType = currentState.transactionType // <-- UPDATED
             )
 
             if (currentState.ruleIdToEdit != null) {
