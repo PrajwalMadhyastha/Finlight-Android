@@ -1,5 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
+// REASON: REFACTOR (Account Picker) - The private `AccountPickerSheet`
+// composable has been refactored to use a `LazyColumn` of `ListItem`s
+// instead of a `LazyVerticalGrid`. This improves usability by preventing
+// account names from being truncated, and it aligns the UI with the
+// list-based account picker in the TransactionDetailScreen.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -20,9 +25,11 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -139,10 +146,61 @@ fun AddTransactionScreen(
     val isSaveEnabled = isAmountEntered
 
     var isDefaultAccountApplied by remember { mutableStateOf(false) }
-    LaunchedEffect(defaultAccount) {
-        if (!isCsvEdit && !isDefaultAccountApplied && defaultAccount != null) {
-            selectedAccount = defaultAccount
-            isDefaultAccountApplied = true
+
+    // This effect handles ALL initial data loading
+    LaunchedEffect(initialDataJson, accounts, categories, defaultAccount, isCsvEdit) {
+        if (isDefaultAccountApplied) return@LaunchedEffect // Only run once
+
+        if (isCsvEdit && initialDataJson != null) {
+            // --- CSV EDITING LOGIC ---
+            try {
+                val gson = Gson()
+                val typeToken = object : TypeToken<Map<String, String>>() {}.type
+                val initialDataMap: Map<String, String> = gson.fromJson(URLDecoder.decode(initialDataJson, "UTF-8"), typeToken)
+
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+
+                initialDataMap["Date"]?.let {
+                    try {
+                        selectedDateTime.time = dateFormat.parse(it) ?: Date()
+                    } catch (e: Exception) { /* Keep default date on parse error */ }
+                }
+                description = initialDataMap["Description"] ?: ""
+                amount = (initialDataMap["Amount"] ?: "").replace(".0", "")
+                transactionType = initialDataMap["Type"]?.lowercase() ?: "expense"
+                val categoryName = initialDataMap["Category"] ?: ""
+                val accountName = initialDataMap["Account"] ?: ""
+                notes = initialDataMap["Notes"] ?: ""
+
+                selectedCategory = categories.find { it.name.equals(categoryName, ignoreCase = true) }
+
+                // Try to find the account from the CSV
+                val csvAccount = accounts.find { it.name.equals(accountName, ignoreCase = true) }
+                if (csvAccount != null) {
+                    selectedAccount = csvAccount
+                } else {
+                    // Fallback to default "Cash Spends"
+                    selectedAccount = defaultAccount ?: accounts.find { it.name.equals("Cash Spends", ignoreCase = true) }
+                }
+
+                isDefaultAccountApplied = true // Mark as applied
+
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error loading row data", Toast.LENGTH_SHORT).show()
+            }
+        } else if (!isCsvEdit) {
+            // --- NEW TRANSACTION LOGIC ---
+            if (defaultAccount != null) {
+                selectedAccount = defaultAccount
+                isDefaultAccountApplied = true
+            } else if (accounts.isNotEmpty()) {
+                // Fallback in case the VM's flow is slow
+                val cashAccount = accounts.find { it.name.equals("Cash Spends", ignoreCase = true) }
+                if (cashAccount != null) {
+                    selectedAccount = cashAccount
+                    isDefaultAccountApplied = true
+                }
+            }
         }
     }
 
@@ -784,11 +842,7 @@ private fun ActionIcon(
     }
 }
 
-// --- REMOVED: TransactionChecklistCard ---
-
-// --- REMOVED: ChecklistItem ---
-
-
+// --- REFACTORED: `AccountPickerSheet` now uses a LazyColumn and ListItems ---
 @Composable
 private fun AccountPickerSheet(
     accounts: List<Account>,
@@ -799,82 +853,73 @@ private fun AccountPickerSheet(
         Text(
             "Select Account",
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(16.dp),
+            color = MaterialTheme.colorScheme.onSurface
         )
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 85.dp),
+        LazyColumn(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(accounts) { account ->
-                AccountGridItem(
-                    account = account,
-                    onSelected = { onAccountSelected(account) }
-                )
+                GlassPanel(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                ) {
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                account.name,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        leadingContent = {
+                            Image(
+                                painter = painterResource(id = BankLogoHelper.getLogoForAccount(account.name)),
+                                contentDescription = "${account.name} Logo",
+                                modifier = Modifier.size(40.dp)
+                            )
+                        },
+                        modifier = Modifier.clickable { onAccountSelected(account) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
             }
             item {
-                AddNewAccountGridItem(onAddNew = onAddNew)
+                GlassPanel(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                ) {
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                "Create New Account",
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.AddCircleOutline,
+                                contentDescription = "Create New Account",
+                                modifier = Modifier.size(40.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        modifier = Modifier.clickable { onAddNew() },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
             }
         }
     }
 }
 
-@Composable
-private fun AccountGridItem(
-    account: Account,
-    onSelected: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onSelected)
-            .padding(vertical = 12.dp)
-            .height(84.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Image(
-            painter = painterResource(id = BankLogoHelper.getLogoForAccount(account.name)),
-            contentDescription = "${account.name} Logo",
-            modifier = Modifier.size(48.dp)
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            account.name.toString(), // <--- FIX: Explicit .toString() to resolve compiler ambiguity
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
+// --- DELETED: `AccountGridItem` is no longer used ---
 
-@Composable
-private fun AddNewAccountGridItem(onAddNew: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onAddNew)
-            .padding(vertical = 12.dp)
-            .height(84.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            Icons.Default.AddCircleOutline,
-            contentDescription = "Create New Account",
-            modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            "New",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
+// --- DELETED: `AddNewAccountGridItem` is no longer used ---
 
 
 @OptIn(ExperimentalLayoutApi::class)
