@@ -8,6 +8,9 @@
 // REASON: FIX (Bug) - Added 'Txn' to the expense keywords and updated a
 // merchant regex to support UPI addresses with '@' and 'by UPI' text. This
 // fixes a bug where certain HDFC UPI messages were not being parsed.
+// REASON: FEATURE (Parsing) - Added 'Dr' and 'Dr.' to the expense keywords.
+// Added a new merchant regex for 'Cr. to [VPA]' format. This is to support
+// a new Bank of Baroda format without modifying existing patterns.
 // =================================================================================
 package io.pm.finlight
 
@@ -29,8 +32,8 @@ object SmsParser {
 
     private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- FIX: Added 'Txn' to the list of expense keywords ---
-    val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|Txn|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with|debit of|debit)\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
+    // --- FIX: Added 'Txn' and 'Dr'/'Dr.' to the list of expense keywords ---
+    val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|Txn|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr|Dr\\.|Dr with|debit of|debit)\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
     val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     private val ACCOUNT_PATTERNS =
@@ -105,6 +108,8 @@ object SmsParser {
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
             "at\\s+'([^']+)'\\s+from".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Add rule for 'Cr. to [VPA]' ---
+            "(?:Cr|Cr\\.) to\\s+([A-Za-z0-9.\\-_]+@[A-Za-z0-9.\\-_]+)".toRegex(RegexOption.IGNORE_CASE),
             "at\\s+(.*?)\\s+\\(UPI Ref No".toRegex(RegexOption.IGNORE_CASE),
             "^([A-Z0-9*\\s]+) refund of".toRegex(RegexOption.IGNORE_CASE),
             // --- FIX: Increased specificity and priority of this ICICI pattern ---
