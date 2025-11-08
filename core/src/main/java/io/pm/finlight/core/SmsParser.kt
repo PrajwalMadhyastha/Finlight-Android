@@ -11,6 +11,12 @@
 // REASON: FEATURE (Parsing) - Added 'Dr' and 'Dr.' to the expense keywords.
 // Added a new merchant regex for 'Cr. to [VPA]' format. This is to support
 // a new Bank of Baroda format without modifying existing patterns.
+// REASON: FEATURE (Parsing) - Added new merchant pattern `towards...UMRN:` and
+// new account pattern `from HDFC Bank A/C No...` to support a new HDFC
+// Mutual Fund debit format.
+// REASON: FIX (Parsing) - Corrected the capture group for the
+// "from HDFC Bank A/C No..." pattern to properly extract only the bank
+// name and account number, fixing an account name formatting bug.
 // =================================================================================
 package io.pm.finlight
 
@@ -41,6 +47,8 @@ object SmsParser {
             "debited from (A/c X*\\d{4}) for NEFT".toRegex(RegexOption.IGNORE_CASE),
             "credited on your (credit card ending \\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "from your (HDFC Bank A/c X*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            // --- FIX: Use two capture groups to separate bank name and account number ---
+            "from (HDFC Bank) A/C No (\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "on (HDFC Bank Prepaid Card \\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "From (HDFC Bank A/[Cc] X*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "spent Card no\\. (XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -110,6 +118,8 @@ object SmsParser {
             "at\\s+'([^']+)'\\s+from".toRegex(RegexOption.IGNORE_CASE),
             // --- NEW: Add rule for 'Cr. to [VPA]' ---
             "(?:Cr|Cr\\.) to\\s+([A-Za-z0-9.\\-_]+@[A-Za-z0-9.\\-_]+)".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Add rule for 'towards...UMRN:' ---
+            "towards\\s+(.+?)(?: UMRN:)".toRegex(RegexOption.IGNORE_CASE),
             "at\\s+(.*?)\\s+\\(UPI Ref No".toRegex(RegexOption.IGNORE_CASE),
             "^([A-Z0-9*\\s]+) refund of".toRegex(RegexOption.IGNORE_CASE),
             // --- FIX: Increased specificity and priority of this ICICI pattern ---
@@ -450,6 +460,9 @@ object SmsParser {
                         PotentialAccount(formattedName = "HDFC Bank Card - ${match.groupValues[1].trim()}", accountType = "Credit Card")
                     "from your (HDFC Bank A/c X*\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    // --- FIX: Use two capture groups to format name correctly ---
+                    "from (HDFC Bank) A/C No (\\d{4})" ->
+                        PotentialAccount(formattedName = "${match.groupValues[1].trim()} - ${match.groupValues[2].trim()}", accountType = "Bank Account")
                     "on (HDFC Bank Prepaid Card \\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Prepaid Card")
                     "From (HDFC Bank A/[Cc] X*\\d{4})" ->
