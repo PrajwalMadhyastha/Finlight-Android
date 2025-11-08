@@ -17,6 +17,11 @@
 // REASON: FIX (Parsing) - Corrected the capture group for the
 // "from HDFC Bank A/C No..." pattern to properly extract only the bank
 // name and account number, fixing an account name formatting bug.
+//
+// REASON: MODIFIED - The `parseWithOnlyCustomRules` function is updated.
+// It now checks for the rule's new `transactionType` field and uses it
+// as the source of truth. It only falls back to keyword-based detection
+// if the rule's `transactionType` is null.
 // =================================================================================
 package io.pm.finlight
 
@@ -243,11 +248,21 @@ object SmsParser {
                         } catch (e: PatternSyntaxException) { /* Ignore */ }
                     }
 
+                    // --- MODIFICATION START ---
+                    val transactionType = if (rule.transactionType != null) {
+                        // 1. Use the type from the rule if it's set
+                        rule.transactionType!!
+                    } else {
+                        // 2. Fallback to the old keyword logic if the rule's type is null
+                        if (EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "expense" else "income"
+                    }
+                    // --- MODIFICATION END ---
+
                     val potentialTxn = PotentialTransaction(
                         sourceSmsId = sms.id,
                         smsSender = sms.sender,
                         amount = customAmount,
-                        transactionType = if (EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "expense" else "income",
+                        transactionType = transactionType, // <-- Use the new logic
                         merchantName = customMerchant,
                         originalMessage = sms.body,
                         potentialAccount = customAccountStr?.let { PotentialAccount(it, "Unknown") },

@@ -4,6 +4,10 @@
 // (MIGRATION_40_42 and MIGRATION_41_42). These migrations safely restructure the
 // `sms_parse_templates` table to use a composite primary key, removing the faulty
 // unique index and cleaning up duplicate data to resolve the crash-on-update.
+//
+// REASON: MODIFIED - Incremented database version to 43 and added
+// MIGRATION_42_43 to add the new `transactionType` column to the
+// `custom_sms_rules` table.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -48,7 +52,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         Trip::class,
         AccountAlias::class
     ],
-    version = 42, // --- UPDATED: Incremented version to 42 ---
+    version = 43, // --- UPDATED: Incremented version to 43 ---
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -74,7 +78,7 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // --- All existing migrations (1-2 through 40-41) remain here ---
+        // --- All existing migrations (1-2 through 41-42) remain here ---
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN transactionType TEXT NOT NULL DEFAULT 'expense'")
@@ -479,22 +483,32 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_date` ON `transactions` (`date`)")
             }
         }
-        // --- THIS IS THE FAULTY MIGRATION ---
         val MIGRATION_40_41 = object : Migration(40, 41) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // This migration cleans up duplicates before applying the unique index.
                 db.execSQL("DELETE FROM sms_parse_templates WHERE id NOT IN (SELECT MIN(id) FROM sms_parse_templates GROUP BY templateSignature)")
                 db.execSQL("DROP INDEX IF EXISTS `index_sms_parse_templates_templateSignature`")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_sms_parse_templates_templateSignature` ON `sms_parse_templates` (`templateSignature`)")
             }
         }
-
-        // --- NEW: Migration from v40 (pre-crash) to v42 (new schema) ---
         val MIGRATION_40_42 = object : Migration(40, 42) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // The old templates are not compatible with the new schema as they lack the
-                // 'correctedMerchantName'. The safest approach is to drop the old table
-                // and create the new one. The app will re-learn templates over time.
+                db.execSQL("DROP TABLE IF EXISTS `sms_parse_templates`")
+                db.execSQL("""
+                    CREATE TABLE `sms_parse_templates` (
+                        `templateSignature` TEXT NOT NULL COLLATE NOCASE, 
+                        `correctedMerchantName` TEXT NOT NULL COLLATE NOCASE, 
+                        `originalSmsBody` TEXT NOT NULL, 
+                        `originalAmountStartIndex` INTEGER NOT NULL, 
+                        `originalAmountEndIndex` INTEGER NOT NULL,
+                        `originalMerchantStartIndex` INTEGER NOT NULL,
+                        `originalMerchantEndIndex` INTEGER NOT NULL,
+                        PRIMARY KEY(`templateSignature`, `correctedMerchantName`)
+                    )
+                """)
+            }
+        }
+        val MIGRATION_41_42 = object : Migration(41, 42) {
+            override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("DROP TABLE IF EXISTS `sms_parse_templates`")
                 db.execSQL("""
                     CREATE TABLE `sms_parse_templates` (
@@ -511,24 +525,10 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // --- NEW: Migration from v41 (crashed version) to v42 (new schema) ---
-        val MIGRATION_41_42 = object : Migration(41, 42) {
+        // --- NEW: Migration for version 43 ---
+        val MIGRATION_42_43 = object : Migration(42, 43) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // The logic is identical to 40-42. We drop the old, potentially problematic table
-                // and create the new, corrected one from scratch.
-                db.execSQL("DROP TABLE IF EXISTS `sms_parse_templates`")
-                db.execSQL("""
-                    CREATE TABLE `sms_parse_templates` (
-                        `templateSignature` TEXT NOT NULL COLLATE NOCASE, 
-                        `correctedMerchantName` TEXT NOT NULL COLLATE NOCASE, 
-                        `originalSmsBody` TEXT NOT NULL, 
-                        `originalAmountStartIndex` INTEGER NOT NULL, 
-                        `originalAmountEndIndex` INTEGER NOT NULL,
-                        `originalMerchantStartIndex` INTEGER NOT NULL,
-                        `originalMerchantEndIndex` INTEGER NOT NULL,
-                        PRIMARY KEY(`templateSignature`, `correctedMerchantName`)
-                    )
-                """)
+                db.execSQL("ALTER TABLE `custom_sms_rules` ADD COLUMN `transactionType` TEXT")
             }
         }
 
@@ -537,7 +537,6 @@ abstract class AppDatabase : RoomDatabase() {
             return INSTANCE ?: synchronized(this) {
                 val securityManager = SecurityManager(context)
                 val passphrase = securityManager.getPassphrase()
-                // --- MIGRATION: Use the new SupportOpenHelperFactory ---
                 val factory = SupportOpenHelperFactory(passphrase)
 
                 val instance =
@@ -555,8 +554,9 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
                             MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40,
                             MIGRATION_40_41,
-                            MIGRATION_40_42, // --- ADDED
-                            MIGRATION_41_42  // --- ADDED
+                            MIGRATION_40_42,
+                            MIGRATION_41_42,
+                            MIGRATION_42_43 // --- ADDED ---
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))
@@ -571,9 +571,7 @@ abstract class AppDatabase : RoomDatabase() {
                 super.onCreate(db)
                 CoroutineScope(Dispatchers.IO).launch {
                     val database = getInstance(context)
-                    // Seed initial account
                     database.accountDao().insert(Account(id = 1, name = "Cash Spends", type = "Cash"))
-                    // The onOpen callback will handle the rest of the seeding.
                 }
             }
 
@@ -583,7 +581,6 @@ abstract class AppDatabase : RoomDatabase() {
                     val database = getInstance(context)
                     val settingsRepository = SettingsRepository(context)
 
-                    // 1. Handle Categories (only on first creation)
                     val categoryDao = database.categoryDao()
                     val categoryCount = categoryDao.getAllCategories().first().size
                     if (categoryCount == 0) {
@@ -591,24 +588,18 @@ abstract class AppDatabase : RoomDatabase() {
                         categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
                     }
 
-                    // 2. Handle Ignore Rules (sync on every update via checksum)
                     val ignoreRuleDao = database.ignoreRuleDao()
-                    // Calculate a checksum of the current rules in the code
                     val liveChecksum = DEFAULT_IGNORE_PHRASES.joinToString { it.pattern }.hashCode()
                     val storedChecksum = settingsRepository.getIgnoreRulesChecksum()
 
                     if (liveChecksum != storedChecksum) {
                         Log.w("DatabaseCallback", "Ignore rule checksum mismatch (Live: $liveChecksum, Stored: $storedChecksum). Syncing default rules.")
-                        // Delete only the default rules, leaving user-added ones intact
                         ignoreRuleDao.deleteDefaultRules()
-                        // Insert the new set of default rules
                         ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
-                        // Save the new checksum to prevent this from running again until the rules change
                         settingsRepository.saveIgnoreRulesChecksum(liveChecksum)
                         Log.i("DatabaseCallback", "Default ignore rules synced successfully.")
                     }
 
-                    // 3. Handle legacy icon repair (can stay as is)
                     repairCategoryIcons(database)
                 }
             }
