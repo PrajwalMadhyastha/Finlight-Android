@@ -10,6 +10,9 @@
 // REASON: MODIFIED - The screen now collects `isPrivacyModeEnabled` and passes
 // it to the `MonthlySummaryHeader`. The header itself is updated to accept
 // this flag and use `PrivacyAwareText` for displaying amounts.
+//
+// REASON: MODIFIED - Extended Privacy Mode to the `BudgetProgress` bar's
+// "Spent" and "Budget" text fields.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -337,7 +340,8 @@ fun MonthlySummaryHeader(
             BudgetProgress(
                 spent = totalSpent,
                 budget = budget.roundToLong(),
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
+                isPrivacyModeEnabled = isPrivacyModeEnabled // --- NEW: Pass state
             )
         } else {
             Text(
@@ -362,7 +366,13 @@ private fun formatAmountInLakhs(amount: Long): String {
 
 
 @Composable
-fun BudgetProgress(spent: Long, budget: Long, modifier: Modifier = Modifier) {
+fun BudgetProgress(
+    spent: Long,
+    budget: Long,
+    modifier: Modifier = Modifier,
+    // --- NEW: Accept privacy mode state ---
+    isPrivacyModeEnabled: Boolean = false
+) {
     val progress = if (budget > 0) (spent.toFloat() / budget.toFloat()) else 0f
     val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = tween(1000), label = "")
 
@@ -390,14 +400,20 @@ fun BudgetProgress(spent: Long, budget: Long, modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                text = "Spent: ${currencyFormat.format(spent)}",
+            // --- MODIFIED: Use PrivacyAwareText ---
+            PrivacyAwareText(
+                amount = spent,
+                isPrivacyMode = isPrivacyModeEnabled,
+                prefix = "Spent: ",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = "Budget: ${currencyFormat.format(budget)}",
+            // --- MODIFIED: Use PrivacyAwareText ---
+            PrivacyAwareText(
+                amount = budget,
+                isPrivacyMode = isPrivacyModeEnabled,
+                prefix = "Budget: ",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
