@@ -9,6 +9,9 @@
 // TestDispatcher could not control the coroutine's execution.
 // The ViewModel should run on the Main dispatcher; the repository is
 // responsible for moving work off the main thread.
+//
+// REASON: MODIFIED - Exposed `isPrivacyModeEnabled` from the
+// SettingsRepository to allow the UI to hide sensitive amounts.
 // =================================================================================
 package io.pm.finlight
 
@@ -172,6 +175,15 @@ class TransactionViewModel(
 
     private val _addTransactionDescription = MutableStateFlow("")
     private val _userManuallySelectedCategory = MutableStateFlow(false)
+
+    // --- NEW: Expose privacy mode state ---
+    val isPrivacyModeEnabled: StateFlow<Boolean> =
+        settingsRepository.getPrivacyModeEnabled()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = false
+            )
 
     val suggestedCategory: StateFlow<Category?> = _addTransactionDescription
         .debounce(400)

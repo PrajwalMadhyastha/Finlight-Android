@@ -4,6 +4,9 @@
 // constructor dependency injection for its repository dependencies. It now extends
 // ViewModel instead of AndroidViewModel, decoupling it from the Android framework
 // and making it fully unit-testable.
+//
+// REASON: MODIFIED - Added SettingsRepository dependency and exposed
+// `isPrivacyModeEnabled` to allow the UI to hide sensitive amounts.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -22,7 +25,9 @@ import kotlin.math.roundToLong
 class IncomeViewModel(
     private val transactionRepository: TransactionRepository,
     val accountRepository: AccountRepository,
-    val categoryRepository: CategoryRepository
+    val categoryRepository: CategoryRepository,
+    // --- NEW: Add SettingsRepository dependency ---
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
@@ -30,6 +35,15 @@ class IncomeViewModel(
 
     private val _filterState = MutableStateFlow(TransactionFilterState())
     val filterState: StateFlow<TransactionFilterState> = _filterState.asStateFlow()
+
+    // --- NEW: Expose privacy mode state ---
+    val isPrivacyModeEnabled: StateFlow<Boolean> =
+        settingsRepository.getPrivacyModeEnabled()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = false
+            )
 
     private val combinedState: Flow<Pair<Calendar, TransactionFilterState>> =
         _selectedMonth.combine(_filterState) { month, filters ->
