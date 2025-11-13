@@ -1,5 +1,14 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/AnalysisViewModelTest.kt
+//
+// REASON: TEST (Analysis Filters) - Added a new test
+// `onIncludeExcludedChanged updates uiState and refetches data` to verify
+// that toggling the new switch correctly calls the DAO with
+// `includeExcluded = true`.
+//
+// REASON: TEST (Analysis Filters) - Updated the
+// `clearFilters resets filter state and refetches data` test to also
+// reset to `false` when `clearFilters` is called.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -24,6 +33,8 @@ import org.mockito.Mockito.*
 import org.mockito.MockitoAnnotations
 import org.robolectric.annotation.Config
 import java.util.*
+// --- FIX: Add missing kotlin.test.assertFalse import ---
+import kotlin.test.assertFalse
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -55,13 +66,19 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         `when`(transactionDao.getAllExpenseMerchants()).thenReturn(flowOf(emptyList()))
 
         // --- FIX: Make default mocks specific to avoid conflicts and NPEs ---
-        // Default for init (all nulls)
-        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull())).thenReturn(flowOf(emptyList()))
-        // Default for search (any string)
-        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), anyString())).thenReturn(flowOf(emptyList()))
-        // Generic fallbacks for other dimensions
-        `when`(transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), any(), any(), any(), any())).thenReturn(flowOf(emptyList()))
-        `when`(transactionDao.getSpendingAnalysisByMerchant(anyLong(), anyLong(), any(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+        // Default for init (all nulls, includeExcluded = false)
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(false))).thenReturn(flowOf(emptyList()))
+        // Default for search (any string, includeExcluded = false)
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), anyString(), eq(false))).thenReturn(flowOf(emptyList()))
+        // Generic fallbacks for other dimensions (includeExcluded = false)
+        `when`(transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), any(), any(), any(), any(), eq(false))).thenReturn(flowOf(emptyList()))
+        `when`(transactionDao.getSpendingAnalysisByMerchant(anyLong(), anyLong(), any(), any(), any(), any(), eq(false))).thenReturn(flowOf(emptyList()))
+
+        // --- NEW: Add mocks for includeExcluded = true scenarios ---
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), any(), any(), any(), any(), eq(true))).thenReturn(flowOf(emptyList()))
+        `when`(transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), any(), any(), any(), any(), eq(true))).thenReturn(flowOf(emptyList()))
+        `when`(transactionDao.getSpendingAnalysisByMerchant(anyLong(), anyLong(), any(), any(), any(), any(), eq(true))).thenReturn(flowOf(emptyList()))
+
 
         viewModel = AnalysisViewModel(transactionDao, categoryDao, tagDao)
     }
@@ -92,6 +109,8 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             assertEquals(AnalysisDimension.CATEGORY, finalState.selectedDimension)
             assertEquals(AnalysisTimePeriod.MONTH, finalState.selectedTimePeriod)
             assertEquals(false, finalState.isLoading)
+            // --- NEW: Verify default state ---
+            assertEquals(false, finalState.includeExcluded)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -100,7 +119,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
     fun `selectDimension updates uiState and calls correct DAO method`() = runTest(standardTestDispatcher) {
         // Arrange
         val mockItems = listOf(SpendingAnalysisItem("1", "Test", 100.0, 1))
-        `when`(transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull())).thenReturn(flowOf(mockItems))
+        `when`(transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(false))).thenReturn(flowOf(mockItems))
 
         viewModel.uiState.test {
             // Await initial loading state
@@ -129,7 +148,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         }
 
         // Verify that the correct DAO method was called.
-        verify(transactionDao).getSpendingAnalysisByTag(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull())
+        verify(transactionDao).getSpendingAnalysisByTag(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(false))
     }
 
     @Test
@@ -154,7 +173,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         val searchQuery = "Food"
         val mockItems = listOf(SpendingAnalysisItem("1", "Food", 50.0, 1))
         // This specific mock will be used instead of the default `anyString()` in setup()
-        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), eq(searchQuery))).thenReturn(flowOf(mockItems))
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), eq(searchQuery), eq(false))).thenReturn(flowOf(mockItems))
 
         viewModel.uiState.test {
             awaitItem() // initial loading
@@ -179,7 +198,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         }
 
         // Also verify the mock was called, as a sanity check
-        verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), eq(searchQuery))
+        verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), eq(searchQuery), eq(false))
     }
 
 
@@ -187,10 +206,10 @@ class AnalysisViewModelTest : BaseViewModelTest() {
     fun `selectDimension clears the search query`() = runTest(standardTestDispatcher) {
         // --- FIX: Add mock for the filtered query to return non-empty data ---
         val queriedItems = listOf(SpendingAnalysisItem("1", "Queried", 1.0, 1))
-        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), eq("some query")))
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), eq("some query"), eq(false)))
             .thenReturn(flowOf(queriedItems))
         // Mock for the new dimension's (TAG) cleared query
-        `when`(transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull()))
+        `when`(transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(false)))
             .thenReturn(flowOf(emptyList()))
 
         viewModel.uiState.test {
@@ -234,7 +253,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         // Arrange
         val foodCategory = Category(1, "Food", "", "")
         val mockItems = listOf(SpendingAnalysisItem("1", "Food", 50.0, 1))
-        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), eq(1), isNull())).thenReturn(flowOf(mockItems))
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), eq(1), isNull(), eq(false))).thenReturn(flowOf(mockItems))
 
         viewModel.uiState.test {
             awaitItem()
@@ -256,9 +275,10 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             cancelAndIgnoreRemainingEvents()
         }
 
-        verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), eq(1), isNull())
+        verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), eq(1), isNull(), eq(false))
     }
 
+    // --- UPDATED: This test now also verifies the includeExcluded flag ---
     @Test
     fun `clearFilters resets filter state and refetches data`() = runTest(standardTestDispatcher) {
         // Arrange
@@ -266,12 +286,11 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         val travelTag = Tag(2, "Travel")
         val filteredItems = listOf(SpendingAnalysisItem("1", "Filtered", 1.0, 1))
 
-        // --- FIX: Add mock for the filtered query to return non-empty data ---
-        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), eq(travelTag.id), isNull(), eq(foodCategory.id), isNull()))
+        // Mock for the filtered query
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), eq(travelTag.id), isNull(), eq(foodCategory.id), isNull(), eq(true)))
             .thenReturn(flowOf(filteredItems))
-        // Mock for the cleared query (already set in @Before, but good to be explicit)
-        // This will be chained: first call (init) gets emptyList, second (clearFilters) gets emptyList
-        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull()))
+        // Mock for the cleared query (all nulls, includeExcluded=false)
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(false)))
             .thenReturn(flowOf(emptyList())) // For init
             .thenReturn(flowOf(emptyList())) // For clearFilters
 
@@ -285,12 +304,17 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             awaitItem() // intermediate cat
             viewModel.selectFilterTag(travelTag)
             awaitItem() // intermediate tag
+            viewModel.onIncludeExcludedChanged(true) // <-- NEW: Set the new flag
+            val intermediateFlag = awaitItem() // intermediate flag
+            assertEquals(true, intermediateFlag.includeExcluded)
+
             advanceTimeBy(301)
             val stateWithFilters = awaitItem() // final loaded with filters (items=[...Filtered...])
 
             // Pre-condition assert
             assertEquals(filteredItems, stateWithFilters.analysisItems)
             assertNotNull(stateWithFilters.selectedFilterCategory)
+            assertEquals(true, stateWithFilters.includeExcluded) // <-- NEW
 
             // Act 2: Clear the filters
             viewModel.clearFilters()
@@ -299,6 +323,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             val intermediateState = awaitItem()
             assertNull(intermediateState.selectedFilterCategory)
             assertNull(intermediateState.selectedFilterTag)
+            assertFalse(intermediateState.includeExcluded) // <-- NEW: Assert flag is reset
             assertEquals(filteredItems, intermediateState.analysisItems) // Still has old items
 
             advanceTimeBy(301) // Let debounce finish
@@ -308,12 +333,16 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             assertNull(finalState.selectedFilterCategory)
             assertNull(finalState.selectedFilterTag)
             assertNull(finalState.selectedFilterMerchant)
+            assertFalse(finalState.includeExcluded) // <-- NEW: Assert flag is reset in final state
             assertEquals(emptyList<SpendingAnalysisItem>(), finalState.analysisItems) // Now has new (empty) items
 
             cancelAndIgnoreRemainingEvents()
         }
 
-        verify(transactionDao, atLeastOnce()).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull())
+        // Verify the DAO was called twice with includeExcluded=false (init, clear)
+        verify(transactionDao, times(2)).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(false))
+        // Verify the DAO was called once with includeExcluded=true (filter)
+        verify(transactionDao, times(1)).getSpendingAnalysisByCategory(anyLong(), anyLong(), eq(travelTag.id), isNull(), eq(foodCategory.id), isNull(), eq(true))
     }
 
     @Test
@@ -322,7 +351,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         val startDate = System.currentTimeMillis() - 100000
         val endDate = System.currentTimeMillis()
         val mockItems = listOf(SpendingAnalysisItem("1", "Custom", 10.0, 1))
-        `when`(transactionDao.getSpendingAnalysisByCategory(eq(startDate), eq(endDate), isNull(), isNull(), isNull(), isNull())).thenReturn(flowOf(mockItems))
+        `when`(transactionDao.getSpendingAnalysisByCategory(eq(startDate), eq(endDate), isNull(), isNull(), isNull(), isNull(), eq(false))).thenReturn(flowOf(mockItems))
 
         // Act & Assert
         viewModel.uiState.test {
@@ -345,7 +374,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             assertEquals(mockItems, finalState.analysisItems)
             cancelAndIgnoreRemainingEvents()
         }
-        verify(transactionDao).getSpendingAnalysisByCategory(eq(startDate), eq(endDate), isNull(), isNull(), isNull(), isNull())
+        verify(transactionDao).getSpendingAnalysisByCategory(eq(startDate), eq(endDate), isNull(), isNull(), isNull(), isNull(), eq(false))
     }
 
 
@@ -375,7 +404,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         // Arrange
         val workTag = Tag(5, "Work")
         val mockItems = listOf(SpendingAnalysisItem("5", "Work", 75.0, 2))
-        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), eq(5), isNull(), isNull(), isNull())).thenReturn(flowOf(mockItems))
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), eq(5), isNull(), isNull(), isNull(), eq(false))).thenReturn(flowOf(mockItems))
 
         viewModel.uiState.test {
             awaitItem() // Consume initial states
@@ -396,7 +425,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             assertEquals(mockItems, updatedState.analysisItems)
             cancelAndIgnoreRemainingEvents()
         }
-        verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), eq(5), isNull(), isNull(), isNull())
+        verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), eq(5), isNull(), isNull(), isNull(), eq(false))
     }
 
     @Test
@@ -404,7 +433,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         // Arrange
         val merchant = "Amazon"
         val mockItems = listOf(SpendingAnalysisItem("amazon", "Amazon", 200.0, 3))
-        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), eq(merchant), isNull(), isNull())).thenReturn(flowOf(mockItems))
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), eq(merchant), isNull(), isNull(), eq(false))).thenReturn(flowOf(mockItems))
 
         viewModel.uiState.test {
             awaitItem() // Consume initial states
@@ -425,10 +454,10 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             assertEquals(mockItems, updatedState.analysisItems)
             cancelAndIgnoreRemainingEvents()
         }
-        verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), eq(merchant), isNull(), isNull())
+        verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), eq(merchant), isNull(), isNull(), eq(false))
     }
 
-    // --- NEW TESTS for selectTimePeriod ---
+    // --- NEW: Test for selectTimePeriod ---
 
     @Test
     fun `selectTimePeriod updates uiState and refetches data`() = runTest(standardTestDispatcher) {
@@ -436,7 +465,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         val mockItems = listOf(SpendingAnalysisItem("1", "Yearly Spend", 500.0, 5))
         // --- FIX: Use chained thenReturn to avoid mock race condition with init ---
         // The first call (from init) gets emptyList. The second (from this test) gets mockItems.
-        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull()))
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(false)))
             .thenReturn(flowOf(emptyList())) // For the init (MONTH) call
             .thenReturn(flowOf(mockItems))  // For the YEAR call
 
@@ -471,7 +500,44 @@ class AnalysisViewModelTest : BaseViewModelTest() {
         }
 
         // Verify the DAO was called twice with these filters
-        verify(transactionDao, times(2)).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull())
+        verify(transactionDao, times(2)).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(false))
+    }
+
+    // --- NEW: Test for onIncludeExcludedChanged ---
+
+    @Test
+    fun `onIncludeExcludedChanged updates uiState and refetches data`() = runTest(standardTestDispatcher) {
+        // Arrange
+        val excludedItems = listOf(SpendingAnalysisItem("10", "Excluded Item", 1.0, 1))
+        `when`(transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(true))).thenReturn(flowOf(excludedItems))
+
+        viewModel.uiState.test {
+            awaitItem() // initial loading
+            advanceTimeBy(301)
+            val initialState = awaitItem() // initial loaded
+            assertEquals(false, initialState.includeExcluded)
+            assertEquals(emptyList<SpendingAnalysisItem>(), initialState.analysisItems)
+
+            // Act
+            viewModel.onIncludeExcludedChanged(true)
+
+            // Assert intermediate state (flag changed, data is old)
+            val intermediateState = awaitItem()
+            assertEquals(true, intermediateState.includeExcluded)
+            assertEquals(emptyList<SpendingAnalysisItem>(), intermediateState.analysisItems)
+
+            // Let debounce finish
+            advanceTimeBy(301)
+
+            // Assert final state (data is new)
+            val finalState = awaitItem()
+            assertEquals(true, finalState.includeExcluded)
+            assertEquals(excludedItems, finalState.analysisItems)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Verify the DAO was called with includeExcluded = true
+        verify(transactionDao).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(true))
     }
 }
-
