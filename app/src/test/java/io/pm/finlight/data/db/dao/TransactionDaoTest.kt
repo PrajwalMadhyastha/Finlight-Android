@@ -511,7 +511,8 @@ class TransactionDaoTest {
         transactionDao.insert(Transaction(description = "Flipkart", amount = 200.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null))
 
         // Act & Assert
-        transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null).test {
+        // --- FIX: Add the missing includeExcluded parameter ---
+        transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, false).test {
             val results = awaitItem()
 
             // Assert: There should be only two groups: one for all "Amazon" variations and one for "Flipkart".
