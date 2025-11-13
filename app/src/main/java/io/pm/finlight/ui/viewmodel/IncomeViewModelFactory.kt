@@ -2,6 +2,9 @@
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/IncomeViewModelFactory.kt
 // REASON: NEW FILE - This factory provides all necessary repository dependencies
 // to the IncomeViewModel, enabling constructor injection for better testability.
+//
+// REASON: MODIFIED - Injected SettingsRepository to allow the ViewModel to
+// observe the Privacy Mode state.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -25,7 +28,8 @@ class IncomeViewModelFactory(private val application: Application) : ViewModelPr
             return IncomeViewModel(
                 transactionRepository,
                 accountRepository,
-                categoryRepository
+                categoryRepository,
+                settingsRepository // --- NEW: Pass SettingsRepository
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

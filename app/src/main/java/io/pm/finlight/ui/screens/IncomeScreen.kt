@@ -6,6 +6,10 @@
 // FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
 // provides a centralized TopAppBar, and this change removes the duplicate,
 // resolving a UI bug.
+//
+// REASON: MODIFIED - The screen now collects `isPrivacyModeEnabled` and passes
+// it to the `IncomeHeader`. The header itself is updated to accept this
+// flag and use `PrivacyAwareText` for displaying the total income.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -33,6 +37,7 @@ import io.pm.finlight.MonthlySummaryItem
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.ui.components.FilterBottomSheet
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.PrivacyAwareText
 import io.pm.finlight.ui.components.TransactionList
 import io.pm.finlight.ui.components.pagerTabIndicatorOffset
 import io.pm.finlight.ui.theme.PopupSurfaceDark
@@ -66,6 +71,9 @@ fun IncomeScreen(
     val allCategories by incomeViewModel.allCategories.collectAsState(initial = emptyList())
     var showFilterSheet by remember { mutableStateOf(false) }
 
+    // --- NEW: Collect privacy mode state ---
+    val isPrivacyModeEnabled by incomeViewModel.isPrivacyModeEnabled.collectAsState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -74,7 +82,8 @@ fun IncomeScreen(
             totalIncome = totalIncome,
             selectedMonth = selectedMonth,
             monthlySummaries = monthlySummaries,
-            onMonthSelected = { incomeViewModel.setSelectedMonth(it) }
+            onMonthSelected = { incomeViewModel.setSelectedMonth(it) },
+            isPrivacyModeEnabled = isPrivacyModeEnabled // --- NEW: Pass state
         )
 
         TabRow(
@@ -141,7 +150,9 @@ fun IncomeHeader(
     selectedMonth: Calendar,
     monthlySummaries: List<MonthlySummaryItem>,
     totalIncome: Long,
-    onMonthSelected: (Calendar) -> Unit
+    onMonthSelected: (Calendar) -> Unit,
+    // --- NEW: Accept privacy mode state ---
+    isPrivacyModeEnabled: Boolean
 ) {
     val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
     val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
@@ -236,8 +247,10 @@ fun IncomeHeader(
                 horizontalAlignment = Alignment.Start
             ) {
                 Text("Total Income", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(
-                    currencyFormat.format(totalIncome),
+                // --- MODIFIED: Use PrivacyAwareText ---
+                PrivacyAwareText(
+                    amount = totalIncome,
+                    isPrivacyMode = isPrivacyModeEnabled,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary

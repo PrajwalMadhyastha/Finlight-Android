@@ -11,6 +11,12 @@
 // FIX (Testing) - Replaced `argThat` with `ArgumentCaptor` and a custom
 // `capture()` helper function. This is the definitive fix for the `NullPointerException`
 // when verifying suspend functions with non-nullable parameters.
+//
+// REASON: MODIFIED - Added new tests for the `transactionType` feature:
+// - `onTransactionTypeChanged updates uiState`
+// - `loadRuleForEditing correctly populates transactionType`
+// - `saveRule correctly saves transactionType`
+// - `saveRule preserves existing regex fields on edit` (BUGFIX TEST)
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -23,6 +29,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -229,5 +236,139 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             assertEquals(selection, state.accountSelection)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // --- NEW TESTS FOR TRANSACTION TYPE ---
+
+    @Test
+    fun `onTransactionTypeChanged updates transactionType in uiState`() = runTest {
+        viewModel.uiState.test {
+            val initialState = awaitItem()
+            assertNull(initialState.transactionType)
+
+            viewModel.onTransactionTypeChanged("income")
+            assertEquals("income", awaitItem().transactionType)
+
+            viewModel.onTransactionTypeChanged("expense")
+            assertEquals("expense", awaitItem().transactionType)
+
+            viewModel.onTransactionTypeChanged(null)
+            assertNull(awaitItem().transactionType)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `loadRuleForEditing correctly populates transactionType`() = runTest {
+        // Arrange
+        val ruleId = 1
+        val existingRule = CustomSmsRule(
+            id = ruleId,
+            triggerPhrase = "test",
+            transactionType = "income", // <-- Test this
+            priority = 10,
+            sourceSmsBody = "some body",
+            merchantRegex = "regex1",
+            amountRegex = "regex2",
+            accountRegex = "regex3",
+            merchantNameExample = null,
+            amountExample = null,
+            accountNameExample = null
+        )
+        `when`(customSmsRuleDao.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
+
+        // Act
+        viewModel.loadRuleForEditing(ruleId)
+        advanceUntilIdle()
+
+        // Assert
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals("income", state.transactionType)
+            // --- Also assert regex fields are loaded ---
+            assertEquals("regex1", state.merchantRegex)
+            assertEquals("regex2", state.amountRegex)
+            assertEquals("regex3", state.accountRegex)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `saveRule correctly saves transactionType`() = runTest {
+        // Arrange
+        var onCompleteCalled = false
+        val smsBody = "Transaction of 100 at Merchant X"
+        val triggerSelection = RuleSelection("Transaction of", 0, 14)
+        val merchantSelection = RuleSelection("Merchant X", 20, 30)
+
+        // Act
+        viewModel.onMarkAsTrigger(triggerSelection)
+        viewModel.onMarkAsMerchant(merchantSelection)
+        viewModel.onTransactionTypeChanged("income") // <-- Set the new type
+        viewModel.saveRule(smsBody) { onCompleteCalled = true }
+        advanceUntilIdle()
+
+        // Assert
+        verify(customSmsRuleDao).insert(capture(ruleCaptor))
+        val capturedRule = ruleCaptor.value
+        assertEquals("income", capturedRule.transactionType)
+        assertEquals(true, onCompleteCalled)
+    }
+
+    @Test
+    fun `saveRule preserves existing regex fields on edit`() = runTest {
+        // ARRANGE: This is the critical bugfix test
+        var onCompleteCalled = false
+        val ruleId = 5
+        val smsBody = "Transaction of 100 at Merchant X"
+        val existingRule = CustomSmsRule(
+            id = ruleId,
+            triggerPhrase = "Transaction of",
+            merchantRegex = "old-merchant-regex",
+            amountRegex = "old-amount-regex",
+            accountRegex = "old-account-regex",
+            merchantNameExample = "Old Merchant",
+            amountExample = "100",
+            accountNameExample = "xx1234",
+            priority = 10,
+            sourceSmsBody = smsBody,
+            transactionType = null // Start as "Auto-Detect"
+        )
+        `when`(customSmsRuleDao.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
+
+        // 1. Load the existing rule
+        viewModel.loadRuleForEditing(ruleId)
+        advanceUntilIdle()
+        viewModel.uiState.test { awaitItem() } // consume initial load
+
+        // 2. Make *only* one change to the transaction type
+        viewModel.onTransactionTypeChanged("income")
+        advanceUntilIdle()
+
+        // 3. Save the rule. No new selections were made, so all startIndexes are -1
+        // ACT
+        viewModel.saveRule(smsBody) { onCompleteCalled = true }
+        advanceUntilIdle()
+
+        // ASSERT
+        // Verify we are calling update, not insert
+        verify(customSmsRuleDao).update(capture(ruleCaptor))
+        val updatedRule = ruleCaptor.value
+
+        // Check that the rule ID and new type are correct
+        assertEquals(ruleId, updatedRule.id)
+        assertEquals("income", updatedRule.transactionType)
+
+        // *** THE BUGFIX ASSERTION ***
+        // Verify that the original regex fields were preserved
+        assertEquals("old-merchant-regex", updatedRule.merchantRegex)
+        assertEquals("old-amount-regex", updatedRule.amountRegex)
+        assertEquals("old-account-regex", updatedRule.accountRegex)
+
+        // Verify example text is also preserved
+        assertEquals("Old Merchant", updatedRule.merchantNameExample)
+
+        assertEquals(true, onCompleteCalled)
     }
 }

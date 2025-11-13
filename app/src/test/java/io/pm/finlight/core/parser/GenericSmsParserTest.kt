@@ -441,4 +441,25 @@ class GenericSmsParserTest : BaseSmsParserTest() {
         assertEquals("Indusind Bank - Credit Card XX4062", result?.potentialAccount?.formattedName)
         assertEquals("Credit Card", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses bob debit with cr to vpa merchant`() = runBlocking {
+        setupTest()
+        val smsBody = "Rs.711.52 Dr. from A/C XXXXXX1236 and Cr. to techmashsolutionspvtl.payu@mairtel. Ref:567123450825. AvlBal:Rs2915.89(2025:11:05 10:43:12). Not you? Call 18005700/5000-BOB"
+        val mockSms = SmsMessage(
+            id = 9017L,
+            sender = "VM-BOB",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(711.52, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("techmashsolutionspvtl.payu@mairtel", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("A/C XXXXXX1236", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }

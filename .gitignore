@@ -24,6 +24,9 @@ captures/
 # Generated files
 generated/
 project_context.txt
+generate_context.sh
+app_src.txt
+app_tests.txt
 tree.txt
 
 # --- ADDED: Ignore generated analysis reports ---

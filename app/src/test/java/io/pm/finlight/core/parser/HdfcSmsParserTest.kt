@@ -416,4 +416,25 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
         assertEquals("HDFC Bank - xx1240", result?.potentialAccount?.formattedName)
         assertEquals("Card", result?.potentialAccount?.accountType)
     }
+
+    @Test
+    fun `test parses hdfc mutual fund debit with umrn`() = runBlocking {
+        setupTest()
+        val smsBody = "PAYMENT ALERT! INR 4000.00 deducted from HDFC Bank A/C No 4677 towards Quant Mutual Fund UMRN: HDFC0000000012345678"
+        val mockSms = SmsMessage(
+            id = 9018L,
+            sender = "VM-HDFCBK",
+            body = smsBody,
+            date = System.currentTimeMillis()
+        )
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+
+        assertNotNull("Parser should not ignore this valid transaction", result)
+        assertEquals(4000.00, result?.amount)
+        assertEquals("expense", result?.transactionType)
+        assertEquals("Quant Mutual Fund", result?.merchantName)
+        assertNotNull(result?.potentialAccount)
+        assertEquals("HDFC Bank - 4677", result?.potentialAccount?.formattedName)
+        assertEquals("Bank Account", result?.potentialAccount?.accountType)
+    }
 }

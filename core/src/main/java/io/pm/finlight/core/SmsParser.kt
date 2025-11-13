@@ -8,6 +8,20 @@
 // REASON: FIX (Bug) - Added 'Txn' to the expense keywords and updated a
 // merchant regex to support UPI addresses with '@' and 'by UPI' text. This
 // fixes a bug where certain HDFC UPI messages were not being parsed.
+// REASON: FEATURE (Parsing) - Added 'Dr' and 'Dr.' to the expense keywords.
+// Added a new merchant regex for 'Cr. to [VPA]' format. This is to support
+// a new Bank of Baroda format without modifying existing patterns.
+// REASON: FEATURE (Parsing) - Added new merchant pattern `towards...UMRN:` and
+// new account pattern `from HDFC Bank A/C No...` to support a new HDFC
+// Mutual Fund debit format.
+// REASON: FIX (Parsing) - Corrected the capture group for the
+// "from HDFC Bank A/C No..." pattern to properly extract only the bank
+// name and account number, fixing an account name formatting bug.
+//
+// REASON: MODIFIED - The `parseWithOnlyCustomRules` function is updated.
+// It now checks for the rule's new `transactionType` field and uses it
+// as the source of truth. It only falls back to keyword-based detection
+// if the rule's `transactionType` is null.
 // =================================================================================
 package io.pm.finlight
 
@@ -29,8 +43,8 @@ object SmsParser {
 
     private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
-    // --- FIX: Added 'Txn' to the list of expense keywords ---
-    val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|Txn|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr with|debit of|debit)\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
+    // --- FIX: Added 'Txn' and 'Dr'/'Dr.' to the list of expense keywords ---
+    val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|Txn|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr|Dr\\.|Dr with|debit of|debit)\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
     val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     private val ACCOUNT_PATTERNS =
@@ -38,6 +52,8 @@ object SmsParser {
             "debited from (A/c X*\\d{4}) for NEFT".toRegex(RegexOption.IGNORE_CASE),
             "credited on your (credit card ending \\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "from your (HDFC Bank A/c X*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
+            // --- FIX: Use two capture groups to separate bank name and account number ---
+            "from (HDFC Bank) A/C No (\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "on (HDFC Bank Prepaid Card \\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "From (HDFC Bank A/[Cc] X*\\d{4})".toRegex(RegexOption.IGNORE_CASE),
             "spent Card no\\. (XX\\d{4})".toRegex(RegexOption.IGNORE_CASE),
@@ -105,6 +121,10 @@ object SmsParser {
     private val MERCHANT_REGEX_PATTERNS =
         listOf(
             "at\\s+'([^']+)'\\s+from".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Add rule for 'Cr. to [VPA]' ---
+            "(?:Cr|Cr\\.) to\\s+([A-Za-z0-9.\\-_]+@[A-Za-z0-9.\\-_]+)".toRegex(RegexOption.IGNORE_CASE),
+            // --- NEW: Add rule for 'towards...UMRN:' ---
+            "towards\\s+(.+?)(?: UMRN:)".toRegex(RegexOption.IGNORE_CASE),
             "at\\s+(.*?)\\s+\\(UPI Ref No".toRegex(RegexOption.IGNORE_CASE),
             "^([A-Z0-9*\\s]+) refund of".toRegex(RegexOption.IGNORE_CASE),
             // --- FIX: Increased specificity and priority of this ICICI pattern ---
@@ -228,11 +248,21 @@ object SmsParser {
                         } catch (e: PatternSyntaxException) { /* Ignore */ }
                     }
 
+                    // --- MODIFICATION START ---
+                    val transactionType = if (rule.transactionType != null) {
+                        // 1. Use the type from the rule if it's set
+                        rule.transactionType!!
+                    } else {
+                        // 2. Fallback to the old keyword logic if the rule's type is null
+                        if (EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "expense" else "income"
+                    }
+                    // --- MODIFICATION END ---
+
                     val potentialTxn = PotentialTransaction(
                         sourceSmsId = sms.id,
                         smsSender = sms.sender,
                         amount = customAmount,
-                        transactionType = if (EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "expense" else "income",
+                        transactionType = transactionType, // <-- Use the new logic
                         merchantName = customMerchant,
                         originalMessage = sms.body,
                         potentialAccount = customAccountStr?.let { PotentialAccount(it, "Unknown") },
@@ -445,6 +475,9 @@ object SmsParser {
                         PotentialAccount(formattedName = "HDFC Bank Card - ${match.groupValues[1].trim()}", accountType = "Credit Card")
                     "from your (HDFC Bank A/c X*\\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Bank Account")
+                    // --- FIX: Use two capture groups to format name correctly ---
+                    "from (HDFC Bank) A/C No (\\d{4})" ->
+                        PotentialAccount(formattedName = "${match.groupValues[1].trim()} - ${match.groupValues[2].trim()}", accountType = "Bank Account")
                     "on (HDFC Bank Prepaid Card \\d{4})" ->
                         PotentialAccount(formattedName = match.groupValues[1].trim(), accountType = "Prepaid Card")
                     "From (HDFC Bank A/[Cc] X*\\d{4})" ->

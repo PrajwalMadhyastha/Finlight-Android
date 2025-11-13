@@ -4,6 +4,20 @@
 // constructor dependency injection for the CustomSmsRuleDao. It now extends
 // ViewModel instead of AndroidViewModel, decoupling it from the Android framework
 // and making it fully unit-testable.
+//
+// REASON: MODIFIED - Added `onTransactionTypeChanged` function to handle
+// UI state updates from the new 3-state toggle.
+// - `loadRuleForEditing` now populates the `transactionType` in the state.
+// - `saveRule` now saves the `transactionType` from the state into the
+//   `CustomSmsRule` entity.
+//
+// REASON: FIX (Bug) - `RuleCreationUiState` now stores the existing `merchantRegex`,
+// `amountRegex`, and `accountRegex` strings.
+// - `loadRuleForEditing` now populates these new fields from the loaded rule.
+// - `saveRule` is updated with new logic: it only generates a new regex if a
+//   new selection has been made (startIndex != -1). Otherwise, it preserves
+//   the existing regex string from the state. This fixes a bug where
+//   editing an old rule would wipe out its regex fields.
 // =================================================================================
 package io.pm.finlight
 
@@ -35,7 +49,11 @@ data class RuleCreationUiState(
     val amountSelection: RuleSelection = RuleSelection(),
     val accountSelection: RuleSelection = RuleSelection(),
     val transactionType: String? = null,
-    val ruleIdToEdit: Int? = null
+    val ruleIdToEdit: Int? = null,
+    // --- FIX: Add fields to hold existing regex strings during an edit ---
+    val merchantRegex: String? = null,
+    val amountRegex: String? = null,
+    val accountRegex: String? = null
 )
 
 /**
@@ -82,12 +100,18 @@ class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : Vi
     fun loadRuleForEditing(ruleId: Int) {
         viewModelScope.launch {
             val rule = customSmsRuleDao.getRuleById(ruleId).firstOrNull() ?: return@launch
+            // --- FIX: Populate the state with all data from the loaded rule ---
             _uiState.value = RuleCreationUiState(
                 triggerSelection = RuleSelection(selectedText = rule.triggerPhrase),
                 merchantSelection = RuleSelection(selectedText = rule.merchantNameExample ?: ""),
                 amountSelection = RuleSelection(selectedText = rule.amountExample ?: ""),
                 accountSelection = RuleSelection(selectedText = rule.accountNameExample ?: ""),
-                ruleIdToEdit = rule.id
+                transactionType = rule.transactionType,
+                ruleIdToEdit = rule.id,
+                // --- FIX: Store the existing regex strings in the state ---
+                merchantRegex = rule.merchantRegex,
+                amountRegex = rule.amountRegex,
+                accountRegex = rule.accountRegex
             )
         }
     }
@@ -108,6 +132,11 @@ class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : Vi
         _uiState.update { it.copy(accountSelection = selection) }
     }
 
+    // --- NEW: Function to handle UI state change from the toggle ---
+    fun onTransactionTypeChanged(newType: String?) {
+        _uiState.update { it.copy(transactionType = newType) }
+    }
+
     fun saveRule(fullSmsText: String, onComplete: () -> Unit) {
         viewModelScope.launch {
             val currentState = _uiState.value
@@ -117,17 +146,28 @@ class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : Vi
                 return@launch
             }
 
-            val merchantRegex = if (currentState.merchantSelection.selectedText.isNotBlank()) {
+            // --- FIX: Conditional Regex Generation ---
+            // Only generate a new regex if the user has made a new selection (startIndex != -1).
+            // Otherwise, preserve the existing regex string from the loaded rule.
+
+            val merchantRegex = if (currentState.merchantSelection.startIndex != -1) {
                 generateRegex(fullSmsText, currentState.merchantSelection)
-            } else null
+            } else {
+                currentState.merchantRegex // Preserve old regex
+            }
 
-            val amountRegex = if (currentState.amountSelection.selectedText.isNotBlank()) {
+            val amountRegex = if (currentState.amountSelection.startIndex != -1) {
                 generateRegex(fullSmsText, currentState.amountSelection)
-            } else null
+            } else {
+                currentState.amountRegex // Preserve old regex
+            }
 
-            val accountRegex = if (currentState.accountSelection.selectedText.isNotBlank()) {
+            val accountRegex = if (currentState.accountSelection.startIndex != -1) {
                 generateRegex(fullSmsText, currentState.accountSelection)
-            } else null
+            } else {
+                currentState.accountRegex // Preserve old regex
+            }
+            // --- END OF FIX ---
 
             val rule = CustomSmsRule(
                 id = currentState.ruleIdToEdit ?: 0,
@@ -139,7 +179,8 @@ class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : Vi
                 amountExample = currentState.amountSelection.selectedText.takeIf { it.isNotBlank() },
                 accountNameExample = currentState.accountSelection.selectedText.takeIf { it.isNotBlank() },
                 priority = 10,
-                sourceSmsBody = fullSmsText
+                sourceSmsBody = fullSmsText,
+                transactionType = currentState.transactionType
             )
 
             if (currentState.ruleIdToEdit != null) {

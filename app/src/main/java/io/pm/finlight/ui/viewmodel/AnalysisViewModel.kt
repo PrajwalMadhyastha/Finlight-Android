@@ -14,6 +14,11 @@
 // main reactive flow has been updated to pass this query to the DAO, and the logic
 // now correctly resets the search query when the user switches between analysis
 // dimensions (e.g., from Category to Tag).
+//
+// REASON: FEATURE (Analysis Filters) - Added `_includeExcluded` state flow
+// to power the new toggle. This boolean is now included in `AnalysisUiState`
+// and `AnalysisInputs`, passed through the reactive flows, and sent to the
+// updated DAO methods. Added `onIncludeExcludedChanged` to update the state.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -51,7 +56,9 @@ data class AnalysisUiState(
     val allTags: List<Tag> = emptyList(),
     val allMerchants: List<String> = emptyList(),
     // --- NEW: State for search ---
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    // --- NEW: State for "Include Excluded" toggle ---
+    val includeExcluded: Boolean = false
 )
 
 // --- NEW: Helper data class for combining flows ---
@@ -62,7 +69,9 @@ private data class AnalysisInputs(
     val filterCat: Category?,
     val filterTag: Tag?,
     val filterMerchant: String?,
-    val searchQuery: String?
+    val searchQuery: String?,
+    // --- NEW: Add includeExcluded field ---
+    val includeExcluded: Boolean
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -86,6 +95,9 @@ class AnalysisViewModel(
     // --- NEW: Input flow for search query ---
     private val _searchQuery = MutableStateFlow("")
 
+    // --- NEW: Input flow for "Include Excluded" toggle ---
+    private val _includeExcluded = MutableStateFlow(false)
+
 
     // --- DATA: Flows for filter dropdowns ---
     private val allCategories = categoryDao.getAllCategories()
@@ -98,7 +110,8 @@ class AnalysisViewModel(
     private val analysisInputsFlow = combine(
         _selectedDimension, _selectedTimePeriod, _customDateRange,
         _selectedFilterCategory, _selectedFilterTag, _selectedFilterMerchant,
-        _searchQuery
+        _searchQuery,
+        _includeExcluded // --- ADDED ---
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         AnalysisInputs(
@@ -108,7 +121,8 @@ class AnalysisViewModel(
             filterCat = args[3] as? Category,
             filterTag = args[4] as? Tag,
             filterMerchant = args[5] as? String,
-            searchQuery = (args[6] as? String)?.takeIf { it.isNotBlank() }
+            searchQuery = (args[6] as? String)?.takeIf { it.isNotBlank() },
+            includeExcluded = args[7] as Boolean // --- ADDED ---
         )
     }
 
@@ -119,9 +133,10 @@ class AnalysisViewModel(
         .flatMapLatest { inputs ->
             val (start, end) = calculateDateRange(inputs.period, inputs.dateRange.first, inputs.dateRange.second)
             when (inputs.dimension) {
-                AnalysisDimension.CATEGORY -> transactionDao.getSpendingAnalysisByCategory(start, end, inputs.filterTag?.id, inputs.filterMerchant, inputs.filterCat?.id, inputs.searchQuery)
-                AnalysisDimension.TAG -> transactionDao.getSpendingAnalysisByTag(start, end, inputs.filterCat?.id, inputs.filterMerchant, inputs.filterTag?.id, inputs.searchQuery)
-                AnalysisDimension.MERCHANT -> transactionDao.getSpendingAnalysisByMerchant(start, end, inputs.filterCat?.id, inputs.filterTag?.id, inputs.filterMerchant, inputs.searchQuery)
+                // --- UPDATED: Pass includeExcluded to DAO methods ---
+                AnalysisDimension.CATEGORY -> transactionDao.getSpendingAnalysisByCategory(start, end, inputs.filterTag?.id, inputs.filterMerchant, inputs.filterCat?.id, inputs.searchQuery, inputs.includeExcluded)
+                AnalysisDimension.TAG -> transactionDao.getSpendingAnalysisByTag(start, end, inputs.filterCat?.id, inputs.filterMerchant, inputs.filterTag?.id, inputs.searchQuery, inputs.includeExcluded)
+                AnalysisDimension.MERCHANT -> transactionDao.getSpendingAnalysisByMerchant(start, end, inputs.filterCat?.id, inputs.filterTag?.id, inputs.filterMerchant, inputs.searchQuery, inputs.includeExcluded)
             }
         }
 
@@ -163,7 +178,8 @@ class AnalysisViewModel(
             allCategories = cats,
             allTags = tags,
             allMerchants = merchants,
-            searchQuery = inputs.searchQuery ?: ""
+            searchQuery = inputs.searchQuery ?: "",
+            includeExcluded = inputs.includeExcluded // --- ADDED ---
         )
     }.stateIn(
         scope = viewModelScope,
@@ -205,10 +221,16 @@ class AnalysisViewModel(
         _selectedFilterMerchant.value = merchant
     }
 
+    // --- NEW: Function to handle "Include Excluded" toggle ---
+    fun onIncludeExcludedChanged(include: Boolean) {
+        _includeExcluded.value = include
+    }
+
     fun clearFilters() {
         _selectedFilterCategory.value = null
         _selectedFilterTag.value = null
         _selectedFilterMerchant.value = null
+        _includeExcluded.value = false // --- ADDED ---
     }
 
     // --- NEW: Function to handle search query changes ---

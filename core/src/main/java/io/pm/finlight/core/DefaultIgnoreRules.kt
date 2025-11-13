@@ -4,6 +4,10 @@
 // more specific "NEFT money transfer.*has been credited to". This prevents the
 // parser from incorrectly ignoring valid credit card reversal/refund messages
 // while still filtering out informational NEFT confirmations.
+// REASON: FIX (Parsing) - Removed the overly broad "Mutual Fund" rule. This
+// was incorrectly causing valid debit transactions for mutual fund
+// purchases to be ignored. More specific rules like "Unit Allotment" and
+// "SIP Purchase" remain to filter out informational-only messages.
 // =================================================================================
 package io.pm.finlight
 
@@ -30,7 +34,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "shipped", "Arriving today", "out for delivery", "from Paytm Balance", "using OlaMoney Postpaid",
     "is declined", "Request Failure", "AutoPay (E-mandate) Active", "mandate is successfully revoked",
     "mandate has been successfully created", "has been dispatched", "is now active",
-    "successfully registered for UPI", "Unit Allotment", "Mutual Fund", "E-statement of",
+    "successfully registered for UPI", "Unit Allotment", "E-statement of", // --- FIX: "Mutual Fund" removed from this line
     "order is received",
     "added/modified.*payee",
     "recharge of.*successfully credited",
@@ -124,7 +128,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "will be deducted", "Reward Points Credited",
     "Statement is sent to", "into SmartEMIS",
 
-).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
+    ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
     "*SBIMF", "*WKEFTT", "*BSNL", "*HDFCMF", "*AXISMF", "*KOTAKM", "*QNTAMC", "*NIMFND",
     "*MYNTRA", "*FLPKRT", "*AMAZON", "*SWIGGY", "*ZOMATO", "*BLUDRT", "*EKARTL",

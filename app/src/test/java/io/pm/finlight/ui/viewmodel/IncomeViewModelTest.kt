@@ -3,6 +3,8 @@
 // REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
 // inheriting all common setup logic and removing boilerplate for rules,
 // dispatchers, and Mockito initialization.
+//
+// REASON: MODIFIED - Added tests for the new `isPrivacyModeEnabled` StateFlow.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,6 +34,8 @@ class IncomeViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var transactionRepository: TransactionRepository
     @Mock private lateinit var accountRepository: AccountRepository
     @Mock private lateinit var categoryRepository: CategoryRepository
+    // --- NEW: Mock for SettingsRepository ---
+    @Mock private lateinit var settingsRepository: SettingsRepository
 
     private lateinit var viewModel: IncomeViewModel
 
@@ -45,13 +50,16 @@ class IncomeViewModelTest : BaseViewModelTest() {
         `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getIncomeByCategoryForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+        // --- NEW: Add default mock for privacy mode ---
+        `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
     }
 
     private fun initializeViewModel() {
         viewModel = IncomeViewModel(
             transactionRepository,
             accountRepository,
-            categoryRepository
+            categoryRepository,
+            settingsRepository // --- NEW: Pass dependency ---
         )
     }
 
@@ -201,5 +209,21 @@ class IncomeViewModelTest : BaseViewModelTest() {
 
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // --- NEW TEST ---
+    @Test
+    fun `isPrivacyModeEnabled flow emits value from settingsRepository`() = runTest {
+        // Arrange
+        val privacyFlow = flowOf(true)
+        `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(privacyFlow)
+        initializeViewModel()
+
+        // Act & Assert
+        viewModel.isPrivacyModeEnabled.test {
+            assertTrue(awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify(settingsRepository).getPrivacyModeEnabled()
     }
 }
