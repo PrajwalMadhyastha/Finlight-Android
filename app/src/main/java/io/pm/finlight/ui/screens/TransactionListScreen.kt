@@ -6,6 +6,10 @@
 // user experience.
 // FIX - The sheet state is now configured with `skipPartiallyExpanded = true`
 // to ensure it opens in a fully expanded state by default.
+//
+// REASON: MODIFIED - The screen now collects `isPrivacyModeEnabled` and passes
+// it to the `MonthlySummaryHeader`. The header itself is updated to accept
+// this flag and use `PrivacyAwareText` for displaying amounts.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -39,6 +43,7 @@ import androidx.navigation.NavController
 import io.pm.finlight.MonthlySummaryItem
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.ui.components.FilterBottomSheet
+import io.pm.finlight.ui.components.PrivacyAwareText
 import io.pm.finlight.ui.components.ShareSnapshotSheet
 import io.pm.finlight.ui.components.TransactionList
 import io.pm.finlight.ui.components.pagerTabIndicatorOffset
@@ -82,6 +87,9 @@ fun TransactionListScreen(
     val showShareSheet by viewModel.showShareSheet.collectAsState()
     val shareableFields by viewModel.shareableFields.collectAsState()
 
+    // --- NEW: Collect privacy mode state ---
+    val isPrivacyModeEnabled by viewModel.isPrivacyModeEnabled.collectAsState()
+
     val context = LocalContext.current
 
     DisposableEffect(Unit) {
@@ -100,7 +108,8 @@ fun TransactionListScreen(
             totalSpent = totalSpent.roundToLong(),
             totalIncome = totalIncome.roundToLong(),
             budget = budget,
-            onMonthSelected = { viewModel.setSelectedMonth(it) }
+            onMonthSelected = { viewModel.setSelectedMonth(it) },
+            isPrivacyModeEnabled = isPrivacyModeEnabled // --- NEW: Pass state
         )
         TabRow(
             selectedTabIndex = pagerState.currentPage,
@@ -204,7 +213,9 @@ fun MonthlySummaryHeader(
     totalSpent: Long,
     totalIncome: Long,
     budget: Float,
-    onMonthSelected: (Calendar) -> Unit
+    onMonthSelected: (Calendar) -> Unit,
+    // --- NEW: Accept privacy mode state ---
+    isPrivacyModeEnabled: Boolean
 ) {
     val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
     val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
@@ -298,8 +309,10 @@ fun MonthlySummaryHeader(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Total Spent", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(
-                    currencyFormat.format(totalSpent),
+                // --- MODIFIED: Use PrivacyAwareText ---
+                PrivacyAwareText(
+                    amount = totalSpent,
+                    isPrivacyMode = isPrivacyModeEnabled,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.error
@@ -307,8 +320,10 @@ fun MonthlySummaryHeader(
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("Total Income", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(
-                    currencyFormat.format(totalIncome),
+                // --- MODIFIED: Use PrivacyAwareText ---
+                PrivacyAwareText(
+                    amount = totalIncome,
+                    isPrivacyMode = isPrivacyModeEnabled,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
