@@ -541,6 +541,110 @@ class TransactionDaoTest {
         }
     }
 
+    // --- NEW: Test for includeExcluded = true on getSpendingAnalysisByMerchant ---
+    @Test
+    fun `getSpendingAnalysisByMerchant_respects_includeExcluded_flag`() = runTest {
+        // Arrange
+        val transactionTime = System.currentTimeMillis()
+        val startTime = transactionTime - TimeUnit.HOURS.toMillis(1)
+        val endTime = transactionTime + TimeUnit.HOURS.toMillis(1)
+
+        // Insert one regular and one excluded transaction for the same merchant
+        transactionDao.insert(Transaction(description = "Amazon", amount = 100.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null, isExcluded = false))
+        transactionDao.insert(Transaction(description = "Amazon", amount = 50.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null, isExcluded = true))
+
+        // Act 1: Call with includeExcluded = false (default behavior)
+        transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, false).test {
+            val results = awaitItem()
+            val amazonItem = results.find { it.dimensionId == "amazon" }
+            assertNotNull(amazonItem)
+            assertEquals(1, amazonItem!!.transactionCount)
+            assertEquals(100.0, amazonItem.totalAmount, 0.01)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Act 2: Call with includeExcluded = true (new behavior)
+        transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, true).test {
+            val results = awaitItem()
+            val amazonItem = results.find { it.dimensionId == "amazon" }
+            assertNotNull(amazonItem)
+            assertEquals(2, amazonItem!!.transactionCount)
+            assertEquals(150.0, amazonItem.totalAmount, 0.01) // 100.0 + 50.0
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Test for includeExcluded = true on getSpendingAnalysisByCategory ---
+    @Test
+    fun `getSpendingAnalysisByCategory_respects_includeExcluded_flag`() = runTest {
+        // Arrange
+        val transactionTime = System.currentTimeMillis()
+        val startTime = transactionTime - TimeUnit.HOURS.toMillis(1)
+        val endTime = transactionTime + TimeUnit.HOURS.toMillis(1)
+
+        // Insert one regular (Cat 1) and one excluded (Cat 1)
+        transactionDao.insert(Transaction(description = "Lunch", amount = 100.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null, isExcluded = false))
+        transactionDao.insert(Transaction(description = "Excluded Lunch", amount = 50.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null, isExcluded = true))
+
+        // Act 1: Call with includeExcluded = false
+        transactionDao.getSpendingAnalysisByCategory(startTime, endTime, null, null, null, null, false).test {
+            val results = awaitItem()
+            val foodItem = results.find { it.dimensionId == category1.id.toString() }
+            assertNotNull(foodItem)
+            assertEquals(1, foodItem!!.transactionCount)
+            assertEquals(100.0, foodItem.totalAmount, 0.01)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Act 2: Call with includeExcluded = true
+        transactionDao.getSpendingAnalysisByCategory(startTime, endTime, null, null, null, null, true).test {
+            val results = awaitItem()
+            val foodItem = results.find { it.dimensionId == category1.id.toString() }
+            assertNotNull(foodItem)
+            assertEquals(2, foodItem!!.transactionCount)
+            assertEquals(150.0, foodItem.totalAmount, 0.01) // 100.0 + 50.0
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- NEW: Test for includeExcluded = true on getSpendingAnalysisByTag ---
+    @Test
+    fun `getSpendingAnalysisByTag_respects_includeExcluded_flag`() = runTest {
+        // Arrange
+        val transactionTime = System.currentTimeMillis()
+        val startTime = transactionTime - TimeUnit.HOURS.toMillis(1)
+        val endTime = transactionTime + TimeUnit.HOURS.toMillis(1)
+
+        // Insert one regular and one excluded, both with tag 1 ("Work")
+        val tx1Id = transactionDao.insert(Transaction(description = "Work Lunch", amount = 100.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null, isExcluded = false)).toInt()
+        val tx2Id = transactionDao.insert(Transaction(description = "Excluded Work Lunch", amount = 50.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null, isExcluded = true)).toInt()
+        transactionDao.addTagsToTransaction(listOf(
+            TransactionTagCrossRef(tx1Id, tag1.id),
+            TransactionTagCrossRef(tx2Id, tag1.id)
+        ))
+
+        // Act 1: Call with includeExcluded = false
+        transactionDao.getSpendingAnalysisByTag(startTime, endTime, null, null, null, null, false).test {
+            val results = awaitItem()
+            val workTagItem = results.find { it.dimensionId == tag1.id.toString() }
+            assertNotNull(workTagItem)
+            assertEquals(1, workTagItem!!.transactionCount)
+            assertEquals(100.0, workTagItem.totalAmount, 0.01)
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // Act 2: Call with includeExcluded = true
+        transactionDao.getSpendingAnalysisByTag(startTime, endTime, null, null, null, null, true).test {
+            val results = awaitItem()
+            val workTagItem = results.find { it.dimensionId == tag1.id.toString() }
+            assertNotNull(workTagItem)
+            assertEquals(2, workTagItem!!.transactionCount)
+            assertEquals(150.0, workTagItem.totalAmount, 0.01) // 100.0 + 50.0
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+
     @Test
     fun `updateTransactionType_modifiesTypeInDatabase`() = runTest {
         // Arrange
