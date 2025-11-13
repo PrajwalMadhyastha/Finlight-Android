@@ -1,9 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/TransactionViewModelTest.kt
+//
+// REASON: MODIFIED - Added test for the new `isPrivacyModeEnabled` StateFlow.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import android.os.Build
 import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
@@ -45,6 +48,7 @@ import org.mockito.Mockito.anyInt
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
 import org.mockito.Mockito.never
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.kotlin.capture
 import org.mockito.kotlin.eq
@@ -135,6 +139,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
             `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
             `when`(db.accountDao().findByName(anyString())).thenReturn(null)
             `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
+            // --- NEW: Add default mock for privacy mode ---
+            `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
             `when`(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
         }
     }
@@ -1748,5 +1754,23 @@ class TransactionViewModelTest : BaseViewModelTest() {
             cancelAndIgnoreRemainingEvents()
         }
     }
-}
 
+    // --- NEW TEST ---
+    @Test
+    fun `isPrivacyModeEnabled flow emits value from settingsRepository`() = runTest {
+        // Arrange
+        val privacyFlow = flowOf(true)
+        `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(privacyFlow)
+        initializeViewModel() // Re-initialize to pick up the new mock
+
+        // Act & Assert
+        viewModel.isPrivacyModeEnabled.test {
+            assertTrue(awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        // --- THE FIX ---
+        // Verify times(2) because it was called once in setup() and once again
+        // in this test's initializeViewModel() call.
+        verify(settingsRepository, times(2)).getPrivacyModeEnabled()
+    }
+}
