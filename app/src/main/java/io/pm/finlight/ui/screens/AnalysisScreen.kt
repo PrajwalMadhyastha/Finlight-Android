@@ -11,6 +11,11 @@
 // with its value and onValueChange connected to the AnalysisViewModel to drive
 // the real-time, database-level filtering. The placeholder text dynamically
 // updates based on the selected dimension.
+//
+// REASON: FEATURE (Analysis Filters) - Added a new `Row` with a `Switch` to
+// the `FilterSheetContent` composable. This UI element is now wired to
+// `uiState.includeExcluded` and calls `viewModel.onIncludeExcludedChanged`
+// when toggled, completing the feature.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -73,7 +78,10 @@ fun AnalysisScreen(
 
     val areFiltersActive by remember(uiState) {
         derivedStateOf {
-            uiState.selectedFilterCategory != null || uiState.selectedFilterTag != null || uiState.selectedFilterMerchant != null
+            uiState.selectedFilterCategory != null ||
+                    uiState.selectedFilterTag != null ||
+                    uiState.selectedFilterMerchant != null ||
+                    uiState.includeExcluded // --- ADDED ---
         }
     }
 
@@ -282,6 +290,8 @@ fun AnalysisScreen(
                 onCategorySelected = viewModel::selectFilterCategory,
                 onTagSelected = viewModel::selectFilterTag,
                 onMerchantSelected = viewModel::selectFilterMerchant,
+                // --- NEW: Pass the handler to the sheet ---
+                onIncludeExcludedChanged = viewModel::onIncludeExcludedChanged,
                 onClearFilters = viewModel::clearFilters
             )
         }
@@ -405,6 +415,7 @@ private fun FilterSheetContent(
     onCategorySelected: (Category?) -> Unit,
     onTagSelected: (Tag?) -> Unit,
     onMerchantSelected: (String?) -> Unit,
+    onIncludeExcludedChanged: (Boolean) -> Unit, // --- NEW ---
     onClearFilters: () -> Unit
 ) {
     Column(
@@ -442,6 +453,28 @@ private fun FilterSheetContent(
             onOptionSelected = onMerchantSelected,
             getDisplayName = { it }
         )
+
+        // --- NEW: "Include Excluded" Toggle ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onIncludeExcludedChanged(!uiState.includeExcluded) }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                "Include Excluded Transactions",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Switch(
+                checked = uiState.includeExcluded,
+                onCheckedChange = onIncludeExcludedChanged
+            )
+        }
+        // --- END NEW ---
 
         Button(
             onClick = onClearFilters,
