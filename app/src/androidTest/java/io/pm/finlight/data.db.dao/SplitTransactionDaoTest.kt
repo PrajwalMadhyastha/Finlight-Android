@@ -40,6 +40,31 @@ class SplitTransactionDaoTest : BaseDaoTest() {
     }
 
     @Test
+    fun updateSplitTransaction() {
+        runBlocking {
+            val parentId = transactionDao.insert(
+                Transaction(description = "Parent", amount = 100.0, date = 0L, accountId = 1, categoryId = null, notes = null, isSplit = true)
+            ).toInt()
+
+            splitDao.insertAll(listOf(
+                SplitTransaction(parentTransactionId = parentId, amount = 50.0, categoryId = 1, notes = "Old Note")
+            ))
+
+            val splits = splitDao.getSplitsForParent(parentId).first()
+            val originalSplit = splits.first().splitTransaction
+
+            val updatedSplit = originalSplit.copy(amount = 75.0, notes = "New Note")
+            splitDao.update(updatedSplit)
+
+            val loadedSplits = splitDao.getSplitsForParent(parentId).first()
+            val loadedSplit = loadedSplits.first().splitTransaction
+
+            assertEquals(75.0, loadedSplit.amount, 0.01)
+            assertEquals("New Note", loadedSplit.notes)
+        }
+    }
+
+    @Test
     fun testCascadingDelete() {
         runBlocking {
             // 1. Create Parent Transaction

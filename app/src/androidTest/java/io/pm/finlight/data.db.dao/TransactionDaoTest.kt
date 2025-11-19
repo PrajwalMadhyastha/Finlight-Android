@@ -37,6 +37,71 @@ class TransactionDaoTest : BaseDaoTest() {
     }
 
     @Test
+    fun insertAndReadTransaction() {
+        runBlocking {
+            val transaction = Transaction(
+                description = "Coffee",
+                amount = 50.0,
+                date = System.currentTimeMillis(),
+                accountId = 1,
+                categoryId = 1,
+                notes = "Yummy"
+            )
+            val id = transactionDao.insert(transaction)
+
+            // Read back using Flow
+            val loadedTxn = transactionDao.getTransactionById(id.toInt()).first()
+
+            assertNotNull(loadedTxn)
+            assertEquals("Coffee", loadedTxn?.description)
+            assertEquals(50.0, loadedTxn?.amount!!, 0.01)
+        }
+    }
+
+    @Test
+    fun updateTransaction() {
+        runBlocking {
+            val id = transactionDao.insert(Transaction(
+                description = "Old Desc",
+                amount = 100.0,
+                date = System.currentTimeMillis(),
+                accountId = 1,
+                categoryId = 1,
+                notes = null
+            )).toInt()
+
+            val original = transactionDao.getTransactionById(id).first()!!
+            val updated = original.copy(description = "New Desc", amount = 150.0)
+
+            transactionDao.update(updated)
+
+            val loaded = transactionDao.getTransactionById(id).first()
+            assertEquals("New Desc", loaded?.description)
+            assertEquals(150.0, loaded?.amount!!, 0.01)
+        }
+    }
+
+    @Test
+    fun deleteTransaction() {
+        runBlocking {
+            val id = transactionDao.insert(Transaction(
+                description = "To Delete",
+                amount = 100.0,
+                date = System.currentTimeMillis(),
+                accountId = 1,
+                categoryId = 1,
+                notes = null
+            )).toInt()
+
+            val txn = transactionDao.getTransactionById(id).first()!!
+            transactionDao.delete(txn)
+
+            val loaded = transactionDao.getTransactionById(id).first()
+            assertNull(loaded)
+        }
+    }
+
+    @Test
     fun getFinancialSummaryForRange_aggregatesCorrectly() {
         runBlocking {
             val today = System.currentTimeMillis()
