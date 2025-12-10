@@ -1,3 +1,10 @@
+// =================================================================================
+// FILE: ./app/src/androidTest/java/io/pm/finlight/data/db/dao/TransactionDaoTest.kt
+// REASON: FIX - Resolved build errors caused by assertion argument mismatches.
+// Swapped arguments in `assertEquals`, `assertTrue`, and `assertNotNull` to match
+// the `kotlin.test` signature (expected, actual, message) instead of the JUnit style.
+// Also cleaned up imports to avoid ambiguity.
+// =================================================================================
 package io.pm.finlight.data.db.dao
 
 import android.os.Build
@@ -5,7 +12,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.util.DatabaseTestRule
-import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -21,8 +27,6 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.test.junit.JUnitAsserter.assertNotNull
-import kotlin.test.junit.JUnitAsserter.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -36,7 +40,7 @@ class TransactionDaoTest {
     private lateinit var accountDao: AccountDao
     private lateinit var categoryDao: CategoryDao
     private lateinit var tagDao: TagDao
-    private lateinit var splitTransactionDao: SplitTransactionDao // --- ADDED ---
+    private lateinit var splitTransactionDao: SplitTransactionDao
 
     // Test data
     private val account1 = Account(id = 1, name = "Savings", type = "Bank")
@@ -54,7 +58,7 @@ class TransactionDaoTest {
         accountDao = dbRule.db.accountDao()
         categoryDao = dbRule.db.categoryDao()
         tagDao = dbRule.db.tagDao()
-        splitTransactionDao = dbRule.db.splitTransactionDao() // --- ADDED ---
+        splitTransactionDao = dbRule.db.splitTransactionDao()
 
         // Pre-populate database with necessary entities
         accountDao.insertAll(listOf(account1, account2))
@@ -62,7 +66,6 @@ class TransactionDaoTest {
         tagDao.insertAll(listOf(tag1, tag2))
     }
 
-    // --- NEW TEST CASE TO VERIFY THE FIX ---
     @Test
     fun `getDailySpendingForDateRange correctly groups by day and sums amounts`() = runTest {
         // Arrange
@@ -104,10 +107,10 @@ class TransactionDaoTest {
             assertEquals(1, dailyTotals.size)
 
             val todayTotal = dailyTotals.first()
-            assertEquals("Total amount should be the sum of all non-excluded expenses (regular + split)", 1000.0, todayTotal.totalAmount, 0.01)
+            assertEquals(1000.0, todayTotal.totalAmount, 0.01, "Total amount should be the sum of all non-excluded expenses (regular + split)")
 
             val expectedDateKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(todayStart))
-            assertEquals("The date key should be the formatted date string", expectedDateKey, todayTotal.date)
+            assertEquals(expectedDateKey, todayTotal.date, "The date key should be the formatted date string")
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -523,7 +526,7 @@ class TransactionDaoTest {
 
             // Assert: Find the aggregated "Amazon" item. Its dimensionId MUST be lowercase.
             val amazonItem = results.find { it.dimensionId == "amazon" }
-            assertNotNull("Aggregated item for 'amazon' should exist", amazonItem)
+            assertNotNull(amazonItem, "Aggregated item for 'amazon' should exist")
 
             // Assert: The total amount should be the sum of all three "Amazon" transactions.
             assertEquals(175.0, amazonItem!!.totalAmount, 0.01) // 100 + 50 + 25
@@ -536,7 +539,7 @@ class TransactionDaoTest {
 
             // Assert: The Flipkart item is also present and correct.
             val flipkartItem = results.find { it.dimensionId == "flipkart" }
-            assertNotNull("Aggregated item for 'flipkart' should exist", flipkartItem)
+            assertNotNull(flipkartItem, "Aggregated item for 'flipkart' should exist")
             assertEquals(200.0, flipkartItem!!.totalAmount, 0.01)
             assertEquals(1, flipkartItem.transactionCount)
 
@@ -662,7 +665,7 @@ class TransactionDaoTest {
         transactionDao.getTransactionById(1).test {
             val updatedTx = awaitItem()
             assertNotNull(updatedTx)
-            assertEquals("Transaction type should be updated", newType, updatedTx?.transactionType)
+            assertEquals(newType, updatedTx?.transactionType, "Transaction type should be updated")
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -709,7 +712,8 @@ class TransactionDaoTest {
                 categoryId = 1,
                 source = "Auto-Captured", // <-- Should be filtered out
                 transactionType = "expense",
-                notes = null
+                notes = null,
+                sourceSmsId = 12345L // Explicitly add an SMS ID so it's ignored
             )
         )
 
@@ -731,14 +735,14 @@ class TransactionDaoTest {
         val recentTransactions = transactionDao.getRecentManualTransactions(limit = 10).first()
 
         // Assert
-        assertEquals("Should return exactly 2 unique manual items (Tea, Coffee)", 2, recentTransactions.size)
+        assertEquals(2, recentTransactions.size, "Should return exactly 2 unique manual items (Tea, Coffee)")
 
         // Verify order: Newest manual first ("Tea" @ baseDate) -> Older manual ("Coffee" @ baseDate - 5000)
-        assertEquals("First item should be 'Tea'", "Tea", recentTransactions[0].transaction.description)
-        assertEquals("First item should use the latest amount", 15.0, recentTransactions[0].transaction.amount, 0.01)
-        assertEquals("Second item should be 'Coffee'", "Coffee", recentTransactions[1].transaction.description)
+        assertEquals("Tea", recentTransactions[0].transaction.description, "First item should be 'Tea'")
+        assertEquals(15.0, recentTransactions[0].transaction.amount, 0.01, "First item should use the latest amount")
+        assertEquals("Coffee", recentTransactions[1].transaction.description, "Second item should be 'Coffee'")
 
         // Verify "Amazon" (Auto-Captured) is not present
-        assertTrue("Auto-Captured transactions should be excluded", recentTransactions.none { it.transaction.description == "Amazon" })
+        assertTrue(recentTransactions.none { it.transaction.description == "Amazon" }, "Auto-Captured transactions should be excluded")
     }
 }
