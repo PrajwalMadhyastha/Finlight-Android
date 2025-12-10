@@ -1,13 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/AppDatabase.kt
-// REASON: FIX - Incremented the database version to 42 and added new migrations
-// (MIGRATION_40_42 and MIGRATION_41_42). These migrations safely restructure the
-// `sms_parse_templates` table to use a composite primary key, removing the faulty
-// unique index and cleaning up duplicate data to resolve the crash-on-update.
-//
-// REASON: MODIFIED - Incremented database version to 43 and added
-// MIGRATION_42_43 to add the new `transactionType` column to the
-// `custom_sms_rules` table.
+// REASON: FIX (Rules Sync) - Updated the checksum calculation logic in
+// `DatabaseCallback` to include the `RuleType`. Previously, it only hashed the
+// pattern string. This prevents silent failures when a rule type is corrected
+// (e.g., Body -> Sender) but the pattern text remains the same.
 // =================================================================================
 package io.pm.finlight.data.db
 
@@ -52,7 +48,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         Trip::class,
         AccountAlias::class
     ],
-    version = 43, // --- UPDATED: Incremented version to 43 ---
+    version = 43,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -589,15 +585,26 @@ abstract class AppDatabase : RoomDatabase() {
                     }
 
                     val ignoreRuleDao = database.ignoreRuleDao()
-                    val liveChecksum = DEFAULT_IGNORE_PHRASES.joinToString { it.pattern }.hashCode()
+                    // --- FIX: Include type in checksum calculation ---
+                    // This ensures that if a rule is moved from BODY to SENDER (or vice versa),
+                    // the checksum changes and the DB is updated.
+                    val liveChecksum = DEFAULT_IGNORE_PHRASES.joinToString { "${it.pattern}|${it.type}" }.hashCode()
                     val storedChecksum = settingsRepository.getIgnoreRulesChecksum()
 
+                    Log.d("DatabaseCallback", "Checking ignore rules... Live: $liveChecksum, Stored: $storedChecksum")
+
                     if (liveChecksum != storedChecksum) {
-                        Log.w("DatabaseCallback", "Ignore rule checksum mismatch (Live: $liveChecksum, Stored: $storedChecksum). Syncing default rules.")
-                        ignoreRuleDao.deleteDefaultRules()
-                        ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
-                        settingsRepository.saveIgnoreRulesChecksum(liveChecksum)
-                        Log.i("DatabaseCallback", "Default ignore rules synced successfully.")
+                        Log.w("DatabaseCallback", "Ignore rule checksum mismatch. Syncing default rules...")
+                        try {
+                            ignoreRuleDao.deleteDefaultRules()
+                            ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
+                            settingsRepository.saveIgnoreRulesChecksum(liveChecksum)
+                            Log.i("DatabaseCallback", "Default ignore rules synced successfully.")
+                        } catch (e: Exception) {
+                            Log.e("DatabaseCallback", "Failed to sync ignore rules", e)
+                        }
+                    } else {
+                        Log.d("DatabaseCallback", "Ignore rules are up to date.")
                     }
 
                     repairCategoryIcons(database)

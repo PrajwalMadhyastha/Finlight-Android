@@ -1,13 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SearchScreen.kt
-// REASON: FEATURE (Date Display) - Added an `AnimatedVisibility` block that
-// displays the `searchUiState.displayDate` in a `GlassPanel` when a user
-// navigates from a heatmap. This provides clear context for the search results.
-//
-// REASON: FEATURE (Heatmap Summary) - The screen now collects the new
-// `daySummary` flow. When populated, it displays a new `DaySummaryCard`
-// composable directly below the date card, showing total income and expenses
-// for the selected day.
+// REASON: FEATURE (Refined UI) - Simplification.
+// 1. Removed `SpendingBarChart` and chart-related dependencies.
+// 2. Updated `SearchScreen` to handle `isDrilldown` state.
+// 3. If in Drilldown mode: Hides search bar and filters. Displays a clean
+//    `DrilldownHeader` with the merchant name and total stats.
+// 4. `SearchInsightsHeader` replaced by `DrilldownHeader` for a list-focused look.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -41,17 +39,14 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.TransactionItem
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import java.text.SimpleDateFormat
 import java.util.*
-// --- NEW IMPORTS ---
 import kotlin.math.roundToLong
 import java.text.NumberFormat
 import io.pm.finlight.FinancialSummary
-// --- END NEW IMPORTS ---
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
@@ -66,7 +61,6 @@ fun SearchScreen(
 ) {
     val searchUiState by searchViewModel.uiState.collectAsState()
     val searchResults by searchViewModel.searchResults.collectAsState()
-    // --- NEW: Collect the day summary ---
     val daySummary by searchViewModel.daySummary.collectAsState()
 
     var showFilters by rememberSaveable { mutableStateOf(false) }
@@ -84,117 +78,128 @@ fun SearchScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            OutlinedTextField(
-                value = searchUiState.keyword,
-                onValueChange = { searchViewModel.onKeywordChange(it) },
-                label = { Text("Keyword (description, notes)") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester),
-                singleLine = true
-            )
+        // --- 1. SEARCH BAR & FILTERS (Only if NOT in Drilldown mode) ---
+        if (!searchUiState.isDrilldown) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                OutlinedTextField(
+                    value = searchUiState.keyword,
+                    onValueChange = { searchViewModel.onKeywordChange(it) },
+                    label = { Text("Keyword (description, notes)") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                    singleLine = true
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            GlassPanel {
-                Column {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showFilters = !showFilters }
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.FilterList,
-                            contentDescription = "Filters",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "Filters",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(
-                            imageVector = if (showFilters) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = if (showFilters) "Collapse Filters" else "Expand Filters",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    AnimatedVisibility(
-                        visible = showFilters,
-                        enter = expandVertically(animationSpec = tween(200)),
-                        exit = shrinkVertically(animationSpec = tween(200))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                GlassPanel {
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showFilters = !showFilters }
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                            SearchableDropdown(
-                                label = "Account",
-                                options = searchUiState.accounts,
-                                selectedOption = searchUiState.selectedAccount,
-                                onOptionSelected = { searchViewModel.onAccountChange(it) },
-                                getDisplayName = { it.name },
+                            Icon(
+                                Icons.Default.FilterList,
+                                contentDescription = "Filters",
+                                tint = MaterialTheme.colorScheme.primary
                             )
-                            SearchableDropdown(
-                                label = "Category",
-                                options = searchUiState.categories,
-                                selectedOption = searchUiState.selectedCategory,
-                                onOptionSelected = { searchViewModel.onCategoryChange(it) },
-                                getDisplayName = { it.name },
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Filters",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
                             )
-                            SearchableDropdown(
-                                label = "Tag",
-                                options = searchUiState.tags,
-                                selectedOption = searchUiState.selectedTag,
-                                onOptionSelected = { searchViewModel.onTagChange(it) },
-                                getDisplayName = { it.name },
+                            Icon(
+                                imageVector = if (showFilters) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (showFilters) "Collapse Filters" else "Expand Filters",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            SearchableDropdown(
-                                label = "Transaction Type",
-                                options = listOf("All", "Income", "Expense"),
-                                selectedOption = searchUiState.transactionType.replaceFirstChar { it.uppercase() },
-                                onOptionSelected = { searchViewModel.onTypeChange(it) },
-                                getDisplayName = { it },
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        }
+
+                        AnimatedVisibility(
+                            visible = showFilters,
+                            enter = expandVertically(animationSpec = tween(200)),
+                            exit = shrinkVertically(animationSpec = tween(200))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    bottom = 16.dp
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                DateTextField(
-                                    label = "Start Date",
-                                    date = searchUiState.startDate,
-                                    formatter = dateFormatter,
-                                    onClick = { searchViewModel.onShowStartDatePicker(true) },
-                                    onClear = { searchViewModel.onClearStartDate() },
-                                    modifier = Modifier.weight(1f),
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(
+                                        alpha = 0.12f
+                                    )
                                 )
-                                DateTextField(
-                                    label = "End Date",
-                                    date = searchUiState.endDate,
-                                    formatter = dateFormatter,
-                                    onClick = { searchViewModel.onShowEndDatePicker(true) },
-                                    onClear = { searchViewModel.onClearEndDate() },
-                                    modifier = Modifier.weight(1f),
+                                SearchableDropdown(
+                                    label = "Account",
+                                    options = searchUiState.accounts,
+                                    selectedOption = searchUiState.selectedAccount,
+                                    onOptionSelected = { searchViewModel.onAccountChange(it) },
+                                    getDisplayName = { it.name },
                                 )
+                                SearchableDropdown(
+                                    label = "Category",
+                                    options = searchUiState.categories,
+                                    selectedOption = searchUiState.selectedCategory,
+                                    onOptionSelected = { searchViewModel.onCategoryChange(it) },
+                                    getDisplayName = { it.name },
+                                )
+                                SearchableDropdown(
+                                    label = "Tag",
+                                    options = searchUiState.tags,
+                                    selectedOption = searchUiState.selectedTag,
+                                    onOptionSelected = { searchViewModel.onTagChange(it) },
+                                    getDisplayName = { it.name },
+                                )
+                                SearchableDropdown(
+                                    label = "Transaction Type",
+                                    options = listOf("All", "Income", "Expense"),
+                                    selectedOption = searchUiState.transactionType.replaceFirstChar { it.uppercase() },
+                                    onOptionSelected = { searchViewModel.onTypeChange(it) },
+                                    getDisplayName = { it },
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    DateTextField(
+                                        label = "Start Date",
+                                        date = searchUiState.startDate,
+                                        formatter = dateFormatter,
+                                        onClick = { searchViewModel.onShowStartDatePicker(true) },
+                                        onClear = { searchViewModel.onClearStartDate() },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    DateTextField(
+                                        label = "End Date",
+                                        date = searchUiState.endDate,
+                                        formatter = dateFormatter,
+                                        onClick = { searchViewModel.onShowEndDatePicker(true) },
+                                        onClear = { searchViewModel.onClearEndDate() },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = { searchViewModel.clearFilters() },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text("Clear All Filters") }
                             }
-                            OutlinedButton(
-                                onClick = { searchViewModel.clearFilters() },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) { Text("Clear All Filters") }
                         }
                     }
                 }
             }
         }
 
-        // --- UPDATED: This block now contains a Column for the date AND the summary ---
+        // --- 2. HEADER FOR CALENDAR NAVIGATION ---
         AnimatedVisibility(
             visible = searchUiState.displayDate != null,
             enter = expandVertically(),
@@ -206,7 +211,6 @@ fun SearchScreen(
                     .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Original Date Card
                 GlassPanel {
                     Column(
                         modifier = Modifier
@@ -228,14 +232,13 @@ fun SearchScreen(
                     }
                 }
 
-                // 2. NEW Day Summary Card
                 if (daySummary != null && (daySummary!!.totalIncome > 0 || daySummary!!.totalExpenses > 0)) {
                     DaySummaryCard(summary = daySummary!!)
                 }
             }
         }
-        // --- END OF UPDATED BLOCK ---
 
+        // --- 3. RESULTS LIST ---
         HorizontalDivider()
 
         if (searchResults.isNotEmpty()) {
@@ -244,14 +247,27 @@ fun SearchScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item {
-                    Text(
-                        text = "Results (${searchResults.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
+                // --- NEW: Header for Drilldown Mode ---
+                if (searchUiState.isDrilldown) {
+                    item {
+                        val totalAmount = searchResults.sumOf { it.transaction.amount }
+                        DrilldownHeader(
+                            title = searchUiState.keyword,
+                            totalAmount = totalAmount,
+                            count = searchResults.size
+                        )
+                    }
+                } else {
+                    item {
+                        Text(
+                            text = "Results (${searchResults.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
                 }
+
                 items(searchResults) { transactionDetails ->
                     TransactionItem(
                         transactionDetails = transactionDetails,
@@ -274,7 +290,7 @@ fun SearchScreen(
 
 
     LaunchedEffect(Unit) {
-        if (focusSearch && !focusAlreadyRequested) {
+        if (focusSearch && !focusAlreadyRequested && !searchUiState.isDrilldown) { // Update focus logic
             focusRequester.requestFocus()
             focusAlreadyRequested = true
         }
@@ -413,7 +429,6 @@ fun DateTextField(
     }
 }
 
-// --- NEW COMPOSABLE FOR THE DAY'S SUMMARY ---
 @Composable
 private fun DaySummaryCard(summary: FinancialSummary) {
     val currencyFormat = remember {
@@ -457,6 +472,74 @@ private fun DaySummaryCard(summary: FinancialSummary) {
                     fontWeight = FontWeight.Bold,
                     color = expenseColor
                 )
+            }
+        }
+    }
+}
+
+// --- NEW: A simple, clean header for the drilldown view (No Chart) ---
+@Composable
+private fun DrilldownHeader(
+    title: String,
+    totalAmount: Double,
+    count: Int
+) {
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+
+    GlassPanel {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Transactions for",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Total Value",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        currencyFormat.format(totalAmount),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Visits",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "$count",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     }

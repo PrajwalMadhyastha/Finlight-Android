@@ -28,6 +28,7 @@ generate_context.sh
 app_src.txt
 app_tests.txt
 tree.txt
+generate_tree.py
 
 # --- ADDED: Ignore generated analysis reports ---
 # This will prevent any CSV files in the project root from being tracked.

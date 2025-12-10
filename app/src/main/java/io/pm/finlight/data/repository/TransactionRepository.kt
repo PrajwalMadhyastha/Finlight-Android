@@ -1,7 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TransactionRepository.kt
-// REASON: FEATURE (Transaction Type Toggle) - Added the
-// `updateTransactionType` function to call the new DAO query.
+// REASON: FEATURE (Quick Fill) - Added `getRecentManualTransactions` function
+// to expose the new DAO query. This will power the suggestion carousel and
+// history sheet in the Add Transaction screen.
 // =================================================================================
 package io.pm.finlight
 
@@ -373,5 +374,10 @@ class TransactionRepository(
             }
             resultList // This is the value emitted by the combine
         }.flowOn(Dispatchers.Default) // Run the calculation on a background thread
+    }
+
+    // --- NEW: Expose the quick fill query ---
+    fun getRecentManualTransactions(limit: Int): Flow<List<TransactionDetails>> {
+        return transactionDao.getRecentManualTransactions(limit)
     }
 }
