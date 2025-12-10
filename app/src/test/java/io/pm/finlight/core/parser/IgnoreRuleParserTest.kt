@@ -1176,5 +1176,23 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
         assertNull("Should ignore messages from FASTag Annual Pass", result)
     }
+
+    @Test
+    fun `test ignores RTGS Initiation`() = runBlocking {
+        setupTest()
+        val smsBody = "RTGS txn initiated: Of Rs.200020 from your HDFC Bank A/c XX1234 using Online Banking. Not you?Call 18002586161/SMS BLOCK OB to 7308080808"
+        val mockSms = SmsMessage(id = 9621L, sender = "CP-HDFCR-S", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+        assertNull("Should ignore messages from HDFC RTGS Initiation", result)
+    }
+
+    @Test
+    fun `test ignores ICICI transaction confirmation`() = runBlocking {
+        setupTest()
+        val smsBody = "We're unable to confirm  txn of  150000.00 on ICICI Bank Savings Acc XX1234 on 24-NOV-25. To dispute call 18002662. To unblock call 18001080 or 912233667777 if not in India"
+        val mockSms = SmsMessage(id = 9621L, sender = "CP-ICICIE-S", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+        assertNull("Should ignore messages for ICICI transaction confirmation", result)
+    }
 }
 

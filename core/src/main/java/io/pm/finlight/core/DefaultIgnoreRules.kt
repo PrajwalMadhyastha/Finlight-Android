@@ -68,6 +68,8 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Total Due.*Min Due",
     "UPI mandate collect request",
     "Zero Toll deducted under Annual Pass",
+    "RTGS txn initiated",
+    "We're unable to confirm",
 
     // Rules for recently found informational messages
     "renewal premium",
