@@ -1,10 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FEATURE (Analysis Filters) - Added `includeExcluded` parameter to the
-// three `getSpendingAnalysis...` queries. The SQL logic in the `AllExpenses`
-// CTE is now conditional: `AND (:includeExcluded = 1 OR T.isExcluded = 0)`.
-// This allows the analysis screen to optionally include transactions that
-// were previously excluded from reports.
+// REASON: FEATURE (Quick Fill) - Added `getRecentManualTransactions` query.
+// This query groups by description to find unique templates and orders them by
+// the most recent occurrence, ensuring the user sees their most relevant habits first.
 // =================================================================================
 package io.pm.finlight
 
@@ -930,4 +928,28 @@ interface TransactionDao {
     @Query("DELETE FROM transaction_tag_cross_ref WHERE tagId = :tagId")
     suspend fun removeAllTransactionsForTag(tagId: Int)
 
+    // --- NEW: Fetch recent manual transactions for Quick Fill ---
+    // We group by description to get unique entries and prioritize the latest usage.
+    @androidx.room.Transaction
+    @Query("""
+        SELECT
+            T.*,
+            A.name as accountName,
+            C.name as categoryName,
+            C.iconKey as categoryIconKey,
+            C.colorKey as categoryColorKey,
+            (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
+        FROM transactions AS T
+        LEFT JOIN accounts AS A ON T.accountId = A.id
+        LEFT JOIN categories AS C ON T.categoryId = C.id
+        WHERE T.id IN (
+            SELECT MAX(id)
+            FROM transactions
+            WHERE source = 'Manual Entry'
+            GROUP BY LOWER(description)
+        )
+        ORDER BY T.date DESC
+        LIMIT :limit
+    """)
+    fun getRecentManualTransactions(limit: Int): Flow<List<TransactionDetails>>
 }

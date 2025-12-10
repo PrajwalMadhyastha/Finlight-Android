@@ -1,10 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddTransactionScreen.kt
-// REASON: REFACTOR (Account Picker) - The private `AccountPickerSheet`
-// composable has been refactored to use a `LazyColumn` of `ListItem`s
-// instead of a `LazyVerticalGrid`. This improves usability by preventing
-// account names from being truncated, and it aligns the UI with the
-// list-based account picker in the TransactionDetailScreen.
+// REASON: FEATURE (Quick Fill) - Integrated "Quick Fill" functionality.
+// 1. Added `QuickFillCarousel` to display recent manual transactions when description is empty.
+// 2. Added `TransactionHistorySheet` to allow searching and selecting older manual entries.
+// 3. Observed `recentManualTransactions` and `historyManualTransactions` from ViewModel.
+// 4. Hooked up selection logic to populate the form.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -26,6 +26,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -87,6 +88,7 @@ private sealed class ComposerSheet {
     object Tags : ComposerSheet()
     object Notes : ComposerSheet()
     object Merchant : ComposerSheet()
+    object History : ComposerSheet() // --- NEW: History Sheet
 }
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -102,8 +104,13 @@ fun AddTransactionScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var amount by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
+    // --- State observed from ViewModel ---
+    val description by viewModel.addTransactionDescription.collectAsState()
+    val amount by viewModel.addTransactionAmount.collectAsState()
+    val selectedCategory by viewModel.addTransactionCategory.collectAsState()
+    val selectedAccount by viewModel.addTransactionAccount.collectAsState()
+
+    // --- Local State for UI Logic ---
     var transactionType by remember { mutableStateOf("expense") }
     var notes by remember { mutableStateOf("") }
     var attachedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -129,9 +136,10 @@ fun AddTransactionScreen(
     val categoryNudgeData by viewModel.showCategoryNudge.collectAsState()
     val suggestedCategory by viewModel.suggestedCategory.collectAsState()
 
+    // --- NEW: Observe Quick Fill data ---
+    val recentManualTransactions by viewModel.recentManualTransactions.collectAsState()
+    val historyManualTransactions by viewModel.historyManualTransactions.collectAsState()
 
-    var selectedAccount by remember { mutableStateOf<Account?>(null) }
-    var selectedCategory by remember { mutableStateOf<Category?>(null) }
     val selectedDateTime by remember { mutableStateOf(Calendar.getInstance()) }
 
     var showDatePicker by remember { mutableStateOf(false) }
@@ -165,22 +173,22 @@ fun AddTransactionScreen(
                         selectedDateTime.time = dateFormat.parse(it) ?: Date()
                     } catch (e: Exception) { /* Keep default date on parse error */ }
                 }
-                description = initialDataMap["Description"] ?: ""
-                amount = (initialDataMap["Amount"] ?: "").replace(".0", "")
+                viewModel.onAddTransactionDescriptionChanged(initialDataMap["Description"] ?: "")
+                viewModel.onAddTransactionAmountChanged((initialDataMap["Amount"] ?: "").replace(".0", ""))
                 transactionType = initialDataMap["Type"]?.lowercase() ?: "expense"
                 val categoryName = initialDataMap["Category"] ?: ""
                 val accountName = initialDataMap["Account"] ?: ""
                 notes = initialDataMap["Notes"] ?: ""
 
-                selectedCategory = categories.find { it.name.equals(categoryName, ignoreCase = true) }
+                viewModel.onAddTransactionCategoryChanged(categories.find { it.name.equals(categoryName, ignoreCase = true) })
 
                 // Try to find the account from the CSV
                 val csvAccount = accounts.find { it.name.equals(accountName, ignoreCase = true) }
                 if (csvAccount != null) {
-                    selectedAccount = csvAccount
+                    viewModel.onAddTransactionAccountChanged(csvAccount)
                 } else {
                     // Fallback to default "Cash Spends"
-                    selectedAccount = defaultAccount ?: accounts.find { it.name.equals("Cash Spends", ignoreCase = true) }
+                    viewModel.onAddTransactionAccountChanged(defaultAccount ?: accounts.find { it.name.equals("Cash Spends", ignoreCase = true) })
                 }
 
                 isDefaultAccountApplied = true // Mark as applied
@@ -191,13 +199,13 @@ fun AddTransactionScreen(
         } else if (!isCsvEdit) {
             // --- NEW TRANSACTION LOGIC ---
             if (defaultAccount != null) {
-                selectedAccount = defaultAccount
+                viewModel.onAddTransactionAccountChanged(defaultAccount)
                 isDefaultAccountApplied = true
             } else if (accounts.isNotEmpty()) {
                 // Fallback in case the VM's flow is slow
                 val cashAccount = accounts.find { it.name.equals("Cash Spends", ignoreCase = true) }
                 if (cashAccount != null) {
-                    selectedAccount = cashAccount
+                    viewModel.onAddTransactionAccountChanged(cashAccount)
                     isDefaultAccountApplied = true
                 }
             }
@@ -206,44 +214,13 @@ fun AddTransactionScreen(
 
     LaunchedEffect(suggestedCategory) {
         suggestedCategory?.let {
-            selectedCategory = it
+            viewModel.onAddTransactionCategoryChanged(it)
         }
     }
 
 
     LaunchedEffect(Unit) {
         viewModel.clearAddTransactionState()
-    }
-
-    LaunchedEffect(initialDataJson, accounts, categories) {
-        if (isCsvEdit && initialDataJson != null) {
-            try {
-                val gson = Gson()
-                val typeToken = object : TypeToken<Map<String, String>>() {}.type
-                val initialDataMap: Map<String, String> = gson.fromJson(URLDecoder.decode(initialDataJson, "UTF-8"), typeToken)
-
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-
-                initialDataMap["Date"]?.let {
-                    try {
-                        selectedDateTime.time = dateFormat.parse(it) ?: Date()
-                    } catch (e: Exception) { /* Keep default date on parse error */
-                    }
-                }
-                description = initialDataMap["Description"] ?: ""
-                amount = (initialDataMap["Amount"] ?: "").replace(".0", "")
-                transactionType = initialDataMap["Type"]?.lowercase() ?: "expense"
-                val categoryName = initialDataMap["Category"] ?: ""
-                val accountName = initialDataMap["Account"] ?: ""
-                notes = initialDataMap["Notes"] ?: ""
-
-                selectedCategory = categories.find { it.name.equals(categoryName, ignoreCase = true) }
-                selectedAccount = accounts.find { it.name.equals(accountName, ignoreCase = true) }
-
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error loading row data", Toast.LENGTH_SHORT).show()
-            }
-        }
     }
 
     LaunchedEffect(categoryNudgeData) {
@@ -279,7 +256,7 @@ fun AddTransactionScreen(
         } ?: false
     }
 
-    // --- NEW: Focus Requester for Amount Field ---
+    // --- Focus Requester for Amount Field ---
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         delay(300) // Give UI time to draw
@@ -317,7 +294,6 @@ fun AddTransactionScreen(
             ) {
                 Spacer(Modifier.height(16.dp))
 
-                // --- REFACTORED: AmountComposer now uses BasicTextField ---
                 AmountComposer(
                     amount = amount,
                     onAmountChange = { newValue ->
@@ -327,7 +303,7 @@ fun AddTransactionScreen(
                         // Regex to match a valid decimal number (up to 2 decimal places)
                         val regex = Regex("^\\d*\\.?\\d{0,2}\$")
                         if (newValue.isEmpty() || regex.matches(newValue)) {
-                            amount = newValue
+                            viewModel.onAddTransactionAmountChanged(newValue)
                         }
                     },
                     focusRequester = focusRequester,
@@ -339,6 +315,22 @@ fun AddTransactionScreen(
                     isDescriptionEntered = isDescriptionEntered,
                     hasInteractedWithNumpad = hasInteracted
                 )
+
+                // --- NEW: Quick Fill Carousel ---
+                // Only show if description is empty and we have suggestions
+                if (!isDescriptionEntered && recentManualTransactions.isNotEmpty()) {
+                    Spacer(Modifier.height(24.dp))
+                    QuickFillCarousel(
+                        recentTransactions = recentManualTransactions,
+                        onQuickFillSelected = { txn ->
+                            viewModel.onQuickFillSelected(txn)
+                            // We might also want to set transaction type if available
+                            transactionType = txn.transaction.transactionType
+                        },
+                        onViewAllClick = { activeSheet = ComposerSheet.History }
+                    )
+                }
+
                 Spacer(Modifier.height(24.dp))
 
                 TransactionTypeToggle(
@@ -347,7 +339,6 @@ fun AddTransactionScreen(
                 )
 
                 Spacer(Modifier.height(24.dp))
-                // --- REFACTORED: Now a Column ---
                 OrbitalChips(
                     selectedCategory = selectedCategory,
                     selectedAccount = selectedAccount,
@@ -370,10 +361,8 @@ fun AddTransactionScreen(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                // --- REMOVED: TransactionChecklistCard ---
 
-
-                // --- NEW: Save Button ---
+                // --- Save Button ---
                 Spacer(Modifier.height(24.dp))
                 Button(
                     onClick = {
@@ -422,7 +411,7 @@ fun AddTransactionScreen(
                 is ComposerSheet.Account -> AccountPickerSheet(
                     accounts = accounts,
                     onAccountSelected = {
-                        selectedAccount = it
+                        viewModel.onAddTransactionAccountChanged(it)
                         activeSheet = null
                     },
                     onAddNew = {
@@ -440,7 +429,7 @@ fun AddTransactionScreen(
                         CategorySelectionGrid(
                             categories = categories,
                             onCategorySelected = {
-                                selectedCategory = it
+                                viewModel.onAddTransactionCategoryChanged(it)
                                 if (categoryNudgeData != null) {
                                     viewModel.saveWithSelectedCategory(it.id) {
                                         navController.popBackStack()
@@ -461,7 +450,8 @@ fun AddTransactionScreen(
                     selectedTags = selectedTags,
                     onTagSelected = viewModel::onTagSelected,
                     onAddNewTag = viewModel::addTagOnTheGo,
-                    onConfirm = { activeSheet = null }
+                    onConfirm = { activeSheet = null },
+                    onDismiss = { activeSheet = null }
                 )
                 is ComposerSheet.Notes -> TextInputSheet(
                     title = "Add Notes",
@@ -475,24 +465,35 @@ fun AddTransactionScreen(
                     viewModel = viewModel,
                     initialDescription = description,
                     onQueryChanged = {
-                        description = it
                         viewModel.onAddTransactionDescriptionChanged(it)
                     },
                     onPredictionSelected = { prediction ->
-                        description = prediction.description
+                        viewModel.onAddTransactionDescriptionChanged(prediction.description)
                         if (!hasInteracted) hasInteracted = true
                         prediction.categoryId?.let { catId ->
-                            selectedCategory = categories.find { it.id == catId }
+                            val cat = categories.find { it.id == catId }
+                            viewModel.onAddTransactionCategoryChanged(cat)
                         }
                         activeSheet = null
                     },
                     onManualSave = { newDescription ->
-                        description = newDescription
+                        viewModel.onAddTransactionDescriptionChanged(newDescription)
                         if (!hasInteracted) hasInteracted = true
                         activeSheet = null
                     },
                     onDismiss = { activeSheet = null }
                 )
+                // --- NEW: History Sheet Content ---
+                is ComposerSheet.History -> {
+                    TransactionHistorySheet(
+                        transactions = historyManualTransactions,
+                        onTransactionSelected = { txn ->
+                            viewModel.onQuickFillSelected(txn)
+                            transactionType = txn.transaction.transactionType
+                            activeSheet = null
+                        }
+                    )
+                }
                 null -> {}
             }
         }
@@ -549,7 +550,7 @@ fun AddTransactionScreen(
             onDismiss = { showCreateAccountDialog = false },
             onConfirm = { name, type ->
                 viewModel.createAccount(name, type) { newAccount ->
-                    selectedAccount = newAccount
+                    viewModel.onAddTransactionAccountChanged(newAccount)
                 }
                 showCreateAccountDialog = false
             }
@@ -561,7 +562,7 @@ fun AddTransactionScreen(
             onDismiss = { showCreateCategoryDialog = false },
             onConfirm = { name, iconKey, colorKey ->
                 viewModel.createCategory(name, iconKey, colorKey) { newCategory ->
-                    selectedCategory = newCategory
+                    viewModel.onAddTransactionCategoryChanged(newCategory)
                     if (categoryNudgeData != null) {
                         viewModel.saveWithSelectedCategory(newCategory.id) {
                             navController.popBackStack()
@@ -571,6 +572,162 @@ fun AddTransactionScreen(
                 showCreateCategoryDialog = false
             }
         )
+    }
+}
+
+// --- NEW: Quick Fill Carousel Composable ---
+@Composable
+fun QuickFillCarousel(
+    recentTransactions: List<TransactionDetails>,
+    onQuickFillSelected: (TransactionDetails) -> Unit,
+    onViewAllClick: () -> Unit
+) {
+    Column {
+        Text(
+            text = "Quick Fill from Recent",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp)
+        ) {
+            items(recentTransactions) { details ->
+                QuickFillChip(
+                    details = details,
+                    onClick = { onQuickFillSelected(details) }
+                )
+            }
+            item {
+                GlassPanel(
+                    modifier = Modifier
+                        .height(48.dp) // Match height of chips
+                        .clickable(onClick = onViewAllClick),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.History,
+                            contentDescription = "View All",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "View All",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickFillChip(
+    details: TransactionDetails,
+    onClick: () -> Unit
+) {
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+
+    GlassPanel(
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val icon = CategoryIconHelper.getIcon(details.categoryIconKey ?: "category")
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = details.transaction.description,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = currencyFormat.format(details.transaction.amount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+// --- NEW: History Sheet Composable ---
+@Composable
+fun TransactionHistorySheet(
+    transactions: List<TransactionDetails>,
+    onTransactionSelected: (TransactionDetails) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredTransactions = remember(searchQuery, transactions) {
+        if (searchQuery.isBlank()) transactions
+        else transactions.filter {
+            it.transaction.description.contains(searchQuery, ignoreCase = true) ||
+                    (it.categoryName?.contains(searchQuery, ignoreCase = true) == true)
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxHeight(0.9f)
+            .navigationBarsPadding()
+            .padding(16.dp)
+    ) {
+        Text(
+            "Transaction History",
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            label = { Text("Search History") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(filteredTransactions) { details ->
+                TransactionItem(
+                    transactionDetails = details,
+                    onClick = { onTransactionSelected(details) },
+                    onCategoryClick = { /* No-op in this context */ }
+                )
+            }
+            if (filteredTransactions.isEmpty() && searchQuery.isNotBlank()) {
+                item {
+                    Text(
+                        "No matches found.",
+                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -917,10 +1074,6 @@ private fun AccountPickerSheet(
     }
 }
 
-// --- DELETED: `AccountGridItem` is no longer used ---
-
-// --- DELETED: `AddNewAccountGridItem` is no longer used ---
-
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -929,7 +1082,8 @@ private fun TagPickerSheet(
     selectedTags: Set<Tag>,
     onTagSelected: (Tag) -> Unit,
     onAddNewTag: (String) -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     var newTagName by remember { mutableStateOf("") }
 
@@ -965,7 +1119,15 @@ private fun TagPickerSheet(
                 value = newTagName,
                 onValueChange = { newTagName = it },
                 label = { Text("New Tag Name") },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             )
             IconButton(
                 onClick = {
@@ -974,19 +1136,22 @@ private fun TagPickerSheet(
                 },
                 enabled = newTagName.isNotBlank()
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add New Tag")
+                Icon(Icons.Default.Add, contentDescription = "Add New Tag", tint = MaterialTheme.colorScheme.primary)
             }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+            Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = {
                 if (newTagName.isNotBlank()) {
                     onAddNewTag(newTagName)
                 }
                 onConfirm()
-            }) { Text("Done") }
+            }) { Text("Save") }
         }
     }
 }

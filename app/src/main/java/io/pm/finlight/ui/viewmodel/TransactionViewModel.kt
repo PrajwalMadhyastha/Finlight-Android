@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/TransactionViewModel.kt
-// REASON: FIX (Description Update) - Updated `updateTransactionDescription` to
-// automatically manage `MerchantRenameRule`s. If a user manually renames a
-// transaction (or reverts it to original), this change now updates or deletes
-// the corresponding global rename rule. This fixes the issue where `applyAliases`
-// would persistently override manual edits in the UI.
+// REASON: FEATURE (Quick Fill) - Added `recentManualTransactions` StateFlow to
+// expose suggestions to the UI. Added `onQuickFillSelected` function to populate
+// the AddTransaction state fields when a suggestion is clicked. This significantly
+// speeds up manual entry for recurring expenses.
 // =================================================================================
 package io.pm.finlight
 
@@ -166,7 +165,23 @@ class TransactionViewModel(
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
+    // --- NEW: Expose Add Transaction Description for state management ---
     private val _addTransactionDescription = MutableStateFlow("")
+    val addTransactionDescription = _addTransactionDescription.asStateFlow()
+
+    // --- NEW: Expose Amount for state management ---
+    private val _addTransactionAmount = MutableStateFlow("")
+    val addTransactionAmount = _addTransactionAmount.asStateFlow()
+
+    // --- NEW: Expose Selected Category for state management ---
+    private val _addTransactionCategory = MutableStateFlow<Category?>(null)
+    val addTransactionCategory = _addTransactionCategory.asStateFlow()
+
+    // --- NEW: Expose Selected Account for state management ---
+    private val _addTransactionAccount = MutableStateFlow<Account?>(null)
+    val addTransactionAccount = _addTransactionAccount.asStateFlow()
+
+
     private val _userManuallySelectedCategory = MutableStateFlow(false)
 
     // --- NEW: Expose privacy mode state ---
@@ -194,6 +209,22 @@ class TransactionViewModel(
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    // --- NEW: Flow for Recent Manual Transactions (Suggestions) ---
+    val recentManualTransactions: StateFlow<List<TransactionDetails>> = transactionRepository.getRecentManualTransactions(limit = 10)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    // --- NEW: Flow for History Sheet (Larger limit) ---
+    val historyManualTransactions: StateFlow<List<TransactionDetails>> = transactionRepository.getRecentManualTransactions(limit = 50)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
 
     init {
@@ -525,6 +556,7 @@ class TransactionViewModel(
         }
     }
 
+    // --- NEW: State update methods for AddTransactionScreen inputs ---
     fun onAddTransactionDescriptionChanged(description: String) {
         _addTransactionDescription.value = description
         if (description.isBlank()) {
@@ -532,9 +564,59 @@ class TransactionViewModel(
         }
     }
 
+    fun onAddTransactionAmountChanged(amount: String) {
+        _addTransactionAmount.value = amount
+    }
+
+    fun onAddTransactionCategoryChanged(category: Category?) {
+        _addTransactionCategory.value = category
+        if (category != null) {
+            _userManuallySelectedCategory.value = true
+        }
+    }
+
+    fun onAddTransactionAccountChanged(account: Account?) {
+        _addTransactionAccount.value = account
+    }
+
     fun onUserManuallySelectedCategory() {
         _userManuallySelectedCategory.value = true
     }
+
+    // --- NEW: Handler for Quick Fill selection ---
+    fun onQuickFillSelected(transactionDetails: TransactionDetails) {
+        _addTransactionDescription.value = transactionDetails.transaction.description
+
+        // Format amount: remove .0 if integer
+        val amount = transactionDetails.transaction.amount
+        val formattedAmount = if (amount % 1.0 == 0.0) {
+            amount.toInt().toString()
+        } else {
+            "%.2f".format(amount)
+        }
+        _addTransactionAmount.value = formattedAmount
+
+        // Populate Categories and Accounts
+        // Note: We need to find the actual objects from the lists loaded in the VM
+        // This logic is best handled by the UI observing the state changes, or we can look them up here
+        // For simplicity, we assume the UI will re-resolve the ID to the object
+        viewModelScope.launch {
+            val categories = allCategories.first()
+            val accounts = allAccounts.first()
+
+            val category = categories.find { it.id == transactionDetails.transaction.categoryId }
+            _addTransactionCategory.value = category
+            _userManuallySelectedCategory.value = true // Prevent auto-categorizer from overwriting
+
+            val account = accounts.find { it.id == transactionDetails.transaction.accountId }
+            _addTransactionAccount.value = account
+
+            // Load tags
+            val tags = transactionRepository.getTagsForTransactionSimple(transactionDetails.transaction.id)
+            _selectedTags.value = tags.toSet()
+        }
+    }
+
 
     fun onSaveTapped(
         description: String,
@@ -623,7 +705,7 @@ class TransactionViewModel(
                 isExcluded = false,
                 sourceSmsId = null,
                 sourceSmsHash = null,
-                source = "Added Manually",
+                source = "Manual Entry",
                 originalAmount = enteredAmount,
                 currencyCode = travelSettings.currencyCode,
                 conversionRate = travelSettings.conversionRate?.toDouble()
@@ -641,7 +723,7 @@ class TransactionViewModel(
                 isExcluded = false,
                 sourceSmsId = null,
                 sourceSmsHash = null,
-                source = "Added Manually"
+                source = "Manual Entry"
             )
         }
 
@@ -666,6 +748,14 @@ class TransactionViewModel(
     fun clearAddTransactionState() {
         _selectedTags.value = emptySet()
         _addTransactionDescription.value = ""
+        _addTransactionAmount.value = ""
+        _addTransactionCategory.value = null
+        // Do not clear account if it's default, otherwise clear
+        if (_addTransactionAccount.value != _defaultAccount.value) {
+            // Logic to reset to default handled in UI LaunchedEffect usually,
+            // but here we just reset the specific manual override state
+            _addTransactionAccount.value = null
+        }
         _userManuallySelectedCategory.value = false
     }
 
