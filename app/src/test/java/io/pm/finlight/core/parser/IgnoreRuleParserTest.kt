@@ -1167,5 +1167,14 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
         assertNull("Should ignore messages from HDFC to split EMIs", result)
     }
+
+    @Test
+    fun `test ignores FASTag Annual Pass Message`() = runBlocking {
+        setupTest()
+        val smsBody = "Kotak FASTag: Vehicle 1234 crossed Pallokonda on 06-12-25 at 17:31 with Zero Toll deducted under Annual Pass. For support, call NHAI Helpline 1033"
+        val mockSms = SmsMessage(id = 9621L, sender = "CP-KOTAKB-S", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+        assertNull("Should ignore messages from FASTag Annual Pass", result)
+    }
 }
 
