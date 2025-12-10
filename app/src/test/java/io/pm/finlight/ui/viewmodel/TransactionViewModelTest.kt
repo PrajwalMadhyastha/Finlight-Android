@@ -1,7 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/TransactionViewModelTest.kt
 //
-// REASON: MODIFIED - Added test for the new `isPrivacyModeEnabled` StateFlow.
+// REASON: MODIFIED - Added test for the new `onQuickFillSelected_populatesStateCorrectly` logic.
+//           FIX - Added background collection for StateFlows in the Quick Fill test
+//           to ensure they are populated before `first()` is called.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -142,6 +144,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
             // --- NEW: Add default mock for privacy mode ---
             `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
             `when`(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
+            // --- NEW: Default mocks for Quick Fill ---
+            `when`(transactionRepository.getRecentManualTransactions(anyInt())).thenReturn(flowOf(emptyList()))
         }
     }
 
@@ -1772,5 +1776,69 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // Verify times(2) because it was called once in setup() and once again
         // in this test's initializeViewModel() call.
         verify(settingsRepository, times(2)).getPrivacyModeEnabled()
+    }
+
+    @Test
+    fun `onQuickFillSelected populates state correctly`() = runTest {
+        // Arrange - Setup specific mocks for this test
+        `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(
+            Account(id = 1, name = "Cash", type = "Cash"),
+            Account(id = 2, name = "Bank", type = "Bank")
+        )))
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(
+            Category(id = 10, name = "Food", iconKey = "food", colorKey = "green"),
+            Category(id = 11, name = "Transport", iconKey = "car", colorKey = "blue")
+        )))
+
+        // Re-initialize ViewModel to pick up the new flows
+        initializeViewModel()
+
+        // FIX: Start collecting `allAccounts` to trigger the `stateIn(WhileSubscribed)` upstream flow.
+        // Without this, `allAccounts.first()` inside the ViewModel returns the initial `emptyList()`
+        // because the StateFlow hasn't connected to the repository flow yet.
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.allAccounts.collect { }
+        }
+
+        // Ensure values are propagated
+        advanceUntilIdle()
+
+        val mockTransaction = Transaction(
+            id = 100,
+            description = "Quick Lunch",
+            amount = 120.50, // Has decimals
+            date = System.currentTimeMillis(),
+            accountId = 1, // "Cash"
+            categoryId = 10, // "Food"
+            source = "Manual Entry",
+            transactionType = "expense",
+            notes = null
+        )
+        val mockDetails = TransactionDetails(
+            transaction = mockTransaction,
+            images = emptyList(),
+            accountName = "Cash",
+            categoryName = "Food",
+            categoryIconKey = "food",
+            categoryColorKey = "green",
+            tagNames = null
+        )
+
+        // Mock getting tags for this transaction (e.g., return empty list)
+        `when`(transactionRepository.getTagsForTransactionSimple(100)).thenReturn(emptyList())
+
+        // Act
+        viewModel.onQuickFillSelected(mockDetails)
+
+        // Advance time to allow coroutines launched within the VM to complete
+        testScheduler.advanceUntilIdle()
+
+        // Assert
+        assertEquals("Description should match", "Quick Lunch", viewModel.addTransactionDescription.value)
+        assertEquals("Amount should be formatted to 2 decimals", "120.50", viewModel.addTransactionAmount.value)
+        assertEquals("Category ID should match", 10, viewModel.addTransactionCategory.value?.id)
+        assertEquals("Category Name should match", "Food", viewModel.addTransactionCategory.value?.name)
+        assertEquals("Account ID should match", 1, viewModel.addTransactionAccount.value?.id)
+        assertEquals("Account Name should match", "Cash", viewModel.addTransactionAccount.value?.name)
     }
 }
