@@ -1,5 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/SearchViewModelTest.kt
+// REASON: FEATURE (Test) - Added new tests for the "Drilldown" feature (initialQuery).
+// - `init with initialQuery sets drilldown mode and keyword` verifies that
+//   passing a query string correctly puts the VM into drilldown mode.
+// - `init without initialQuery does not set drilldown mode` verifies the default state.
+//
 // REASON: FEATURE (Test) - Added new tests for the `displayDate` feature.
 // - `init with initialDateMillis sets date range and displayDate` now
 //   verifies the user-friendly formatted date string is correctly set.
@@ -9,8 +14,7 @@
 //   reset to null.
 //
 // REASON: FIX (Test) - Added a mock for `transactionDao.getFinancialSummaryForRangeFlow`
-// in the `setup` block. This new dependency was added to the ViewModel's `init`
-// block but was not mocked in the test, causing a NullPointerException.
+// in the `setup` block.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -63,8 +67,20 @@ class SearchViewModelTest : BaseViewModelTest() {
         `when`(transactionDao.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
     }
 
-    private fun initializeViewModel(initialCategoryId: Int? = null, initialDateMillis: Long? = null) {
-        viewModel = SearchViewModel(transactionDao, accountDao, categoryDao, tagDao, initialCategoryId, initialDateMillis)
+    private fun initializeViewModel(
+        initialCategoryId: Int? = null,
+        initialDateMillis: Long? = null,
+        initialQuery: String? = null // --- UPDATED: Added initialQuery parameter
+    ) {
+        viewModel = SearchViewModel(
+            transactionDao,
+            accountDao,
+            categoryDao,
+            tagDao,
+            initialCategoryId,
+            initialDateMillis,
+            initialQuery // --- UPDATED: Pass to constructor
+        )
     }
 
     @Test
@@ -291,5 +307,34 @@ class SearchViewModelTest : BaseViewModelTest() {
             assertFalse(awaitItem().showEndDatePicker)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // --- NEW TESTS: Drilldown Mode ---
+
+    @Test
+    fun `init with initialQuery sets drilldown mode and keyword`() = runTest {
+        // Arrange
+        val query = "Starbucks"
+
+        // Act
+        initializeViewModel(initialQuery = query)
+        advanceUntilIdle()
+
+        // Assert
+        val state = viewModel.uiState.value
+        assertEquals("Keyword should match initial query", query, state.keyword)
+        assertTrue("isDrilldown should be true", state.isDrilldown)
+    }
+
+    @Test
+    fun `init without initialQuery does not set drilldown mode`() = runTest {
+        // Act
+        initializeViewModel(initialQuery = null)
+        advanceUntilIdle()
+
+        // Assert
+        val state = viewModel.uiState.value
+        assertEquals("", state.keyword)
+        assertFalse("isDrilldown should be false by default", state.isDrilldown)
     }
 }
