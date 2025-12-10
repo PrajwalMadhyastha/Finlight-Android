@@ -1,17 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/TransactionViewModel.kt
-// REASON: FEATURE (Transaction Type Toggle) - Added the
-// `updateTransactionType` function to call the repository and added error
-// handling.
-//
-// FIX (Test): Removed explicit `Dispatchers.IO` from `updateTransactionCategory`
-// launch block. This was causing a race condition in unit tests, as the
-// TestDispatcher could not control the coroutine's execution.
-// The ViewModel should run on the Main dispatcher; the repository is
-// responsible for moving work off the main thread.
-//
-// REASON: MODIFIED - Exposed `isPrivacyModeEnabled` from the
-// SettingsRepository to allow the UI to hide sensitive amounts.
+// REASON: FIX (Description Update) - Updated `updateTransactionDescription` to
+// automatically manage `MerchantRenameRule`s. If a user manually renames a
+// transaction (or reverts it to original), this change now updates or deletes
+// the corresponding global rename rule. This fixes the issue where `applyAliases`
+// would persistently override manual edits in the UI.
 // =================================================================================
 package io.pm.finlight
 
@@ -921,6 +914,28 @@ class TransactionViewModel(
                         }
                     }
                 }
+
+                // --- FIX: Check if we need to update or delete a Rename Rule ---
+                val currentTransaction = transactionRepository.getTransactionById(id).firstOrNull()
+                if (currentTransaction?.originalDescription != null) {
+                    val original = currentTransaction.originalDescription
+                    val aliases = merchantAliases.value
+                    // The map key is lowercase original name
+                    val existingAlias = aliases[original.lowercase()]
+
+                    if (existingAlias != null) {
+                        if (newDescription.equals(original, ignoreCase = true)) {
+                            // User is reverting to the original name -> Delete the rule
+                            merchantRenameRuleRepository.deleteByOriginalName(original)
+                        } else if (!newDescription.equals(existingAlias, ignoreCase = true)) {
+                            // User is changing to a DIFFERENT name -> Update the rule
+                            val rule = MerchantRenameRule(originalName = original, newName = newDescription)
+                            merchantRenameRuleRepository.insert(rule)
+                        }
+                    }
+                }
+                // --- End of Fix ---
+
                 transactionRepository.updateDescription(id, newDescription)
             }
         } catch (e: Exception) {

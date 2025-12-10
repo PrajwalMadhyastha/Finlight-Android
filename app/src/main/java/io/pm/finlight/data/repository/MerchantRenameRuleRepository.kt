@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/MerchantRenameRuleRepository.kt
-// REASON: FIX - Re-added the `insert` function. This function is required by the
-// TransactionViewModel to save new merchant rename rules and was accidentally
-// removed, causing a build error.
+// REASON: FEATURE - Added `deleteByOriginalName` to allow the ViewModel to remove
+// a rename rule when a user manually reverts a transaction description to its
+// original value. This ensures the UI reflects the user's intent.
 // =================================================================================
 package io.pm.finlight
 
@@ -30,5 +30,13 @@ class MerchantRenameRuleRepository(private val dao: MerchantRenameRuleDao) {
      */
     suspend fun insert(rule: MerchantRenameRule) {
         dao.insert(rule)
+    }
+
+    /**
+     * Deletes a rename rule based on the original merchant name.
+     * @param originalName The original name key of the rule to delete.
+     */
+    suspend fun deleteByOriginalName(originalName: String) {
+        dao.deleteByOriginalName(originalName)
     }
 }
