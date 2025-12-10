@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FEATURE (Quick Fill) - Added `getRecentManualTransactions` query.
-// This query groups by description to find unique templates and orders them by
-// the most recent occurrence, ensuring the user sees their most relevant habits first.
+// REASON: FIX (Quick Fill) - Simplified the `getRecentManualTransactions` filter.
+// Instead of whitelisting specific string tags (like 'Manual Entry' or NULL),
+// we now strictly check `sourceSmsId IS NULL`. This correctly captures ALL manual
+// entries (including legacy 'Added Manually' data) while excluding SMS-based items.
 // =================================================================================
 package io.pm.finlight
 
@@ -930,6 +931,8 @@ interface TransactionDao {
 
     // --- NEW: Fetch recent manual transactions for Quick Fill ---
     // We group by description to get unique entries and prioritize the latest usage.
+    // --- FIX: Broadened query to include transactions where `source IS NULL` (legacy manual)
+    // --- FIX: Added `sourceSmsId IS NULL` to ensure we don't accidentally pick up SMS txns.
     @androidx.room.Transaction
     @Query("""
         SELECT
@@ -945,7 +948,7 @@ interface TransactionDao {
         WHERE T.id IN (
             SELECT MAX(id)
             FROM transactions
-            WHERE source = 'Manual Entry'
+            WHERE sourceSmsId IS NULL
             GROUP BY LOWER(description)
         )
         ORDER BY T.date DESC
