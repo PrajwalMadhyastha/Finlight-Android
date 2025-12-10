@@ -1,9 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TransactionDetailScreen.kt
-// REASON: FEATURE (Transaction Type Toggle) - Completed the feature by
-// wiring the onTypeSelected lambda in the TransactionPropertiesCard to the
-// viewModel.updateTransactionType function. This connects the UI switch
-// to the backend logic.
+// REASON: FIX (UI) - Refactored `SelectableTransactionItem` to use `GlassPanel`
+// matching the "Project Aurora" design language.
+// REASON: FIX (Bug) - Corrected the `Checkbox` colors in the retrospective update
+// sheet. The `checkmarkColor` was previously set to `surface` (which is transparent
+// in this theme), making the tick mark invisible. It is now set to `onPrimary`
+// to ensure high contrast and visibility.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -83,7 +85,6 @@ import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.utils.BankLogoHelper
-// --- NEW: Import the public TransactionTypeToggle ---
 import io.pm.finlight.ui.screens.TransactionTypeToggle
 
 private const val TAG = "DetailScreenDebug"
@@ -205,7 +206,6 @@ fun TransactionDetailScreen(
             "income" -> "Credit transaction"
             else -> "Transaction Details"
         }
-        // --- FIX: Use a local mutable state for the calendar to provide instant UI feedback ---
         var selectedDateTime by remember(details) {
             mutableStateOf(Calendar.getInstance().apply { timeInMillis = details.transaction.date })
         }
@@ -254,7 +254,6 @@ fun TransactionDetailScreen(
                             }
                         },
                         actions = {
-                            // --- NEW: Add HelpActionIcon ---
                             HelpActionIcon(helpKey = "transaction_detail")
                             IconButton(onClick = { showMenu = true }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "More options")
@@ -297,7 +296,6 @@ fun TransactionDetailScreen(
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             TransactionSpotlightHeader(
                                 details = details,
-                                // --- FIX: Pass the local state to the header ---
                                 displayDate = selectedDateTime.time,
                                 visitCount = visitCount,
                                 isSplit = details.transaction.isSplit,
@@ -338,13 +336,11 @@ fun TransactionDetailScreen(
                         }
                     }
 
-                    // --- NEW: Transaction Properties Card ---
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             TransactionPropertiesCard(
                                 details = details,
                                 onTypeSelected = { newType ->
-                                    // --- UPDATED: Connect the UI to the ViewModel ---
                                     viewModel.updateTransactionType(details.transaction.id, newType)
                                 },
                                 onExcludeToggled = { newIsExcludedValue ->
@@ -354,7 +350,6 @@ fun TransactionDetailScreen(
                         }
                     }
 
-                    // --- UPDATED: Renamed to AccountCard ---
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             AccountCard(
@@ -531,7 +526,6 @@ fun TransactionDetailScreen(
                         confirmButton = {
                             TextButton(onClick = {
                                 datePickerState.selectedDateMillis?.let {
-                                    // --- FIX: Update local state immediately ---
                                     selectedDateTime = Calendar.getInstance().apply { timeInMillis = it }
                                 }
                                 showDatePicker = false
@@ -539,13 +533,11 @@ fun TransactionDetailScreen(
                             }) { Text("OK") }
                         },
                         dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
-                        // --- FIX: Add explicit container color ---
                         colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
                     ) { DatePicker(state = datePickerState) }
                 }
                 if (showTimePicker) {
                     val timePickerState = rememberTimePickerState(initialHour = selectedDateTime.get(Calendar.HOUR_OF_DAY), initialMinute = selectedDateTime.get(Calendar.MINUTE))
-                    // --- FIX: Wrap TimePicker in an AlertDialog with explicit color ---
                     AlertDialog(
                         onDismissRequest = { showTimePicker = false },
                         containerColor = popupContainerColor,
@@ -629,7 +621,6 @@ fun TransactionDetailScreen(
     }
 }
 
-// --- NEW: Card for Transaction Properties ---
 @Composable
 private fun TransactionPropertiesCard(
     details: TransactionDetails,
@@ -640,10 +631,9 @@ private fun TransactionPropertiesCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp), // Padding applied to items instead
+                .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Add the TransactionTypeToggle (with its own padding)
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 TransactionTypeToggle(
                     selectedType = details.transaction.transactionType,
@@ -652,14 +642,12 @@ private fun TransactionPropertiesCard(
                 )
             }
 
-            // 2. Add the divider
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
 
-            // 3. Add the "Exclude" switch
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onExcludeToggled(!details.transaction.isExcluded) } // Click row to toggle
+                    .clickable { onExcludeToggled(!details.transaction.isExcluded) }
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -977,7 +965,6 @@ private fun TransactionSpotlightHeader(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        // --- FIX: Use the local displayDate state ---
                         text = dateFormatter.format(displayDate),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.8f),
@@ -1022,7 +1009,6 @@ private fun TransactionSpotlightHeader(
 }
 
 
-// --- REFACTORED: Renamed to AccountCard, removed switch logic ---
 @Composable
 private fun AccountCard(
     details: TransactionDetails,
@@ -1033,7 +1019,7 @@ private fun AccountCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onAccountClick)
-                .padding(horizontal = 16.dp, vertical = 16.dp), // Increased padding
+                .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Image(
@@ -1077,9 +1063,8 @@ private fun NotesRow(details: TransactionDetails, onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp) // Space between label row and value
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Label Row
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -1091,7 +1076,7 @@ private fun NotesRow(details: TransactionDetails, onClick: () -> Unit) {
             )
             Text(
                 "Notes",
-                style = MaterialTheme.typography.titleMedium, // Using a slightly larger style for the label
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -1103,12 +1088,11 @@ private fun NotesRow(details: TransactionDetails, onClick: () -> Unit) {
             )
         }
 
-        // Value Text (indented)
         Text(
             details.transaction.notes ?: "Tap to add",
             fontWeight = if (details.transaction.notes.isNullOrBlank()) FontWeight.Normal else FontWeight.SemiBold,
             color = if (details.transaction.notes.isNullOrBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = 40.dp) // Indent the note text
+            modifier = Modifier.padding(start = 40.dp)
         )
     }
 }
@@ -1229,7 +1213,7 @@ private fun TransactionEditSheetContent(
             MerchantPredictionSheet(
                 viewModel = viewModel,
                 initialDescription = details.transaction.description,
-                onQueryChanged = {}, // This screen doesn't need real-time categorization
+                onQueryChanged = {},
                 onPredictionSelected = { prediction ->
                     viewModel.updateTransactionDescription(transactionId, prediction.description)
                     prediction.categoryId?.let { catId ->
@@ -1536,7 +1520,6 @@ internal fun CategoryPickerSheet(
             modifier = Modifier.padding(16.dp),
             color = MaterialTheme.colorScheme.onSurface
         )
-        // --- UPDATED: Replaced the LazyVerticalGrid with the new reusable component ---
         CategorySelectionGrid(
             categories = items,
             onCategorySelected = onItemSelected,
@@ -1568,7 +1551,6 @@ private fun TagPickerSheet(
     ) {
         Text("Manage Tags", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
 
-        // --- FIX: This column is now scrollable ---
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -1787,7 +1769,7 @@ private fun RetrospectiveUpdateSheetContent(
                     colors = CheckboxDefaults.colors(
                         checkedColor = MaterialTheme.colorScheme.primary,
                         uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        checkmarkColor = MaterialTheme.colorScheme.surface
+                        checkmarkColor = MaterialTheme.colorScheme.onPrimary // Ensure visibility
                     )
                 )
                 Text(
@@ -1841,38 +1823,49 @@ private fun SelectableTransactionItem(
     onToggle: () -> Unit
 ) {
     val dateFormatter = remember { SimpleDateFormat("dd MMM, yy", Locale.getDefault()) }
-    Row(
+
+    // --- FIX: Wrap in GlassPanel for visual consistency and better layout ---
+    GlassPanel(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Checkbox(
-            checked = isSelected,
-            onCheckedChange = { onToggle() },
-            colors = CheckboxDefaults.colors(
-                checkedColor = MaterialTheme.colorScheme.primary,
-                uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                checkmarkColor = MaterialTheme.colorScheme.surface
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Checkbox(
+                checked = isSelected,
+                onCheckedChange = null, // Let the row click handle it
+                colors = CheckboxDefaults.colors(
+                    checkedColor = MaterialTheme.colorScheme.primary,
+                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    // --- FIX: Set checkmark color to ensure visibility against primary ---
+                    checkmarkColor = MaterialTheme.colorScheme.onPrimary
+                )
             )
-        )
-        Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = transaction.description,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = dateFormatter.format(Date(transaction.date)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Text(
-                text = transaction.description,
-                fontWeight = FontWeight.SemiBold,
+                text = "₹${"%,.2f".format(transaction.amount)}",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = dateFormatter.format(Date(transaction.date)),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
-        Text(
-            text = "₹${"%,.2f".format(transaction.amount)}",
-            color = MaterialTheme.colorScheme.onSurface
-        )
     }
 }
