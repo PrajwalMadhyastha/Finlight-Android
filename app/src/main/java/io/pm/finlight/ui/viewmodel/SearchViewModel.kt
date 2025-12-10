@@ -1,9 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/SearchViewModel.kt
-// REASON: FEATURE (Merchant Drilldown) - Added `initialQuery` parameter to the
-// constructor. The `init` block now populates the `keyword` state with this value
-// if provided. This allows other screens (like Transaction Detail) to deeplink
-// directly into a search for a specific merchant.
+// REASON: FEATURE (Drilldown Mode) - Added `isDrilldown` to `SearchUiState`.
+// This flag is set to true when `initialQuery` is provided, allowing the UI to
+// enter a focused mode (hiding the search bar) similar to the Analysis Details screen.
+// REFACTOR - Removed `searchTrend` logic as charts have been removed from the
+// Search Screen requirements.
 // =================================================================================
 package io.pm.finlight
 
@@ -32,7 +33,8 @@ data class SearchUiState(
     val hasSearched: Boolean = false,
     val showStartDatePicker: Boolean = false,
     val showEndDatePicker: Boolean = false,
-    val displayDate: String? = null
+    val displayDate: String? = null,
+    val isDrilldown: Boolean = false // --- NEW: Flag for drilldown mode
 )
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -43,7 +45,7 @@ class SearchViewModel(
     private val tagDao: TagDao,
     private val initialCategoryId: Int?,
     private val initialDateMillis: Long?,
-    private val initialQuery: String? // --- NEW: Accept initial search query
+    private val initialQuery: String?
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
@@ -62,7 +64,7 @@ class SearchViewModel(
                     state.startDate != null ||
                     state.endDate != null
 
-            val shouldSearch = state.keyword.isNotBlank() || filtersAreActive
+            val shouldSearch = state.keyword.isNotBlank() || filtersAreActive || state.isDrilldown
             _uiState.update { it.copy(hasSearched = shouldSearch) }
 
             if (shouldSearch) {
@@ -108,9 +110,12 @@ class SearchViewModel(
             }
         }
 
-        // --- NEW: Handle initial query (e.g. from Merchant Drilldown) ---
+        // --- UPDATED: Handle initial query and set Drilldown mode ---
         if (!initialQuery.isNullOrBlank()) {
-            _uiState.update { it.copy(keyword = initialQuery) }
+            _uiState.update { it.copy(
+                keyword = initialQuery,
+                isDrilldown = true // Enable drilldown mode
+            ) }
         }
 
         if (initialDateMillis != null && initialDateMillis != -1L) {
