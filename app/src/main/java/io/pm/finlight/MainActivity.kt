@@ -1,3 +1,10 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
+// REASON: FEATURE (Merchant Drilldown) - Updated the `search_screen` route configuration.
+// 1. Added `query` as an optional navigation argument.
+// 2. Updated the `SearchViewModelFactory` instantiation to pass this query.
+// 3. This enables navigation from "Visits count" to a pre-filled search screen.
+// =================================================================================
 package io.pm.finlight
 
 import android.Manifest
@@ -743,12 +750,14 @@ fun AppNavHost(
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) { CsvValidationScreen(navController, settingsViewModel) }
         composable(
-            route = "search_screen?categoryId={categoryId}&date={date}&focusSearch={focusSearch}&expandFilters={expandFilters}",
+            // --- UPDATED: Add 'query' parameter to the route ---
+            route = "search_screen?categoryId={categoryId}&date={date}&focusSearch={focusSearch}&expandFilters={expandFilters}&query={query}",
             arguments = listOf(
                 navArgument("categoryId") { type = NavType.IntType; defaultValue = -1 },
                 navArgument("date") { type = NavType.LongType; defaultValue = -1L },
                 navArgument("focusSearch") { type = NavType.BoolType; defaultValue = true },
-                navArgument("expandFilters") { type = NavType.BoolType; defaultValue = true }
+                navArgument("expandFilters") { type = NavType.BoolType; defaultValue = true },
+                navArgument("query") { type = NavType.StringType; nullable = true; defaultValue = null } // --- NEW
             ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
@@ -759,11 +768,13 @@ fun AppNavHost(
             val date = backStackEntry.arguments?.getLong("date") ?: -1L
             val focusSearch = backStackEntry.arguments?.getBoolean("focusSearch") ?: true
             val expandFilters = backStackEntry.arguments?.getBoolean("expandFilters") ?: true
+            val query = backStackEntry.arguments?.getString("query") // --- NEW
 
             val factory = SearchViewModelFactory(
                 activity.application,
                 if (categoryId != -1) categoryId else null,
-                if (date != -1L) date else null
+                if (date != -1L) date else null,
+                query // --- NEW
             )
             val searchViewModel: SearchViewModel = viewModel(factory = factory)
             SearchScreen(navController, searchViewModel, transactionViewModel, focusSearch, expandFilters)

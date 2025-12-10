@@ -1,14 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/SearchViewModel.kt
-// REASON: FEATURE (Date Display) - The `SearchUiState` data class now
-// includes a `displayDate: String?`. The `init` block has been updated
-// to format the `initialDateMillis` into this user-friendly string
-// (e.g., "October 29, 2025") if it's provided.
-//
-// REASON: FEATURE (Heatmap Summary) - Added a new `daySummary` StateFlow.
-// When the ViewModel is initialized from a heatmap click (via `initialDateMillis`),
-// it now also fetches the `FinancialSummary` for that specific day.
-// The `clearFilters` function is updated to reset this new state.
+// REASON: FEATURE (Merchant Drilldown) - Added `initialQuery` parameter to the
+// constructor. The `init` block now populates the `keyword` state with this value
+// if provided. This allows other screens (like Transaction Detail) to deeplink
+// directly into a search for a specific merchant.
 // =================================================================================
 package io.pm.finlight
 
@@ -47,12 +42,12 @@ class SearchViewModel(
     private val categoryDao: CategoryDao,
     private val tagDao: TagDao,
     private val initialCategoryId: Int?,
-    private val initialDateMillis: Long?
+    private val initialDateMillis: Long?,
+    private val initialQuery: String? // --- NEW: Accept initial search query
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
-    // --- NEW: StateFlow to hold the summary for the selected day ---
     private val _daySummary = MutableStateFlow<FinancialSummary?>(null)
     val daySummary: StateFlow<FinancialSummary?> = _daySummary.asStateFlow()
 
@@ -113,6 +108,11 @@ class SearchViewModel(
             }
         }
 
+        // --- NEW: Handle initial query (e.g. from Merchant Drilldown) ---
+        if (!initialQuery.isNullOrBlank()) {
+            _uiState.update { it.copy(keyword = initialQuery) }
+        }
+
         if (initialDateMillis != null && initialDateMillis != -1L) {
             val cal = Calendar.getInstance().apply { timeInMillis = initialDateMillis }
             cal.set(Calendar.HOUR_OF_DAY, 0)
@@ -125,17 +125,15 @@ class SearchViewModel(
             cal.set(Calendar.SECOND, 59)
             val end = cal.timeInMillis
 
-            // --- NEW: Format the date for display ---
             val dateFormatter = SimpleDateFormat("MMMM d, yyyy", Locale.getDefault())
             val formattedDate = dateFormatter.format(cal.time)
 
             _uiState.update { it.copy(
                 startDate = start,
                 endDate = end,
-                displayDate = formattedDate // <-- Set the display date
+                displayDate = formattedDate
             ) }
 
-            // --- NEW: Launch coroutine to fetch the day's summary ---
             viewModelScope.launch {
                 transactionDao.getFinancialSummaryForRangeFlow(start, end).collect { summary ->
                     _daySummary.value = summary
@@ -204,7 +202,6 @@ class SearchViewModel(
                 categories = _uiState.value.categories,
                 tags = _uiState.value.tags,
             )
-        // --- NEW: Also reset the day summary ---
         _daySummary.value = null
     }
 }

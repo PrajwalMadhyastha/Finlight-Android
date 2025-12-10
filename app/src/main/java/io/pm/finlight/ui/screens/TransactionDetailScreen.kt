@@ -1,11 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TransactionDetailScreen.kt
-// REASON: FIX (UI) - Refactored `SelectableTransactionItem` to use `GlassPanel`
-// matching the "Project Aurora" design language.
-// REASON: FIX (Bug) - Corrected the `Checkbox` colors in the retrospective update
-// sheet. The `checkmarkColor` was previously set to `surface` (which is transparent
-// in this theme), making the tick mark invisible. It is now set to `onPrimary`
-// to ensure high contrast and visibility.
+// REASON: FEATURE (Merchant Drilldown) - Updated `TransactionSpotlightHeader` to
+// make the "Visits count" chip clickable. When clicked, it now navigates to the
+// Search Screen pre-filled with the merchant's description, allowing the user
+// to instantly see all transactions for that specific merchant.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -315,6 +313,11 @@ fun TransactionDetailScreen(
                                 onDateTimeClick = { showDatePicker = true },
                                 onSplitClick = {
                                     navController.navigate("split_transaction/${details.transaction.id}")
+                                },
+                                // --- NEW: Handle visit count click ---
+                                onVisitCountClick = {
+                                    // Navigate to Search Screen with the merchant name pre-filled
+                                    navController.navigate("search_screen?query=${details.transaction.description}")
                                 }
                             )
                         }
@@ -836,7 +839,8 @@ private fun TransactionSpotlightHeader(
     onAmountClick: () -> Unit,
     onCategoryClick: () -> Unit,
     onDateTimeClick: () -> Unit,
-    onSplitClick: () -> Unit
+    onSplitClick: () -> Unit,
+    onVisitCountClick: () -> Unit // --- NEW: Callback for visit count click
 ) {
     val displayCategory = if (isSplit) {
         Category(name = "Multiple Categories", iconKey = "call_split", colorKey = "gray_light")
@@ -994,7 +998,7 @@ private fun TransactionSpotlightHeader(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp),
-                    onClick = { /* No action needed */ },
+                    onClick = onVisitCountClick, // --- NEW: Trigger navigation
                     label = { Text("$visitCount visits") },
                     leadingIcon = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     colors = AssistChipDefaults.assistChipColors(
@@ -1824,7 +1828,6 @@ private fun SelectableTransactionItem(
 ) {
     val dateFormatter = remember { SimpleDateFormat("dd MMM, yy", Locale.getDefault()) }
 
-    // --- FIX: Wrap in GlassPanel for visual consistency and better layout ---
     GlassPanel(
         modifier = Modifier
             .fillMaxWidth()
@@ -1841,7 +1844,6 @@ private fun SelectableTransactionItem(
                 colors = CheckboxDefaults.colors(
                     checkedColor = MaterialTheme.colorScheme.primary,
                     uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    // --- FIX: Set checkmark color to ensure visibility against primary ---
                     checkmarkColor = MaterialTheme.colorScheme.onPrimary
                 )
             )

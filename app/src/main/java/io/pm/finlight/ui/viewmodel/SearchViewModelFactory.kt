@@ -1,11 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/SearchViewModelFactory.kt
-// REASON: FEATURE - The factory now accepts an optional `initialDateMillis`
-// parameter. This allows it to create a SearchViewModel that is pre-configured
-// to filter for a specific date, which is essential for the new clickable
-// calendar feature.
-// FEATURE - The factory now provides the `TagDao` to the `SearchViewModel`. This
-// is necessary to populate the new tag filter dropdown in the search UI.
+// REASON: FEATURE - Updated the factory to accept the new `initialQuery`
+// parameter and pass it to the SearchViewModel constructor.
 // =================================================================================
 package io.pm.finlight
 
@@ -17,7 +13,8 @@ import io.pm.finlight.data.db.AppDatabase
 class SearchViewModelFactory(
     private val application: Application,
     private val initialCategoryId: Int?,
-    private val initialDateMillis: Long?
+    private val initialDateMillis: Long?,
+    private val initialQuery: String? // --- NEW: Add parameter
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SearchViewModel::class.java)) {
@@ -27,9 +24,10 @@ class SearchViewModelFactory(
                 transactionDao = database.transactionDao(),
                 accountDao = database.accountDao(),
                 categoryDao = database.categoryDao(),
-                tagDao = database.tagDao(), // --- NEW: Pass TagDao
+                tagDao = database.tagDao(),
                 initialCategoryId = initialCategoryId,
-                initialDateMillis = initialDateMillis
+                initialDateMillis = initialDateMillis,
+                initialQuery = initialQuery // --- NEW: Pass to VM
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
