@@ -7,6 +7,8 @@ import io.pm.finlight.*
 import io.pm.finlight.util.DatabaseTestRule
 import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Rule
@@ -20,6 +22,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.junit.JUnitAsserter.assertNotNull
+import kotlin.test.junit.JUnitAsserter.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -662,5 +665,80 @@ class TransactionDaoTest {
             assertEquals("Transaction type should be updated", newType, updatedTx?.transactionType)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun getRecentManualTransactions_filtersAndGroupsCorrectly() = runBlocking {
+        val baseDate = System.currentTimeMillis()
+
+        // 1. Add an old manual transaction ("Tea")
+        transactionDao.insert(
+            Transaction(
+                description = "Tea",
+                amount = 10.0,
+                date = baseDate - 10000,
+                accountId = 1,
+                categoryId = 1,
+                source = "Manual Entry",
+                transactionType = "expense",
+                notes = "Old entry"
+            )
+        )
+
+        // 2. Add a NEWER manual transaction ("Tea") - Should replace the old one in results
+        transactionDao.insert(
+            Transaction(
+                description = "Tea",
+                amount = 15.0, // Different amount
+                date = baseDate, // Newer
+                accountId = 1,
+                categoryId = 1,
+                source = "Manual Entry",
+                transactionType = "expense",
+                notes = "New entry"
+            )
+        )
+
+        // 3. Add an "Auto-Captured" transaction - Should be IGNORED
+        transactionDao.insert(
+            Transaction(
+                description = "Amazon",
+                amount = 500.0,
+                date = baseDate + 1000, // Newest
+                accountId = 1,
+                categoryId = 1,
+                source = "Auto-Captured", // <-- Should be filtered out
+                transactionType = "expense",
+                notes = null
+            )
+        )
+
+        // 4. Add another unique manual transaction ("Coffee")
+        transactionDao.insert(
+            Transaction(
+                description = "Coffee",
+                amount = 25.0,
+                date = baseDate - 5000, // Between old Tea and new Tea
+                accountId = 1,
+                categoryId = 1,
+                source = "Manual Entry",
+                transactionType = "expense",
+                notes = null
+            )
+        )
+
+        // Act
+        val recentTransactions = transactionDao.getRecentManualTransactions(limit = 10).first()
+
+        // Assert
+        assertEquals("Should return exactly 2 unique manual items (Tea, Coffee)", 2, recentTransactions.size)
+
+        // Verify order: Newest manual first ("Tea" @ baseDate) -> Older manual ("Coffee" @ baseDate - 5000)
+        assertEquals("First item should be 'Tea'", "Tea", recentTransactions[0].transaction.description)
+        assertEquals("First item should use the latest amount", 15.0, recentTransactions[0].transaction.amount, 0.01)
+        assertEquals("Second item should be 'Coffee'", "Coffee", recentTransactions[1].transaction.description)
+
+        // Verify "Amazon" (Auto-Captured) is not present
+        assertTrue("Auto-Captured transactions should be excluded", recentTransactions.none { it.transaction.description == "Amazon" })
     }
 }
