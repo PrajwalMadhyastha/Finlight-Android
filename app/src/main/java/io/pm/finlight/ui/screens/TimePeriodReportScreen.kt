@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.NotificationManagerCompat
@@ -282,6 +283,10 @@ private fun YearlyOutlierManagementCard(
     onToggleExpense: (String) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
+    }
 
     GlassPanel {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -318,9 +323,9 @@ private fun YearlyOutlierManagementCard(
                     Spacer(Modifier.height(16.dp))
                     
                     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                        Text("Month", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
-                        Text("Income", modifier = Modifier.width(70.dp), style = MaterialTheme.typography.labelMedium)
-                        Text("Spend", modifier = Modifier.width(70.dp), style = MaterialTheme.typography.labelMedium)
+                        Text("Month", modifier = Modifier.weight(1.2f), style = MaterialTheme.typography.labelMedium)
+                        Text("Income", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.End)
+                        Text("Spend", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.End)
                     }
                     
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -334,32 +339,46 @@ private fun YearlyOutlierManagementCard(
                         ) {
                             Text(
                                 breakdown.monthName,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1.2f),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             
-                            IconButton(
-                                onClick = { onToggleIncome(breakdown.monthKey) },
-                                modifier = Modifier.size(70.dp, 36.dp)
+                            // Income Toggle + Amount
+                            Column(
+                                modifier = Modifier.weight(1f).clickable { onToggleIncome(breakdown.monthKey) },
+                                horizontalAlignment = Alignment.End
                             ) {
+                                Text(
+                                    currencyFormat.format(breakdown.income),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (breakdown.isIncomeExcluded) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
+                                    fontWeight = if (breakdown.isIncomeExcluded) FontWeight.Normal else FontWeight.Bold
+                                )
                                 Icon(
                                     imageVector = if (breakdown.isIncomeExcluded) Icons.Default.CheckBoxOutlineBlank else Icons.Default.CheckCircle,
-                                    contentDescription = "Toggle Income",
+                                    contentDescription = null,
                                     tint = if (breakdown.isIncomeExcluded) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
 
-                            IconButton(
-                                onClick = { onToggleExpense(breakdown.monthKey) },
-                                modifier = Modifier.size(70.dp, 36.dp)
+                            // Expense Toggle + Amount
+                            Column(
+                                modifier = Modifier.weight(1f).clickable { onToggleExpense(breakdown.monthKey) },
+                                horizontalAlignment = Alignment.End
                             ) {
+                                Text(
+                                    currencyFormat.format(breakdown.expenses),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (breakdown.isExpenseExcluded) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error,
+                                    fontWeight = if (breakdown.isExpenseExcluded) FontWeight.Normal else FontWeight.Bold
+                                )
                                 Icon(
                                     imageVector = if (breakdown.isExpenseExcluded) Icons.Default.CheckBoxOutlineBlank else Icons.Default.CheckCircle,
-                                    contentDescription = "Toggle Expense",
+                                    contentDescription = null,
                                     tint = if (breakdown.isExpenseExcluded) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
