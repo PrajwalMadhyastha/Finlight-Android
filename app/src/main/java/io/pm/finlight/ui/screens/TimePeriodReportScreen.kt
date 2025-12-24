@@ -2,6 +2,8 @@ package io.pm.finlight.ui.screens
 
 import android.app.Application
 import android.graphics.Typeface
+import androidx.compose.animation.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -51,10 +53,9 @@ fun TimePeriodReportScreen(
     timePeriod: TimePeriod,
     transactionViewModel: TransactionViewModel,
     initialDateMillis: Long? = null,
-    showPreviousMonth: Boolean = false // --- NEW: Add parameter
+    showPreviousMonth: Boolean = false
 ) {
     val application = LocalContext.current.applicationContext as Application
-    // --- UPDATED: Pass the new parameter to the factory ---
     val factory = TimePeriodReportViewModelFactory(application, timePeriod, initialDateMillis, showPreviousMonth)
     val viewModel: TimePeriodReportViewModel = viewModel(factory = factory)
 
@@ -66,8 +67,13 @@ fun TimePeriodReportScreen(
     val yearlyConsistencyData by viewModel.yearlyConsistencyData.collectAsState()
     val consistencyStats by viewModel.consistencyStats.collectAsState()
 
-    val totalSpent = transactions.filter { it.transaction.transactionType == "expense" && !it.transaction.isExcluded }.sumOf { it.transaction.amount }.roundToLong()
+    // --- FIX: Use ViewModel-derived totals which account for outlier exclusions ---
+    val totalSpent by viewModel.totalExpenses.collectAsState()
     val totalIncome by viewModel.totalIncome.collectAsState()
+    val averageSpent by viewModel.monthlyAverageExpenses.collectAsState()
+    val averageIncome by viewModel.monthlyAverageIncome.collectAsState()
+
+    val yearlyMonthlyBreakdown by viewModel.yearlyMonthlyBreakdown.collectAsState()
 
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -116,8 +122,20 @@ fun TimePeriodReportScreen(
             item {
                 SpendingSummaryCard(
                     totalSpent = totalSpent,
-                    totalIncome = totalIncome
+                    totalIncome = totalIncome,
+                    averageSpent = averageSpent,
+                    averageIncome = averageIncome
                 )
+            }
+
+            if (timePeriod == TimePeriod.YEARLY && yearlyMonthlyBreakdown.isNotEmpty()) {
+                item {
+                    YearlyOutlierManagementCard(
+                        breakdowns = yearlyMonthlyBreakdown,
+                        onToggleIncome = viewModel::toggleIncomeExclusion,
+                        onToggleExpense = viewModel::toggleExpenseExclusion
+                    )
+                }
             }
 
             item {
@@ -135,7 +153,6 @@ fun TimePeriodReportScreen(
                         onPreviousMonth = viewModel::selectPreviousPeriod,
                         onNextMonth = viewModel::selectNextPeriod,
                         onDayClick = { date ->
-                            // FIX: Passing safeToSpend argument to search_screen from monthly calendar.
                             val dayData = monthlyConsistencyData.find {
                                 val cal1 = Calendar.getInstance().apply { time = it.date }
                                 val cal2 = Calendar.getInstance().apply { time = date }
@@ -167,7 +184,6 @@ fun TimePeriodReportScreen(
                                 ConsistencyCalendar(
                                     data = yearlyConsistencyData,
                                     onDayClick = { date ->
-                                        // FIX: Passing safeToSpend argument to search_screen from yearly calendar.
                                         val dayData = yearlyConsistencyData.find {
                                             val cal1 = Calendar.getInstance().apply { time = it.date }
                                             val cal2 = Calendar.getInstance().apply { time = date }
@@ -251,6 +267,101 @@ fun TimePeriodReportScreen(
                                 "No transactions recorded for this period.",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun YearlyOutlierManagementCard(
+    breakdowns: List<MonthlyBreakdown>,
+    onToggleIncome: (String) -> Unit,
+    onToggleExpense: (String) -> Unit
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    GlassPanel {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Manage Outlier Months",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(modifier = Modifier.padding(top = 16.dp)) {
+                    Text(
+                        "Exclude months with irregular high spend/income to see a more accurate monthly average.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                        Text("Month", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium)
+                        Text("Income", modifier = Modifier.width(70.dp), style = MaterialTheme.typography.labelMedium)
+                        Text("Spend", modifier = Modifier.width(70.dp), style = MaterialTheme.typography.labelMedium)
+                    }
+                    
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                    breakdowns.forEach { breakdown ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                breakdown.monthName,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            
+                            IconButton(
+                                onClick = { onToggleIncome(breakdown.monthKey) },
+                                modifier = Modifier.size(70.dp, 36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (breakdown.isIncomeExcluded) Icons.Default.CheckBoxOutlineBlank else Icons.Default.CheckCircle,
+                                    contentDescription = "Toggle Income",
+                                    tint = if (breakdown.isIncomeExcluded) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { onToggleExpense(breakdown.monthKey) },
+                                modifier = Modifier.size(70.dp, 36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (breakdown.isExpenseExcluded) Icons.Default.CheckBoxOutlineBlank else Icons.Default.CheckCircle,
+                                    contentDescription = "Toggle Expense",
+                                    tint = if (breakdown.isExpenseExcluded) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 }

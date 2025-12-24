@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
-// REASON: FEATURE (Backup) - Added a new blocking function
-// `isAutoBackupNotificationEnabledBlocking()`. This is required by the
-// `FinlightBackupAgent` which runs in a context where collecting a `Flow`
-// is not feasible.
+// REASON: FEATURE (Outlier Months) - Added support for excluding specific months
+// from yearly report averages. Independent sets for income and expense exclusions
+// are stored in SharedPreferences to allow handling different outliers.
 // =================================================================================
 package io.pm.finlight
 
@@ -89,7 +88,44 @@ class SettingsRepository(context: Context) {
         private const val KEY_IGNORE_RULES_CHECKSUM = "ignore_rules_checksum"
         // --- NEW: Key for the last backup timestamp ---
         private const val KEY_LAST_BACKUP_TIMESTAMP = "last_backup_timestamp"
+
+        // --- NEW: Outlier Exclusions ---
+        private const val KEY_EXCLUDED_INCOME_MONTHS = "excluded_income_months"
+        private const val KEY_EXCLUDED_EXPENSE_MONTHS = "excluded_expense_months"
     }
+
+    // --- NEW: Outlier Month Management Functions ---
+
+    fun getExcludedIncomeMonths(): Flow<Set<String>> = getSetFlow(KEY_EXCLUDED_INCOME_MONTHS)
+    fun getExcludedExpenseMonths(): Flow<Set<String>> = getSetFlow(KEY_EXCLUDED_EXPENSE_MONTHS)
+
+    fun toggleIncomeMonthExclusion(monthKey: String) {
+        toggleInSet(KEY_EXCLUDED_INCOME_MONTHS, monthKey)
+    }
+
+    fun toggleExpenseMonthExclusion(monthKey: String) {
+        toggleInSet(KEY_EXCLUDED_EXPENSE_MONTHS, monthKey)
+    }
+
+    private fun getSetFlow(key: String): Flow<Set<String>> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, k ->
+            if (k == key) trySend(sp.getStringSet(key, emptySet()) ?: emptySet())
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(prefs.getStringSet(key, emptySet()) ?: emptySet())
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    private fun toggleInSet(key: String, value: String) {
+        val current = prefs.getStringSet(key, emptySet()) ?: emptySet()
+        val newSet = if (current.contains(value)) {
+            current.toMutableSet().apply { remove(value) }
+        } else {
+            current.toMutableSet().apply { add(value) }
+        }
+        prefs.edit { putStringSet(key, newSet) }
+    }
+
 
     // --- NEW: Functions to manage the last backup timestamp ---
     fun saveLastBackupTimestamp(timestamp: Long) {
@@ -775,4 +811,3 @@ class SettingsRepository(context: Context) {
         }
     }
 }
-
