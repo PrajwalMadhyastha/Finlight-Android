@@ -135,7 +135,14 @@ fun TimePeriodReportScreen(
                         onPreviousMonth = viewModel::selectPreviousPeriod,
                         onNextMonth = viewModel::selectNextPeriod,
                         onDayClick = { date ->
-                            navController.navigate("search_screen?date=${date.time}")
+                            // FIX: Passing safeToSpend argument to search_screen from monthly calendar.
+                            val dayData = monthlyConsistencyData.find {
+                                val cal1 = Calendar.getInstance().apply { time = it.date }
+                                val cal2 = Calendar.getInstance().apply { time = date }
+                                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+                            }
+                            val safeToSpend = dayData?.safeToSpend ?: 0L
+                            navController.navigate("search_screen?date=${date.time}&safeToSpend=$safeToSpend&focusSearch=false")
                         }
                     )
                 }
@@ -160,7 +167,14 @@ fun TimePeriodReportScreen(
                                 ConsistencyCalendar(
                                     data = yearlyConsistencyData,
                                     onDayClick = { date ->
-                                        navController.navigate("search_screen?date=${date.time}&focusSearch=false")
+                                        // FIX: Passing safeToSpend argument to search_screen from yearly calendar.
+                                        val dayData = yearlyConsistencyData.find {
+                                            val cal1 = Calendar.getInstance().apply { time = it.date }
+                                            val cal2 = Calendar.getInstance().apply { time = date }
+                                            cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+                                        }
+                                        val safeToSpend = dayData?.safeToSpend ?: 0L
+                                        navController.navigate("search_screen?date=${date.time}&safeToSpend=$safeToSpend&focusSearch=false")
                                     }
                                 )
                             }

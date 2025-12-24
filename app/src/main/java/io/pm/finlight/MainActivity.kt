@@ -750,14 +750,14 @@ fun AppNavHost(
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
         ) { CsvValidationScreen(navController, settingsViewModel) }
         composable(
-            // --- UPDATED: Add 'query' parameter to the route ---
-            route = "search_screen?categoryId={categoryId}&date={date}&focusSearch={focusSearch}&expandFilters={expandFilters}&query={query}",
+            route = "search_screen?categoryId={categoryId}&date={date}&safeToSpend={safeToSpend}&focusSearch={focusSearch}&expandFilters={expandFilters}&query={query}",
             arguments = listOf(
                 navArgument("categoryId") { type = NavType.IntType; defaultValue = -1 },
                 navArgument("date") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("safeToSpend") { type = NavType.LongType; defaultValue = -1L },
                 navArgument("focusSearch") { type = NavType.BoolType; defaultValue = true },
                 navArgument("expandFilters") { type = NavType.BoolType; defaultValue = true },
-                navArgument("query") { type = NavType.StringType; nullable = true; defaultValue = null } // --- NEW
+                navArgument("query") { type = NavType.StringType; nullable = true; defaultValue = null }
             ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
@@ -766,18 +766,19 @@ fun AppNavHost(
         ) { backStackEntry ->
             val categoryId = backStackEntry.arguments?.getInt("categoryId") ?: -1
             val date = backStackEntry.arguments?.getLong("date") ?: -1L
+            val safeToSpend = backStackEntry.arguments?.getLong("safeToSpend") ?: -1L
             val focusSearch = backStackEntry.arguments?.getBoolean("focusSearch") ?: true
             val expandFilters = backStackEntry.arguments?.getBoolean("expandFilters") ?: true
-            val query = backStackEntry.arguments?.getString("query") // --- NEW
+            val query = backStackEntry.arguments?.getString("query")
 
             val factory = SearchViewModelFactory(
                 activity.application,
                 if (categoryId != -1) categoryId else null,
                 if (date != -1L) date else null,
-                query // --- NEW
+                query
             )
             val searchViewModel: SearchViewModel = viewModel(factory = factory)
-            SearchScreen(navController, searchViewModel, transactionViewModel, focusSearch, expandFilters)
+            SearchScreen(navController, searchViewModel, transactionViewModel, focusSearch, expandFilters, if (safeToSpend != -1L) safeToSpend else null)
         }
         composable(
             route = "review_sms_screen",

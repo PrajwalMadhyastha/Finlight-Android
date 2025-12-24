@@ -6,6 +6,11 @@
 // 3. If in Drilldown mode: Hides search bar and filters. Displays a clean
 //    `DrilldownHeader` with the merchant name and total stats.
 // 4. `SearchInsightsHeader` replaced by `DrilldownHeader` for a list-focused look.
+// FIX - Updated the visibility condition for `DaySummaryCard` to include
+// `safeToSpend`. This ensures the summary (with the safe-to-spend metric) is
+// visible even on days with no transactions.
+// UI REFINEMENT - Moved "Safe to Spend" to the header card for better legibility
+// when income and expense numbers are large.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -57,7 +62,8 @@ fun SearchScreen(
     searchViewModel: SearchViewModel,
     transactionViewModel: TransactionViewModel,
     focusSearch: Boolean,
-    expandFilters: Boolean
+    expandFilters: Boolean,
+    safeToSpend: Long?
 ) {
     val searchUiState by searchViewModel.uiState.collectAsState()
     val searchResults by searchViewModel.searchResults.collectAsState()
@@ -69,6 +75,11 @@ fun SearchScreen(
 
     val focusRequester = remember { FocusRequester() }
     val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+
+    val currencyFormat = remember {
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
+    }
 
     LaunchedEffect(searchUiState.selectedCategory, expandFilters) {
         if (searchUiState.selectedCategory != null && expandFilters && !filtersAlreadyExpanded) {
@@ -229,6 +240,27 @@ fun SearchScreen(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+
+                        // UI REFINEMENT: Safe to Spend moved here
+                        if (safeToSpend != null) {
+                            Spacer(Modifier.height(8.dp))
+                            HorizontalDivider(
+                                modifier = Modifier.width(40.dp),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = "Safe to Spend",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = currencyFormat.format(safeToSpend),
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
 
