@@ -170,7 +170,13 @@ fun ReportsScreen(
                                     ConsistencyCalendar(
                                         data = yearlyCalendarData,
                                         onDayClick = { date ->
-                                            navController.navigate("search_screen?date=${date.time}&focusSearch=false")
+                                            val dayData = yearlyCalendarData.find {
+                                                val cal1 = Calendar.getInstance().apply { time = it.date }
+                                                val cal2 = Calendar.getInstance().apply { time = date }
+                                                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+                                            }
+                                            val safeToSpend = dayData?.safeToSpend ?: 0L
+                                            navController.navigate("search_screen?date=${date.time}&safeToSpend=$safeToSpend&focusSearch=false")
                                         }
                                     )
                                 }
@@ -185,7 +191,13 @@ fun ReportsScreen(
                                         onPreviousMonth = viewModel::selectPreviousMonth,
                                         onNextMonth = viewModel::selectNextMonth,
                                         onDayClick = { date ->
-                                            navController.navigate("search_screen?date=${date.time}&focusSearch=false")
+                                            val dayData = detailedMonthData.find {
+                                                val cal1 = Calendar.getInstance().apply { time = it.date }
+                                                val cal2 = Calendar.getInstance().apply { time = date }
+                                                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+                                            }
+                                            val safeToSpend = dayData?.safeToSpend ?: 0L
+                                            navController.navigate("search_screen?date=${date.time}&safeToSpend=$safeToSpend&focusSearch=false")
                                         }
                                     )
                                 }

@@ -33,6 +33,7 @@ class TimePeriodReportViewModelFactory(
                 // --- UPDATED: Pass repositories instead of DAOs ---
                 transactionDao = db.transactionDao(), // Still needed for charts/insights
                 transactionRepository = transactionRepository,
+                settingsRepository = settingsRepository, // --- NEW: Added ---
                 timePeriod = timePeriod,
                 initialDateMillis = initialDateMillis,
                 showPreviousMonth = showPreviousMonth

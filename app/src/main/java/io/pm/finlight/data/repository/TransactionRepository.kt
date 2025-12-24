@@ -347,7 +347,8 @@ class TransactionRepository(
                 }
             } else {
                 // CASE 2: A BUDGET IS SET (e.g., 0f or 145000f)
-                val safeToSpend = if (budget > 0 && daysInMonth > 0) (budget.toDouble() / daysInMonth).roundToLong() else 0L
+                var cumulativeSpending = 0.0
+                val totalBudget = budget.toDouble()
 
                 for (i in 1..daysInMonth) {
                     dayIterator.set(Calendar.DAY_OF_MONTH, i)
@@ -358,18 +359,26 @@ class TransactionRepository(
                         continue
                     }
 
+                    val remainingBudget = totalBudget - cumulativeSpending
+                    val remainingDays = (daysInMonth - i + 1).coerceAtLeast(1)
+                    val safeToSpend = if (remainingBudget > 0) (remainingBudget / remainingDays).roundToLong() else 0L
+
+
                     val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
-                    val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
+                    val amountSpent = (spendingMap[dateKey] ?: 0.0)
+                    val amountSpentLong = amountSpent.roundToLong()
 
                     // This is the new, more robust 'when' block that fixes the original bug
                     val status = when {
-                        amountSpent == 0L && safeToSpend == 0L -> SpendingStatus.WITHIN_LIMIT // Met 0 budget (blue)
-                        amountSpent == 0L && safeToSpend > 0L -> SpendingStatus.NO_SPEND     // No spend on a day with a budget (green)
-                        amountSpent > 0L && safeToSpend == 0L -> SpendingStatus.OVER_LIMIT   // Spent > 0 on a 0 budget (red)
-                        amountSpent > safeToSpend -> SpendingStatus.OVER_LIMIT               // Spent > budget (red)
+                        amountSpentLong == 0L && safeToSpend == 0L -> SpendingStatus.WITHIN_LIMIT // Met 0 budget (blue)
+                        amountSpentLong == 0L && safeToSpend > 0L -> SpendingStatus.NO_SPEND     // No spend on a day with a budget (green)
+                        amountSpentLong > 0L && safeToSpend == 0L -> SpendingStatus.OVER_LIMIT   // Spent > 0 on a 0 budget (red)
+                        amountSpentLong > safeToSpend -> SpendingStatus.OVER_LIMIT               // Spent > budget (red)
                         else -> SpendingStatus.WITHIN_LIMIT // Spent <= budget (and not 0) (blue)
                     }
-                    resultList.add(CalendarDayStatus(date, status, amountSpent, safeToSpend))
+                    Log.d("HeatmapDebug", "Date: $dateKey, Spent: $amountSpentLong, Threshold: $safeToSpend, Status: $status")
+                    resultList.add(CalendarDayStatus(date, status, amountSpentLong, safeToSpend))
+                    cumulativeSpending += amountSpent
                 }
             }
             resultList // This is the value emitted by the combine
