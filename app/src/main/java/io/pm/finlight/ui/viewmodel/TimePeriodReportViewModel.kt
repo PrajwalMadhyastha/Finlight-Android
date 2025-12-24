@@ -1,10 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/TimePeriodReportViewModel.kt
-// REASON: REFACTOR (Consistency) - This ViewModel now uses the new, centralized
-// `transactionRepository.getMonthlyConsistencyData` function for both its monthly
-// and yearly calendar flows. The old, duplicated, and buggy local functions
-// (`generateMonthConsistencyData`, `generateYearlyConsistencyData`) have been
-// completely removed.
+// REASON: FEATURE (Outlier Adjusted Totals) - Updated `totalIncome` and
+// `totalExpenses` to respect outlier exclusions when in `TimePeriod.YEARLY` mode.
+// This ensures that the overall summary card reflects the same adjusted values used
+// for averages, providing consistent feedback to the user.
 // =================================================================================
 package io.pm.finlight
 
@@ -22,10 +21,20 @@ import java.util.*
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
+data class MonthlyBreakdown(
+    val monthKey: String, // yyyy-MM
+    val monthName: String,
+    val income: Double,
+    val expenses: Double,
+    val isIncomeExcluded: Boolean,
+    val isExpenseExcluded: Boolean
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimePeriodReportViewModel(
     private val transactionDao: TransactionDao,
-    private val transactionRepository: TransactionRepository, // --- NEW ---
+    private val transactionRepository: TransactionRepository,
+    private val settingsRepository: SettingsRepository,
     private val timePeriod: TimePeriod,
     initialDateMillis: Long?,
     showPreviousMonth: Boolean
@@ -47,11 +56,88 @@ class TimePeriodReportViewModel(
         transactionDao.getTransactionDetailsForRange(start, end, null, null, null)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val totalIncome: StateFlow<Long> = transactionsForPeriod.map { transactions ->
-        transactions
-            .filter { it.transaction.transactionType == "income" && !it.transaction.isExcluded }
-            .sumOf { it.transaction.amount }.roundToLong()
+    val excludedIncomeMonths: StateFlow<Set<String>> = settingsRepository.getExcludedIncomeMonths()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+    val excludedExpenseMonths: StateFlow<Set<String>> = settingsRepository.getExcludedExpenseMonths()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    val yearlyMonthlyBreakdown: StateFlow<List<MonthlyBreakdown>> = combine(
+        transactionsForPeriod,
+        excludedIncomeMonths,
+        excludedExpenseMonths,
+        _selectedDate
+    ) { transactions, excludedIncome, excludedExpense, date ->
+        if (timePeriod != TimePeriod.YEARLY) return@combine emptyList()
+
+        val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+        val nameSdf = SimpleDateFormat("MMM", Locale.getDefault())
+        val breakdownMap = mutableMapOf<String, Pair<Double, Double>>()
+
+        val cal = (date.clone() as Calendar).apply { set(Calendar.MONTH, Calendar.JANUARY) }
+        for (i in 0..11) {
+            breakdownMap[sdf.format(cal.time)] = Pair(0.0, 0.0)
+            cal.add(Calendar.MONTH, 1)
+        }
+
+        transactions.forEach { txn ->
+            val monthKey = sdf.format(Date(txn.transaction.date))
+            val current = breakdownMap[monthKey] ?: Pair(0.0, 0.0)
+            if (txn.transaction.transactionType == "income" && !txn.transaction.isExcluded) {
+                breakdownMap[monthKey] = current.copy(first = current.first + txn.transaction.amount)
+            } else if (txn.transaction.transactionType == "expense" && !txn.transaction.isExcluded) {
+                breakdownMap[monthKey] = current.copy(second = current.second + txn.transaction.amount)
+            }
+        }
+
+        breakdownMap.entries.sortedBy { it.key }.map { (key, totals) ->
+            val monthDate = sdf.parse(key)!!
+            MonthlyBreakdown(
+                monthKey = key,
+                monthName = nameSdf.format(monthDate),
+                income = totals.first,
+                expenses = totals.second,
+                isIncomeExcluded = excludedIncome.contains(key),
+                isExpenseExcluded = excludedExpense.contains(key)
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+
+    // --- UPDATED: Use breakdowns and exclusions for totals and averages ---
+    
+    val totalIncome: StateFlow<Long> = combine(transactionsForPeriod, yearlyMonthlyBreakdown) { transactions, breakdowns ->
+        if (timePeriod == TimePeriod.YEARLY) {
+            breakdowns.filter { !it.isIncomeExcluded }.sumOf { it.income }.roundToLong()
+        } else {
+            transactions
+                .filter { it.transaction.transactionType == "income" && !it.transaction.isExcluded }
+                .sumOf { it.transaction.amount }.roundToLong()
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val totalExpenses: StateFlow<Long> = combine(transactionsForPeriod, yearlyMonthlyBreakdown) { transactions, breakdowns ->
+        if (timePeriod == TimePeriod.YEARLY) {
+            breakdowns.filter { !it.isExpenseExcluded }.sumOf { it.expenses }.roundToLong()
+        } else {
+            transactions
+                .filter { it.transaction.transactionType == "expense" && !it.transaction.isExcluded }
+                .sumOf { it.transaction.amount }.roundToLong()
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val monthlyAverageIncome: StateFlow<Double?> = combine(yearlyMonthlyBreakdown, _selectedDate) { breakdowns, date ->
+        if (timePeriod != TimePeriod.YEARLY) return@combine null
+        val elapsedMonths = getElapsedMonthsInYear(date)
+        val includedBreakdowns = breakdowns.take(elapsedMonths).filter { !it.isIncomeExcluded }
+        if (includedBreakdowns.isEmpty()) null else includedBreakdowns.sumOf { it.income } / includedBreakdowns.size
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val monthlyAverageExpenses: StateFlow<Double?> = combine(yearlyMonthlyBreakdown, _selectedDate) { breakdowns, date ->
+        if (timePeriod != TimePeriod.YEARLY) return@combine null
+        val elapsedMonths = getElapsedMonthsInYear(date)
+        val includedBreakdowns = breakdowns.take(elapsedMonths).filter { !it.isExpenseExcluded }
+        if (includedBreakdowns.isEmpty()) null else includedBreakdowns.sumOf { it.expenses } / includedBreakdowns.size
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
 
     val insights: StateFlow<ReportInsights?> = _selectedDate.flatMapLatest { calendar ->
@@ -221,35 +307,27 @@ class TimePeriodReportViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    // --- REFACTORED: Use the new centralized repository function ---
     val monthlyConsistencyData: StateFlow<List<CalendarDayStatus>> = _selectedDate.flatMapLatest { calendar ->
         if (timePeriod != TimePeriod.MONTHLY) return@flatMapLatest flowOf(emptyList())
-        // Call the centralized function from the repository
         transactionRepository.getMonthlyConsistencyData(
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH) + 1
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // --- REFACTORED: Use the new centralized repository function ---
     val yearlyConsistencyData: StateFlow<List<CalendarDayStatus>> = _selectedDate.flatMapLatest { calendar ->
         if (timePeriod != TimePeriod.YEARLY) return@flatMapLatest flowOf(emptyList())
 
         flow {
             val year = calendar.get(Calendar.YEAR)
-            // Create a flow for each month of the selected year
-            // --- FIX: Add explicit types to resolve build error ---
             val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> = (1..12).map { month ->
                 transactionRepository.getMonthlyConsistencyData(year, month)
             }
 
-            // Combine all 12 flows
-            // --- FIX: This is the corrected logic ---
             val combinedFlow = combine(monthlyDataFlows) { monthlyDataArray: Array<List<CalendarDayStatus>> ->
-                monthlyDataArray.toList().flatten() // Flatten the Array<List> into a single List
+                monthlyDataArray.toList().flatten()
             }
 
-            // Collect the combined flow and emit its single list result
             combinedFlow.collect { combinedYearlyData: List<CalendarDayStatus> ->
                 emit(combinedYearlyData)
             }
@@ -263,7 +341,6 @@ class TimePeriodReportViewModel(
     ) { monthlyData, yearlyData ->
         val data = if (timePeriod == TimePeriod.MONTHLY) monthlyData else yearlyData
         val today = Calendar.getInstance()
-        // Filter out future days from stats calculation
         val relevantData = data.filter { !it.date.after(today.time) }
         val goodDays = relevantData.count { it.status == SpendingStatus.WITHIN_LIMIT }
         val badDays = relevantData.count { it.status == SpendingStatus.OVER_LIMIT }
@@ -301,6 +378,14 @@ class TimePeriodReportViewModel(
                 )
             }
         }
+    }
+
+    fun toggleIncomeExclusion(monthKey: String) {
+        settingsRepository.toggleIncomeMonthExclusion(monthKey)
+    }
+
+    fun toggleExpenseExclusion(monthKey: String) {
+        settingsRepository.toggleExpenseMonthExclusion(monthKey)
     }
 
     private fun getPeriodDateRange(calendar: Calendar): Pair<Long, Long> {
@@ -341,8 +426,14 @@ class TimePeriodReportViewModel(
         return Pair(startCal.timeInMillis, endCal.timeInMillis)
     }
 
-    // --- DELETED: generateMonthConsistencyData function ---
-
-    // --- DELETED: generateYearlyConsistencyData function ---
+    private fun getElapsedMonthsInYear(selectedDate: Calendar): Int {
+        val now = Calendar.getInstance()
+        return if (selectedDate.get(Calendar.YEAR) < now.get(Calendar.YEAR)) {
+            12
+        } else if (selectedDate.get(Calendar.YEAR) > now.get(Calendar.YEAR)) {
+            0
+        } else {
+            now.get(Calendar.MONTH) + 1
+        }
+    }
 }
-

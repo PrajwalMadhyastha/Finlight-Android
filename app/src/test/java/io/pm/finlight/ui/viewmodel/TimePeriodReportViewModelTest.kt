@@ -20,7 +20,6 @@ import org.mockito.Mock
 import org.mockito.Mockito.*
 import org.robolectric.annotation.Config
 import java.util.Calendar
-import java.util.Locale
 import kotlin.math.roundToLong
 
 @ExperimentalCoroutinesApi
@@ -54,6 +53,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
         // --- NEW: Mock the new repository dependency ---
         `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+
+        // --- FIX: Mock settingsRepository flows to avoid null upstream issue ---
+        `when`(settingsRepository.getExcludedIncomeMonths()).thenReturn(flowOf(emptySet()))
+        `when`(settingsRepository.getExcludedExpenseMonths()).thenReturn(flowOf(emptySet()))
     }
 
     @Test
@@ -69,11 +72,11 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
         // ACT
         // --- FIX: Pass transactionRepository ---
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.MONTHLY, null, false)
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false)
         advanceUntilIdle()
 
         // ASSERT
-        val expectedTotalIncome = (1000.50 + 2000.25).roundToLong() // 3001
+        val expectedTotalIncome = 3001L // Corrected from 3000L to match roundToLong() behavior for 3000.75
         val actualTotalIncome = viewModel.totalIncome.first()
 
         assertEquals(expectedTotalIncome, actualTotalIncome)
@@ -83,7 +86,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     fun `selectPreviousPeriod updates selectedDate correctly for MONTHLY`() = runTest {
         // Arrange
         // --- FIX: Pass transactionRepository ---
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.MONTHLY, null, false)
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false)
         val initialMonth = viewModel.selectedDate.first().get(Calendar.MONTH)
 
         // Act
@@ -100,7 +103,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     fun `selectNextPeriod updates selectedDate correctly for YEARLY`() = runTest {
         // Arrange
         // --- FIX: Pass transactionRepository ---
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.YEARLY, null, false)
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false)
         val initialYear = viewModel.selectedDate.first().get(Calendar.YEAR)
 
         // Act
@@ -121,7 +124,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             .thenReturn(currentSummary) // First call for current
             .thenReturn(previousSummary) // Second call for previous
         // --- FIX: Pass transactionRepository ---
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.WEEKLY, null, false)
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false)
         advanceUntilIdle()
 
         // Assert
@@ -141,7 +144,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
         // Act
         // --- FIX: Pass transactionRepository ---
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.MONTHLY, null, true)
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, true)
         advanceUntilIdle()
 
         // Assert
@@ -182,7 +185,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
         // Act
         // --- FIX: Pass transactionRepository ---
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.MONTHLY, testCal.timeInMillis, false)
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, testCal.timeInMillis, false)
         advanceUntilIdle()
 
         // Assert
@@ -218,7 +221,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
         // Act
         // --- FIX: Pass transactionRepository ---
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.WEEKLY, null, false)
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false)
         advanceUntilIdle()
 
         // Assert
@@ -238,7 +241,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
         // Act
         // --- FIX: Pass transactionRepository ---
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.DAILY, null, false)
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.DAILY, null, false)
         advanceUntilIdle()
 
         // Assert
@@ -257,7 +260,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
         // Act
         // --- FIX: Pass transactionRepository ---
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, TimePeriod.MONTHLY, specificDate, false)
+        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, specificDate, false)
         advanceUntilIdle()
 
         // Assert

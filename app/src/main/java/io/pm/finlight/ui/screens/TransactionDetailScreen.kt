@@ -4,6 +4,14 @@
 // make the "Visits count" chip clickable. When clicked, it now navigates to the
 // Search Screen pre-filled with the merchant's description, allowing the user
 // to instantly see all transactions for that specific merchant.
+// UI REFINEMENT - Consolidated "Actions" and "Attachments" into a single,
+// more legible `TransactionActionsCard`. Using a grid of action buttons
+// improves usability on small phones and provides a cleaner grouping for
+// transaction-related tasks like attaching photos or fixing parsing rules.
+// FIX (Build) - Fixed type mismatch for `sourceSmsId` in `TransactionActionsCard`
+// (changed from `Int?` to `Long?` to match the `Transaction` entity).
+// UI REFINEMENT - Improved `TransactionActionsCard` layout to utilize full row
+// width. Renamed "Fix Rules" to "Fix Parsing" for clarity.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -19,6 +27,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -46,6 +55,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -83,7 +93,6 @@ import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.utils.BankLogoHelper
-import io.pm.finlight.ui.screens.TransactionTypeToggle
 
 private const val TAG = "DetailScreenDebug"
 
@@ -209,7 +218,6 @@ fun TransactionDetailScreen(
         }
 
 
-        fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
         val isThemeDark = MaterialTheme.colorScheme.background.isDark()
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
@@ -314,9 +322,7 @@ fun TransactionDetailScreen(
                                 onSplitClick = {
                                     navController.navigate("split_transaction/${details.transaction.id}")
                                 },
-                                // --- NEW: Handle visit count click ---
                                 onVisitCountClick = {
-                                    // Navigate to Search Screen with the merchant name pre-filled
                                     navController.navigate("search_screen?query=${details.transaction.description}")
                                 }
                             )
@@ -384,50 +390,37 @@ fun TransactionDetailScreen(
 
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            AttachmentRow(
+                            TransactionActionsCard(
                                 images = attachedImages,
                                 onAddClick = { imagePickerLauncher.launch("image/*") },
                                 onViewClick = { showImageViewer = it },
-                                onDeleteClick = { showImageDeleteDialog = it }
+                                onDeleteClick = { showImageDeleteDialog = it },
+                                sourceSmsId = details.transaction.sourceSmsId,
+                                onFixParsingClick = {
+                                    scope.launch {
+                                        val smsMessage = viewModel.getOriginalSmsMessage(details.transaction.sourceSmsId!!)
+                                        if (smsMessage != null) {
+                                            val potentialTxn = PotentialTransaction(
+                                                sourceSmsId = smsMessage.id,
+                                                smsSender = smsMessage.sender,
+                                                amount = details.transaction.amount,
+                                                transactionType = details.transaction.transactionType,
+                                                merchantName = details.transaction.description,
+                                                originalMessage = smsMessage.body,
+                                                sourceSmsHash = details.transaction.sourceSmsHash
+                                            )
+                                            val json = Gson().toJson(potentialTxn)
+                                            val encodedJson = URLEncoder.encode(json, "UTF-8")
+                                            navController.navigate("rule_creation_screen?potentialTransactionJson=$encodedJson")
+                                        } else {
+                                            Toast.makeText(context, "Original SMS not found.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
                             )
                         }
                     }
 
-
-                    if (details.transaction.sourceSmsId != null) {
-                        item {
-                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                Button(
-                                    onClick = {
-                                        scope.launch {
-                                            val smsMessage = viewModel.getOriginalSmsMessage(details.transaction.sourceSmsId!!)
-                                            if (smsMessage != null) {
-                                                val potentialTxn = PotentialTransaction(
-                                                    sourceSmsId = smsMessage.id,
-                                                    smsSender = smsMessage.sender,
-                                                    amount = details.transaction.amount,
-                                                    transactionType = details.transaction.transactionType,
-                                                    merchantName = details.transaction.description,
-                                                    originalMessage = smsMessage.body,
-                                                    sourceSmsHash = details.transaction.sourceSmsHash
-                                                )
-                                                val json = Gson().toJson(potentialTxn)
-                                                val encodedJson = URLEncoder.encode(json, "UTF-8")
-                                                navController.navigate("rule_creation_screen?potentialTransactionJson=$encodedJson")
-                                            } else {
-                                                Toast.makeText(context, "Original SMS not found.", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Default.Build, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Fix Parsing")
-                                }
-                            }
-                        }
-                    }
 
                     if (!originalSms.isNullOrBlank()) {
                         item {
@@ -840,7 +833,7 @@ private fun TransactionSpotlightHeader(
     onCategoryClick: () -> Unit,
     onDateTimeClick: () -> Unit,
     onSplitClick: () -> Unit,
-    onVisitCountClick: () -> Unit // --- NEW: Callback for visit count click
+    onVisitCountClick: () -> Unit
 ) {
     val displayCategory = if (isSplit) {
         Category(name = "Multiple Categories", iconKey = "call_split", colorKey = "gray_light")
@@ -998,7 +991,7 @@ private fun TransactionSpotlightHeader(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp),
-                    onClick = onVisitCountClick, // --- NEW: Trigger navigation
+                    onClick = onVisitCountClick,
                     label = { Text("$visitCount visits") },
                     leadingIcon = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     colors = AssistChipDefaults.assistChipColors(
@@ -1134,62 +1127,135 @@ private fun TagsRow(selectedTags: Set<Tag>, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AttachmentRow(
+private fun TransactionActionsCard(
     images: List<TransactionImage>,
     onAddClick: () -> Unit,
     onViewClick: (Uri) -> Unit,
-    onDeleteClick: (TransactionImage) -> Unit
+    onDeleteClick: (TransactionImage) -> Unit,
+    sourceSmsId: Long?,
+    onFixParsingClick: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+    GlassPanel {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(Icons.Default.Attachment, contentDescription = "Attachments", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(16.dp))
-            Text("Actions", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
-            TextButton(onClick = onAddClick) {
-                Icon(Icons.Default.AddAPhoto, contentDescription = "Add Attachment", modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Add")
+            Text(
+                "Actions",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ActionItem(
+                    icon = Icons.Default.AddAPhoto,
+                    label = "Attach",
+                    onClick = onAddClick,
+                    modifier = Modifier.weight(1f)
+                )
+
+                if (sourceSmsId != null) {
+                    ActionItem(
+                        icon = Icons.Default.Build,
+                        label = "Fix Parsing",
+                        onClick = onFixParsingClick,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+
+                // Removed trailing spacer to allow buttons to fill row
             }
-        }
-        if (images.isNotEmpty()) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(images) { image ->
-                    Box {
-                        AsyncImage(
-                            model = File(image.imageUri),
-                            contentDescription = "Transaction Attachment",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onViewClick(File(image.imageUri).toUri()) }
-                        )
-                        IconButton(
-                            onClick = { onDeleteClick(image) },
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(4.dp)
-                                .size(24.dp)
-                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Delete Attachment",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
+
+            if (images.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+
+                Text(
+                    "Attachments (${images.size})",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    items(images) { image ->
+                        Box {
+                            AsyncImage(
+                                model = File(image.imageUri),
+                                contentDescription = "Attachment",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(90.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onViewClick(File(image.imageUri).toUri()) }
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
                             )
+                            IconButton(
+                                onClick = { onDeleteClick(image) },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .size(24.dp)
+                                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f), CircleShape)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Delete",
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ActionItem(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
@@ -1773,7 +1839,7 @@ private fun RetrospectiveUpdateSheetContent(
                     colors = CheckboxDefaults.colors(
                         checkedColor = MaterialTheme.colorScheme.primary,
                         uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        checkmarkColor = MaterialTheme.colorScheme.onPrimary // Ensure visibility
+                        checkmarkColor = MaterialTheme.colorScheme.onPrimary
                     )
                 )
                 Text(
@@ -1840,7 +1906,7 @@ private fun SelectableTransactionItem(
         ) {
             Checkbox(
                 checked = isSelected,
-                onCheckedChange = null, // Let the row click handle it
+                onCheckedChange = null,
                 colors = CheckboxDefaults.colors(
                     checkedColor = MaterialTheme.colorScheme.primary,
                     uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,

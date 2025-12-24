@@ -19,6 +19,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.*
+import java.util.Calendar
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -155,7 +156,14 @@ private fun DashboardCard(
                         ConsistencyCalendar(
                             data = yearlyConsistencyData,
                             onDayClick = { date ->
-                                navController.navigate("search_screen?date=${date.time}&focusSearch=false")
+                                // FIX: Now passing safeToSpend argument to search_screen from dashboard calendar too.
+                                val dayData = yearlyConsistencyData.find {
+                                    val cal1 = Calendar.getInstance().apply { time = it.date }
+                                    val cal2 = Calendar.getInstance().apply { time = date }
+                                    cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+                                }
+                                val safeToSpend = dayData?.safeToSpend ?: 0L
+                                navController.navigate("search_screen?date=${date.time}&safeToSpend=$safeToSpend&focusSearch=false")
                             }
                         )
                     }

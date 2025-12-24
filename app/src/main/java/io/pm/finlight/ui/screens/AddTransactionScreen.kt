@@ -5,6 +5,7 @@
 // 2. Added `TransactionHistorySheet` to allow searching and selecting older manual entries.
 // 3. Observed `recentManualTransactions` and `historyManualTransactions` from ViewModel.
 // 4. Hooked up selection logic to populate the form.
+// 5. FIXED: Paste functionality by replacing description `Text` with `BasicTextField`.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -308,6 +309,7 @@ fun AddTransactionScreen(
                     },
                     focusRequester = focusRequester,
                     description = description,
+                    onDescriptionChange = { viewModel.onAddTransactionDescriptionChanged(it) },
                     onDescriptionClick = { activeSheet = ComposerSheet.Merchant },
                     isTravelMode = isTravelModeActive,
                     travelModeSettings = travelModeSettings,
@@ -763,6 +765,7 @@ private fun AmountComposer(
     onAmountChange: (String) -> Unit,
     focusRequester: FocusRequester,
     description: String,
+    onDescriptionChange: (String) -> Unit,
     onDescriptionClick: () -> Unit,
     isTravelMode: Boolean,
     travelModeSettings: TravelModeSettings?,
@@ -784,27 +787,50 @@ private fun AmountComposer(
         label = "HighlightBorderAnimation"
     )
 
-    val descriptionText = when {
-        isDescriptionEntered -> description
-        hasInteractedWithNumpad -> "What did you spend on?"
-        else -> "Paid to..."
-    }
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth() // This is OK
     ) {
-        Text(
-            text = descriptionText,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        BasicTextField(
+            value = description,
+            onValueChange = onDescriptionChange,
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
                 .border(2.dp, animatedBorderColor, RoundedCornerShape(12.dp))
-                .clickable(onClick = onDescriptionClick)
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            textStyle = MaterialTheme.typography.titleLarge.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            ),
+            singleLine = true,
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            decorationBox = { innerTextField ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (description.isEmpty()) {
+                            Text(
+                                text = if (hasInteractedWithNumpad) "What did you spend on?" else "Paid to...",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        innerTextField()
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(onClick = onDescriptionClick, modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search Predictions",
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
         )
 
         Spacer(Modifier.height(8.dp))
