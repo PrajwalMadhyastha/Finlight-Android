@@ -52,7 +52,7 @@ fun ManageIgnoreRulesScreen(
     var ruleToDelete by remember { mutableStateOf<IgnoreRule?>(null) }
     var selectedRuleType by remember { mutableStateOf(RuleType.BODY_PHRASE) }
 
-    val (defaultRules, customRules) = rules.partition { it.isDefault }
+    val (defaultRules, customRules) = rules.filter { it.type == selectedRuleType }.partition { it.isDefault }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
