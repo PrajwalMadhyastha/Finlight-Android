@@ -85,12 +85,23 @@ import kotlinx.coroutines.withContext
 import java.net.URLDecoder
 import java.util.concurrent.Executor
 
+import com.google.android.gms.common.GoogleApiAvailability
+import com.google.android.gms.common.ConnectionResult
+
+private const val PLAY_SERVICES_RESOLUTION_REQUEST = 9000
+
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 class MainActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Add this check at the very beginning of onCreate
+        if (!checkGooglePlayServices()) {
+            return
+        }
+
         enableEdgeToEdge()
         // Temporarily disable FLAG_SECURE
 //        window.setFlags(
@@ -127,6 +138,21 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun checkGooglePlayServices(): Boolean {
+        val googleApiAvailability = GoogleApiAvailability.getInstance()
+        val resultCode = googleApiAvailability.isGooglePlayServicesAvailable(this)
+        if (resultCode != ConnectionResult.SUCCESS) {
+            if (googleApiAvailability.isUserResolvableError(resultCode)) {
+                googleApiAvailability.getErrorDialog(this, resultCode, PLAY_SERVICES_RESOLUTION_REQUEST)?.show()
+            } else {
+                Toast.makeText(this, "This device does not support Google Play Services. If the problem persists, try restarting the app.", Toast.LENGTH_LONG).show()
+                finish() // Close the app if Play Services is not supported
+            }
+            return false
+        }
+        return true
     }
 }
 
@@ -557,6 +583,7 @@ fun MainAppScreen() {
 
 
 @RequiresApi(Build.VERSION_CODES.O)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavHost(
     navController: NavHostController,
