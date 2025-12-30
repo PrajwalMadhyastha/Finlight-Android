@@ -10,18 +10,19 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.AccountAliasDao
 import io.pm.finlight.data.db.dao.AccountDao
 import io.pm.finlight.data.db.entity.AccountAlias
+import io.mockk.coEvery
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asExecutor
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Mock
 import org.mockito.Mockito.*
-import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
@@ -61,13 +62,21 @@ class AccountRepositoryTest : BaseViewModelTest() {
         `when`(db.transactionDao()).thenReturn(transactionDao)
         `when`(db.accountAliasDao()).thenReturn(accountAliasDao)
 
-        // Mock the underlying components that `withTransaction` uses,
-        // instead of mocking the static extension function itself.
+        // Mock the underlying components that `withTransaction` uses.
+        // Note: For unit tests with mocks, we often need to mock the extension function itself
+        // to avoid Room's internal transaction machinery which can hang.
         `when`(db.openHelper).thenReturn(openHelper)
         `when`(openHelper.writableDatabase).thenReturn(writableDb)
         `when`(db.transactionExecutor).thenReturn(testDispatcher.asExecutor())
 
         repository = AccountRepository(db)
+    }
+
+    @After
+    override fun tearDown() {
+        super.tearDown()
+        // Ensure we clear any static mocks to avoid affecting other tests
+        unmockkStatic("androidx.room.RoomDatabaseKt")
     }
 
     @Test
@@ -110,7 +119,6 @@ class AccountRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `mergeAccounts performs all steps in correct order`() = runTest {
         // Arrange
         val destinationId = 1
@@ -121,8 +129,23 @@ class AccountRepositoryTest : BaseViewModelTest() {
         `when`(accountDao.getAccountByIdBlocking(2)).thenReturn(sourceAccount2)
         `when`(accountDao.getAccountByIdBlocking(3)).thenReturn(sourceAccount3)
 
-        @Suppress("UNCHECKED_CAST")
-        val aliasCaptor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<AccountAlias>>
+        // Mock the withTransaction extension function to avoid the hang.
+        // We manually call the transaction methods on writableDb to satisfy the test's verification logic.
+        mockkStatic("androidx.room.RoomDatabaseKt")
+        coEvery { db.withTransaction<Any?>(any()) } coAnswers {
+            writableDb.beginTransaction()
+            try {
+                @Suppress("UNCHECKED_CAST")
+                val block = it.invocation.args[1] as suspend () -> Any?
+                val result = block()
+                writableDb.setTransactionSuccessful()
+                result
+            } finally {
+                writableDb.endTransaction()
+            }
+        }
+
+        val aliasCaptor = argumentCaptor<List<AccountAlias>>()
 
         // Act
         repository.mergeAccounts(destinationId, sourceIds)
@@ -135,7 +158,7 @@ class AccountRepositoryTest : BaseViewModelTest() {
         inOrder.verify(writableDb).beginTransaction()
 
         // 1. Verify aliases are created first
-        inOrder.verify(accountAliasDao).insertAll(aliasCaptor.capture())
+        inOrder.verify(accountAliasDao).insertAll(capture(aliasCaptor))
         val capturedAliases = aliasCaptor.value
         assertEquals(2, capturedAliases.size)
         assertTrue(capturedAliases.any { it.aliasName == "Source Account 2" && it.destinationAccountId == destinationId })
@@ -156,4 +179,3 @@ class AccountRepositoryTest : BaseViewModelTest() {
         inOrder.verify(writableDb).endTransaction()
     }
 }
-

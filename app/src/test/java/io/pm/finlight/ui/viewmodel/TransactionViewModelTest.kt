@@ -763,17 +763,17 @@ class TransactionViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `dataLoading failure emits emptyList and sends uiEvent`() = runTest {
         // ARRANGE
         val errorFlow = flow<List<TransactionDetails>> { throw RuntimeException("DB error") }
         `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(errorFlow)
 
+        // FIX: Re-initialize the ViewModel BEFORE the test block.
+        // This ensures the current 'viewModel' instance uses the mock above.
+        initializeViewModel()
+
         // ACT & ASSERT
         viewModel.uiEvent.test {
-            // Re-initialize the ViewModel here. This defines the flow with the error mock.
-            initializeViewModel()
-
             // Launch a collector for the lazy flow. This is what triggers
             // the upstream flow, causing the exception to be thrown and the `.catch`
             // block to execute. Using `backgroundScope` prevents this from blocking.

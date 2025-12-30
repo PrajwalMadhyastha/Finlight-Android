@@ -1,20 +1,16 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/TransactionItem.kt
-// REASON: FIX - Added default values to the new selection mode parameters in
-// the `TransactionItem` and `TransactionList` composables. This resolves build
-// errors by making the parameters optional for screens that don't use the
-// selection feature, such as the dashboard and search results.
-// FEATURE - The subtitle text now displays the comma-separated list of tag names
-// if they exist, falling back to the category name otherwise. This makes the
-// transaction list significantly more informative at a glance.
-// FIX - The subtitle's clickable modifier is now only enabled when displaying
-// the category name, preventing the confusing UX of clicking tags to open the
-// category picker. The category icon remains the consistent tap target.
+// REASON: FEATURE (UI Hardening) - Improved layout flexibility for variable content.
+// 1. Applied `heightIn(min = 72.dp)` to GlassPanel to allow vertical expansion.
+// 2. Increased Merchant Name `maxLines` to 2.
+// 3. Removed `maxLines` constraint on Subtitle to allow wrapping of long tags.
 // =================================================================================
 package io.pm.finlight.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,20 +28,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
 import io.pm.finlight.ui.theme.IncomeGreenLight
+import io.pm.finlight.utils.CategoryIconHelper
 import java.text.SimpleDateFormat
 import java.util.*
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.ui.text.style.TextOverflow
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -75,6 +69,8 @@ fun TransactionItem(
     GlassPanel(
         modifier = modifier
             .fillMaxWidth()
+            // FIX: Use heightIn to allow the card to grow vertically if text wraps
+            .heightIn(min = 72.dp)
             .then(clickModifier)
     ) {
         Row(
@@ -147,7 +143,10 @@ fun TransactionItem(
                     text = transactionDetails.transaction.description,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
+                    // FIX: Allow up to 2 lines for merchant name
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 val hasTags = !transactionDetails.tagNames.isNullOrEmpty()
@@ -165,8 +164,9 @@ fun TransactionItem(
                     fontStyle = FontStyle.Italic,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
                     modifier = Modifier.clickable(enabled = !isSplit && !isSelectionMode && !hasTags) { onCategoryClick(transactionDetails) },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    // FIX: Allow subtitle to wrap naturally
+                    // maxLines = 1,
+                    // overflow = TextOverflow.Ellipsis
                 )
 
                 Text(

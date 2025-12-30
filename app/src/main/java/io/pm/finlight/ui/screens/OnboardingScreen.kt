@@ -1,8 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/OnboardingScreen.kt
-// REASON: REFACTOR - Removed the 'SmsScanningInfoPage' (page 5) from the
-// onboarding flow to streamline the user's first experience. The pager count
-// and bottom bar logic have been updated to reflect this change.
+// REASON: REFACTOR - Temporarily removed 'CurrencySetupPage' from onboarding flow.
+// 1. Reduced pager count from 7 to 6.
+// 2. Commented out CurrencySetupPage in HorizontalPager and shifted subsequent page indices.
+// 3. Updated OnboardingBottomBar logic to hide "Next" button on the correct new indices
+//    for SMS (3) and Notification (4) permission pages.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -54,8 +56,8 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(viewModel: OnboardingViewModel, onOnboardingFinished: () -> Unit) {
-    // --- UPDATED: Page count reduced from 8 to 7 ---
-    val pagerState = rememberPagerState { 7 }
+    // --- UPDATED: Page count reduced from 7 to 6 (Currency page removed) ---
+    val pagerState = rememberPagerState { 6 }
     val scope = rememberCoroutineScope()
 
     val onNextClicked: () -> Unit = {
@@ -88,11 +90,11 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, onOnboardingFinished: () ->
                 0 -> WelcomePage()
                 1 -> UserNamePage(viewModel = viewModel, pagerState = pagerState)
                 2 -> BudgetSetupPage(viewModel = viewModel, pagerState = pagerState)
-                3 -> CurrencySetupPage(viewModel = viewModel)
-                4 -> SmsPermissionPage(onPermissionResult = onNextClicked)
-                // --- REMOVED: SmsScanningInfoPage ---
-                5 -> NotificationPermissionPage(onPermissionResult = onNextClicked)
-                6 -> CompletionPage()
+                // --- REMOVED: CurrencySetupPage (Previously Index 3) ---
+                // 3 -> CurrencySetupPage(viewModel = viewModel)
+                3 -> SmsPermissionPage(onPermissionResult = onNextClicked) // Shifted from 4
+                4 -> NotificationPermissionPage(onPermissionResult = onNextClicked) // Shifted from 5
+                5 -> CompletionPage() // Shifted from 6
             }
         }
     }
@@ -112,17 +114,17 @@ fun OnboardingBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding() // --- FIX: Added navigationBarsPadding ---
+                .navigationBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             PageIndicator(pageCount = pagerState.pageCount, currentPage = pagerState.currentPage)
 
-            // --- UPDATED: Logic adjusted for the removed page. Notification page is now at index 5. ---
+            // --- UPDATED: Logic adjusted for removed currency page. Indices shifted down by 1. ---
             val isNextButtonVisible = pagerState.currentPage < pagerState.pageCount - 1 &&
-                    pagerState.currentPage != 4 && // Hide on SMS Permission Page
-                    pagerState.currentPage != 5    // Hide on Notification Permission Page
+                    pagerState.currentPage != 3 && // Hide on SMS Permission Page (was 4)
+                    pagerState.currentPage != 4    // Hide on Notification Permission Page (was 5)
 
             val isNextEnabled = if (pagerState.currentPage == 1) {
                 userName.isNotBlank()
@@ -340,6 +342,7 @@ fun BudgetSetupPage(viewModel: OnboardingViewModel, pagerState: PagerState) {
     }
 }
 
+// NOTE: This composable is preserved but unused in the current pager flow.
 @Composable
 fun CurrencySetupPage(viewModel: OnboardingViewModel) {
     val detectedCurrency by viewModel.homeCurrency.collectAsState()
