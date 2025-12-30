@@ -115,6 +115,11 @@ fun GroupedBarChart(
                 axisLeft.setDrawGridLines(true)
 
                 axisRight.isEnabled = false
+                
+                // Enable dragging/scrolling
+                isDragEnabled = true
+                setScaleEnabled(false) // Disable zoom to keep bar width consistent
+                setPinchZoom(false)
 
                 // --- NEW: Add click listener ---
                 if (onBarClick != null) {
@@ -144,6 +149,11 @@ fun GroupedBarChart(
             chart.axisLeft.textColor = textColor
 
             chart.groupBars(0f, groupSpace, barSpace)
+            
+            // Limit visible range to 5 groups (months) and scroll to end
+            chart.setVisibleXRangeMaximum(5f)
+            chart.moveViewToX(labels.size.toFloat())
+            
             chart.invalidate()
         },
         modifier =

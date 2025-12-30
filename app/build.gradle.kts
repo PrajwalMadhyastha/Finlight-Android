@@ -1,5 +1,5 @@
 // =================================================================================
-// FILE: ./app/build.gradle.kts
+// FILE: ./app/src/main/java/io/pm/finlight/app/build.gradle.kts
 // REASON: FIX (Testing) - Added the 'mockito-inline' dependency. This is
 // essential for Mockito to be able to mock final classes and methods, which is
 // standard in Kotlin. This resolves potential Mockito errors in our unit tests.
@@ -172,6 +172,7 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("com.google.android.gms:play-services-base:18.9.0") // Added for Google Play Services check
 
     //Disabling crashlytics until 16kb page size is supported
     //implementation("com.google.firebase:firebase-crashlytics-buildtools:3.0.6")

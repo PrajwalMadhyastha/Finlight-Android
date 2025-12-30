@@ -302,8 +302,22 @@ private fun DetailedDayCell(
 ) {
     val color = when (data?.status) {
         SpendingStatus.NO_SPEND -> Color(0xFF39D353)
-        SpendingStatus.WITHIN_LIMIT -> lerp(Color(0xFFACD5F2), Color(0xFF006DAB), (data.amountSpent / data.safeToSpend).toFloat().coerceIn(0f, 1f))
-        SpendingStatus.OVER_LIMIT -> lerp(Color(0xFFF87171), Color(0xFFB91C1C), (min((data.amountSpent / data.safeToSpend).toFloat(), 2f) - 1f).coerceIn(0f, 1f))
+        SpendingStatus.WITHIN_LIMIT -> {
+            val fraction = if (data.safeToSpend > 0) {
+                data.amountSpent.toFloat() / data.safeToSpend
+            } else {
+                0f
+            }
+            lerp(Color(0xFFACD5F2), Color(0xFF006DAB), fraction.coerceIn(0f, 1f))
+        }
+        SpendingStatus.OVER_LIMIT -> {
+            val fraction = if (data.safeToSpend > 0) {
+                min((data.amountSpent.toFloat() / data.safeToSpend), 2f) - 1f
+            } else {
+                1f
+            }
+            lerp(Color(0xFFF87171), Color(0xFFB91C1C), fraction.coerceIn(0f, 1f))
+        }
         else -> Color.Transparent
     }
 

@@ -272,10 +272,9 @@ class ReportsViewModel(
     private fun calculateTrendStartDate(period: ReportPeriod): Long {
         val calendar = Calendar.getInstance()
         return when (period) {
-            ReportPeriod.WEEK, ReportPeriod.MONTH -> (calendar.clone() as Calendar).apply { add(Calendar.MONTH, -6) }.timeInMillis
-            ReportPeriod.QUARTER -> (calendar.clone() as Calendar).apply { add(Calendar.MONTH, -6) }.timeInMillis
+            ReportPeriod.WEEK, ReportPeriod.MONTH -> (calendar.clone() as Calendar).apply { add(Calendar.YEAR, -1) }.timeInMillis
+            ReportPeriod.QUARTER -> (calendar.clone() as Calendar).apply { add(Calendar.YEAR, -1) }.timeInMillis
             ReportPeriod.ALL_TIME -> 0L
         }
     }
 }
-

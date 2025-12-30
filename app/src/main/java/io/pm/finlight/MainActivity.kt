@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MainActivity.kt
-// REASON: FEATURE (Merchant Drilldown) - Updated the `search_screen` route configuration.
-// 1. Added `query` as an optional navigation argument.
-// 2. Updated the `SearchViewModelFactory` instantiation to pass this query.
-// 3. This enables navigation from "Visits count" to a pre-filled search screen.
+// REASON: FEATURE (UI Scaling) - Upgraded font scaling fix to handle Display Size.
+// 1. Renamed `ForceSmallFonts` to `ForceAppScaling`.
+// 2. Added logic to clamp screen density if width < 375dp (fixes system zoom issues).
+// 3. Updated `setContent` to use the new `ForceAppScaling` wrapper.
 // =================================================================================
 package io.pm.finlight
 
@@ -46,9 +46,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -78,6 +81,7 @@ import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.*
 import io.pm.finlight.utils.CategoryIconHelper
+// REMOVED: import io.pm.finlight.ui.common.ForceSmallFonts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
@@ -85,12 +89,23 @@ import kotlinx.coroutines.withContext
 import java.net.URLDecoder
 import java.util.concurrent.Executor
 
+import com.google.android.gms.common.GoogleApiAvailability
+import com.google.android.gms.common.ConnectionResult
+
+private const val PLAY_SERVICES_RESOLUTION_REQUEST = 9000
+
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 class MainActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Add this check at the very beginning of onCreate
+        if (!checkGooglePlayServices()) {
+            return
+        }
+
         enableEdgeToEdge()
         // Temporarily disable FLAG_SECURE
 //        window.setFlags(
@@ -110,23 +125,41 @@ class MainActivity : AppCompatActivity() {
             )
             val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
 
-            PersonalFinanceAppTheme(selectedTheme = selectedTheme) {
-                var showOnboarding by remember { mutableStateOf(!hasSeenOnboarding) }
+            // UPDATED: Using ForceAppScaling to handle both Text and Display scaling
+            ForceAppScaling {
+                PersonalFinanceAppTheme(selectedTheme = selectedTheme) {
+                    var showOnboarding by remember { mutableStateOf(!hasSeenOnboarding) }
 
-                if (showOnboarding) {
-                    val onboardingViewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModelFactory(application))
-                    OnboardingScreen(
-                        viewModel = onboardingViewModel,
-                        onOnboardingFinished = {
-                            settingsRepository.setHasSeenOnboarding(true)
-                            showOnboarding = false
-                        }
-                    )
-                } else {
-                    FinanceAppWithLockScreen(isInitiallyLocked = settingsRepository.isAppLockEnabledBlocking())
+                    if (showOnboarding) {
+                        val onboardingViewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModelFactory(application))
+                        OnboardingScreen(
+                            viewModel = onboardingViewModel,
+                            onOnboardingFinished = {
+                                settingsRepository.setHasSeenOnboarding(true)
+                                showOnboarding = false
+                            }
+                        )
+                    } else {
+                        FinanceAppWithLockScreen(isInitiallyLocked = settingsRepository.isAppLockEnabledBlocking())
+                    }
                 }
             }
         }
+    }
+
+    private fun checkGooglePlayServices(): Boolean {
+        val googleApiAvailability = GoogleApiAvailability.getInstance()
+        val resultCode = googleApiAvailability.isGooglePlayServicesAvailable(this)
+        if (resultCode != ConnectionResult.SUCCESS) {
+            if (googleApiAvailability.isUserResolvableError(resultCode)) {
+                googleApiAvailability.getErrorDialog(this, resultCode, PLAY_SERVICES_RESOLUTION_REQUEST)?.show()
+            } else {
+                Toast.makeText(this, "This device does not support Google Play Services. If the problem persists, try restarting the app.", Toast.LENGTH_LONG).show()
+                finish() // Close the app if Play Services is not supported
+            }
+            return false
+        }
+        return true
     }
 }
 
@@ -557,6 +590,7 @@ fun MainAppScreen() {
 
 
 @RequiresApi(Build.VERSION_CODES.O)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavHost(
     navController: NavHostController,
@@ -1273,4 +1307,49 @@ private fun CategoryIconDisplay(category: Category) {
             )
         }
     }
+}
+
+/**
+ * A wrapper that enforces a consistent app scaling experience, ignoring system-level
+ * font size and display size changes if they compromise the layout integrity.
+ *
+ * BEHAVIOR:
+ * 1. Forces [fontScale] to 1.0f (Standard).
+ * 2. Clamps [density] (DPI) if the screen width drops below 375dp (e.g., due to Display Zoom),
+ * ensuring the layout never gets "crunched" narrower than a standard small phone.
+ */
+@Composable
+fun ForceAppScaling(content: @Composable () -> Unit) {
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+
+    // "Project Aurora" layouts generally break below ~360dp width.
+    // We set 375dp as a safe minimum width to maintain card proportions.
+    val minWidthDp = 375f
+    val screenWidthDp = configuration.screenWidthDp.toFloat()
+
+    // Calculate scaling factor.
+    // If screenWidthDp is 320 (zoomed in), we need a multiplier < 1 to "zoom out" the density.
+    // Logic: Target / Actual? No.
+    // We want the app to THINK it has 375dp width.
+    // WidthDp = Pixels / Density.
+    // To increase WidthDp, we must DECREASE Density.
+    // TargetDensity = CurrentDensity * (CurrentWidth / TargetWidth)
+    // Example: 320 / 375 = 0.85. New Density = 3.0 * 0.85 = 2.55.
+    // New Width = (320 * 3.0) / 2.55 = 376.
+    val densityMultiplier = if (screenWidthDp < minWidthDp && screenWidthDp > 0) {
+        screenWidthDp / minWidthDp
+    } else {
+        1f
+    }
+
+    val customDensity = Density(
+        density = density.density * densityMultiplier,
+        fontScale = 1f // Always enforce 1.0 font scale
+    )
+
+    CompositionLocalProvider(
+        LocalDensity provides customDensity,
+        content = content
+    )
 }
