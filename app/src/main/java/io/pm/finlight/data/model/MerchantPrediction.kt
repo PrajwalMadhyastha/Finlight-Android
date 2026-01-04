@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/model/MerchantPrediction.kt
-// REASON: FIX - The package name has been corrected to match its file path.
-// This resolves the "Unresolved reference" build error in downstream files like
-// the DAO and Repository by making the DTO properly accessible.
+// REASON: FEATURE (Quick Fill) - Added `accountName` to the prediction model.
+// This allows the UI to display which account was previously used for a merchant,
+// providing better context to the user before they select a suggestion.
 // =================================================================================
 package io.pm.finlight.data.model
 
@@ -16,11 +16,15 @@ package io.pm.finlight.data.model
  * @param categoryName The name of the associated category.
  * @param categoryIconKey The icon key for the category's UI representation.
  * @param categoryColorKey The color key for the category's UI representation.
+ * @param accountId The ID of the account used for this transaction.
+ * @param accountName The name of the account used for this transaction.
  */
 data class MerchantPrediction(
     val description: String,
     val categoryId: Int?,
     val categoryName: String?,
     val categoryIconKey: String?,
-    val categoryColorKey: String?
+    val categoryColorKey: String?,
+    val accountId: Int?,
+    val accountName: String?
 )

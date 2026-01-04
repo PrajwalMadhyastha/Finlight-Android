@@ -7,6 +7,7 @@
 // 4. Hooked up selection logic to populate the form.
 // 5. FIXED: Paste functionality by replacing description `Text` with `BasicTextField`.
 // 6. ADDED: `PredictionCarousel` to show past merchant suggestions as the user types.
+// 7. FIXED: prediction selection now also populates the account details.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -343,6 +344,10 @@ fun AddTransactionScreen(
                                 val cat = categories.find { it.id == catId }
                                 viewModel.onAddTransactionCategoryChanged(cat)
                             }
+                            prediction.accountId?.let { accId ->
+                                val acc = accounts.find { it.id == accId }
+                                viewModel.onAddTransactionAccountChanged(acc)
+                            }
                         }
                     )
                 }
@@ -489,6 +494,10 @@ fun AddTransactionScreen(
                         prediction.categoryId?.let { catId ->
                             val cat = categories.find { it.id == catId }
                             viewModel.onAddTransactionCategoryChanged(cat)
+                        }
+                        prediction.accountId?.let { accId ->
+                            val acc = accounts.find { it.id == accId }
+                            viewModel.onAddTransactionAccountChanged(acc)
                         }
                         activeSheet = null
                     },
@@ -736,9 +745,16 @@ fun PredictionChip(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (prediction.categoryName != null) {
+                if (prediction.categoryName != null || prediction.accountName != null) {
+                    val subtitle = buildString {
+                        if (prediction.categoryName != null) append(prediction.categoryName)
+                        if (prediction.accountName != null) {
+                            if (isNotEmpty()) append(" • ")
+                            append(prediction.accountName)
+                        }
+                    }
                     Text(
-                        text = prediction.categoryName,
+                        text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
