@@ -184,13 +184,13 @@ class SettingsRepository(context: Context) {
     fun setLastMonthSummaryDismissed() {
         val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
         prefs.edit {
-            putBoolean("$KEY_LAST_MONTH_SUMMARY_DISMISSED$monthKey", true)
+            putBoolean("KEY_LAST_MONTH_SUMMARY_DISMISSED$monthKey", true)
         }
     }
 
     fun hasLastMonthSummaryBeenDismissed(): Boolean {
         val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
-        return prefs.getBoolean("$KEY_LAST_MONTH_SUMMARY_DISMISSED$monthKey", false)
+        return prefs.getBoolean("KEY_LAST_MONTH_SUMMARY_DISMISSED$monthKey", false)
     }
 
     fun saveAutoCaptureNotificationEnabled(isEnabled: Boolean) {
@@ -250,7 +250,7 @@ class SettingsRepository(context: Context) {
 
     // --- NEW: Blocking version for FinlightBackupAgent ---
     fun isAutoBackupNotificationEnabledBlocking(): Boolean {
-        return prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, true)
+        return prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, false) // Changed default to false
     }
 
     // --- DELETED: saveAutoBackupTime function ---

@@ -33,7 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material3.* 
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -305,6 +305,8 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
     val weeklyReportTime by settingsViewModel.weeklyReportTime.collectAsState()
     var showWeeklyTimePicker by remember { mutableStateOf(false) }
     val isAutoCaptureNotificationEnabled by settingsViewModel.autoCaptureNotificationEnabled.collectAsState()
+    val isAutoBackupEnabled by settingsViewModel.autoBackupEnabled.collectAsState() // NEW: Collect isAutoBackupEnabled
+    val isAutoBackupNotificationEnabled by settingsViewModel.autoBackupNotificationEnabled.collectAsState() // NEW: Collect autoBackupNotification setting
 
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -321,6 +323,19 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
                     icon = Icons.Default.Sms,
                     checked = isAutoCaptureNotificationEnabled,
                     onCheckedChange = { settingsViewModel.setAutoCaptureNotificationEnabled(it) }
+                )
+            }
+        }
+        item {
+            Spacer(Modifier.height(16.dp))
+            SettingsSection(title = "Backup Notifications") { // NEW SECTION for Backup Notification
+                SettingsToggleItem(
+                    title = "Backup Notification",
+                    subtitle = "Notify when a backup is complete",
+                    icon = Icons.Default.CloudUpload,
+                    checked = isAutoBackupNotificationEnabled,
+                    onCheckedChange = { settingsViewModel.setAutoBackupNotificationEnabled(it) },
+                    enabled = isAutoBackupEnabled // Keep the dependency on auto-backup being enabled
                 )
             }
         }
@@ -428,7 +443,7 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     val isAutoBackupEnabled by settingsViewModel.autoBackupEnabled.collectAsState()
-    val isAutoBackupNotificationEnabled by settingsViewModel.autoBackupNotificationEnabled.collectAsState()
+    // --- DELETED: val isAutoBackupNotificationEnabled by settingsViewModel.autoBackupNotificationEnabled.collectAsState()
 
     val isPrivacyModeEnabled by settingsViewModel.privacyModeEnabled.collectAsState()
 
@@ -562,6 +577,8 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                         checked = isAutoBackupEnabled,
                         onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) }
                     )
+                    // --- DELETED: Backup Notification Toggle ---
+                    /*
                     SettingsToggleItem(
                         title = "Backup Notification",
                         subtitle = "Notify when a backup is complete",
@@ -570,6 +587,8 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                         onCheckedChange = { settingsViewModel.setAutoBackupNotificationEnabled(it) },
                         enabled = isAutoBackupEnabled
                     )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    */
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsActionItem(
                         text = "Export Data (JSON)",
