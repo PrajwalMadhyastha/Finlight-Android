@@ -328,7 +328,7 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
         }
         item {
             Spacer(Modifier.height(16.dp))
-            SettingsSection(title = "Backup Notifications") { // NEW SECTION for Backup Notification
+            SettingsSection(title = "Backup Notification") { // NEW SECTION for Backup Notification
                 SettingsToggleItem(
                     title = "Backup Notification",
                     subtitle = "Notify when a backup is complete",
