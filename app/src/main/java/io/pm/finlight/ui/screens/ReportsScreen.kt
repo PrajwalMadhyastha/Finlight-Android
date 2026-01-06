@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarViewDay
 import androidx.compose.material.icons.filled.CalendarViewMonth
@@ -368,7 +369,7 @@ fun ReportsScreen(
             GlassReportNavigationCard(
                 title = "Yearly Report",
                 subtitle = "Review your financial performance for the year.",
-                icon = Icons.Default.ShowChart,
+                icon = Icons.AutoMirrored.Filled.ShowChart,
                 onClick = { navController.navigate("time_period_report_screen/${TimePeriod.YEARLY}") }
             )
         }
