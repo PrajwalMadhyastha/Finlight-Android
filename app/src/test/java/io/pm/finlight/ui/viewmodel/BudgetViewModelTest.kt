@@ -136,17 +136,18 @@ class BudgetViewModelTest : BaseViewModelTest() {
         val cal = Calendar.getInstance()
         val currentYear = cal.get(Calendar.YEAR)
         val currentMonth = cal.get(Calendar.MONTH) + 1
-        // --- FIX: Correctly get previous month's index ---
-        val prevMonthIndex = cal.get(Calendar.MONTH) - 1
-        val prevMonthCal = getCalendar(currentYear, prevMonthIndex)
+        
+        // --- FIX: Correctly get previous month and its year safely ---
+        val prevMonthCal = (cal.clone() as Calendar).apply { add(Calendar.MONTH, -1) }
+        val prevYear = prevMonthCal.get(Calendar.YEAR)
+        val prevMonth = prevMonthCal.get(Calendar.MONTH) + 1
 
         val currentMonthBudget = 10000f
         val prevMonthBudget = 5000f
 
         // Mock settings repo to return different budgets for different months
         `when`(settingsRepository.getOverallBudgetForMonth(currentYear, currentMonth)).thenReturn(flowOf(currentMonthBudget))
-        // --- FIX: Use correct month index (prevMonthIndex + 1) for the mock ---
-        `when`(settingsRepository.getOverallBudgetForMonth(currentYear, prevMonthIndex + 1)).thenReturn(flowOf(prevMonthBudget))
+        `when`(settingsRepository.getOverallBudgetForMonth(prevYear, prevMonth)).thenReturn(flowOf(prevMonthBudget))
 
         // --- Re-initialize ViewModel *after* test-specific mocks are set ---
         viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
@@ -166,7 +167,7 @@ class BudgetViewModelTest : BaseViewModelTest() {
 
         // Verify the repository was called for both months
         verify(settingsRepository).getOverallBudgetForMonth(currentYear, currentMonth)
-        verify(settingsRepository).getOverallBudgetForMonth(currentYear, prevMonthIndex + 1)
+        verify(settingsRepository).getOverallBudgetForMonth(prevYear, prevMonth)
     }
 
     // --- NEW: Test for "Not Set" (null) budget ---

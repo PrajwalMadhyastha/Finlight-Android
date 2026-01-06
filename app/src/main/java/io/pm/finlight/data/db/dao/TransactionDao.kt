@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionDao.kt
-// REASON: FIX (Quick Fill) - Simplified the `getRecentManualTransactions` filter.
-// Instead of whitelisting specific string tags (like 'Manual Entry' or NULL),
-// we now strictly check `sourceSmsId IS NULL`. This correctly captures ALL manual
-// entries (including legacy 'Added Manually' data) while excluding SMS-based items.
+// REASON: FIX (Quick Fill) - Updated `searchMerchants` to include `accountId` and
+// `accountName`. This enables the "Add Transaction" screen to automatically
+// select the correct account when a past merchant is picked from suggestions.
 // =================================================================================
 package io.pm.finlight
 
@@ -191,14 +190,17 @@ interface TransactionDao {
         SELECT
             T.description,
             T.categoryId,
+            T.accountId,
+            A.name as accountName,
             C.name as categoryName,
             C.iconKey as categoryIconKey,
             C.colorKey as categoryColorKey
         FROM transactions AS T
         LEFT JOIN categories AS C ON T.categoryId = C.id
+        LEFT JOIN accounts AS A ON T.accountId = A.id
         WHERE (LOWER(T.description) LIKE '%' || LOWER(:query) || '%' OR LOWER(T.originalDescription) LIKE '%' || LOWER(:query) || '%')
           AND T.description != ''
-        GROUP BY LOWER(T.description), T.categoryId
+        GROUP BY LOWER(T.description), T.categoryId, T.accountId -- Added T.accountId to GROUP BY
         ORDER BY MAX(T.date) DESC
         LIMIT 10
     """)

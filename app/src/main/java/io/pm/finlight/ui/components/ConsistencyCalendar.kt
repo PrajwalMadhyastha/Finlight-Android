@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/ConsistencyCalendar.kt
-// REASON: FEATURE - Added a new `ConsistencyCalendarLegend` composable to the
-// bottom of the yearly and detailed monthly calendar views to provide users
-// with a clear explanation of what each color in the heatmap represents.
+// REASON: FIX - Refactored ConsistencyCalendar to accept a `year` parameter.
+// Previously, it hardcoded `today.get(Calendar.YEAR)`, causing the grid to
+// always render the current year even when viewing past data.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -87,7 +87,6 @@ fun MonthlyConsistencyCalendarCard(
                             CircularProgressIndicator()
                         }
                     } else {
-                        // --- FIX: Use the correct, detailed monthly calendar component ---
                         DetailedMonthlyCalendar(
                             data = data,
                             selectedMonth = selectedMonth,
@@ -146,6 +145,7 @@ private fun StatItem(count: Int, label: String) {
 @Composable
 fun ConsistencyCalendar(
     data: List<CalendarDayStatus>,
+    year: Int, // Added year parameter to support navigation
     modifier: Modifier = Modifier,
     onDayClick: (Date) -> Unit
 ) {
@@ -154,7 +154,9 @@ fun ConsistencyCalendar(
     val dataMap = remember(data) { data.associateByDate() }
 
     val today = remember { Calendar.getInstance() }
-    val year = today.get(Calendar.YEAR)
+
+    // We now use the passed 'year' instead of hardcoding today's year.
+    // This allows the calendar structure to reflect the year of the data being viewed.
 
     val months = (0..11).map { monthIndex ->
         val cal = Calendar.getInstance().apply {
@@ -171,9 +173,18 @@ fun ConsistencyCalendar(
     LaunchedEffect(key1 = data) {
         if (data.isNotEmpty()) {
             val currentMonthIndex = today.get(Calendar.MONTH)
-            val scrollIndex = (currentMonthIndex - 2).coerceAtLeast(0)
-            coroutineScope.launch {
-                lazyListState.animateScrollToItem(scrollIndex)
+            // If viewing current year, scroll to current month.
+            // If viewing past year, maybe scroll to end? For now, stick to current logic if years match.
+            if (year == today.get(Calendar.YEAR)) {
+                val scrollIndex = (currentMonthIndex - 2).coerceAtLeast(0)
+                coroutineScope.launch {
+                    lazyListState.animateScrollToItem(scrollIndex)
+                }
+            } else {
+                // If viewing a different year, start at beginning
+                coroutineScope.launch {
+                    lazyListState.scrollToItem(0)
+                }
             }
         }
     }
@@ -194,7 +205,6 @@ fun ConsistencyCalendar(
                 )
             }
         }
-        // --- NEW: Add the legend below the calendar ---
         ConsistencyCalendarLegend()
     }
 }
@@ -288,7 +298,6 @@ fun DetailedMonthlyCalendar(
                 }
             }
         }
-        // --- NEW: Add the legend below the calendar ---
         ConsistencyCalendarLegend()
     }
 }
@@ -436,7 +445,10 @@ private fun MonthColumn(
                         set(year, monthData.monthIndex, dayOfMonth)
                     }
 
-                    val dayData = if (!currentDayCal.after(today)) {
+                    // Check if future date using strict Calendar comparison
+                    val isFuture = currentDayCal.after(today)
+
+                    val dayData = if (!isFuture) {
                         dataMap[currentDayCal.get(Calendar.DAY_OF_YEAR) to year]
                     } else {
                         null

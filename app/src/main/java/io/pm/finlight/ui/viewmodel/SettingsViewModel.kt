@@ -168,7 +168,7 @@ class SettingsViewModel(
         settingsRepository.getAutoBackupNotificationEnabled().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = true
+            initialValue = false // Changed default value to false
         )
 
     val privacyModeEnabled: StateFlow<Boolean> =

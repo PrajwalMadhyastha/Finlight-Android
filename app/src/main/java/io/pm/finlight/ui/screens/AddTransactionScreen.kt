@@ -6,6 +6,8 @@
 // 3. Observed `recentManualTransactions` and `historyManualTransactions` from ViewModel.
 // 4. Hooked up selection logic to populate the form.
 // 5. FIXED: Paste functionality by replacing description `Text` with `BasicTextField`.
+// 6. ADDED: `PredictionCarousel` to show past merchant suggestions as the user types.
+// 7. FIXED: prediction selection now also populates the account details.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -68,6 +70,7 @@ import androidx.navigation.NavController
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import io.pm.finlight.*
+import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.*
 import io.pm.finlight.ui.theme.AuroraNumpadHighlight
 import io.pm.finlight.ui.theme.GlassPanelBorder
@@ -89,7 +92,7 @@ private sealed class ComposerSheet {
     object Tags : ComposerSheet()
     object Notes : ComposerSheet()
     object Merchant : ComposerSheet()
-    object History : ComposerSheet() // --- NEW: History Sheet
+    object History : ComposerSheet()
 }
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -137,9 +140,10 @@ fun AddTransactionScreen(
     val categoryNudgeData by viewModel.showCategoryNudge.collectAsState()
     val suggestedCategory by viewModel.suggestedCategory.collectAsState()
 
-    // --- NEW: Observe Quick Fill data ---
+    // --- NEW: Observe Quick Fill & Prediction data ---
     val recentManualTransactions by viewModel.recentManualTransactions.collectAsState()
     val historyManualTransactions by viewModel.historyManualTransactions.collectAsState()
+    val merchantPredictions by viewModel.merchantPredictions.collectAsState()
 
     val selectedDateTime by remember { mutableStateOf(Calendar.getInstance()) }
 
@@ -318,18 +322,33 @@ fun AddTransactionScreen(
                     hasInteractedWithNumpad = hasInteracted
                 )
 
-                // --- NEW: Quick Fill Carousel ---
-                // Only show if description is empty and we have suggestions
+                // --- NEW: Quick Fill / Suggestions ---
                 if (!isDescriptionEntered && recentManualTransactions.isNotEmpty()) {
                     Spacer(Modifier.height(24.dp))
                     QuickFillCarousel(
                         recentTransactions = recentManualTransactions,
                         onQuickFillSelected = { txn ->
                             viewModel.onQuickFillSelected(txn)
-                            // We might also want to set transaction type if available
                             transactionType = txn.transaction.transactionType
                         },
                         onViewAllClick = { activeSheet = ComposerSheet.History }
+                    )
+                } else if (isDescriptionEntered && merchantPredictions.isNotEmpty()) {
+                    Spacer(Modifier.height(24.dp))
+                    PredictionCarousel(
+                        predictions = merchantPredictions,
+                        onPredictionSelected = { prediction ->
+                            viewModel.onAddTransactionDescriptionChanged(prediction.description)
+                            if (!hasInteracted) hasInteracted = true
+                            prediction.categoryId?.let { catId ->
+                                val cat = categories.find { it.id == catId }
+                                viewModel.onAddTransactionCategoryChanged(cat)
+                            }
+                            prediction.accountId?.let { accId ->
+                                val acc = accounts.find { it.id == accId }
+                                viewModel.onAddTransactionAccountChanged(acc)
+                            }
+                        }
                     )
                 }
 
@@ -476,6 +495,10 @@ fun AddTransactionScreen(
                             val cat = categories.find { it.id == catId }
                             viewModel.onAddTransactionCategoryChanged(cat)
                         }
+                        prediction.accountId?.let { accId ->
+                            val acc = accounts.find { it.id == accId }
+                            viewModel.onAddTransactionAccountChanged(acc)
+                        }
                         activeSheet = null
                     },
                     onManualSave = { newDescription ->
@@ -485,7 +508,6 @@ fun AddTransactionScreen(
                     },
                     onDismiss = { activeSheet = null }
                 )
-                // --- NEW: History Sheet Content ---
                 is ComposerSheet.History -> {
                     TransactionHistorySheet(
                         transactions = historyManualTransactions,
@@ -577,7 +599,6 @@ fun AddTransactionScreen(
     }
 }
 
-// --- NEW: Quick Fill Carousel Composable ---
 @Composable
 fun QuickFillCarousel(
     recentTransactions: List<TransactionDetails>,
@@ -604,7 +625,7 @@ fun QuickFillCarousel(
             item {
                 GlassPanel(
                     modifier = Modifier
-                        .height(48.dp) // Match height of chips
+                        .height(48.dp)
                         .clickable(onClick = onViewAllClick),
                 ) {
                     Row(
@@ -670,7 +691,79 @@ fun QuickFillChip(
     }
 }
 
-// --- NEW: History Sheet Composable ---
+@Composable
+fun PredictionCarousel(
+    predictions: List<MerchantPrediction>,
+    onPredictionSelected: (MerchantPrediction) -> Unit
+) {
+    Column {
+        Text(
+            text = "Past Merchants",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp)
+        ) {
+            items(predictions) { prediction ->
+                PredictionChip(
+                    prediction = prediction,
+                    onClick = { onPredictionSelected(prediction) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PredictionChip(
+    prediction: MerchantPrediction,
+    onClick: () -> Unit
+) {
+    GlassPanel(
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val icon = CategoryIconHelper.getIcon(prediction.categoryIconKey ?: "category")
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = prediction.description,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (prediction.categoryName != null || prediction.accountName != null) {
+                    val subtitle = buildString {
+                        if (prediction.categoryName != null) append(prediction.categoryName)
+                        if (prediction.accountName != null) {
+                            if (isNotEmpty()) append(" • ")
+                            append(prediction.accountName)
+                        }
+                    }
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun TransactionHistorySheet(
     transactions: List<TransactionDetails>,
@@ -789,7 +882,7 @@ private fun AmountComposer(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth() // This is OK
+        modifier = Modifier.fillMaxWidth()
     ) {
         BasicTextField(
             value = description,
@@ -835,28 +928,27 @@ private fun AmountComposer(
 
         Spacer(Modifier.height(8.dp))
 
-        // --- REFACTORED SECTION ---
         val textStyle = MaterialTheme.typography.displayLarge.copy(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center // <-- FIX 1: Set to Center
+            textAlign = TextAlign.Center
         )
 
         BasicTextField(
             value = amount,
             onValueChange = onAmountChange,
             modifier = Modifier
-                .fillMaxWidth() // <-- FIX 2: Add fillMaxWidth
+                .fillMaxWidth()
                 .focusRequester(focusRequester),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            textStyle = textStyle, // <-- Pass Center-aligned style
+            textStyle = textStyle,
             singleLine = true,
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             decorationBox = { innerTextField ->
                 Row(
-                    modifier = Modifier.fillMaxWidth(), // <-- FIX 3: Add fillMaxWidth
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center // <-- FIX 4: Add Arrangement.Center
+                    horizontalArrangement = Arrangement.Center
                 ) {
                     Text(
                         text = currencySymbol,
@@ -864,7 +956,7 @@ private fun AmountComposer(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(end = 4.dp)
                     )
-                    Box(contentAlignment = Alignment.Center) { // <-- FIX 5: Change to Alignment.Center
+                    Box(contentAlignment = Alignment.Center) {
                         if (amount.isEmpty()) {
                             Text(
                                 "0",
@@ -876,7 +968,6 @@ private fun AmountComposer(
                 }
             }
         )
-        // --- END REFACTORED SECTION ---
 
         if (isTravelMode && currentTravelSettings?.tripType == TripType.INTERNATIONAL) {
             val enteredAmount = amount.toDoubleOrNull() ?: 0.0
@@ -901,7 +992,6 @@ private fun OrbitalChips(
     onAccountClick: () -> Unit,
     onDateClick: () -> Unit
 ) {
-    // --- REFACTORED: Changed from Row to Column ---
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -929,7 +1019,7 @@ private fun OrbitalChips(
 private fun DetailChip(icon: ImageVector, text: String, onClick: () -> Unit) {
     GlassPanel(
         modifier = Modifier
-            .fillMaxWidth(0.8f) // Take up 80% of width to look substantial
+            .fillMaxWidth(0.8f)
             .clickable(onClick = onClick)
     ) {
         Row(
@@ -1025,7 +1115,6 @@ private fun ActionIcon(
     }
 }
 
-// --- REFACTORED: `AccountPickerSheet` now uses a LazyColumn and ListItems ---
 @Composable
 private fun AccountPickerSheet(
     accounts: List<Account>,

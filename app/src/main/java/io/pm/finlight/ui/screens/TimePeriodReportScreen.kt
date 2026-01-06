@@ -1,3 +1,9 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/ui/screens/TimePeriodReportScreen.kt
+// REASON: FIX - Passed the required `year` parameter to `ConsistencyCalendar` inside
+// `TimePeriodReportScreen`. This resolves the build error caused by the recent
+// API change in `ConsistencyCalendar` (which now requires an explicit year).
+// =================================================================================
 package io.pm.finlight.ui.screens
 
 import android.app.Application
@@ -184,6 +190,7 @@ fun TimePeriodReportScreen(
                             } else {
                                 ConsistencyCalendar(
                                     data = yearlyConsistencyData,
+                                    year = selectedDate.get(Calendar.YEAR), // FIX: Pass the year here
                                     onDayClick = { date ->
                                         val dayData = yearlyConsistencyData.find {
                                             val cal1 = Calendar.getInstance().apply { time = it.date }
@@ -321,13 +328,13 @@ private fun YearlyOutlierManagementCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(16.dp))
-                    
+
                     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                         Text("Month", modifier = Modifier.weight(1.2f), style = MaterialTheme.typography.labelMedium)
                         Text("Income", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.End)
                         Text("Spend", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.End)
                     }
-                    
+
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                     breakdowns.forEach { breakdown ->
@@ -343,7 +350,7 @@ private fun YearlyOutlierManagementCard(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            
+
                             // Income Toggle + Amount
                             Column(
                                 modifier = Modifier.weight(1f).clickable { onToggleIncome(breakdown.monthKey) },
