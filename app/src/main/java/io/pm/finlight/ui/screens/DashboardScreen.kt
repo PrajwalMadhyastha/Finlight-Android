@@ -1,3 +1,9 @@
+// =================================================================================
+// FILE: ./app/src/main/java/io/pm/finlight/ui/screens/DashboardScreen.kt
+// REASON: FIX - Updated `DashboardScreen` to pass the required `year` parameter
+// to `ConsistencyCalendar`. The year is derived from the `yearlyConsistencyData`
+// or defaults to the current year. This fixes the build error.
+// =================================================================================
 package io.pm.finlight.ui.screens
 
 import android.app.Application
@@ -153,8 +159,20 @@ private fun DashboardCard(
                     if (yearlyConsistencyData.isEmpty()) {
                         CircularProgressIndicator()
                     } else {
+                        // FIX: Calculate year from data or default to current year
+                        val year = remember(yearlyConsistencyData) {
+                            if (yearlyConsistencyData.isNotEmpty()) {
+                                val cal = Calendar.getInstance()
+                                cal.time = yearlyConsistencyData.first().date
+                                cal.get(Calendar.YEAR)
+                            } else {
+                                Calendar.getInstance().get(Calendar.YEAR)
+                            }
+                        }
+
                         ConsistencyCalendar(
                             data = yearlyConsistencyData,
+                            year = year,
                             onDayClick = { date ->
                                 // FIX: Now passing safeToSpend argument to search_screen from dashboard calendar too.
                                 val dayData = yearlyConsistencyData.find {
