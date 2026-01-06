@@ -1,9 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/TransactionViewModelTest.kt
 //
-// REASON: MODIFIED - Added test for the new `onQuickFillSelected_populatesStateCorrectly` logic.
-//           FIX - Added background collection for StateFlows in the Quick Fill test
-//           to ensure they are populated before `first()` is called.
+// REASON: FIX - Updated `MerchantPrediction` constructor calls in tests to include
+//               new `accountId` and `accountName` parameters, resolving compilation errors.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -1455,7 +1454,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // Arrange
         val query = "Coffee"
         val mockPredictions = listOf(
-            MerchantPrediction("Coffee Shop", 1, "Food", "icon", "color")
+            MerchantPrediction("Coffee Shop", 1, "Food", "icon", "color", null, null)
         )
         `when`(transactionRepository.searchMerchants(query)).thenReturn(flowOf(mockPredictions))
 
@@ -1477,7 +1476,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // Arrange
         val query = "Coffee"
         val mockPredictions = listOf(
-            MerchantPrediction("Coffee Shop", 1, "Food", "icon", "color")
+            MerchantPrediction("Coffee Shop", 1, "Food", "icon", "color", null, null)
         )
         `when`(transactionRepository.searchMerchants(query)).thenReturn(flowOf(mockPredictions))
 

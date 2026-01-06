@@ -4,6 +4,12 @@
 // at 2:00 AM, removing its dependency on SharedPreferences.
 // CLEANUP: The `scheduleSnapshotWorker` function and its associated tag
 // and `rescheduleAllWork` entry have been completely removed.
+//
+// REASON: FIX - Added an app-level preference to enable/disable the recurring
+// transaction feature. This ensures that the RecurringPatternWorker and
+// RecurringTransactionWorker are only scheduled if the feature is explicitly
+// enabled, addressing the user's request to keep the feature disabled during
+// development.
 // =================================================================================
 package io.pm.finlight.utils
 
@@ -32,6 +38,9 @@ object ReminderManager {
     private const val AUTO_BACKUP_WORK_TAG = "auto_backup_work"
     // --- DELETED: SNAPSHOT_WORKER_TAG ---
 
+    // New preference key for enabling/disabling the recurring transaction feature
+    private const val KEY_RECURRING_TRANSACTION_FEATURE_ENABLED = "recurring_transaction_feature_enabled"
+
 
     fun rescheduleAllWork(context: Context) {
         Log.d("ReminderManager", "Rescheduling all background work...")
@@ -50,8 +59,16 @@ object ReminderManager {
             scheduleAutoBackup(context)
         }
 
-        scheduleRecurringTransactionWorker(context)
-        scheduleRecurringPatternWorker(context)
+        // Check the app-level flag before scheduling recurring transaction workers
+        if (settings.getBoolean(KEY_RECURRING_TRANSACTION_FEATURE_ENABLED, false)) { // Default to false
+            scheduleRecurringTransactionWorker(context)
+            scheduleRecurringPatternWorker(context)
+        } else {
+            Log.d("ReminderManager", "Recurring transaction feature is disabled. Not scheduling workers.")
+            // Also cancel any existing workers if the feature is now disabled.
+            cancelRecurringTransactionWorkers(context)
+        }
+
         // --- DELETED: scheduleSnapshotWorker(context) ---
     }
 
@@ -123,6 +140,13 @@ object ReminderManager {
             recurringRequest
         )
         Log.d("ReminderManager", "Recurring transaction worker scheduled for ${nextRun.time}")
+    }
+
+    // New function to cancel recurring transaction workers
+    fun cancelRecurringTransactionWorkers(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(RECURRING_PATTERN_WORK_TAG)
+        WorkManager.getInstance(context).cancelUniqueWork(RECURRING_TRANSACTION_WORK_TAG)
+        Log.d("ReminderManager", "Cancelled all recurring transaction workers.")
     }
 
 

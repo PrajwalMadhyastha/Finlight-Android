@@ -559,6 +559,7 @@ class TransactionViewModel(
     // --- NEW: State update methods for AddTransactionScreen inputs ---
     fun onAddTransactionDescriptionChanged(description: String) {
         _addTransactionDescription.value = description
+        _merchantSearchQuery.value = description // Trigger predictions
         if (description.isBlank()) {
             _userManuallySelectedCategory.value = false
         }

@@ -465,32 +465,34 @@ class DashboardViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(30000f))
         `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(FinancialSummary(0.0, 1000.0)))
 
+        // FIX: Use thenReturn for sequence, ensuring Mockito knows exactly what to return on consecutive calls.
+        // Also supply enough returns in case initialization consumes more than one.
         `when`(transactionRepository.getTotalExpensesSince(anyLong()))
-            .thenAnswer { 100.0 } // 1st call
-            .thenAnswer { 90000.0 } // 2nd call (forces a "pacing high" scenario)
+            .thenReturn(100.0, 100.0, 90000.0)
+
         initializeViewModel()
 
         // Act & Assert
         viewModel.budgetHealthSummary.test {
             advanceUntilIdle()
-            val initialMessage = awaitItem() // Consumes item 1 (Good Pacing)
+            val initialMessage = awaitItem()
             assertTrue("Initial message '$initialMessage' should be valid", allPossibleMessages.contains(initialMessage))
 
             // 2. Trigger refresh
             viewModel.refreshBudgetSummary()
-            advanceUntilIdle() // Let the refresh logic run.
+            advanceUntilIdle()
 
-            // 3. Await the new item. This will no longer time out.
-            val finalMessage = awaitItem() // Consumes item 2 (Pacing High)
+            // 3. We assume the refresh changes the value.
+            // If the value doesn't change, awaitItem() will timeout.
+            // But we mocked 90000.0, so it SHOULD change to "Pacing High".
+            val finalMessage = awaitItem()
 
-            // 4. Assert the new state is different and valid
             assertTrue("Final message '$finalMessage' should be valid", allPossibleMessages.contains(finalMessage))
-            assertTrue("Initial and final messages should be different due to mock change", initialMessage != finalMessage)
+            assertTrue("Messages should differ", initialMessage != finalMessage)
 
             cancelAndIgnoreRemainingEvents()
         }
 
-        // 4. The verification is the most important part, proving the logic re-ran.
         verify(transactionRepository, atLeast(2)).getTotalExpensesSince(anyLong())
     }
 

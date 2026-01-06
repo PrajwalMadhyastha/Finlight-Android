@@ -1,14 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/ReportsScreen.kt
-// REASON: FIX - The navigation from the DonutChart now includes a
-// `focusSearch=false` argument. This tells the destination SearchScreen not
-// to automatically request focus for the search bar, resolving the unintended
-// UI behavior.
-// FEATURE - A new "Spending Analysis" card has been added to the "Detailed
-// Reports" section. This serves as the primary entry point for the new
-// analysis feature.
-// FEATURE - Added a new "Yearly Report" card to provide an entry point for the
-// new yearly summary feature.
+// REASON: FIX - Passed the actual year from the `yearlyCalendarData` to the
+// `ConsistencyCalendar`. This ensures that when the user navigates to a previous
+// year, the calendar component renders the grid for that specific year instead of
+// defaulting to the current one.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -22,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarViewDay
 import androidx.compose.material.icons.filled.CalendarViewMonth
@@ -167,8 +163,16 @@ fun ReportsScreen(
                                 if (yearlyCalendarData.isEmpty()) {
                                     CircularProgressIndicator()
                                 } else {
+                                    // Extract year from the first data item
+                                    val year = remember(yearlyCalendarData) {
+                                        val cal = Calendar.getInstance()
+                                        cal.time = yearlyCalendarData.first().date
+                                        cal.get(Calendar.YEAR)
+                                    }
+
                                     ConsistencyCalendar(
                                         data = yearlyCalendarData,
+                                        year = year,
                                         onDayClick = { date ->
                                             val dayData = yearlyCalendarData.find {
                                                 val cal1 = Calendar.getInstance().apply { time = it.date }
@@ -365,7 +369,7 @@ fun ReportsScreen(
             GlassReportNavigationCard(
                 title = "Yearly Report",
                 subtitle = "Review your financial performance for the year.",
-                icon = Icons.Default.ShowChart,
+                icon = Icons.AutoMirrored.Filled.ShowChart,
                 onClick = { navController.navigate("time_period_report_screen/${TimePeriod.YEARLY}") }
             )
         }
