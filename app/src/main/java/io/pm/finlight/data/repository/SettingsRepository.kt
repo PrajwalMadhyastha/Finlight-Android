@@ -184,13 +184,13 @@ class SettingsRepository(context: Context) {
     fun setLastMonthSummaryDismissed() {
         val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
         prefs.edit {
-            putBoolean("KEY_LAST_MONTH_SUMMARY_DISMISSED$monthKey", true)
+            putBoolean(KEY_LAST_MONTH_SUMMARY_DISMISSED + monthKey, true)
         }
     }
 
     fun hasLastMonthSummaryBeenDismissed(): Boolean {
         val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
-        return prefs.getBoolean("KEY_LAST_MONTH_SUMMARY_DISMISSED$monthKey", false)
+        return prefs.getBoolean(KEY_LAST_MONTH_SUMMARY_DISMISSED + monthKey, false)
     }
 
     fun saveAutoCaptureNotificationEnabled(isEnabled: Boolean) {

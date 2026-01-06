@@ -163,6 +163,7 @@ class ReminderManagerTest : BaseViewModelTest() {
             .putBoolean("weekly_summary_enabled", true)
             .putBoolean("monthly_summary_enabled", true)
             .putBoolean("auto_backup_enabled", true)
+            .putBoolean("recurring_transaction_feature_enabled", true)
             .apply()
 
         // Act
@@ -186,6 +187,7 @@ class ReminderManagerTest : BaseViewModelTest() {
             .putBoolean("weekly_summary_enabled", false)
             .putBoolean("monthly_summary_enabled", false)
             .putBoolean("auto_backup_enabled", false)
+            .putBoolean("recurring_transaction_feature_enabled", true)
             .apply()
 
         // Act
@@ -202,4 +204,3 @@ class ReminderManagerTest : BaseViewModelTest() {
         assertWorkIsEnqueued("recurring_pattern_work", RecurringPatternWorker::class.java)
     }
 }
-
