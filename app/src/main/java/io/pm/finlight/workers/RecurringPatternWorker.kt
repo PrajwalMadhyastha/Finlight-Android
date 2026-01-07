@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/RecurringPatternWorker.kt
-// REASON: FIX - The call to `recurringTransactionDao.insert()` now correctly
-// returns a Long, so the `.toInt()` conversion works as expected, resolving
-// the compilation error.
+// REASON: FIX - Added check for `recurring_transactions_enabled` preference.
+// If disabled, the worker reschedules itself and returns success immediately,
+// preventing analysis and notifications.
 // =================================================================================
 package io.pm.finlight
 
@@ -14,6 +14,7 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
@@ -40,6 +41,18 @@ class RecurringPatternWorker(
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
+                // FIX: Check if the feature is enabled before proceeding
+                val settingsRepo = SettingsRepository(context)
+                val isEnabled = settingsRepo.getRecurringTransactionsEnabled().first()
+
+                if (!isEnabled) {
+                    Log.d("RecurringPatternWorker", "Feature disabled. Rescheduling and exiting.")
+                    // Important: We must still reschedule the worker, otherwise it will stop running forever.
+                    // If the user re-enables the feature later, we want the worker to be alive to catch it.
+                    ReminderManager.scheduleRecurringPatternWorker(context)
+                    return@withContext Result.success()
+                }
+
                 // 1. Fetch recent transactions that have an SMS signature.
                 val recentTransactions = transactionDao.getTransactionsWithSignatureSince(
                     System.currentTimeMillis() - TimeUnit.DAYS.toMillis(ANALYSIS_WINDOW_DAYS)

@@ -1,8 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/SettingsRepository.kt
-// REASON: FEATURE (Outlier Months) - Added support for excluding specific months
-// from yearly report averages. Independent sets for income and expense exclusions
-// are stored in SharedPreferences to allow handling different outliers.
+// REASON: FEATURE (Recurring Transactions) - Added toggle for recurring transaction
+// feature to allow workers to respect user preference.
 // =================================================================================
 package io.pm.finlight
 
@@ -89,9 +88,34 @@ class SettingsRepository(context: Context) {
         // --- NEW: Key for the last backup timestamp ---
         private const val KEY_LAST_BACKUP_TIMESTAMP = "last_backup_timestamp"
 
+        // --- NEW: Recurring Transactions ---
+        private const val KEY_RECURRING_TRANSACTIONS_ENABLED = "recurring_transactions_enabled"
+
         // --- NEW: Outlier Exclusions ---
         private const val KEY_EXCLUDED_INCOME_MONTHS = "excluded_income_months"
         private const val KEY_EXCLUDED_EXPENSE_MONTHS = "excluded_expense_months"
+    }
+
+    // --- NEW: Recurring Transaction Settings ---
+
+    fun saveRecurringTransactionsEnabled(isEnabled: Boolean) {
+        prefs.edit {
+            putBoolean(KEY_RECURRING_TRANSACTIONS_ENABLED, isEnabled)
+        }
+    }
+
+    fun getRecurringTransactionsEnabled(): Flow<Boolean> {
+        return callbackFlow {
+            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                if (key == KEY_RECURRING_TRANSACTIONS_ENABLED) {
+                    trySend(sp.getBoolean(key, true))
+                }
+            }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            // Default to true (enabled)
+            trySend(prefs.getBoolean(KEY_RECURRING_TRANSACTIONS_ENABLED, true))
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
     }
 
     // --- NEW: Outlier Month Management Functions ---
