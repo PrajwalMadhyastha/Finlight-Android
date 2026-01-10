@@ -745,4 +745,48 @@ class TransactionDaoTest {
         // Verify "Amazon" (Auto-Captured) is not present
         assertTrue(recentTransactions.none { it.transaction.description == "Amazon" }, "Auto-Captured transactions should be excluded")
     }
+
+    @Test
+    fun `searchMerchants returns unique predictions based on description category and account`() = runTest {
+        // Arrange
+        val transactionTime = System.currentTimeMillis()
+        // Transaction 1: Coffee, Food, Savings
+        transactionDao.insert(Transaction(id = 1, description = "Coffee", amount = 50.0, date = transactionTime - 1000, accountId = account1.id, categoryId = category1.id, transactionType = "expense", notes = null))
+        // Transaction 2: Coffee, Food, Credit Card
+        transactionDao.insert(Transaction(id = 2, description = "Coffee", amount = 70.0, date = transactionTime, accountId = account2.id, categoryId = category1.id, transactionType = "expense", notes = null))
+        // Transaction 3: Coffee, Travel, Savings
+        transactionDao.insert(Transaction(id = 3, description = "Coffee", amount = 100.0, date = transactionTime + 1000, accountId = account1.id, categoryId = category2.id, transactionType = "expense", notes = null))
+        // Transaction 4: Tea, Food, Savings (different merchant)
+        transactionDao.insert(Transaction(id = 4, description = "Tea", amount = 30.0, date = transactionTime - 500, accountId = account1.id, categoryId = category1.id, transactionType = "expense", notes = null))
+
+        // Act
+        val predictions = transactionDao.searchMerchants("Coffee").first()
+
+        // Assert
+        assertEquals(3, predictions.size, "Should return 3 unique predictions for 'Coffee'")
+
+        // Verify each prediction's unique key
+        val uniqueKeys = predictions.map { it.uniqueKey }.toSet()
+        assertEquals(3, uniqueKeys.size, "All predictions should have unique keys")
+
+        assertTrue(uniqueKeys.contains("Coffee_${category1.id}_${account1.id}"))
+        assertTrue(uniqueKeys.contains("Coffee_${category1.id}_${account2.id}"))
+        assertTrue(uniqueKeys.contains("Coffee_${category2.id}_${account1.id}"))
+
+        // Verify ordering (most recent first for each group - though not strictly tested here, the query specifies it)
+        // The most recent 'Coffee' transaction overall is transaction 3.
+        assertEquals("Coffee", predictions[0].description)
+        assertEquals(category2.id, predictions[0].categoryId)
+        assertEquals(account1.id, predictions[0].accountId)
+
+        // The next most recent 'Coffee' transaction is transaction 2.
+        assertEquals("Coffee", predictions[1].description)
+        assertEquals(category1.id, predictions[1].categoryId)
+        assertEquals(account2.id, predictions[1].accountId)
+
+        // The last 'Coffee' transaction is transaction 1.
+        assertEquals("Coffee", predictions[2].description)
+        assertEquals(category1.id, predictions[2].categoryId)
+        assertEquals(account1.id, predictions[2].accountId)
+    }
 }

@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/model/MerchantPrediction.kt
-// REASON: FEATURE (Quick Fill) - Added `accountName` to the prediction model.
-// This allows the UI to display which account was previously used for a merchant,
-// providing better context to the user before they select a suggestion.
+// REASON: FIX (Crash Prevention) - Added `uniqueKey` property. This centralizes
+// the key generation logic used in LazyColumns to ensure it's consistent across
+// the app (Carousel vs Sheet) and unique enough to prevent "Key already used"
+// crashes when the same merchant/category is used with different accounts.
 // =================================================================================
 package io.pm.finlight.data.model
 
@@ -27,4 +28,11 @@ data class MerchantPrediction(
     val categoryColorKey: String?,
     val accountId: Int?,
     val accountName: String?
-)
+) {
+    /**
+     * Generates a unique key for this prediction, suitable for use in
+     * LazyColumn or LazyRow items.
+     */
+    val uniqueKey: String
+        get() = "${description}_${categoryId ?: 0}_${accountId ?: 0}"
+}
