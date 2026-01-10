@@ -1,9 +1,12 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/MerchantPredictionSheet.kt
-// REASON: FEATURE - The composable's signature is updated to accept an
-// `onQueryChanged` lambda. This callback is now invoked whenever the text in
-// the search field changes, feeding the description in real-time to the new
-// auto-categorization flow in the ViewModel.
+// REASON: FIX (Crash) - Fixed "Key already used" crash in LazyColumn by making
+// the item key more unique. Since the search query groups by description,
+// category, and account, all three must be part of the key.
+// UI REFINEMENT - Updated `PredictionItem` to display the account name as
+// supporting text. This helps users distinguish between similar suggestions
+// (e.g., same merchant used with different accounts) and brings it in line
+// with the `PredictionCarousel` in the Add Transaction screen.
 // =================================================================================
 package io.pm.finlight.ui.components
 
@@ -35,7 +38,7 @@ import kotlin.collections.isNotEmpty
 fun MerchantPredictionSheet(
     viewModel: TransactionViewModel,
     initialDescription: String,
-    onQueryChanged: (String) -> Unit, // --- NEW: Add callback for real-time updates
+    onQueryChanged: (String) -> Unit,
     onPredictionSelected: (prediction: MerchantPrediction) -> Unit,
     onManualSave: (newDescription: String) -> Unit,
     onDismiss: () -> Unit
@@ -78,7 +81,7 @@ fun MerchantPredictionSheet(
             value = currentDescription,
             onValueChange = {
                 currentDescription = it
-                onQueryChanged(it) // --- NEW: Call the real-time update handler ---
+                onQueryChanged(it)
             },
             label = { Text("Search or enter new merchant") },
             modifier = Modifier
@@ -90,7 +93,8 @@ fun MerchantPredictionSheet(
 
         if (predictions.isNotEmpty()) {
             LazyColumn(modifier = Modifier.weight(1f)) {
-                items(predictions, key = { it.description + it.categoryId }) { prediction ->
+                // --- FIX: Use a more unique key (description + category + account) ---
+                items(predictions, key = { "${it.description}_${it.categoryId}_${it.accountId}" }) { prediction ->
                     PredictionItem(
                         prediction = prediction,
                         onClick = { onPredictionSelected(prediction) }
@@ -139,6 +143,16 @@ private fun PredictionItem(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
+        },
+        supportingContent = {
+            // --- NEW: Display account name if available ---
+            prediction.accountName?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         },
         trailingContent = {
             if (prediction.categoryName != null) {
