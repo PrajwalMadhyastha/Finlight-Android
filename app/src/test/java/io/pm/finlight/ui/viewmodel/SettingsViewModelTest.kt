@@ -23,6 +23,7 @@ import io.mockk.slot
 import io.mockk.unmockkAll
 import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
+import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.ml.SmsClassifier
@@ -74,6 +75,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var smsRepository: SmsRepository
     @Mock private lateinit var transactionViewModel: TransactionViewModel
     @Mock private lateinit var smsClassifier: SmsClassifier
+    private lateinit var transactionRunner: TransactionRunner
 
     // Mocks for all DAOs called by DataExportService and ViewModel
     @Mock private lateinit var transactionDao: TransactionDao
@@ -147,7 +149,17 @@ class SettingsViewModelTest : BaseViewModelTest() {
         `when`(db.tripDao()).thenReturn(tripDao)
         `when`(db.accountAliasDao()).thenReturn(accountAliasDao)
         // FIX: Provide an executor for Room's withTransaction block to use in tests.
-        `when`(db.transactionExecutor).thenReturn(testDispatcher.asExecutor())
+        // `when`(db.transactionExecutor).thenReturn(testDispatcher.asExecutor()) // Not needed with TransactionRunner
+
+        // --- NEW: Mock TransactionRunner to execute immediately ---
+        transactionRunner = io.mockk.mockk()
+        // Match generic arguments using MockK
+        coEvery { transactionRunner.run<Any?>(any(), any()) } coAnswers {
+            val block = secondArg<suspend () -> Any?>()
+            block()
+        }
+
+
 
         // --- NEW: Grant SMS permissions via Shadow (backup) ---
         org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
@@ -209,8 +221,17 @@ class SettingsViewModelTest : BaseViewModelTest() {
             categoryRepository,
             smsRepository,
             transactionViewModel,
-            smsClassifier
+            smsClassifier,
+            transactionRunner,
+            dispatchers = TestDispatcherProvider(testDispatcher)
         )
+    }
+
+    class TestDispatcherProvider(private val testDispatcher: kotlinx.coroutines.test.TestDispatcher) : io.pm.finlight.utils.DispatcherProvider {
+        override val main: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
+        override val io: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
+        override val default: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
+        override val unconfined: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
     }
 
     @After
@@ -226,7 +247,8 @@ class SettingsViewModelTest : BaseViewModelTest() {
         val allSms = listOf(transactionalSms, nonTransactionalSms)
 
         // Mock dependencies
-        `when`(smsRepository.fetchAllSms(anyLong())).thenReturn(allSms)
+        // Use Mockito's isNull() for nullable argument or loose any()
+        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull())).thenReturn(allSms)
         `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
         `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
         `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
@@ -237,37 +259,41 @@ class SettingsViewModelTest : BaseViewModelTest() {
         `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
 
         // --- FIX: Correctly mock the suspend functions on the DAO mocks ---
-        // Force the parsed transaction to need mapping
-        `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-        `when`(accountDao.findByName(anyString())).thenReturn(null)
+            // Force the parsed transaction to need mapping
+            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
-        // Mock classifier behavior: high confidence for txn, low for spam
-        `when`(smsClassifier.classify(transactionalSms.body)).thenReturn(0.9f)
-        `when`(smsClassifier.classify(nonTransactionalSms.body)).thenReturn(0.05f)
+            // Mock the parser to successfully parse the transaction
+            val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
-        // --- NEW: Mock the autoSave call ---
+            // Mock classifier behavior: high confidence for txn, low for spam
+            `when`(smsClassifier.classify(transactionalSms.body)).thenReturn(0.9f)
+            `when`(smsClassifier.classify(nonTransactionalSms.body)).thenReturn(0.05f)
+
+            // --- NEW: Mock the autoSave call ---
         `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenReturn(true)
 
         initializeViewModel()
 
-        var importedCountResult = -1 // --- REFACTORED ---
+        // prevent deadlock on uiEvent send
+        val eventJob = launch { viewModel.uiEvent.collect() }
+
+        var importedCountResult = -1
 
         // Act
-        viewModel.startSmsScanAndIdentifyMappings(null) { importedCount -> // --- REFACTORED ---
+        viewModel.startSmsScanAndIdentifyMappings(null) { importedCount ->
             importedCountResult = importedCount
         }
         advanceUntilIdle()
 
         // Assert
-        // The callback might be called before all StateFlow updates are processed if using advanceUntilIdle()
-        // But here we care about the importedCountResult.
         println("SettingsViewModelTest: importedCountResult = $importedCountResult")
         assertEquals("Should have imported 1 transaction", 1, importedCountResult)
 
         // Verify classifier was called for both messages
         verify(smsClassifier).classify(transactionalSms.body)
         verify(smsClassifier).classify(nonTransactionalSms.body)
-
         // --- DELETED: `mappingsToReview` test block ---
     }
 
@@ -577,7 +603,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         viewModel.rescanSmsWithNewRule { count ->
             newTransactionCount = count
         }
-        advanceUntilIdle()
+        advanceUntilIdle() 
 
         // Assert
         println("SettingsViewModelTest: newTransactionCount = $newTransactionCount")

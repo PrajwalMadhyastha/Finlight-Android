@@ -24,10 +24,13 @@ import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.entity.AccountAlias
+import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.utils.DispatcherProvider
+import io.pm.finlight.utils.DefaultDispatcherProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -53,7 +56,9 @@ class SettingsViewModel(
     private val categoryRepository: CategoryRepository,
     private val smsRepository: SmsRepository,
     private val transactionViewModel: TransactionViewModel,
-    private val smsClassifier: SmsClassifier
+    private val smsClassifier: SmsClassifier,
+    private val transactionRunner: TransactionRunner,
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : AndroidViewModel(application) {
 
     private val context = application
@@ -240,14 +245,14 @@ class SettingsViewModel(
             var newTransactionsFound = 0
             try {
                 val startDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -30) }.timeInMillis
-                val rawMessages = withContext(Dispatchers.IO) {
+                val rawMessages = withContext(dispatchers.io) {
                     smsRepository.fetchAllSms(startDate)
                 }
 
-                val existingMappings = withContext(Dispatchers.IO) {
+                val existingMappings = withContext(dispatchers.io) {
                     merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
                 }
-                val existingSmsHashes = withContext(Dispatchers.IO) {
+                val existingSmsHashes = withContext(dispatchers.io) {
                     transactionRepository.getAllSmsHashes().first().toSet()
                 }
 
@@ -273,7 +278,7 @@ class SettingsViewModel(
                     override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
                 }
 
-                val parsedList = withContext(Dispatchers.Default) {
+                val parsedList = withContext(dispatchers.default) {
                     rawMessages.map { sms ->
                         async {
                             SmsParser.parse(
@@ -323,9 +328,10 @@ class SettingsViewModel(
             _processedSmsCount.value = 0
             _totalSmsToScan.value = 0
             var autoImportedCount = 0
+
             try {
                 // 2. Fetch all messages
-                val rawMessages = withContext(Dispatchers.IO) { smsRepository.fetchAllSms(startDate) }
+                val rawMessages = withContext(dispatchers.io) { smsRepository.fetchAllSms(startDate) }
 
                 // 3. Update total count to show the UI
                 _totalSmsToScan.value = rawMessages.size
@@ -336,8 +342,8 @@ class SettingsViewModel(
                 }
 
                 // 4. Get all DB lookups *before* the loop
-                val existingMappings = withContext(Dispatchers.IO) { merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName }) }
-                val existingSmsHashes = withContext(Dispatchers.IO) { transactionRepository.getAllSmsHashes().first().toSet() }
+                val existingMappings = withContext(dispatchers.io) { merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName }) }
+                val existingSmsHashes = withContext(dispatchers.io) { transactionRepository.getAllSmsHashes().first().toSet() }
 
                 val categoryFinderProvider = object : CategoryFinderProvider {
                     override fun getCategoryIdByName(name: String): Int? = CategoryIconHelper.getCategoryIdByName(name)
@@ -365,7 +371,7 @@ class SettingsViewModel(
                 // 6. Loop through chunks
                 for (chunk in chunks) {
                     // Process one chunk in parallel
-                    val parsedList = withContext(Dispatchers.Default) {
+                    val parsedList = withContext(dispatchers.default) {
                         chunk.map { sms ->
                             async {
                                 // Run the full parsing pipeline (Custom Rules, ML, Heuristics)
@@ -668,7 +674,7 @@ class SettingsViewModel(
             val allCategories = db.categoryDao().getAllCategories().first()
             val usedColorKeys = allCategories.mapNotNull { it.colorKey }.toMutableList()
 
-            db.withTransaction {
+            transactionRunner.run(db) {
                 if (isFinlightExport) {
                     importFinlightCsv(header, rows, learnedMappings, usedColorKeys)
                 } else {
