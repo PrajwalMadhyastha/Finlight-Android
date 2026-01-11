@@ -274,20 +274,20 @@ class TransactionViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `unsplitTransaction correctly calls DAO methods`() = runTest {
         // ARRANGE
-        // Mock the withTransaction extension function to execute the lambda passed to it
         mockkStatic("androidx.room.RoomDatabaseKt")
-        coEvery { db.withTransaction<Unit>(any()) } coAnswers {
-            val block = arg<suspend () -> Unit>(0)
+        
+        // Use a more robust mock for withTransaction that doesn't rely on complex arg matching if possible
+        coEvery { any<AppDatabase>().withTransaction<Any?>(any()) } coAnswers {
+            val block = secondArg<suspend () -> Any?>()
             block()
         }
 
         val transaction = Transaction(id = 1, description = "Split", isSplit = true, originalDescription = "Original Desc", amount = 100.0, date = 0L, accountId = 1, categoryId = null, notes = null)
         val splits = listOf(SplitTransactionDetails(SplitTransaction(1, 1, 50.0, 1, null), "Cat1", "", ""))
 
-        `when`(db.splitTransactionDao().getSplitsForParent(1)).thenReturn(flowOf(splits))
+        `when`(splitTransactionDao.getSplitsForParentSimple(1)).thenReturn(splits)
 
         // ACT
         viewModel.unsplitTransaction(transaction)
