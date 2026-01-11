@@ -589,7 +589,7 @@ class SettingsViewModel(
     ): ReviewableRow {
         if (tokens.size < 8) return ReviewableRow(lineNumber, tokens, CsvRowStatus.INVALID_COLUMN_COUNT, "Invalid column count. Expected at least 8.")
 
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         try {
             dateFormat.parse(tokens[2])
         } catch (
@@ -736,7 +736,7 @@ class SettingsViewModel(
         usedColorKeys: MutableList<String>
     ): Transaction {
         val h = header.associateWith { header.indexOf(it) }.withDefault { -1 }
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
 
         val date = dateFormat.parse(row[h.getValue("Date")])?.time ?: Date().time
         val description = row[h.getValue("Description")]

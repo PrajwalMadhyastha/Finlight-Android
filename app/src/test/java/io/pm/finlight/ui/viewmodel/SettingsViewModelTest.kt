@@ -3,9 +3,13 @@
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
+import android.Manifest
 import android.app.Application
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import androidx.core.content.ContextCompat
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
@@ -13,7 +17,9 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockkObject
+import io.mockk.mockkStatic
 import io.mockk.runs
+import io.mockk.slot
 import io.mockk.unmockkAll
 import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
@@ -22,6 +28,7 @@ import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.ReminderManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +56,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.Shadows.shadowOf
 import java.io.ByteArrayInputStream
 import java.util.Calendar
+
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -141,6 +149,15 @@ class SettingsViewModelTest : BaseViewModelTest() {
         // FIX: Provide an executor for Room's withTransaction block to use in tests.
         `when`(db.transactionExecutor).thenReturn(testDispatcher.asExecutor())
 
+        // --- NEW: Grant SMS permissions via Shadow (backup) ---
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+
+        // --- NEW: Force permission grant by mocking ContextCompat ---
+        mockkStatic(ContextCompat::class)
+        io.mockk.every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+
+        // REMOVED withTransaction mock to let it run naturally with the mocked executor.
+
 
         runTest {
             `when`(transactionDao.getAllTransactionsSimple()).thenReturn(flowOf(emptyList()))
@@ -202,7 +219,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `startSmsScanAndIdentifyMappings filters nonTransactional sms using classifier`() = runTest {
         // Arrange
         val transactionalSms = SmsMessage(1, "TXN-SENDER", "spent Rs. 100 at Store", 1L)
@@ -375,7 +391,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `commitCsvImport calls repository to insert transactions`() = runTest {
         // Arrange
         initializeViewModel()
@@ -401,7 +416,8 @@ class SettingsViewModelTest : BaseViewModelTest() {
         // Assert
         val transactionCaptor = argumentCaptor<Transaction>()
         val tagsCaptor = argumentCaptor<Set<Tag>>()
-        verify(transactionRepository).insertTransactionWithTags(capture(transactionCaptor), capture(tagsCaptor))
+        // Use timeout because of race condition with Dispatchers.IO
+        verify(transactionRepository, org.mockito.Mockito.timeout(5000)).insertTransactionWithTags(capture(transactionCaptor), capture(tagsCaptor))
 
         assertEquals("Coffee", transactionCaptor.value.description)
         assertEquals(150.0, transactionCaptor.value.amount, 0.0)
@@ -525,7 +541,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
     // --- NEW: Tests for the objective ---
 
     @Test
-    @Ignore
     fun `rescanSmsWithNewRule finds and saves new transactions`() = runTest {
         // Arrange
         val sms = SmsMessage(1, "SENDER", "spent Rs 100", 1L)
@@ -789,12 +804,15 @@ class SettingsViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `saveDailyReportTime calls repository and schedules when enabled`() = runTest {
         // Arrange
         // Override the default mock from setup()
         `when`(settingsRepository.getDailyReportEnabled()).thenReturn(flowOf(true))
         initializeViewModel()
+
+        // --- FIX: Start a collector to ensure StateFlow updates ---
+        val job = launch(testDispatcher) { viewModel.dailyReportEnabled.collect() }
+
         // Wait for the ViewModel's init block to collect the 'true' value
         advanceUntilIdle()
 
@@ -806,6 +824,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
         verify(settingsRepository).saveDailyReportTime(8, 30)
         // Verify it was called *after* the save
         coVerify { ReminderManager.scheduleDailyReport(applicationContext) }
+
+        // Cleanup
+        job.cancel()
     }
 
     @Test
