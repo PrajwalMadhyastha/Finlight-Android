@@ -538,7 +538,7 @@ class SettingsViewModel(
                     val report = generateValidationReport(uri)
                     _csvValidationReport.value = report
                 } catch (e: Exception) {
-                    Log.e("SettingsViewModel", "CSV validation failed", e)
+                    Log.e("SettingsViewModel", "CSV validation failed for URI: $uri", e)
                 }
             }
         }

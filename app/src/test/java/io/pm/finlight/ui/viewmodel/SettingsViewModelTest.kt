@@ -39,6 +39,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.`when`
+import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -209,7 +210,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         val allSms = listOf(transactionalSms, nonTransactionalSms)
 
         // Mock dependencies
-        `when`(smsRepository.fetchAllSms(any())).thenReturn(allSms)
+        `when`(smsRepository.fetchAllSms(anyLong())).thenReturn(allSms)
         `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
         `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
         `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
@@ -229,7 +230,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         `when`(smsClassifier.classify(nonTransactionalSms.body)).thenReturn(0.05f)
 
         // --- NEW: Mock the autoSave call ---
-        `when`(transactionViewModel.autoSaveSmsTransaction(any(), anyString())).thenReturn(true)
+        `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenReturn(true)
 
         initializeViewModel()
 
@@ -242,7 +243,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
         advanceUntilIdle()
 
         // Assert
-        assertEquals("Should have imported 1 transaction", 1, importedCountResult) // --- REFACTORED ---
+        // The callback might be called before all StateFlow updates are processed if using advanceUntilIdle()
+        // But here we care about the importedCountResult.
+        println("SettingsViewModelTest: importedCountResult = $importedCountResult")
+        assertEquals("Should have imported 1 transaction", 1, importedCountResult)
 
         // Verify classifier was called for both messages
         verify(smsClassifier).classify(transactionalSms.body)
@@ -274,7 +278,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
     // --- DELETED: `finalizeImport` test ---
 
     @Test
-    @Ignore
     fun `validateCsvFile correctly processes valid and invalid rows`() = runTest {
         // Arrange
         // FIX: The CSV content now includes the correct 11-column header.
@@ -301,7 +304,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
         // Assert
         viewModel.csvValidationReport.test {
-            val report = awaitItem()
+            var report = awaitItem()
+            while (report == null) {
+                report = awaitItem()
+            }
             assertNotNull(report) // This should now pass.
             assertEquals(3, report!!.totalRowCount)
             assertEquals(3, report.reviewableRows.size)
@@ -338,7 +344,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `updateAndRevalidateRow updates the correct row`() = runTest {
         // Arrange
         initializeViewModel()
@@ -357,7 +362,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
         // Assert
         viewModel.csvValidationReport.test {
-            val report = awaitItem()
+            var report = awaitItem()
+            while (report == null) {
+                report = awaitItem()
+            }
             assertNotNull(report)
             val updatedRow = report!!.reviewableRows.find { it.lineNumber == 1 }
             assertNotNull(updatedRow)
@@ -523,7 +531,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         val sms = SmsMessage(1, "SENDER", "spent Rs 100", 1L)
         val parsedTxn = PotentialTransaction(1L, "SENDER", 100.0, "expense", "Store", "spent Rs 100", null, "hash123")
 
-        `when`(smsRepository.fetchAllSms(any())).thenReturn(listOf(sms))
+        `when`(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
         `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList())) // No existing hashes
 
@@ -557,6 +565,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         advanceUntilIdle()
 
         // Assert
+        println("SettingsViewModelTest: newTransactionCount = $newTransactionCount")
         assertEquals("Should have found and saved 1 new transaction", 1, newTransactionCount)
         // --- FIX: Use anyObject() for verification too ---
         verify(transactionViewModel).autoSaveSmsTransaction(anyObject(), eq("Imported"))
