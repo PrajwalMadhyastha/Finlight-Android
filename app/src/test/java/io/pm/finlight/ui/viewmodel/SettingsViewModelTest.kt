@@ -240,61 +240,56 @@ class SettingsViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `startSmsScanAndIdentifyMappings filters nonTransactional sms using classifier`() = runTest {
-        // Arrange
-        val transactionalSms = SmsMessage(1, "TXN-SENDER", "spent Rs. 100 at Store", 1L)
-        val nonTransactionalSms = SmsMessage(2, "SPAM-SENDER", "Your OTP is 12345", 2L)
-        val allSms = listOf(transactionalSms, nonTransactionalSms)
+    fun `startSmsScanAndIdentifyMappings does not call classifier for SMS matching custom rules`() = runTest {
+        // This test verifies the optimization: classifier is NOT called if custom rule matches
+        
+        val sms = SmsMessage(1, "ICICI", "ICICI Bank Acct XX123 debited for Rs 240.00 on 28-Jun-25; DAKSHIN CAFE credited.", 1L)
 
         // Mock dependencies
-        // Use Mockito's isNull() for nullable argument or loose any()
-        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull())).thenReturn(allSms)
+        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull())).thenReturn(listOf(sms))
         `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
         `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
-        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
         `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
         `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
         `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
         `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
         `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+        `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+        `when`(accountDao.findByName(anyString())).thenReturn(null)
 
-        // --- FIX: Correctly mock the suspend functions on the DAO mocks ---
-            // Force the parsed transaction to need mapping
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
+        // Add a custom rule that matches the SMS
+        val rule = CustomSmsRule(
+            id = 1,
+            triggerPhrase = "debited for",
+            merchantRegex = "([A-Z\\s]+) credited",
+            amountRegex = "Rs ([\\d.]+)",
+            accountRegex = null,
+            merchantNameExample = "DAKSHIN CAFE",
+            amountExample = "240.00",
+            accountNameExample = null,
+            priority = 10,
+            sourceSmsBody = sms.body,
+            transactionType = null
+        )
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
-            // Mock the parser to successfully parse the transaction
-            val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
-
-            // Mock classifier behavior: high confidence for txn, low for spam
-            `when`(smsClassifier.classify(transactionalSms.body)).thenReturn(0.9f)
-            `when`(smsClassifier.classify(nonTransactionalSms.body)).thenReturn(0.05f)
-
-            // --- NEW: Mock the autoSave call ---
-        `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenReturn(true)
+        // Grant SMS permission (required by ViewModel)
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
 
         initializeViewModel()
 
-        // prevent deadlock on uiEvent send
         val eventJob = launch { viewModel.uiEvent.collect() }
 
-        var importedCountResult = -1
+        try {
+            // Act
+            viewModel.startSmsScanAndIdentifyMappings(null) { }
+            advanceUntilIdle()
 
-        // Act
-        viewModel.startSmsScanAndIdentifyMappings(null) { importedCount ->
-            importedCountResult = importedCount
+            // Assert - Classifier should NOT be called because custom rule matched
+            verify(smsClassifier, org.mockito.Mockito.never()).classify(anyString())
+        } finally {
+            eventJob.cancel()
         }
-        advanceUntilIdle()
-
-        // Assert
-        println("SettingsViewModelTest: importedCountResult = $importedCountResult")
-        assertEquals("Should have imported 1 transaction", 1, importedCountResult)
-
-        // Verify classifier was called for both messages
-        verify(smsClassifier).classify(transactionalSms.body)
-        verify(smsClassifier).classify(nonTransactionalSms.body)
-        // --- DELETED: `mappingsToReview` test block ---
     }
 
     @Test
