@@ -1560,7 +1560,6 @@ class TransactionViewModelTest : BaseViewModelTest() {
     // --- NEW: Tests for functions requested in the last prompt ---
 
     @Test
-    @Ignore
     fun `saveTransactionSplits calls DAOs within transaction`() = runTest {
         // Arrange
         val transactionId = 1
@@ -1576,8 +1575,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
         // Mock the withTransaction block
         mockkStatic("androidx.room.RoomDatabaseKt")
-        coEvery { db.withTransaction<Unit>(any()) } coAnswers {
-            val block = arg<suspend () -> Unit>(0)
+        coEvery { any<AppDatabase>().withTransaction<Any?>(any()) } coAnswers {
+            val block = secondArg<suspend () -> Any?>()
             block()
         }
         val splitCaptor = argumentCaptor<List<SplitTransaction>>()
