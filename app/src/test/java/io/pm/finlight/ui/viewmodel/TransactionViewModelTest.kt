@@ -16,13 +16,7 @@ import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
-import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.slot
-import io.mockk.unmockkAll
-import io.mockk.unmockkStatic
+import io.mockk.*
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.utils.ShareImageGenerator
@@ -41,7 +35,7 @@ import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
-import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.any as mockitoAny
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.Mockito.`when`
@@ -172,7 +166,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val transaction = Transaction(id = 1, description = "amzn", originalDescription = "amzn", amount = 100.0, date = 1L, accountId = 1, categoryId = 1, notes = null)
         val transactionDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
         val aliases = mapOf("amzn" to "Amazon")
-        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(listOf(transactionDetails)))
+        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), mockitoAny(), mockitoAny(), mockitoAny())).thenReturn(flowOf(listOf(transactionDetails)))
         `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
 
         // ACT
@@ -248,19 +242,25 @@ class TransactionViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `reparseTransactionFromSms updates transaction with new parsed data`() = runTest {
         // ARRANGE
-        mockkStatic(SmsParser::class)
+        mockkObject(SmsParser)
         val originalTxn = Transaction(id = 1, description = "Old", categoryId = 1, amount = 100.0, date = 0, accountId = 1, notes = null, sourceSmsId = 123L)
         val sms = SmsMessage(123L, "Sender", "New Merchant spent 150", 0L)
         val newParsedTxn = PotentialTransaction(123L, "Sender", 150.0, "expense", "New Merchant", "Msg", categoryId = 2)
 
         `when`(transactionRepository.getTransactionById(1)).thenReturn(flowOf(originalTxn))
         `when`(smsRepository.getSmsDetailsById(123L)).thenReturn(sms)
+        `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+        `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+        `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
 
-        // Mock the static SmsParser to return our desired new transaction
-        coEvery { SmsParser.parse(any<SmsMessage>(), any(), any(), any(), any(), any(), any(), any()) } returns newParsedTxn
+        // Mock the object SmsParser to return our desired new transaction
+        coEvery { SmsParser.parse(any(), any(), any(), any(), any(), any(), any(), any()) } returns newParsedTxn
 
         // ACT
         viewModel.reparseTransactionFromSms(1)
@@ -270,7 +270,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         verify(transactionRepository).updateDescription(1, "New Merchant")
         verify(transactionRepository).updateCategoryId(1, 2)
 
-        unmockkStatic(SmsParser::class)
+        unmockkObject(SmsParser)
     }
 
     @Test
@@ -765,7 +765,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
     fun `dataLoading failure emits emptyList and sends uiEvent`() = runTest {
         // ARRANGE
         val errorFlow = flow<List<TransactionDetails>> { throw RuntimeException("DB error") }
-        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(errorFlow)
+        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), mockitoAny(), mockitoAny(), mockitoAny())).thenReturn(errorFlow)
 
         // FIX: Re-initialize the ViewModel BEFORE the test block.
         // This ensures the current 'viewModel' instance uses the mock above.
