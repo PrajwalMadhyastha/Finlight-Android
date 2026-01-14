@@ -57,6 +57,7 @@ fun generateVersionCode(): Int {
     return sdf.format(Date()).toInt()
 }
 
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -65,6 +66,28 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
     id("org.jetbrains.kotlinx.kover")
+    id("org.sonarqube")
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "PrajwalMadhyastha_Finlight-Android")
+        property("sonar.organization", "prajwalmadhyastha-1")
+        property("sonar.host.url", "https://sonarcloud.io")
+        
+        // Securely read token from Environment Variable (CI) or local.properties (Local)
+        val sonarToken = System.getenv("SONAR_TOKEN") ?: project.rootProject.file("local.properties").let { file ->
+            if (file.exists()) {
+                val props = Properties()
+                props.load(FileInputStream(file))
+                props.getProperty("sonar.token")
+            } else null
+        }
+        property("sonar.token", sonarToken ?: "")
+        
+        // Point to Kover report
+        property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/kover/report.xml")
+    }
 }
 
 android {
