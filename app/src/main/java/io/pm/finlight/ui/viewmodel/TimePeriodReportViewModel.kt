@@ -142,17 +142,32 @@ class TimePeriodReportViewModel(
 
     val insights: StateFlow<ReportInsights?> = _selectedDate.flatMapLatest { calendar ->
         flow {
-            val (currentStart, currentEnd) = getPeriodDateRange(calendar)
+            // For MONTHLY and YEARLY, use same-period comparison
+            // For DAILY and WEEKLY, use full period comparison (existing behavior)
+            val (currentStart, currentEnd) = when (timePeriod) {
+                TimePeriod.MONTHLY, TimePeriod.YEARLY -> {
+                    val periodStart = getPeriodDateRange(calendar).first
+                    val actualEnd = getActualPeriodEnd(calendar)
+                    Pair(periodStart, actualEnd)
+                }
+                else -> getPeriodDateRange(calendar)
+            }
 
-            val previousPeriodEndCal = (calendar.clone() as Calendar).apply {
-                when (timePeriod) {
-                    TimePeriod.DAILY -> add(Calendar.HOUR_OF_DAY, -24)
-                    TimePeriod.WEEKLY -> add(Calendar.DAY_OF_YEAR, -7)
-                    TimePeriod.MONTHLY -> add(Calendar.MONTH, -1)
-                    TimePeriod.YEARLY -> add(Calendar.YEAR, -1)
+            val (previousStart, previousEnd) = when (timePeriod) {
+                TimePeriod.MONTHLY, TimePeriod.YEARLY -> {
+                    getSamePeriodPreviousYearRange(calendar)
+                }
+                else -> {
+                    val previousPeriodEndCal = (calendar.clone() as Calendar).apply {
+                        when (timePeriod) {
+                            TimePeriod.DAILY -> add(Calendar.HOUR_OF_DAY, -24)
+                            TimePeriod.WEEKLY -> add(Calendar.DAY_OF_YEAR, -7)
+                            else -> {} // Already handled above
+                        }
+                    }
+                    getPeriodDateRange(previousPeriodEndCal)
                 }
             }
-            val (previousStart, previousEnd) = getPeriodDateRange(previousPeriodEndCal)
 
             val currentSummary = transactionDao.getFinancialSummaryForRange(currentStart, currentEnd)
             val previousSummary = transactionDao.getFinancialSummaryForRange(previousStart, previousEnd)
@@ -435,5 +450,68 @@ class TimePeriodReportViewModel(
         } else {
             now.get(Calendar.MONTH) + 1
         }
+    }
+
+    /**
+     * Returns the actual end date for the current period.
+     * For periods in the past, returns the period end.
+     * For the current period, returns today (or period end if today is beyond it).
+     */
+    private fun getActualPeriodEnd(calendar: Calendar): Long {
+        val now = Calendar.getInstance()
+        val (_, periodEnd) = getPeriodDateRange(calendar)
+        val periodEndCal = Calendar.getInstance().apply { timeInMillis = periodEnd }
+        
+        return if (periodEndCal.after(now)) {
+            now.timeInMillis
+        } else {
+            periodEnd
+        }
+    }
+
+    /**
+     * For MONTHLY and YEARLY periods, returns the same date range from the previous year.
+     * For example, if viewing Jan 1-15, 2026, returns Jan 1-15, 2025.
+     */
+    private fun getSamePeriodPreviousYearRange(calendar: Calendar): Pair<Long, Long> {
+        val previousYearCal = (calendar.clone() as Calendar).apply {
+            add(Calendar.YEAR, -1)
+        }
+        
+        val periodStart = getPeriodDateRange(previousYearCal).first
+        val actualEnd = getActualPeriodEnd(calendar)
+        
+        // Calculate the offset from period start to actual end in current year
+        val currentPeriodStart = getPeriodDateRange(calendar).first
+        val currentPeriodStartCal = Calendar.getInstance().apply { timeInMillis = currentPeriodStart }
+        val actualEndCal = Calendar.getInstance().apply { timeInMillis = actualEnd }
+        
+        // Apply the same offset to previous year
+        val previousEndCal = Calendar.getInstance().apply {
+            timeInMillis = periodStart
+            when (timePeriod) {
+                TimePeriod.MONTHLY -> {
+                    val dayOfMonth = actualEndCal.get(Calendar.DAY_OF_MONTH)
+                    val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+                    set(Calendar.DAY_OF_MONTH, minOf(dayOfMonth, maxDay))
+                    set(Calendar.HOUR_OF_DAY, actualEndCal.get(Calendar.HOUR_OF_DAY))
+                    set(Calendar.MINUTE, actualEndCal.get(Calendar.MINUTE))
+                    set(Calendar.SECOND, actualEndCal.get(Calendar.SECOND))
+                    set(Calendar.MILLISECOND, actualEndCal.get(Calendar.MILLISECOND))
+                }
+                TimePeriod.YEARLY -> {
+                    val dayOfYear = actualEndCal.get(Calendar.DAY_OF_YEAR)
+                    val maxDay = getActualMaximum(Calendar.DAY_OF_YEAR)
+                    set(Calendar.DAY_OF_YEAR, minOf(dayOfYear, maxDay))
+                    set(Calendar.HOUR_OF_DAY, actualEndCal.get(Calendar.HOUR_OF_DAY))
+                    set(Calendar.MINUTE, actualEndCal.get(Calendar.MINUTE))
+                    set(Calendar.SECOND, actualEndCal.get(Calendar.SECOND))
+                    set(Calendar.MILLISECOND, actualEndCal.get(Calendar.MILLISECOND))
+                }
+                else -> {} // Not used for DAILY/WEEKLY
+            }
+        }
+        
+        return Pair(periodStart, previousEndCal.timeInMillis)
     }
 }

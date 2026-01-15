@@ -225,5 +225,80 @@ class ReportsViewModelTest : BaseViewModelTest() {
         val newMonth = viewModel.selectedMonth.value.get(Calendar.MONTH)
         assertEquals(expectedMonth, newMonth)
     }
+
+    @Test
+    fun `reportData uses same-period comparison for MONTH period`() = runTest {
+        // Arrange - Mock data for mid-month scenario (Jan 15, 2026)
+        val spendingList = listOf(CategorySpending("Food", 150.0, "red", "restaurant"))
+        val trends = listOf(MonthlyTrend("2026-01", 200.0, 150.0))
+        
+        // Current period (Jan 1-15, 2026): 150.0 expenses
+        val currentSummary = FinancialSummary(0.0, 150.0)
+        // Previous period (Jan 1-15, 2025): 100.0 expenses
+        val previousSummary = FinancialSummary(0.0, 100.0)
+        val topCategory = spendingList.first()
+
+        var currentStartCaptured = 0L
+        var currentEndCaptured = 0L
+        var previousStartCaptured = 0L
+        var previousEndCaptured = 0L
+        var summaryCallCount = 0
+
+        `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(spendingList))
+        `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(trends))
+        
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenAnswer { invocation ->
+            val start = invocation.getArgument<Long>(0)
+            val end = invocation.getArgument<Long>(1)
+            
+            summaryCallCount++
+            if (summaryCallCount == 1) {
+                currentStartCaptured = start
+                currentEndCaptured = end
+                flowOf(currentSummary)
+            } else {
+                previousStartCaptured = start
+                previousEndCaptured = end
+                flowOf(previousSummary)
+            }
+        }
+        
+        `when`(transactionRepository.getTopSpendingCategoriesForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(topCategory))
+
+        // Act
+        viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository)
+        viewModel.selectPeriod(ReportPeriod.MONTH)
+        advanceUntilIdle()
+
+        // Assert
+        viewModel.reportData.test {
+            val data = awaitItem()
+            
+            // Verify percentage change calculation (50% increase)
+            assertEquals(50, data.insights?.percentageChange) // (150 - 100) / 100 * 100 = 50%
+            
+            // Verify current period is from start of current month to today
+            val currentStartCal = Calendar.getInstance().apply { timeInMillis = currentStartCaptured }
+            val currentEndCal = Calendar.getInstance().apply { timeInMillis = currentEndCaptured }
+            assertEquals(1, currentStartCal.get(Calendar.DAY_OF_MONTH))
+            
+            // Verify previous period is same day range from previous year
+            val previousStartCal = Calendar.getInstance().apply { timeInMillis = previousStartCaptured }
+            val previousEndCal = Calendar.getInstance().apply { timeInMillis = previousEndCaptured }
+            
+            val today = Calendar.getInstance()
+            val previousYear = today.get(Calendar.YEAR) - 1
+            
+            assertEquals(previousYear, previousStartCal.get(Calendar.YEAR))
+            assertEquals(today.get(Calendar.MONTH), previousStartCal.get(Calendar.MONTH))
+            assertEquals(1, previousStartCal.get(Calendar.DAY_OF_MONTH))
+            
+            // Previous end should be same day of month as today (or max day if today exceeds it)
+            assertEquals(previousYear, previousEndCal.get(Calendar.YEAR))
+            assertEquals(today.get(Calendar.MONTH), previousEndCal.get(Calendar.MONTH))
+            
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
 
