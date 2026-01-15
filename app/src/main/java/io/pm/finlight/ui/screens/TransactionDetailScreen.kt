@@ -529,14 +529,19 @@ fun TransactionDetailScreen(
                             }) { Text("OK") }
                         },
                         dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
-                        colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
-                    ) { DatePicker(state = datePickerState) }
+                        colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                    ) {
+                        DatePicker(
+                            state = datePickerState,
+                            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                        )
+                    }
                 }
                 if (showTimePicker) {
                     val timePickerState = rememberTimePickerState(initialHour = selectedDateTime.get(Calendar.HOUR_OF_DAY), initialMinute = selectedDateTime.get(Calendar.MINUTE))
                     AlertDialog(
                         onDismissRequest = { showTimePicker = false },
-                        containerColor = popupContainerColor,
+                        containerColor = popupContainerColor.copy(alpha = 1f),
                         title = { Text("Select Time") },
                         text = {
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
