@@ -36,10 +36,15 @@
 // leading to a race condition and native memory corruption. This lock ensures
 // that only one thread can access the interpreter at a time, fixing the
 // "gather index out of bounds" crash.
+//
+// REFACTOR (Testability): Added an internal constructor for testing that accepts
+// pre-loaded vocabulary and interpreter, enabling unit tests to cover this class
+// without requiring TFLite model loading in Robolectric.
 // =================================================================================
 package io.pm.finlight.ml
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import java.io.Closeable
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
@@ -55,33 +60,57 @@ import java.nio.channels.FileChannel
  *
  * @param context The application context, used to access the assets folder.
  */
-class SmsClassifier(
-    private val context: Context,
-    private val modelName: String = "sms_classifier.tflite",
-    private val vocabName: String = "vocab.txt"
+class SmsClassifier private constructor(
+    private val context: Context?,
+    private val modelName: String,
+    private val vocabName: String,
+    preloadedVocab: Map<String, Int>?,
+    preloadedInterpreter: Interpreter?
 ) : Closeable {
 
     companion object {
         // Must match the Python script's configuration
-        private const val MAX_SEQUENCE_LENGTH = 250
-        private const val UNKNOWN_TOKEN = 1L // '[UNK]' is typically the second item in the vocab
+        @VisibleForTesting
+        internal const val MAX_SEQUENCE_LENGTH = 250
+        @VisibleForTesting
+        internal const val UNKNOWN_TOKEN = 1L // '[UNK]' is typically the second item in the vocab
     }
 
-    private var interpreter: Interpreter? = null
-    private val vocab = mutableMapOf<String, Int>()
+    private var interpreter: Interpreter? = preloadedInterpreter
+    @VisibleForTesting
+    internal val vocab = preloadedVocab?.toMutableMap() ?: mutableMapOf()
 
     private val interpreterLock = Any()
 
-    init {
+    /**
+     * Primary constructor for production use.
+     * Loads the TFLite model and vocabulary from assets.
+     */
+    constructor(
+        context: Context,
+        modelName: String = "sms_classifier.tflite",
+        vocabName: String = "vocab.txt"
+    ) : this(context, modelName, vocabName, null, null) {
         loadModel()
         loadVocabulary()
     }
 
     /**
+     * Internal constructor for unit testing.
+     * Allows injecting pre-loaded vocabulary and interpreter.
+     */
+    @VisibleForTesting
+    internal constructor(
+        vocab: Map<String, Int>,
+        interpreter: Interpreter?
+    ) : this(null, "", "", vocab, interpreter)
+
+    /**
      * Loads the TFLite model from the assets folder into an Interpreter.
      */
     private fun loadModel() {
-        val modelFileDescriptor = context.assets.openFd(modelName)
+        val ctx = context ?: return
+        val modelFileDescriptor = ctx.assets.openFd(modelName)
         val fileInputStream = FileInputStream(modelFileDescriptor.fileDescriptor)
         val fileChannel = fileInputStream.channel
         val startOffset = modelFileDescriptor.startOffset
@@ -97,7 +126,8 @@ class SmsClassifier(
      * Loads the vocabulary file from assets into a map for tokenization.
      */
     private fun loadVocabulary() {
-        context.assets.open(vocabName).bufferedReader().useLines { lines ->
+        val ctx = context ?: return
+        ctx.assets.open(vocabName).bufferedReader().useLines { lines ->
             lines.forEachIndexed { index, line ->
                 vocab[line] = index
             }
@@ -110,14 +140,15 @@ class SmsClassifier(
      * @param text The raw SMS body.
      * @return A padded long array representing the tokenized text.
      */
-    private fun tokenize(text: String): LongArray {
+    @VisibleForTesting
+    internal fun tokenize(text: String): LongArray {
         // 1. Preprocess the text to exactly match Python's default TextVectorization.
         val punctuationRegex = Regex("[!\"#\$%&'()*+,-./:;<=>?@\\[\\\\\\]^_`{|}~]")
         val cleanedText = text.lowercase()
             .replace(punctuationRegex, "")       // Remove punctuation
             .replace(Regex("\\s+"), " ") // Collapse multiple spaces into one
             .trim()                               // Remove leading/trailing spaces
-        val words = cleanedText.split(" ")          // Split by single space
+        val words = if (cleanedText.isEmpty()) emptyList() else cleanedText.split(" ")
 
         // 2. Convert words to integer tokens using the vocabulary.
         val tokens = words.map { vocab.getOrDefault(it, UNKNOWN_TOKEN.toInt()).toLong() }.toMutableList()
