@@ -445,8 +445,10 @@ private fun MonthColumn(
                         set(year, monthData.monthIndex, dayOfMonth)
                     }
 
-                    // Check if future date using strict Calendar comparison
-                    val isFuture = currentDayCal.after(today)
+                    // Check if date is in the future (day-level comparison)
+                    val isFuture = currentDayCal.get(Calendar.YEAR) > today.get(Calendar.YEAR) ||
+                            (currentDayCal.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
+                                    currentDayCal.get(Calendar.DAY_OF_YEAR) > today.get(Calendar.DAY_OF_YEAR))
 
                     val dayData = if (!isFuture) {
                         dataMap[currentDayCal.get(Calendar.DAY_OF_YEAR) to year]
@@ -481,6 +483,18 @@ private fun MonthColumn(
                         size = Size(daySizePx, daySizePx),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
                     )
+
+                    // Draw border around today's cell
+                    val isToday = !isFuture && isSameDay(currentDayCal, today)
+                    if (isToday) {
+                        drawRoundRect(
+                            color = androidx.compose.ui.graphics.Color(0xFF1976D2),
+                            topLeft = Offset(x = week * totalCellSize, y = day * totalCellSize + yOffset),
+                            size = Size(daySizePx, daySizePx),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx())
+                        )
+                    }
                 }
             }
         }
