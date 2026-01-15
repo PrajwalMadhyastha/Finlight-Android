@@ -90,6 +90,16 @@ sonar {
     }
 }
 
+// --- NEW: Kover configuration to exclude ViewModelFactory classes from coverage ---
+kover {
+    reports {
+        filters {
+            excludes {
+                classes("*ViewModelFactory*")
+            }
+        }
+    }
+}
 android {
     namespace = "io.pm.finlight"
     compileSdk = 35

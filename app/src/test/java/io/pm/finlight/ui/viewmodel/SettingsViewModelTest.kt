@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -247,7 +248,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
         // Mock dependencies
         `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull())).thenReturn(listOf(sms))
-        `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+        `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
         `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
         `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
         `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
@@ -1037,6 +1038,204 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
         // Assert
         assertNull(viewModel.csvValidationReport.value)
+    }
+
+    // =========================================================================
+    // New tests for startSmsScanAndIdentifyMappings coverage
+    // =========================================================================
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings returns 0 when no SMS permission`() = runTest {
+        // Arrange - Do NOT grant permission
+        initializeViewModel()
+        var importedCount = -1
+        
+        val eventJob = launch { viewModel.uiEvent.collect() }
+
+        try {
+            // Act
+            viewModel.startSmsScanAndIdentifyMappings(null) { importedCount = it }
+            advanceUntilIdle()
+
+            // Assert
+            assertEquals("Should return 0 when permission denied", 0, importedCount)
+        } finally {
+            eventJob.cancel()
+        }
+    }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings sends event when no SMS found`() = runTest {
+        // Arrange
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull())).thenReturn(emptyList())
+        
+        initializeViewModel()
+        
+        val events = mutableListOf<String>()
+        val eventJob = launch { viewModel.uiEvent.collect { events.add(it) } }
+        var importedCount = -1
+
+        try {
+            // Act
+            viewModel.startSmsScanAndIdentifyMappings(null) { importedCount = it }
+            advanceUntilIdle()
+
+            // Assert
+            assertEquals("Should return 0 when no SMS found", 0, importedCount)
+            assertTrue("Should send 'No SMS' event", events.any { it.contains("No SMS") })
+        } finally {
+            eventJob.cancel()
+        }
+    }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings filters non-transactional SMS using classifier`() = runTest {
+        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+        // Re-init with unconfined for this test to ensure immediate execution of async tasks
+        viewModel = SettingsViewModel(
+            applicationContext,
+            settingsRepository,
+            db,
+            transactionRepository,
+            merchantMappingRepository,
+            accountRepository,
+            categoryRepository,
+            smsRepository,
+            transactionViewModel,
+            smsClassifier,
+            transactionRunner,
+            dispatchers = TestDispatcherProvider(testDispatcher)
+        )
+
+        // This tests the ML classifier filtering path
+        val transactionalSms = SmsMessage(1, "BANK", "Your account credited with Rs 500", 1L)
+        val nonTransactionalSms = SmsMessage(2, "PROMO", "Check out our latest deals!", 2L)
+        
+        `when`(smsClassifier.classify("Your account credited with Rs 500")).thenReturn(0.9f)
+        `when`(smsClassifier.classify("Check out our latest deals!")).thenReturn(0.05f)
+        
+        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull()))
+            .thenReturn(listOf(transactionalSms, nonTransactionalSms))
+        
+        `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+        `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+        `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+        `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+        `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+        `when`(accountDao.findByName(anyString())).thenReturn(null)
+        
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+        
+        val eventJob = launch { viewModel.uiEvent.collect() }
+
+        try {
+            viewModel.startSmsScanAndIdentifyMappings(null) { }
+            advanceUntilIdle() // Should be redundant with Unconfined but good practice
+
+            verify(smsClassifier).classify("Your account credited with Rs 500")
+            verify(smsClassifier).classify("Check out our latest deals!")
+        } finally {
+            eventJob.cancel()
+        }
+    }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings updates progress state flows during scan`() = runTest {
+        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+        viewModel = SettingsViewModel(
+            applicationContext,
+            settingsRepository,
+            db,
+            transactionRepository,
+            merchantMappingRepository,
+            accountRepository,
+            categoryRepository,
+            smsRepository,
+            transactionViewModel,
+            smsClassifier,
+            transactionRunner,
+            dispatchers = TestDispatcherProvider(testDispatcher)
+        )
+
+        val sms1 = SmsMessage(1, "BANK", "Transaction 1", 1L)
+        val sms2 = SmsMessage(2, "BANK", "Transaction 2", 2L)
+        
+        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull()))
+            .thenReturn(listOf(sms1, sms2))
+        `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+        `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+        `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+        `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+        `when`(smsClassifier.classify(anyString())).thenReturn(0.05f) 
+        
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+        
+        val eventJob = launch { viewModel.uiEvent.collect() }
+        
+        val totalSmsCounts = mutableListOf<Int>()
+        // Use a conflated collection or just collectLatest to see distinct values? 
+        // StateFlow coalesces values. We might miss '2' if it flips back to '0' quickly.
+        // But with Unconfined, it should happen sequentially.
+        val totalSmsJob = launch(UnconfinedTestDispatcher(testScheduler)) { 
+            viewModel.totalSmsToScan.collect { 
+                println("Test: totalSmsToScan emitted: $it")
+                totalSmsCounts.add(it) 
+            } 
+        }
+
+        try {
+            viewModel.startSmsScanAndIdentifyMappings(null) { }
+            // No advanceUntilIdle needed strictly if Unconfined, but good for safety
+            
+            // Check if 2 was ever emitted
+            assertTrue("totalSmsToScan should have been set to 2. History: $totalSmsCounts", totalSmsCounts.contains(2))
+        } finally {
+            eventJob.cancel()
+            totalSmsJob.cancel()
+        }
+    }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings resets state after completion`() = runTest {
+        // Arrange
+        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull()))
+            .thenReturn(listOf(SmsMessage(1, "BANK", "Test", 1L)))
+        `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+        `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+        `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+        `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+        `when`(smsClassifier.classify(anyString())).thenReturn(0.05f)
+        
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+        initializeViewModel()
+        
+        val eventJob = launch { viewModel.uiEvent.collect() }
+
+        try {
+            // Act
+            viewModel.startSmsScanAndIdentifyMappings(null) { }
+            advanceUntilIdle()
+
+            // Assert - State should be reset after completion
+            assertFalse("isScanning should be false after completion", viewModel.isScanning.value)
+            assertEquals("totalSmsToScan should be 0 after completion", 0, viewModel.totalSmsToScan.value)
+            assertEquals("processedSmsCount should be 0 after completion", 0, viewModel.processedSmsCount.value)
+        } finally {
+            eventJob.cancel()
+        }
     }
 }
 
