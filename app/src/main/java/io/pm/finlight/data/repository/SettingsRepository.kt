@@ -108,12 +108,12 @@ class SettingsRepository(context: Context) {
         return callbackFlow {
             val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
                 if (key == KEY_RECURRING_TRANSACTIONS_ENABLED) {
-                    trySend(sp.getBoolean(key, true))
+                    trySend(sp.getBoolean(key, false))
                 }
             }
             prefs.registerOnSharedPreferenceChangeListener(listener)
-            // Default to true (enabled)
-            trySend(prefs.getBoolean(KEY_RECURRING_TRANSACTIONS_ENABLED, true))
+            // Default to false (disabled)
+            trySend(prefs.getBoolean(KEY_RECURRING_TRANSACTIONS_ENABLED, false))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }

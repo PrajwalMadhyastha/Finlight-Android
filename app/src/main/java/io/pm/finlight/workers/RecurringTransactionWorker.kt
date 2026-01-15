@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/RecurringTransactionWorker.kt
-// REASON: FIX - The PotentialTransaction object created by the worker is now
-// correctly initialized with the current system timestamp. This ensures it is
-// compatible with the updated data class structure and prevents potential
-// date-related bugs in the linking/approval screens.
+// REASON: FIX - Added check for `recurring_transactions_enabled` preference.
+// If disabled, the worker reschedules itself and returns success immediately,
+// preventing notifications and processing. This ensures the feature is completely
+// disabled at the platform level.
 // =================================================================================
 package io.pm.finlight
 
@@ -15,6 +15,7 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
@@ -26,6 +27,18 @@ class RecurringTransactionWorker(
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
+                // FIX: Check if the feature is enabled before proceeding
+                val settingsRepo = SettingsRepository(context)
+                val isEnabled = settingsRepo.getRecurringTransactionsEnabled().first()
+
+                if (!isEnabled) {
+                    Log.d("RecurringTransactionWorker", "Feature disabled. Rescheduling and exiting.")
+                    // Important: We must still reschedule the worker, otherwise it will stop running forever.
+                    // If the user re-enables the feature later, we want the worker to be alive to catch it.
+                    ReminderManager.scheduleRecurringTransactionWorker(context)
+                    return@withContext Result.success()
+                }
+
                 val db = AppDatabase.getInstance(context)
                 val recurringDao = db.recurringTransactionDao()
 

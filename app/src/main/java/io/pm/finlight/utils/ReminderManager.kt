@@ -39,7 +39,7 @@ object ReminderManager {
     // --- DELETED: SNAPSHOT_WORKER_TAG ---
 
     // New preference key for enabling/disabling the recurring transaction feature
-    private const val KEY_RECURRING_TRANSACTION_FEATURE_ENABLED = "recurring_transaction_feature_enabled"
+    private const val KEY_RECURRING_TRANSACTION_FEATURE_ENABLED = "recurring_transactions_enabled"
 
 
     fun rescheduleAllWork(context: Context) {
