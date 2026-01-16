@@ -44,6 +44,7 @@ import io.pm.finlight.ui.components.ConsistencyCalendar
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.MonthlyConsistencyCalendarCard
+import io.pm.finlight.ui.components.ModernTrendChart
 import io.pm.finlight.ui.components.ReportPeriodSelector
 import io.pm.finlight.ui.components.SpendingSummaryCard
 import io.pm.finlight.ui.components.TransactionItem
@@ -221,8 +222,13 @@ fun TimePeriodReportScreen(
                         )
                         Spacer(Modifier.height(16.dp))
                         if (chartDataPair != null) {
-                            SpendingBarChart(
-                                chartData = chartDataPair!!
+                            ModernTrendChart(
+                                chartData = chartDataPair!!,
+                                onBarClick = null, // No navigation needed in detail view
+                                initialScrollIndex = if (timePeriod == TimePeriod.YEARLY) {
+                                    // Scroll to current month (0-indexed)
+                                    Calendar.getInstance().get(Calendar.MONTH)
+                                } else null
                             )
                         } else {
                             Box(
@@ -394,57 +400,4 @@ private fun YearlyOutlierManagementCard(
             }
         }
     }
-}
-
-@Composable
-private fun SpendingBarChart(chartData: Pair<BarData, List<String>>) {
-    val (barData, labels) = chartData
-    val selectedIndex = labels.size - 1
-
-    val highlightColor = MaterialTheme.colorScheme.primary.toArgb()
-    val defaultColor = MaterialTheme.colorScheme.surfaceVariant.toArgb()
-    val axisTextColor = MaterialTheme.colorScheme.onSurface.toArgb()
-    val valueTextColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
-
-    val colors = labels.indices.map { if (it == selectedIndex) highlightColor else defaultColor }
-    (barData.dataSets.first() as BarDataSet).colors = colors
-
-    AndroidView(
-        factory = { context ->
-            BarChart(context).apply {
-                description.isEnabled = false
-                legend.isEnabled = false
-                setDrawGridBackground(false)
-                setDrawValueAboveBar(true)
-                setTouchEnabled(false)
-
-                xAxis.apply {
-                    position = XAxis.XAxisPosition.BOTTOM
-                    setDrawGridLines(false)
-                    setDrawAxisLine(false)
-                    granularity = 1f
-                    valueFormatter = IndexAxisValueFormatter(labels)
-                    textColor = axisTextColor
-                    textSize = 12f
-                    typeface = Typeface.DEFAULT_BOLD
-                }
-                axisLeft.apply {
-                    setDrawGridLines(true)
-                    gridColor = axisTextColor and 0x22FFFFFF
-                    setDrawLabels(false)
-                    setDrawAxisLine(false)
-                    axisMinimum = 0f
-                }
-                axisRight.isEnabled = false
-            }
-        },
-        update = { chart ->
-            chart.data = barData
-            (chart.data.dataSets.first() as BarDataSet).valueTextColor = valueTextColor
-            chart.invalidate()
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-    )
 }

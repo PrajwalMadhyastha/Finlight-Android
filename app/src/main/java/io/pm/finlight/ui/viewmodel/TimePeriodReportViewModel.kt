@@ -191,26 +191,29 @@ class TimePeriodReportViewModel(
                 val endCal = (calendar.clone() as Calendar)
                 val startCal = (calendar.clone() as Calendar).apply { add(Calendar.HOUR_OF_DAY, -24) }
 
-                transactionDao.getDailySpendingForDateRange(startCal.timeInMillis, endCal.timeInMillis).map { dailyTotals ->
-                    if (dailyTotals.isEmpty()) return@map null
+                transactionDao.getDailyTrends(startCal.timeInMillis, endCal.timeInMillis).map { dailyTrends ->
+                    if (dailyTrends.isEmpty()) return@map null
 
-                    val entries = mutableListOf<BarEntry>()
+                    val incomeEntries = mutableListOf<BarEntry>()
+                    val expenseEntries = mutableListOf<BarEntry>()
                     val labels = mutableListOf<String>()
                     val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
                     val fullDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-                    dailyTotals.forEachIndexed { index, dailyTotal ->
-                        entries.add(BarEntry(index.toFloat(), dailyTotal.totalAmount.toFloat()))
-                        val date = fullDateFormat.parse(dailyTotal.date)
+                    dailyTrends.forEachIndexed { index, dailyTrend ->
+                        incomeEntries.add(BarEntry(index.toFloat(), dailyTrend.totalIncome.toFloat()))
+                        expenseEntries.add(BarEntry(index.toFloat(), dailyTrend.totalExpenses.toFloat()))
+                        val date = fullDateFormat.parse(dailyTrend.date)
                         labels.add(dayFormat.format(date!!))
                     }
 
-                    val dataSet = BarDataSet(entries, "Daily Spending").apply {
-                        color = 0xFF81D4FA.toInt() // Light Blue
-                        setDrawValues(true)
-                        valueTextColor = 0xFFFFFFFF.toInt()
+                    val incomeDataSet = BarDataSet(incomeEntries, "Income").apply {
+                        color = 0xFF66BB6A.toInt() // Green
                     }
-                    Pair(BarData(dataSet), labels)
+                    val expenseDataSet = BarDataSet(expenseEntries, "Expense").apply {
+                        color = 0xFFEF5350.toInt() // Red
+                    }
+                    Pair(BarData(incomeDataSet, expenseDataSet), labels)
                 }
             }
             TimePeriod.WEEKLY -> {
@@ -224,28 +227,31 @@ class TimePeriodReportViewModel(
                     set(Calendar.DAY_OF_WEEK, firstDayOfWeek)
                 }
 
-                transactionDao.getWeeklySpendingForDateRange(startCal.timeInMillis, endCal.timeInMillis).map { weeklyTotals ->
-                    if (weeklyTotals.isEmpty()) return@map null
+                transactionDao.getWeeklyTrends(startCal.timeInMillis, endCal.timeInMillis).map { weeklyTrends ->
+                    if (weeklyTrends.isEmpty()) return@map null
 
-                    val entries = mutableListOf<BarEntry>()
+                    val incomeEntries = mutableListOf<BarEntry>()
+                    val expenseEntries = mutableListOf<BarEntry>()
                     val labels = mutableListOf<String>()
-                    val totalsMap = weeklyTotals.associateBy { it.period }
+                    val trendsMap = weeklyTrends.associateBy { it.period }
 
                     for (i in 0..7) {
                         val weekCal = (startCal.clone() as Calendar).apply { add(Calendar.WEEK_OF_YEAR, i) }
                         val yearWeek = "${weekCal.get(Calendar.YEAR)}-${weekCal.get(Calendar.WEEK_OF_YEAR).toString().padStart(2, '0')}"
 
-                        val total = totalsMap[yearWeek]?.totalAmount?.toFloat() ?: 0f
-                        entries.add(BarEntry(i.toFloat(), total))
+                        val trend = trendsMap[yearWeek]
+                        incomeEntries.add(BarEntry(i.toFloat(), trend?.totalIncome?.toFloat() ?: 0f))
+                        expenseEntries.add(BarEntry(i.toFloat(), trend?.totalExpenses?.toFloat() ?: 0f))
                         labels.add("W${weekCal.get(Calendar.WEEK_OF_YEAR)}")
                     }
 
-                    val dataSet = BarDataSet(entries, "Weekly Spending").apply {
-                        color = 0xFF9575CD.toInt() // Deep Purple
-                        setDrawValues(true)
-                        valueTextColor = 0xFFFFFFFF.toInt()
+                    val incomeDataSet = BarDataSet(incomeEntries, "Income").apply {
+                        color = 0xFF66BB6A.toInt() // Green
                     }
-                    Pair(BarData(dataSet), labels)
+                    val expenseDataSet = BarDataSet(expenseEntries, "Expense").apply {
+                        color = 0xFFEF5350.toInt() // Red
+                    }
+                    Pair(BarData(incomeDataSet, expenseDataSet), labels)
                 }
             }
             TimePeriod.MONTHLY -> {
@@ -257,66 +263,84 @@ class TimePeriodReportViewModel(
                     set(Calendar.DAY_OF_MONTH, 1)
                 }
 
-                transactionDao.getMonthlySpendingForDateRange(startCal.timeInMillis, endCal.timeInMillis).map { monthlyTotals ->
-                    if (monthlyTotals.isEmpty()) return@map null
+                transactionDao.getMonthlyTrends(startCal.timeInMillis).map { monthlyTrends ->
+                    if (monthlyTrends.isEmpty()) return@map null
 
-                    val entries = mutableListOf<BarEntry>()
+                    val incomeEntries = mutableListOf<BarEntry>()
+                    val expenseEntries = mutableListOf<BarEntry>()
                     val labels = mutableListOf<String>()
                     val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
                     val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-                    val totalsMap = monthlyTotals.associateBy { it.period }
+                    val trendsMap = monthlyTrends.associateBy { it.monthYear }
 
                     for (i in 0..5) {
                         val monthCal = (startCal.clone() as Calendar).apply { add(Calendar.MONTH, i) }
                         val yearMonth = yearMonthFormat.format(monthCal.time)
 
-                        val total = totalsMap[yearMonth]?.totalAmount?.toFloat() ?: 0f
-                        entries.add(BarEntry(i.toFloat(), total))
+                        val trend = trendsMap[yearMonth]
+                        incomeEntries.add(BarEntry(i.toFloat(), trend?.totalIncome?.toFloat() ?: 0f))
+                        expenseEntries.add(BarEntry(i.toFloat(), trend?.totalExpenses?.toFloat() ?: 0f))
                         labels.add(monthFormat.format(monthCal.time))
                     }
 
-                    val dataSet = BarDataSet(entries, "Monthly Spending").apply {
-                        color = 0xFF4DB6AC.toInt() // Teal
-                        setDrawValues(true)
-                        valueTextColor = 0xFFFFFFFF.toInt()
+                    val incomeDataSet = BarDataSet(incomeEntries, "Income").apply {
+                        color = 0xFF66BB6A.toInt() // Green
                     }
-                    Pair(BarData(dataSet), labels)
+                    val expenseDataSet = BarDataSet(expenseEntries, "Expense").apply {
+                        color = 0xFFEF5350.toInt() // Red
+                    }
+                    Pair(BarData(incomeDataSet, expenseDataSet), labels)
                 }
             }
             TimePeriod.YEARLY -> {
                 val endCal = (calendar.clone() as Calendar).apply {
                     set(Calendar.MONTH, Calendar.DECEMBER)
                     set(Calendar.DAY_OF_MONTH, 31)
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
                 }
                 val startCal = (calendar.clone() as Calendar).apply {
                     set(Calendar.MONTH, Calendar.JANUARY)
                     set(Calendar.DAY_OF_MONTH, 1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
                 }
 
-                transactionDao.getMonthlySpendingForDateRange(startCal.timeInMillis, endCal.timeInMillis).map { monthlyTotals ->
-                    val entries = mutableListOf<BarEntry>()
+                // Use getMonthlyTrends but filter results to only include current year
+                transactionDao.getMonthlyTrends(startCal.timeInMillis).map { monthlyTrends ->
+                    val incomeEntries = mutableListOf<BarEntry>()
+                    val expenseEntries = mutableListOf<BarEntry>()
                     val labels = mutableListOf<String>()
                     val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
                     val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-                    val totalsMap = monthlyTotals.associateBy { it.period }
+                    
+                    // Filter trends to only include current year
+                    val currentYear = calendar.get(Calendar.YEAR).toString()
+                    val trendsMap = monthlyTrends
+                        .filter { it.monthYear.startsWith(currentYear) }
+                        .associateBy { it.monthYear }
 
                     for (i in 0..11) {
                         val monthCal = (startCal.clone() as Calendar).apply { add(Calendar.MONTH, i) }
                         val yearMonth = yearMonthFormat.format(monthCal.time)
 
-                        val total = totalsMap[yearMonth]?.totalAmount?.toFloat() ?: 0f
-                        entries.add(BarEntry(i.toFloat(), total))
+                        val trend = trendsMap[yearMonth]
+                        incomeEntries.add(BarEntry(i.toFloat(), trend?.totalIncome?.toFloat() ?: 0f))
+                        expenseEntries.add(BarEntry(i.toFloat(), trend?.totalExpenses?.toFloat() ?: 0f))
                         labels.add(monthFormat.format(monthCal.time))
                     }
 
-                    if (entries.all { it.y == 0f }) return@map null
+                    if (incomeEntries.all { it.y == 0f } && expenseEntries.all { it.y == 0f }) return@map null
 
-                    val dataSet = BarDataSet(entries, "Yearly Spending").apply {
-                        color = 0xFF4DD0E1.toInt() // Cyan
-                        setDrawValues(true)
-                        valueTextColor = 0xFFFFFFFF.toInt()
+                    val incomeDataSet = BarDataSet(incomeEntries, "Income").apply {
+                        color = 0xFF66BB6A.toInt() // Green
                     }
-                    Pair(BarData(dataSet), labels)
+                    val expenseDataSet = BarDataSet(expenseEntries, "Expense").apply {
+                        color = 0xFFEF5350.toInt() // Red
+                    }
+                    Pair(BarData(incomeDataSet, expenseDataSet), labels)
                 }
             }
         }

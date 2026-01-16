@@ -813,6 +813,35 @@ interface TransactionDao {
     """)
     fun getMonthlySpendingForDateRange(startDate: Long, endDate: Long): Flow<List<PeriodTotal>>
 
+    @Query("""
+        SELECT
+            strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime') as date,
+            SUM(CASE WHEN T1.transactionType = 'income' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
+            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%m-%d', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.transactionType = 'income') as totalIncome,
+            SUM(CASE WHEN T1.transactionType = 'expense' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
+            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%m-%d', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.transactionType = 'expense') as totalExpenses
+        FROM transactions AS T1
+        WHERE T1.date BETWEEN :startDate AND :endDate AND T1.isExcluded = 0
+        GROUP BY strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime')
+        ORDER BY date ASC
+    """)
+    fun getDailyTrends(startDate: Long, endDate: Long): Flow<List<DailyTrend>>
+
+    @Query("""
+        SELECT
+            strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime') as period,
+            SUM(CASE WHEN T1.transactionType = 'income' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
+            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%W', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.transactionType = 'income') as totalIncome,
+            SUM(CASE WHEN T1.transactionType = 'expense' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
+            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%W', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.transactionType = 'expense') as totalExpenses
+        FROM transactions AS T1
+        WHERE T1.date BETWEEN :startDate AND :endDate AND T1.isExcluded = 0
+        GROUP BY strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime')
+        ORDER BY period ASC
+    """)
+    fun getWeeklyTrends(startDate: Long, endDate: Long): Flow<List<WeeklyTrend>>
+
+
     @Query("UPDATE transactions SET sourceSmsHash = :smsHash WHERE id = :transactionId")
     suspend fun setSmsHash(transactionId: Int, smsHash: String)
 
