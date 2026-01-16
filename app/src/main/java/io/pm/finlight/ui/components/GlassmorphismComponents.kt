@@ -50,10 +50,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import io.pm.finlight.*
@@ -179,60 +181,146 @@ fun DashboardHeroCard(
 
         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
 
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceAround
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            StatItem(label = "Income", amount = income, onClick = { navController.navigate("income_screen") }, isPrivacyModeEnabled = isPrivacyModeEnabled)
-            StatItem(label = "Budget", amount = totalBudget, isCurrency = true, onClick = { navController.navigate("budget_screen") }, isPrivacyModeEnabled = isPrivacyModeEnabled)
-            StatItem(label = "Safe to Spend", amount = safeToSpend, isPerDay = true, isPrivacyModeEnabled = isPrivacyModeEnabled)
+            // Line 1: Income and Budget side-by-side
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                MinimalStatItem(
+                    label = "Income",
+                    amount = income,
+                    onClick = { navController.navigate("income_screen") },
+                    isPrivacyModeEnabled = isPrivacyModeEnabled
+                )
+                MinimalStatItem(
+                    label = "Budget",
+                    amount = totalBudget,
+                    onClick = { navController.navigate("budget_screen") },
+                    isPrivacyModeEnabled = isPrivacyModeEnabled
+                )
+            }
+
+            // Line 2: Safe to Spend with subtle emphasis
+            EmphasizedMinimalStatItem(
+                label = "Safe to Spend",
+                amount = safeToSpend,
+                isPerDay = true,
+                isPrivacyModeEnabled = isPrivacyModeEnabled
+            )
         }
     }
 }
 
 @Composable
-private fun StatItem(
+private fun MinimalStatItem(
     label: String,
     amount: Long,
     isPrivacyModeEnabled: Boolean,
-    isCurrency: Boolean = true,
-    isPerDay: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     val animatedAmount by animateFloatAsState(
         targetValue = amount.toFloat(),
         animationSpec = tween(durationMillis = 400, easing = EaseOutCubic),
-        label = "StatItemAnimation"
+        label = "MinimalStatItemAnimation"
     )
-    val clickableModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+
+    val clickableModifier = if (onClick != null) {
+        Modifier.clickable(onClick = onClick)
+    } else {
+        Modifier
+    }
 
     Column(
+        modifier = clickableModifier.padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = clickableModifier
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PrivacyAwareText(
-                amount = animatedAmount.roundToInt(),
-                isPrivacyMode = isPrivacyModeEnabled,
-                isCurrency = isCurrency,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+        PrivacyAwareText(
+            amount = animatedAmount.roundToInt(),
+            isPrivacyMode = isPrivacyModeEnabled,
+            isCurrency = true,
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontFeatureSettings = "tnum",
+                letterSpacing = 0.3.sp
+            ),
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun EmphasizedMinimalStatItem(
+    label: String,
+    amount: Long,
+    isPerDay: Boolean,
+    isPrivacyModeEnabled: Boolean
+) {
+    val animatedAmount by animateFloatAsState(
+        targetValue = amount.toFloat(),
+        animationSpec = tween(durationMillis = 400, easing = EaseOutCubic),
+        label = "EmphasizedMinimalStatItemAnimation"
+    )
+
+    val isDark = isSystemInDarkTheme()
+    val backgroundColor = if (isDark) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+    } else {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(backgroundColor)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
-            if (isPerDay) {
-                Text(
-                    text = "/day",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 2.dp, top = 4.dp)
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                PrivacyAwareText(
+                    amount = animatedAmount.roundToInt(),
+                    isPrivacyMode = isPrivacyModeEnabled,
+                    isCurrency = true,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontFeatureSettings = "tnum",
+                        letterSpacing = 0.5.sp
+                    ),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+                if (isPerDay) {
+                    Text(
+                        text = "/day",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 2.dp, bottom = 2.dp)
+                    )
+                }
             }
         }
     }
