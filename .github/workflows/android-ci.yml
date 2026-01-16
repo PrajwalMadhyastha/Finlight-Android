@@ -1,5 +1,9 @@
 name: Android CI
 
+# Explicitly limit permissions for security (principle of least privilege)
+permissions:
+  contents: read
+
 # This workflow runs on any pull request that targets the 'develop' and 'main' branches
 on:
   pull_request:

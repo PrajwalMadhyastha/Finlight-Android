@@ -36,6 +36,7 @@ import io.pm.finlight.DrilldownViewModel
 import io.pm.finlight.DrilldownViewModelFactory
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.ModernTrendChart
 import io.pm.finlight.ui.components.TransactionItem
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,7 +76,10 @@ fun DrilldownScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     if (chartData != null) {
-                        SpendingBarChart(chartData = chartData!!)
+                        ModernTrendChart(
+                            chartData = chartData!!,
+                            onBarClick = null
+                        )
                     } else {
                         Box(
                             modifier = Modifier
@@ -110,50 +114,4 @@ fun DrilldownScreen(
             }
         }
     }
-}
-
-@Composable
-private fun SpendingBarChart(chartData: Pair<BarData, List<String>>) {
-    val (barData, labels) = chartData
-    val axisTextColor = MaterialTheme.colorScheme.onSurface.toArgb()
-    val valueTextColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
-
-    AndroidView(
-        factory = { context ->
-            BarChart(context).apply {
-                description.isEnabled = false
-                legend.isEnabled = false
-                setDrawGridBackground(false)
-                setDrawValueAboveBar(true)
-                setTouchEnabled(false)
-
-                xAxis.apply {
-                    position = XAxis.XAxisPosition.BOTTOM
-                    setDrawGridLines(false)
-                    setDrawAxisLine(false)
-                    granularity = 1f
-                    valueFormatter = IndexAxisValueFormatter(labels)
-                    textColor = axisTextColor
-                    textSize = 12f
-                    typeface = Typeface.DEFAULT_BOLD
-                }
-                axisLeft.apply {
-                    setDrawGridLines(true)
-                    gridColor = axisTextColor and 0x22FFFFFF
-                    setDrawLabels(false)
-                    setDrawAxisLine(false)
-                    axisMinimum = 0f
-                }
-                axisRight.isEnabled = false
-            }
-        },
-        update = { chart ->
-            chart.data = barData
-            (chart.data.dataSets.first()).valueTextColor = valueTextColor
-            chart.invalidate()
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(200.dp)
-    )
 }

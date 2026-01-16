@@ -1331,7 +1331,7 @@ class TransactionViewModel(
     fun unsplitTransaction(transaction: Transaction) {
         viewModelScope.launch {
             db.withTransaction {
-                val firstSplitCategory = db.splitTransactionDao().getSplitsForParent(transaction.id).firstOrNull()?.firstOrNull()?.splitTransaction?.categoryId
+                val firstSplitCategory = db.splitTransactionDao().getSplitsForParentSimple(transaction.id).firstOrNull()?.splitTransaction?.categoryId
                 db.splitTransactionDao().deleteSplitsForParent(transaction.id)
                 val originalDescription = transaction.originalDescription ?: transaction.description
                 db.transactionDao().unmarkAsSplit(transaction.id, originalDescription, firstSplitCategory)

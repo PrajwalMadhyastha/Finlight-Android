@@ -23,6 +23,8 @@ import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.ml.SmsClassifier
 
+import io.pm.finlight.data.RoomTransactionRunner
+
 class SettingsViewModelFactory(
     private val application: Application,
     private val transactionViewModel: TransactionViewModel
@@ -39,6 +41,7 @@ class SettingsViewModelFactory(
             val categoryRepository = CategoryRepository(db.categoryDao())
             val smsRepository = SmsRepository(application)
             val smsClassifier = SmsClassifier(application)
+            val transactionRunner = RoomTransactionRunner()
 
             @Suppress("UNCHECKED_CAST")
             return SettingsViewModel(
@@ -51,7 +54,8 @@ class SettingsViewModelFactory(
                 categoryRepository,
                 smsRepository,
                 transactionViewModel,
-                smsClassifier
+                smsClassifier,
+                transactionRunner
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

@@ -97,6 +97,13 @@ private const val PLAY_SERVICES_RESOLUTION_REQUEST = 9000
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 class MainActivity : AppCompatActivity() {
+    
+    companion object {
+        const val ACTION_ADD_EXPENSE = "io.pm.finlight.ACTION_ADD_EXPENSE"
+        const val ACTION_ADD_INCOME = "io.pm.finlight.ACTION_ADD_INCOME"
+        const val ACTION_SEARCH = "io.pm.finlight.ACTION_SEARCH"
+    }
+    
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -140,7 +147,10 @@ class MainActivity : AppCompatActivity() {
                             }
                         )
                     } else {
-                        FinanceAppWithLockScreen(isInitiallyLocked = settingsRepository.isAppLockEnabledBlocking())
+                        FinanceAppWithLockScreen(
+                            isInitiallyLocked = settingsRepository.isAppLockEnabledBlocking(),
+                            shortcutAction = intent?.action
+                        )
                     }
                 }
             }
@@ -165,7 +175,7 @@ class MainActivity : AppCompatActivity() {
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
-fun FinanceAppWithLockScreen(isInitiallyLocked: Boolean) {
+fun FinanceAppWithLockScreen(isInitiallyLocked: Boolean, shortcutAction: String? = null) {
     val context = LocalContext.current
     val settingsRepository = remember { SettingsRepository(context) }
 
@@ -204,7 +214,7 @@ fun FinanceAppWithLockScreen(isInitiallyLocked: Boolean) {
     if (isLocked) {
         LockScreen(onUnlock = { isLocked = false })
     } else {
-        MainAppScreen()
+        MainAppScreen(shortcutAction = shortcutAction)
     }
 }
 
@@ -264,7 +274,7 @@ fun LockScreen(onUnlock: () -> Unit) {
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainAppScreen() {
+fun MainAppScreen(shortcutAction: String? = null) {
     val navController = rememberNavController()
     val context = LocalContext.current.applicationContext as Application
 
@@ -302,6 +312,21 @@ fun MainAppScreen() {
         BottomNavItem.Reports,
         BottomNavItem.Profile
     )
+    
+    // Handle shortcut navigation
+    LaunchedEffect(shortcutAction) {
+        when (shortcutAction) {
+            MainActivity.ACTION_ADD_EXPENSE -> {
+                navController.navigate("add_transaction?transactionType=expense")
+            }
+            MainActivity.ACTION_ADD_INCOME -> {
+                navController.navigate("add_transaction?transactionType=income")
+            }
+            MainActivity.ACTION_SEARCH -> {
+                navController.navigate("search_screen")
+            }
+        }
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
@@ -856,11 +881,12 @@ fun AppNavHost(
         }
 
         composable(
-            "add_transaction?isCsvEdit={isCsvEdit}&csvLineNumber={csvLineNumber}&initialDataJson={initialDataJson}",
+            "add_transaction?isCsvEdit={isCsvEdit}&csvLineNumber={csvLineNumber}&initialDataJson={initialDataJson}&transactionType={transactionType}",
             arguments = listOf(
                 navArgument("isCsvEdit") { type = NavType.BoolType; defaultValue = false },
                 navArgument("csvLineNumber") { type = NavType.IntType; defaultValue = -1 },
-                navArgument("initialDataJson") { type = NavType.StringType; nullable = true; defaultValue = null }
+                navArgument("initialDataJson") { type = NavType.StringType; nullable = true; defaultValue = null },
+                navArgument("transactionType") { type = NavType.StringType; nullable = true; defaultValue = null }
             ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
@@ -872,7 +898,8 @@ fun AppNavHost(
                 navController = navController,
                 viewModel = transactionViewModel,
                 isCsvEdit = arguments.getBoolean("isCsvEdit"),
-                initialDataJson = arguments.getString("initialDataJson")?.let { URLDecoder.decode(it, "UTF-8") }
+                initialDataJson = arguments.getString("initialDataJson")?.let { URLDecoder.decode(it, "UTF-8") },
+                initialTransactionType = arguments.getString("transactionType")
             )
         }
 

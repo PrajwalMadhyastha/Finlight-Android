@@ -266,7 +266,8 @@ fun TransactionDetailScreen(
                             }
                             DropdownMenu(
                                 expanded = showMenu,
-                                onDismissRequest = { showMenu = false }
+                                onDismissRequest = { showMenu = false },
+                                modifier = Modifier.background(popupContainerColor.copy(alpha = 1f))
                             ) {
                                 if (details.transaction.isSplit) {
                                     DropdownMenuItem(
@@ -529,14 +530,19 @@ fun TransactionDetailScreen(
                             }) { Text("OK") }
                         },
                         dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
-                        colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
-                    ) { DatePicker(state = datePickerState) }
+                        colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                    ) {
+                        DatePicker(
+                            state = datePickerState,
+                            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                        )
+                    }
                 }
                 if (showTimePicker) {
                     val timePickerState = rememberTimePickerState(initialHour = selectedDateTime.get(Calendar.HOUR_OF_DAY), initialMinute = selectedDateTime.get(Calendar.MINUTE))
                     AlertDialog(
                         onDismissRequest = { showTimePicker = false },
-                        containerColor = popupContainerColor,
+                        containerColor = popupContainerColor.copy(alpha = 1f),
                         title = { Text("Select Time") },
                         text = {
                             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -561,7 +567,7 @@ fun TransactionDetailScreen(
                 if (showDeleteDialog) {
                     AlertDialog(
                         onDismissRequest = { showDeleteDialog = false },
-                        containerColor = popupContainerColor,
+                        containerColor = popupContainerColor.copy(alpha = 1f),
                         title = { Text("Delete Transaction?", color = MaterialTheme.colorScheme.onSurface) },
                         text = { Text("Are you sure you want to permanently delete this transaction? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         confirmButton = {
@@ -594,7 +600,7 @@ fun TransactionDetailScreen(
                 if (showImageDeleteDialog != null) {
                     AlertDialog(
                         onDismissRequest = { showImageDeleteDialog = null },
-                        containerColor = popupContainerColor,
+                        containerColor = popupContainerColor.copy(alpha = 1f),
                         title = { Text("Delete Attachment?", color = MaterialTheme.colorScheme.onSurface) },
                         text = { Text("Are you sure you want to delete this attachment? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         confirmButton = {

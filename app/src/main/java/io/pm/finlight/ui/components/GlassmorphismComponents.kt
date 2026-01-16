@@ -50,10 +50,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import io.pm.finlight.*
@@ -119,8 +121,7 @@ fun DashboardHeroCard(
 
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp),
+            .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
@@ -128,7 +129,9 @@ fun DashboardHeroCard(
             text = budgetHealthSummary,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -179,60 +182,146 @@ fun DashboardHeroCard(
 
         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
 
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceAround
+                .padding(horizontal = 16.dp, vertical = 0.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            StatItem(label = "Income", amount = income, onClick = { navController.navigate("income_screen") }, isPrivacyModeEnabled = isPrivacyModeEnabled)
-            StatItem(label = "Budget", amount = totalBudget, isCurrency = true, onClick = { navController.navigate("budget_screen") }, isPrivacyModeEnabled = isPrivacyModeEnabled)
-            StatItem(label = "Safe to Spend", amount = safeToSpend, isPerDay = true, isPrivacyModeEnabled = isPrivacyModeEnabled)
+            // Line 1: Income and Budget side-by-side
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                MinimalStatItem(
+                    label = "Income",
+                    amount = income,
+                    onClick = { navController.navigate("income_screen") },
+                    isPrivacyModeEnabled = isPrivacyModeEnabled
+                )
+                MinimalStatItem(
+                    label = "Budget",
+                    amount = totalBudget,
+                    onClick = { navController.navigate("budget_screen") },
+                    isPrivacyModeEnabled = isPrivacyModeEnabled
+                )
+            }
+
+            // Line 2: Safe to Spend with subtle emphasis
+            EmphasizedMinimalStatItem(
+                label = "Safe to Spend",
+                amount = safeToSpend,
+                isPerDay = true,
+                isPrivacyModeEnabled = isPrivacyModeEnabled
+            )
         }
     }
 }
 
 @Composable
-private fun StatItem(
+private fun MinimalStatItem(
     label: String,
     amount: Long,
     isPrivacyModeEnabled: Boolean,
-    isCurrency: Boolean = true,
-    isPerDay: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     val animatedAmount by animateFloatAsState(
         targetValue = amount.toFloat(),
         animationSpec = tween(durationMillis = 400, easing = EaseOutCubic),
-        label = "StatItemAnimation"
+        label = "MinimalStatItemAnimation"
     )
-    val clickableModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+
+    val clickableModifier = if (onClick != null) {
+        Modifier.clickable(onClick = onClick)
+    } else {
+        Modifier
+    }
 
     Column(
+        modifier = clickableModifier.padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = clickableModifier
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PrivacyAwareText(
-                amount = animatedAmount.roundToInt(),
-                isPrivacyMode = isPrivacyModeEnabled,
-                isCurrency = isCurrency,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+        PrivacyAwareText(
+            amount = animatedAmount.roundToInt(),
+            isPrivacyMode = isPrivacyModeEnabled,
+            isCurrency = true,
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontFeatureSettings = "tnum",
+                letterSpacing = 0.3.sp
+            ),
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun EmphasizedMinimalStatItem(
+    label: String,
+    amount: Long,
+    isPerDay: Boolean,
+    isPrivacyModeEnabled: Boolean
+) {
+    val animatedAmount by animateFloatAsState(
+        targetValue = amount.toFloat(),
+        animationSpec = tween(durationMillis = 400, easing = EaseOutCubic),
+        label = "EmphasizedMinimalStatItemAnimation"
+    )
+
+    val isDark = isSystemInDarkTheme()
+    val backgroundColor = if (isDark) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+    } else {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(backgroundColor)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
-            if (isPerDay) {
-                Text(
-                    text = "/day",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 2.dp, top = 4.dp)
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                PrivacyAwareText(
+                    amount = animatedAmount.roundToInt(),
+                    isPrivacyMode = isPrivacyModeEnabled,
+                    isCurrency = true,
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontFeatureSettings = "tnum",
+                        letterSpacing = 0.5.sp
+                    ),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+                if (isPerDay) {
+                    Text(
+                        text = "/day",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 2.dp, bottom = 2.dp)
+                    )
+                }
             }
         }
     }
@@ -242,10 +331,38 @@ private fun StatItem(
 @Composable
 private fun AuroraProgressBar(progress: Float) {
     val animatedPercentage = (progress * 100).roundToInt()
-    val progressColor = when {
-        progress > 0.9 -> MaterialTheme.colorScheme.error
-        progress > 0.7 -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.primary
+    val isDark = isSystemInDarkTheme()
+    
+    // Vibrant gradient colors - adjusted warning to be more orange
+    val progressGradient = when {
+        progress > 0.9 -> listOf(Color(0xFFFF3B30), Color(0xFFFF2D55))
+        progress > 0.7 -> listOf(Color(0xFFFF8C00), Color(0xFFFF9500))
+        else -> listOf(Color(0xFF34C759), Color(0xFF30D158))
+    }
+    
+    val borderColor = if (isDark) {
+        Color.White.copy(alpha = 0.25f)
+    } else {
+        Color.Black.copy(alpha = 0.15f)
+    }
+    
+    // Zone colors for background - subtle but visible
+    val greenZone = if (isDark) {
+        Color(0xFF34C759).copy(alpha = 0.20f)
+    } else {
+        Color(0xFF34C759).copy(alpha = 0.15f)
+    }
+    
+    val orangeZone = if (isDark) {
+        Color(0xFFFF8C00).copy(alpha = 0.20f)
+    } else {
+        Color(0xFFFF8C00).copy(alpha = 0.15f)
+    }
+    
+    val redZone = if (isDark) {
+        Color(0xFFFF3B30).copy(alpha = 0.20f)
+    } else {
+        Color(0xFFFF3B30).copy(alpha = 0.15f)
     }
 
     Layout(
@@ -261,25 +378,53 @@ private fun AuroraProgressBar(progress: Float) {
                     .fillMaxWidth()
                     .height(20.dp)
             ) {
+                // Border
                 drawRoundRect(
-                    color = Color.Black.copy(alpha = 0.2f),
+                    color = borderColor,
                     size = size,
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2),
-                    style = Stroke(width = 1.dp.toPx()),
-                    topLeft = Offset(0f, 1.dp.toPx())
+                    style = Stroke(width = 1.5.dp.toPx())
                 )
+                
+                // Green zone (0-70%)
                 drawRoundRect(
-                    color = Color.White.copy(alpha = 0.1f),
-                    size = size,
+                    color = greenZone,
+                    size = Size(width = size.width * 0.7f, height = size.height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
+                )
+                
+                // Orange zone (70-90%)
+                drawRect(
+                    color = orangeZone,
+                    topLeft = Offset(size.width * 0.7f, 0f),
+                    size = Size(width = size.width * 0.2f, height = size.height)
+                )
+                
+                // Red zone (90-100%)
+                drawRoundRect(
+                    color = redZone,
+                    topLeft = Offset(size.width * 0.9f, 0f),
+                    size = Size(width = size.width * 0.1f, height = size.height),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
                 )
 
                 if (progress > 0) {
+                    // Vibrant progress fill
+                    drawRoundRect(
+                        brush = Brush.horizontalGradient(colors = progressGradient),
+                        size = Size(width = size.width * progress, height = size.height),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
+                    )
+                    
+                    // Inner glow
                     drawRoundRect(
                         brush = Brush.horizontalGradient(
-                            colors = listOf(progressColor.copy(alpha = 0.6f), progressColor)
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.3f),
+                                Color.White.copy(alpha = 0.1f)
+                            )
                         ),
-                        size = Size(width = size.width * progress, height = size.height),
+                        size = Size(width = size.width * progress, height = size.height * 0.5f),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
                     )
                 }
@@ -288,14 +433,8 @@ private fun AuroraProgressBar(progress: Float) {
     ) { measurables, constraints ->
         val textPlaceable = measurables[0].measure(Constraints())
         val canvasPlaceable = measurables[1].measure(constraints)
-
         val progressWidth = (canvasPlaceable.width * progress).toInt()
-        val textX = (progressWidth - textPlaceable.width / 2).coerceIn(
-            0,
-            canvasPlaceable.width - textPlaceable.width
-        )
-        val textY = (canvasPlaceable.height - textPlaceable.height) / 2
-
+        val textX = (progressWidth - textPlaceable.width / 2).coerceIn(0, canvasPlaceable.width - textPlaceable.width)
         layout(canvasPlaceable.width, canvasPlaceable.height + textPlaceable.height + 4.dp.roundToPx()) {
             canvasPlaceable.placeRelative(0, textPlaceable.height + 4.dp.roundToPx())
             textPlaceable.placeRelative(textX, 0)
@@ -613,7 +752,7 @@ private fun QuickActionItem(
     Row(
         modifier = modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 20.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
     ) {

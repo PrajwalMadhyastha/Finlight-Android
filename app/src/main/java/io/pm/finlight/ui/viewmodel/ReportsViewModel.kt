@@ -256,8 +256,33 @@ class ReportsViewModel(
                 Pair(startDate, endDate)
             }
             ReportPeriod.MONTH -> {
-                val endDate = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); add(Calendar.DAY_OF_MONTH, -1) }.timeInMillis
-                val startDate = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, -1); set(Calendar.DAY_OF_MONTH, 1) }.timeInMillis
+                // Use same-period comparison: compare same day range from previous year
+                val currentDayOfMonth = calendar.get(Calendar.DAY_OF_MONTH)
+                
+                // Previous year, same month
+                val previousYearCal = (calendar.clone() as Calendar).apply {
+                    add(Calendar.YEAR, -1)
+                }
+                
+                // Start: first day of that month
+                val startDate = (previousYearCal.clone() as Calendar).apply {
+                    set(Calendar.DAY_OF_MONTH, 1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                
+                // End: same day of month (or last day if current day exceeds previous month's max)
+                val endDate = (previousYearCal.clone() as Calendar).apply {
+                    val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+                    set(Calendar.DAY_OF_MONTH, minOf(currentDayOfMonth, maxDay))
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }.timeInMillis
+                
                 Pair(startDate, endDate)
             }
             ReportPeriod.QUARTER -> {

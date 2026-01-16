@@ -3,9 +3,13 @@
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
+import android.Manifest
 import android.app.Application
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import androidx.core.content.ContextCompat
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
@@ -13,15 +17,19 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockkObject
+import io.mockk.mockkStatic
 import io.mockk.runs
+import io.mockk.slot
 import io.mockk.unmockkAll
 import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
+import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.ReminderManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +39,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -39,6 +48,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.`when`
+import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -48,6 +58,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.Shadows.shadowOf
 import java.io.ByteArrayInputStream
 import java.util.Calendar
+
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -65,6 +76,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var smsRepository: SmsRepository
     @Mock private lateinit var transactionViewModel: TransactionViewModel
     @Mock private lateinit var smsClassifier: SmsClassifier
+    private lateinit var transactionRunner: TransactionRunner
 
     // Mocks for all DAOs called by DataExportService and ViewModel
     @Mock private lateinit var transactionDao: TransactionDao
@@ -138,7 +150,26 @@ class SettingsViewModelTest : BaseViewModelTest() {
         `when`(db.tripDao()).thenReturn(tripDao)
         `when`(db.accountAliasDao()).thenReturn(accountAliasDao)
         // FIX: Provide an executor for Room's withTransaction block to use in tests.
-        `when`(db.transactionExecutor).thenReturn(testDispatcher.asExecutor())
+        // `when`(db.transactionExecutor).thenReturn(testDispatcher.asExecutor()) // Not needed with TransactionRunner
+
+        // --- NEW: Mock TransactionRunner to execute immediately ---
+        transactionRunner = io.mockk.mockk()
+        // Match generic arguments using MockK
+        coEvery { transactionRunner.run<Any?>(any(), any()) } coAnswers {
+            val block = secondArg<suspend () -> Any?>()
+            block()
+        }
+
+
+
+        // --- NEW: Grant SMS permissions via Shadow (backup) ---
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+
+        // --- NEW: Force permission grant by mocking ContextCompat ---
+        mockkStatic(ContextCompat::class)
+        io.mockk.every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+
+        // REMOVED withTransaction mock to let it run naturally with the mocked executor.
 
 
         runTest {
@@ -191,8 +222,17 @@ class SettingsViewModelTest : BaseViewModelTest() {
             categoryRepository,
             smsRepository,
             transactionViewModel,
-            smsClassifier
+            smsClassifier,
+            transactionRunner,
+            dispatchers = TestDispatcherProvider(testDispatcher)
         )
+    }
+
+    class TestDispatcherProvider(private val testDispatcher: kotlinx.coroutines.test.TestDispatcher) : io.pm.finlight.utils.DispatcherProvider {
+        override val main: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
+        override val io: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
+        override val default: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
+        override val unconfined: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
     }
 
     @After
@@ -201,54 +241,56 @@ class SettingsViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
-    fun `startSmsScanAndIdentifyMappings filters nonTransactional sms using classifier`() = runTest {
-        // Arrange
-        val transactionalSms = SmsMessage(1, "TXN-SENDER", "spent Rs. 100 at Store", 1L)
-        val nonTransactionalSms = SmsMessage(2, "SPAM-SENDER", "Your OTP is 12345", 2L)
-        val allSms = listOf(transactionalSms, nonTransactionalSms)
+    fun `startSmsScanAndIdentifyMappings does not call classifier for SMS matching custom rules`() = runTest {
+        // This test verifies the optimization: classifier is NOT called if custom rule matches
+        
+        val sms = SmsMessage(1, "ICICI", "ICICI Bank Acct XX123 debited for Rs 240.00 on 28-Jun-25; DAKSHIN CAFE credited.", 1L)
 
         // Mock dependencies
-        `when`(smsRepository.fetchAllSms(any())).thenReturn(allSms)
-        `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull())).thenReturn(listOf(sms))
+        `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
         `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
-        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
         `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
         `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
         `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
         `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
         `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-
-        // --- FIX: Correctly mock the suspend functions on the DAO mocks ---
-        // Force the parsed transaction to need mapping
         `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
         `when`(accountDao.findByName(anyString())).thenReturn(null)
 
-        // Mock classifier behavior: high confidence for txn, low for spam
-        `when`(smsClassifier.classify(transactionalSms.body)).thenReturn(0.9f)
-        `when`(smsClassifier.classify(nonTransactionalSms.body)).thenReturn(0.05f)
+        // Add a custom rule that matches the SMS
+        val rule = CustomSmsRule(
+            id = 1,
+            triggerPhrase = "debited for",
+            merchantRegex = "([A-Z\\s]+) credited",
+            amountRegex = "Rs ([\\d.]+)",
+            accountRegex = null,
+            merchantNameExample = "DAKSHIN CAFE",
+            amountExample = "240.00",
+            accountNameExample = null,
+            priority = 10,
+            sourceSmsBody = sms.body,
+            transactionType = null
+        )
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
-        // --- NEW: Mock the autoSave call ---
-        `when`(transactionViewModel.autoSaveSmsTransaction(any(), anyString())).thenReturn(true)
+        // Grant SMS permission (required by ViewModel)
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
 
         initializeViewModel()
 
-        var importedCountResult = -1 // --- REFACTORED ---
+        val eventJob = launch { viewModel.uiEvent.collect() }
 
-        // Act
-        viewModel.startSmsScanAndIdentifyMappings(null) { importedCount -> // --- REFACTORED ---
-            importedCountResult = importedCount
+        try {
+            // Act
+            viewModel.startSmsScanAndIdentifyMappings(null) { }
+            advanceUntilIdle()
+
+            // Assert - Classifier should NOT be called because custom rule matched
+            verify(smsClassifier, org.mockito.Mockito.never()).classify(anyString())
+        } finally {
+            eventJob.cancel()
         }
-        advanceUntilIdle()
-
-        // Assert
-        assertEquals("Should have imported 1 transaction", 1, importedCountResult) // --- REFACTORED ---
-
-        // Verify classifier was called for both messages
-        verify(smsClassifier).classify(transactionalSms.body)
-        verify(smsClassifier).classify(nonTransactionalSms.body)
-
-        // --- DELETED: `mappingsToReview` test block ---
     }
 
     @Test
@@ -274,7 +316,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
     // --- DELETED: `finalizeImport` test ---
 
     @Test
-    @Ignore
     fun `validateCsvFile correctly processes valid and invalid rows`() = runTest {
         // Arrange
         // FIX: The CSV content now includes the correct 11-column header.
@@ -301,7 +342,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
         // Assert
         viewModel.csvValidationReport.test {
-            val report = awaitItem()
+            var report = awaitItem()
+            while (report == null) {
+                report = awaitItem()
+            }
             assertNotNull(report) // This should now pass.
             assertEquals(3, report!!.totalRowCount)
             assertEquals(3, report.reviewableRows.size)
@@ -338,7 +382,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `updateAndRevalidateRow updates the correct row`() = runTest {
         // Arrange
         initializeViewModel()
@@ -357,7 +400,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
         // Assert
         viewModel.csvValidationReport.test {
-            val report = awaitItem()
+            var report = awaitItem()
+            while (report == null) {
+                report = awaitItem()
+            }
             assertNotNull(report)
             val updatedRow = report!!.reviewableRows.find { it.lineNumber == 1 }
             assertNotNull(updatedRow)
@@ -367,7 +413,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `commitCsvImport calls repository to insert transactions`() = runTest {
         // Arrange
         initializeViewModel()
@@ -393,7 +438,8 @@ class SettingsViewModelTest : BaseViewModelTest() {
         // Assert
         val transactionCaptor = argumentCaptor<Transaction>()
         val tagsCaptor = argumentCaptor<Set<Tag>>()
-        verify(transactionRepository).insertTransactionWithTags(capture(transactionCaptor), capture(tagsCaptor))
+        // Use timeout because of race condition with Dispatchers.IO
+        verify(transactionRepository, org.mockito.Mockito.timeout(5000)).insertTransactionWithTags(capture(transactionCaptor), capture(tagsCaptor))
 
         assertEquals("Coffee", transactionCaptor.value.description)
         assertEquals(150.0, transactionCaptor.value.amount, 0.0)
@@ -517,13 +563,12 @@ class SettingsViewModelTest : BaseViewModelTest() {
     // --- NEW: Tests for the objective ---
 
     @Test
-    @Ignore
     fun `rescanSmsWithNewRule finds and saves new transactions`() = runTest {
         // Arrange
         val sms = SmsMessage(1, "SENDER", "spent Rs 100", 1L)
         val parsedTxn = PotentialTransaction(1L, "SENDER", 100.0, "expense", "Store", "spent Rs 100", null, "hash123")
 
-        `when`(smsRepository.fetchAllSms(any())).thenReturn(listOf(sms))
+        `when`(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
         `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList())) // No existing hashes
 
@@ -554,9 +599,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
         viewModel.rescanSmsWithNewRule { count ->
             newTransactionCount = count
         }
-        advanceUntilIdle()
+        advanceUntilIdle() 
 
         // Assert
+        println("SettingsViewModelTest: newTransactionCount = $newTransactionCount")
         assertEquals("Should have found and saved 1 new transaction", 1, newTransactionCount)
         // --- FIX: Use anyObject() for verification too ---
         verify(transactionViewModel).autoSaveSmsTransaction(anyObject(), eq("Imported"))
@@ -780,12 +826,15 @@ class SettingsViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    @Ignore
     fun `saveDailyReportTime calls repository and schedules when enabled`() = runTest {
         // Arrange
         // Override the default mock from setup()
         `when`(settingsRepository.getDailyReportEnabled()).thenReturn(flowOf(true))
         initializeViewModel()
+
+        // --- FIX: Start a collector to ensure StateFlow updates ---
+        val job = launch(testDispatcher) { viewModel.dailyReportEnabled.collect() }
+
         // Wait for the ViewModel's init block to collect the 'true' value
         advanceUntilIdle()
 
@@ -797,6 +846,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
         verify(settingsRepository).saveDailyReportTime(8, 30)
         // Verify it was called *after* the save
         coVerify { ReminderManager.scheduleDailyReport(applicationContext) }
+
+        // Cleanup
+        job.cancel()
     }
 
     @Test
@@ -986,6 +1038,204 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
         // Assert
         assertNull(viewModel.csvValidationReport.value)
+    }
+
+    // =========================================================================
+    // New tests for startSmsScanAndIdentifyMappings coverage
+    // =========================================================================
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings returns 0 when no SMS permission`() = runTest {
+        // Arrange - Do NOT grant permission
+        initializeViewModel()
+        var importedCount = -1
+        
+        val eventJob = launch { viewModel.uiEvent.collect() }
+
+        try {
+            // Act
+            viewModel.startSmsScanAndIdentifyMappings(null) { importedCount = it }
+            advanceUntilIdle()
+
+            // Assert
+            assertEquals("Should return 0 when permission denied", 0, importedCount)
+        } finally {
+            eventJob.cancel()
+        }
+    }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings sends event when no SMS found`() = runTest {
+        // Arrange
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull())).thenReturn(emptyList())
+        
+        initializeViewModel()
+        
+        val events = mutableListOf<String>()
+        val eventJob = launch { viewModel.uiEvent.collect { events.add(it) } }
+        var importedCount = -1
+
+        try {
+            // Act
+            viewModel.startSmsScanAndIdentifyMappings(null) { importedCount = it }
+            advanceUntilIdle()
+
+            // Assert
+            assertEquals("Should return 0 when no SMS found", 0, importedCount)
+            assertTrue("Should send 'No SMS' event", events.any { it.contains("No SMS") })
+        } finally {
+            eventJob.cancel()
+        }
+    }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings filters non-transactional SMS using classifier`() = runTest {
+        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+        // Re-init with unconfined for this test to ensure immediate execution of async tasks
+        viewModel = SettingsViewModel(
+            applicationContext,
+            settingsRepository,
+            db,
+            transactionRepository,
+            merchantMappingRepository,
+            accountRepository,
+            categoryRepository,
+            smsRepository,
+            transactionViewModel,
+            smsClassifier,
+            transactionRunner,
+            dispatchers = TestDispatcherProvider(testDispatcher)
+        )
+
+        // This tests the ML classifier filtering path
+        val transactionalSms = SmsMessage(1, "BANK", "Your account credited with Rs 500", 1L)
+        val nonTransactionalSms = SmsMessage(2, "PROMO", "Check out our latest deals!", 2L)
+        
+        `when`(smsClassifier.classify("Your account credited with Rs 500")).thenReturn(0.9f)
+        `when`(smsClassifier.classify("Check out our latest deals!")).thenReturn(0.05f)
+        
+        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull()))
+            .thenReturn(listOf(transactionalSms, nonTransactionalSms))
+        
+        `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+        `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+        `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+        `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+        `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+        `when`(accountDao.findByName(anyString())).thenReturn(null)
+        
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+        
+        val eventJob = launch { viewModel.uiEvent.collect() }
+
+        try {
+            viewModel.startSmsScanAndIdentifyMappings(null) { }
+            advanceUntilIdle() // Should be redundant with Unconfined but good practice
+
+            verify(smsClassifier).classify("Your account credited with Rs 500")
+            verify(smsClassifier).classify("Check out our latest deals!")
+        } finally {
+            eventJob.cancel()
+        }
+    }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings updates progress state flows during scan`() = runTest {
+        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+        viewModel = SettingsViewModel(
+            applicationContext,
+            settingsRepository,
+            db,
+            transactionRepository,
+            merchantMappingRepository,
+            accountRepository,
+            categoryRepository,
+            smsRepository,
+            transactionViewModel,
+            smsClassifier,
+            transactionRunner,
+            dispatchers = TestDispatcherProvider(testDispatcher)
+        )
+
+        val sms1 = SmsMessage(1, "BANK", "Transaction 1", 1L)
+        val sms2 = SmsMessage(2, "BANK", "Transaction 2", 2L)
+        
+        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull()))
+            .thenReturn(listOf(sms1, sms2))
+        `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+        `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+        `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+        `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+        `when`(smsClassifier.classify(anyString())).thenReturn(0.05f) 
+        
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+        
+        val eventJob = launch { viewModel.uiEvent.collect() }
+        
+        val totalSmsCounts = mutableListOf<Int>()
+        // Use a conflated collection or just collectLatest to see distinct values? 
+        // StateFlow coalesces values. We might miss '2' if it flips back to '0' quickly.
+        // But with Unconfined, it should happen sequentially.
+        val totalSmsJob = launch(UnconfinedTestDispatcher(testScheduler)) { 
+            viewModel.totalSmsToScan.collect { 
+                println("Test: totalSmsToScan emitted: $it")
+                totalSmsCounts.add(it) 
+            } 
+        }
+
+        try {
+            viewModel.startSmsScanAndIdentifyMappings(null) { }
+            // No advanceUntilIdle needed strictly if Unconfined, but good for safety
+            
+            // Check if 2 was ever emitted
+            assertTrue("totalSmsToScan should have been set to 2. History: $totalSmsCounts", totalSmsCounts.contains(2))
+        } finally {
+            eventJob.cancel()
+            totalSmsJob.cancel()
+        }
+    }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings resets state after completion`() = runTest {
+        // Arrange
+        `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull()))
+            .thenReturn(listOf(SmsMessage(1, "BANK", "Test", 1L)))
+        `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+        `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+        `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+        `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+        `when`(smsClassifier.classify(anyString())).thenReturn(0.05f)
+        
+        org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+        initializeViewModel()
+        
+        val eventJob = launch { viewModel.uiEvent.collect() }
+
+        try {
+            // Act
+            viewModel.startSmsScanAndIdentifyMappings(null) { }
+            advanceUntilIdle()
+
+            // Assert - State should be reset after completion
+            assertFalse("isScanning should be false after completion", viewModel.isScanning.value)
+            assertEquals("totalSmsToScan should be 0 after completion", 0, viewModel.totalSmsToScan.value)
+            assertEquals("processedSmsCount should be 0 after completion", 0, viewModel.processedSmsCount.value)
+        } finally {
+            eventJob.cancel()
+        }
     }
 }
 

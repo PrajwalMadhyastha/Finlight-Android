@@ -61,6 +61,10 @@
                     android:host="finlight.pm.io"
                     android:scheme="app" />
             </intent-filter>
+            
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <receiver

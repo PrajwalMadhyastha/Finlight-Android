@@ -240,9 +240,12 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
             dismissButton = {
                 TextButton(onClick = { showDatePickerDialog = false }) { Text("Cancel") }
             },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            )
         }
     }
 

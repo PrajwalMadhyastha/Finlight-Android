@@ -163,7 +163,7 @@ class ReminderManagerTest : BaseViewModelTest() {
             .putBoolean("weekly_summary_enabled", true)
             .putBoolean("monthly_summary_enabled", true)
             .putBoolean("auto_backup_enabled", true)
-            .putBoolean("recurring_transaction_feature_enabled", true)
+            .putBoolean("recurring_transactions_enabled", true)
             .apply()
 
         // Act
@@ -174,33 +174,31 @@ class ReminderManagerTest : BaseViewModelTest() {
         assertWorkIsEnqueued("weekly_summary_work", WeeklySummaryWorker::class.java)
         assertWorkIsEnqueued("monthly_summary_work", MonthlySummaryWorker::class.java)
         assertWorkIsEnqueued("auto_backup_work", BackupWorker::class.java)
-        // Always scheduled workers
+        // Recurring transaction workers (when enabled)
         assertWorkIsEnqueued("recurring_transaction_work", RecurringTransactionWorker::class.java)
         assertWorkIsEnqueued("recurring_pattern_work", RecurringPatternWorker::class.java)
     }
 
     @Test
     fun `rescheduleAllWork does not schedule disabled workers`() {
-        // Arrange: Disable everything optional
+        // Arrange: Disable everything including recurring transactions
         prefs.edit()
             .putBoolean("daily_report_enabled", false)
             .putBoolean("weekly_summary_enabled", false)
             .putBoolean("monthly_summary_enabled", false)
             .putBoolean("auto_backup_enabled", false)
-            .putBoolean("recurring_transaction_feature_enabled", true)
+            .putBoolean("recurring_transactions_enabled", false)
             .apply()
 
         // Act
         ReminderManager.rescheduleAllWork(context)
 
-        // Assert: Optional workers are cancelled/not present
+        // Assert: All workers are cancelled/not present when disabled
         assertWorkIsCancelled("daily_expense_report_work")
         assertWorkIsCancelled("weekly_summary_work")
         assertWorkIsCancelled("monthly_summary_work")
         assertWorkIsCancelled("auto_backup_work")
-
-        // Assert: Always-on workers are still scheduled
-        assertWorkIsEnqueued("recurring_transaction_work", RecurringTransactionWorker::class.java)
-        assertWorkIsEnqueued("recurring_pattern_work", RecurringPatternWorker::class.java)
+        assertWorkIsCancelled("recurring_transaction_work")
+        assertWorkIsCancelled("recurring_pattern_work")
     }
 }

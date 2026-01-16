@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Finlight</string>
+    
+    <!-- App Shortcuts -->
+    <string name="shortcut_add_expense_short">Add Expense</string>
+    <string name="shortcut_add_expense_long">Add a new expense</string>
+    <string name="shortcut_add_income_short">Add Income</string>
+    <string name="shortcut_add_income_long">Add a new income</string>
+    <string name="shortcut_search_short">Search</string>
+    <string name="shortcut_search_long">Search transactions</string>
 </resources>

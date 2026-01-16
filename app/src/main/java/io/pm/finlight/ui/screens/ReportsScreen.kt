@@ -49,7 +49,7 @@ import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ui.components.ConsistencyCalendar
 import io.pm.finlight.ui.components.DetailedMonthlyCalendar
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.GroupedBarChart
+import io.pm.finlight.ui.components.ModernTrendChart
 import io.pm.finlight.utils.CategoryIconHelper
 import java.util.*
 import kotlin.math.abs
@@ -293,18 +293,14 @@ fun ReportsScreen(
                     Spacer(Modifier.height(16.dp))
                     val trendDataPair = reportData.trendData
                     if (trendDataPair != null && trendDataPair.first.entryCount > 0) {
-                        GroupedBarChart(
+                        ModernTrendChart(
                             chartData = trendDataPair,
-                            onBarClick = { entry ->
-                                val monthIndex = entry.x.toInt()
-                                val trends = viewModel.reportData.value.trendData?.first?.dataSets?.firstOrNull()?.getEntryForIndex(monthIndex)
-                                if (trends != null) {
-                                    val calendar = Calendar.getInstance()
-                                    calendar.add(Calendar.MONTH, monthIndex - (reportData.trendData?.second?.size?.minus(1) ?: 0))
-                                    calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH))
-                                    val dateMillis = calendar.timeInMillis
-                                    navController.navigate("time_period_report_screen/${TimePeriod.MONTHLY}?date=$dateMillis")
-                                }
+                            onBarClick = { monthIndex ->
+                                val calendar = Calendar.getInstance()
+                                calendar.add(Calendar.MONTH, monthIndex - (reportData.trendData?.second?.size?.minus(1) ?: 0))
+                                calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH))
+                                val dateMillis = calendar.timeInMillis
+                                navController.navigate("time_period_report_screen/${TimePeriod.MONTHLY}?date=$dateMillis")
                             }
                         )
                     } else {
