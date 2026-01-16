@@ -320,12 +320,15 @@ private fun DetailedDayCell(
         MaterialTheme.colorScheme.onSurface
     }
 
+    // Theme-aware border color for current day
+    val borderColor = MaterialTheme.colorScheme.primary
+
     Box(
         modifier = Modifier
             .size(26.dp)
             .clip(CircleShape)
             .background(color)
-            .then(if (isToday) Modifier.border(1.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier)
+            .then(if (isToday) Modifier.border(1.5.dp, borderColor, CircleShape) else Modifier)
             .clickable(enabled = data?.status != SpendingStatus.NO_DATA, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -387,6 +390,13 @@ private fun MonthColumn(
     val canvasHeightDp = with(LocalDensity.current) { canvasHeight.toDp() }
 
     val noDataColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+    // Theme-aware border color for current day
+    val isThemeDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val todayBorderColor = if (isThemeDark) {
+        Color.White.copy(alpha = 0.8f) // White for dark mode
+    } else {
+        Color(0xFF1976D2) // Dark blue for light mode
+    }
 
     Canvas(
         modifier = Modifier
@@ -472,7 +482,7 @@ private fun MonthColumn(
                     val isToday = !isFuture && isSameDay(currentDayCal, today)
                     if (isToday) {
                         drawRoundRect(
-                            color = androidx.compose.ui.graphics.Color(0xFF1976D2),
+                            color = todayBorderColor,
                             topLeft = Offset(x = week * totalCellSize, y = day * totalCellSize + yOffset),
                             size = Size(daySizePx, daySizePx),
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
