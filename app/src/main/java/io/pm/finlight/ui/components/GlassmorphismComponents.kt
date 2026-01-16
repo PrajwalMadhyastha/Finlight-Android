@@ -330,10 +330,38 @@ private fun EmphasizedMinimalStatItem(
 @Composable
 private fun AuroraProgressBar(progress: Float) {
     val animatedPercentage = (progress * 100).roundToInt()
-    val progressColor = when {
-        progress > 0.9 -> MaterialTheme.colorScheme.error
-        progress > 0.7 -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.primary
+    val isDark = isSystemInDarkTheme()
+    
+    // Vibrant gradient colors - adjusted warning to be more orange
+    val progressGradient = when {
+        progress > 0.9 -> listOf(Color(0xFFFF3B30), Color(0xFFFF2D55))
+        progress > 0.7 -> listOf(Color(0xFFFF8C00), Color(0xFFFF9500))
+        else -> listOf(Color(0xFF34C759), Color(0xFF30D158))
+    }
+    
+    val borderColor = if (isDark) {
+        Color.White.copy(alpha = 0.25f)
+    } else {
+        Color.Black.copy(alpha = 0.15f)
+    }
+    
+    // Zone colors for background - subtle but visible
+    val greenZone = if (isDark) {
+        Color(0xFF34C759).copy(alpha = 0.20f)
+    } else {
+        Color(0xFF34C759).copy(alpha = 0.15f)
+    }
+    
+    val orangeZone = if (isDark) {
+        Color(0xFFFF8C00).copy(alpha = 0.20f)
+    } else {
+        Color(0xFFFF8C00).copy(alpha = 0.15f)
+    }
+    
+    val redZone = if (isDark) {
+        Color(0xFFFF3B30).copy(alpha = 0.20f)
+    } else {
+        Color(0xFFFF3B30).copy(alpha = 0.15f)
     }
 
     Layout(
@@ -349,25 +377,53 @@ private fun AuroraProgressBar(progress: Float) {
                     .fillMaxWidth()
                     .height(20.dp)
             ) {
+                // Border
                 drawRoundRect(
-                    color = Color.Black.copy(alpha = 0.2f),
+                    color = borderColor,
                     size = size,
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2),
-                    style = Stroke(width = 1.dp.toPx()),
-                    topLeft = Offset(0f, 1.dp.toPx())
+                    style = Stroke(width = 1.5.dp.toPx())
                 )
+                
+                // Green zone (0-70%)
                 drawRoundRect(
-                    color = Color.White.copy(alpha = 0.1f),
-                    size = size,
+                    color = greenZone,
+                    size = Size(width = size.width * 0.7f, height = size.height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
+                )
+                
+                // Orange zone (70-90%)
+                drawRect(
+                    color = orangeZone,
+                    topLeft = Offset(size.width * 0.7f, 0f),
+                    size = Size(width = size.width * 0.2f, height = size.height)
+                )
+                
+                // Red zone (90-100%)
+                drawRoundRect(
+                    color = redZone,
+                    topLeft = Offset(size.width * 0.9f, 0f),
+                    size = Size(width = size.width * 0.1f, height = size.height),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
                 )
 
                 if (progress > 0) {
+                    // Vibrant progress fill
+                    drawRoundRect(
+                        brush = Brush.horizontalGradient(colors = progressGradient),
+                        size = Size(width = size.width * progress, height = size.height),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
+                    )
+                    
+                    // Inner glow
                     drawRoundRect(
                         brush = Brush.horizontalGradient(
-                            colors = listOf(progressColor.copy(alpha = 0.6f), progressColor)
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.3f),
+                                Color.White.copy(alpha = 0.1f)
+                            )
                         ),
-                        size = Size(width = size.width * progress, height = size.height),
+                        size = Size(width = size.width * progress, height = size.height * 0.5f),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
                     )
                 }
@@ -376,14 +432,8 @@ private fun AuroraProgressBar(progress: Float) {
     ) { measurables, constraints ->
         val textPlaceable = measurables[0].measure(Constraints())
         val canvasPlaceable = measurables[1].measure(constraints)
-
         val progressWidth = (canvasPlaceable.width * progress).toInt()
-        val textX = (progressWidth - textPlaceable.width / 2).coerceIn(
-            0,
-            canvasPlaceable.width - textPlaceable.width
-        )
-        val textY = (canvasPlaceable.height - textPlaceable.height) / 2
-
+        val textX = (progressWidth - textPlaceable.width / 2).coerceIn(0, canvasPlaceable.width - textPlaceable.width)
         layout(canvasPlaceable.width, canvasPlaceable.height + textPlaceable.height + 4.dp.roundToPx()) {
             canvasPlaceable.placeRelative(0, textPlaceable.height + 4.dp.roundToPx())
             textPlaceable.placeRelative(textX, 0)
