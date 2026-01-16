@@ -130,7 +130,9 @@ fun DashboardHeroCard(
             text = budgetHealthSummary,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
