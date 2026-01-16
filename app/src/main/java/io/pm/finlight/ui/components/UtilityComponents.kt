@@ -94,34 +94,59 @@ fun ChartLegend(pieData: PieData?) {
 @Composable
 fun GroupedBarChart(
     chartData: Pair<BarData, List<String>>,
-    onBarClick: ((Entry) -> Unit)? = null // Add a callback for bar clicks
+    onBarClick: ((Entry) -> Unit)? = null
 ) {
     val (barData, labels) = chartData
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
     val legendColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+    val customGridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f).toArgb()
 
     AndroidView(
         factory = { context ->
             BarChart(context).apply {
                 description.isEnabled = false
                 legend.isEnabled = true
+                legend.textSize = 12f
                 setDrawGridBackground(false)
+                setDrawBarShadow(false)
+                setDrawValueAboveBar(false) // Disable values above bars to prevent overlap
 
-                xAxis.position = XAxis.XAxisPosition.BOTTOM
-                xAxis.setDrawGridLines(false)
-                xAxis.granularity = 1f
+                xAxis.apply {
+                    position = XAxis.XAxisPosition.BOTTOM
+                    setDrawGridLines(false)
+                    setDrawAxisLine(false)
+                    granularity = 1f
+                    textSize = 11f
+                }
 
-                axisLeft.axisMinimum = 0f
-                axisLeft.setDrawGridLines(true)
+                axisLeft.apply {
+                    axisMinimum = 0f
+                    setDrawGridLines(true)
+                    gridColor = customGridColor
+                    gridLineWidth = 0.5f
+                    textSize = 11f
+                    setDrawAxisLine(false)
+                    // Use custom formatter for Y-axis labels
+                    valueFormatter = object : com.github.mikephil.charting.formatter.ValueFormatter() {
+                        override fun getFormattedValue(value: Float): String {
+                            return when {
+                                value >= 10000000 -> String.format("%.1fCr", value / 10000000)
+                                value >= 100000 -> String.format("%.1fL", value / 100000)
+                                value >= 1000 -> String.format("%.1fK", value / 1000)
+                                else -> value.toInt().toString()
+                            }
+                        }
+                    }
+                }
 
                 axisRight.isEnabled = false
                 
                 // Enable dragging/scrolling
                 isDragEnabled = true
-                setScaleEnabled(false) // Disable zoom to keep bar width consistent
+                setScaleEnabled(false)
                 setPinchZoom(false)
 
-                // --- NEW: Add click listener ---
+                // Add click listener
                 if (onBarClick != null) {
                     setOnChartValueSelectedListener(object : OnChartValueSelectedListener {
                         override fun onValueSelected(e: Entry?, h: Highlight?) {
@@ -138,6 +163,11 @@ fun GroupedBarChart(
             val groupSpace = 0.4f
             barData.barWidth = barWidth
 
+            // Disable value labels on bars to prevent overlap
+            barData.dataSets.forEach { dataSet ->
+                dataSet.setDrawValues(false)
+            }
+
             chart.data = barData
             chart.xAxis.valueFormatter = IndexAxisValueFormatter(labels)
             chart.xAxis.axisMinimum = 0f
@@ -150,15 +180,14 @@ fun GroupedBarChart(
 
             chart.groupBars(0f, groupSpace, barSpace)
             
-            // Limit visible range to 5 groups (months) and scroll to end
+            // Limit visible range to 5 groups and scroll to end
             chart.setVisibleXRangeMaximum(5f)
             chart.moveViewToX(labels.size.toFloat())
             
             chart.invalidate()
         },
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(250.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(300.dp) // Increased from 250dp for better spacing
     )
 }

@@ -319,8 +319,13 @@ fun CurrencyTravelScreen(
                 }) { Text("OK") }
             },
             dismissButton = { TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") } },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
-        ) { DatePicker(state = datePickerState) }
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+        ) {
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            )
+        }
     }
     if (showEndDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = endDate ?: startDate ?: System.currentTimeMillis())
@@ -340,8 +345,13 @@ fun CurrencyTravelScreen(
                 }) { Text("OK") }
             },
             dismissButton = { TextButton(onClick = { showEndDatePicker = false }) { Text("Cancel") } },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
-        ) { DatePicker(state = datePickerState) }
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+        ) {
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            )
+        }
     }
 }
 
@@ -504,7 +514,7 @@ private fun CurrencyPickerDialog(
                 Text("Cancel")
             }
         },
-        containerColor = popupContainerColor
+        containerColor = popupContainerColor.copy(alpha = 1f)
     )
 }
 

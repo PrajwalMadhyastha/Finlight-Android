@@ -59,23 +59,26 @@ class DashboardViewModelTest : BaseViewModelTest() {
 
     // --- List of possible messages from ViewModel for assertions ---
     private val goodPacingMessages = listOf(
-        "Excellent pacing this month!", "On track with room to spare", "Well within budget, great job",
-        "Your budget is looking healthy", "Consistently great spending", "Keep this momentum going!",
-        "Smooth sailing this month", "You're building a nice buffer", "Perfectly on track", "Another great spending day"
+        "Excellent pacing!", "On track with room to spare", "Well within budget!",
+        "Budget looking healthy", "Consistently great spending", "Keep this momentum going!",
+        "Smooth sailing this month", "Building a nice buffer", "Perfectly on track", "Another great spending day",
+        "Crushing it this month", "Budget in great shape"
     )
     private val highPacingMessages = listOf(
-        "Pacing a bit high for this month", "Time to ease up on spending", "Still trending over budget",
-        "Let's try to slow things down", "Watch the spending for a bit", "Heads up: pacing is still high",
-        "A bit too fast for this month", "Let's pump the brakes slightly", "Budget is feeling the pressure", "Trending to overspend"
+        "Pacing high this month", "Time to ease up on spending", "Still trending over budget",
+        "Let's slow things down", "Watch the spending a bit", "Pacing is still high",
+        "A bit too fast this month", "Time to pump the brakes", "Budget feeling the pressure", "Trending to overspend",
+        "Ease up for a bit", "Spending's running hot"
     )
     private val allPossibleMessages = goodPacingMessages + highPacingMessages + listOf(
-        "Nice recovery! You're on pace now", "Spending slowed, looking good", "Back on track for the month!",
-        "Great adjustment on spending", "You've course-corrected perfectly", "Well done reining it in",
-        "Pacing is now under control", "The rest of the month looks good", "Good save! Keep it up",
-        "Back within your monthly plan", "Spending has picked up recently", "Careful, you're trending over",
-        "Watch the recent spending", "You were on track, pace has increased", "A recent slip-up in spending",
-        "Let's get back to that great pace", "Trending high the last few days", "A little adjustment will help",
-        "Let's avoid a spending spree", "Back on the brakes for a bit"
+        "Nice recovery! On pace now", "Spending slowed nicely", "Back on track!",
+        "Great spending adjustment", "You've course-corrected!", "Well done reining it in",
+        "Pacing is now under control", "Rest of month looks good", "Good save! Keep it up",
+        "Back within your plan", "Perfect correction", "Nicely rebalanced",
+        "Spending picked up recently", "Careful, trending over",
+        "Watch the recent spending", "Pace increased lately", "A recent slip-up",
+        "Let's get back on track", "Trending high lately", "A small adjustment helps",
+        "Avoid a spending spree", "Back on the brakes", "Recent uptick in spending", "Tighten up a bit"
     )
 
     @Before

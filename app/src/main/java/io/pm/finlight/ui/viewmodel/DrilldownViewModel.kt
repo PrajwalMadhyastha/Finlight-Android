@@ -82,37 +82,38 @@ class DrilldownViewModel(
                 set(Calendar.DAY_OF_MONTH, 1)
             }
 
-            val monthlyTotals = when (drilldownType) {
-                DrilldownType.CATEGORY -> transactionDao.getMonthlySpendingForCategory(entityName, startCal.timeInMillis, endCal.timeInMillis)
-                DrilldownType.MERCHANT -> transactionDao.getMonthlySpendingForMerchant(entityName, startCal.timeInMillis, endCal.timeInMillis)
-            }.first()
+            // Use getMonthlyTrends to show both income and expense
+            val monthlyTrends = transactionDao.getMonthlyTrends(startCal.timeInMillis).first()
 
-            if (monthlyTotals.isEmpty()) {
+            if (monthlyTrends.isEmpty()) {
                 emit(null)
                 return@flow
             }
 
-            val entries = mutableListOf<BarEntry>()
+            val incomeEntries = mutableListOf<BarEntry>()
+            val expenseEntries = mutableListOf<BarEntry>()
             val labels = mutableListOf<String>()
             val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
             val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-            val totalsMap = monthlyTotals.associateBy { it.period }
+            val trendsMap = monthlyTrends.associateBy { it.monthYear }
 
             for (i in 0..5) {
                 val monthCal = (startCal.clone() as Calendar).apply { add(Calendar.MONTH, i) }
                 val yearMonth = yearMonthFormat.format(monthCal.time)
 
-                val total = totalsMap[yearMonth]?.totalAmount?.toFloat() ?: 0f
-                entries.add(BarEntry(i.toFloat(), total))
+                val trend = trendsMap[yearMonth]
+                incomeEntries.add(BarEntry(i.toFloat(), trend?.totalIncome?.toFloat() ?: 0f))
+                expenseEntries.add(BarEntry(i.toFloat(), trend?.totalExpenses?.toFloat() ?: 0f))
                 labels.add(monthFormat.format(monthCal.time))
             }
 
-            val dataSet = BarDataSet(entries, "Monthly Spending").apply {
-                color = 0xFF4DB6AC.toInt() // Teal
-                setDrawValues(true)
-                valueTextColor = 0xFFFFFFFF.toInt()
+            val incomeDataSet = BarDataSet(incomeEntries, "Income").apply {
+                color = 0xFF66BB6A.toInt() // Green
             }
-            emit(Pair(BarData(dataSet), labels))
+            val expenseDataSet = BarDataSet(expenseEntries, "Expense").apply {
+                color = 0xFFEF5350.toInt() // Red
+            }
+            emit(Pair(BarData(incomeDataSet, expenseDataSet), labels))
 
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     }

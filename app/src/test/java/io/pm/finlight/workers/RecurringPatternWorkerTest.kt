@@ -41,6 +41,12 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
 
+        // Enable the recurring transaction feature for tests
+        context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("recurring_transactions_enabled", true)
+            .apply()
+
         db = mockk()
         transactionDao = mockk()
         patternDao = mockk()

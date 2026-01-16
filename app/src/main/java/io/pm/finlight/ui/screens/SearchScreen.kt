@@ -344,9 +344,12 @@ fun SearchScreen(
             dismissButton = {
                 TextButton(onClick = { searchViewModel.onShowStartDatePicker(false) }) { Text("Cancel") }
             },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            )
         }
     }
 
@@ -363,9 +366,12 @@ fun SearchScreen(
             dismissButton = {
                 TextButton(onClick = { searchViewModel.onShowEndDatePicker(false) }) { Text("Cancel") }
             },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            )
         }
     }
 }

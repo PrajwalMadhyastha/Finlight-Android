@@ -58,66 +58,50 @@ fun MonthlyConsistencyCalendarCard(
     onDayClick: (Date) -> Unit
 ) {
     GlassPanel(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Spending Consistency",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            Text(
+                "Spending Consistency",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Heatmap Container
+            if (data.isEmpty()) {
                 Box(
-                    modifier = Modifier.weight(1.7f) // Give more weight to the calendar
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    if (data.isEmpty()) {
-                        Box(modifier = Modifier.height(150.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    } else {
-                        DetailedMonthlyCalendar(
-                            data = data,
-                            selectedMonth = selectedMonth,
-                            onPreviousMonth = onPreviousMonth,
-                            onNextMonth = onNextMonth,
-                            onDayClick = onDayClick
-                        )
-                    }
+                    CircularProgressIndicator()
                 }
+            } else {
+                DetailedMonthlyCalendar(
+                    data = data,
+                    selectedMonth = selectedMonth,
+                    onPreviousMonth = onPreviousMonth,
+                    onNextMonth = onNextMonth,
+                    onDayClick = onDayClick
+                )
 
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                Spacer(Modifier.height(16.dp))
 
-                // Stats Container (2x2 Grid)
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                // Stats displayed horizontally below calendar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        StatItem(stats.noSpendDays, "No Spend")
-                        StatItem(stats.goodDays, "Good Days")
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        StatItem(stats.badDays, "Over Budget")
-                        StatItem(stats.noDataDays, "No Data")
-                    }
+                    StatItem(stats.noSpendDays, "No Spend")
+                    StatItem(stats.goodDays, "Good Days")
+                    StatItem(stats.badDays, "Over Budget")
+                    StatItem(stats.noDataDays, "No Data")
                 }
             }
         }
@@ -126,7 +110,7 @@ fun MonthlyConsistencyCalendarCard(
 
 @Composable
 private fun StatItem(count: Int, label: String) {
-    Column(horizontalAlignment = Alignment.Start) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = "$count",
             style = MaterialTheme.typography.titleLarge,
@@ -336,12 +320,15 @@ private fun DetailedDayCell(
         MaterialTheme.colorScheme.onSurface
     }
 
+    // Theme-aware border color for current day
+    val borderColor = MaterialTheme.colorScheme.primary
+
     Box(
         modifier = Modifier
             .size(26.dp)
             .clip(CircleShape)
             .background(color)
-            .then(if (isToday) Modifier.border(1.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier)
+            .then(if (isToday) Modifier.border(1.5.dp, borderColor, CircleShape) else Modifier)
             .clickable(enabled = data?.status != SpendingStatus.NO_DATA, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -403,6 +390,13 @@ private fun MonthColumn(
     val canvasHeightDp = with(LocalDensity.current) { canvasHeight.toDp() }
 
     val noDataColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+    // Theme-aware border color for current day
+    val isThemeDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val todayBorderColor = if (isThemeDark) {
+        Color.White.copy(alpha = 0.8f) // White for dark mode
+    } else {
+        Color(0xFF1976D2) // Dark blue for light mode
+    }
 
     Canvas(
         modifier = Modifier
@@ -445,8 +439,10 @@ private fun MonthColumn(
                         set(year, monthData.monthIndex, dayOfMonth)
                     }
 
-                    // Check if future date using strict Calendar comparison
-                    val isFuture = currentDayCal.after(today)
+                    // Check if date is in the future (day-level comparison)
+                    val isFuture = currentDayCal.get(Calendar.YEAR) > today.get(Calendar.YEAR) ||
+                            (currentDayCal.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
+                                    currentDayCal.get(Calendar.DAY_OF_YEAR) > today.get(Calendar.DAY_OF_YEAR))
 
                     val dayData = if (!isFuture) {
                         dataMap[currentDayCal.get(Calendar.DAY_OF_YEAR) to year]
@@ -481,6 +477,18 @@ private fun MonthColumn(
                         size = Size(daySizePx, daySizePx),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
                     )
+
+                    // Draw border around today's cell
+                    val isToday = !isFuture && isSameDay(currentDayCal, today)
+                    if (isToday) {
+                        drawRoundRect(
+                            color = todayBorderColor,
+                            topLeft = Offset(x = week * totalCellSize, y = day * totalCellSize + yOffset),
+                            size = Size(daySizePx, daySizePx),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx())
+                        )
+                    }
                 }
             }
         }

@@ -80,8 +80,12 @@ class DrilldownViewModelTest {
     fun `when dimension is CATEGORY, it calls correct DAO methods`() = runTest {
         // Arrange
         val categoryName = "Food"
+        val mockMonthlyTrends = listOf(
+            io.pm.finlight.MonthlyTrend("2025-01", 50.0, 100.0),
+            io.pm.finlight.MonthlyTrend("2025-02", 75.0, 150.0)
+        )
         `when`(transactionDao.getTransactionsForCategoryName(anyString(), anyLong(), anyLong())).thenReturn(flowOf(mockTransactionDetails))
-        `when`(transactionDao.getMonthlySpendingForCategory(anyString(), anyLong(), anyLong())).thenReturn(flowOf(mockPeriodTotals))
+        `when`(transactionDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
 
         // Act
         viewModel = DrilldownViewModel(transactionDao, DrilldownType.CATEGORY, categoryName, 1, 2025)
@@ -96,20 +100,24 @@ class DrilldownViewModelTest {
             // Test that the chart data is processed correctly
             val chartData = awaitItem()
             assertEquals(6, chartData?.second?.size) // 6 months of labels
-            assertEquals(6, chartData?.first?.entryCount)
+            assertEquals(12, chartData?.first?.entryCount) // 6 months x 2 datasets (income + expense)
             cancelAndIgnoreRemainingEvents()
         }
 
         verify(transactionDao).getTransactionsForCategoryName(anyString(), anyLong(), anyLong())
-        verify(transactionDao).getMonthlySpendingForCategory(anyString(), anyLong(), anyLong())
+        verify(transactionDao).getMonthlyTrends(anyLong())
     }
 
     @Test
     fun `when dimension is MERCHANT, it calls correct DAO methods`() = runTest {
         // Arrange
         val merchantName = "Amazon"
+        val mockMonthlyTrends = listOf(
+            io.pm.finlight.MonthlyTrend("2025-01", 50.0, 100.0),
+            io.pm.finlight.MonthlyTrend("2025-02", 75.0, 150.0)
+        )
         `when`(transactionDao.getTransactionsForMerchantName(anyString(), anyLong(), anyLong())).thenReturn(flowOf(mockTransactionDetails))
-        `when`(transactionDao.getMonthlySpendingForMerchant(anyString(), anyLong(), anyLong())).thenReturn(flowOf(mockPeriodTotals))
+        `when`(transactionDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
 
         // Act
         viewModel = DrilldownViewModel(transactionDao, DrilldownType.MERCHANT, merchantName, 1, 2025)
@@ -123,11 +131,11 @@ class DrilldownViewModelTest {
         viewModel.monthlyTrendChartData.test {
             val chartData = awaitItem()
             assertEquals(6, chartData?.second?.size)
-            assertEquals(6, chartData?.first?.entryCount)
+            assertEquals(12, chartData?.first?.entryCount) // 6 months x 2 datasets
             cancelAndIgnoreRemainingEvents()
         }
 
         verify(transactionDao).getTransactionsForMerchantName(anyString(), anyLong(), anyLong())
-        verify(transactionDao).getMonthlySpendingForMerchant(anyString(), anyLong(), anyLong())
+        verify(transactionDao).getMonthlyTrends(anyLong())
     }
 }

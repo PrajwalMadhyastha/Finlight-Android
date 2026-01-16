@@ -256,9 +256,12 @@ fun AddEditGoalScreen(
                 TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
             },
             /* FIX: Explicit containerColor so the dialog is not transparent */
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            )
         }
     }
 }

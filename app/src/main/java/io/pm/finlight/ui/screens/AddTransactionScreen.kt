@@ -103,7 +103,8 @@ fun AddTransactionScreen(
     navController: NavController,
     viewModel: TransactionViewModel,
     isCsvEdit: Boolean = false,
-    initialDataJson: String? = null
+    initialDataJson: String? = null,
+    initialTransactionType: String? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -115,7 +116,7 @@ fun AddTransactionScreen(
     val selectedAccount by viewModel.addTransactionAccount.collectAsState()
 
     // --- Local State for UI Logic ---
-    var transactionType by remember { mutableStateOf("expense") }
+    var transactionType by remember { mutableStateOf(initialTransactionType ?: "expense") }
     var notes by remember { mutableStateOf("") }
     var attachedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
@@ -540,8 +541,13 @@ fun AddTransactionScreen(
                 }) { Text("OK") }
             },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor)
-        ) { DatePicker(state = datePickerState) }
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+        ) {
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            )
+        }
     }
 
     if (showTimePicker) {
@@ -551,7 +557,7 @@ fun AddTransactionScreen(
         )
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
-            containerColor = popupContainerColor,
+            containerColor = popupContainerColor.copy(alpha = 1f),
             title = { Text("Select Time") },
             text = {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
