@@ -266,7 +266,8 @@ fun TransactionDetailScreen(
                             }
                             DropdownMenu(
                                 expanded = showMenu,
-                                onDismissRequest = { showMenu = false }
+                                onDismissRequest = { showMenu = false },
+                                modifier = Modifier.background(popupContainerColor.copy(alpha = 1f))
                             ) {
                                 if (details.transaction.isSplit) {
                                     DropdownMenuItem(
@@ -566,7 +567,7 @@ fun TransactionDetailScreen(
                 if (showDeleteDialog) {
                     AlertDialog(
                         onDismissRequest = { showDeleteDialog = false },
-                        containerColor = popupContainerColor,
+                        containerColor = popupContainerColor.copy(alpha = 1f),
                         title = { Text("Delete Transaction?", color = MaterialTheme.colorScheme.onSurface) },
                         text = { Text("Are you sure you want to permanently delete this transaction? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         confirmButton = {
@@ -599,7 +600,7 @@ fun TransactionDetailScreen(
                 if (showImageDeleteDialog != null) {
                     AlertDialog(
                         onDismissRequest = { showImageDeleteDialog = null },
-                        containerColor = popupContainerColor,
+                        containerColor = popupContainerColor.copy(alpha = 1f),
                         title = { Text("Delete Attachment?", color = MaterialTheme.colorScheme.onSurface) },
                         text = { Text("Are you sure you want to delete this attachment? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                         confirmButton = {
