@@ -86,7 +86,7 @@ sonar {
         property("sonar.token", sonarToken ?: "")
         
         // Point to Kover report - FIXED: Use path from root project directory
-        property("sonar.coverage.jacoco.xmlReportPaths", "app/build/reports/kover/report.xml")
+        property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/kover/report.xml")
         
         // Exclude from coverage (will be tested with instrumented tests later)
         // These exclusions match Kover's exclusions to ensure consistent coverage reporting
