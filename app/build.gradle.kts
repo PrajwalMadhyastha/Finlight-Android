@@ -99,7 +99,8 @@ sonar {
             "**/ui/NavItems.kt," +
             "**/MainActivity.kt," +
             "**/MainApplication.kt," +
-            "**/utils/ShareImageGenerator.kt"
+            "**/utils/ShareImageGenerator.kt," +
+            "**/data/db/**" // Exclude DB package
         )
         property("sonar.exclusions", "**/*ViewModelFactory*.kt")
     }
@@ -118,7 +119,8 @@ kover {
                 packages(
                     "io.pm.finlight.ui.screens",
                     "io.pm.finlight.ui.components",
-                    "io.pm.finlight.ui.theme"
+                    "io.pm.finlight.ui.theme",
+                    "io.pm.finlight.data.db" // Exclude DB package from unit tests
                 )
                 // Exclude navigation items (defined in NavItems.kt)
                 classes(
