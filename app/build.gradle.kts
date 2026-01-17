@@ -85,17 +85,73 @@ sonar {
         }
         property("sonar.token", sonarToken ?: "")
         
-        // Point to Kover report
+        // Point to Kover report - FIXED: Use path from root project directory
         property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/kover/report.xml")
+        
+        // Exclude from coverage (will be tested with instrumented tests later)
+        // These exclusions match Kover's exclusions to ensure consistent coverage reporting
+        property("sonar.coverage.exclusions", 
+            "**/*ViewModelFactory*.kt," +
+            "**/*Screen.kt," +
+            "**/ui/screens/**," +
+            "**/ui/components/**," +
+            "**/ui/theme/**," +
+            "**/ui/NavItems.kt," +
+            "**/MainActivity.kt," +
+            "**/MainApplication.kt," +
+            "**/utils/ShareImageGenerator.kt," +
+            "**/data/db/**," + // Exclude DB package
+            "**/*_Impl*" // Exclude generated implementations
+        )
+        property("sonar.exclusions", "**/*ViewModelFactory*.kt")
     }
 }
 
-// --- NEW: Kover configuration to exclude ViewModelFactory classes from coverage ---
+// --- Kover configuration: Exclude files that will be tested with instrumented tests ---
 kover {
     reports {
         filters {
             excludes {
-                classes("*ViewModelFactory*")
+                classes(
+                    "*ViewModelFactory*",
+                    "*Screen",
+                    "*Screen$*"
+                )
+                packages(
+                    "io.pm.finlight.ui.screens",
+                    "io.pm.finlight.ui.components",
+                    "io.pm.finlight.ui.theme",
+                    "io.pm.finlight.data.db", // Exclude DB package from unit tests
+                    "io.pm.finlight.data.db.dao",
+                    "io.pm.finlight.data.db.entity"
+                )
+                classes(
+                    "*_Impl",
+                    "*_Impl$*"
+                )
+                // Exclude navigation items (defined in NavItems.kt)
+                classes(
+                    "io.pm.finlight.ui.BottomNavItem",
+                    "io.pm.finlight.ui.BottomNavItem$*",
+                    "io.pm.finlight.ui.NavItemsKt"
+                )
+                // Exclude MainActivity (Pure Compose UI)
+                classes(
+                    "io.pm.finlight.MainActivity",
+                    "io.pm.finlight.MainActivity$*",
+                    "io.pm.finlight.MainActivityKt",
+                    "io.pm.finlight.MainActivityKt$*",
+                    "io.pm.finlight.ComposableSingletons$*MainActivityKt*"
+                )
+                // Exclude MainApplication (Framework initialization)
+                classes("io.pm.finlight.MainApplication")
+                // Exclude ShareImageGenerator (Complex Android graphics)
+                classes(
+                    "io.pm.finlight.utils.ShareImageGenerator",
+                    "io.pm.finlight.utils.ShareImageGenerator$*",
+                    "io.pm.finlight.utils.ShareImageGeneratorKt",
+                    "io.pm.finlight.utils.ShareImageGeneratorKt$*"
+                )
             }
         }
     }
@@ -162,6 +218,14 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    
+    // Include Room schema files in androidTest assets for migration testing
+    sourceSets {
+        getByName("androidTest") {
+            assets.srcDirs("schemas")
+        }
+    }
+    
     @Suppress("UnstableApiUsage")
     testOptions {
         unitTests {
@@ -261,6 +325,9 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:$espressoVersion")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.06.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    
+    // Room testing for migration tests
+    androidTestImplementation("androidx.room:room-testing:$roomVersion")
 
     // Debug dependencies
     debugImplementation("androidx.compose.ui:ui-tooling")

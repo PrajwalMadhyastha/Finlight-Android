@@ -66,4 +66,15 @@ class MerchantRenameRuleRepositoryTest : BaseViewModelTest() {
         // Assert
         verify(merchantRenameRuleDao).insert(newRule)
     }
+    @Test
+    fun `deleteByOriginalName calls DAO`() = runTest {
+        // Arrange
+        val originalName = "UBER"
+
+        // Act
+        repository.deleteByOriginalName(originalName)
+
+        // Assert
+        verify(merchantRenameRuleDao).deleteByOriginalName(originalName)
+    }
 }

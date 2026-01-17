@@ -24,6 +24,7 @@ package io.pm.finlight
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.utils.DateUtils
+import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -47,10 +48,12 @@ class DashboardViewModel(
     private val accountRepository: AccountRepository,
     private val budgetDao: BudgetDao,
     private val settingsRepository: SettingsRepository,
-    private val merchantRenameRuleRepository: MerchantRenameRuleRepository
+    private val merchantRenameRuleRepository: MerchantRenameRuleRepository,
+    private val timeProvider: TimeProvider // Added dependency
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
+
 
     val netWorth: StateFlow<Long>
     val monthlyIncome: StateFlow<Long>
@@ -355,7 +358,7 @@ class DashboardViewModel(
     }
 
     private fun checkForLastMonthSummary() {
-        val today = Calendar.getInstance()
+        val today = timeProvider.now()
         if (today.get(Calendar.DAY_OF_MONTH) == 1 && !settingsRepository.hasLastMonthSummaryBeenDismissed()) {
             _showLastMonthSummaryCard.value = true
             viewModelScope.launch {
