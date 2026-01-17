@@ -6,6 +6,8 @@ import app.cash.turbine.awaitItem
 import app.cash.turbine.expectMostRecentItem
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.data.repository.*
+import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -81,6 +83,9 @@ class DashboardViewModelTest : BaseViewModelTest() {
         "Avoid a spending spree", "Back on the brakes", "Recent uptick in spending", "Tighten up a bit"
     )
 
+    @Mock
+    private lateinit var timeProvider: TimeProvider
+
     @Before
     override fun setup() {
         super.setup() // Initializes mocks and sets the main dispatcher
@@ -127,6 +132,10 @@ class DashboardViewModelTest : BaseViewModelTest() {
         // --- FIX: Add missing mock for the new dependency ---
         `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
+        // Default mock time: Not 1st of month
+        val mockNow = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 15) }
+        `when`(timeProvider.now()).thenReturn(mockNow)
+
 
         // Initialize the ViewModel with mocked dependencies
         viewModel = DashboardViewModel(
@@ -134,7 +143,8 @@ class DashboardViewModelTest : BaseViewModelTest() {
             accountRepository = accountRepository,
             budgetDao = budgetDao,
             settingsRepository = settingsRepository,
-            merchantRenameRuleRepository = merchantRenameRuleRepository
+            merchantRenameRuleRepository = merchantRenameRuleRepository,
+            timeProvider = timeProvider
         )
     }
 
@@ -144,7 +154,8 @@ class DashboardViewModelTest : BaseViewModelTest() {
             accountRepository = accountRepository,
             budgetDao = budgetDao,
             settingsRepository = settingsRepository,
-            merchantRenameRuleRepository = merchantRenameRuleRepository
+            merchantRenameRuleRepository = merchantRenameRuleRepository,
+            timeProvider = timeProvider
         )
     }
 
@@ -169,6 +180,45 @@ class DashboardViewModelTest : BaseViewModelTest() {
     }
 
     @Test
+    fun `lastMonthSummary is shown on the first day of the month`() = runTest {
+        // Arrange
+        val summary = FinancialSummary(1000.0, 500.0)
+        Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
+        Mockito.`when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
+            .thenReturn(flowOf(summary))
+
+        // Mock TimeProvider to return 1st of month
+        val firstOfMonth = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1) }
+        `when`(timeProvider.now()).thenReturn(firstOfMonth)
+
+        // Act
+        initializeViewModel()
+        advanceUntilIdle()
+
+        // Assert
+        assertTrue(viewModel.showLastMonthSummaryCard.value)
+        assertEquals(LastMonthSummary(summary.totalIncome, summary.totalExpenses), viewModel.lastMonthSummary.value)
+    }
+
+    @Test
+    fun `lastMonthSummary is NOT shown on other days`() = runTest {
+        // Arrange
+        val summary = FinancialSummary(1000.0, 500.0)
+        Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
+        Mockito.`when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
+            .thenReturn(flowOf(summary))
+
+        // Mock TimeProvider to return 2nd of month
+        val secondOfMonth = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 2) }
+        `when`(timeProvider.now()).thenReturn(secondOfMonth)
+
+        // Act
+        initializeViewModel()
+        advanceUntilIdle()
+
+        // Assert
+        assertFalse(viewModel.showLastMonthSummaryCard.value)
+    } @Test
     fun `test amount remaining calculation is correct`() = runTest {
         // ARRANGE
         val budget = 3000f
@@ -393,35 +443,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
         }
     }
 
-    @Test
-    fun `lastMonthSummary is shown on the first day of the month`() = runTest {
-        // This test requires manipulating the current date, which can be tricky.
-        // For simplicity, we'll assume today is the 1st and the summary hasn't been dismissed.
-        // This is more of an integration test, but we can verify the logic flow.
 
-        // Arrange
-        val summary = FinancialSummary(1000.0, 500.0)
-        Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
-        Mockito.`when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
-            .thenReturn(flowOf(summary))
-
-        // A more robust test would use a TestClock to set the date to the 1st.
-        // For Robolectric, we can't easily do that. We check the logic path instead.
-        val today = Calendar.getInstance()
-        if (today.get(Calendar.DAY_OF_MONTH) == 1) {
-            initializeViewModel()
-            advanceUntilIdle()
-
-            // Assert
-            assertTrue(viewModel.showLastMonthSummaryCard.value)
-            assertEquals(LastMonthSummary(summary.totalIncome, summary.totalExpenses), viewModel.lastMonthSummary.value)
-        } else {
-            // If not the 1st, the card should not show
-            initializeViewModel()
-            advanceUntilIdle()
-            assertEquals(false, viewModel.showLastMonthSummaryCard.value)
-        }
-    }
 
     @Test
     fun `dismissLastMonthSummaryCard calls repository and updates state`() {
