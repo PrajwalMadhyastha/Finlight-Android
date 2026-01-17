@@ -80,10 +80,102 @@ class OnboardingViewModelTest : BaseViewModelTest() {
 
 
     @Test
-    fun `initial state detects a home currency`() = runTest {
+    fun `detects currency from network country iso`() = runTest {
+        // Arrange
+        val shadowTelephonyManager = org.robolectric.Shadows.shadowOf(
+            application.getSystemService(android.content.Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager
+        )
+        shadowTelephonyManager.setNetworkCountryIso("us") // United States -> USD
+
+        // Act
+        // Re-init viewModel to trigger init block
+        viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
+
         // Assert
         viewModel.homeCurrency.test {
-            assertNotNull("Home currency should be detected and not null on init", awaitItem())
+            val currencyInfo = awaitItem()
+            assertNotNull(currencyInfo)
+            assertEquals("USD", currencyInfo?.currencyCode)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `detects currency from resource configuration locale when network iso missing`() = runTest {
+        // Arrange
+        val shadowTelephonyManager = org.robolectric.Shadows.shadowOf(
+            application.getSystemService(android.content.Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager
+        )
+        shadowTelephonyManager.setNetworkCountryIso("") // Missing Network ISO
+
+        // Set configuration locale to Japan (JPY)
+        val res = application.resources
+        val config = res.configuration
+        config.setLocale(java.util.Locale.JAPAN)
+        res.updateConfiguration(config, res.displayMetrics)
+
+        // Act
+        viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
+
+        // Assert
+        viewModel.homeCurrency.test {
+            val currencyInfo = awaitItem()
+            assertNotNull(currencyInfo)
+            assertEquals("JPY", currencyInfo?.currencyCode)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `detects currency from default locale when others missing`() = runTest {
+        // Arrange
+        val shadowTelephonyManager = org.robolectric.Shadows.shadowOf(
+            application.getSystemService(android.content.Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager
+        )
+        shadowTelephonyManager.setNetworkCountryIso("") // Missing Network ISO
+
+        // Clear configuration locale (roughly speaking, or set to something neutral if possible, but Robolectric keeps defaults)
+        // Ideally we set Default Locale and ensure Config is empty or ignored.
+        // However, OnboardingViewModel prioritizes Config over Default.
+        // So we must ensure Config is "invalid" or "empty" country to fall through?
+        // Code: if (configLocale != null && configLocale.country.isNotBlank())
+        
+        // Let's set Config to a locale with no country, e.g. just "en"
+        val res = application.resources
+        val config = res.configuration
+        config.setLocale(java.util.Locale("en", "")) // No country
+        res.updateConfiguration(config, res.displayMetrics)
+
+        // Set Default Locale to UK (GBP)
+        java.util.Locale.setDefault(java.util.Locale.UK)
+
+        // Act
+        viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
+
+        // Assert
+        viewModel.homeCurrency.test {
+            val currencyInfo = awaitItem()
+            assertNotNull(currencyInfo)
+            assertEquals("GBP", currencyInfo?.currencyCode)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `falls back to INR on exception`() = runTest {
+        // Arrange
+        // Mock application to throw exception when accessing system service
+        val mockApp = mock(Application::class.java)
+        `when`(mockApp.getSystemService(anyString())).thenThrow(RuntimeException("System Service Error"))
+
+        // Act
+        viewModel = OnboardingViewModel(mockApp, categoryRepository, settingsRepository)
+
+        // Assert
+        viewModel.homeCurrency.test {
+            val currencyInfo = awaitItem()
+            assertNotNull(currencyInfo)
+            assertEquals("INR", currencyInfo?.currencyCode) // Fallback
             cancelAndIgnoreRemainingEvents()
         }
     }
