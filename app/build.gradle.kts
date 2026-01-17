@@ -209,6 +209,14 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    
+    // Include Room schema files in androidTest assets for migration testing
+    sourceSets {
+        getByName("androidTest") {
+            assets.srcDirs("schemas")
+        }
+    }
+    
     @Suppress("UnstableApiUsage")
     testOptions {
         unitTests {
@@ -308,6 +316,9 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:$espressoVersion")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.06.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    
+    // Room testing for migration tests
+    androidTestImplementation("androidx.room:room-testing:$roomVersion")
 
     // Debug dependencies
     debugImplementation("androidx.compose.ui:ui-tooling")
