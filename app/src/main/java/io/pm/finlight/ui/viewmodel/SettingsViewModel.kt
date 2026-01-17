@@ -539,7 +539,7 @@ class SettingsViewModel(
     fun validateCsvFile(uri: Uri) {
         viewModelScope.launch {
             _csvValidationReport.value = null
-            withContext(Dispatchers.IO) {
+            withContext(dispatchers.io) {
                 try {
                     val report = generateValidationReport(uri)
                     _csvValidationReport.value = report
@@ -649,7 +649,7 @@ class SettingsViewModel(
 
                 if (indexToUpdate != -1) {
                     val revalidatedRow =
-                        withContext(Dispatchers.IO) {
+                        withContext(dispatchers.io) {
                             val accountsMap = db.accountDao().getAllAccounts().first().associateBy { it.name }
                             val categoriesMap = db.categoryDao().getAllCategories().first().associateBy { it.name }
                             createReviewableRow(lineNumber, correctedData, accountsMap, categoriesMap)
@@ -662,7 +662,7 @@ class SettingsViewModel(
     }
 
     fun commitCsvImport(rowsToImport: List<ReviewableRow>) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatchers.io) {
             val header = _csvValidationReport.value?.header ?: run {
                 Log.e("CsvImport", "Header not found in validation report. Aborting.")
                 return@launch
@@ -836,7 +836,7 @@ class SettingsViewModel(
 
     fun createBackupSnapshot() {
         viewModelScope.launch {
-            val success = withContext(Dispatchers.IO) {
+            val success = withContext(dispatchers.io) {
                 DataExportService.createBackupSnapshot(context)
             }
             if (success) {
