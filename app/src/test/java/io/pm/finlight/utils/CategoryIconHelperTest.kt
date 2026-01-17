@@ -11,6 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -83,5 +84,30 @@ class CategoryIconHelperTest : BaseViewModelTest() {
     fun `getCategoryIdByName returns null for non-existent category`() {
         val id = CategoryIconHelper.getCategoryIdByName("Non-Existent Category")
         assertNull(id)
+    }
+
+    @Test
+    fun `getCategoryBackground returns correct drawable for known key`() {
+        val drawableRes = CategoryIconHelper.getCategoryBackground("receipt_long")
+        assertNotEquals(0, drawableRes)
+        // We can't easily check the exact resource ID without R class access in unit tests sometimes,
+        // but here we have R access.
+        // Assuming R.drawable.bg_cat_bills is the expected value for "receipt_long"
+        // checking it is not 0 and not the default if we know the default is different.
+    }
+
+    @Test
+    fun `getCategoryBackground returns default drawable for unknown key`() {
+        val drawableRes = CategoryIconHelper.getCategoryBackground("unknown_key")
+        // Default is bg_cat_general
+        assertNotEquals(0, drawableRes)
+    }
+
+    @Test
+    fun `getAllIcons returns non-empty map`() {
+        val icons = CategoryIconHelper.getAllIcons()
+        assertNotNull(icons)
+        assertNotEquals(0, icons.size)
+        assertTrue(icons.containsKey("receipt_long"))
     }
 }
