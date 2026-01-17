@@ -85,17 +85,42 @@ sonar {
         }
         property("sonar.token", sonarToken ?: "")
         
-        // Point to Kover report
-        property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/kover/report.xml")
+        // Point to Kover report - FIXED: Use path from root project directory
+        property("sonar.coverage.jacoco.xmlReportPaths", "app/build/reports/kover/report.xml")
+        
+        // Exclude from coverage (will be tested with instrumented tests later)
+        // These exclusions match Kover's exclusions to ensure consistent coverage reporting
+        property("sonar.coverage.exclusions", 
+            "**/*ViewModelFactory*.kt," +
+            "**/*Screen.kt," +
+            "**/ui/screens/**," +
+            "**/ui/components/**," +
+            "**/ui/NavItems.kt"
+        )
+        property("sonar.exclusions", "**/*ViewModelFactory*.kt")
     }
 }
 
-// --- NEW: Kover configuration to exclude ViewModelFactory classes from coverage ---
+// --- Kover configuration: Exclude files that will be tested with instrumented tests ---
 kover {
     reports {
         filters {
             excludes {
-                classes("*ViewModelFactory*")
+                classes(
+                    "*ViewModelFactory*",
+                    "*Screen",
+                    "*Screen$*"
+                )
+                packages(
+                    "io.pm.finlight.ui.screens",
+                    "io.pm.finlight.ui.components"
+                )
+                // Exclude navigation items (defined in NavItems.kt)
+                classes(
+                    "io.pm.finlight.ui.BottomNavItem",
+                    "io.pm.finlight.ui.BottomNavItem$*",
+                    "io.pm.finlight.ui.NavItemsKt"
+                )
             }
         }
     }
