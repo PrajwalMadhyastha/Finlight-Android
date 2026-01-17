@@ -95,7 +95,11 @@ sonar {
             "**/*Screen.kt," +
             "**/ui/screens/**," +
             "**/ui/components/**," +
-            "**/ui/NavItems.kt"
+            "**/ui/theme/**," +
+            "**/ui/NavItems.kt," +
+            "**/MainActivity.kt," +
+            "**/MainApplication.kt," +
+            "**/utils/ShareImageGenerator.kt"
         )
         property("sonar.exclusions", "**/*ViewModelFactory*.kt")
     }
@@ -113,13 +117,31 @@ kover {
                 )
                 packages(
                     "io.pm.finlight.ui.screens",
-                    "io.pm.finlight.ui.components"
+                    "io.pm.finlight.ui.components",
+                    "io.pm.finlight.ui.theme"
                 )
                 // Exclude navigation items (defined in NavItems.kt)
                 classes(
                     "io.pm.finlight.ui.BottomNavItem",
                     "io.pm.finlight.ui.BottomNavItem$*",
                     "io.pm.finlight.ui.NavItemsKt"
+                )
+                // Exclude MainActivity (Pure Compose UI)
+                classes(
+                    "io.pm.finlight.MainActivity",
+                    "io.pm.finlight.MainActivity$*",
+                    "io.pm.finlight.MainActivityKt",
+                    "io.pm.finlight.MainActivityKt$*",
+                    "io.pm.finlight.ComposableSingletons$*MainActivityKt*"
+                )
+                // Exclude MainApplication (Framework initialization)
+                classes("io.pm.finlight.MainApplication")
+                // Exclude ShareImageGenerator (Complex Android graphics)
+                classes(
+                    "io.pm.finlight.utils.ShareImageGenerator",
+                    "io.pm.finlight.utils.ShareImageGenerator$*",
+                    "io.pm.finlight.utils.ShareImageGeneratorKt",
+                    "io.pm.finlight.utils.ShareImageGeneratorKt$*"
                 )
             }
         }
