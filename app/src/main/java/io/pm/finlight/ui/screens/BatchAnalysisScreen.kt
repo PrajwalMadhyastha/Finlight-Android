@@ -2,6 +2,9 @@ package io.pm.finlight.ui.screens
 
 import android.content.Context
 import android.net.Uri
+import android.util.JsonReader
+import android.util.JsonWriter
+import android.util.Xml
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,21 +24,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.DEFAULT_IGNORE_PHRASES
+import io.pm.finlight.ml.SmsClassifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.BufferedInputStream
+import java.io.File
+import java.io.InputStream
 
 data class BatchStatus(
-    val total: Int = 0,
     val processed: Int = 0,
     val isRunning: Boolean = false,
-    val resultJson: String? = null
+    val resultFile: File? = null
 )
 
 class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
@@ -46,66 +48,38 @@ class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
     fun processFile(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                updateStatus { it.copy(isRunning = true, total = 0, processed = 0, resultJson = null) }
+                updateStatus { it.copy(isRunning = true, processed = 0, resultFile = null) }
                 
-                val content = context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    BufferedReader(InputStreamReader(inputStream)).readText()
-                } ?: throw Exception("Could not read file")
+                // Temp output file to avoid OOM by holding results in memory
+                val outputFile = File(context.cacheDir, "temp_classified_sms.json")
+                val jsonWriter = JsonWriter(outputFile.writer())
+                jsonWriter.setIndent("  ")
+                jsonWriter.beginArray()
 
-                val jsonArray = if (content.trim().startsWith("<")) {
-                    parseXmlToJson(content)
-                } else {
-                    JSONArray(content)
-                }
+                var processedCount = 0
 
-                val total = jsonArray.length()
-                updateStatus { it.copy(total = total) }
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val bufferedIn = BufferedInputStream(inputStream)
+                    bufferedIn.mark(10)
+                    val firstByte = bufferedIn.read()
+                    bufferedIn.reset()
 
-                val results = JSONArray()
-
-                for (i in 0 until total) {
-                    val item = jsonArray.getJSONObject(i)
-                    // Support both common schema variations
-                    val body = item.optString("body", item.optString("message", ""))
-                    val address = item.optString("address", "") // Needed for Sender Rules
-                    
-                    // 1. Run Classifier (Returns Float 0.0 - 1.0)
-                    val score = classifier.classify(body)
-                    
-                    // 2. Run Ignore Rules (Mimic Production App)
-                    // Check Body Rules
-                    val ignoreBodyRule = DEFAULT_IGNORE_PHRASES
-                        .filter { it.type == io.pm.finlight.RuleType.BODY_PHRASE }
-                        .find { java.util.regex.Pattern.compile(it.pattern, java.util.regex.Pattern.CASE_INSENSITIVE).matcher(body).find() }
-                    
-                    // Check Sender Rules
-                    val ignoreSenderRule = DEFAULT_IGNORE_PHRASES
-                        .filter { it.type == io.pm.finlight.RuleType.SENDER }
-                        .find { matchesSender(address, it.pattern) }
-
-                    val isIgnored = ignoreBodyRule != null || ignoreSenderRule != null
-                    
-                    // logic: If ignored by rule -> Not a transaction. Else -> trust ML (custom threshold)
-                    val isTransaction = !isIgnored && score > 0.5f 
-                    
-                    // Enrich Object with explicit casts
-                    item.put("ml_score", score.toDouble())
-                    item.put("ml_predicted_is_transaction", isTransaction)
-                    item.put("ml_rule_ignore", isIgnored)
-                    if (isIgnored) {
-                        item.put("ml_ignore_reason", ignoreBodyRule?.pattern ?: ignoreSenderRule?.pattern)
-                    }
-
-                    results.put(item)
-
-                    // Update Progress every 10 items to avoid UI spam
-                    if (i % 10 == 0) {
-                        updateStatus { it.copy(processed = i + 1) }
+                    if (firstByte == '<'.code) {
+                        processedCount = processXmlStream(bufferedIn, jsonWriter) { count ->
+                            // Update UI every 50 items
+                            if (count % 50 == 0) updateStatus { it.copy(processed = count) }
+                        }
+                    } else {
+                         processedCount = processJsonStream(bufferedIn, jsonWriter) { count ->
+                            if (count % 50 == 0) updateStatus { it.copy(processed = count) }
+                        }
                     }
                 }
+                
+                jsonWriter.endArray()
+                jsonWriter.close()
 
-                val finalJson = results.toString(2)
-                updateStatus { it.copy(isRunning = false, processed = total, resultJson = finalJson) }
+                updateStatus { it.copy(isRunning = false, processed = processedCount, resultFile = outputFile) }
                 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -117,6 +91,99 @@ class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
         }
     }
 
+    // Streaming XML Parser (XmlPullParser)
+    private fun processXmlStream(input: InputStream, writer: JsonWriter, onProgress: suspend (Int) -> Unit): Int {
+        var count = 0
+        val parser = Xml.newPullParser()
+        parser.setFeature(org.xmlpull.v1.XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
+        parser.setInput(input.reader())
+
+        var eventType = parser.eventType
+        while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+            if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG && parser.name == "sms") {
+                val address = parser.getAttributeValue(null, "address") ?: ""
+                val date = parser.getAttributeValue(null, "date")?.toLongOrNull() ?: 0L
+                val body = parser.getAttributeValue(null, "body") ?: ""
+                
+                processSingleItem(address, body, date, writer)
+                count++
+                runBlocking { onProgress(count) }
+            }
+            eventType = parser.next()
+        }
+        return count
+    }
+
+    // Streaming JSON Parser (JsonReader)
+    private fun processJsonStream(input: InputStream, writer: JsonWriter, onProgress: suspend (Int) -> Unit): Int {
+        var count = 0
+        val reader = JsonReader(input.reader())
+        
+        // Check if root is array or object (dump vs flat)
+        // Implementation assumption: Input is Array of Objects
+        // If it's a legacy dump object {"count": N, "smses": [...]}, this simple reader will fail.
+        // But for "Batch Classifier", we mostly consume the flat arrays we produce or simple dumps.
+        // Let's assume array for now or try to detect.
+        
+        try {
+            reader.beginArray()
+            while (reader.hasNext()) {
+                var address = ""
+                var body = ""
+                var date = 0L
+                
+                reader.beginObject()
+                while (reader.hasNext()) {
+                    val name = reader.nextName()
+                    when (name) {
+                        "address" -> address = reader.nextString()
+                        "body", "message" -> body = reader.nextString()
+                        "date" -> date = reader.nextLong() // safely parses string numbers too
+                        else -> reader.skipValue()
+                    }
+                }
+                reader.endObject()
+
+                processSingleItem(address, body, date, writer)
+                count++
+                runBlocking { onProgress(count) }
+            }
+            reader.endArray()
+        } catch (e: Exception) {
+            // Fallback for nested object? Or just let it fail for now and advise user.
+            throw e
+        }
+        return count
+    }
+
+    private fun processSingleItem(address: String, body: String, date: Long, writer: JsonWriter) {
+        val score = classifier.classify(body)
+        
+        // Default Ignore Rules
+        val ignoreBodyRule = DEFAULT_IGNORE_PHRASES
+            .filter { it.type == io.pm.finlight.RuleType.BODY_PHRASE }
+            .find { java.util.regex.Pattern.compile(it.pattern, java.util.regex.Pattern.CASE_INSENSITIVE).matcher(body).find() }
+        
+        val ignoreSenderRule = DEFAULT_IGNORE_PHRASES
+            .filter { it.type == io.pm.finlight.RuleType.SENDER }
+            .find { matchesSender(address, it.pattern) }
+
+        val isIgnored = ignoreBodyRule != null || ignoreSenderRule != null
+        val isTransaction = !isIgnored && score > 0.5f
+
+        writer.beginObject()
+        writer.name("address").value(address)
+        writer.name("body").value(body)
+        writer.name("date").value(date)
+        writer.name("ml_score").value(score.toDouble())
+        writer.name("ml_predicted_is_transaction").value(isTransaction)
+        writer.name("ml_rule_ignore").value(isIgnored)
+        if (isIgnored) {
+             writer.name("ml_ignore_reason").value(ignoreBodyRule?.pattern ?: ignoreSenderRule?.pattern)
+        }
+        writer.endObject()
+    }
+
     // Helper for Wildcard Sender Matching (e.g. *Jio* matches VM-JioNet)
     private fun matchesSender(sender: String, pattern: String): Boolean {
         // Convert wildcard to regex
@@ -124,45 +191,7 @@ class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
         val regex = pattern
              .replace(".", "\\\\.") // Escape dots first
              .replace("*", ".*")    // Convert wildcard
-        
-        // Sender match usually contains partial match logic or exact?
-        // DefaultIgnoreRules patterns like *HDFCMF imply we want to match ends.
-        // Let's use simple find() or matches() depending on intent.
-        // ".*HDFCMF" -> matches()
         return java.util.regex.Pattern.compile(regex, java.util.regex.Pattern.CASE_INSENSITIVE).matcher(sender).matches()
-    }
-
-    private fun parseXmlToJson(xmlContent: String): JSONArray {
-        val entries = JSONArray()
-        try {
-            val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance()
-            val builder = factory.newDocumentBuilder()
-            val inputSource = org.xml.sax.InputSource(java.io.StringReader(xmlContent))
-            val doc = builder.parse(inputSource)
-            
-            val smsNodes = doc.getElementsByTagName("sms")
-            
-            for (i in 0 until smsNodes.length) {
-                val node = smsNodes.item(i)
-                if (node.nodeType == org.w3c.dom.Node.ELEMENT_NODE) {
-                    val element = node as org.w3c.dom.Element
-                    val address = element.getAttribute("address") ?: ""
-                    val date = element.getAttribute("date") ?: "0"
-                    val body = element.getAttribute("body") ?: ""
-                    
-                    val jsonObj = JSONObject()
-                    jsonObj.put("address", address)
-                    jsonObj.put("date", date.toLongOrNull() ?: 0L)
-                    jsonObj.put("body", body)
-                    
-                    entries.put(jsonObj)
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            // Return empty or partial list on error
-        }
-        return entries
     }
 
     private suspend fun updateStatus(update: (BatchStatus) -> BatchStatus) {
@@ -201,9 +230,11 @@ fun BatchAnalysisScreen(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         uri?.let {
-            status.resultJson?.let { json ->
+            status.resultFile?.let { tempFile ->
                 context.contentResolver.openOutputStream(it)?.use { os ->
-                    os.write(json.toByteArray())
+                    tempFile.inputStream().use { input ->
+                        input.copyTo(os)
+                    }
                 }
                 Toast.makeText(context, "Saved!", Toast.LENGTH_SHORT).show()
             }
@@ -243,7 +274,7 @@ fun BatchAnalysisScreen(
                 style = MaterialTheme.typography.headlineMedium
             )
             Text(
-                "Load a JSON or XML dump to run the TFLite model.",
+                "Streaming processing for large datasets.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -251,11 +282,9 @@ fun BatchAnalysisScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             if (status.isRunning) {
-                LinearProgressIndicator(
-                    progress = { if (status.total > 0) status.processed.toFloat() / status.total.toFloat() else 0f },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text("Processing: ${status.processed} / ${status.total}")
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Processed: ${status.processed}")
             } else {
                 Button(
                     onClick = { filePickerLauncher.launch("*/*") },
@@ -266,7 +295,7 @@ fun BatchAnalysisScreen(
                     Text("Load Dump & Run")
                 }
 
-                if (status.resultJson != null) {
+                if (status.resultFile != null) {
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedButton(
                         onClick = { saveFileLauncher.launch("classified_sms.json") },
@@ -278,7 +307,7 @@ fun BatchAnalysisScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Processed ${status.total} items.",
+                        "Processed ${status.processed} items.",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary
                     )
