@@ -36,10 +36,6 @@ dependencies {
     // --- ADDED: Compose Desktop Dependencies ---
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
-
-    // --- TEMPORARY MOCK: TFLite removed for Phase 3 UI Testing ---
-    // implementation("org.tensorflow:tensorflow-lite-api:2.14.0")
-    // implementation("org.tensorflow:tensorflow-lite:2.14.0")
 }
 
 application {
