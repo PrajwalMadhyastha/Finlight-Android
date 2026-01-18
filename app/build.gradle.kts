@@ -141,9 +141,11 @@ android {
             ndk {
                 debugSymbolLevel = "FULL"
             }
+            buildConfigField("boolean", "ENABLE_DEV_TOOLS", "false")
         }
         debug {
             isDebuggable = true
+            buildConfigField("boolean", "ENABLE_DEV_TOOLS", "true")
         }
     }
     compileOptions {

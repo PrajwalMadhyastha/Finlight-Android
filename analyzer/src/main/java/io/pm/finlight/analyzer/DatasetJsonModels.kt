@@ -30,3 +30,14 @@ data class DatasetSmsEntry(
     @SerialName("+@body")
     val body: String,
 )
+
+@Serializable
+data class AndroidSmsItem(
+    val address: String,
+    val body: String,
+    val date: Long,
+    val ml_score: Double? = null,
+    val ml_predicted_is_transaction: Boolean? = null,
+    val ml_rule_ignore: Boolean? = null,
+    val ml_ignore_reason: String? = null
+)

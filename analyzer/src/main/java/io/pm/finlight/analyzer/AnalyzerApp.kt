@@ -405,48 +405,117 @@ fun App() {
                                     try {
                                         val text = file.readText()
                                         val isXml = text.trim().startsWith("<")
-                                        val rawItems = if (isXml) XmlParser.parse(text) else {
-                                            val json = Json { ignoreUnknownKeys = true; isLenient = true }
-                                            val dump = json.decodeFromString<DatasetSmsDump>(text)
-                                            dump.smses.sms
-                                        }
-
-                                        if (rawItems.isNotEmpty()) {
-                                            // CREATE NEW PROJECT FROM FILENAME
+                                        
+                                        // FORMAT 1: XML
+                                        if (isXml) {
+                                            val rawItems = XmlParser.parse(text)
                                             val newProjectName = file.nameWithoutExtension
-
-                                            // Processing
-                                            val newSmsList = rawItems.map {
-                                                val score = classifier.classify(it.body)
-                                                val silver: PotentialTransaction? = if (score > 0.2) {
-                                                    runBlocking {
-                                                        DesktopSmsParser.parse(SmsMessage(id = 0L, body = it.body, sender = it.address, date = it.date.toLongOrNull() ?: 0L))
-                                                    }
-                                                } else null
-
-                                                ReviewItem(
-                                                    id = it.date,
-                                                    sender = it.address,
-                                                    body = it.body,
-                                                    timestamp = it.date.toLongOrNull() ?: 0L,
-                                                    confidence = score,
-                                                    silverLabel = silver,
-                                                    isTransaction = if (score > 0.95 && silver != null) true else if (score < 0.05) false else null
-                                                )
+                                            val newSmsList = rawItems.map { it ->
+                                                 val score = classifier.classify(it.body)
+                                                 val silver: PotentialTransaction? = if (score > 0.2) {
+                                                     runBlocking {
+                                                         DesktopSmsParser.parse(SmsMessage(id = 0L, body = it.body, sender = it.address, date = it.date.toLongOrNull() ?: 0L))
+                                                     }
+                                                 } else null
+                                                 
+                                                 ReviewItem(
+                                                     id = it.date, // Use date as ID for simplicity
+                                                     sender = it.address,
+                                                     body = it.body,
+                                                     timestamp = it.date.toLongOrNull() ?: 0L,
+                                                     confidence = score,
+                                                     silverLabel = silver,
+                                                     // Heuristic: Auto-accept > 0.95 with silver, Auto-reject < 0.05
+                                                     isTransaction = if (score > 0.95 && silver != null) true else if (score < 0.05) false else null
+                                                 )
                                             }
-
-                                            // Update State
                                             smsList = newSmsList
                                             currentProject = newProjectName
-                                            statusMessage = "Created Project: $newProjectName"
-                                            currentIndex = 0
+                                            statusMessage = "Created Project: $newProjectName (Legacy XML)"
+                                        } 
+                                        // FORMAT 2: Android JSON (Flat Array)
+                                        else if (text.trim().startsWith("[")) {
+                                             val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+                                             val rawItems = json.decodeFromString<List<AndroidSmsItem>>(text)
+                                             val newProjectName = file.nameWithoutExtension
 
+                                             val newSmsList = rawItems.map { it ->
+                                                 // score is ALREADY computed by Android
+                                                 val score = it.ml_score?.toFloat() ?: classifier.classify(it.body)
+                                                 val isIgnoredByRule = it.ml_rule_ignore == true
+                                                 
+                                                 val silver: PotentialTransaction? = if (!isIgnoredByRule && score > 0.2) {
+                                                     runBlocking {
+                                                         DesktopSmsParser.parse(SmsMessage(id = 0L, body = it.body, sender = it.address, date = it.date))
+                                                     }
+                                                 } else null
+
+                                                 // If ignored by rule, append reason to body for visibility in UI
+                                                 val displayBody = if (isIgnoredByRule) "[IGNORED: ${it.ml_ignore_reason}] ${it.body}" else it.body
+
+                                                 ReviewItem(
+                                                     id = it.date.toString(),
+                                                     sender = it.address,
+                                                     body = displayBody,
+                                                     timestamp = it.date,
+                                                     confidence = score,
+                                                     silverLabel = silver,
+                                                     // Logic: 
+                                                     // 1. If Ignored by Rule -> FALSE (Definitive)
+                                                     // 2. If Score > 0.95 & Silver Extracted -> TRUE (Auto-verify)
+                                                     // 3. If Score < 0.05 -> FALSE (Auto-reject)
+                                                     // 4. Else -> NULL (Review Queue)
+                                                     isTransaction = if (isIgnoredByRule) false 
+                                                                     else if (score > 0.95 && silver != null) true 
+                                                                     else if (score < 0.05) false 
+                                                                     else null
+                                                 )
+                                             }
+                                             smsList = newSmsList
+                                             currentProject = newProjectName
+                                             statusMessage = "Created Project: $newProjectName (Android Batch)"
+                                        }
+                                        // FORMAT 3: Legacy JSON Dump (Nested)
+                                        else {
+                                            val json = Json { ignoreUnknownKeys = true; isLenient = true }
+                                            val dump = json.decodeFromString<DatasetSmsDump>(text)
+                                            val rawItems = dump.smses.sms
+                                            
+                                            // ... (Same logic as XML basically)
+                                            val newProjectName = file.nameWithoutExtension
+                                            val newSmsList = rawItems.map { it ->
+                                                val score = classifier.classify(it.body)
+                                                val silver: PotentialTransaction? = if (score > 0.2) {
+                                                     runBlocking {
+                                                         DesktopSmsParser.parse(SmsMessage(id = 0L, body = it.body, sender = it.address, date = it.date.toLongOrNull() ?: 0L))
+                                                     }
+                                                 } else null
+
+                                                 ReviewItem(
+                                                     id = it.date, 
+                                                     sender = it.address,
+                                                     body = it.body,
+                                                     timestamp = it.date.toLongOrNull() ?: 0L,
+                                                     confidence = score,
+                                                     silverLabel = silver,
+                                                     isTransaction = if (score > 0.95 && silver != null) true else if (score < 0.05) false else null
+                                                 )
+                                            }
+                                            smsList = newSmsList
+                                            currentProject = newProjectName
+                                            statusMessage = "Created Project: $newProjectName (Legacy JSON)"
+                                        }
+
+                                        // Common Post-Processing
+                                        if (smsList.isNotEmpty()) {
+                                            currentIndex = 0
                                             // Refresh Project List & Save
-                                            projectList = listProjects() + newProjectName // Optimistic update
+                                            projectList = listProjects() + (currentProject ?: "") 
                                             scope.launch(Dispatchers.IO) {
-                                                saveCurrentProject() // Save new file
+                                                saveCurrentProject() 
                                             }
                                         }
+
                                     } catch (e: Exception) {
                                         statusMessage = "Error: ${e.message}"
                                         e.printStackTrace()
