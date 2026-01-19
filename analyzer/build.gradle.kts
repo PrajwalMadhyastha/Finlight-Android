@@ -40,6 +40,8 @@ dependencies {
     // --- TEMPORARY MOCK: TFLite removed for Phase 3 UI Testing ---
     // implementation("org.tensorflow:tensorflow-lite-api:2.14.0")
     // implementation("org.tensorflow:tensorflow-lite:2.14.0")
+
+    testImplementation(kotlin("test-junit"))
 }
 
 application {

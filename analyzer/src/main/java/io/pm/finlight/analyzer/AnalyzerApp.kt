@@ -75,7 +75,8 @@ data class SerializableReviewItem(
     val timestamp: Long,
     val isTransaction: Boolean? = null,
     val confidence: Float = 0.0f,
-    val silverLabel: SerializablePotentialTransaction? = null
+    val silverLabel: SerializablePotentialTransaction? = null,
+    val ignoreReason: String? = null // NEW FIELD for Migration
 )
 
 // Helper mappers
@@ -110,7 +111,8 @@ fun ReviewItem.toSerializable() = SerializableReviewItem(
     timestamp = timestamp,
     isTransaction = isTransaction,
     confidence = confidence,
-    silverLabel = silverLabel?.toSerializable()
+    silverLabel = silverLabel?.toSerializable(),
+    ignoreReason = ignoreReason
 )
 
 fun SerializableReviewItem.toDomain() = ReviewItem(
@@ -120,7 +122,8 @@ fun SerializableReviewItem.toDomain() = ReviewItem(
     timestamp = timestamp,
     isTransaction = isTransaction,
     confidence = confidence,
-    silverLabel = silverLabel?.toDomain()
+    silverLabel = silverLabel?.toDomain(),
+    ignoreReason = ignoreReason
 )
 
 // --- PERSISTENCE UTILS ---
@@ -158,7 +161,8 @@ data class ReviewItem(
     val timestamp: Long,
     var isTransaction: Boolean? = null, // null = undecided, true = yes, false = no
     var confidence: Float = 0.0f,
-    var silverLabel: PotentialTransaction? = null // Regex Result
+    var silverLabel: PotentialTransaction? = null, // Regex Result
+    var ignoreReason: String? = null // NEW: Stores reason separately from body
 )
 
 enum class AppMode {
@@ -434,47 +438,82 @@ fun App() {
                                             statusMessage = "Created Project: $newProjectName (Legacy XML)"
                                         } 
                                         // FORMAT 2: Android JSON (Flat Array)
-                                        else if (text.trim().startsWith("[")) {
-                                             val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
-                                             val rawItems = json.decodeFromString<List<AndroidSmsItem>>(text)
-                                             val newProjectName = file.nameWithoutExtension
+                                         else if (text.trim().startsWith("[")) {
+                                              val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+                                              // TRY DETECTING: Is this a Workspace Project (ReviewItem list) OR Android Dump (AndroidSmsItem list)?
+                                              // Check the first few chars for specific keys to guess
+                                              
+                                              // MIGRATION / LOAD WORKSPACE LOGIC
+                                              if (text.contains("\"id\":") && text.contains("\"isTransaction\":")) {
+                                                  // It's likely a saved workspace (SerializableReviewItem)
+                                                  val loadedDtos = json.decodeFromString<List<SerializableReviewItem>>(text)
+                                                  
+                                                  val migratedList = loadedDtos.map { dto ->
+                                                      // MIGRATION: Check for polluted body
+                                                      var cleanBody = dto.body
+                                                      var reason = dto.ignoreReason
+                                                      
+                                                      // Regex to catch [IGNORED: Reason] Prefix
+                                                      val pollutionRegex = Regex("^\\[IGNORED: (.*?)\\] (.*)")
+                                                      val match = pollutionRegex.find(cleanBody)
+                                                      if (match != null) {
+                                                          // We found pollution! Fix it.
+                                                          reason = match.groupValues[1] // The reason part
+                                                          cleanBody = match.groupValues[2] // The actual SMS part
+                                                          println("MIGRATION: Cleaned item ${dto.id}")
+                                                      }
 
-                                             val newSmsList = rawItems.map { it ->
-                                                 // score is ALREADY computed by Android
-                                                 val score = it.ml_score?.toFloat() ?: classifier.classify(it.body)
-                                                 val isIgnoredByRule = it.ml_rule_ignore == true
-                                                 
-                                                 val silver: PotentialTransaction? = if (!isIgnoredByRule && score > 0.2) {
-                                                     runBlocking {
-                                                         DesktopSmsParser.parse(SmsMessage(id = 0L, body = it.body, sender = it.address, date = it.date))
-                                                     }
-                                                 } else null
-
-                                                 // If ignored by rule, append reason to body for visibility in UI
-                                                 val displayBody = if (isIgnoredByRule) "[IGNORED: ${it.ml_ignore_reason}] ${it.body}" else it.body
-
-                                                 ReviewItem(
-                                                     id = it.date.toString(),
-                                                     sender = it.address,
-                                                     body = displayBody,
-                                                     timestamp = it.date,
-                                                     confidence = score,
-                                                     silverLabel = silver,
-                                                     // Logic: 
-                                                     // 1. If Ignored by Rule -> FALSE (Definitive)
-                                                     // 2. If Score > 0.75 -> TRUE (Auto-verify)
-                                                     // 3. If Score < 0.25 -> FALSE (Auto-reject)
-                                                     // 4. Else -> NULL (Review Queue)
-                                                     isTransaction = if (isIgnoredByRule) false 
-                                                                     else if (score > 0.75) true 
-                                                                     else if (score < 0.25) false 
-                                                                     else null
-                                                 )
-                                             }
-                                             smsList = newSmsList
-                                             currentProject = newProjectName
-                                             statusMessage = "Created Project: $newProjectName (Android Batch)"
-                                        }
+                                                      ReviewItem(
+                                                          id = dto.id,
+                                                          sender = dto.sender,
+                                                          body = cleanBody, // Restored Raw Body
+                                                          timestamp = dto.timestamp,
+                                                          isTransaction = dto.isTransaction,
+                                                          confidence = dto.confidence,
+                                                          silverLabel = dto.silverLabel?.toDomain(),
+                                                          ignoreReason = reason // Moved to proper field
+                                                      )
+                                                  }
+                                                  
+                                                  smsList = migratedList
+                                                  currentProject = file.nameWithoutExtension
+                                                  statusMessage = "Opened Project: $currentProject (with Migration)"
+                                              } 
+                                              // ANDROID BATCH IMPORT LOGIC
+                                              else {
+                                                  val rawItems = json.decodeFromString<List<AndroidSmsItem>>(text)
+                                                  val newProjectName = file.nameWithoutExtension
+    
+                                                  val newSmsList = rawItems.map { it ->
+                                                      // score is ALREADY computed by Android
+                                                      val score = it.ml_score?.toFloat() ?: classifier.classify(it.body)
+                                                      val isIgnoredByRule = it.ml_rule_ignore == true
+                                                      
+                                                      val silver: PotentialTransaction? = if (!isIgnoredByRule && score > 0.2) {
+                                                          runBlocking {
+                                                              DesktopSmsParser.parse(SmsMessage(id = 0L, body = it.body, sender = it.address, date = it.date))
+                                                          }
+                                                      } else null
+    
+                                                      ReviewItem(
+                                                          id = it.date.toString(),
+                                                          sender = it.address,
+                                                          body = it.body, // KEEP RAW
+                                                          timestamp = it.date,
+                                                          confidence = score,
+                                                          silverLabel = silver,
+                                                          ignoreReason = if (isIgnoredByRule) it.ml_ignore_reason else null,
+                                                          isTransaction = if (isIgnoredByRule) false 
+                                                                          else if (score > 0.75) true 
+                                                                          else if (score < 0.25) false 
+                                                                          else null
+                                                      )
+                                                  }
+                                                  smsList = newSmsList
+                                                  currentProject = newProjectName
+                                                  statusMessage = "Created Project: $newProjectName (Android Batch)"
+                                              }
+                                         }
                                         // FORMAT 3: Legacy JSON Dump (Nested)
                                         else {
                                             val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -569,21 +608,22 @@ fun App() {
                             modifier = Modifier.padding(end = 16.dp)
                         ) { Text("Reset Progress") }
 
-                        // EXPORT BUTTON (Stage 1 Output)
+                        // EXPORT BUTTON 1: NER Data (Verified Only)
                         Button(
                             onClick = {
                                 val verified = smsList.filter { it.isTransaction == true }
                                 if (verified.isNotEmpty()) {
-                                    val file = saveFile()
+                                    val file = saveFile("verified_transactions.json")
                                     if (file != null) {
                                         // Anonymize on Export (Pipeline Rule)
                                         val exportList = verified.map {
                                             it.copy(body = Anonymizer.anonymize(it.body))
                                         }
                                         try {
-                                            val jsonString = Json { prettyPrint = true }.encodeToString(exportList.map { it.toSerializable() })
+                                            val json = Json { prettyPrint = true; encodeDefaults = true }
+                                            val jsonString = json.encodeToString(exportList.map { it.toSerializable() })
                                             file.writeText(jsonString)
-                                            statusMessage = "Exported ${exportList.size} verified transactions to ${file.name}"
+                                            statusMessage = "Exported ${exportList.size} items for NER to ${file.name}"
                                         } catch (e: Exception) {
                                             statusMessage = "Export failed: ${e.message}"
                                             e.printStackTrace()
@@ -595,7 +635,36 @@ fun App() {
                             },
                              colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF006400)), // Dark Green
                              modifier = Modifier.padding(end = 16.dp)
-                        ) { Text("Export Verified") }
+                        ) { Text("Export Verified (NER)") }
+
+                        // EXPORT BUTTON 2: Classifier Training Data (All Labeled)
+                        Button(
+                            onClick = {
+                                val labeled = smsList.filter { it.isTransaction != null }
+                                if (labeled.isNotEmpty()) {
+                                    val file = saveFile("classifier_training_data.json")
+                                    if (file != null) {
+                                        // Anonymize on Export (Pipeline Rule)
+                                        val exportList = labeled.map {
+                                            it.copy(body = Anonymizer.anonymize(it.body))
+                                        }
+                                        try {
+                                            val json = Json { prettyPrint = true; encodeDefaults = true }
+                                            val jsonString = json.encodeToString(exportList.map { it.toSerializable() })
+                                            file.writeText(jsonString)
+                                            statusMessage = "Exported ${exportList.size} items for Classifier to ${file.name}"
+                                        } catch (e: Exception) {
+                                            statusMessage = "Export failed: ${e.message}"
+                                            e.printStackTrace()
+                                        }
+                                    }
+                                } else {
+                                    statusMessage = "Nothing to export! No labeled items found."
+                                }
+                            },
+                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3F51B5)), // Indigo
+                             modifier = Modifier.padding(end = 16.dp)
+                        ) { Text("Export Training Data") }
 
                         Switch(
                             checked = isAnonymizationEnabled,
@@ -619,7 +688,9 @@ fun App() {
             } else if (appMode == AppMode.REVIEW_QUEUE) {
                 // --- REVIEW MODE (Focus Card) ---
                 if (currentItem != null) {
-                    val displayBody = if (isAnonymizationEnabled) Anonymizer.anonymize(currentItem.body) else currentItem.body
+                    val rawBody = currentItem.body
+                    val displayBody = if (isAnonymizationEnabled) Anonymizer.anonymize(rawBody) else rawBody
+                    val ignoreTag = currentItem.ignoreReason?.let { "[IGNORED: $it]" } // UI Only Tag
 
                     Card(modifier = Modifier.fillMaxWidth().weight(1f).padding(8.dp), elevation = CardDefaults.cardElevation(4.dp)) {
                         Column(modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
@@ -631,6 +702,13 @@ fun App() {
                             Spacer(modifier = Modifier.height(16.dp))
                             HorizontalDivider()
                             Spacer(modifier = Modifier.height(16.dp))
+                            
+                            // Display Ignore Tag if present
+                            if (ignoreTag != null) {
+                                Text(ignoreTag, color = Color.Gray, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                            
                             Text(displayBody, style = MaterialTheme.typography.bodyLarge, fontSize = 20.sp)
 
                             // --- SILVER LABEL DISPLAY ---
@@ -824,6 +902,12 @@ fun App() {
                                                 Text(item.sender, fontWeight = FontWeight.Bold)
                                                 Text(String.format("%.2f", item.confidence), fontSize = 12.sp, color = if(item.confidence > 0.5) Color(0xFF006400) else Color(0xFF8B0000))
                                             }
+                                            
+                                            // UI: Show Ignore Reason if exists
+                                            if (item.ignoreReason != null) {
+                                                Text("[IGNORED: ${item.ignoreReason}]", fontSize = 11.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                                            }
+
                                             // Allow up to 4 lines for body, with ellipsis if longer
                                             Text(displayBody, maxLines = 4, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, fontSize = 13.sp, lineHeight = 18.sp, color = if (!isMarkedAsTx) Color.Gray else Color.Black)
                                             if (item.silverLabel != null && isMarkedAsTx) {
@@ -887,10 +971,10 @@ fun chooseFile(): File? {
     return null
 }
 
-fun saveFile(): File? {
+fun saveFile(defaultName: String = "verified_transactions.json"): File? {
     val chooser = JFileChooser()
-    chooser.dialogTitle = "Export Verified Transactions"
-    chooser.selectedFile = File("verified_transactions.json")
+    chooser.dialogTitle = "Export Data"
+    chooser.selectedFile = File(defaultName)
     val returnVal = chooser.showSaveDialog(null)
     if (returnVal == JFileChooser.APPROVE_OPTION) {
         return chooser.selectedFile
