@@ -425,8 +425,8 @@ fun App() {
                                                      timestamp = it.date.toLongOrNull() ?: 0L,
                                                      confidence = score,
                                                      silverLabel = silver,
-                                                     // Heuristic: Auto-accept > 0.95 with silver, Auto-reject < 0.05
-                                                     isTransaction = if (score > 0.95 && silver != null) true else if (score < 0.05) false else null
+                                                     // Heuristic: Auto-accept > 0.75, Auto-reject < 0.25
+                                                     isTransaction = if (score > 0.75) true else if (score < 0.25) false else null
                                                  )
                                             }
                                             smsList = newSmsList
@@ -462,12 +462,12 @@ fun App() {
                                                      silverLabel = silver,
                                                      // Logic: 
                                                      // 1. If Ignored by Rule -> FALSE (Definitive)
-                                                     // 2. If Score > 0.95 & Silver Extracted -> TRUE (Auto-verify)
-                                                     // 3. If Score < 0.05 -> FALSE (Auto-reject)
+                                                     // 2. If Score > 0.75 -> TRUE (Auto-verify)
+                                                     // 3. If Score < 0.25 -> FALSE (Auto-reject)
                                                      // 4. Else -> NULL (Review Queue)
                                                      isTransaction = if (isIgnoredByRule) false 
-                                                                     else if (score > 0.95 && silver != null) true 
-                                                                     else if (score < 0.05) false 
+                                                                     else if (score > 0.75) true 
+                                                                     else if (score < 0.25) false 
                                                                      else null
                                                  )
                                              }
@@ -498,7 +498,7 @@ fun App() {
                                                      timestamp = it.date.toLongOrNull() ?: 0L,
                                                      confidence = score,
                                                      silverLabel = silver,
-                                                     isTransaction = if (score > 0.95 && silver != null) true else if (score < 0.05) false else null
+                                                     isTransaction = if (score > 0.75) true else if (score < 0.25) false else null
                                                  )
                                             }
                                             smsList = newSmsList
@@ -702,63 +702,95 @@ fun App() {
                 val invalidCount = allCount - validCount
 
                 Column(modifier = Modifier.weight(1f)) {
+                    // Confidence Range Filter State
+                    var minScoreText by remember { mutableStateOf("") }
+                    var maxScoreText by remember { mutableStateOf("") }
+
                     // Audit Filters with Counts
-                    Row(modifier = Modifier.padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = auditFilter == "All",
-                            onClick = { auditFilter = "All" },
-                            label = { Text("All ($allCount)") },
-                            leadingIcon = if (auditFilter == "All") {
-                                { Icon(androidx.compose.material.icons.Icons.Default.Check, contentDescription = null) }
-                            } else null
-                        )
-                         FilterChip(
-                            selected = auditFilter == "Valid",
-                            onClick = { auditFilter = "Valid" },
-                            label = { Text("Valid ($validCount)") },
-                            leadingIcon = if (auditFilter == "Valid") {
-                                { Icon(androidx.compose.material.icons.Icons.Default.Check, contentDescription = null) }
-                            } else null
-                        )
-                         FilterChip(
-                            selected = auditFilter == "Invalid",
-                            onClick = { auditFilter = "Invalid" },
-                            label = { Text("Invalid ($invalidCount)") },
-                            leadingIcon = if (auditFilter == "Invalid") {
-                                { Icon(androidx.compose.material.icons.Icons.Default.Close, contentDescription = null) }
-                            } else null
-                        )
-                        FilterChip(
-                            selected = auditFilter == "Auto",
-                            onClick = { auditFilter = "Auto" },
-                            label = { Text("Auto ($autoCount)") },
-                            leadingIcon = if (auditFilter == "Auto") {
-                                { Icon(androidx.compose.material.icons.Icons.Default.Settings, contentDescription = null) }
-                            } else null
-                        )
-                        FilterChip(
-                            selected = auditFilter == "Manual",
-                            onClick = { auditFilter = "Manual" },
-                            label = { Text("Accepted ($manualCount)") },
-                            leadingIcon = if (auditFilter == "Manual") {
-                                { Icon(androidx.compose.material.icons.Icons.Default.Face, contentDescription = null) }
-                            } else null
-                        )
+                    Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = auditFilter == "All",
+                                onClick = { auditFilter = "All" },
+                                label = { Text("All ($allCount)") },
+                                leadingIcon = if (auditFilter == "All") {
+                                    { Icon(androidx.compose.material.icons.Icons.Default.Check, contentDescription = null) }
+                                } else null
+                            )
+                             FilterChip(
+                                selected = auditFilter == "Valid",
+                                onClick = { auditFilter = "Valid" },
+                                label = { Text("Valid ($validCount)") },
+                                leadingIcon = if (auditFilter == "Valid") {
+                                    { Icon(androidx.compose.material.icons.Icons.Default.Check, contentDescription = null) }
+                                } else null
+                            )
+                             FilterChip(
+                                selected = auditFilter == "Invalid",
+                                onClick = { auditFilter = "Invalid" },
+                                label = { Text("Invalid ($invalidCount)") },
+                                leadingIcon = if (auditFilter == "Invalid") {
+                                    { Icon(androidx.compose.material.icons.Icons.Default.Close, contentDescription = null) }
+                                } else null
+                            )
+                            FilterChip(
+                                selected = auditFilter == "Auto",
+                                onClick = { auditFilter = "Auto" },
+                                label = { Text("Auto ($autoCount)") },
+                                leadingIcon = if (auditFilter == "Auto") {
+                                    { Icon(androidx.compose.material.icons.Icons.Default.Settings, contentDescription = null) }
+                                } else null
+                            )
+                            FilterChip(
+                                selected = auditFilter == "Manual",
+                                onClick = { auditFilter = "Manual" },
+                                label = { Text("Accepted ($manualCount)") },
+                                leadingIcon = if (auditFilter == "Manual") {
+                                    { Icon(androidx.compose.material.icons.Icons.Default.Face, contentDescription = null) }
+                                } else null
+                            )
+                        }
+                        
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                            Text("Confidence Score Range:", fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
+                            
+                            OutlinedTextField(
+                                value = minScoreText,
+                                onValueChange = { minScoreText = it },
+                                label = { Text("Min (0.0)") },
+                                placeholder = { Text("0.0") },
+                                modifier = Modifier.width(100.dp),
+                                singleLine = true
+                            )
+                            Text(" - ", modifier = Modifier.padding(horizontal = 4.dp))
+                            OutlinedTextField(
+                                value = maxScoreText,
+                                onValueChange = { maxScoreText = it },
+                                label = { Text("Max (1.0)") },
+                                placeholder = { Text("1.0") },
+                                modifier = Modifier.width(100.dp),
+                                singleLine = true
+                            )
+                        }
                     }
 
-                    Box(modifier = Modifier.weight(1f)) {
-                        val state = rememberLazyListState()
-                        
+                        // Apply Filters
+                        val minVal = minScoreText.toFloatOrNull() ?: 0.0f
+                        val maxVal = maxScoreText.toFloatOrNull() ?: 1.0f
+
                         val filteredAuditList = when(auditFilter) {
                             "Valid" -> displayedList.filter { it.isTransaction == true || (it.isTransaction == null && it.confidence > 0.5f) }
                             "Invalid" -> displayedList.filter { it.isTransaction == false || (it.isTransaction == null && it.confidence <= 0.5f) }
                             "Auto" -> displayedList.filter { it.isTransaction == null && it.confidence > 0.5f }
                             "Manual" -> displayedList.filter { it.isTransaction == true }
                             else -> displayedList
-                        }
+                        }.filter { it.confidence in minVal..maxVal }
 
-                        LazyColumn(state = state, modifier = Modifier.fillMaxSize().padding(end = 12.dp)) {
-                            items(filteredAuditList) { item ->
+                        Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
+                            val state = rememberLazyListState()
+                            
+                            LazyColumn(state = state, modifier = Modifier.fillMaxSize().padding(end = 12.dp)) {
+                                items(filteredAuditList) { item ->
                                 val displayBody = if (isAnonymizationEnabled) Anonymizer.anonymize(item.body) else item.body
                                 
                                 // Logic: 
@@ -788,7 +820,10 @@ fun App() {
                                         Spacer(modifier = Modifier.width(8.dp))
 
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(item.sender, fontWeight = FontWeight.Bold)
+                                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                                Text(item.sender, fontWeight = FontWeight.Bold)
+                                                Text(String.format("%.2f", item.confidence), fontSize = 12.sp, color = if(item.confidence > 0.5) Color(0xFF006400) else Color(0xFF8B0000))
+                                            }
                                             // Allow up to 4 lines for body, with ellipsis if longer
                                             Text(displayBody, maxLines = 4, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, fontSize = 13.sp, lineHeight = 18.sp, color = if (!isMarkedAsTx) Color.Gray else Color.Black)
                                             if (item.silverLabel != null && isMarkedAsTx) {
