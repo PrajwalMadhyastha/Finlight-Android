@@ -55,3 +55,11 @@ tasks.withType<KotlinCompile>().configureEach {
         jvmTarget.set(JvmTarget.JVM_17)
     }
 }
+
+// --- CUSTOM TASK: Run NER Labeler App ---
+tasks.register<JavaExec>("runNerLabeler") {
+    group = "application"
+    description = "Run the NER Labeler Desktop App"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("io.pm.finlight.analyzer.NerLabelerAppKt")
+}

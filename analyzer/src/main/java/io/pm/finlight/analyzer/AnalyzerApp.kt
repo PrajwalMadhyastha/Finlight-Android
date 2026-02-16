@@ -615,9 +615,11 @@ fun App() {
                                 if (verified.isNotEmpty()) {
                                     val file = saveFile("verified_transactions.json")
                                     if (file != null) {
-                                        // Anonymize on Export (Pipeline Rule)
-                                        val exportList = verified.map {
-                                            it.copy(body = Anonymizer.anonymize(it.body))
+                                        // Conditionally anonymize based on toggle
+                                        val exportList = if (isAnonymizationEnabled) {
+                                            verified.map { it.copy(body = Anonymizer.anonymize(it.body)) }
+                                        } else {
+                                            verified
                                         }
                                         try {
                                             val json = Json { prettyPrint = true; encodeDefaults = true }
@@ -644,9 +646,11 @@ fun App() {
                                 if (labeled.isNotEmpty()) {
                                     val file = saveFile("classifier_training_data.json")
                                     if (file != null) {
-                                        // Anonymize on Export (Pipeline Rule)
-                                        val exportList = labeled.map {
-                                            it.copy(body = Anonymizer.anonymize(it.body))
+                                        // Conditionally anonymize based on toggle
+                                        val exportList = if (isAnonymizationEnabled) {
+                                            labeled.map { it.copy(body = Anonymizer.anonymize(it.body)) }
+                                        } else {
+                                            labeled
                                         }
                                         try {
                                             val json = Json { prettyPrint = true; encodeDefaults = true }
