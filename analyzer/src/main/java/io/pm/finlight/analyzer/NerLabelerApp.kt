@@ -127,7 +127,8 @@ fun NerLabelerApp() {
                 val file = getNerProjectFile(proj)
                 val workspace = NerWorkspace(
                     items = itemsList.map { it.toSerializable() },
-                    patternLibrary = patternLibrary
+                    patternLibrary = patternLibrary,
+                    lastViewedIndex = currentIndex
                 )
                 val jsonString = Json { prettyPrint = true }.encodeToString(workspace)
                 file.writeText(jsonString)
@@ -355,9 +356,12 @@ fun NerLabelerApp() {
                     val workspace = json.decodeFromString<NerWorkspace>(file.readText())
                     itemsList = workspace.items.map { it.toDomain() }
                     patternLibrary = workspace.patternLibrary
+                    currentIndex = workspace.lastViewedIndex // Restore
+                    
                     val patternCount = patternLibrary.merchantPatterns.size + 
                                       patternLibrary.amountContextPatterns.size + 
-                                      patternLibrary.accountPatterns.size
+                                      patternLibrary.accountPatterns.size +
+                                      patternLibrary.balanceContextPatterns.size
                     statusMessage = if (patternCount > 0) {
                         "Loaded project '$first' with $patternCount learned patterns ✨"
                     } else {
@@ -369,10 +373,12 @@ fun NerLabelerApp() {
                         val loaded = json.decodeFromString<List<SerializableNerLabelItem>>(file.readText())
                         itemsList = loaded.map { it.toDomain() }
                         patternLibrary = PatternLibrary() // Start fresh
+                        currentIndex = 0 // Reset
                         statusMessage = "Loaded project '$first' (old format, pattern learning will start fresh)"
                     } catch (e2: Exception) {
                         statusMessage = "Failed to load project: ${e2.message}"
                         e2.printStackTrace()
+                        currentIndex = 0
                     }
                 }
             }
@@ -399,6 +405,13 @@ fun NerLabelerApp() {
         }
     }
     
+    // Auto-save progress when navigating (debounced)
+    LaunchedEffect(currentIndex) {
+        if (currentProject != null) {
+            delay(500) // Debounce to avoid excessive writes
+            saveCurrentProject()
+        }
+    }
     
     MaterialTheme {
         Box(
@@ -504,6 +517,7 @@ fun NerLabelerApp() {
                                                                         val workspace = json.decodeFromString<NerWorkspace>(nextFile.readText())
                                                                         itemsList = workspace.items.map { it.toDomain() }
                                                                         patternLibrary = workspace.patternLibrary
+                                                                        currentIndex = workspace.lastViewedIndex // Restore
                                                                         statusMessage = "Deleted '$proj', switched to '$next'"
                                                                     } catch (e: Exception) {
                                                                         // Fallback to old format
@@ -511,10 +525,12 @@ fun NerLabelerApp() {
                                                                             val loaded = json.decodeFromString<List<SerializableNerLabelItem>>(nextFile.readText())
                                                                             itemsList = loaded.map { it.toDomain() }
                                                                             patternLibrary = PatternLibrary()
+                                                                            currentIndex = 0 // Reset
                                                                             statusMessage = "Deleted '$proj', switched to '$next' (old format)"
                                                                         } catch (e2: Exception) {
                                                                             statusMessage = "Deleted '$proj', but failed to load '$next': ${e2.message}"
                                                                             e2.printStackTrace()
+                                                                            currentIndex = 0
                                                                         }
                                                                     }
                                                                 }
@@ -544,6 +560,8 @@ fun NerLabelerApp() {
                                                     val workspace = json.decodeFromString<NerWorkspace>(file.readText())
                                                     itemsList = workspace.items.map { it.toDomain() }
                                                     patternLibrary = workspace.patternLibrary
+                                                    currentIndex = workspace.lastViewedIndex // Restore saved position
+                                                    
                                                     val patternCount = patternLibrary.merchantPatterns.size + 
                                                                       patternLibrary.amountContextPatterns.size + 
                                                                       patternLibrary.accountPatterns.size +
@@ -559,13 +577,14 @@ fun NerLabelerApp() {
                                                         val loaded = json.decodeFromString<List<SerializableNerLabelItem>>(file.readText())
                                                         itemsList = loaded.map { it.toDomain() }
                                                         patternLibrary = PatternLibrary() // Start fresh
+                                                        currentIndex = 0 // Reset for old format
                                                         statusMessage = "Switched to '$proj' (old format, pattern learning will start fresh)"
                                                     } catch (e2: Exception) {
                                                         statusMessage = "Failed to load project: ${e2.message}"
                                                         e2.printStackTrace()
+                                                        currentIndex = 0
                                                     }
                                                 }
-                                                currentIndex = 0
                                             }
                                         }
                                     )

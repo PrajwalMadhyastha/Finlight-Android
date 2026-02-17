@@ -64,7 +64,8 @@ data class SerializableNerLabels(
 @Serializable
 data class NerWorkspace(
     val items: List<SerializableNerLabelItem>,
-    val patternLibrary: PatternLibrary = PatternLibrary()
+    val patternLibrary: PatternLibrary = PatternLibrary(),
+    val lastViewedIndex: Int = 0
 )
 
 // --- EXPORT: NER Training Data Format ---
