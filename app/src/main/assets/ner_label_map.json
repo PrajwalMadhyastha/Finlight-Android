@@ -1,0 +1,35 @@
+{
+  "labels": [
+    "O",
+    "B-MERCHANT",
+    "I-MERCHANT",
+    "B-AMOUNT",
+    "I-AMOUNT",
+    "B-ACCOUNT",
+    "I-ACCOUNT",
+    "B-BALANCE",
+    "I-BALANCE"
+  ],
+  "id_to_label": {
+    "0": "O",
+    "1": "B-MERCHANT",
+    "2": "I-MERCHANT",
+    "3": "B-AMOUNT",
+    "4": "I-AMOUNT",
+    "5": "B-ACCOUNT",
+    "6": "I-ACCOUNT",
+    "7": "B-BALANCE",
+    "8": "I-BALANCE"
+  },
+  "label_to_id": {
+    "O": 0,
+    "B-MERCHANT": 1,
+    "I-MERCHANT": 2,
+    "B-AMOUNT": 3,
+    "I-AMOUNT": 4,
+    "B-ACCOUNT": 5,
+    "I-ACCOUNT": 6,
+    "B-BALANCE": 7,
+    "I-BALANCE": 8
+  }
+}
