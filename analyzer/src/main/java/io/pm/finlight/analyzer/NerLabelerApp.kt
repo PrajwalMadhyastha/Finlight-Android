@@ -638,6 +638,22 @@ fun NerLabelerApp() {
                         
                         Spacer(modifier = Modifier.width(8.dp))
                         
+                        // Anonymization Toggle
+                        var isAnonymizationEnabled by remember { mutableStateOf(true) }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = isAnonymizationEnabled,
+                                onCheckedChange = { isAnonymizationEnabled = it }
+                            )
+                            Text(
+                                "Anonymize",
+                                fontSize = 12.sp,
+                                color = if (isAnonymizationEnabled) Color(0xFF006400) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                        
                         // Export Button with Filter
                         var exportFilter by remember { mutableStateOf(ExportFilter.ALL) }
                         var isExportDropdownOpen by remember { mutableStateOf(false) }
@@ -751,13 +767,21 @@ fun NerLabelerApp() {
                                                     if (exportItems.isEmpty()) {
                                                         statusMessage = "No labeled items match the selected filter!"
                                                     } else {
+                                                        // Apply anonymization if enabled
+                                                        val finalItems = if (isAnonymizationEnabled) {
+                                                            exportItems.map { NerAnonymizer.anonymize(it) }
+                                                        } else {
+                                                            exportItems
+                                                        }
+                                                        
                                                         val json = Json { prettyPrint = true; encodeDefaults = true }
-                                                        val jsonString = json.encodeToString(exportItems)
+                                                        val jsonString = json.encodeToString(finalItems)
                                                         file.writeText(jsonString)
                                                         
                                                         // Show detailed statistics
                                                         val totalLabeled = itemsList.count { it.labels != null }
-                                                        statusMessage = "Exported ${exportItems.size} items (of $totalLabeled labeled) to ${file.name}"
+                                                        val anonLabel = if (isAnonymizationEnabled) " (anonymized)" else ""
+                                                        statusMessage = "Exported ${finalItems.size} items (of $totalLabeled labeled)$anonLabel to ${file.name}"
                                                     }
                                                 } catch (e: Exception) {
                                                     statusMessage = "Export failed: ${e.message}"

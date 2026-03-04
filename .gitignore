@@ -35,3 +35,9 @@ generate_tree.py
 # This will prevent any CSV files in the project root from being tracked.
 *.csv
 *.json
+
+# ML Training (Phase 4)
+ml_training/venv/
+ml_training/data/
+ml_training/output/
+ml_training/__pycache__/
