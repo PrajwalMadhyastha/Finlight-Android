@@ -199,9 +199,10 @@ object SmsParser {
         ignoreRuleProvider: IgnoreRuleProvider,
         merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
         categoryFinderProvider: CategoryFinderProvider,
-        smsParseTemplateProvider: SmsParseTemplateProvider
+        smsParseTemplateProvider: SmsParseTemplateProvider,
+        nerEntities: Map<String, String>? = null,
     ): PotentialTransaction? {
-        return when (val result = parseWithReason(sms, mappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)) {
+        return when (val result = parseWithReason(sms, mappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider, nerEntities = nerEntities)) {
             is ParseResult.Success -> result.transaction
             is ParseResult.Ignored, is ParseResult.NotParsed, is ParseResult.IgnoredByClassifier -> null
         }
