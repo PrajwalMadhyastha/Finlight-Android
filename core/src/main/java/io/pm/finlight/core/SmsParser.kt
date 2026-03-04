@@ -289,7 +289,8 @@ object SmsParser {
         ignoreRuleProvider: IgnoreRuleProvider,
         merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
         categoryFinderProvider: CategoryFinderProvider,
-        smsParseTemplateProvider: SmsParseTemplateProvider
+        smsParseTemplateProvider: SmsParseTemplateProvider,
+        nerEntities: Map<String, String>? = null,
     ): ParseResult {
         val normalizedBody = sms.body.replace(Regex("\\s+"), " ").trim()
 
@@ -328,42 +329,72 @@ object SmsParser {
 
 
         // --- Stage 3: If still no match, fall back to Generic Regex Parsing ---
+        // NER entities (if provided) override amount and merchant extraction in this stage.
         if (potentialTxn == null) {
             var extractedAmount: Double? = null
             var detectedCurrency: String? = null
 
-            val highConfidenceMatch = AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX.find(normalizedBody)
-            if (highConfidenceMatch != null) {
-                val currencyStr = highConfidenceMatch.groupValues[1].ifEmpty { null }
-                val amountStr = highConfidenceMatch.groupValues[2].ifEmpty { highConfidenceMatch.groupValues[3] }
-                extractedAmount = amountStr.replace(",", "").toDoubleOrNull()
-                detectedCurrency = if (currencyStr != null) if (currencyStr.equals("RS", ignoreCase = true)) "INR" else currencyStr.uppercase() else "INR"
+            // --- NER AMOUNT OVERRIDE ---
+            // If the NER model found an AMOUNT entity, parse it directly.
+            // Otherwise, use the existing regex pipeline.
+            val nerAmountStr = nerEntities?.get("AMOUNT")
+            if (nerAmountStr != null) {
+                // Strip currency prefixes (rs, inr, etc.) and normalize.
+                // The [.:\\s]* also handles "Rs:147.5" colon-notation used by some banks.
+                val numericPart = nerAmountStr
+                    .replace(Regex("^(rs|inr|usd|sgd|myr|eur|gbp)[.:\\s]*", RegexOption.IGNORE_CASE), "")
+                    .replace(",", "")
+                    .trim()
+                extractedAmount = numericPart.toDoubleOrNull()
+                // Detect currency from NER amount string prefix
+                val currencyMatch = Regex("^(inr|rs|usd|sgd|myr|eur|gbp)", RegexOption.IGNORE_CASE).find(nerAmountStr)
+                detectedCurrency = currencyMatch?.value?.uppercase()?.let { if (it == "RS") "INR" else it } ?: "INR"
             } else {
-                val bestMatch = FALLBACK_AMOUNT_REGEX.findAll(normalizedBody).firstOrNull()
-                if (bestMatch != null) {
-                    val (amount, currency) = parseAmountAndCurrency(bestMatch)
-                    extractedAmount = amount
-                    detectedCurrency = currency
+                val highConfidenceMatch = AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX.find(normalizedBody)
+                if (highConfidenceMatch != null) {
+                    val currencyStr = highConfidenceMatch.groupValues[1].ifEmpty { null }
+                    val amountStr = highConfidenceMatch.groupValues[2].ifEmpty { highConfidenceMatch.groupValues[3] }
+                    extractedAmount = amountStr.replace(",", "").toDoubleOrNull()
+                    detectedCurrency = if (currencyStr != null) if (currencyStr.equals("RS", ignoreCase = true)) "INR" else currencyStr.uppercase() else "INR"
+                } else {
+                    val bestMatch = FALLBACK_AMOUNT_REGEX.findAll(normalizedBody).firstOrNull()
+                    if (bestMatch != null) {
+                        val (amount, currency) = parseAmountAndCurrency(bestMatch)
+                        extractedAmount = amount
+                        detectedCurrency = currency
+                    }
                 }
             }
 
             val amount = extractedAmount
             if (amount != null) {
+                // Transaction type always comes from keywords (NER doesn't extract this)
                 val transactionType = if (EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "expense" else if (INCOME_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "income" else null
                 if (transactionType != null) {
+                    // --- NER MERCHANT OVERRIDE ---
+                    // Check sender mappings first (highest trust). Then prefer NER over regex.
                     var merchantName = mappings[sms.sender]
                     if (merchantName == null) {
-                        for (pattern in MERCHANT_REGEX_PATTERNS) {
-                            val match = pattern.find(normalizedBody)
-                            if (match != null) {
-                                val potentialName = match.groups[1]?.value?.replace("_", " ")?.replace(Regex("\\s+"), " ")?.trim()?.trimEnd('.')
-                                if (!potentialName.isNullOrBlank() && !potentialName.contains("call", ignoreCase = true)) {
-                                    val containsLetters = potentialName.any { it.isLetter() }
-                                    val containsDigits = potentialName.any { it.isDigit() }
-                                    val isLikelyRefNumber = potentialName.length >= 8 && containsDigits && !containsLetters && !potentialName.startsWith("NEFT", ignoreCase = true)
-                                    if (!isLikelyRefNumber) {
-                                        merchantName = potentialName
-                                        break
+                        val nerMerchant = nerEntities?.get("MERCHANT")
+                        if (nerMerchant != null) {
+                            // Use NER merchant, but capitalize it properly
+                            merchantName = nerMerchant.split(" ").joinToString(" ") { word ->
+                                word.replaceFirstChar { it.uppercaseChar() }
+                            }
+                        } else {
+                            // Fall back to existing regex patterns
+                            for (pattern in MERCHANT_REGEX_PATTERNS) {
+                                val match = pattern.find(normalizedBody)
+                                if (match != null) {
+                                    val potentialName = match.groups[1]?.value?.replace("_", " ")?.replace(Regex("\\s+"), " ")?.trim()?.trimEnd('.')
+                                    if (!potentialName.isNullOrBlank() && !potentialName.contains("call", ignoreCase = true)) {
+                                        val containsLetters = potentialName.any { it.isLetter() }
+                                        val containsDigits = potentialName.any { it.isDigit() }
+                                        val isLikelyRefNumber = potentialName.length >= 8 && containsDigits && !containsLetters && !potentialName.startsWith("NEFT", ignoreCase = true)
+                                        if (!isLikelyRefNumber) {
+                                            merchantName = potentialName
+                                            break
+                                        }
                                     }
                                 }
                             }

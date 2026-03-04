@@ -21,6 +21,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.AccountDao
+import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.NotificationHelper
@@ -34,6 +35,7 @@ class SmsReceiver : BroadcastReceiver() {
     private val tag = "SmsReceiver"
     // --- REFACTOR: Allow injecting a mock classifier for testing ---
     internal var smsClassifier: SmsClassifier? = null
+    internal var nerExtractor: NerExtractor? = null
     // --- NEW: Expose CoroutineScope for test injection ---
     internal var coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
@@ -48,6 +50,9 @@ class SmsReceiver : BroadcastReceiver() {
             // --- REFACTOR: Initialize only if not already set (by a test) ---
             if (smsClassifier == null) {
                 smsClassifier = SmsClassifier(context)
+            }
+            if (nerExtractor == null) {
+                nerExtractor = NerExtractor(context)
             }
 
             // --- UPDATED: Use the injectable coroutineScope ---
@@ -109,7 +114,10 @@ class SmsReceiver : BroadcastReceiver() {
                                 continue // Skip to the next message
                             }
 
-                            // --- HIERARCHY STEP 3: Run the main parser (Heuristics -> Generic) ---
+                            // --- HIERARCHY STEP 3: Run NER to extract entities, then run the main parser ---
+                            val nerEntities = nerExtractor?.extract(fullBody)
+                            Log.d(tag, "NER entities for SMS: $nerEntities")
+
                             parseResult = SmsParser.parseWithReason(
                                 sms = smsMessage,
                                 mappings = existingMappings,
@@ -118,7 +126,8 @@ class SmsReceiver : BroadcastReceiver() {
                                 ignoreRuleProvider = ignoreRuleProvider,
                                 merchantCategoryMappingProvider = merchantCategoryMappingProvider,
                                 categoryFinderProvider = categoryFinderProvider,
-                                smsParseTemplateProvider = smsParseTemplateProvider
+                                smsParseTemplateProvider = smsParseTemplateProvider,
+                                nerEntities = nerEntities,
                             )
                         }
 

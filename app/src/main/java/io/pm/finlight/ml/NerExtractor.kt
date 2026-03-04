@@ -291,6 +291,7 @@ class NerExtractor private constructor(
      *
      * Handles: periods, commas, forward slashes, colons, hyphens, and asterisks
      * that appear as isolated tokens with spaces on both sides.
+     * Also strips trailing punctuation that BERT includes from sentence boundaries.
      */
     private fun cleanupPunctuationSpacing(text: String): String {
         return text
@@ -299,6 +300,8 @@ class NerExtractor private constructor(
             // Remove space after punctuation: "Rs.267" stays, "Rs. 267" → "Rs.267"
             // But only when followed by alphanumeric (avoid collapsing "Rs. " at end)
             .replace(Regex("""([.,/:*\-])\s+(?=\w)"""), "$1")
+            // Strip trailing punctuation from sentence boundaries (e.g. "AIIMS JODHPUR." → "AIIMS JODHPUR")
+            .trimEnd('.', ',', ':', ';')
     }
 
     override fun close() {
