@@ -361,6 +361,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             val invalidDateRow = report.reviewableRows[2]
             assertEquals(CsvRowStatus.INVALID_DATE, invalidDateRow.status)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -381,6 +382,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             assertNotNull(report)
             assertEquals(1, report!!.reviewableRows.size)
             assertEquals(2, report.reviewableRows.first().lineNumber)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -412,6 +414,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             assertNotNull(updatedRow)
             // This assertion should now pass.
             assertEquals(CsvRowStatus.VALID, updatedRow!!.status)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
