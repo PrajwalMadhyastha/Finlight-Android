@@ -25,6 +25,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.pm.finlight.DEFAULT_IGNORE_PHRASES
+import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,6 +43,7 @@ data class BatchStatus(
 
 class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
     private val classifier = SmsClassifier(context)
+    private val nerExtractor = NerExtractor(context)
     var status by mutableStateOf(BatchStatus())
         private set
 
@@ -158,18 +160,23 @@ class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
 
     private fun processSingleItem(address: String, body: String, date: Long, writer: JsonWriter) {
         val score = classifier.classify(body)
-        
+
         // Default Ignore Rules
         val ignoreBodyRule = DEFAULT_IGNORE_PHRASES
             .filter { it.type == io.pm.finlight.RuleType.BODY_PHRASE }
             .find { java.util.regex.Pattern.compile(it.pattern, java.util.regex.Pattern.CASE_INSENSITIVE).matcher(body).find() }
-        
+
         val ignoreSenderRule = DEFAULT_IGNORE_PHRASES
             .filter { it.type == io.pm.finlight.RuleType.SENDER }
             .find { matchesSender(address, it.pattern) }
 
         val isIgnored = ignoreBodyRule != null || ignoreSenderRule != null
         val isTransaction = !isIgnored && score > 0.5f
+
+        // Run NER extraction for transactional-looking messages (score > 0.1 to catch borderline cases)
+        val nerEntities: Map<String, String> = if (!isIgnored && score > 0.1f) {
+            try { nerExtractor.extract(body) } catch (e: Exception) { emptyMap() }
+        } else emptyMap()
 
         writer.beginObject()
         writer.name("address").value(address)
@@ -179,7 +186,14 @@ class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
         writer.name("ml_predicted_is_transaction").value(isTransaction)
         writer.name("ml_rule_ignore").value(isIgnored)
         if (isIgnored) {
-             writer.name("ml_ignore_reason").value(ignoreBodyRule?.pattern ?: ignoreSenderRule?.pattern)
+            writer.name("ml_ignore_reason").value(ignoreBodyRule?.pattern ?: ignoreSenderRule?.pattern)
+        }
+        // Write NER entities as individual fields for easy analysis
+        if (nerEntities.isNotEmpty()) {
+            writer.name("ner_amount").value(nerEntities["AMOUNT"])
+            writer.name("ner_merchant").value(nerEntities["MERCHANT"])
+            writer.name("ner_account").value(nerEntities["ACCOUNT"])
+            nerEntities["BALANCE"]?.let { writer.name("ner_balance").value(it) }
         }
         writer.endObject()
     }
@@ -198,6 +212,12 @@ class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
         withContext(Dispatchers.Main) {
             status = update(status)
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        classifier.close()
+        nerExtractor.close()
     }
 }
 
