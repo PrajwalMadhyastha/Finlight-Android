@@ -26,6 +26,7 @@ import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
+import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.ReminderManager
@@ -76,6 +77,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var smsRepository: SmsRepository
     @Mock private lateinit var transactionViewModel: TransactionViewModel
     @Mock private lateinit var smsClassifier: SmsClassifier
+    @Mock private lateinit var nerExtractor: NerExtractor
     private lateinit var transactionRunner: TransactionRunner
 
     // Mocks for all DAOs called by DataExportService and ViewModel
@@ -223,6 +225,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             smsRepository,
             transactionViewModel,
             smsClassifier,
+            nerExtractor,
             transactionRunner,
             dispatchers = TestDispatcherProvider(testDispatcher)
         )
@@ -1104,6 +1107,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             smsRepository,
             transactionViewModel,
             smsClassifier,
+            nerExtractor,
             transactionRunner,
             dispatchers = TestDispatcherProvider(testDispatcher)
         )
@@ -1158,6 +1162,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             smsRepository,
             transactionViewModel,
             smsClassifier,
+            nerExtractor,
             transactionRunner,
             dispatchers = TestDispatcherProvider(testDispatcher)
         )

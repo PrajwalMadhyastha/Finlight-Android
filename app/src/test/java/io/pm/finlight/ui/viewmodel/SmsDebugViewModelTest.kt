@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -46,6 +47,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var smsRepository: SmsRepository
     @Mock private lateinit var db: AppDatabase
     @Mock private lateinit var smsClassifier: SmsClassifier
+    @Mock private lateinit var nerExtractor: NerExtractor
 
     // DAOs
     @Mock private lateinit var customSmsRuleDao: CustomSmsRuleDao
@@ -90,6 +92,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             smsRepository,
             db,
             smsClassifier,
+            nerExtractor,
             transactionViewModel
         )
     }

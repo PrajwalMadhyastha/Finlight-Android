@@ -1,0 +1,47 @@
+=== NER EVALUATION SUMMARY ===
+Total cases: 35
+SAME (no change): 26 (74%)
+NER_BETTER (NER fixed a wrong result): 0 (0%)
+MERCHANT_DIFFERS (amounts match, merchants differ): 9 (25%)
+AMOUNT_DIFFERS: 0 (0%)
+REGRESSION (NER broke something): 0 (0%)
+
+REGRESSIONS:
+
+MERCHANT_DIFFERS:
+  [HDFC] Update! INR 11,000.00 deposited in HDFC Bank A/c XX2536 on 1
+    Baseline: TPT-Transfer-PRAJWAL MADHYASTHA K P
+    NER:      Prajwal Madhyastha K P
+    Expected: TPT-Transfer-PRAJWAL MADHYASTHA K P
+  [HDFC] Dear Customer, Rs.180,000.00 is debited from A/c XXXX5733 fo
+    Baseline: NEFT transaction
+    NER:      Neft
+    Expected: NEFT transaction
+  [HDFC] Money Sent-INR 15,000.00 From HDFC Bank A/c XX5733 on 28-10-
+    Baseline: A/c xxxxxxxx9709
+    NER:      Imps
+    Expected: A/c xxxxxxxx9709
+  [HDFC] Paid: INR 100 on HDFC Bank Prepaid Card 2742 at PAY*SWIGGY o
+    Baseline: PAY*SWIGGY
+    NER:      Swiggy
+    Expected: PAY*SWIGGY
+  [GENERIC] Rs.1600 Credited to A/c ...7656 thru UPI/069871591309 by 968
+    Baseline: 9686714029 axl
+    NER:      9686714029
+    Expected: 9686714029 axl
+  [GENERIC] Rs.711.52 Dr. from A/C XXXXXX1236 and Cr. to techmashsolutio
+    Baseline: techmashsolutionspvtl.payu@mairtel
+    NER:      Techmashsolutionspvtl
+    Expected: techmashsolutionspvtl.payu@mairtel
+  [GENERIC] Your Sodexo Card has been successfully loaded with Rs.1250 t
+    Baseline: null
+    NER:      Loaded
+    Expected: null
+  [GENERIC] Account  No. XXXXXX5755 CREDIT with amount Rs. 5700.00 on 30
+    Baseline: null
+    NER:      Credit
+    Expected: null
+  [GENERIC] Account  No. XXXXXX5755 DEBIT with amount Rs. 15000.00 on 15
+    Baseline: null
+    NER:      Debit
+    Expected: null

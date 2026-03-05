@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
+import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.NotificationHelper
 import io.mockk.*
@@ -57,6 +58,7 @@ class SmsReceiverTest : BaseViewModelTest() {
     private lateinit var accountAliasDao: AccountAliasDao
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var tagDao: TagDao
+    private lateinit var nerExtractor: NerExtractor
 
 
     @Implements(Telephony.Sms.Intents::class)
@@ -96,7 +98,9 @@ class SmsReceiverTest : BaseViewModelTest() {
         mockkObject(NotificationHelper)
 
         receiver = spyk(SmsReceiver())
+        nerExtractor = mockk(relaxed = true)
         receiver.smsClassifier = smsClassifier
+        receiver.nerExtractor = nerExtractor
         mockPendingResult = mockk(relaxed = true)
         every { receiver.goAsync() } returns mockPendingResult
 
@@ -114,6 +118,7 @@ class SmsReceiverTest : BaseViewModelTest() {
 
 
         every { smsClassifier.classify(any()) } returns 0.9f
+        every { nerExtractor.extract(any()) } returns emptyMap()
         every { anyConstructed<SettingsRepository>().isAutoCaptureNotificationEnabledBlocking() } returns true
         every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(null)
         every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
