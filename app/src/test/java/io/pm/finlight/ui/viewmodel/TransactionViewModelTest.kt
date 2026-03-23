@@ -260,7 +260,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
 
         // Mock the object SmsParser to return our desired new transaction
-        coEvery { SmsParser.parse(any(), any(), any(), any(), any(), any(), any(), any()) } returns newParsedTxn
+        coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(newParsedTxn)
 
         // ACT
         viewModel.reparseTransactionFromSms(1)

@@ -86,12 +86,18 @@ class SmsReceiver : BroadcastReceiver() {
                         }
                         val merchantRenameRuleProvider = object : MerchantRenameRuleProvider {
                             override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+                            override suspend fun getAllRulesMap(): Map<String, String> {
+                                return db.merchantRenameRuleDao().getAllRulesList().associateBy({ it.originalName.lowercase() }, { it.newName })
+                            }
                         }
                         val ignoreRuleProvider = object : IgnoreRuleProvider {
                             override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
                         }
                         val merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
                             override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+                            override suspend fun getAllMappings(): Map<String, Int> {
+                                return db.merchantCategoryMappingDao().getAll().associateBy({ it.parsedName.lowercase() }, { it.categoryId })
+                            }
                         }
                         val smsParseTemplateProvider = object : SmsParseTemplateProvider {
                             override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
@@ -135,6 +141,17 @@ class SmsReceiver : BroadcastReceiver() {
 
                         // --- FINAL STEP: Process the result from whichever step succeeded ---
                         if (parseResult is ParseResult.Success) {
+                            
+                            // --- AUTO-HEALING WITH NER SIMILARITY ENGINE ---
+                            parseResult.newlyDiscoveredRenameAlias?.let { (oldName, newName) ->
+                                Log.d(tag, "Auto-healing rename rule for NER fallback: $oldName -> $newName")
+                                db.merchantRenameRuleDao().insert(MerchantRenameRule(oldName, newName))
+                            }
+                            parseResult.newlyDiscoveredCategoryAlias?.let { (merchant, catId) ->
+                                Log.d(tag, "Auto-healing category rule for NER fallback: $merchant -> $catId")
+                                db.merchantCategoryMappingDao().insert(MerchantCategoryMapping(merchant, catId))
+                            }
+
                             val potentialTxn = parseResult.transaction
                             if (potentialTxn.sourceSmsHash != null && !existingSmsHashes.contains(potentialTxn.sourceSmsHash)) {
                                 val travelSettings = settingsRepository.getTravelModeSettings().first()

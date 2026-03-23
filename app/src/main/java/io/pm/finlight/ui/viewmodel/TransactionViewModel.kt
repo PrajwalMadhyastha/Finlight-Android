@@ -809,30 +809,45 @@ class TransactionViewModel(
             }
             val merchantRenameRuleProvider = object : MerchantRenameRuleProvider {
                 override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+                override suspend fun getAllRulesMap(): Map<String, String> {
+                    return db.merchantRenameRuleDao().getAllRulesList().associateBy({ it.originalName.lowercase() }, { it.newName })
+                }
             }
             val ignoreRuleProvider = object : IgnoreRuleProvider {
                 override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
             }
             val merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
                 override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+                override suspend fun getAllMappings(): Map<String, Int> {
+                    return db.merchantCategoryMappingDao().getAll().associateBy({ it.parsedName.lowercase() }, { it.categoryId })
+                }
             }
             val smsParseTemplateProvider = object : SmsParseTemplateProvider {
                 override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
                 override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
             }
 
-            val potentialTxn = SmsParser.parse(
-                smsMessage,
-                existingMappings,
-                customSmsRuleProvider,
-                merchantRenameRuleProvider,
-                ignoreRuleProvider,
-                merchantCategoryMappingProvider,
-                categoryFinderProvider,
-                smsParseTemplateProvider
+            val parseResult = SmsParser.parseWithReason(
+                sms = smsMessage,
+                mappings = existingMappings,
+                customSmsRuleProvider = customSmsRuleProvider,
+                merchantRenameRuleProvider = merchantRenameRuleProvider,
+                ignoreRuleProvider = ignoreRuleProvider,
+                merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                categoryFinderProvider = categoryFinderProvider,
+                smsParseTemplateProvider = smsParseTemplateProvider
             )
 
-            if (potentialTxn != null) {
+            if (parseResult is ParseResult.Success) {
+                // --- AUTO-HEALING ---
+                parseResult.newlyDiscoveredRenameAlias?.let { (oldName, newName) ->
+                    db.merchantRenameRuleDao().insert(MerchantRenameRule(oldName, newName))
+                }
+                parseResult.newlyDiscoveredCategoryAlias?.let { (merchant, catId) ->
+                    db.merchantCategoryMappingDao().insert(MerchantCategoryMapping(merchant, catId))
+                }
+
+                val potentialTxn = parseResult.transaction
                 val merchant = potentialTxn.merchantName
                 if (merchant != null && merchant != transaction.description) {
                     transactionRepository.updateDescription(transactionId, merchant)
