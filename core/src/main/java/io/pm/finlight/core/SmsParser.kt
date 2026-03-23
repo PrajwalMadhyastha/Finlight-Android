@@ -523,12 +523,13 @@ object SmsParser {
         }
 
         // --- Step 4: Construct the final transaction object with all enrichments ---
-        val finalAccount = txn.potentialAccount ?: parseAccount(normalizedBody, sender) ?: nerEntities?.get("ACCOUNT")?.let { accountStr ->
+        val finalAccount = txn.potentialAccount ?: nerEntities?.get("ACCOUNT")?.let { accountStr ->
             val cleaned = accountStr.split(" ").joinToString(" ") { word ->
                 word.replaceFirstChar { it.uppercaseChar() }
             }
             PotentialAccount(cleaned, "Auto-Detected")
-        }
+        } ?: parseAccount(normalizedBody, sender)
+
         val smsHash = (sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
         val smsSignature = generateSmsSignature(normalizedBody)
 
