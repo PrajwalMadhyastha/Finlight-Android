@@ -26,6 +26,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.pm.finlight.DEFAULT_IGNORE_PHRASES
 import io.pm.finlight.ml.NerExtractor
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,7 +44,7 @@ data class BatchStatus(
 
 class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
     private val classifier = SmsClassifier(context)
-    private val nerExtractor = NerExtractor(context)
+    private val nerExtractor: SmsEntityExtractor = NerExtractor(context)
     var status by mutableStateOf(BatchStatus())
         private set
 

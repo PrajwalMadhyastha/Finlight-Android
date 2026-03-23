@@ -22,6 +22,7 @@ import androidx.work.workDataOf
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.AccountDao
 import io.pm.finlight.ml.NerExtractor
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.NotificationHelper
@@ -35,7 +36,7 @@ class SmsReceiver : BroadcastReceiver() {
     private val tag = "SmsReceiver"
     // --- REFACTOR: Allow injecting a mock classifier for testing ---
     internal var smsClassifier: SmsClassifier? = null
-    internal var nerExtractor: NerExtractor? = null
+    internal var nerExtractor: SmsEntityExtractor? = null
     // --- NEW: Expose CoroutineScope for test injection ---
     internal var coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 

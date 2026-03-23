@@ -13,7 +13,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.ml.NerExtractor
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.flow.*
@@ -43,7 +43,7 @@ class SmsDebugViewModel(
     private val smsRepository: SmsRepository,
     private val db: AppDatabase,
     private val smsClassifier: SmsClassifier,
-    private val nerExtractor: NerExtractor,
+    private val nerExtractor: SmsEntityExtractor,
     private val transactionViewModel: TransactionViewModel
 ) : AndroidViewModel(application) {
 

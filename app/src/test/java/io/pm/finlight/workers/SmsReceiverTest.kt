@@ -11,7 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
-import io.pm.finlight.ml.NerExtractor
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.NotificationHelper
 import io.mockk.*
@@ -58,7 +58,7 @@ class SmsReceiverTest : BaseViewModelTest() {
     private lateinit var accountAliasDao: AccountAliasDao
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var tagDao: TagDao
-    private lateinit var nerExtractor: NerExtractor
+    private lateinit var nerExtractor: SmsEntityExtractor
 
 
     @Implements(Telephony.Sms.Intents::class)

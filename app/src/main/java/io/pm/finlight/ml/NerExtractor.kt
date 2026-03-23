@@ -31,7 +31,7 @@ class NerExtractor private constructor(
     preloadedTokenizer: WordPieceTokenizer?,
     preloadedInterpreter: Interpreter?,
     preloadedLabelMap: Map<Int, String>?,
-) : Closeable {
+) : SmsEntityExtractor {
 
     companion object {
         private const val DEFAULT_MODEL = "sms_ner.tflite"
@@ -116,7 +116,7 @@ class NerExtractor private constructor(
      * @return Map of entity type to extracted text, e.g. {"MERCHANT": "Amazon", "AMOUNT": "Rs 500"}.
      *         Only entities found in the text are included.
      */
-    fun extract(text: String): Map<String, String> {
+    override fun extract(text: String): Map<String, String> {
         val interp = interpreter ?: return emptyMap()
         val tok = tokenizer ?: return emptyMap()
 
@@ -257,7 +257,17 @@ class NerExtractor private constructor(
             }
         }
 
-        return entityMap.mapValues { (_, values) -> values.joinToString(", ") }
+        return entityMap.mapValues { (type, values) -> 
+            val uniqueValues = values.distinct()
+            var joined = uniqueValues.joinToString(", ")
+            
+            // Post-process AMOUNT to remove currency prefixes and commas
+            if (type == "AMOUNT") {
+                joined = joined.replace(Regex("(?i)^(?:rs\\.?|inr\\.?|₹)\\s*"), "")
+                               .replace(Regex(",(?=\\d{2,3})"), "") // Remove Indian-style commas
+            }
+            joined
+        }
     }
 
     /**
@@ -296,12 +306,12 @@ class NerExtractor private constructor(
     private fun cleanupPunctuationSpacing(text: String): String {
         return text
             // Remove space before punctuation: "Rs . 267" → "Rs. 267"
-            .replace(Regex("""\s+([.,/:*\-])"""), "$1")
+            .replace(Regex("""\s+([.,/:*\-@])"""), "$1")
             // Remove space after punctuation: "Rs.267" stays, "Rs. 267" → "Rs.267"
             // But only when followed by alphanumeric (avoid collapsing "Rs. " at end)
-            .replace(Regex("""([.,/:*\-])\s+(?=\w)"""), "$1")
-            // Strip trailing punctuation from sentence boundaries (e.g. "AIIMS JODHPUR." → "AIIMS JODHPUR")
-            .trimEnd('.', ',', ':', ';')
+            .replace(Regex("""([.,/:*\-@])\s+(?=\w)"""), "$1")
+            // Strip trailing punctuation from sentence boundaries
+            .trimEnd('.', ',', ':', ';', '-', '@')
     }
 
     override fun close() {

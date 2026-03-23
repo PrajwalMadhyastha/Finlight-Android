@@ -25,7 +25,7 @@ import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.data.TransactionRunner
-import io.pm.finlight.ml.NerExtractor
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.CategoryIconHelper
@@ -58,7 +58,7 @@ class SettingsViewModel(
     private val smsRepository: SmsRepository,
     private val transactionViewModel: TransactionViewModel,
     private val smsClassifier: SmsClassifier,
-    private val nerExtractor: NerExtractor,
+    private val nerExtractor: SmsEntityExtractor,
     private val transactionRunner: TransactionRunner,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : AndroidViewModel(application) {
