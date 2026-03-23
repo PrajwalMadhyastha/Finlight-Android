@@ -273,18 +273,16 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
     @Test
     fun `insights uses same-period comparison for monthly reports mid-month`() = runTest {
-        // Arrange - Simulate viewing Jan 15, 2026
-        // Note: Since the test runs at actual current time (e.g. past Jan 2026),
-        // the ViewModel's `getActualPeriodEnd` will resolve to the full month end (Jan 31st)
-        // rather than Jan 15th, because it only clamps to 'now' if 'now' is mid-month.
         val testDate = Calendar.getInstance().apply {
             set(2026, Calendar.JANUARY, 15, 12, 0, 0)
             set(Calendar.MILLISECOND, 0)
         }
+        val actualToday = Calendar.getInstance()
+        val todayDayOfMonth = actualToday.get(Calendar.DAY_OF_MONTH)
 
-        // Mock current period (Jan 1-15, 2026): 150.0 expenses
+        // Mock current period: Jan 1 to today
         val currentSummary = FinancialSummary(0.0, 150.0)
-        // Mock previous period (Jan 1-15, 2025): 100.0 expenses
+        // Mock previous period: Jan 1 to same day last year
         val previousSummary = FinancialSummary(0.0, 100.0)
 
         // We need to verify the exact date ranges being queried
@@ -324,25 +322,49 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // Verify percentage change calculation
             assertEquals(50, insights?.percentageChange) // (150 - 100) / 100 * 100 = 50%
             
-            // Since the date is in the past, getActualPeriodEnd returns the full period end
+            // Determine if the period end (Jan 31, 2026) is in the future relative to "now"
+            val actualNow = Calendar.getInstance()
+            val todayDayOfMonth = actualNow.get(Calendar.DAY_OF_MONTH)
+            val periodEndCal = Calendar.getInstance().apply { 
+                set(2026, Calendar.JANUARY, 31, 23, 59, 59)
+                set(Calendar.MILLISECOND, 999)
+            }
+            val isFuture = periodEndCal.after(actualNow)
+
+            // Verify current period is Jan 1, 2026
             val currentStartCal = Calendar.getInstance().apply { timeInMillis = currentStartCaptured }
             assertEquals(2026, currentStartCal.get(Calendar.YEAR))
             assertEquals(Calendar.JANUARY, currentStartCal.get(Calendar.MONTH))
             assertEquals(1, currentStartCal.get(Calendar.DAY_OF_MONTH))
             
             val currentEndCal = Calendar.getInstance().apply { timeInMillis = currentEndCaptured }
-            // Since the date is in the past, it clamps to the end of the month (Jan 31)
-            assertEquals(31, currentEndCal.get(Calendar.DAY_OF_MONTH))
-            
-            // Verify previous period is Jan 2025 (full month)
+            if (isFuture) {
+                // Should clamp to today
+                assertEquals(actualNow.get(Calendar.YEAR), currentEndCal.get(Calendar.YEAR))
+                assertEquals(actualNow.get(Calendar.MONTH), currentEndCal.get(Calendar.MONTH))
+                assertEquals(todayDayOfMonth, currentEndCal.get(Calendar.DAY_OF_MONTH))
+            } else {
+                // Full month (Jan 31)
+                assertEquals(31, currentEndCal.get(Calendar.DAY_OF_MONTH))
+            }
+
+            // Verify previous period is Jan 1 to same day last year (2025)
             val previousStartCal = Calendar.getInstance().apply { timeInMillis = previousStartCaptured }
             assertEquals(2025, previousStartCal.get(Calendar.YEAR))
             assertEquals(Calendar.JANUARY, previousStartCal.get(Calendar.MONTH))
             assertEquals(1, previousStartCal.get(Calendar.DAY_OF_MONTH))
             
             val previousEndCal = Calendar.getInstance().apply { timeInMillis = previousEndCaptured }
-            // Full month (Jan 31)
-            assertEquals(31, previousEndCal.get(Calendar.DAY_OF_MONTH))
+            if (isFuture) {
+                // Same relative day of month in 2025
+                assertEquals(2025, previousEndCal.get(Calendar.YEAR))
+                assertEquals(Calendar.JANUARY, previousEndCal.get(Calendar.MONTH))
+                assertEquals(todayDayOfMonth, previousEndCal.get(Calendar.DAY_OF_MONTH))
+            } else {
+                // Full month (Jan 31, 2025)
+                assertEquals(2025, previousEndCal.get(Calendar.YEAR))
+                assertEquals(31, previousEndCal.get(Calendar.DAY_OF_MONTH))
+            }
             
             cancelAndIgnoreRemainingEvents()
         }
@@ -350,12 +372,15 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
     @Test
     fun `insights uses same-period comparison for yearly reports mid-year`() = runTest {
-        // Arrange - Simulate viewing Jan 15, 2024
-        // Note: Since this is in the past, getActualPeriodEnd resolves to Dec 31st
+        // Arrange - Simulate viewing Jan 15, 2024 (Past) vs Jan 15, 2026 (Future)
+        // We use 2024 to test "past period" behavior.
         val testDate = Calendar.getInstance().apply {
             set(2024, Calendar.JANUARY, 15, 12, 0, 0)
             set(Calendar.MILLISECOND, 0)
         }
+        
+        val actualToday = Calendar.getInstance()
+        val todayDayOfYear = actualToday.get(Calendar.DAY_OF_YEAR)
 
         val currentSummary = FinancialSummary(0.0, 500.0)
         val previousSummary = FinancialSummary(0.0, 400.0)
@@ -394,26 +419,44 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // Verify percentage change
             assertEquals(25, insights?.percentageChange) // (500 - 400) / 400 * 100 = 25%
             
-            // Verify current period is 2024
+            // Determine if 2024 is future
+            val actualNow = Calendar.getInstance()
+            val todayDayOfYear = actualNow.get(Calendar.DAY_OF_YEAR)
+            val isFuture = 2024 > actualNow.get(Calendar.YEAR)
+
+            // Verify current period start is Jan 1, 2024
             val currentStartCal = Calendar.getInstance().apply { timeInMillis = currentStartCaptured }
             assertEquals(2024, currentStartCal.get(Calendar.YEAR))
             assertEquals(1, currentStartCal.get(Calendar.DAY_OF_YEAR))
             
             val currentEndCal = Calendar.getInstance().apply { timeInMillis = currentEndCaptured }
-            // End time is set to Dec 31st
-            assertEquals(31, currentEndCal.get(Calendar.DAY_OF_MONTH))
-            assertEquals(Calendar.DECEMBER, currentEndCal.get(Calendar.MONTH))
-            
-            // Verify previous period is 2023
+            if (isFuture) {
+                // Clamps to today
+                assertEquals(actualNow.get(Calendar.YEAR), currentEndCal.get(Calendar.YEAR))
+                assertEquals(todayDayOfYear, currentEndCal.get(Calendar.DAY_OF_YEAR))
+            } else {
+                // Full year (Dec 31)
+                assertEquals(31, currentEndCal.get(Calendar.DAY_OF_MONTH))
+                assertEquals(Calendar.DECEMBER, currentEndCal.get(Calendar.MONTH))
+            }
+
+            // Verify previous period is same range in 2023
             val previousStartCal = Calendar.getInstance().apply { timeInMillis = previousStartCaptured }
             assertEquals(2023, previousStartCal.get(Calendar.YEAR))
             assertEquals(Calendar.JANUARY, previousStartCal.get(Calendar.MONTH))
             assertEquals(1, previousStartCal.get(Calendar.DAY_OF_MONTH))
             
             val previousEndCal = Calendar.getInstance().apply { timeInMillis = previousEndCaptured }
-            // End time is set to Dec 31st
-            assertEquals(31, previousEndCal.get(Calendar.DAY_OF_MONTH))
-            assertEquals(Calendar.DECEMBER, previousEndCal.get(Calendar.MONTH))
+            if (isFuture) {
+                // Same relative day in 2025 (or as close as possible)
+                assertEquals(2025, previousEndCal.get(Calendar.YEAR))
+                assertEquals(todayDayOfYear, previousEndCal.get(Calendar.DAY_OF_YEAR))
+            } else {
+                // Full year 2023
+                assertEquals(2023, previousEndCal.get(Calendar.YEAR))
+                assertEquals(31, previousEndCal.get(Calendar.DAY_OF_MONTH))
+                assertEquals(Calendar.DECEMBER, previousEndCal.get(Calendar.MONTH))
+            }
             
             cancelAndIgnoreRemainingEvents()
         }

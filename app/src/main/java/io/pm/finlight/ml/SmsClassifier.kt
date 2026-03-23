@@ -65,7 +65,8 @@ class SmsClassifier private constructor(
     private val modelName: String,
     private val vocabName: String,
     preloadedVocab: Map<String, Int>?,
-    preloadedInterpreter: Interpreter?
+    preloadedInterpreter: Interpreter?,
+    private val interpreterFactory: ((ByteBuffer, Interpreter.Options) -> Interpreter)? = null
 ) : Closeable {
 
     companion object {
@@ -106,6 +107,18 @@ class SmsClassifier private constructor(
     ) : this(null, "", "", vocab, interpreter)
 
     /**
+     * Internal constructor for unit testing with Context and mocked Interpreter.
+     */
+    @VisibleForTesting
+    internal constructor(
+        context: Context,
+        factory: (ByteBuffer, Interpreter.Options) -> Interpreter
+    ) : this(context, "sms_classifier.tflite", "vocab.txt", null, null, factory) {
+        loadVocabulary()
+        loadModel()
+    }
+
+    /**
      * Loads the TFLite model from the assets folder into an Interpreter.
      */
     private fun loadModel() {
@@ -119,7 +132,13 @@ class SmsClassifier private constructor(
 
         val options = Interpreter.Options()
         options.setNumThreads(4)
-        interpreter = Interpreter(modelBuffer, options)
+        
+        // Use the injected factory or default to creating a real Interpreter
+        if (interpreterFactory != null) {
+            interpreter = interpreterFactory.invoke(modelBuffer, options)
+        } else {
+            interpreter = Interpreter(modelBuffer, options)
+        }
     }
 
     /**

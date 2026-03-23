@@ -227,4 +227,142 @@ class NotificationHelperTest : BaseViewModelTest() {
         val homeTxn = Gson().fromJson(homeJson, PotentialTransaction::class.java)
         assertEquals(false, homeTxn.isForeignCurrency)
     }
+
+    @Test
+    fun `showRecurringPatternDetectedNotification_buildsCorrectly`() {
+        // Arrange
+        val rule = io.pm.finlight.RecurringTransaction(
+            id = 1,
+            description = "Netflix",
+            amount = 199.0,
+            transactionType = "expense",
+            recurrenceInterval = "MONTHLY",
+            startDate = System.currentTimeMillis(),
+            accountId = 1,
+            categoryId = null
+        )
+        val expectedUri = "app://finlight.pm.io/add_recurring_transaction?ruleId=1"
+
+        // Act
+        NotificationHelper.showRecurringPatternDetectedNotification(context, rule)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification("pattern_${rule.id}".hashCode())
+        assertNotNull(notification)
+        assertEquals("New Recurring Transaction Found", notification.extras.getString(Notification.EXTRA_TITLE))
+        
+        val contentPI = notification.contentIntent
+        val contentIntent = shadowOf(contentPI).savedIntent
+        assertEquals(expectedUri, contentIntent.data.toString())
+        
+        assertEquals(1, notification.actions.size)
+        assertEquals("Review Rule", notification.actions[0].title)
+    }
+
+    @Test
+    fun `showWeeklySummaryNotification_buildsCorrectly`() {
+        // Arrange
+        val totalExpenses = 5000.0
+        val percentageChange = 10 // +10%
+        val topCategories = listOf(
+            CategorySpending("Food", 2000.0, "red_light", "restaurant"),
+            CategorySpending("Travel", 1500.0, "blue_light", "travel_explore")
+        )
+        val expectedUri = "app://finlight.pm.io/report/WEEKLY"
+
+        // Act
+        NotificationHelper.showWeeklySummaryNotification(context, totalExpenses, percentageChange, topCategories)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(3) // ID for Weekly Summary
+        assertNotNull(notification)
+        assertEquals("Spends up by 10% this week", notification.extras.getString(Notification.EXTRA_TITLE))
+        assertTrue(notification.extras.getString(Notification.EXTRA_TEXT)?.contains("You spent ₹5,000.00 in total.") == true)
+
+        val contentPI = notification.contentIntent
+        val contentIntent = shadowOf(contentPI).savedIntent
+        assertEquals(expectedUri, contentIntent.data.toString())
+
+        // Check inbox style lines for categories
+        val inboxLines = notification.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
+        assertNotNull(inboxLines)
+        assertTrue(inboxLines!!.any { it.toString().contains("• Food: ₹2,000.00") })
+    }
+
+    @Test
+    fun `showMonthlySummaryNotification_buildsCorrectly`() {
+        // Arrange
+        val calendar = java.util.Calendar.getInstance()
+        calendar.set(2023, java.util.Calendar.JANUARY, 1) // January
+        val totalExpenses = 20000.0
+        val percentageChange = -5 // -5%
+        val topCategories = emptyList<CategorySpending>()
+        val expectedUri = "app://finlight.pm.io/report/MONTHLY?showPreviousMonth=true"
+
+        // Act
+        NotificationHelper.showMonthlySummaryNotification(context, calendar, totalExpenses, percentageChange, topCategories)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(4) // ID for Monthly Summary
+        assertNotNull(notification)
+        assertEquals("Spends down by 5% in January", notification.extras.getString(Notification.EXTRA_TITLE))
+        
+        val contentPI = notification.contentIntent
+        val contentIntent = shadowOf(contentPI).savedIntent
+        assertEquals(expectedUri, contentIntent.data.toString())
+        
+        val inboxLines = notification.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
+        assertNotNull(inboxLines)
+        // Should show "No expenses recorded" since topCategories is empty
+        assertTrue(inboxLines!!.any { it.toString().contains("No expenses recorded for this period.") })
+    }
+
+    @Test
+    fun `showAutoSaveConfirmationNotification_buildsCorrectly`() {
+        // Arrange
+        val transaction = Transaction(id = 101, description = "Uber Ride", amount = 150.0, transactionType = "expense", date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null)
+        val expectedUri = "app://finlight.pm.io/transaction_detail/101"
+
+        // Act
+        NotificationHelper.showAutoSaveConfirmationNotification(context, transaction)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(101)
+        assertNotNull(notification)
+        assertEquals("Transaction Auto-Saved", notification.extras.getString(Notification.EXTRA_TITLE))
+        assertTrue(notification.extras.getString(Notification.EXTRA_TEXT)?.contains("Saved Uber Ride (₹150.00)") == true)
+        
+        val contentPI = notification.contentIntent
+        val contentIntent = shadowOf(contentPI).savedIntent
+        assertEquals(expectedUri, contentIntent.data.toString())
+        
+        assertEquals("finlight_transaction_group_101", notification.group)
+        assertEquals(1, notification.actions.size)
+        assertEquals("Edit", notification.actions[0].title)
+    }
+
+    @Test
+    fun `showTransactionNotification_buildsCorrectly`() {
+        // Arrange
+        val transaction = Transaction(id = 202, description = "Salary", amount = 50000.0, transactionType = "income", date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null)
+        val expectedUri = "app://finlight.pm.io/transaction_detail/202"
+
+        // Act
+        NotificationHelper.showTransactionNotification(context, transaction)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(202)
+        assertNotNull(notification)
+        assertEquals("New Transaction Found", notification.extras.getString(Notification.EXTRA_TITLE))
+        
+        val bigText = notification.extras.getString(NotificationCompat.EXTRA_BIG_TEXT)
+        assertTrue(bigText?.contains("Income of ₹50000.00 from Salary detected") == true)
+        
+        val contentPI = notification.contentIntent
+        val contentIntent = shadowOf(contentPI).savedIntent
+        assertEquals(expectedUri, contentIntent.data.toString())
+        
+        assertEquals(1, notification.actions.size)
+        assertEquals("Review & Categorize", notification.actions[0].title)
+    }
 }

@@ -14,6 +14,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
 
+import io.pm.finlight.utils.SystemTimeProvider
+
 /**
  * Factory for creating a DashboardViewModel with a constructor that takes dependencies.
  */
@@ -33,7 +35,8 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                 accountRepository = accountRepository,
                 budgetDao = db.budgetDao(),
                 settingsRepository = settingsRepository,
-                merchantRenameRuleRepository = merchantRenameRuleRepository
+                merchantRenameRuleRepository = merchantRenameRuleRepository,
+                timeProvider = SystemTimeProvider()
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
