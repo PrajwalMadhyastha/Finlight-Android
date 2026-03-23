@@ -279,7 +279,7 @@ dependencies {
     implementation("com.google.ai.edge.litert:litert-support:1.4.0")
     implementation("com.google.ai.edge.litert:litert-metadata:1.4.0")
     // Flex Delegate — required by NER model (uses SELECT_TF_OPS during conversion)
-    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+    implementation("io.github.google-ai-edge:litert-select-tf-ops:0.1.0")
     testImplementation(kotlin("test"))
     testImplementation("org.bouncycastle:bcprov-jdk15on:1.70")
 }
