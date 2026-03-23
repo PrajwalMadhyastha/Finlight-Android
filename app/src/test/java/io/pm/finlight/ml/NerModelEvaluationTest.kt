@@ -129,8 +129,10 @@ class NerModelEvaluationTest {
             val nerEntities: Map<String, String>,
             val nerAmount: String?,
             val nerMerchant: String?,
+            val nerAccount: String?,
             val amountMatch: Boolean,
             val merchantMatch: Boolean,
+            val accountMatch: Boolean,
             val verdict: String,
         )
 
@@ -146,6 +148,7 @@ class NerModelEvaluationTest {
 
             val nerAmount = entities["AMOUNT"]
             val nerMerchant = entities["MERCHANT"]
+            val nerAccount = entities["ACCOUNT"]
 
             // Amount comparison: normalize to double
             val amountMatch = if (case.expectedAmount != null && nerAmount != null) {
@@ -164,14 +167,24 @@ class NerModelEvaluationTest {
                 case.expectedMerchant == null && nerMerchant == null
             }
 
-            val verdict = when {
-                amountMatch && merchantMatch -> "MATCH"
-                !amountMatch && !merchantMatch -> "BOTH_DIFFER"
-                !amountMatch -> "AMOUNT_DIFFERS"
-                else -> "MERCHANT_DIFFERS"
+            // Account comparison: case-insensitive substring or exact
+            val accountMatch = if (case.expectedAccount != null && nerAccount != null) {
+                val expected = case.expectedAccount.lowercase().trim().replace(Regex("[^a-z0-9]"), "")
+                val actual = nerAccount.lowercase().trim().replace(Regex("[^a-z0-9]"), "")
+                expected.contains(actual) && actual.isNotEmpty()
+            } else {
+                case.expectedAccount == null && nerAccount == null
             }
 
-            results.add(EvalResult(case, entities, nerAmount, nerMerchant, amountMatch, merchantMatch, verdict))
+            val verdict = when {
+                amountMatch && merchantMatch && accountMatch -> "MATCH"
+                amountMatch && merchantMatch -> "ACCOUNT_DIFFERS"
+                amountMatch && accountMatch -> "MERCHANT_DIFFERS"
+                merchantMatch && accountMatch -> "AMOUNT_DIFFERS"
+                else -> "MULTIPLES_DIFFER"
+            }
+
+            results.add(EvalResult(case, entities, nerAmount, nerMerchant, nerAccount, amountMatch, merchantMatch, accountMatch, verdict))
         }
 
         // ---- Compute statistics ----
@@ -179,7 +192,8 @@ class NerModelEvaluationTest {
         val matchCount = results.count { it.verdict == "MATCH" }
         val amountDiffers = results.count { it.verdict == "AMOUNT_DIFFERS" }
         val merchantDiffers = results.count { it.verdict == "MERCHANT_DIFFERS" }
-        val bothDiffer = results.count { it.verdict == "BOTH_DIFFER" }
+        val accountDiffers = results.count { it.verdict == "ACCOUNT_DIFFERS" }
+        val multiplesDiffer = results.count { it.verdict == "MULTIPLES_DIFFER" }
 
         // Per-entity precision/recall
         val amountTP = results.count { it.amountMatch && it.case.expectedAmount != null }
@@ -189,6 +203,10 @@ class NerModelEvaluationTest {
         val merchantTP = results.count { it.merchantMatch && it.case.expectedMerchant != null }
         val merchantFP = results.count { !it.merchantMatch && it.nerMerchant != null }
         val merchantFN = results.count { !it.merchantMatch && it.case.expectedMerchant != null }
+
+        val accountTP = results.count { it.accountMatch && it.case.expectedAccount != null }
+        val accountFP = results.count { !it.accountMatch && it.nerAccount != null }
+        val accountFN = results.count { !it.accountMatch && it.case.expectedAccount != null }
 
         fun precision(tp: Int, fp: Int) = if (tp + fp > 0) tp.toDouble() / (tp + fp) else 0.0
         fun recall(tp: Int, fn: Int) = if (tp + fn > 0) tp.toDouble() / (tp + fn) else 0.0
@@ -202,9 +220,13 @@ class NerModelEvaluationTest {
         val merchantR = recall(merchantTP, merchantFN)
         val merchantF1 = f1(merchantP, merchantR)
 
-        val overallTP = amountTP + merchantTP
-        val overallFP = amountFP + merchantFP
-        val overallFN = amountFN + merchantFN
+        val accountP = precision(accountTP, accountFP)
+        val accountR = recall(accountTP, accountFN)
+        val accountF1 = f1(accountP, accountR)
+
+        val overallTP = amountTP + merchantTP + accountTP
+        val overallFP = amountFP + merchantFP + accountFP
+        val overallFN = amountFN + merchantFN + accountFN
         val microP = precision(overallTP, overallFP)
         val microR = recall(overallTP, overallFN)
         val microF1 = f1(microP, microR)
@@ -218,11 +240,13 @@ class NerModelEvaluationTest {
             appendLine("Full match:        $matchCount (${pct(matchCount, total)})")
             appendLine("Amount differs:    $amountDiffers (${pct(amountDiffers, total)})")
             appendLine("Merchant differs:  $merchantDiffers (${pct(merchantDiffers, total)})")
-            appendLine("Both differ:       $bothDiffer (${pct(bothDiffer, total)})")
+            appendLine("Account differs:   $accountDiffers (${pct(accountDiffers, total)})")
+            appendLine("Multiples differ:  $multiplesDiffer (${pct(multiplesDiffer, total)})")
             appendLine()
             appendLine("--- Per-Entity Metrics ---")
             appendLine("AMOUNT:   P=${fmt(amountP)}  R=${fmt(amountR)}  F1=${fmt(amountF1)}  (TP=$amountTP FP=$amountFP FN=$amountFN)")
             appendLine("MERCHANT: P=${fmt(merchantP)}  R=${fmt(merchantR)}  F1=${fmt(merchantF1)}  (TP=$merchantTP FP=$merchantFP FN=$merchantFN)")
+            appendLine("ACCOUNT:  P=${fmt(accountP)}  R=${fmt(accountR)}  F1=${fmt(accountF1)}  (TP=$accountTP FP=$accountFP FN=$accountFN)")
             appendLine()
             appendLine("--- Overall Micro ---")
             appendLine("Precision: ${fmt(microP)}  Recall: ${fmt(microR)}  F1: ${fmt(microF1)}")
@@ -236,8 +260,8 @@ class NerModelEvaluationTest {
                 for (r in mismatches) {
                     appendLine("[${r.verdict}] ${r.case.bank}")
                     appendLine("  SMS: ${r.case.smsBody.take(80)}...")
-                    appendLine("  Expected: amount=${r.case.expectedAmount}  merchant=${r.case.expectedMerchant}")
-                    appendLine("  NER:      amount=${r.nerAmount}  merchant=${r.nerMerchant}")
+                    appendLine("  Expected: amount=${r.case.expectedAmount}  merchant=${r.case.expectedMerchant}  account=${r.case.expectedAccount}")
+                    appendLine("  NER:      amount=${r.nerAmount}  merchant=${r.nerMerchant}  account=${r.nerAccount}")
                     appendLine()
                 }
             }
@@ -257,7 +281,7 @@ class NerModelEvaluationTest {
         // Detailed CSV
         val csvFile = File(reportsDir, "ner_eval_$timestamp.csv")
         csvFile.bufferedWriter().use { w ->
-            w.write("bank,verdict,expected_amount,ner_amount,amount_match,expected_merchant,ner_merchant,merchant_match,sms_body")
+            w.write("bank,verdict,expected_amount,ner_amount,amount_match,expected_merchant,ner_merchant,merchant_match,expected_account,ner_account,account_match,sms_body")
             w.newLine()
             for (r in results) {
                 w.write(csvEscape(r.case.bank))
@@ -268,6 +292,9 @@ class NerModelEvaluationTest {
                 w.write(",${csvEscape(r.case.expectedMerchant ?: "")}")
                 w.write(",${csvEscape(r.nerMerchant ?: "")}")
                 w.write(",${r.merchantMatch}")
+                w.write(",${csvEscape(r.case.expectedAccount ?: "")}")
+                w.write(",${csvEscape(r.nerAccount ?: "")}")
+                w.write(",${r.accountMatch}")
                 w.write(",${csvEscape(r.case.smsBody)}")
                 w.newLine()
             }

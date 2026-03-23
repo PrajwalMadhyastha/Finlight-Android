@@ -421,7 +421,7 @@ object SmsParser {
             return ParseResult.NotParsed("No parsing method succeeded.")
         }
 
-        val finalTxn = enrichTransaction(potentialTxn, merchantRenameRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, normalizedBody, sms.sender)
+        val finalTxn = enrichTransaction(potentialTxn, merchantRenameRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, normalizedBody, sms.sender, nerEntities)
         return ParseResult.Success(finalTxn)
     }
 
@@ -434,7 +434,8 @@ object SmsParser {
         merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
         categoryFinderProvider: CategoryFinderProvider,
         normalizedBody: String,
-        sender: String
+        sender: String,
+        nerEntities: Map<String, String>? = null
     ): PotentialTransaction {
         val renameRules = merchantRenameRuleProvider.getAllRules().associateBy({ it.originalName.lowercase() }, { it.newName })
 
@@ -462,7 +463,12 @@ object SmsParser {
         }
 
         // --- Step 4: Construct the final transaction object with all enrichments ---
-        val finalAccount = txn.potentialAccount ?: parseAccount(normalizedBody, sender)
+        val finalAccount = txn.potentialAccount ?: parseAccount(normalizedBody, sender) ?: nerEntities?.get("ACCOUNT")?.let { accountStr ->
+            val cleaned = accountStr.split(" ").joinToString(" ") { word ->
+                word.replaceFirstChar { it.uppercaseChar() }
+            }
+            PotentialAccount(cleaned, "Auto-Detected")
+        }
         val smsHash = (sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
         val smsSignature = generateSmsSignature(normalizedBody)
 
