@@ -153,6 +153,19 @@ fun ProfileScreen(
                 )
             }
         }
+
+        if (io.pm.finlight.BuildConfig.ENABLE_DEV_TOOLS) {
+            item {
+                SettingsSection(title = "Developer Tools") {
+                    SettingsActionItem(
+                        text = "Batch Classifier",
+                        subtitle = "Run TFLite on JSON dump",
+                        icon = Icons.Default.BugReport,
+                        onClick = { navController.navigate("batch_analysis") }
+                    )
+                }
+            }
+        }
     }
 }
 

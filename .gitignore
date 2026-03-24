@@ -34,4 +34,13 @@ generate_tree.py
 # --- ADDED: Ignore generated analysis reports ---
 # This will prevent any CSV files in the project root from being tracked.
 *.csv
+ner_eval_summary*.txt
 *.json
+# Exception: NER model label map is a static app asset, not a generated file
+!app/src/main/assets/ner_label_map.json
+
+# ML Training (Phase 4)
+ml_training/venv/
+ml_training/data/
+ml_training/output/
+ml_training/__pycache__/

@@ -13,6 +13,7 @@ import io.pm.finlight.SmsDebugViewModel
 import io.pm.finlight.SmsRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 
 class SmsDebugViewModelFactory(
@@ -24,6 +25,7 @@ class SmsDebugViewModelFactory(
             val smsRepository = SmsRepository(application)
             val db = AppDatabase.getInstance(application)
             val smsClassifier = SmsClassifier(application)
+            val nerExtractor = NerExtractor(application)
 
             @Suppress("UNCHECKED_CAST")
             return SmsDebugViewModel(
@@ -31,6 +33,7 @@ class SmsDebugViewModelFactory(
                 smsRepository,
                 db,
                 smsClassifier,
+                nerExtractor,
                 transactionViewModel
             ) as T
         }

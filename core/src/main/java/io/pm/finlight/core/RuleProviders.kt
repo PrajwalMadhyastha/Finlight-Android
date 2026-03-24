@@ -26,6 +26,7 @@ interface CustomSmsRuleProvider {
  */
 interface MerchantRenameRuleProvider {
     suspend fun getAllRules(): List<MerchantRenameRule>
+    suspend fun getAllRulesMap(): Map<String, String> = emptyMap() // Maps originalName (lowercase) to newName
 }
 
 /**
@@ -33,6 +34,7 @@ interface MerchantRenameRuleProvider {
  */
 interface MerchantCategoryMappingProvider {
     suspend fun getCategoryIdForMerchant(merchantName: String): Int?
+    suspend fun getAllMappings(): Map<String, Int> = emptyMap() // Maps merchantName (lowercase) to categoryId
 }
 
 /**

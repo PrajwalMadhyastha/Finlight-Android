@@ -10,6 +10,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     id("org.jetbrains.kotlin.jvm")
     kotlin("plugin.serialization")
+    id("org.jetbrains.compose")
+    id("org.jetbrains.kotlin.plugin.compose")
     application
 }
 
@@ -30,12 +32,21 @@ dependencies {
 
     // Use the robust JSON serialization library.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
+    // --- ADDED: Compose Desktop Dependencies ---
+    implementation(compose.desktop.currentOs)
+    implementation(compose.material3)
+
+    // --- TEMPORARY MOCK: TFLite removed for Phase 3 UI Testing ---
+    // implementation("org.tensorflow:tensorflow-lite-api:2.14.0")
+    // implementation("org.tensorflow:tensorflow-lite:2.14.0")
+
+    testImplementation(kotlin("test-junit"))
 }
 
 application {
-    // --- UPDATED: Changed the main class to our new dataset generator.
-    // To run the old tool, change this back to "io.pm.finlight.analyzer.SmsAnalysisToolKt"
-    mainClass.set("io.pm.finlight.analyzer.DatasetGeneratorKt")
+    // --- UPDATED: Main class is now the Desktop App
+    mainClass.set("io.pm.finlight.analyzer.AnalyzerAppKt")
 }
 
 tasks.withType<KotlinCompile>().configureEach {
@@ -43,4 +54,12 @@ tasks.withType<KotlinCompile>().configureEach {
         // Ensure Kotlin also targets JVM 17 for consistency.
         jvmTarget.set(JvmTarget.JVM_17)
     }
+}
+
+// --- CUSTOM TASK: Run NER Labeler App ---
+tasks.register<JavaExec>("runNerLabeler") {
+    group = "application"
+    description = "Run the NER Labeler Desktop App"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("io.pm.finlight.analyzer.NerLabelerAppKt")
 }

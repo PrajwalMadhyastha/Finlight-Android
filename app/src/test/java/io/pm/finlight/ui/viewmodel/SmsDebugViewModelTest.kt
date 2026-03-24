@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -46,6 +47,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var smsRepository: SmsRepository
     @Mock private lateinit var db: AppDatabase
     @Mock private lateinit var smsClassifier: SmsClassifier
+    @Mock private lateinit var nerExtractor: SmsEntityExtractor
 
     // DAOs
     @Mock private lateinit var customSmsRuleDao: CustomSmsRuleDao
@@ -90,6 +92,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             smsRepository,
             db,
             smsClassifier,
+            nerExtractor,
             transactionViewModel
         )
     }
@@ -267,5 +270,89 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             "Final parse result should be Success, but was ${finalResult?.parseResult}",
             finalResult?.parseResult is ParseResult.Success
         )
+    }
+
+    @Test
+    fun `runAutoImportAndRefresh handles autoSave failure`() = runTest {
+        // Arrange
+        setupDefaultDaoBehaviors()
+        val sms = SmsMessage(1, "S1", "Update from MyBank. Order 123 completed. Val: 20.", 1L)
+        val successTxnRule = CustomSmsRule(
+            id = 1,
+            triggerPhrase = "Update from MyBank",
+            amountRegex = "Val: ([\\d,.]+)",
+            merchantRegex = "Order (\\d+)",
+            accountRegex = null,
+            merchantNameExample = "123",
+            amountExample = "20",
+            accountNameExample = null,
+            priority = 10,
+            sourceSmsBody = sms.body
+        )
+        
+        `when`(smsRepository.fetchAllSms(anyObject())).thenReturn(listOf(sms))
+        `when`(smsClassifier.classify(sms.body)).thenReturn(0.9f)
+        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList())).thenReturn(flowOf(listOf(successTxnRule)))
+        // Mocks for failure
+        var autoSaveCalled = false
+        `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer { 
+            autoSaveCalled = true
+            false 
+        }
+
+        initializeViewModel()
+        advanceUntilIdle()
+
+        // Act
+        viewModel.runAutoImportAndRefresh()
+        advanceUntilIdle()
+
+        // Assert
+        assertTrue("autoSaveSmsTransaction should have been called", autoSaveCalled)
+    }
+
+    @Test
+    fun `onCleared closes dependencies`() {
+        initializeViewModel()
+        
+        // Find onCleared in the hierarchy
+        var clazz: Class<*>? = viewModel.javaClass
+        var method: java.lang.reflect.Method? = null
+        while (clazz != null && method == null) {
+            try {
+                method = clazz.getDeclaredMethod("onCleared")
+            } catch (e: NoSuchMethodException) {
+                clazz = clazz.superclass
+            }
+        }
+        
+        assertNotNull("onCleared method not found", method)
+        method!!.isAccessible = true
+        method.invoke(viewModel)
+        
+        verify(smsClassifier).close()
+        verify(nerExtractor).close()
+    }
+
+    @Test
+    fun `refreshScan uses categoryFinderProvider for keyword lookup`() = runTest {
+        setupDefaultDaoBehaviors()
+        // "Swiggy" matches "Food & Drinks" (ID 4)
+        // Adding "Spent" and a period to trigger merchant extraction via regex
+        val sms = SmsMessage(1, "S1", "Spent Rs 500 at Swiggy.", 1L)
+        `when`(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms))
+        `when`(smsClassifier.classify(anyString())).thenReturn(0.9f)
+        `when`(nerExtractor.extract(anyString())).thenReturn(emptyMap())
+        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+        
+        initializeViewModel()
+        
+        viewModel.uiState.test {
+            advanceUntilIdle()
+            val result = expectMostRecentItem().debugResults.first()
+            val success = result.parseResult as ParseResult.Success
+            assertEquals(4, success.transaction.categoryId)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

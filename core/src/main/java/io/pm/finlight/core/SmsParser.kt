@@ -26,13 +26,18 @@
 package io.pm.finlight
 
 import io.pm.finlight.core.CATEGORY_KEYWORD_MAP
+import io.pm.finlight.core.utils.StringSimilarity
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 import kotlin.math.min
 
 // --- Sealed Class for detailed parse results ---
 sealed class ParseResult {
-    data class Success(val transaction: PotentialTransaction) : ParseResult()
+    data class Success(
+        val transaction: PotentialTransaction,
+        val newlyDiscoveredCategoryAlias: Pair<String, Int>? = null,
+        val newlyDiscoveredRenameAlias: Pair<String, String>? = null
+    ) : ParseResult()
     data class Ignored(val reason: String) : ParseResult()
     data class NotParsed(val reason: String) : ParseResult()
     data class IgnoredByClassifier(val confidence: Float, val reason: String = "Ignored by ML model") : ParseResult()
@@ -199,9 +204,10 @@ object SmsParser {
         ignoreRuleProvider: IgnoreRuleProvider,
         merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
         categoryFinderProvider: CategoryFinderProvider,
-        smsParseTemplateProvider: SmsParseTemplateProvider
+        smsParseTemplateProvider: SmsParseTemplateProvider,
+        nerEntities: Map<String, String>? = null,
     ): PotentialTransaction? {
-        return when (val result = parseWithReason(sms, mappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)) {
+        return when (val result = parseWithReason(sms, mappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider, nerEntities = nerEntities)) {
             is ParseResult.Success -> result.transaction
             is ParseResult.Ignored, is ParseResult.NotParsed, is ParseResult.IgnoredByClassifier -> null
         }
@@ -269,8 +275,8 @@ object SmsParser {
                         date = sms.date
                     )
                     // Enrich and return immediately if a custom rule matches
-                    val finalTxn = enrichTransaction(potentialTxn, merchantRenameRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, normalizedBody, sms.sender)
-                    return ParseResult.Success(finalTxn)
+                    val (finalTxn, catAlias, renAlias) = enrichTransaction(potentialTxn, merchantRenameRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, normalizedBody, sms.sender)
+                    return ParseResult.Success(finalTxn, catAlias, renAlias)
                 }
             }
         }
@@ -289,7 +295,8 @@ object SmsParser {
         ignoreRuleProvider: IgnoreRuleProvider,
         merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
         categoryFinderProvider: CategoryFinderProvider,
-        smsParseTemplateProvider: SmsParseTemplateProvider
+        smsParseTemplateProvider: SmsParseTemplateProvider,
+        nerEntities: Map<String, String>? = null,
     ): ParseResult {
         val normalizedBody = sms.body.replace(Regex("\\s+"), " ").trim()
 
@@ -328,42 +335,72 @@ object SmsParser {
 
 
         // --- Stage 3: If still no match, fall back to Generic Regex Parsing ---
+        // NER entities (if provided) override amount and merchant extraction in this stage.
         if (potentialTxn == null) {
             var extractedAmount: Double? = null
             var detectedCurrency: String? = null
 
-            val highConfidenceMatch = AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX.find(normalizedBody)
-            if (highConfidenceMatch != null) {
-                val currencyStr = highConfidenceMatch.groupValues[1].ifEmpty { null }
-                val amountStr = highConfidenceMatch.groupValues[2].ifEmpty { highConfidenceMatch.groupValues[3] }
-                extractedAmount = amountStr.replace(",", "").toDoubleOrNull()
-                detectedCurrency = if (currencyStr != null) if (currencyStr.equals("RS", ignoreCase = true)) "INR" else currencyStr.uppercase() else "INR"
+            // --- NER AMOUNT OVERRIDE ---
+            // If the NER model found an AMOUNT entity, parse it directly.
+            // Otherwise, use the existing regex pipeline.
+            val nerAmountStr = nerEntities?.get("AMOUNT")
+            if (nerAmountStr != null) {
+                // Strip currency prefixes (rs, inr, etc.) and normalize.
+                // The [.:\\s]* also handles "Rs:147.5" colon-notation used by some banks.
+                val numericPart = nerAmountStr
+                    .replace(Regex("^(rs|inr|usd|sgd|myr|eur|gbp)[.:\\s]*", RegexOption.IGNORE_CASE), "")
+                    .replace(",", "")
+                    .trim()
+                extractedAmount = numericPart.toDoubleOrNull()
+                // Detect currency from NER amount string prefix
+                val currencyMatch = Regex("^(inr|rs|usd|sgd|myr|eur|gbp)", RegexOption.IGNORE_CASE).find(nerAmountStr)
+                detectedCurrency = currencyMatch?.value?.uppercase()?.let { if (it == "RS") "INR" else it } ?: "INR"
             } else {
-                val bestMatch = FALLBACK_AMOUNT_REGEX.findAll(normalizedBody).firstOrNull()
-                if (bestMatch != null) {
-                    val (amount, currency) = parseAmountAndCurrency(bestMatch)
-                    extractedAmount = amount
-                    detectedCurrency = currency
+                val highConfidenceMatch = AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX.find(normalizedBody)
+                if (highConfidenceMatch != null) {
+                    val currencyStr = highConfidenceMatch.groupValues[1].ifEmpty { null }
+                    val amountStr = highConfidenceMatch.groupValues[2].ifEmpty { highConfidenceMatch.groupValues[3] }
+                    extractedAmount = amountStr.replace(",", "").toDoubleOrNull()
+                    detectedCurrency = if (currencyStr != null) if (currencyStr.equals("RS", ignoreCase = true)) "INR" else currencyStr.uppercase() else "INR"
+                } else {
+                    val bestMatch = FALLBACK_AMOUNT_REGEX.findAll(normalizedBody).firstOrNull()
+                    if (bestMatch != null) {
+                        val (amount, currency) = parseAmountAndCurrency(bestMatch)
+                        extractedAmount = amount
+                        detectedCurrency = currency
+                    }
                 }
             }
 
             val amount = extractedAmount
             if (amount != null) {
+                // Transaction type always comes from keywords (NER doesn't extract this)
                 val transactionType = if (EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "expense" else if (INCOME_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "income" else null
                 if (transactionType != null) {
+                    // --- NER MERCHANT OVERRIDE ---
+                    // Check sender mappings first (highest trust). Then prefer NER over regex.
                     var merchantName = mappings[sms.sender]
                     if (merchantName == null) {
-                        for (pattern in MERCHANT_REGEX_PATTERNS) {
-                            val match = pattern.find(normalizedBody)
-                            if (match != null) {
-                                val potentialName = match.groups[1]?.value?.replace("_", " ")?.replace(Regex("\\s+"), " ")?.trim()?.trimEnd('.')
-                                if (!potentialName.isNullOrBlank() && !potentialName.contains("call", ignoreCase = true)) {
-                                    val containsLetters = potentialName.any { it.isLetter() }
-                                    val containsDigits = potentialName.any { it.isDigit() }
-                                    val isLikelyRefNumber = potentialName.length >= 8 && containsDigits && !containsLetters && !potentialName.startsWith("NEFT", ignoreCase = true)
-                                    if (!isLikelyRefNumber) {
-                                        merchantName = potentialName
-                                        break
+                        val nerMerchant = nerEntities?.get("MERCHANT")
+                        if (nerMerchant != null) {
+                            // Use NER merchant, but capitalize it properly
+                            merchantName = nerMerchant.split(" ").joinToString(" ") { word ->
+                                word.replaceFirstChar { it.uppercaseChar() }
+                            }
+                        } else {
+                            // Fall back to existing regex patterns
+                            for (pattern in MERCHANT_REGEX_PATTERNS) {
+                                val match = pattern.find(normalizedBody)
+                                if (match != null) {
+                                    val potentialName = match.groups[1]?.value?.replace("_", " ")?.replace(Regex("\\s+"), " ")?.trim()?.trimEnd('.')
+                                    if (!potentialName.isNullOrBlank() && !potentialName.contains("call", ignoreCase = true)) {
+                                        val containsLetters = potentialName.any { it.isLetter() }
+                                        val containsDigits = potentialName.any { it.isDigit() }
+                                        val isLikelyRefNumber = potentialName.length >= 8 && containsDigits && !containsLetters && !potentialName.startsWith("NEFT", ignoreCase = true)
+                                        if (!isLikelyRefNumber) {
+                                            merchantName = potentialName
+                                            break
+                                        }
                                     }
                                 }
                             }
@@ -389,8 +426,8 @@ object SmsParser {
             return ParseResult.NotParsed("No parsing method succeeded.")
         }
 
-        val finalTxn = enrichTransaction(potentialTxn, merchantRenameRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, normalizedBody, sms.sender)
-        return ParseResult.Success(finalTxn)
+        val (finalTxn, catAlias, renAlias) = enrichTransaction(potentialTxn, merchantRenameRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, normalizedBody, sms.sender, nerEntities)
+        return ParseResult.Success(finalTxn, catAlias, renAlias)
     }
 
     /**
@@ -402,17 +439,46 @@ object SmsParser {
         merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
         categoryFinderProvider: CategoryFinderProvider,
         normalizedBody: String,
-        sender: String
-    ): PotentialTransaction {
-        val renameRules = merchantRenameRuleProvider.getAllRules().associateBy({ it.originalName.lowercase() }, { it.newName })
+        sender: String,
+        nerEntities: Map<String, String>? = null
+    ): Triple<PotentialTransaction, Pair<String, Int>?, Pair<String, String>?> {
+        val renameRules = merchantRenameRuleProvider.getAllRules()
 
         val originalMerchant = txn.merchantName
         var finalCategoryId: Int? = txn.categoryId
+
+        var newCategoryAlias: Pair<String, Int>? = null
+        var newRenameAlias: Pair<String, String>? = null
 
         // --- Step 1: Prioritize Category Learning (using original merchant name) ---
         if (finalCategoryId == null && originalMerchant != null) {
             // First, try direct mapping.
             finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(originalMerchant)
+            
+            // --- NEW: Token Overlap Similarity Fallback ---
+            if (finalCategoryId == null) {
+                var bestOverlap = 0.0
+                var bestJaccard = 0.0
+                var bestCategoryId: Int? = null
+
+                for ((legacyString, catId) in merchantCategoryMappingProvider.getAllMappings()) {
+                    val overlap = StringSimilarity.calculateTokenOverlapScore(legacyString, originalMerchant)
+                    if (overlap >= 0.85) { 
+                        val jaccard = StringSimilarity.calculateJaccardIndex(legacyString, originalMerchant)
+                        if (overlap > bestOverlap || (overlap == bestOverlap && jaccard > bestJaccard)) {
+                            bestOverlap = overlap
+                            bestJaccard = jaccard
+                            bestCategoryId = catId
+                        }
+                    }
+                }
+                
+                if (bestCategoryId != null) {
+                    finalCategoryId = bestCategoryId
+                    newCategoryAlias = Pair(originalMerchant, bestCategoryId)
+                }
+            }
+
             // If no mapping, try keyword-based heuristic.
             if (finalCategoryId == null) {
                 finalCategoryId = findCategoryIdByKeyword(originalMerchant, categoryFinderProvider)
@@ -420,9 +486,36 @@ object SmsParser {
         }
 
         // --- Step 2: Apply Merchant Rename Rule (After Category Lookup) ---
-        val finalMerchantName = originalMerchant?.let {
-            renameRules[it.lowercase()]
-        } ?: originalMerchant
+        var finalMerchantName = originalMerchant?.let {
+            val lowercaseOriginal = it.lowercase()
+            renameRules.find { r -> r.originalName.lowercase() == lowercaseOriginal }?.newName
+        }
+
+        // --- NEW: Token Overlap Fallback for Rename Rules ---
+        if (finalMerchantName == null && originalMerchant != null) {
+            var bestOverlap = 0.0
+            var bestJaccard = 0.0
+            var bestNewName: String? = null
+
+            for (rule in renameRules) {
+                val overlap = StringSimilarity.calculateTokenOverlapScore(rule.originalName, originalMerchant)
+                if (overlap >= 0.85) {
+                    val jaccard = StringSimilarity.calculateJaccardIndex(rule.originalName, originalMerchant)
+                    if (overlap > bestOverlap || (overlap == bestOverlap && jaccard > bestJaccard)) {
+                        bestOverlap = overlap
+                        bestJaccard = jaccard
+                        bestNewName = rule.newName
+                    }
+                }
+            }
+                
+            if (bestNewName != null) {
+                finalMerchantName = bestNewName
+                newRenameAlias = Pair(originalMerchant, bestNewName)
+            }
+        }
+
+        finalMerchantName = finalMerchantName ?: originalMerchant
 
         // --- Step 3: If we still haven't found a category, try again with the RENAMED merchant name ---
         if (finalCategoryId == null && finalMerchantName != null) {
@@ -430,16 +523,26 @@ object SmsParser {
         }
 
         // --- Step 4: Construct the final transaction object with all enrichments ---
-        val finalAccount = txn.potentialAccount ?: parseAccount(normalizedBody, sender)
+        val finalAccount = txn.potentialAccount ?: nerEntities?.get("ACCOUNT")?.let { accountStr ->
+            val cleaned = accountStr.split(" ").joinToString(" ") { word ->
+                word.replaceFirstChar { it.uppercaseChar() }
+            }
+            PotentialAccount(cleaned, "Auto-Detected")
+        } ?: parseAccount(normalizedBody, sender)
+
         val smsHash = (sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
         val smsSignature = generateSmsSignature(normalizedBody)
 
-        return txn.copy(
-            merchantName = finalMerchantName,
-            categoryId = finalCategoryId,
-            potentialAccount = finalAccount,
-            sourceSmsHash = smsHash,
-            smsSignature = smsSignature
+        return Triple(
+            txn.copy(
+                merchantName = finalMerchantName,
+                categoryId = finalCategoryId,
+                potentialAccount = finalAccount,
+                sourceSmsHash = smsHash,
+                smsSignature = smsSignature
+            ),
+            newCategoryAlias,
+            newRenameAlias
         )
     }
 

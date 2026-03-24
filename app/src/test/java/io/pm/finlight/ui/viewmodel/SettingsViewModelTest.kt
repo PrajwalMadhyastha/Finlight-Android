@@ -26,6 +26,7 @@ import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.ReminderManager
@@ -76,6 +77,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var smsRepository: SmsRepository
     @Mock private lateinit var transactionViewModel: TransactionViewModel
     @Mock private lateinit var smsClassifier: SmsClassifier
+    @Mock private lateinit var nerExtractor: SmsEntityExtractor
     private lateinit var transactionRunner: TransactionRunner
 
     // Mocks for all DAOs called by DataExportService and ViewModel
@@ -223,6 +225,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             smsRepository,
             transactionViewModel,
             smsClassifier,
+            nerExtractor,
             transactionRunner,
             dispatchers = TestDispatcherProvider(testDispatcher)
         )
@@ -358,6 +361,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             val invalidDateRow = report.reviewableRows[2]
             assertEquals(CsvRowStatus.INVALID_DATE, invalidDateRow.status)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -378,6 +382,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             assertNotNull(report)
             assertEquals(1, report!!.reviewableRows.size)
             assertEquals(2, report.reviewableRows.first().lineNumber)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -409,6 +414,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             assertNotNull(updatedRow)
             // This assertion should now pass.
             assertEquals(CsvRowStatus.VALID, updatedRow!!.status)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -1104,6 +1110,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             smsRepository,
             transactionViewModel,
             smsClassifier,
+            nerExtractor,
             transactionRunner,
             dispatchers = TestDispatcherProvider(testDispatcher)
         )
@@ -1158,6 +1165,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             smsRepository,
             transactionViewModel,
             smsClassifier,
+            nerExtractor,
             transactionRunner,
             dispatchers = TestDispatcherProvider(testDispatcher)
         )

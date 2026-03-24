@@ -21,6 +21,7 @@ import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionViewModel
+import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 
 import io.pm.finlight.data.RoomTransactionRunner
@@ -41,6 +42,7 @@ class SettingsViewModelFactory(
             val categoryRepository = CategoryRepository(db.categoryDao())
             val smsRepository = SmsRepository(application)
             val smsClassifier = SmsClassifier(application)
+            val nerExtractor = NerExtractor(application)
             val transactionRunner = RoomTransactionRunner()
 
             @Suppress("UNCHECKED_CAST")
@@ -55,6 +57,7 @@ class SettingsViewModelFactory(
                 smsRepository,
                 transactionViewModel,
                 smsClassifier,
+                nerExtractor,
                 transactionRunner
             ) as T
         }

@@ -159,24 +159,13 @@ class SmsClassifier private constructor(
      * @param text The raw SMS body.
      * @return A padded long array representing the tokenized text.
      */
+    /**
+     * Cleans and tokenizes the input text into a sequence of integers.
+     * Uses the shared SmsTokenizer from the core module to ensure consistency.
+     */
     @VisibleForTesting
     internal fun tokenize(text: String): LongArray {
-        // 1. Preprocess the text to exactly match Python's default TextVectorization.
-        val punctuationRegex = Regex("[!\"#\$%&'()*+,-./:;<=>?@\\[\\\\\\]^_`{|}~]")
-        val cleanedText = text.lowercase()
-            .replace(punctuationRegex, "")       // Remove punctuation
-            .replace(Regex("\\s+"), " ") // Collapse multiple spaces into one
-            .trim()                               // Remove leading/trailing spaces
-        val words = if (cleanedText.isEmpty()) emptyList() else cleanedText.split(" ")
-
-        // 2. Convert words to integer tokens using the vocabulary.
-        val tokens = words.map { vocab.getOrDefault(it, UNKNOWN_TOKEN.toInt()).toLong() }.toMutableList()
-
-        // 3. Pad or truncate the sequence to the required length.
-        while (tokens.size < MAX_SEQUENCE_LENGTH) {
-            tokens.add(0L) // 0 is the padding token
-        }
-        return tokens.take(MAX_SEQUENCE_LENGTH).toLongArray()
+        return io.pm.finlight.core.SmsTokenizer(vocab).tokenize(text)
     }
 
 

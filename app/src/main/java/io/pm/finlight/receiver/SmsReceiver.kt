@@ -21,6 +21,8 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.AccountDao
+import io.pm.finlight.ml.NerExtractor
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.NotificationHelper
@@ -34,6 +36,7 @@ class SmsReceiver : BroadcastReceiver() {
     private val tag = "SmsReceiver"
     // --- REFACTOR: Allow injecting a mock classifier for testing ---
     internal var smsClassifier: SmsClassifier? = null
+    internal var nerExtractor: SmsEntityExtractor? = null
     // --- NEW: Expose CoroutineScope for test injection ---
     internal var coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
@@ -48,6 +51,9 @@ class SmsReceiver : BroadcastReceiver() {
             // --- REFACTOR: Initialize only if not already set (by a test) ---
             if (smsClassifier == null) {
                 smsClassifier = SmsClassifier(context)
+            }
+            if (nerExtractor == null) {
+                nerExtractor = NerExtractor(context)
             }
 
             // --- UPDATED: Use the injectable coroutineScope ---
@@ -80,12 +86,18 @@ class SmsReceiver : BroadcastReceiver() {
                         }
                         val merchantRenameRuleProvider = object : MerchantRenameRuleProvider {
                             override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+                            override suspend fun getAllRulesMap(): Map<String, String> {
+                                return db.merchantRenameRuleDao().getAllRulesList().associateBy({ it.originalName.lowercase() }, { it.newName })
+                            }
                         }
                         val ignoreRuleProvider = object : IgnoreRuleProvider {
                             override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
                         }
                         val merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
                             override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+                            override suspend fun getAllMappings(): Map<String, Int> {
+                                return db.merchantCategoryMappingDao().getAll().associateBy({ it.parsedName.lowercase() }, { it.categoryId })
+                            }
                         }
                         val smsParseTemplateProvider = object : SmsParseTemplateProvider {
                             override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
@@ -109,7 +121,10 @@ class SmsReceiver : BroadcastReceiver() {
                                 continue // Skip to the next message
                             }
 
-                            // --- HIERARCHY STEP 3: Run the main parser (Heuristics -> Generic) ---
+                            // --- HIERARCHY STEP 3: Run NER to extract entities, then run the main parser ---
+                            val nerEntities = nerExtractor?.extract(fullBody)
+                            Log.d(tag, "NER entities for SMS: $nerEntities")
+
                             parseResult = SmsParser.parseWithReason(
                                 sms = smsMessage,
                                 mappings = existingMappings,
@@ -118,13 +133,25 @@ class SmsReceiver : BroadcastReceiver() {
                                 ignoreRuleProvider = ignoreRuleProvider,
                                 merchantCategoryMappingProvider = merchantCategoryMappingProvider,
                                 categoryFinderProvider = categoryFinderProvider,
-                                smsParseTemplateProvider = smsParseTemplateProvider
+                                smsParseTemplateProvider = smsParseTemplateProvider,
+                                nerEntities = nerEntities,
                             )
                         }
 
 
                         // --- FINAL STEP: Process the result from whichever step succeeded ---
                         if (parseResult is ParseResult.Success) {
+                            
+                            // --- AUTO-HEALING WITH NER SIMILARITY ENGINE ---
+                            parseResult.newlyDiscoveredRenameAlias?.let { (oldName, newName) ->
+                                Log.d(tag, "Auto-healing rename rule for NER fallback: $oldName -> $newName")
+                                db.merchantRenameRuleDao().insert(MerchantRenameRule(oldName, newName))
+                            }
+                            parseResult.newlyDiscoveredCategoryAlias?.let { (merchant, catId) ->
+                                Log.d(tag, "Auto-healing category rule for NER fallback: $merchant -> $catId")
+                                db.merchantCategoryMappingDao().insert(MerchantCategoryMapping(merchant, catId))
+                            }
+
                             val potentialTxn = parseResult.transaction
                             if (potentialTxn.sourceSmsHash != null && !existingSmsHashes.contains(potentialTxn.sourceSmsHash)) {
                                 val travelSettings = settingsRepository.getTravelModeSettings().first()

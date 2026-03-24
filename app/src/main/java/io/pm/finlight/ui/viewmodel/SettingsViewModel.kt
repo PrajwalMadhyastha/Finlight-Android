@@ -25,6 +25,7 @@ import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.data.TransactionRunner
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.CategoryIconHelper
@@ -57,6 +58,7 @@ class SettingsViewModel(
     private val smsRepository: SmsRepository,
     private val transactionViewModel: TransactionViewModel,
     private val smsClassifier: SmsClassifier,
+    private val nerExtractor: SmsEntityExtractor,
     private val transactionRunner: TransactionRunner,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : AndroidViewModel(application) {
@@ -203,6 +205,7 @@ class SettingsViewModel(
     override fun onCleared() {
         super.onCleared()
         smsClassifier.close()
+        nerExtractor.close()
     }
 
     fun dismissBackupSuccessDialog() {
@@ -289,7 +292,8 @@ class SettingsViewModel(
                                 ignoreRuleProvider,
                                 merchantCategoryMappingProvider,
                                 categoryFinderProvider,
-                                smsParseTemplateProvider
+                                smsParseTemplateProvider,
+                                nerEntities = nerExtractor.extract(sms.body),
                             )
                         }
                     }.awaitAll().filterNotNull()
@@ -394,7 +398,8 @@ class SettingsViewModel(
                                             ignoreRuleProvider = ignoreRuleProvider,
                                             merchantCategoryMappingProvider = merchantCategoryMappingProvider,
                                             categoryFinderProvider = categoryFinderProvider,
-                                            smsParseTemplateProvider = smsParseTemplateProvider
+                                            smsParseTemplateProvider = smsParseTemplateProvider,
+                                            nerEntities = nerExtractor.extract(sms.body),
                                         )
                                     }
                                 }
