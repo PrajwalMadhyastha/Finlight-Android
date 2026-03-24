@@ -43,6 +43,10 @@ class NerExtractor private constructor(
     private var tokenizer: WordPieceTokenizer? = preloadedTokenizer
     private var idToLabel: Map<Int, String> = preloadedLabelMap ?: emptyMap()
 
+    private var interpreterFactory: (ByteBuffer, Interpreter.Options) -> Interpreter = { buffer, options ->
+        Interpreter(buffer, options)
+    }
+
     private val interpreterLock = Any()
 
     /**
@@ -54,7 +58,11 @@ class NerExtractor private constructor(
         modelName: String = DEFAULT_MODEL,
         vocabName: String = DEFAULT_VOCAB,
         labelMapName: String = DEFAULT_LABEL_MAP,
+        interpreterFactory: ((ByteBuffer, Interpreter.Options) -> Interpreter)? = null
     ) : this(context, modelName, vocabName, labelMapName, null, null, null) {
+        if (interpreterFactory != null) {
+            this.interpreterFactory = interpreterFactory
+        }
         loadModel()
         loadVocabulary()
         loadLabelMap()
@@ -83,7 +91,7 @@ class NerExtractor private constructor(
 
         val options = Interpreter.Options()
         options.setNumThreads(4)
-        interpreter = Interpreter(modelBuffer, options)
+        interpreter = interpreterFactory(modelBuffer, options)
     }
 
     private fun loadVocabulary() {

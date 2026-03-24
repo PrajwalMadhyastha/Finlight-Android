@@ -1,14 +1,32 @@
 package io.pm.finlight.ml
 
+import android.os.Build
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import android.content.Context
+import android.content.res.AssetManager
+import android.content.res.AssetFileDescriptor
+import io.pm.finlight.TestApplication
+import java.io.ByteArrayInputStream
+import java.io.FileDescriptor
+import java.io.FileInputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.mockito.ArgumentMatchers.anyLong
+import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.*
 import org.tensorflow.lite.Interpreter
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import org.tensorflow.lite.Tensor
+import io.mockk.*
+import org.robolectric.annotation.Config
 
+@RunWith(AndroidJUnit4::class)
+@Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class NerExtractorTest {
 
     // Helper for Mockito any() with non-nullable Kotlin types
@@ -302,5 +320,45 @@ class NerExtractorTest {
         val extractorToClose = NerExtractor(tokenizer, mockInterpreter, labelMap)
         extractorToClose.close()
         verify(mockInterpreter).close()
+    }
+
+    @Test
+    fun `testPrimaryConstructorAndAssetLoading covers asset loading logic`() {
+        // Use Mockk for this test as it handles construction mocking more reliably in Kotlin
+        val mockContext = mockk<Context>(relaxed = true)
+        val mockAssets = mockk<AssetManager>(relaxed = true)
+        val mockFd = mockk<AssetFileDescriptor>(relaxed = true)
+        val mockFileDescriptor = FileDescriptor()
+
+        every { mockContext.assets } returns mockAssets
+        every { mockAssets.openFd(any()) } returns mockFd
+        every { mockFd.fileDescriptor } returns mockFileDescriptor
+        every { mockFd.startOffset } returns 0L
+        every { mockFd.declaredLength } returns 100L
+
+        // Mock vocabulary and label map streams
+        every { mockAssets.open("ner_vocab.txt") } returns ByteArrayInputStream("word1\nword2".toByteArray())
+        every { mockAssets.open("ner_label_map.json") } returns ByteArrayInputStream("""{"id_to_label": {"0": "O", "1": "B-MERCHANT"}}""".toByteArray())
+
+        mockkConstructor(FileInputStream::class)
+        
+        val mockChannel = mockk<FileChannel>(relaxed = true)
+        every { anyConstructed<FileInputStream>().channel } returns mockChannel
+        every { mockChannel.map(any(), any(), any()) } returns mockk<MappedByteBuffer>(relaxed = true)
+
+        val mockInterpreter = mockk<Interpreter>(relaxed = true)
+
+        try {
+            // This triggers loadModel, loadVocabulary, loadLabelMap
+            // Pass the factory to avoid native library loading in static block
+            val extractorFromAssets = NerExtractor(mockContext, interpreterFactory = { _, _ -> mockInterpreter })
+            
+            assertNotNull(extractorFromAssets)
+            verify { mockAssets.openFd("sms_ner.tflite") }
+            verify { mockAssets.open("ner_vocab.txt") }
+            verify { mockAssets.open("ner_label_map.json") }
+        } finally {
+            unmockkConstructor(FileInputStream::class)
+        }
     }
 }
