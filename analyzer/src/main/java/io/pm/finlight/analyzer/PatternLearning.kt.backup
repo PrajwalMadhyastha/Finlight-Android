@@ -1,0 +1,262 @@
+package io.pm.finlight.analyzer
+
+import kotlinx.serialization.Serializable
+
+/**
+ * Pattern Learning System for NER Labeler - Redesigned
+ * 
+ * Uses two strategies:
+ * 1. Exact text matching for merchants and accounts (stable entities)
+ * 2. Context-based matching for amounts and balances (variable values)
+ */
+
+sealed class EntityPattern {
+    // For merchants and accounts - exact text matching
+    @Serializable
+    data class ExactTextPattern(
+        val text: String,              // The exact text that was labeled
+        val normalizedText: String,    // Normalized version for matching
+        val entityType: String,        // "MERCHANT" or "ACCOUNT"
+        val frequency: Int = 1,        // How many times this pattern was seen
+        val confidence: Float = 1.0f   // Confidence score (0.0 - 1.0)
+    ) : EntityPattern()
+    
+    // For amounts and balances - positional/contextual
+    @Serializable
+    data class ContextPattern(
+        val entityType: String,                    // "AMOUNT" or "BALANCE"
+        val precedingTokens: List<String> = emptyList(),  // Normalized tokens before (e.g., ["bal", "rs"])
+        val followingTokens: List<String> = emptyList(),  // Normalized tokens after (e.g., ["cr"])
+        val frequency: Int = 1,
+        val confidence: Float = 1.0f
+    ) : EntityPattern()
+}
+
+@Serializable
+data class PatternLibrary(
+    val merchantPatterns: MutableList<EntityPattern.ExactTextPattern> = mutableListOf(),
+    val accountPatterns: MutableList<EntityPattern.ExactTextPattern> = mutableListOf(),
+    val amountContextPatterns: MutableList<EntityPattern.ContextPattern> = mutableListOf(),
+    val balanceContextPatterns: MutableList<EntityPattern.ContextPattern> = mutableListOf()
+)
+
+class PatternLearner {
+    
+    companion object {
+        // Configuration constants for negative learning
+        private const val CONFIDENCE_PENALTY = 0.2f  // Decrease per removal
+        private const val REMOVAL_THRESHOLD = 0.3f   // Delete pattern if confidence drops below this
+        private const val CONFIDENCE_BOOST = 0.1f    // Increase per positive label
+    }
+    
+    /**
+     * Extract exact text pattern from labeled tokens (for merchants and accounts)
+     */
+    private fun extractExactTextPattern(tokens: List<String>, indices: List<Int>, entityType: String): EntityPattern.ExactTextPattern? {
+        if (indices.isEmpty()) return null
+        
+        val text = indices.joinToString(" ") { tokens[it] }
+        val normalizedText = normalizeForMatching(text)
+        
+        return EntityPattern.ExactTextPattern(
+            text = text,
+            normalizedText = normalizedText,
+            entityType = entityType,
+            frequency = 1,
+            confidence = 1.0f
+        )
+    }
+    
+    /**
+     * Learn from a labeled item
+     */
+    fun learnFromLabels(
+        item: NerLabelItem,
+        library: PatternLibrary
+    ): PatternLibrary {
+        val labels = item.labels ?: return library
+        
+        // Learn merchant pattern
+        if (labels.merchantTokenIndices.isNotEmpty()) {
+            val pattern = extractPattern(item.tokens, labels.merchantTokenIndices, "MERCHANT")
+            if (pattern != null) {
+                addOrUpdatePattern(library.merchantPatterns, pattern)
+            }
+        }
+        
+        // Learn amount pattern
+        if (labels.amountTokenIndices.isNotEmpty()) {
+            val pattern = extractPattern(item.tokens, labels.amountTokenIndices, "AMOUNT")
+            if (pattern != null) {
+                addOrUpdatePattern(library.amountPatterns, pattern)
+            }
+        }
+        
+        // Learn account pattern
+        if (labels.accountTokenIndices.isNotEmpty()) {
+            val pattern = extractPattern(item.tokens, labels.accountTokenIndices, "ACCOUNT")
+            if (pattern != null) {
+                addOrUpdatePattern(library.accountPatterns, pattern)
+            }
+        }
+        
+        // Learn balance pattern
+        if (labels.balanceTokenIndices.isNotEmpty()) {
+            val pattern = extractPattern(item.tokens, labels.balanceTokenIndices, "BALANCE")
+            if (pattern != null) {
+                addOrUpdatePattern(library.balancePatterns, pattern)
+            }
+        }
+        
+        return library
+    }
+    
+    /**
+     * Unlearn from removed labels (negative feedback)
+     * Decreases confidence for patterns that were removed by the user
+     */
+    fun unlearnFromRemovals(
+        item: NerLabelItem,
+        previousLabels: NerLabels?,
+        newLabels: NerLabels?,
+        library: PatternLibrary
+    ): PatternLibrary {
+        if (previousLabels == null) return library
+        
+        // Detect removed merchant
+        if (previousLabels.merchantTokenIndices.isNotEmpty() && 
+            (newLabels == null || newLabels.merchantTokenIndices.isEmpty())) {
+            val pattern = extractPattern(item.tokens, previousLabels.merchantTokenIndices, "MERCHANT")
+            if (pattern != null) {
+                decreasePatternConfidence(library.merchantPatterns, pattern)
+            }
+        }
+        
+        // Detect removed amount
+        if (previousLabels.amountTokenIndices.isNotEmpty() && 
+            (newLabels == null || newLabels.amountTokenIndices.isEmpty())) {
+            val pattern = extractPattern(item.tokens, previousLabels.amountTokenIndices, "AMOUNT")
+            if (pattern != null) {
+                decreasePatternConfidence(library.amountPatterns, pattern)
+            }
+        }
+        
+        // Detect removed account
+        if (previousLabels.accountTokenIndices.isNotEmpty() && 
+            (newLabels == null || newLabels.accountTokenIndices.isEmpty())) {
+            val pattern = extractPattern(item.tokens, previousLabels.accountTokenIndices, "ACCOUNT")
+            if (pattern != null) {
+                decreasePatternConfidence(library.accountPatterns, pattern)
+            }
+        }
+        
+        // Detect removed balance
+        if (previousLabels.balanceTokenIndices.isNotEmpty() && 
+            (newLabels == null || newLabels.balanceTokenIndices.isEmpty())) {
+            val pattern = extractPattern(item.tokens, previousLabels.balanceTokenIndices, "BALANCE")
+            if (pattern != null) {
+                decreasePatternConfidence(library.balancePatterns, pattern)
+            }
+        }
+        
+        return library
+    }
+    
+    /**
+     * Add pattern to list or update frequency if it exists
+     */
+    private fun addOrUpdatePattern(patterns: MutableList<LearnedPattern>, newPattern: LearnedPattern) {
+        val existing = patterns.find { it.normalizedText == newPattern.normalizedText }
+        if (existing != null) {
+            // Update frequency and confidence
+            val index = patterns.indexOf(existing)
+            patterns[index] = existing.copy(
+                frequency = existing.frequency + 1,
+                confidence = minOf(1.0f, existing.confidence + CONFIDENCE_BOOST)
+            )
+        } else {
+            patterns.add(newPattern)
+        }
+    }
+    
+    /**
+     * Decrease confidence for a pattern (negative feedback)
+     * Removes the pattern entirely if confidence drops below threshold
+     */
+    private fun decreasePatternConfidence(
+        patterns: MutableList<LearnedPattern>,
+        removedPattern: LearnedPattern
+    ) {
+        val existing = patterns.find { it.normalizedText == removedPattern.normalizedText }
+        if (existing != null) {
+            val newConfidence = existing.confidence - CONFIDENCE_PENALTY
+            
+            if (newConfidence < REMOVAL_THRESHOLD) {
+                // Remove pattern entirely if confidence too low
+                patterns.remove(existing)
+            } else {
+                // Update with decreased confidence
+                val index = patterns.indexOf(existing)
+                patterns[index] = existing.copy(confidence = newConfidence)
+            }
+        }
+    }
+    
+    /**
+     * Find matching patterns in the library for given tokens
+     */
+    fun findMatchingPatterns(
+        tokens: List<String>,
+        library: PatternLibrary
+    ): Quad<List<Int>?, List<Int>?, List<Int>?, List<Int>?> {
+        val merchantIndices = findPatternMatch(tokens, library.merchantPatterns)
+        val amountIndices = findPatternMatch(tokens, library.amountPatterns)
+        val accountIndices = findPatternMatch(tokens, library.accountPatterns)
+        val balanceIndices = findPatternMatch(tokens, library.balancePatterns)
+        
+        return Quad(merchantIndices, amountIndices, accountIndices, balanceIndices)
+    }
+    
+    /**
+     * Find a pattern match in tokens
+     */
+    private fun findPatternMatch(tokens: List<String>, patterns: List<LearnedPattern>): List<Int>? {
+        // Sort by confidence and frequency
+        val sortedPatterns = patterns.sortedByDescending { it.confidence * it.frequency }
+        
+        for (pattern in sortedPatterns) {
+            val patternTokens = pattern.text.split(" ")
+            
+            // Try to find contiguous match
+            for (i in 0..(tokens.size - patternTokens.size)) {
+                var match = true
+                for (j in patternTokens.indices) {
+                    if (!tokensMatch(tokens[i + j], patternTokens[j])) {
+                        match = false
+                        break
+                    }
+                }
+                if (match) {
+                    return (i until i + patternTokens.size).toList()
+                }
+            }
+        }
+        
+        return null
+    }
+    
+    /**
+     * Check if two tokens match (with normalization)
+     */
+    private fun tokensMatch(token1: String, token2: String): Boolean {
+        return normalizeForMatching(token1) == normalizeForMatching(token2)
+    }
+    
+    /**
+     * Normalize text for matching
+     */
+    private fun normalizeForMatching(text: String): String {
+        return text.lowercase()
+            .replace(Regex("[^a-z0-9]"), "")
+    }
+}

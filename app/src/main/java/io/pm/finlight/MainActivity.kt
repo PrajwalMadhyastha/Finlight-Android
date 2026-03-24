@@ -650,6 +650,11 @@ fun AppNavHost(
         ) {
             AnalysisScreen(navController = navController)
         }
+        if (io.pm.finlight.BuildConfig.ENABLE_DEV_TOOLS) {
+            composable("batch_analysis") {
+                 BatchAnalysisScreen(navController = navController)
+            }
+        }
         // --- NEW: Route for Spending Analysis Detail Screen ---
         composable(
             "analysis_detail_screen/{dimension}/{dimensionId}/{startDate}/{endDate}?title={title}",

@@ -65,7 +65,8 @@ class SmsClassifier private constructor(
     private val modelName: String,
     private val vocabName: String,
     preloadedVocab: Map<String, Int>?,
-    preloadedInterpreter: Interpreter?
+    preloadedInterpreter: Interpreter?,
+    private val interpreterFactory: ((ByteBuffer, Interpreter.Options) -> Interpreter)? = null
 ) : Closeable {
 
     companion object {
@@ -106,6 +107,18 @@ class SmsClassifier private constructor(
     ) : this(null, "", "", vocab, interpreter)
 
     /**
+     * Internal constructor for unit testing with Context and mocked Interpreter.
+     */
+    @VisibleForTesting
+    internal constructor(
+        context: Context,
+        factory: (ByteBuffer, Interpreter.Options) -> Interpreter
+    ) : this(context, "sms_classifier.tflite", "vocab.txt", null, null, factory) {
+        loadVocabulary()
+        loadModel()
+    }
+
+    /**
      * Loads the TFLite model from the assets folder into an Interpreter.
      */
     private fun loadModel() {
@@ -119,7 +132,13 @@ class SmsClassifier private constructor(
 
         val options = Interpreter.Options()
         options.setNumThreads(4)
-        interpreter = Interpreter(modelBuffer, options)
+        
+        // Use the injected factory or default to creating a real Interpreter
+        if (interpreterFactory != null) {
+            interpreter = interpreterFactory.invoke(modelBuffer, options)
+        } else {
+            interpreter = Interpreter(modelBuffer, options)
+        }
     }
 
     /**
@@ -140,24 +159,13 @@ class SmsClassifier private constructor(
      * @param text The raw SMS body.
      * @return A padded long array representing the tokenized text.
      */
+    /**
+     * Cleans and tokenizes the input text into a sequence of integers.
+     * Uses the shared SmsTokenizer from the core module to ensure consistency.
+     */
     @VisibleForTesting
     internal fun tokenize(text: String): LongArray {
-        // 1. Preprocess the text to exactly match Python's default TextVectorization.
-        val punctuationRegex = Regex("[!\"#\$%&'()*+,-./:;<=>?@\\[\\\\\\]^_`{|}~]")
-        val cleanedText = text.lowercase()
-            .replace(punctuationRegex, "")       // Remove punctuation
-            .replace(Regex("\\s+"), " ") // Collapse multiple spaces into one
-            .trim()                               // Remove leading/trailing spaces
-        val words = if (cleanedText.isEmpty()) emptyList() else cleanedText.split(" ")
-
-        // 2. Convert words to integer tokens using the vocabulary.
-        val tokens = words.map { vocab.getOrDefault(it, UNKNOWN_TOKEN.toInt()).toLong() }.toMutableList()
-
-        // 3. Pad or truncate the sequence to the required length.
-        while (tokens.size < MAX_SEQUENCE_LENGTH) {
-            tokens.add(0L) // 0 is the padding token
-        }
-        return tokens.take(MAX_SEQUENCE_LENGTH).toLongArray()
+        return io.pm.finlight.core.SmsTokenizer(vocab).tokenize(text)
     }
 
 

@@ -13,6 +13,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.flow.*
@@ -42,6 +43,7 @@ class SmsDebugViewModel(
     private val smsRepository: SmsRepository,
     private val db: AppDatabase,
     private val smsClassifier: SmsClassifier,
+    private val nerExtractor: SmsEntityExtractor,
     private val transactionViewModel: TransactionViewModel
 ) : AndroidViewModel(application) {
 
@@ -122,7 +124,8 @@ class SmsDebugViewModel(
                                 ignoreRuleProvider = ignoreRuleProvider,
                                 merchantCategoryMappingProvider = merchantCategoryMappingProvider,
                                 categoryFinderProvider = categoryFinderProvider,
-                                smsParseTemplateProvider = smsParseTemplateProvider
+                                smsParseTemplateProvider = smsParseTemplateProvider,
+                                nerEntities = nerExtractor.extract(sms.body),
                             )
                         }
                     }
@@ -137,7 +140,8 @@ class SmsDebugViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        smsClassifier.close() // Release TFLite resources
+        smsClassifier.close()
+        nerExtractor.close()
     }
 
 
@@ -191,7 +195,8 @@ class SmsDebugViewModel(
                                 ignoreRuleProvider = ignoreRuleProvider,
                                 merchantCategoryMappingProvider = merchantCategoryMappingProvider,
                                 categoryFinderProvider = categoryFinderProvider,
-                                smsParseTemplateProvider = smsParseTemplateProvider
+                                smsParseTemplateProvider = smsParseTemplateProvider,
+                                nerEntities = nerExtractor.extract(sms.body),
                             )
                         }
                     }
@@ -224,4 +229,3 @@ class SmsDebugViewModel(
         }
     }
 }
-

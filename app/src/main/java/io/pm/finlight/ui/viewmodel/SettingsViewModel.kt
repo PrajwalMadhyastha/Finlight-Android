@@ -25,6 +25,7 @@ import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.data.TransactionRunner
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.CategoryIconHelper
@@ -57,6 +58,7 @@ class SettingsViewModel(
     private val smsRepository: SmsRepository,
     private val transactionViewModel: TransactionViewModel,
     private val smsClassifier: SmsClassifier,
+    private val nerExtractor: SmsEntityExtractor,
     private val transactionRunner: TransactionRunner,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
 ) : AndroidViewModel(application) {
@@ -203,6 +205,7 @@ class SettingsViewModel(
     override fun onCleared() {
         super.onCleared()
         smsClassifier.close()
+        nerExtractor.close()
     }
 
     fun dismissBackupSuccessDialog() {
@@ -289,7 +292,8 @@ class SettingsViewModel(
                                 ignoreRuleProvider,
                                 merchantCategoryMappingProvider,
                                 categoryFinderProvider,
-                                smsParseTemplateProvider
+                                smsParseTemplateProvider,
+                                nerEntities = nerExtractor.extract(sms.body),
                             )
                         }
                     }.awaitAll().filterNotNull()
@@ -394,7 +398,8 @@ class SettingsViewModel(
                                             ignoreRuleProvider = ignoreRuleProvider,
                                             merchantCategoryMappingProvider = merchantCategoryMappingProvider,
                                             categoryFinderProvider = categoryFinderProvider,
-                                            smsParseTemplateProvider = smsParseTemplateProvider
+                                            smsParseTemplateProvider = smsParseTemplateProvider,
+                                            nerEntities = nerExtractor.extract(sms.body),
                                         )
                                     }
                                 }
@@ -539,7 +544,7 @@ class SettingsViewModel(
     fun validateCsvFile(uri: Uri) {
         viewModelScope.launch {
             _csvValidationReport.value = null
-            withContext(Dispatchers.IO) {
+            withContext(dispatchers.io) {
                 try {
                     val report = generateValidationReport(uri)
                     _csvValidationReport.value = report
@@ -649,7 +654,7 @@ class SettingsViewModel(
 
                 if (indexToUpdate != -1) {
                     val revalidatedRow =
-                        withContext(Dispatchers.IO) {
+                        withContext(dispatchers.io) {
                             val accountsMap = db.accountDao().getAllAccounts().first().associateBy { it.name }
                             val categoriesMap = db.categoryDao().getAllCategories().first().associateBy { it.name }
                             createReviewableRow(lineNumber, correctedData, accountsMap, categoriesMap)
@@ -662,7 +667,7 @@ class SettingsViewModel(
     }
 
     fun commitCsvImport(rowsToImport: List<ReviewableRow>) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatchers.io) {
             val header = _csvValidationReport.value?.header ?: run {
                 Log.e("CsvImport", "Header not found in validation report. Aborting.")
                 return@launch
@@ -836,7 +841,7 @@ class SettingsViewModel(
 
     fun createBackupSnapshot() {
         viewModelScope.launch {
-            val success = withContext(Dispatchers.IO) {
+            val success = withContext(dispatchers.io) {
                 DataExportService.createBackupSnapshot(context)
             }
             if (success) {

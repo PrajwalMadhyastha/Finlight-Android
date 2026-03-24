@@ -21,6 +21,10 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.tensorflow.lite.Interpreter
 import java.nio.ByteBuffer
+import androidx.test.core.app.ApplicationProvider
+import android.content.Context
+import io.mockk.mockkConstructor
+import io.mockk.unmockkConstructor
 
 /**
  * Comprehensive unit tests for [SmsClassifier].
@@ -337,5 +341,40 @@ class SmsClassifierTest {
     @Test
     fun `UNKNOWN_TOKEN is 1`() {
         assertEquals("UNKNOWN_TOKEN should be 1", 1L, SmsClassifier.UNKNOWN_TOKEN)
+    }
+
+    // =========================================================================
+    // Public Constructor & Asset Loading Tests
+    // =========================================================================
+
+    @Test
+    fun `public constructor loads model and vocabulary from assets`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        
+        var factoryCalled = false
+        
+        // Create classifier using the testing constructor with factory
+        val classifier = SmsClassifier(context) { buffer, options ->
+            factoryCalled = true
+            assertNotNull("Model buffer should not be null", buffer)
+            assertTrue("Model buffer should have capacity > 0", buffer.capacity() > 0)
+            mockInterpreter
+        }
+        
+        try {
+            // Verify vocabulary is loaded
+            assertTrue("Vocabulary should be loaded from assets", classifier.vocab.isNotEmpty())
+            assertTrue("Vocabulary should contain > 100 words", classifier.vocab.size > 100)
+            
+            // Verify factory was usage
+            assertTrue("Interpreter factory should have been called", factoryCalled)
+            
+            // Verify integration: calling classify uses the mocked interpreter
+            classifier.classify("test")
+            verify { mockInterpreter.run(any(), any()) }
+            
+        } finally {
+            classifier.close()
+        }
     }
 }
