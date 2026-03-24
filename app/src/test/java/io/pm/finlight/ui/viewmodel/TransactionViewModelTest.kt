@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/TransactionViewModelTest.kt
-//
-// REASON: FIX - Updated `MerchantPrediction` constructor calls in tests to include
-//               new `accountId` and `accountName` parameters, resolving compilation errors.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -14,8 +8,10 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.core.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
+import io.pm.finlight.data.db.entity.*
 import io.mockk.*
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.ShareableField
@@ -34,19 +30,19 @@ import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentCaptor
-import org.mockito.ArgumentMatchers.any as mockitoAny
 import org.mockito.Mock
-import org.mockito.Mockito
-import org.mockito.Mockito.`when`
-import org.mockito.Mockito.anyInt
-import org.mockito.Mockito.anyLong
-import org.mockito.Mockito.anyString
-import org.mockito.Mockito.never
-import org.mockito.Mockito.times
-import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when` as whenever
+import org.mockito.ArgumentMatchers.anyInt
+import org.mockito.ArgumentMatchers.anyLong
+import org.mockito.ArgumentMatchers.anyString
+import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.capture
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.never
+import org.mockito.kotlin.times
+import org.mockito.kotlin.verify
 import org.robolectric.Robolectric
 import org.robolectric.annotation.Config
 import java.lang.RuntimeException
@@ -95,17 +91,17 @@ class TransactionViewModelTest : BaseViewModelTest() {
         super.setup()
 
         // Mock DAO access from the AppDatabase mock
-        `when`(db.accountDao()).thenReturn(accountDao)
-        `when`(db.categoryDao()).thenReturn(categoryDao)
-        `when`(db.tagDao()).thenReturn(tagDao)
-        `when`(db.transactionDao()).thenReturn(transactionDao)
-        `when`(db.customSmsRuleDao()).thenReturn(customSmsRuleDao)
-        `when`(db.ignoreRuleDao()).thenReturn(ignoreRuleDao)
-        `when`(db.merchantCategoryMappingDao()).thenReturn(merchantCategoryMappingDao)
-        `when`(db.merchantRenameRuleDao()).thenReturn(merchantRenameRuleDao)
-        `when`(db.smsParseTemplateDao()).thenReturn(smsParseTemplateDao)
-        `when`(db.splitTransactionDao()).thenReturn(splitTransactionDao)
-        `when`(db.accountAliasDao()).thenReturn(accountAliasDao)
+        whenever(db.accountDao()).thenReturn(accountDao)
+        whenever(db.categoryDao()).thenReturn(categoryDao)
+        whenever(db.tagDao()).thenReturn(tagDao)
+        whenever(db.transactionDao()).thenReturn(transactionDao)
+        whenever(db.customSmsRuleDao()).thenReturn(customSmsRuleDao)
+        whenever(db.ignoreRuleDao()).thenReturn(ignoreRuleDao)
+        whenever(db.merchantCategoryMappingDao()).thenReturn(merchantCategoryMappingDao)
+        whenever(db.merchantRenameRuleDao()).thenReturn(merchantRenameRuleDao)
+        whenever(db.smsParseTemplateDao()).thenReturn(smsParseTemplateDao)
+        whenever(db.splitTransactionDao()).thenReturn(splitTransactionDao)
+        whenever(db.accountAliasDao()).thenReturn(accountAliasDao)
 
 
         // Setup default mock behaviors for ViewModel initialization
@@ -121,24 +117,24 @@ class TransactionViewModelTest : BaseViewModelTest() {
      */
     private fun setupDefaultMocks() {
         runTest {
-            `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
-            `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
-            `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
-            `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
-            `when`(transactionRepository.getSpendingByMerchantForMonth(anyLong(), anyLong(), Mockito.nullable(String::class.java), Mockito.nullable(Int::class.java), Mockito.nullable(Int::class.java))).thenReturn(flowOf(emptyList()))
-            `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
-            `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
-            `when`(tagRepository.allTags).thenReturn(flowOf(emptyList()))
-            `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
-            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
-            `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
-            `when`(db.accountDao().findByName(anyString())).thenReturn(null)
-            `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
+            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
+            whenever(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
+            whenever(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getSpendingByMerchantForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+            whenever(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
+            whenever(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
+            whenever(tagRepository.allTags).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
+            whenever(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+            whenever(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
+            whenever(db.accountDao().findByName(anyString())).thenReturn(null)
+            whenever(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
             // --- NEW: Add default mock for privacy mode ---
-            `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
-            `when`(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
+            whenever(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
+            whenever(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
             // --- NEW: Default mocks for Quick Fill ---
-            `when`(transactionRepository.getRecentManualTransactions(anyInt())).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getRecentManualTransactions(anyInt())).thenReturn(flowOf(emptyList()))
         }
     }
 
@@ -166,15 +162,16 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val transaction = Transaction(id = 1, description = "amzn", originalDescription = "amzn", amount = 100.0, date = 1L, accountId = 1, categoryId = 1, notes = null)
         val transactionDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
         val aliases = mapOf("amzn" to "Amazon")
-        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), mockitoAny(), mockitoAny(), mockitoAny())).thenReturn(flowOf(listOf(transactionDetails)))
-        `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
+        whenever(transactionRepository.getTransactionDetailsForRange(any<Long>(), any<Long>(), anyOrNull(), anyOrNull(), anyOrNull())).thenReturn(flowOf(listOf(transactionDetails)))
+        whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
 
         // ACT
         initializeViewModel()
 
         // ASSERT
         viewModel.transactionsForSelectedMonth.test {
-            val result = awaitItem()
+            advanceUntilIdle()
+            val result = expectMostRecentItem()
             assertEquals(1, result.size)
             assertEquals("Amazon", result.first().transaction.description)
             cancelAndIgnoreRemainingEvents()
@@ -185,7 +182,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
     fun `financial summary flows correctly update from repository`() = runTest {
         // ARRANGE
         val summary = FinancialSummary(totalIncome = 10000.50, totalExpenses = 5000.25)
-        `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(summary))
+        whenever(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(summary))
 
         // ACT
         initializeViewModel()
@@ -206,9 +203,9 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // ARRANGE
         val potentialTxn = PotentialTransaction(1L, "Test", 100.0, "expense", "Test Merchant", "Msg", PotentialAccount("New Account", "Bank"), "hash")
         val transactionCaptor = argumentCaptor<Transaction>()
-        `when`(db.accountDao().findByName("New Account")).thenReturn(null).thenReturn(Account(1, "New Account", "Bank"))
-        `when`(accountRepository.insert(anyObject())).thenReturn(1L)
-        `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(1L)
+        whenever(db.accountDao().findByName("New Account")).thenReturn(null).thenReturn(Account(1, "New Account", "Bank"))
+        whenever(accountRepository.insert(any())).thenReturn(1L)
+        whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
 
         // ACT
         val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), false)
@@ -216,9 +213,9 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
         // ASSERT
         assertTrue(result)
-        verify(accountRepository).insert(anyObject())
-        verify(transactionRepository).insertTransactionWithTags(capture(transactionCaptor), eq(emptySet()))
-        assertEquals("Test Merchant", transactionCaptor.value.description)
+        verify(accountRepository).insert(any())
+        verify(transactionRepository).insertTransactionWithTags(transactionCaptor.capture(), eq(emptySet()))
+        assertEquals("Test Merchant", transactionCaptor.firstValue.description)
     }
 
     @Test
@@ -226,9 +223,9 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // ARRANGE
         val potentialTxn = PotentialTransaction(1L, "Test", 100.0, "expense", "Auto Merchant", "Msg", PotentialAccount("Cash", "Wallet"), "hash", 1)
         val transactionCaptor = argumentCaptor<Transaction>()
-        `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-        `when`(accountDao.findByName("Cash")).thenReturn(Account(1, "Cash", "Wallet"))
-        `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(1L)
+        whenever(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+        whenever(accountDao.findByName("Cash")).thenReturn(Account(1, "Cash", "Wallet"))
+        whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
 
         // ACT
         val result = viewModel.autoSaveSmsTransaction(potentialTxn)
@@ -236,9 +233,9 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
         // ASSERT
         assertTrue(result)
-        verify(transactionRepository).insertTransactionWithTags(capture(transactionCaptor), eq(emptySet()))
-        assertEquals("Auto Merchant", transactionCaptor.value.description)
-        assertEquals(1, transactionCaptor.value.categoryId)
+        verify(transactionRepository).insertTransactionWithTags(transactionCaptor.capture(), eq(emptySet()))
+        assertEquals("Auto Merchant", transactionCaptor.firstValue.description)
+        assertEquals(1, transactionCaptor.firstValue.categoryId)
     }
 
     @Test
@@ -249,15 +246,15 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val sms = SmsMessage(123L, "Sender", "New Merchant spent 150", 0L)
         val newParsedTxn = PotentialTransaction(123L, "Sender", 150.0, "expense", "New Merchant", "Msg", categoryId = 2)
 
-        `when`(transactionRepository.getTransactionById(1)).thenReturn(flowOf(originalTxn))
-        `when`(smsRepository.getSmsDetailsById(123L)).thenReturn(sms)
-        `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
-        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-        `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-        `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-        `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-        `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-        `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+        whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(originalTxn))
+        whenever(smsRepository.getSmsDetailsById(123L)).thenReturn(sms)
+        whenever(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+        whenever(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        whenever(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+        whenever(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+        whenever(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+        whenever(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+        whenever(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
 
         // Mock the object SmsParser to return our desired new transaction
         coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(newParsedTxn)
@@ -287,7 +284,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val transaction = Transaction(id = 1, description = "Split", isSplit = true, originalDescription = "Original Desc", amount = 100.0, date = 0L, accountId = 1, categoryId = null, notes = null)
         val splits = listOf(SplitTransactionDetails(SplitTransaction(1, 1, 50.0, 1, null), "Cat1", "", ""))
 
-        `when`(splitTransactionDao.getSplitsForParentSimple(1)).thenReturn(splits)
+        whenever(splitTransactionDao.getSplitsForParentSimple(1)).thenReturn(splits)
 
         // ACT
         viewModel.unsplitTransaction(transaction)
@@ -396,7 +393,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // ARRANGE
         val accountId = 1
         var onSaveCompleteCalled = false
-        `when`(transactionRepository.insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())).thenReturn(1L)
+        whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(1L)
 
         // ACT
         viewModel.onSaveTapped(
@@ -413,7 +410,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
         // ASSERT
         assertNull(viewModel.showCategoryNudge.value)
-        verify(transactionRepository).insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())
+        verify(transactionRepository).insertTransactionWithTagsAndImages(any(), any(), any())
         assertTrue(onSaveCompleteCalled)
     }
 
@@ -439,7 +436,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // ASSERT
         assertNotNull(viewModel.showCategoryNudge.value)
         assertEquals("Coffee", viewModel.showCategoryNudge.value?.description)
-        verify(transactionRepository, never()).insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())
+        verify(transactionRepository, never()).insertTransactionWithTagsAndImages(any(), any(), any())
         assertFalse(onSaveCompleteCalled)
     }
 
@@ -451,7 +448,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val newCategoryId = 5
         val transactionCaptor = argumentCaptor<Transaction>()
 
-        `when`(transactionRepository.insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())).thenReturn(1L)
+        whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(1L)
 
         // First, trigger the nudge
         viewModel.onSaveTapped(
@@ -472,8 +469,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
         advanceUntilIdle()
 
         // ASSERT
-        verify(transactionRepository).insertTransactionWithTagsAndImages(capture(transactionCaptor), anyObject(), anyObject())
-        val savedTransaction = transactionCaptor.value
+        verify(transactionRepository).insertTransactionWithTagsAndImages(transactionCaptor.capture(), any(), any())
+        val savedTransaction = transactionCaptor.firstValue
         assertEquals("Lunch", savedTransaction.description)
         assertEquals(250.0, savedTransaction.amount, 0.0)
         assertEquals(accountId, savedTransaction.accountId)
@@ -497,9 +494,9 @@ class TransactionViewModelTest : BaseViewModelTest() {
             tripName = "US Trip"
         )
         // Set up the mock to return the active travel settings
-        `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(travelSettings))
+        whenever(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(travelSettings))
         val transactionCaptor = argumentCaptor<Transaction>()
-        `when`(transactionRepository.insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())).thenReturn(1L)
+        whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(1L)
 
         // Re-initialize the ViewModel to pick up the new mock behavior
         initializeViewModel()
@@ -520,8 +517,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
         advanceUntilIdle() // Run the coroutine launched by onSaveTapped
 
         // ASSERT
-        verify(transactionRepository).insertTransactionWithTagsAndImages(capture(transactionCaptor), anyObject(), anyObject())
-        val savedTransaction = transactionCaptor.value
+        verify(transactionRepository).insertTransactionWithTagsAndImages(transactionCaptor.capture(), any(), any())
+        val savedTransaction = transactionCaptor.firstValue
         assertEquals(425.0, savedTransaction.amount, 0.0) // 5.0 * 85.0
         assertEquals(5.0, savedTransaction.originalAmount!!, 0.0)
         assertEquals("USD", savedTransaction.currencyCode)
@@ -539,7 +536,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         viewModel.validationError.test {
             assertEquals("Please enter a valid, positive amount.", awaitItem())
         }
-        verify(transactionRepository, never()).insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())
+        verify(transactionRepository, never()).insertTransactionWithTagsAndImages(any(), any(), any())
     }
 
     @Test
@@ -552,7 +549,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         viewModel.validationError.test {
             assertEquals("An account must be selected.", awaitItem())
         }
-        verify(transactionRepository, never()).insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject())
+        verify(transactionRepository, never()).insertTransactionWithTagsAndImages(any(), any(), any())
     }
 
     @Test
@@ -563,13 +560,13 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val similarTxns = listOf(Transaction(id = 2, description = "Starbucks", categoryId = 1, amount = 12.0, date = 0L, accountId = 1, notes = null))
 
         // Mock repository calls
-        `when`(transactionRepository.getTransactionById(1)).thenReturn(flowOf(initialTxn), flowOf(currentTxn))
-        `when`(transactionRepository.findSimilarTransactions("Starbucks", 1)).thenReturn(similarTxns)
+        whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(initialTxn), flowOf(currentTxn))
+        whenever(transactionRepository.findSimilarTransactions("Starbucks", 1)).thenReturn(similarTxns)
         // Add mocks for the methods called inside loadTransactionForDetailScreen
-        `when`(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
-        `when`(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
-        `when`(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+        whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+        whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+        whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+        whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
 
 
         // ACT
@@ -637,7 +634,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
             originalDescription = originalDescription
         )
 
-        `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(transaction))
+        whenever(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(transaction))
 
         // Act
         viewModel.updateTransactionCategory(transactionId, newCategoryId)
@@ -702,7 +699,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
     fun `saveManualTransaction failure updates validationError`() = runTest {
         // ARRANGE
         val errorMessage = "An error occurred while saving."
-        `when`(transactionRepository.insertTransactionWithTagsAndImages(anyObject(), anyObject(), anyObject()))
+        whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any()))
             .thenThrow(RuntimeException("Database insertion failed"))
         var onSaveCompleteCalled = false
 
@@ -732,7 +729,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // ARRANGE
         val transactionToDelete = Transaction(id = 1, description = "Test", amount = 1.0, date = 0, accountId = 1, categoryId = 1, notes = null)
         val errorMessage = "Failed to delete transaction. Please try again."
-        `when`(transactionRepository.delete(anyObject())).thenThrow(RuntimeException("DB delete failed"))
+        whenever(transactionRepository.delete(any())).thenThrow(RuntimeException("DB delete failed"))
 
         // ACT & ASSERT
         viewModel.uiEvent.test {
@@ -747,7 +744,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
     fun `onConfirmDeleteSelection failure sends uiEvent`() = runTest {
         // ARRANGE
         val errorMessage = "Failed to delete transactions. Please try again."
-        `when`(transactionRepository.deleteByIds(anyObject())).thenThrow(RuntimeException("DB batch delete failed"))
+        whenever(transactionRepository.deleteByIds(any())).thenThrow(RuntimeException("DB batch delete failed"))
 
         viewModel.enterSelectionMode(1) // Set up the state for deletion
         advanceUntilIdle()
@@ -765,7 +762,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
     fun `dataLoading failure emits emptyList and sends uiEvent`() = runTest {
         // ARRANGE
         val errorFlow = flow<List<TransactionDetails>> { throw RuntimeException("DB error") }
-        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), mockitoAny(), mockitoAny(), mockitoAny())).thenReturn(errorFlow)
+        whenever(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(errorFlow)
 
         // FIX: Re-initialize the ViewModel BEFORE the test block.
         // This ensures the current 'viewModel' instance uses the mock above.
@@ -800,8 +797,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
     fun `updateDescription failure sends uiEvent`() = runTest {
         // ARRANGE
         val errorMessage = "Failed to update description. Please try again."
-        `when`(transactionRepository.updateDescription(anyInt(), anyString())).thenThrow(RuntimeException("DB update failed"))
-        `when`(transactionRepository.getTransactionById(anyInt())).thenReturn(flowOf(null)) // To simplify the test logic
+        whenever(transactionRepository.updateDescription(anyInt(), anyString())).thenThrow(RuntimeException("DB update failed"))
+        whenever(transactionRepository.getTransactionById(anyInt())).thenReturn(flowOf(null)) // To simplify the test logic
 
         // ACT & ASSERT
         viewModel.uiEvent.test {
@@ -837,7 +834,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val transactionId = 1
         val newType = "income"
         val errorMessage = "DB Error"
-        `when`(transactionRepository.updateTransactionType(anyInt(), anyString())).thenThrow(RuntimeException(errorMessage))
+        whenever(transactionRepository.updateTransactionType(anyInt(), anyString())).thenThrow(RuntimeException(errorMessage))
 
         // Act & Assert
         viewModel.uiEvent.test {
@@ -882,6 +879,10 @@ class TransactionViewModelTest : BaseViewModelTest() {
             // Act: Remove first item
             viewModel.toggleTransactionSelection(1)
             assertEquals(setOf(2), awaitItem())
+
+            // Act: Remove second item
+            viewModel.toggleTransactionSelection(2)
+            assertTrue("Should be empty again", awaitItem().isEmpty())
         }
     }
 
@@ -1013,7 +1014,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
     fun `onAddTransactionDescriptionChanged updates suggestion flow and resets manual select on blank`() = runTest {
         // Arrange
         val foodCategory = Category(1, "Food & Drinks", "icon", "color")
-        `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
+        whenever(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
         initializeViewModel()
 
         viewModel.suggestedCategory.test(timeout = 5.seconds) { // Increase timeout for debounce
@@ -1052,7 +1053,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
     fun `onUserManuallySelectedCategory stops suggestedCategory flow`() = runTest {
         // Arrange
         val foodCategory = Category(1, "Food & Drinks", "icon", "color")
-        `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
+        whenever(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
         initializeViewModel()
 
         viewModel.suggestedCategory.test(timeout = 5.seconds) {
@@ -1083,7 +1084,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // Arrange
         val foodCategory = Category(1, "Food & Drinks", "icon", "color")
         val testTag = Tag(1, "Test")
-        `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
+        whenever(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
         initializeViewModel()
 
         // Set up a dirty state
@@ -1124,11 +1125,11 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val transaction = Transaction(id = transactionId, description = "Test", amount = 1.0, date = 0, accountId = 1, categoryId = 1, notes = null, sourceSmsId = smsId, originalDescription = "Test")
 
         // Mocks for loadTransactionForDetailScreen
-        `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(transaction))
-        `when`(transactionRepository.getTagsForTransaction(transactionId)).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getImagesForTransaction(transactionId)).thenReturn(flowOf(emptyList()))
-        `when`(smsRepository.getSmsDetailsById(smsId)).thenReturn(SmsMessage(smsId, "Sender", smsBody, 0L))
-        `when`(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+        whenever(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(transaction))
+        whenever(transactionRepository.getTagsForTransaction(transactionId)).thenReturn(flowOf(emptyList()))
+        whenever(transactionRepository.getImagesForTransaction(transactionId)).thenReturn(flowOf(emptyList()))
+        whenever(smsRepository.getSmsDetailsById(smsId)).thenReturn(SmsMessage(smsId, "Sender", smsBody, 0L))
+        whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
 
         initializeViewModel()
 
@@ -1187,7 +1188,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         advanceUntilIdle()
 
         // Mock the repository call to throw an exception
-        `when`(transactionRepository.updateTagsForTransaction(eq(transactionId), eq(tags)))
+        whenever(transactionRepository.updateTagsForTransaction(eq(transactionId), eq(tags)))
             .thenThrow(RuntimeException("DB update failed"))
 
         // Act & Assert
@@ -1236,7 +1237,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val newTagRowId = 10L // This is the Long ID returned from the repository
         // This mocks the repository's insert function, which should take a Tag with no ID
         // and return the new row ID (Long).
-        `when`(tagRepository.insert(Tag(name = newTagName))).thenReturn(newTagRowId)
+        whenever(tagRepository.insert(Tag(name = newTagName))).thenReturn(newTagRowId)
 
         viewModel.selectedTags.test {
             // Initial state
@@ -1264,7 +1265,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // Arrange
         val newTagName = "BadTag"
         val errorMessage = "Failed to add new tag. Please try again."
-        `when`(tagRepository.insert(Tag(name = newTagName)))
+        whenever(tagRepository.insert(Tag(name = newTagName)))
             .thenThrow(RuntimeException("DB insert failed"))
 
         // Act & Assert
@@ -1304,12 +1305,12 @@ class TransactionViewModelTest : BaseViewModelTest() {
             Transaction(id = it, description = "Starbucks", categoryId = 1, amount = 12.0, date = 0L, accountId = 1, notes = null)
         }
 
-        `when`(transactionRepository.getTransactionById(1)).thenReturn(flowOf(initialTxn), flowOf(currentTxn))
-        `when`(transactionRepository.findSimilarTransactions("Starbucks", 1)).thenReturn(similarTxns)
-        `when`(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
-        `when`(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
-        `when`(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+        whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(initialTxn), flowOf(currentTxn))
+        whenever(transactionRepository.findSimilarTransactions("Starbucks", 1)).thenReturn(similarTxns)
+        whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+        whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+        whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+        whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
 
         viewModel.loadTransactionForDetailScreen(1)
         viewModel.onAttemptToLeaveScreen { }
@@ -1414,9 +1415,9 @@ class TransactionViewModelTest : BaseViewModelTest() {
         advanceUntilIdle()
 
         // ASSERT
-        verify(merchantRenameRuleRepository, never()).insert(anyObject())
-        verify(transactionRepository, never()).updateDescriptionForIds(anyObject(), anyString())
-        verify(transactionRepository, never()).updateCategoryForIds(anyObject(), anyInt())
+        verify(merchantRenameRuleRepository, never()).insert(any())
+        verify(transactionRepository, never()).updateDescriptionForIds(any(), anyString())
+        verify(transactionRepository, never()).updateCategoryForIds(any(), anyInt())
         assertNull("Sheet should be dismissed", viewModel.retroUpdateSheetState.value)
     }
 
@@ -1428,7 +1429,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val expectedErrorMessage = "Batch update failed. Please try again."
 
         // --- MODIFICATION: Mock failure ---
-        `when`(transactionRepository.updateDescriptionForIds(anyObject(), anyString()))
+        whenever(transactionRepository.updateDescriptionForIds(any(), anyString()))
             .thenThrow(RuntimeException("Database failed!"))
 
         // ACT & ASSERT
@@ -1456,7 +1457,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val mockPredictions = listOf(
             MerchantPrediction("Coffee Shop", 1, "Food", "icon", "color", null, null)
         )
-        `when`(transactionRepository.searchMerchants(query)).thenReturn(flowOf(mockPredictions))
+        whenever(transactionRepository.searchMerchants(query)).thenReturn(flowOf(mockPredictions))
 
         // Act & Assert
         viewModel.merchantPredictions.test(timeout = 5.seconds) {
@@ -1478,7 +1479,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val mockPredictions = listOf(
             MerchantPrediction("Coffee Shop", 1, "Food", "icon", "color", null, null)
         )
-        `when`(transactionRepository.searchMerchants(query)).thenReturn(flowOf(mockPredictions))
+        whenever(transactionRepository.searchMerchants(query)).thenReturn(flowOf(mockPredictions))
 
         // Act & Assert
         viewModel.merchantPredictions.test(timeout = 5.seconds) {
@@ -1544,7 +1545,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val mockSplits = listOf(
             SplitTransactionDetails(SplitTransaction(1, 1, 50.0, 1, null), "Cat1", "", "")
         )
-        `when`(splitTransactionRepository.getSplitsForParent(transactionId)).thenReturn(flowOf(mockSplits))
+        whenever(splitTransactionRepository.getSplitsForParent(transactionId)).thenReturn(flowOf(mockSplits))
 
         // Act
         val resultFlow = viewModel.getSplitDetailsForTransaction(transactionId)
@@ -1571,7 +1572,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         )
         var onCompleteCalled = false
 
-        `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(parentTxn))
+        whenever(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(parentTxn))
 
         // Mock the withTransaction block
         mockkStatic("androidx.room.RoomDatabaseKt")
@@ -1579,7 +1580,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
             val block = secondArg<suspend () -> Any?>()
             block()
         }
-        val splitCaptor = argumentCaptor<List<SplitTransaction>>()
+        val listCaptor = argumentCaptor<List<SplitTransaction>>()
 
         // Act
         viewModel.saveTransactionSplits(transactionId, splitItems) { onCompleteCalled = true }
@@ -1589,14 +1590,14 @@ class TransactionViewModelTest : BaseViewModelTest() {
         coVerify { db.withTransaction<Unit>(any()) }
         verify(transactionDao).markAsSplit(transactionId, true)
         verify(splitTransactionDao).deleteSplitsForParent(transactionId)
-        verify(splitTransactionDao).insertAll(capture(splitCaptor))
+        verify(splitTransactionDao).insertAll(listCaptor.capture())
 
-        val capturedSplits = splitCaptor.value
+        val capturedSplits = listCaptor.firstValue
         assertEquals(2, capturedSplits.size)
-        assertEquals(60.0, capturedSplits[0].amount, 0.0)
+        assertEquals(60.0, capturedSplits[0].amount, 0.001)
         assertEquals(1, capturedSplits[0].categoryId)
         assertEquals("Lunch", capturedSplits[0].notes)
-        assertEquals(40.0, capturedSplits[1].amount, 0.0)
+        assertEquals(40.0, capturedSplits[1].amount, 0.001)
         assertNull(capturedSplits[1].categoryId)
 
         assertTrue(onCompleteCalled)
@@ -1611,8 +1612,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val mockDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
         val aliases = mapOf("amzn" to "Amazon")
 
-        `when`(transactionRepository.getTransactionDetailsById(transactionId)).thenReturn(flowOf(mockDetails))
-        `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
+        whenever(transactionRepository.getTransactionDetailsById(transactionId)).thenReturn(flowOf(mockDetails))
+        whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
 
         // --- THIS IS THE FIX ---
         // Re-initialize the ViewModel *after* the test-specific mock for getAliasesAsMap is set.
@@ -1657,9 +1658,9 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val newAccount = Account(1, newAccountName, newAccountType)
         var createdAccount: Account? = null
 
-        `when`(db.accountDao().findByName(newAccountName)).thenReturn(null)
-        `when`(accountRepository.insert(Account(name = newAccountName, type = newAccountType))).thenReturn(1L)
-        `when`(accountRepository.getAccountById(1)).thenReturn(flowOf(newAccount))
+        whenever(db.accountDao().findByName(newAccountName)).thenReturn(null)
+        whenever(accountRepository.insert(Account(name = newAccountName, type = newAccountType))).thenReturn(1L)
+        whenever(accountRepository.getAccountById(1)).thenReturn(flowOf(newAccount))
 
         // Act
         viewModel.createAccount(newAccountName, newAccountType) { createdAccount = it }
@@ -1677,7 +1678,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val existingAccount = Account(1, existingAccountName, "Bank")
         var createdAccount: Account? = null
 
-        `when`(db.accountDao().findByName(existingAccountName)).thenReturn(existingAccount)
+        whenever(db.accountDao().findByName(existingAccountName)).thenReturn(existingAccount)
 
         // Act & Assert
         viewModel.validationError.test {
@@ -1687,7 +1688,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
             assertEquals("An account named '$existingAccountName' already exists.", awaitItem())
             assertNull(createdAccount)
-            verify(accountRepository, never()).insert(anyObject())
+            verify(accountRepository, never()).insert(any())
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -1701,10 +1702,10 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val newCategory = Category(1, newCategoryName, newIcon, newColor)
         var createdCategory: Category? = null
 
-        `when`(db.categoryDao().findByName(newCategoryName)).thenReturn(null)
-        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList())) // For color helper
-        `when`(categoryRepository.insert(Category(name = newCategoryName, iconKey = newIcon, colorKey = newColor))).thenReturn(1L)
-        `when`(categoryRepository.getCategoryById(1)).thenReturn(newCategory)
+        whenever(db.categoryDao().findByName(newCategoryName)).thenReturn(null)
+        whenever(categoryRepository.allCategories).thenReturn(flowOf(emptyList())) // For color helper
+        whenever(categoryRepository.insert(Category(name = newCategoryName, iconKey = newIcon, colorKey = newColor))).thenReturn(1L)
+        whenever(categoryRepository.getCategoryById(1)).thenReturn(newCategory)
 
         // Act
         viewModel.createCategory(newCategoryName, newIcon, newColor) { createdCategory = it }
@@ -1722,7 +1723,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val existingCategory = Category(1, existingCategoryName, "icon", "color")
         var createdCategory: Category? = null
 
-        `when`(db.categoryDao().findByName(existingCategoryName)).thenReturn(existingCategory)
+        whenever(db.categoryDao().findByName(existingCategoryName)).thenReturn(existingCategory)
 
         // Act & Assert
         viewModel.validationError.test {
@@ -1732,7 +1733,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
             assertEquals("A category named '$existingCategoryName' already exists.", awaitItem())
             assertNull(createdCategory)
-            verify(categoryRepository, never()).insert(anyObject())
+            verify(categoryRepository, never()).insert(any())
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -1762,7 +1763,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
     fun `isPrivacyModeEnabled flow emits value from settingsRepository`() = runTest {
         // Arrange
         val privacyFlow = flowOf(true)
-        `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(privacyFlow)
+        whenever(settingsRepository.getPrivacyModeEnabled()).thenReturn(privacyFlow)
         initializeViewModel() // Re-initialize to pick up the new mock
 
         // Act & Assert
@@ -1779,11 +1780,11 @@ class TransactionViewModelTest : BaseViewModelTest() {
     @Test
     fun `onQuickFillSelected populates state correctly`() = runTest {
         // Arrange - Setup specific mocks for this test
-        `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(
+        whenever(accountRepository.allAccounts).thenReturn(flowOf(listOf(
             Account(id = 1, name = "Cash", type = "Cash"),
             Account(id = 2, name = "Bank", type = "Bank")
         )))
-        `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(
+        whenever(categoryRepository.allCategories).thenReturn(flowOf(listOf(
             Category(id = 10, name = "Food", iconKey = "food", colorKey = "green"),
             Category(id = 11, name = "Transport", iconKey = "car", colorKey = "blue")
         )))
@@ -1823,7 +1824,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         )
 
         // Mock getting tags for this transaction (e.g., return empty list)
-        `when`(transactionRepository.getTagsForTransactionSimple(100)).thenReturn(emptyList())
+        whenever(transactionRepository.getTagsForTransactionSimple(100)).thenReturn(emptyList())
 
         // Act
         viewModel.onQuickFillSelected(mockDetails)
@@ -1838,5 +1839,85 @@ class TransactionViewModelTest : BaseViewModelTest() {
         assertEquals("Category Name should match", "Food", viewModel.addTransactionCategory.value?.name)
         assertEquals("Account ID should match", 1, viewModel.addTransactionAccount.value?.id)
         assertEquals("Account Name should match", "Cash", viewModel.addTransactionAccount.value?.name)
+    }
+
+    @Test
+    fun `createAccount validation fails for blank name or type`() = runTest {
+        // Act
+        viewModel.createAccount("", "Bank") { fail("Should not be called") }
+        viewModel.createAccount("Name", "") { fail("Should not be called") }
+        advanceUntilIdle()
+
+        // Assert
+        verify(accountRepository, never()).insert(any())
+    }
+
+    @Test
+    fun `createAccount fails for existing account name`() = runTest {
+        // Arrange
+        whenever(db.accountDao().findByName("Savings")).thenReturn(Account(1, "Savings", "Bank"))
+        
+        // Act
+        viewModel.createAccount("Savings", "Bank") { fail("Should not be called") }
+        advanceUntilIdle()
+
+        // Assert
+        viewModel.validationError.test {
+            assertEquals("An account named 'Savings' already exists.", awaitItem())
+        }
+    }
+
+    @Test
+    fun `createCategory validation fails for blank name`() = runTest {
+        // Act
+        viewModel.createCategory("", "icon", "color") { fail("Should not be called") }
+        advanceUntilIdle()
+
+        // Assert
+        verify(categoryRepository, never()).insert(any())
+    }
+
+    @Test
+    fun `addTagOnTheGo fails for existing tag name`() = runTest {
+        // Arrange
+        whenever(db.tagDao().findByName("Work")).thenReturn(Tag(1, "Work"))
+
+        // Act
+        viewModel.addTagOnTheGo("Work")
+        advanceUntilIdle()
+
+        // Assert
+        viewModel.validationError.test {
+            assertEquals("A tag named 'Work' already exists.", awaitItem())
+        }
+    }
+
+    @Test
+    fun `autoSaveSmsTransaction uses account alias if found`() = runTest {
+        // Arrange
+        val potentialAccount = PotentialAccount("Alias", "Bank")
+        val potentialTxn = PotentialTransaction(
+            sourceSmsId = 1L,
+            smsSender = "S1",
+            amount = 100.0,
+            transactionType = "expense",
+            merchantName = "M",
+            originalMessage = "Msg",
+            potentialAccount = potentialAccount,
+            sourceSmsHash = "hash"
+        )
+        val alias = AccountAlias(aliasName = "Alias", destinationAccountId = 2)
+        whenever(accountAliasDao.findByAlias("Alias")).thenReturn(alias)
+        whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
+
+        // Act
+        val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+        advanceUntilIdle()
+
+        // Assert
+        assertTrue(result)
+        val captor = argumentCaptor<Transaction>()
+        verify(transactionRepository).insertTransactionWithTags(captor.capture(), any())
+        assertEquals(2, captor.firstValue.accountId)
     }
 }

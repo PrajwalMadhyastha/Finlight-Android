@@ -317,5 +317,78 @@ class SmsReceiverTest : BaseViewModelTest() {
         assertNull(savedTx.conversionRate)
         coVerify(exactly = 1) { transactionDao.addTagsToTransaction(any()) } // Travel tag was added
     }
+
+    @Test
+    fun `ignore intent with different action`() = runTest {
+        // Arrange
+        val intent = Intent("INVALID_ACTION")
+        receiver.coroutineScope = this
+
+        // Act
+        receiver.onReceive(context, intent)
+        advanceUntilIdle()
+
+        // Assert
+        coVerify(exactly = 0) { transactionDao.insert(any()) }
+        verify(exactly = 1) { receiver.onReceive(any(), any()) } // Just to verify it was called
+    }
+
+    @Test
+    fun `ignore SMS with null sender`() = runTest {
+        // Arrange
+        val intent = Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION)
+        val mockMessage = mockk<AndroidSmsMessage>()
+        every { mockMessage.originatingAddress } returns null
+        every { mockMessage.messageBody } returns "Body"
+        every { mockMessage.timestampMillis } returns 1L
+        ShadowTelephonyIntents.mockSmsMessages = arrayOf(mockMessage)
+        
+        receiver.coroutineScope = this
+
+        // Act
+        receiver.onReceive(context, intent)
+        advanceUntilIdle()
+
+        // Assert
+        coVerify(exactly = 0) { transactionDao.insert(any()) }
+        verify(exactly = 1) { mockPendingResult.finish() }
+    }
+
+    @Test
+    fun `travel mode with unknown currency shows notification`() = runTest {
+        // Arrange
+        val sender = "AM-CITI"
+        val body = "Spent GBP 10.00 at Starbucks" // Different from USD
+        val intent = createSmsIntent(sender, body)
+        val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 80.0f)
+
+        every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
+        every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
+        receiver.coroutineScope = this
+
+        // Act
+        receiver.onReceive(context, intent)
+        advanceUntilIdle()
+
+        // Assert
+        verify(exactly = 1) { NotificationHelper.showTravelModeSmsNotification(any(), any(), any()) }
+        coVerify(exactly = 0) { transactionDao.insert(any()) }
+        verify(exactly = 1) { mockPendingResult.finish() }
+    }
+
+    @Test
+    fun `handle exception during processing gracefully`() = runTest {
+        // Arrange
+        val intent = createSmsIntent("Sender", "Body")
+        coEvery { transactionDao.getAllSmsHashes() } throws RuntimeException("DB Error")
+        receiver.coroutineScope = this
+
+        // Act
+        receiver.onReceive(context, intent)
+        advanceUntilIdle()
+
+        // Assert
+        verify(exactly = 1) { mockPendingResult.finish() }
+    }
 }
 
