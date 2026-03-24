@@ -13,6 +13,7 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ml.SmsClassifier
+import io.pm.finlight.data.db.entity.*
 import io.pm.finlight.utils.NotificationHelper
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -389,6 +390,81 @@ class SmsReceiverTest : BaseViewModelTest() {
 
         // Assert
         verify(exactly = 1) { mockPendingResult.finish() }
+    }
+
+    @Test
+    fun `auto-healing rules are saved on success`() = runTest {
+        // Arrange
+        val intent = createSmsIntent("AM-HDFCBK", "Spent Rs.100 at Starbucks")
+        val potentialTxn = PotentialTransaction(
+            sourceSmsId = 1L,
+            smsSender = "AM-HDFCBK",
+            amount = 100.0,
+            transactionType = "expense",
+            merchantName = "Starbucks",
+            originalMessage = "Spent Rs.100 at Starbucks",
+            sourceSmsHash = "hash1"
+        )
+        val success = ParseResult.Success(
+            transaction = potentialTxn,
+            newlyDiscoveredRenameAlias = "Starbucks" to "Starbucks Coffee",
+            newlyDiscoveredCategoryAlias = "Starbucks" to 4
+        )
+        mockkObject(SmsParser)
+        coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+        coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns success
+        receiver.coroutineScope = this
+
+        // Act
+        receiver.onReceive(context, intent)
+        advanceUntilIdle()
+
+        // Assert
+        coVerify { merchantRenameRuleDao.insert(any()) }
+        coVerify { merchantCategoryMappingDao.insert(any()) }
+        unmockkObject(SmsParser)
+    }
+
+    @Test
+    fun `transaction is saved using account alias`() = runTest {
+        val intent = createSmsIntent("AM-HDFCBK", "Spent Rs.100 at Starbucks")
+        coEvery { accountAliasDao.findByAlias(any()) } returns AccountAlias("HDFCBK", 2)
+        receiver.coroutineScope = this
+        
+        receiver.onReceive(context, intent)
+        advanceUntilIdle()
+
+        coVerify { transactionDao.insert(any()) }
+    }
+
+    @Test
+    fun `new account is created if it does not exist`() = runTest {
+        val intent = createSmsIntent("Sender", "Spent Rs.100 at Starbucks")
+        coEvery { accountDao.findByName(any()) } returns null
+        coEvery { accountDao.insert(any()) } returns 10L
+        coEvery { accountDao.getAccountByIdBlocking(10) } returns Account(10, "Sender", "General")
+        receiver.coroutineScope = this
+        
+        receiver.onReceive(context, intent)
+        advanceUntilIdle()
+
+        coVerify { accountDao.insert(any()) }
+        coVerify { transactionDao.insert(match { it.accountId == 10 }) }
+    }
+
+    @Test
+    fun `failed account creation logs error`() = runTest {
+        val intent = createSmsIntent("Sender", "Spent Rs.100 at Starbucks")
+        coEvery { accountDao.findByName(any()) } returns null
+        coEvery { accountDao.insert(any()) } returns 99L
+        coEvery { accountDao.getAccountByIdBlocking(99) } returns null
+        receiver.coroutineScope = this
+        
+        receiver.onReceive(context, intent)
+        advanceUntilIdle()
+
+        // Should not call insert on transactionDao if account is null
+        coVerify(exactly = 0) { transactionDao.insert(any()) }
     }
 }
 
