@@ -27,7 +27,8 @@ class NerExtractorTest {
         3 to "B-AMOUNT",
         4 to "I-AMOUNT",
         5 to "B-ACCOUNT",
-        6 to "I-ACCOUNT"
+        6 to "I-ACCOUNT",
+        7 to "B-PAYEE"
     )
 
     @Before
@@ -174,6 +175,9 @@ class NerExtractorTest {
         assertEquals("end", extractor.mergeSubwordTokens(listOf("end", ".")))
         assertEquals("end", extractor.mergeSubwordTokens(listOf("end", ",")))
         assertEquals("end", extractor.mergeSubwordTokens(listOf("end", "@")))
+        assertEquals("end", extractor.mergeSubwordTokens(listOf("end", ";")))
+        assertEquals("end", extractor.mergeSubwordTokens(listOf("end", ":")))
+        assertEquals("end", extractor.mergeSubwordTokens(listOf("end", "-")))
     }
 
     @Test
@@ -218,6 +222,16 @@ class NerExtractorTest {
         predictions3[2] = 4
         result = extractor.extractEntities(predictions3, tokenResult3)
         assertEquals("99", result["AMOUNT"])
+
+        // Test mixed case and Indian-style commas
+        val tokenResult4 = tokenResult.copy(
+            tokens = listOf("inR", "1", ",", "23", ",", "456") + List(122) { "" },
+            wordIds = intArrayOf(0, 1, 2, 3, 4, 5) + IntArray(122) { -1 }
+        )
+        val predictions4 = IntArray(128) { 4 } // All I-AMOUNT (orphan I- start)
+        predictions4[0] = 3 // B-AMOUNT at "inR"
+        result = extractor.extractEntities(predictions4, tokenResult4)
+        assertEquals("123456", result["AMOUNT"])
     }
 
     @Test
@@ -240,23 +254,36 @@ class NerExtractorTest {
     }
 
     @Test
-    fun `extractEntities joins multiple merchants with comma`() {
-        val tokens = listOf("amazon", "and", "flipkart")
-        val wordIds = intArrayOf(0, 1, 2)
+    fun `extractEntities joins multiple merchants with comma and handles BIO edge cases`() {
+        val tokens = listOf("amazon", "and", "flipkart", "sep", "swiggy")
+        val wordIds = intArrayOf(0, 1, 2, -1, 3) // wordId -1 at tokens[3]
         val tokenResult = WordPieceTokenizer.TokenizationResult(
             inputIds = intArrayOf(0),
             attentionMask = intArrayOf(0),
-            wordIds = wordIds + IntArray(125) { -1 },
-            tokens = tokens + List(125) { "[PAD]" }
+            wordIds = wordIds + IntArray(123) { -1 },
+            tokens = tokens + List(123) { "[PAD]" }
         )
 
         val predictions = IntArray(128) { 0 }
         predictions[0] = 1 // B-MERCHANT (amazon)
+        predictions[1] = 1 // B-MERCHANT (and)
         predictions[2] = 1 // B-MERCHANT (flipkart)
+        // 2. Separate entity after wordId -1
+        predictions[4] = 7 // B-PAYEE (swiggy)
+        
+        // 3. Type mismatch: B-MERCHANT followed by I-AMOUNT
+        val p2 = IntArray(128) { 0 }
+        p2[0] = 1 // B-MERCHANT (amazon)
+        p2[1] = 4 // I-AMOUNT (and) -> type mismatch
+        p2[2] = 4 // I-AMOUNT (flipkart)
 
-        val result = extractor.extractEntities(predictions, tokenResult)
-
-        assertEquals("amazon, flipkart", result["MERCHANT"])
+        var result = extractor.extractEntities(predictions, tokenResult)
+        assertEquals("amazon, and, flipkart", result["MERCHANT"])
+        assertEquals("swiggy", result["PAYEE"])
+        
+        result = extractor.extractEntities(p2, tokenResult)
+        assertEquals("amazon", result["MERCHANT"])
+        assertEquals("and flipkart", result["AMOUNT"])
     }
 
     @Test

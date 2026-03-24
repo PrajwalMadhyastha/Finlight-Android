@@ -306,10 +306,10 @@ class NerExtractor private constructor(
     private fun cleanupPunctuationSpacing(text: String): String {
         return text
             // Remove space before punctuation: "Rs . 267" → "Rs. 267"
-            .replace(Regex("""\s+([.,/:*\-@])"""), "$1")
+            .replace(Regex("""\s+([.,/:*\-@;])"""), "$1")
             // Remove space after punctuation: "Rs.267" stays, "Rs. 267" → "Rs.267"
             // But only when followed by alphanumeric (avoid collapsing "Rs. " at end)
-            .replace(Regex("""([.,/:*\-@])\s+(?=\w)"""), "$1")
+            .replace(Regex("""([.,/:*\-@;])\s+(?=\w)"""), "$1")
             // Strip trailing punctuation from sentence boundaries
             .trimEnd('.', ',', ':', ';', '-', '@')
     }
