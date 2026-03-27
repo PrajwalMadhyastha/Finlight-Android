@@ -329,7 +329,7 @@ private fun EmphasizedMinimalStatItem(
 
 
 @Composable
-private fun AuroraProgressBar(progress: Float) {
+internal fun AuroraProgressBar(progress: Float) {
     val animatedPercentage = (progress * 100).roundToInt()
     val isDark = isSystemInDarkTheme()
     

@@ -17,7 +17,6 @@
 package io.pm.finlight.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -27,7 +26,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
@@ -35,10 +33,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import io.pm.finlight.ui.components.AuroraProgressBar
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -374,30 +370,14 @@ fun BudgetProgress(
     isPrivacyModeEnabled: Boolean = false
 ) {
     val progress = if (budget > 0) (spent.toFloat() / budget.toFloat()) else 0f
-    val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = tween(1000), label = "")
 
     val currencyFormat = remember {
         NumberFormat.getCurrencyInstance(Locale("en", "IN"))
             .apply { maximumFractionDigits = 0 }
     }
 
-    val progressColor = when {
-        progress > 1f -> MaterialTheme.colorScheme.error
-        progress > 0.8f -> Color(0xFFFBC02D) // Amber
-        else -> MaterialTheme.colorScheme.primary
-    }
-
     Column(modifier = modifier.fillMaxWidth()) {
-        LinearProgressIndicator(
-            progress = { animatedProgress },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(12.dp)
-                .clip(CircleShape),
-            color = progressColor,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            strokeCap = StrokeCap.Round
-        )
+        AuroraProgressBar(progress = progress)
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             // --- MODIFIED: Use PrivacyAwareText ---

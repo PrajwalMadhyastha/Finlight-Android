@@ -306,16 +306,42 @@ class BudgetViewModelTest : BaseViewModelTest() {
     // --- Existing Tests (Updated) ---
 
     @Test
+    fun `totalSpending reflects transactions even when no category budgets are defined`() = runTest {
+        // ARRANGE: No category budgets in this month
+        val totalMonthlyExpenses = 3500.0
+        `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+        
+        // Mock the repository call for total spending
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
+            .thenReturn(flowOf(FinancialSummary(totalIncome = 0.0, totalExpenses = totalMonthlyExpenses)))
+
+        // ACT
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+        advanceUntilIdle()
+
+        // ASSERT
+        val actualSpending = viewModel.totalSpendingForSelectedMonth.first()
+        
+        // It should reflect the total Monthly Expenses even though there were no category budgets
+        assertEquals(totalMonthlyExpenses.roundToLong(), actualSpending)
+    }
+
+    @Test
     fun `totalSpending and overallBudget are converted to Long`() = runTest {
         // ARRANGE
         val overallBudgetFloat = 10000.55f
         val spendingPerCategory = 1234.56
+        val totalMonthlyExpenses = 5000.75
 
         `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(overallBudgetFloat))
         `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(listOf(
             BudgetWithSpending(Budget(1, "Food", 5000.0, 10, 2025), spendingPerCategory, "icon", "color")
         )))
         `when`(budgetRepository.getActualSpendingForCategory(anyString(), anyInt(), anyInt())).thenReturn(flowOf(spendingPerCategory))
+        
+        // --- FIX: Mock the new repository call for total spending ---
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
+            .thenReturn(flowOf(FinancialSummary(totalIncome = 0.0, totalExpenses = totalMonthlyExpenses)))
 
         // ACT
         viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
@@ -325,9 +351,9 @@ class BudgetViewModelTest : BaseViewModelTest() {
         val actualBudget = viewModel.overallBudgetForSelectedMonth.first()
         val actualSpending = viewModel.totalSpendingForSelectedMonth.first()
 
-        // This test's assertion is now different. The budget is a Float?, spending is Long.
         assertEquals(overallBudgetFloat, actualBudget)
-        assertEquals(spendingPerCategory.roundToLong(), actualSpending)
+        // Verify that it now uses the total Monthly Expenses from the repository, not category sum
+        assertEquals(totalMonthlyExpenses.roundToLong(), actualSpending)
     }
 
     @Test

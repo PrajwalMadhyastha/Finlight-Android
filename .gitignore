@@ -36,6 +36,7 @@ generate_tree.py
 *.csv
 ner_eval_summary*.txt
 *.json
+.antigravityignore
 # Exception: NER model label map is a static app asset, not a generated file
 !app/src/main/assets/ner_label_map.json
 
