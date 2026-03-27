@@ -32,6 +32,8 @@ import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.delay
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import kotlin.collections.isNotEmpty
 
 @Composable
@@ -43,13 +45,15 @@ fun MerchantPredictionSheet(
     onManualSave: (newDescription: String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var currentDescription by remember { mutableStateOf(initialDescription) }
+    var currentDescription by remember {
+        mutableStateOf(TextFieldValue(initialDescription, TextRange(initialDescription.length)))
+    }
     val predictions by viewModel.merchantPredictions.collectAsState()
     val focusRequester = remember { FocusRequester() }
 
     // Trigger search when the description text changes
-    LaunchedEffect(currentDescription) {
-        viewModel.onMerchantSearchQueryChanged(currentDescription)
+    LaunchedEffect(currentDescription.text) {
+        viewModel.onMerchantSearchQueryChanged(currentDescription.text)
     }
 
     // Request focus when the sheet appears
@@ -81,7 +85,7 @@ fun MerchantPredictionSheet(
             value = currentDescription,
             onValueChange = {
                 currentDescription = it
-                onQueryChanged(it)
+                onQueryChanged(it.text)
             },
             label = { Text("Search or enter new merchant") },
             modifier = Modifier
@@ -101,14 +105,14 @@ fun MerchantPredictionSheet(
                     )
                 }
             }
-        } else if (currentDescription.length > 1) {
+        } else if (currentDescription.text.length > 1) {
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No past transactions found matching '${currentDescription}'", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("No past transactions found matching '${currentDescription.text}'", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             Spacer(modifier = Modifier.weight(1f))
@@ -122,8 +126,8 @@ fun MerchantPredictionSheet(
             TextButton(onClick = onDismiss) { Text("Cancel") }
             Spacer(Modifier.width(8.dp))
             Button(
-                onClick = { onManualSave(currentDescription) },
-                enabled = currentDescription.isNotBlank()
+                onClick = { onManualSave(currentDescription.text) },
+                enabled = currentDescription.text.isNotBlank()
             ) {
                 Text("Save")
             }

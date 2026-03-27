@@ -38,6 +38,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CallSplit
@@ -1458,6 +1460,10 @@ private fun AccountPickerItem(
     isCurrent: Boolean = false
 ) {
     val focusRequester = remember { FocusRequester() }
+    // Local TextFieldValue to preserve selection state; parent receives plain String on change
+    var localTextFieldValue by remember(editingName) {
+        mutableStateOf(TextFieldValue(editingName, TextRange(editingName.length)))
+    }
 
     if (isEditing) {
         Row(
@@ -1468,8 +1474,11 @@ private fun AccountPickerItem(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
-                value = editingName,
-                onValueChange = onEditingNameChange,
+                value = localTextFieldValue,
+                onValueChange = {
+                    localTextFieldValue = it
+                    onEditingNameChange(it.text)
+                },
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(focusRequester),
@@ -1525,7 +1534,9 @@ private fun EditTextFieldSheet(
     onDismiss: () -> Unit,
     additionalContent: @Composable (() -> Unit)? = null
 ) {
-    var text by remember { mutableStateOf(initialValue) }
+    var textFieldValue by remember {
+        mutableStateOf(TextFieldValue(initialValue, TextRange(initialValue.length)))
+    }
     val focusRequester = remember { FocusRequester() }
 
     Column(
@@ -1536,8 +1547,8 @@ private fun EditTextFieldSheet(
     ) {
         Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
         OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
+            value = textFieldValue,
+            onValueChange = { textFieldValue = it },
             label = { Text("Value") },
             keyboardOptions = KeyboardOptions(
                 keyboardType = keyboardType,
@@ -1570,7 +1581,7 @@ private fun EditTextFieldSheet(
             TextButton(onClick = onDismiss) { Text("Cancel") }
             Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = {
-                onConfirm(text)
+                onConfirm(textFieldValue.text)
             }) { Text("Save") }
         }
     }
@@ -1615,7 +1626,7 @@ private fun TagPickerSheet(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var newTagName by remember { mutableStateOf("") }
+    var newTagFieldValue by remember { mutableStateOf(TextFieldValue("")) }
 
     Column(
         modifier = Modifier
@@ -1654,8 +1665,8 @@ private fun TagPickerSheet(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
-                value = newTagName,
-                onValueChange = { newTagName = it },
+                value = newTagFieldValue,
+                onValueChange = { newTagFieldValue = it },
                 label = { Text("New Tag Name") },
                 modifier = Modifier.weight(1f),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -1669,10 +1680,10 @@ private fun TagPickerSheet(
             )
             IconButton(
                 onClick = {
-                    onAddNewTag(newTagName)
-                    newTagName = ""
+                    onAddNewTag(newTagFieldValue.text)
+                    newTagFieldValue = TextFieldValue("")
                 },
-                enabled = newTagName.isNotBlank()
+                enabled = newTagFieldValue.text.isNotBlank()
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add New Tag", tint = MaterialTheme.colorScheme.primary)
             }
@@ -1685,8 +1696,8 @@ private fun TagPickerSheet(
             TextButton(onClick = onDismiss) { Text("Cancel") }
             Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = {
-                if (newTagName.isNotBlank()) {
-                    onAddNewTag(newTagName)
+                if (newTagFieldValue.text.isNotBlank()) {
+                    onAddNewTag(newTagFieldValue.text)
                 }
                 onConfirm()
             }) { Text("Save") }

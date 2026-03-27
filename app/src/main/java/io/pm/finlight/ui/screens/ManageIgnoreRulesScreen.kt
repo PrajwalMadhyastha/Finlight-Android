@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -48,7 +49,7 @@ fun ManageIgnoreRulesScreen(
     viewModel: ManageIgnoreRulesViewModel
 ) {
     val rules by viewModel.allRules.collectAsState()
-    var newPattern by remember { mutableStateOf("") }
+    var newPattern by remember { mutableStateOf(TextFieldValue("")) }
     var ruleToDelete by remember { mutableStateOf<IgnoreRule?>(null) }
     var selectedRuleType by remember { mutableStateOf(RuleType.BODY_PHRASE) }
 
@@ -115,10 +116,10 @@ fun ManageIgnoreRulesScreen(
                         )
                         Button(
                             onClick = {
-                                viewModel.addIgnoreRule(newPattern, selectedRuleType)
-                                newPattern = "" // Clear input
+                                viewModel.addIgnoreRule(newPattern.text, selectedRuleType)
+                                newPattern = TextFieldValue("") // Clear input
                             },
-                            enabled = newPattern.isNotBlank()
+                            enabled = newPattern.text.isNotBlank()
                         ) {
                             Icon(Icons.Default.Add, contentDescription = "Add Rule")
                         }

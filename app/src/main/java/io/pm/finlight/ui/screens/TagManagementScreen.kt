@@ -22,6 +22,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -142,7 +144,7 @@ fun TagManagementScreen(
 
 @Composable
 private fun AddTagInput(onAddTag: (String) -> Unit) {
-    var newTagName by remember { mutableStateOf("") }
+    var newTagName by remember { mutableStateOf(TextFieldValue("")) }
     GlassPanel {
         Row(
             modifier = Modifier
@@ -170,10 +172,10 @@ private fun AddTagInput(onAddTag: (String) -> Unit) {
             )
             Button(
                 onClick = {
-                    onAddTag(newTagName)
-                    newTagName = ""
+                    onAddTag(newTagName.text)
+                    newTagName = TextFieldValue("")
                 },
-                enabled = newTagName.isNotBlank()
+                enabled = newTagName.text.isNotBlank()
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Tag")
             }
@@ -187,7 +189,9 @@ private fun EditTagDialog(
     onDismiss: () -> Unit,
     onConfirm: (Tag) -> Unit
 ) {
-    var tagName by remember(tag) { mutableStateOf(tag.name) }
+    var tagName by remember(tag) {
+        mutableStateOf(TextFieldValue(tag.name, TextRange(tag.name.length)))
+    }
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
@@ -204,8 +208,8 @@ private fun EditTagDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(tag.copy(name = tagName)) },
-                enabled = tagName.isNotBlank()
+                onClick = { onConfirm(tag.copy(name = tagName.text)) },
+                enabled = tagName.text.isNotBlank()
             ) {
                 Text("Save")
             }

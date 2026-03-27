@@ -22,7 +22,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -56,9 +58,9 @@ fun AddEditGoalScreen(
     val accounts by txnViewModel.allAccounts.collectAsState(initial = emptyList())
 
     /* Local UI state */
-    var name by remember { mutableStateOf("") }
-    var targetAmount by remember { mutableStateOf("") }
-    var savedAmount by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(TextFieldValue("")) }
+    var targetAmount by remember { mutableStateOf(TextFieldValue("")) }
+    var savedAmount by remember { mutableStateOf(TextFieldValue("")) }
     var selectedAccount by remember { mutableStateOf<Account?>(null) }
     var targetDateMillis by remember { mutableStateOf<Long?>(null) }
 
@@ -74,9 +76,12 @@ fun AddEditGoalScreen(
 
     LaunchedEffect(goalToEdit, accounts) {
         goalToEdit?.let { goal ->
-            name = goal.name
-            targetAmount = NumberFormat.getNumberInstance().format(goal.targetAmount)
-            savedAmount = NumberFormat.getNumberInstance().format(goal.savedAmount)
+            val nameStr = goal.name
+            val targetStr = NumberFormat.getNumberInstance().format(goal.targetAmount)
+            val savedStr = NumberFormat.getNumberInstance().format(goal.savedAmount)
+            name = TextFieldValue(nameStr, TextRange(nameStr.length))
+            targetAmount = TextFieldValue(targetStr, TextRange(targetStr.length))
+            savedAmount = TextFieldValue(savedStr, TextRange(savedStr.length))
             targetDateMillis = goal.targetDate
             selectedAccount = accounts.find { it.id == goal.accountId }
         }
@@ -107,7 +112,9 @@ fun AddEditGoalScreen(
                     )
                     OutlinedTextField(
                         value = targetAmount,
-                        onValueChange = { targetAmount = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                        onValueChange = { tfv ->
+                            targetAmount = tfv.copy(text = tfv.text.filter { ch -> ch.isDigit() || ch == '.' })
+                        },
                         label = { Text("Target Amount") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -117,7 +124,9 @@ fun AddEditGoalScreen(
                     )
                     OutlinedTextField(
                         value = savedAmount,
-                        onValueChange = { savedAmount = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                        onValueChange = { tfv ->
+                            savedAmount = tfv.copy(text = tfv.text.filter { ch -> ch.isDigit() || ch == '.' })
+                        },
                         label = { Text("Already Saved") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -212,18 +221,18 @@ fun AddEditGoalScreen(
                     modifier = Modifier.weight(1f)
                 ) { Text("Cancel") }
 
-                val saveEnabled = name.isNotBlank()
-                        && targetAmount.toDoubleOrNull() != null
+                val saveEnabled = name.text.isNotBlank()
+                        && targetAmount.text.toDoubleOrNull() != null
                         && selectedAccount != null
 
                 Button(
                     onClick = {
-                        val tgtAmt = targetAmount.toDouble()
-                        val svdAmt = savedAmount.toDoubleOrNull() ?: 0.0
+                        val tgtAmt = targetAmount.text.toDouble()
+                        val svdAmt = savedAmount.text.toDoubleOrNull() ?: 0.0
 
                         goalViewModel.saveGoal(
                             id = goalId,
-                            name = name.trim(),
+                            name = name.text.trim(),
                             targetAmount = tgtAmt,
                             savedAmount = svdAmt,
                             targetDate = targetDateMillis,
