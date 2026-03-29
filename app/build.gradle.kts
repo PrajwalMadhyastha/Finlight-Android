@@ -316,6 +316,7 @@ dependencies {
 
     // --- NEW: Add Room Testing dependency ---
     testImplementation("androidx.room:room-testing:$roomVersion")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
 
 
     // Instrumented UI tests
