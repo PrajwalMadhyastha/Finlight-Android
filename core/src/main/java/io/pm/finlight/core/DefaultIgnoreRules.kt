@@ -130,6 +130,8 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Contribution of.*has been received", // --- NEW: For passbook/PF/NPS updates
     "will be deducted", "Reward Points Credited",
     "Statement is sent to", "into SmartEMIS",
+    "is under process",
+    "will be credited",
 
     ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
