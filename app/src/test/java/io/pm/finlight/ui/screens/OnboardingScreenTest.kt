@@ -72,16 +72,16 @@ class OnboardingScreenTest {
 
     @Test
     @Config(sdk = [Build.VERSION_CODES.S]) // Android 12
-    fun `notification page content correctly triggers auto-skip on older android versions`() {
+    fun `notification page content correctly shows Continue button on older android versions`() {
         var skipTriggered = false
         
         composeTestRule.setContent {
             NotificationPermissionPage(onPermissionResult = { skipTriggered = true })
         }
 
-        // On Android < 13, the NotificationPermissionPage has a LaunchedEffect(Unit) 
-        // that immediately calls onPermissionResult.
-        // We verify that this trigger happens.
+        // On Android < 13, we now show a "Continue" button instead of auto-skipping.
+        assert(!skipTriggered)
+        composeTestRule.onNodeWithText("Continue").assertIsDisplayed().performClick()
         assert(skipTriggered)
     }
 }

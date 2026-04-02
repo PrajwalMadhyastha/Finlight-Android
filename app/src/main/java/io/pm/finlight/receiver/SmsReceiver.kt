@@ -13,6 +13,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Telephony
 import android.util.Log
 import androidx.core.app.ActivityCompat
@@ -259,8 +260,13 @@ class SmsReceiver : BroadcastReceiver() {
             // The repository will now handle travel tagging automatically.
             val newTransactionId = transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
 
-            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED &&
-                settingsRepository.isAutoCaptureNotificationEnabledBlocking()) {
+            val canShowNotification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+
+            if (canShowNotification && settingsRepository.isAutoCaptureNotificationEnabledBlocking()) {
                 val workRequest = OneTimeWorkRequestBuilder<TransactionNotificationWorker>()
                     .setInputData(workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to newTransactionId.toInt()))
                     .build()

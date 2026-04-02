@@ -512,18 +512,21 @@ fun NotificationPermissionPage(onPermissionResult: () -> Unit) {
         )
         Spacer(Modifier.height(24.dp))
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Button(onClick = {
+        Button(onClick = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }) {
-                Text("Enable Notifications")
-            }
-            Spacer(Modifier.height(16.dp))
-        } else {
-            LaunchedEffect(Unit) {
+            } else {
                 onPermissionResult()
             }
+        }) {
+            val buttonText = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                "Enable Notifications"
+            } else {
+                "Continue"
+            }
+            Text(buttonText)
         }
+        Spacer(Modifier.height(16.dp))
     }
 }
 

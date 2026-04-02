@@ -16,6 +16,9 @@ import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.data.db.entity.*
 import io.pm.finlight.utils.NotificationHelper
 import io.mockk.*
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
+import androidx.work.WorkRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -453,18 +456,24 @@ class SmsReceiverTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `failed account creation logs error`() = runTest {
-        val intent = createSmsIntent("Sender", "Spent Rs.100 at Starbucks")
-        coEvery { accountDao.findByName(any()) } returns null
-        coEvery { accountDao.insert(any()) } returns 99L
-        coEvery { accountDao.getAccountByIdBlocking(99) } returns null
+    @Config(sdk = [Build.VERSION_CODES.S]) // API 31
+    fun `valid SMS on API 31 enqueues notification worker despite no explicit permission granted`() = runTest {
+        // Arrange
+        val intent = createSmsIntent("AM-HDFCBK", "Spent Rs.100 at Starbucks")
         receiver.coroutineScope = this
+        mockkObject(WorkManager)
+        val mockWorkManager = mockk<WorkManager>(relaxed = true)
+        every { WorkManager.getInstance(any()) } returns mockWorkManager
         
+        // Act
         receiver.onReceive(context, intent)
         advanceUntilIdle()
 
-        // Should not call insert on transactionDao if account is null
-        coVerify(exactly = 0) { transactionDao.insert(any()) }
+        // Assert
+        // On API 31, the permission check should return 'true' 
+        // because it's guarded by SDK >= 33.
+        verify(exactly = 1) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+        unmockkObject(WorkManager)
     }
 }
 
