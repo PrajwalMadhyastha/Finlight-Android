@@ -75,7 +75,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
         assertNotNull(result)
         assertEquals(349.0, result?.amount)
         assertEquals("expense", result?.transactionType)
-        assertEquals("RAZ*StickON", result?.merchantName)
+        assertEquals("StickON", result?.merchantName)
         assertEquals("HDFC Bank CREDIT Card - xx1335", result?.potentialAccount?.formattedName)
     }
 
@@ -157,7 +157,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
         assertNotNull(result)
         assertEquals(2.0, result?.amount)
         assertEquals("income", result?.transactionType)
-        assertEquals("user34@axisbank", result?.merchantName)
+        assertEquals("user34", result?.merchantName)
         assertNotNull(result?.potentialAccount)
         assertEquals("HDFC Bank A/c xx2536", result?.potentialAccount?.formattedName)
         assertEquals("Bank Account", result?.potentialAccount?.accountType)
@@ -411,7 +411,7 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
         assertNotNull("Parser should not ignore this valid transaction", result)
         assertEquals(1118.00, result?.amount)
         assertEquals("expense", result?.transactionType)
-        assertEquals("paytmqr2810050501011g5070gzn6zb@paytm", result?.merchantName)
+        assertEquals("paytmqr2810050501011g5070gzn6zb", result?.merchantName)
         assertNotNull(result?.potentialAccount)
         assertEquals("HDFC Bank - xx1240", result?.potentialAccount?.formattedName)
         assertEquals("Card", result?.potentialAccount?.accountType)
