@@ -139,6 +139,7 @@ fun IncomeScreen(
                 onKeywordChange = incomeViewModel::updateFilterKeyword,
                 onAccountChange = incomeViewModel::updateFilterAccount,
                 onCategoryChange = incomeViewModel::updateFilterCategory,
+                showTransactionTypeFilter = false,
                 onClearFilters = incomeViewModel::clearFilters
             )
         }

@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -39,7 +40,8 @@ private const val TAG = "TransactionViewModel"
 data class TransactionFilterState(
     val keyword: String = "",
     val account: Account? = null,
-    val category: Category? = null
+    val category: Category? = null,
+    val transactionType: AnalysisTransactionType = AnalysisTransactionType.EXPENSE
 )
 
 data class RetroUpdateSheetState(
@@ -279,13 +281,23 @@ class TransactionViewModel(
         categorySpendingForSelectedMonth = combinedState.flatMapLatest { (calendar, filters) ->
             val monthStart = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
             val monthEnd = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, 1); set(Calendar.DAY_OF_MONTH, 1); add(Calendar.DAY_OF_MONTH, -1); set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59) }.timeInMillis
-            transactionRepository.getSpendingByCategoryForMonth(monthStart, monthEnd, filters.keyword.takeIf { it.isNotBlank() }, filters.account?.id, filters.category?.id)
+            val typeStr = when (filters.transactionType) {
+                AnalysisTransactionType.EXPENSE -> "expense"
+                AnalysisTransactionType.INCOME -> "income"
+                AnalysisTransactionType.ALL -> null
+            }
+            transactionRepository.getSpendingByCategoryForMonth(monthStart, monthEnd, filters.keyword.takeIf { it.isNotBlank() }, filters.account?.id, filters.category?.id, typeStr)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         merchantSpendingForSelectedMonth = combinedState.flatMapLatest { (calendar, filters) ->
             val monthStart = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
             val monthEnd = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, 1); set(Calendar.DAY_OF_MONTH, 1); add(Calendar.DAY_OF_MONTH, -1); set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59) }.timeInMillis
-            transactionRepository.getSpendingByMerchantForMonth(monthStart, monthEnd, filters.keyword.takeIf { it.isNotBlank() }, filters.account?.id, filters.category?.id)
+            val typeStr = when (filters.transactionType) {
+                AnalysisTransactionType.EXPENSE -> "expense"
+                AnalysisTransactionType.INCOME -> "income"
+                AnalysisTransactionType.ALL -> null
+            }
+            transactionRepository.getSpendingByMerchantForMonth(monthStart, monthEnd, filters.keyword.takeIf { it.isNotBlank() }, filters.account?.id, filters.category?.id, typeStr)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         allAccounts = accountRepository.allAccounts.stateIn(
@@ -889,6 +901,10 @@ class TransactionViewModel(
 
     fun updateFilterCategory(category: Category?) {
         _filterState.update { it.copy(category = category) }
+    }
+
+    fun updateFilterTransactionType(type: AnalysisTransactionType) {
+        _filterState.update { it.copy(transactionType = type) }
     }
 
     fun clearFilters() {

@@ -292,6 +292,7 @@ fun AnalysisScreen(
                 onMerchantSelected = viewModel::selectFilterMerchant,
                 // --- NEW: Pass the handler to the sheet ---
                 onIncludeExcludedChanged = viewModel::onIncludeExcludedChanged,
+                onTransactionTypeSelected = viewModel::selectTransactionType,
                 onClearFilters = viewModel::clearFilters
             )
         }
@@ -416,6 +417,7 @@ private fun FilterSheetContent(
     onTagSelected: (Tag?) -> Unit,
     onMerchantSelected: (String?) -> Unit,
     onIncludeExcludedChanged: (Boolean) -> Unit, // --- NEW ---
+    onTransactionTypeSelected: (io.pm.finlight.ui.viewmodel.AnalysisTransactionType) -> Unit,
     onClearFilters: () -> Unit
 ) {
     Column(
@@ -429,6 +431,23 @@ private fun FilterSheetContent(
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Transaction Type",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                io.pm.finlight.ui.viewmodel.AnalysisTransactionType.values().forEach { type ->
+                    FilterChip(
+                        selected = uiState.selectedTransactionType == type,
+                        onClick = { onTransactionTypeSelected(type) },
+                        label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                    )
+                }
+            }
+        }
 
         AnalysisSearchableDropdown(
             label = "Category",

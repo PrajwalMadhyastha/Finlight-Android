@@ -180,6 +180,7 @@ fun TransactionListScreen(
                 onKeywordChange = viewModel::updateFilterKeyword,
                 onAccountChange = viewModel::updateFilterAccount,
                 onCategoryChange = viewModel::updateFilterCategory,
+                onTransactionTypeChange = viewModel::updateFilterTransactionType,
                 onClearFilters = viewModel::clearFilters
             )
         }

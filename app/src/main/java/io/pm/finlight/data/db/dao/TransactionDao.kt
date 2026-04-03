@@ -54,12 +54,12 @@ interface TransactionDao {
         WITH AllExpenses AS (
             SELECT T.id, T.categoryId, T.amount, T.description
             FROM transactions T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0)
+            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0)
             UNION ALL
             SELECT P.id, S.categoryId, S.amount, P.description
             FROM split_transactions S
             JOIN transactions P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0)
+            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0)
         )
         SELECT
             C.id as dimensionId,
@@ -79,18 +79,18 @@ interface TransactionDao {
         GROUP BY C.id, C.name
         ORDER BY totalAmount DESC
     """)
-    fun getSpendingAnalysisByCategory(startDate: Long, endDate: Long, filterTagId: Int?, filterMerchantName: String?, filterCategoryId: Int?, searchQuery: String?, includeExcluded: Boolean): Flow<List<SpendingAnalysisItem>>
+    fun getSpendingAnalysisByCategory(startDate: Long, endDate: Long, filterTagId: Int?, filterMerchantName: String?, filterCategoryId: Int?, searchQuery: String?, includeExcluded: Boolean, transactionType: String?): Flow<List<SpendingAnalysisItem>>
 
     @Query("""
         WITH AllExpenses AS (
             SELECT T.id, T.categoryId, T.amount, T.description
             FROM transactions T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0)
+            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0)
             UNION ALL
             SELECT P.id, S.categoryId, S.amount, P.description
             FROM split_transactions S
             JOIN transactions P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0)
+            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0)
         )
         SELECT
             TG.id AS dimensionId,
@@ -108,7 +108,7 @@ interface TransactionDao {
         GROUP BY TG.id, TG.name
         ORDER BY totalAmount DESC
     """)
-    fun getSpendingAnalysisByTag(startDate: Long, endDate: Long, filterCategoryId: Int?, filterMerchantName: String?, filterTagId: Int?, searchQuery: String?, includeExcluded: Boolean): Flow<List<SpendingAnalysisItem>>
+    fun getSpendingAnalysisByTag(startDate: Long, endDate: Long, filterCategoryId: Int?, filterMerchantName: String?, filterTagId: Int?, searchQuery: String?, includeExcluded: Boolean, transactionType: String?): Flow<List<SpendingAnalysisItem>>
 
     // =============================================================================
     // --- FIX: Corrected the merchant analysis query to prevent crashes. ---
@@ -120,12 +120,12 @@ interface TransactionDao {
         WITH AllExpenses AS (
             SELECT T.id, T.categoryId, T.amount, T.description
             FROM transactions T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0)
+            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0)
             UNION ALL
             SELECT P.id, S.categoryId, S.amount, P.description
             FROM split_transactions S
             JOIN transactions P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0)
+            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0)
         )
         SELECT
             LOWER(AE.description) as dimensionId,
@@ -145,7 +145,7 @@ interface TransactionDao {
         GROUP BY dimensionId
         ORDER BY totalAmount DESC
     """)
-    fun getSpendingAnalysisByMerchant(startDate: Long, endDate: Long, filterCategoryId: Int?, filterTagId: Int?, filterMerchantName: String?, searchQuery: String?, includeExcluded: Boolean): Flow<List<SpendingAnalysisItem>>
+    fun getSpendingAnalysisByMerchant(startDate: Long, endDate: Long, filterCategoryId: Int?, filterTagId: Int?, filterMerchantName: String?, searchQuery: String?, includeExcluded: Boolean, transactionType: String?): Flow<List<SpendingAnalysisItem>>
 
 
     @androidx.room.Transaction
@@ -375,7 +375,7 @@ interface TransactionDao {
             SUM(T.amount) as totalAmount,
             COUNT(T.id) as transactionCount
         FROM transactions AS T
-        WHERE T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate
+        WHERE (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate
           AND T.isExcluded = 0
           AND T.isSplit = 0
           AND (:keyword IS NULL OR LOWER(T.description) LIKE '%' || LOWER(:keyword) || '%' OR LOWER(T.notes) LIKE '%' || LOWER(:keyword) || '%')
@@ -384,7 +384,7 @@ interface TransactionDao {
         GROUP BY LOWER(T.description)
         ORDER BY totalAmount DESC
     """)
-    fun getSpendingByMerchantForMonth(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?): Flow<List<MerchantSpendingSummary>>
+    fun getSpendingByMerchantForMonth(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?, transactionType: String?): Flow<List<MerchantSpendingSummary>>
 
     @androidx.room.Transaction
     @Query("""
@@ -591,12 +591,12 @@ interface TransactionDao {
         WITH AtomicExpenses AS (
             SELECT T.categoryId, T.amount, T.description, T.notes, T.accountId
             FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
               AND (:accountId IS NULL OR T.accountId = :accountId)
             UNION ALL
             SELECT S.categoryId, S.amount, P.description, S.notes, P.accountId
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
               AND (:accountId IS NULL OR P.accountId = :accountId)
         )
         SELECT 
@@ -618,7 +618,8 @@ interface TransactionDao {
         endDate: Long,
         keyword: String?,
         accountId: Int?,
-        categoryId: Int?
+        categoryId: Int?,
+        transactionType: String?
     ): Flow<List<CategorySpending>>
 
     @Query(
