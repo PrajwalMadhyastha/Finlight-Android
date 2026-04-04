@@ -346,8 +346,8 @@ dependencies {
     implementation("com.google.ai.edge.litert:litert-api:1.4.0")
     implementation("com.google.ai.edge.litert:litert-support:1.4.0")
     implementation("com.google.ai.edge.litert:litert-metadata:1.4.0")
-    // Flex Delegate — required by NER model (uses SELECT_TF_OPS during conversion)
-    implementation("io.github.google-ai-edge:litert-select-tf-ops:0.1.0")
+    // Flex Delegate removed — MobileBERT NER model uses only TFLITE_BUILTINS,
+    // confirmed via flatbuffer inspection (0 Flex ops) and full F1 regression check.
     testImplementation(kotlin("test"))
     testImplementation("org.bouncycastle:bcprov-jdk15on:1.70")
 }

@@ -105,9 +105,11 @@ def convert_to_tflite(model_path: str, output_path: Path):
         converter = tf.lite.TFLiteConverter.from_concrete_functions(
             [serving_fn.get_concrete_function()], tf_model
         )
+        # TFLITE_BUILTINS only — flatbuffer inspection confirmed MobileBERT produces
+        # zero Flex ops, so SELECT_TF_OPS is not needed. Removing it allows the
+        # litert-select-tf-ops Gradle dependency (~80-100 MB) to be dropped.
         converter.target_spec.supported_ops = [
             tf.lite.OpsSet.TFLITE_BUILTINS,
-            tf.lite.OpsSet.SELECT_TF_OPS,
         ]
         # INT8 dynamic-range quantization: weights → int8, activations stay float32.
         # No calibration dataset needed. Achieves ~4x model size reduction.
@@ -359,6 +361,7 @@ def evaluate_tflite_f1(
     tflite_path: Path,
     dataset_path: str,
     label_map_path: str,
+    model_dir: str,
 ):
     """Run the full test dataset through the TFLite model and compute seqeval F1.
 
@@ -399,7 +402,7 @@ def evaluate_tflite_f1(
             lm = json.load(f)
         id2label = {{int(k): v for k, v in lm["id_to_label"].items()}}
 
-        tokenizer = AutoTokenizer.from_pretrained("{tflite_path.parent}")
+        tokenizer = AutoTokenizer.from_pretrained("{model_dir}")
 
         print(f"   Test samples: {{len(test_set)}}", file=sys.stderr)
 
@@ -592,7 +595,7 @@ def main():
             print(f"\n⚠️  Dataset not found at {dataset_dir}, skipping F1 evaluation.")
             print(f"   Pass --dataset <path> to specify the dataset location.")
         else:
-            evaluate_tflite_f1(tflite_path, dataset_dir, label_map)
+            evaluate_tflite_f1(tflite_path, dataset_dir, label_map, str(model_path))
 
     # Copy label map
     label_map_src = model_path / "ner_label_map.json"
