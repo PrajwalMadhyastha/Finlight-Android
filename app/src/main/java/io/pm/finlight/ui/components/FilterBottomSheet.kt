@@ -33,6 +33,8 @@ fun FilterBottomSheet(
     onKeywordChange: (String) -> Unit,
     onAccountChange: (Account?) -> Unit,
     onCategoryChange: (Category?) -> Unit,
+    showTransactionTypeFilter: Boolean = true,
+    onTransactionTypeChange: (io.pm.finlight.ui.viewmodel.AnalysisTransactionType) -> Unit = {},
     onClearFilters: () -> Unit
 ) {
     Column(
@@ -55,6 +57,25 @@ fun FilterBottomSheet(
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
         )
+
+        if (showTransactionTypeFilter) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Transaction Type",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    io.pm.finlight.ui.viewmodel.AnalysisTransactionType.values().forEach { type ->
+                        FilterChip(
+                            selected = filterState.transactionType == type,
+                            onClick = { onTransactionTypeChange(type) },
+                            label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                        )
+                    }
+                }
+            }
+        }
 
         SearchableDropdown(
             label = "Account",

@@ -104,7 +104,6 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_SEARCH = "io.pm.finlight.ACTION_SEARCH"
     }
     
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -173,7 +172,6 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 fun FinanceAppWithLockScreen(isInitiallyLocked: Boolean, shortcutAction: String? = null) {
     val context = LocalContext.current
@@ -182,11 +180,16 @@ fun FinanceAppWithLockScreen(isInitiallyLocked: Boolean, shortcutAction: String?
     var isLocked by remember { mutableStateOf(isInitiallyLocked) }
     val appLockEnabled by settingsRepository.getAppLockEnabled().collectAsState(initial = isInitiallyLocked)
 
-    val permissionsToRequest = arrayOf(
-        Manifest.permission.READ_SMS,
-        Manifest.permission.RECEIVE_SMS,
-        Manifest.permission.POST_NOTIFICATIONS
-    )
+    val permissionsToRequest = remember {
+        val list = mutableListOf(
+            Manifest.permission.READ_SMS,
+            Manifest.permission.RECEIVE_SMS
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            list.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        list.toTypedArray()
+    }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { perms ->

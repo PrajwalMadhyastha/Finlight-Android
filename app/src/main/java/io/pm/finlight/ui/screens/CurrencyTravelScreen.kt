@@ -25,8 +25,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.utils.CurrencyHelper
@@ -75,10 +77,10 @@ fun CurrencyTravelScreen(
         }
     }
 
-    var tripName by remember { mutableStateOf("") }
+    var tripName by remember { mutableStateOf(TextFieldValue("")) }
     var tripType by remember { mutableStateOf(TripType.DOMESTIC) }
     var selectedCurrency by remember { mutableStateOf<CurrencyInfo?>(null) }
-    var conversionRate by remember { mutableStateOf("") }
+    var conversionRate by remember { mutableStateOf(TextFieldValue("")) }
     var startDate by remember { mutableStateOf<Long?>(null) }
     var endDate by remember { mutableStateOf<Long?>(null) }
     var tripToDelete by remember { mutableStateOf<TripWithStats?>(null) }
@@ -98,10 +100,11 @@ fun CurrencyTravelScreen(
             activeTravelSettings
         }
 
-        tripName = source?.tripName ?: ""
+        tripName = TextFieldValue(source?.tripName ?: "", TextRange((source?.tripName ?: "").length))
         tripType = source?.tripType ?: TripType.DOMESTIC
         selectedCurrency = CurrencyHelper.getCurrencyInfo(source?.currencyCode)
-        conversionRate = source?.conversionRate?.toString() ?: ""
+        val rateStr = source?.conversionRate?.toString() ?: ""
+        conversionRate = TextFieldValue(rateStr, TextRange(rateStr.length))
         startDate = source?.startDate
         endDate = source?.endDate
     }
@@ -113,10 +116,10 @@ fun CurrencyTravelScreen(
     var showEndDatePicker by remember { mutableStateOf(false) }
     var showCancelConfirmation by remember { mutableStateOf(false) }
 
-    val isSaveEnabled = tripName.isNotBlank() &&
+    val isSaveEnabled = tripName.text.isNotBlank() &&
             startDate != null &&
             endDate != null &&
-            (tripType == TripType.DOMESTIC || (selectedCurrency != null && (conversionRate.toFloatOrNull() ?: 0f) > 0f))
+            (tripType == TripType.DOMESTIC || (selectedCurrency != null && (conversionRate.text.toFloatOrNull() ?: 0f) > 0f))
 
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -151,10 +154,17 @@ fun CurrencyTravelScreen(
             }
             SettingsSection(title = sectionTitle) {
                 TripSettingsForm(
-                    tripName = tripName, onTripNameChange = { tripName = it },
+                    tripName = tripName.text, onTripNameChange = { str ->
+                        tripName = TextFieldValue(str, TextRange(str.length))
+                    },
                     tripType = tripType, onTripTypeChange = { tripType = it },
                     selectedCurrency = selectedCurrency, onSelectCurrencyClick = { showTravelCurrencyPicker = true },
-                    conversionRate = conversionRate, onConversionRateChange = { conversionRate = it.filter { c -> c.isDigit() || c == '.' } },
+                    conversionRate = conversionRate.text, onConversionRateChange = { str ->
+                        conversionRate = TextFieldValue(
+                            str.filter { c -> c.isDigit() || c == '.' },
+                            TextRange(str.filter { c -> c.isDigit() || c == '.' }.length)
+                        )
+                    },
                     homeCurrencyCode = homeCurrencyCode,
                     startDate = startDate, onStartDateClick = { showStartDatePicker = true },
                     endDate = endDate, onEndDateClick = { showEndDatePicker = true }
@@ -181,10 +191,10 @@ fun CurrencyTravelScreen(
                 Button(
                     onClick = {
                         val settings = TravelModeSettings(
-                            isEnabled = true, tripName = tripName, tripType = tripType,
+                            isEnabled = true, tripName = tripName.text, tripType = tripType,
                             startDate = startDate!!, endDate = endDate!!,
                             currencyCode = if (tripType == TripType.INTERNATIONAL) selectedCurrency?.currencyCode else null,
-                            conversionRate = if (tripType == TripType.INTERNATIONAL) conversionRate.toFloatOrNull() else null
+                            conversionRate = if (tripType == TripType.INTERNATIONAL) conversionRate.text.toFloatOrNull() else null
                         )
                         if (isEditMode) {
                             viewModel.updateHistoricTrip(settings)

@@ -365,4 +365,305 @@ class NotificationHelperTest : BaseViewModelTest() {
         assertEquals(1, notification.actions.size)
         assertEquals("Review & Categorize", notification.actions[0].title)
     }
+
+    @Test
+    fun `showAutoBackupNotification_whenPermissionDenied_doesNotPostNotification`() {
+        // Arrange
+        val shadowApplication = shadowOf(context)
+        shadowApplication.denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val backupTime = System.currentTimeMillis()
+
+        // Act
+        NotificationHelper.showAutoBackupNotification(context, backupTime)
+
+        // Assert
+        val postedNotification = shadowNotificationManager.getNotification(NotificationHelper.BACKUP_NOTIFICATION_ID)
+        assertTrue("Notification should NOT have been posted", postedNotification == null)
+    }
+
+    @Test
+    fun `showRichTransactionNotification_withDifferentVisitCounts`() {
+        // Arrange
+        val transactionId = 123
+        val baseDetails = TransactionDetails(
+            transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
+            images = emptyList(),
+            accountName = "Test Account",
+            categoryName = "Food",
+            categoryIconKey = "restaurant",
+            categoryColorKey = "red_light",
+            tagNames = null
+        )
+
+        // Test visitCount = 1
+        NotificationHelper.showRichTransactionNotification(context, baseDetails, 789.0, 1)
+        var inboxLines = shadowNotificationManager.getNotification(transactionId).extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
+        assertTrue(inboxLines!![1].toString().contains("This is your first visit here."))
+
+        // Test visitCount = 2
+        NotificationHelper.showRichTransactionNotification(context, baseDetails, 789.0, 2)
+        inboxLines = shadowNotificationManager.getNotification(transactionId).extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
+        assertTrue(inboxLines!![1].toString().contains("This is your 2nd visit here."))
+
+        // Test visitCount = 5
+        NotificationHelper.showRichTransactionNotification(context, baseDetails, 789.0, 5)
+        inboxLines = shadowNotificationManager.getNotification(transactionId).extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
+        assertTrue(inboxLines!![1].toString().contains("This is your 5th visit here."))
+
+        // Test visitCount = 0 (Should only have 1 line in inbox style)
+        NotificationHelper.showRichTransactionNotification(context, baseDetails, 789.0, 0)
+        inboxLines = shadowNotificationManager.getNotification(transactionId).extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
+        assertEquals(1, inboxLines!!.size)
+    }
+
+    @Test
+    fun `showRichTransactionNotification_withIncomeType`() {
+        // Arrange
+        val transactionId = 123
+        val details = TransactionDetails(
+            transaction = Transaction(id = transactionId, description = "Salary", amount = 50000.0, transactionType = "income", date = 0L, accountId = 1, categoryId = 1, notes = null),
+            images = emptyList(),
+            accountName = "Test Account",
+            categoryName = "Salary",
+            categoryIconKey = "account_balance",
+            categoryColorKey = "green_light",
+            tagNames = null
+        )
+
+        // Act
+        NotificationHelper.showRichTransactionNotification(context, details, 50000.0, 0)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(transactionId)
+        val inboxLines = notification.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
+        assertTrue(inboxLines!![0].toString().contains("income this month"))
+    }
+
+    @Test
+    fun `showRichTransactionNotification_withMissingIconKey`() {
+        // Arrange
+        val transactionId = 123
+        val details = TransactionDetails(
+            transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null),
+            images = emptyList(),
+            accountName = "Test Account",
+            categoryName = "Food",
+            categoryIconKey = null, // Will trigger letter icon
+            categoryColorKey = "red_light",
+            tagNames = null
+        )
+
+        // Act
+        NotificationHelper.showRichTransactionNotification(context, details, 789.0, 0)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(transactionId)
+        assertNotNull(notification.getLargeIcon()) // Should still have an icon (the generated bitmap)
+    }
+
+    @Test
+    fun `showWeeklySummaryNotification_withEdgePercentageChanges`() {
+        // No change (0%)
+        NotificationHelper.showWeeklySummaryNotification(context, 1000.0, 0, emptyList())
+        var notification = shadowNotificationManager.getNotification(3)
+        assertEquals("Spends same as last week", notification.extras.getString(Notification.EXTRA_TITLE))
+
+        // Null change
+        NotificationHelper.showWeeklySummaryNotification(context, 1000.0, null, emptyList())
+        notification = shadowNotificationManager.getNotification(3)
+        assertEquals("Your Weekly Summary", notification.extras.getString(Notification.EXTRA_TITLE))
+    }
+
+    @Test
+    fun `showMonthlySummaryNotification_withEdgePercentageChanges`() {
+        val calendar = java.util.Calendar.getInstance()
+        calendar.set(2023, java.util.Calendar.MARCH, 1) // March
+
+        // No change (0%)
+        NotificationHelper.showMonthlySummaryNotification(context, calendar, 1000.0, 0, emptyList())
+        var notification = shadowNotificationManager.getNotification(4)
+        assertEquals("Spends same as last month", notification.extras.getString(Notification.EXTRA_TITLE))
+
+        // Null change
+        NotificationHelper.showMonthlySummaryNotification(context, calendar, 1000.0, null, emptyList())
+        notification = shadowNotificationManager.getNotification(4)
+        assertEquals("Your March Summary", notification.extras.getString(Notification.EXTRA_TITLE))
+    }
+
+    @Test
+    fun `showDailyReportNotification_withEmptyCategories`() {
+        // Act
+        NotificationHelper.showDailyReportNotification(context, "Today's Summary", 0.0, emptyList(), System.currentTimeMillis())
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(2)
+        val inboxLines = notification.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
+        assertTrue(inboxLines!!.any { it.toString().contains("No expenses recorded for this period.") })
+    }
+
+    @Test
+    fun `showRichTransactionNotification_withVisitCount3`() {
+        // Arrange
+        val transactionId = 123
+        val details = TransactionDetails(
+            transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
+            images = emptyList(),
+            accountName = "Test Account",
+            categoryName = "Food",
+            categoryIconKey = "restaurant",
+            categoryColorKey = "red_light",
+            tagNames = null
+        )
+
+        // Act
+        NotificationHelper.showRichTransactionNotification(context, details, 789.0, 3)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(transactionId)
+        val inboxLines = notification.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
+        assertTrue(inboxLines!![1].toString().contains("This is your 3rd visit here."))
+        
+        // Assert random emoji is present from the list
+        val emojis = listOf("🛍️", "✨", "🎉", "👍", "💸", "💳", "🛒", "✅", "💯", "🤩", "🚀", "🙌", "🔥")
+        val line = inboxLines[1].toString()
+        assertTrue("Line should contain a random emoji from the list: $line", emojis.any { line.contains(it) })
+    }
+
+    @Test
+    fun `showRichTransactionNotification_withLetterDefaultIconKey`() {
+        // Arrange
+        val transactionId = 321
+        val details = TransactionDetails(
+            transaction = Transaction(id = transactionId, description = "Misc", amount = 1.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null),
+            images = emptyList(),
+            accountName = "Test Account",
+            categoryName = "Other",
+            categoryIconKey = "letter_default",
+            categoryColorKey = "gray_light",
+            tagNames = null
+        )
+
+        // Act
+        NotificationHelper.showRichTransactionNotification(context, details, 1.0, 0)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(transactionId)
+        assertNotNull(notification.getLargeIcon())
+    }
+
+    @Test
+    fun `showRichTransactionNotification_withCategoryIconKey`() {
+        // Arrange
+        val transactionId = 322
+        val details = TransactionDetails(
+            transaction = Transaction(id = transactionId, description = "Misc", amount = 1.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null),
+            images = emptyList(),
+            accountName = "Test Account",
+            categoryName = "Other",
+            categoryIconKey = "category",
+            categoryColorKey = "gray_light",
+            tagNames = null
+        )
+
+        // Act
+        NotificationHelper.showRichTransactionNotification(context, details, 1.0, 0)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(transactionId)
+        assertNotNull(notification.getLargeIcon())
+    }
+
+    @Test
+    fun `showWeeklySummaryNotification_withNegativeChange`() {
+        // Act
+        NotificationHelper.showWeeklySummaryNotification(context, 1000.0, -15, emptyList())
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(3)
+        assertEquals("Spends down by 15% this week", notification.extras.getString(Notification.EXTRA_TITLE))
+    }
+
+    @Test
+    fun `showMonthlySummaryNotification_withPositiveChange`() {
+        // Arrange
+        val calendar = java.util.Calendar.getInstance()
+        calendar.set(2023, java.util.Calendar.APRIL, 1) // April
+
+        // Act
+        NotificationHelper.showMonthlySummaryNotification(context, calendar, 5000.0, 20, emptyList())
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(4)
+        assertEquals("Spends up by 20% in April", notification.extras.getString(Notification.EXTRA_TITLE))
+    }
+
+    @Test
+    fun `getFallbackDrawableRes_coversVariousIcons`() {
+        val iconsToTest = listOf(
+            "fastfood", "shopping_cart", "local_gas_station", "travel_explore",
+            "work", "school", "directions_car", "home", "shield", "star",
+            "swap_horiz", "trending_up", "redo", "add_card", "two_wheeler",
+            "credit_score", "pets", "account_balance", "more_horiz", "unknown_key"
+        )
+        
+        iconsToTest.forEachIndexed { index, iconKey ->
+            val transactionId = 1000 + index
+            val details = TransactionDetails(
+                transaction = Transaction(id = transactionId, description = "Icon Test", amount = 1.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null),
+                images = emptyList(),
+                accountName = "Test Account",
+                categoryName = "Test Category",
+                categoryIconKey = iconKey,
+                categoryColorKey = "blue_light",
+                tagNames = null
+            )
+            
+            NotificationHelper.showRichTransactionNotification(context, details, 1.0, 0)
+            val notification = shadowNotificationManager.getNotification(transactionId)
+            assertNotNull("Icon should not be null for $iconKey", notification.getLargeIcon())
+        }
+    }
+
+    @Config(sdk = [Build.VERSION_CODES.R])
+    @Test
+    fun `showNotification_onOlderSdk_worksWithoutPermissionCheck`() {
+        // Arrange
+        val transaction = Transaction(id = 505, description = "Old SDK Test", amount = 10.0, transactionType = "expense", date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null)
+
+        // Act
+        NotificationHelper.showTransactionNotification(context, transaction)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(505)
+        assertNotNull(notification)
+    }
+
+    @Test
+    fun `showTravelModeSmsNotification_whenPermissionDenied_doesNotPostNotification`() {
+        // Arrange
+        shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val potentialTxn = PotentialTransaction(789L, "TravelSender", 50.0, "expense", "Uber", "Uber ride", date = System.currentTimeMillis())
+        val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 83.5f)
+
+        // Act
+        NotificationHelper.showTravelModeSmsNotification(context, potentialTxn, travelSettings)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(potentialTxn.sourceSmsId.toInt())
+        assertTrue("Notification should NOT have been posted", notification == null)
+    }
+
+    @Test
+    fun `showRecurringPatternDetectedNotification_whenPermissionDenied_doesNotPost`() {
+        // Arrange
+        shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val rule = io.pm.finlight.RecurringTransaction(id = 8, description = "Test", amount = 1.0, transactionType = "expense", recurrenceInterval = "DAILY", startDate = 0L, accountId = 1, categoryId = null)
+
+        // Act
+        NotificationHelper.showRecurringPatternDetectedNotification(context, rule)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification("pattern_8".hashCode())
+        assertTrue(notification == null)
+    }
 }

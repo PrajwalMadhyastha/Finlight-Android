@@ -26,6 +26,7 @@
 package io.pm.finlight
 
 import io.pm.finlight.core.CATEGORY_KEYWORD_MAP
+import io.pm.finlight.core.utils.MerchantCleaner
 import io.pm.finlight.core.utils.StringSimilarity
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
@@ -444,7 +445,7 @@ object SmsParser {
     ): Triple<PotentialTransaction, Pair<String, Int>?, Pair<String, String>?> {
         val renameRules = merchantRenameRuleProvider.getAllRules()
 
-        val originalMerchant = txn.merchantName
+        val originalMerchant = MerchantCleaner.clean(txn.merchantName)
         var finalCategoryId: Int? = txn.categoryId
 
         var newCategoryAlias: Pair<String, Int>? = null

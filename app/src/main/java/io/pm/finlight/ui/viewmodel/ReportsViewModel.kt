@@ -79,7 +79,7 @@ class ReportsViewModel(
             val categorySpendingFlow = transactionRepository.getSpendingByCategoryForMonth(
                 startDate = currentStartDate,
                 endDate = currentEndDate,
-                keyword = null, accountId = null, categoryId = null
+                keyword = null, accountId = null, categoryId = null, transactionType = "expense"
             )
 
             val monthlyTrendFlow = transactionRepository.getMonthlyTrends(trendStartDate)

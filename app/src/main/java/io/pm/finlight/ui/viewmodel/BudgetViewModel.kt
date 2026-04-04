@@ -130,19 +130,28 @@ class BudgetViewModel(
                 categories.filter { category -> category.name !in budgetedCategoryNames }
             }
 
-        // --- REFACTORED: Use flatMapLatest on dynamic budgetsForSelectedMonth ---
-        totalSpendingForSelectedMonth = budgetsForSelectedMonth.flatMapLatest { budgets ->
-            if (budgets.isEmpty()) {
-                flowOf(0L)
-            } else {
-                val spendingFlows = budgets.map {
-                    // Use getActualSpending for the selected month
-                    getActualSpending(it.budget.categoryName)
-                }
-                combine(spendingFlows) { amounts ->
-                    amounts.sum()
-                }
-            }
+        // --- FIX: Use real total spending for the selected month, not just budgeted categories ---
+        totalSpendingForSelectedMonth = _selectedMonth.flatMapLatest { calendar ->
+            val monthStart = (calendar.clone() as Calendar).apply {
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+            val monthEnd = (calendar.clone() as Calendar).apply {
+                add(Calendar.MONTH, 1)
+                set(Calendar.DAY_OF_MONTH, 1)
+                add(Calendar.DAY_OF_MONTH, -1)
+                set(Calendar.HOUR_OF_DAY, 23)
+                set(Calendar.MINUTE, 59)
+                set(Calendar.SECOND, 59)
+                set(Calendar.MILLISECOND, 999)
+            }.timeInMillis
+
+            transactionRepository.getFinancialSummaryForRangeFlow(monthStart, monthEnd)
+                .map { (it?.totalExpenses ?: 0.0).roundToLong() }
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

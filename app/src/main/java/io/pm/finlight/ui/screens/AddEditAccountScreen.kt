@@ -15,6 +15,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.ui.components.GlassPanel
@@ -34,8 +36,8 @@ fun AddEditAccountScreen(
     val isEditMode = accountId != null
     val titleText = if (isEditMode) "Edit Account" else "Add New Account"
 
-    var accountName by remember { mutableStateOf("") }
-    var accountType by remember { mutableStateOf("") }
+    var accountName by remember { mutableStateOf(TextFieldValue("")) }
+    var accountType by remember { mutableStateOf(TextFieldValue("")) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     val accountToEdit by if (isEditMode) {
@@ -46,8 +48,8 @@ fun AddEditAccountScreen(
 
     LaunchedEffect(accountToEdit) {
         accountToEdit?.let {
-            accountName = it.name
-            accountType = it.type
+            accountName = TextFieldValue(it.name, TextRange(it.name.length))
+            accountType = TextFieldValue(it.type, TextRange(it.type.length))
         }
     }
 
@@ -127,15 +129,15 @@ fun AddEditAccountScreen(
                 onClick = {
                     if (isEditMode) {
                         accountToEdit?.let {
-                            viewModel.updateAccount(it.copy(name = accountName, type = accountType))
+                            viewModel.updateAccount(it.copy(name = accountName.text, type = accountType.text))
                         }
                     } else {
-                        viewModel.addAccount(accountName, accountType)
+                        viewModel.addAccount(accountName.text, accountType.text)
                     }
                     navController.popBackStack()
                 },
                 modifier = Modifier.weight(1f),
-                enabled = accountName.isNotBlank() && accountType.isNotBlank(),
+                enabled = accountName.text.isNotBlank() && accountType.text.isNotBlank(),
             ) {
                 Text(if (isEditMode) "Update" else "Save")
             }

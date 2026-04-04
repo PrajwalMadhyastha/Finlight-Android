@@ -1194,5 +1194,23 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
         val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
         assertNull("Should ignore messages for ICICI transaction confirmation", result)
     }
+
+    @Test
+    fun `test ignores pending transaction with is under process`() = runBlocking {
+        setupTest()
+        val smsBody = "Dear 94562, The following Online Txn is under process and will be credited in your following bank account shortly.Bank A/C No.: 10123456282. Amount: 490.76. Ledger Balance: .00Cr. Bill No.: . User: swapnil. Pinnacle Stock Broker"
+        val mockSms = SmsMessage(id = 9622L, sender = "VM-PNCLSB", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+        assertNull("Should ignore pending transactions under process", result)
+    }
+
+    @Test
+    fun `test ignores transaction with will be credited`() = runBlocking {
+        setupTest()
+        val smsBody = "Your refund of Rs 500 will be credited to your account ending in 1234 soon."
+        val mockSms = SmsMessage(id = 9623L, sender = "VM-HDFCBK", body = smsBody, date = System.currentTimeMillis())
+        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
+        assertNull("Should ignore future credit notifications", result)
+    }
 }
 

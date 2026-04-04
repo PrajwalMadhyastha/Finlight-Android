@@ -465,7 +465,7 @@ class TransactionDaoTest {
         transactionDao.insert(Transaction(description = "Salary", amount = 50000.0, date = now, transactionType = "income", accountId = 1, categoryId = 3, notes = null)) // Should be ignored
 
         // Act & Assert
-        transactionDao.getSpendingByCategoryForMonth(startDate, now, null, null, null).test {
+        transactionDao.getSpendingByCategoryForMonth(startDate, now, null, null, null, "expense").test {
             val spendingList = awaitItem()
             assertEquals(2, spendingList.size)
 
@@ -518,7 +518,7 @@ class TransactionDaoTest {
 
         // Act & Assert
         // --- FIX: Add the missing includeExcluded parameter ---
-        transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, false).test {
+        transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, false, "expense").test {
             val results = awaitItem()
 
             // Assert: There should be only two groups: one for all "Amazon" variations and one for "Flipkart".
@@ -560,7 +560,7 @@ class TransactionDaoTest {
         transactionDao.insert(Transaction(description = "Amazon", amount = 50.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null, isExcluded = true))
 
         // Act 1: Call with includeExcluded = false (default behavior)
-        transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, false).test {
+        transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, false, "expense").test {
             val results = awaitItem()
             val amazonItem = results.find { it.dimensionId == "amazon" }
             assertNotNull(amazonItem)
@@ -570,7 +570,7 @@ class TransactionDaoTest {
         }
 
         // Act 2: Call with includeExcluded = true (new behavior)
-        transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, true).test {
+        transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, true, "expense").test {
             val results = awaitItem()
             val amazonItem = results.find { it.dimensionId == "amazon" }
             assertNotNull(amazonItem)
@@ -593,7 +593,7 @@ class TransactionDaoTest {
         transactionDao.insert(Transaction(description = "Excluded Lunch", amount = 50.0, date = transactionTime, accountId = 1, categoryId = 1, transactionType = "expense", notes = null, isExcluded = true))
 
         // Act 1: Call with includeExcluded = false
-        transactionDao.getSpendingAnalysisByCategory(startTime, endTime, null, null, null, null, false).test {
+        transactionDao.getSpendingAnalysisByCategory(startTime, endTime, null, null, null, null, false, "expense").test {
             val results = awaitItem()
             val foodItem = results.find { it.dimensionId == category1.id.toString() }
             assertNotNull(foodItem)
@@ -603,7 +603,7 @@ class TransactionDaoTest {
         }
 
         // Act 2: Call with includeExcluded = true
-        transactionDao.getSpendingAnalysisByCategory(startTime, endTime, null, null, null, null, true).test {
+        transactionDao.getSpendingAnalysisByCategory(startTime, endTime, null, null, null, null, true, "expense").test {
             val results = awaitItem()
             val foodItem = results.find { it.dimensionId == category1.id.toString() }
             assertNotNull(foodItem)
@@ -630,7 +630,7 @@ class TransactionDaoTest {
         ))
 
         // Act 1: Call with includeExcluded = false
-        transactionDao.getSpendingAnalysisByTag(startTime, endTime, null, null, null, null, false).test {
+        transactionDao.getSpendingAnalysisByTag(startTime, endTime, null, null, null, null, false, "expense").test {
             val results = awaitItem()
             val workTagItem = results.find { it.dimensionId == tag1.id.toString() }
             assertNotNull(workTagItem)
@@ -640,7 +640,7 @@ class TransactionDaoTest {
         }
 
         // Act 2: Call with includeExcluded = true
-        transactionDao.getSpendingAnalysisByTag(startTime, endTime, null, null, null, null, true).test {
+        transactionDao.getSpendingAnalysisByTag(startTime, endTime, null, null, null, null, true, "expense").test {
             val results = awaitItem()
             val workTagItem = results.find { it.dimensionId == tag1.id.toString() }
             assertNotNull(workTagItem)

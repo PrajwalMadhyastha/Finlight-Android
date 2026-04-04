@@ -60,9 +60,10 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, onOnboardingFinished: () ->
     val pagerState = rememberPagerState { 6 }
     val scope = rememberCoroutineScope()
 
-    val onNextClicked: () -> Unit = {
+    val onNextClicked: (Int) -> Unit = { fromPage ->
         scope.launch {
-            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+            // Ensure we move to the next page relative to the caller's page, escaping race conditions
+            pagerState.animateScrollToPage(fromPage + 1)
         }
     }
 
@@ -71,7 +72,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, onOnboardingFinished: () ->
             OnboardingBottomBar(
                 pagerState = pagerState,
                 viewModel = viewModel,
-                onNextClicked = onNextClicked,
+                onNextClicked = { onNextClicked(pagerState.currentPage) },
                 onFinishClicked = {
                     viewModel.finishOnboarding()
                     onOnboardingFinished()
@@ -92,8 +93,8 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, onOnboardingFinished: () ->
                 2 -> BudgetSetupPage(viewModel = viewModel, pagerState = pagerState)
                 // --- REMOVED: CurrencySetupPage (Previously Index 3) ---
                 // 3 -> CurrencySetupPage(viewModel = viewModel)
-                3 -> SmsPermissionPage(onPermissionResult = onNextClicked) // Shifted from 4
-                4 -> NotificationPermissionPage(onPermissionResult = onNextClicked) // Shifted from 5
+                3 -> SmsPermissionPage(onPermissionResult = { onNextClicked(3) }) // Shifted from 4
+                4 -> NotificationPermissionPage(onPermissionResult = { onNextClicked(4) }) // Shifted from 5
                 5 -> CompletionPage() // Shifted from 6
             }
         }
@@ -123,8 +124,8 @@ fun OnboardingBottomBar(
 
             // --- UPDATED: Logic adjusted for removed currency page. Indices shifted down by 1. ---
             val isNextButtonVisible = pagerState.currentPage < pagerState.pageCount - 1 &&
-                    pagerState.currentPage != 3 && // Hide on SMS Permission Page (was 4)
-                    pagerState.currentPage != 4    // Hide on Notification Permission Page (was 5)
+                    pagerState.currentPage != 3 // Hide on SMS Permission Page (Force choice or click "Enable")
+                    // Removed: pagerState.currentPage != 4 (Allow "Next" as a Skip for Notifications)
 
             val isNextEnabled = if (pagerState.currentPage == 1) {
                 userName.isNotBlank()
@@ -453,6 +454,7 @@ fun SmsPermissionPage(onPermissionResult: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -493,6 +495,7 @@ fun NotificationPermissionPage(onPermissionResult: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -509,18 +512,21 @@ fun NotificationPermissionPage(onPermissionResult: () -> Unit) {
         )
         Spacer(Modifier.height(24.dp))
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Button(onClick = {
+        Button(onClick = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }) {
-                Text("Enable Notifications")
-            }
-            Spacer(Modifier.height(16.dp))
-        } else {
-            LaunchedEffect(Unit) {
+            } else {
                 onPermissionResult()
             }
+        }) {
+            val buttonText = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                "Enable Notifications"
+            } else {
+                "Continue"
+            }
+            Text(buttonText)
         }
+        Spacer(Modifier.height(16.dp))
     }
 }
 

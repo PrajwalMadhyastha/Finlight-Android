@@ -18,7 +18,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.Budget
@@ -40,7 +42,7 @@ fun AddEditBudgetScreen(
     val buttonText = if (isEditMode) "Update Budget" else "Save Budget"
     val titleText = if (isEditMode) "Edit Budget" else "Add Budget"
 
-    var amount by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf(TextFieldValue("")) }
     val availableCategories by viewModel.availableCategoriesForNewBudget.collectAsState(initial = emptyList())
     val allCategories by viewModel.allCategories.collectAsState(initial = emptyList())
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
@@ -55,7 +57,8 @@ fun AddEditBudgetScreen(
     LaunchedEffect(budgetToEdit, allCategories) {
         if (isEditMode) {
             budgetToEdit?.let { budget ->
-                amount = "%.0f".format(budget.amount)
+                val formatted = "%.0f".format(budget.amount)
+                amount = TextFieldValue(formatted, TextRange(formatted.length))
                 selectedCategory = allCategories.find { it.name == budget.categoryName }
             }
         }
@@ -133,7 +136,7 @@ fun AddEditBudgetScreen(
             }
             Button(
                 onClick = {
-                    val amountDouble = amount.toDoubleOrNull()
+                    val amountDouble = amount.text.toDoubleOrNull()
                     if (selectedCategory != null && amountDouble != null && amountDouble > 0) {
                         if (isEditMode) {
                             budgetToEdit?.let { currentBudget ->
@@ -153,13 +156,13 @@ fun AddEditBudgetScreen(
                             }
                         } else {
                             // --- This now correctly uses the selectedMonth from the VM ---
-                            viewModel.addCategoryBudget(selectedCategory!!.name, amount)
+                            viewModel.addCategoryBudget(selectedCategory!!.name, amount.text)
                         }
                         navController.popBackStack()
                     }
                 },
                 modifier = Modifier.weight(1f),
-                enabled = selectedCategory != null && amount.isNotBlank(),
+                enabled = selectedCategory != null && amount.text.isNotBlank(),
             ) {
                 Text(buttonText)
             }

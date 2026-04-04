@@ -52,8 +52,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -505,13 +507,12 @@ fun EditOverallBudgetDialog(
 ) {
     // --- REFACTORED: Handle null/0f for initial display ---
     var budgetInput by remember {
-        mutableStateOf(
-            if (currentBudget != null && currentBudget > 0f) {
-                currentBudget.roundToLong().toString()
-            } else {
-                ""
-            }
-        )
+        val initial = if (currentBudget != null && currentBudget > 0f) {
+            currentBudget.roundToLong().toString()
+        } else {
+            ""
+        }
+        mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
     }
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -522,7 +523,9 @@ fun EditOverallBudgetDialog(
         text = {
             OutlinedTextField(
                 value = budgetInput,
-                onValueChange = { budgetInput = it.filter { char -> char.isDigit() } },
+                onValueChange = { tfv ->
+                    budgetInput = tfv.copy(text = tfv.text.filter { char -> char.isDigit() })
+                },
                 label = { Text("Total Monthly Budget Amount") },
                 leadingIcon = { Text("₹") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -531,8 +534,8 @@ fun EditOverallBudgetDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(budgetInput) },
-                enabled = budgetInput.isNotBlank()
+                onClick = { onConfirm(budgetInput.text) },
+                enabled = budgetInput.text.isNotBlank()
             ) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
