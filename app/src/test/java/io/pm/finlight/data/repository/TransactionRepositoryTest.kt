@@ -749,5 +749,22 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         }
         verify(transactionDao).getMonthlyTrends(123L)
     }
+
+    @Test
+    fun `getSpendingByMerchantForMonth emits data from DAO`() = runTest {
+        // Arrange
+        setupDefaultPropertyMocks() // Add default mocks for properties
+        repository = TransactionRepository(transactionDao, settingsRepository, tagRepository) // Initialize
+
+        val mockSpending = listOf(MerchantSpendingSummary("Amazon", 100.0, 2))
+        `when`(transactionDao.getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, "expense")).thenReturn(flowOf(mockSpending))
+
+        // Act & Assert
+        repository.getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, "expense").test {
+            assertEquals(mockSpending, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        verify(transactionDao).getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, "expense")
+    }
 }
 
