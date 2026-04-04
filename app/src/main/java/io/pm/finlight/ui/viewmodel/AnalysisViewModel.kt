@@ -39,6 +39,10 @@ enum class AnalysisTimePeriod {
     WEEK, MONTH, YEAR, ALL_TIME, CUSTOM
 }
 
+enum class AnalysisTransactionType {
+    EXPENSE, INCOME, ALL
+}
+
 data class AnalysisUiState(
     val selectedDimension: AnalysisDimension = AnalysisDimension.CATEGORY,
     val selectedTimePeriod: AnalysisTimePeriod = AnalysisTimePeriod.MONTH,
@@ -58,7 +62,8 @@ data class AnalysisUiState(
     // --- NEW: State for search ---
     val searchQuery: String = "",
     // --- NEW: State for "Include Excluded" toggle ---
-    val includeExcluded: Boolean = false
+    val includeExcluded: Boolean = false,
+    val selectedTransactionType: AnalysisTransactionType = AnalysisTransactionType.EXPENSE
 )
 
 // --- NEW: Helper data class for combining flows ---
@@ -71,7 +76,8 @@ private data class AnalysisInputs(
     val filterMerchant: String?,
     val searchQuery: String?,
     // --- NEW: Add includeExcluded field ---
-    val includeExcluded: Boolean
+    val includeExcluded: Boolean,
+    val transactionType: AnalysisTransactionType
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -98,6 +104,8 @@ class AnalysisViewModel(
     // --- NEW: Input flow for "Include Excluded" toggle ---
     private val _includeExcluded = MutableStateFlow(false)
 
+    private val _selectedTransactionType = MutableStateFlow(AnalysisTransactionType.EXPENSE)
+
 
     // --- DATA: Flows for filter dropdowns ---
     private val allCategories = categoryDao.getAllCategories()
@@ -111,7 +119,8 @@ class AnalysisViewModel(
         _selectedDimension, _selectedTimePeriod, _customDateRange,
         _selectedFilterCategory, _selectedFilterTag, _selectedFilterMerchant,
         _searchQuery,
-        _includeExcluded // --- ADDED ---
+        _includeExcluded, // --- ADDED ---
+        _selectedTransactionType
     ) { args ->
         @Suppress("UNCHECKED_CAST")
         AnalysisInputs(
@@ -122,7 +131,8 @@ class AnalysisViewModel(
             filterTag = args[4] as? Tag,
             filterMerchant = args[5] as? String,
             searchQuery = (args[6] as? String)?.takeIf { it.isNotBlank() },
-            includeExcluded = args[7] as Boolean // --- ADDED ---
+            includeExcluded = args[7] as Boolean, // --- ADDED ---
+            transactionType = args[8] as AnalysisTransactionType
         )
     }
 
@@ -132,11 +142,16 @@ class AnalysisViewModel(
         .debounce(300) // Debounce search input
         .flatMapLatest { inputs ->
             val (start, end) = calculateDateRange(inputs.period, inputs.dateRange.first, inputs.dateRange.second)
+            val typeStr = when (inputs.transactionType) {
+                AnalysisTransactionType.EXPENSE -> "expense"
+                AnalysisTransactionType.INCOME -> "income"
+                AnalysisTransactionType.ALL -> null
+            }
             when (inputs.dimension) {
                 // --- UPDATED: Pass includeExcluded to DAO methods ---
-                AnalysisDimension.CATEGORY -> transactionDao.getSpendingAnalysisByCategory(start, end, inputs.filterTag?.id, inputs.filterMerchant, inputs.filterCat?.id, inputs.searchQuery, inputs.includeExcluded)
-                AnalysisDimension.TAG -> transactionDao.getSpendingAnalysisByTag(start, end, inputs.filterCat?.id, inputs.filterMerchant, inputs.filterTag?.id, inputs.searchQuery, inputs.includeExcluded)
-                AnalysisDimension.MERCHANT -> transactionDao.getSpendingAnalysisByMerchant(start, end, inputs.filterCat?.id, inputs.filterTag?.id, inputs.filterMerchant, inputs.searchQuery, inputs.includeExcluded)
+                AnalysisDimension.CATEGORY -> transactionDao.getSpendingAnalysisByCategory(start, end, inputs.filterTag?.id, inputs.filterMerchant, inputs.filterCat?.id, inputs.searchQuery, inputs.includeExcluded, typeStr)
+                AnalysisDimension.TAG -> transactionDao.getSpendingAnalysisByTag(start, end, inputs.filterCat?.id, inputs.filterMerchant, inputs.filterTag?.id, inputs.searchQuery, inputs.includeExcluded, typeStr)
+                AnalysisDimension.MERCHANT -> transactionDao.getSpendingAnalysisByMerchant(start, end, inputs.filterCat?.id, inputs.filterTag?.id, inputs.filterMerchant, inputs.searchQuery, inputs.includeExcluded, typeStr)
             }
         }
 
@@ -179,7 +194,8 @@ class AnalysisViewModel(
             allTags = tags,
             allMerchants = merchants,
             searchQuery = inputs.searchQuery ?: "",
-            includeExcluded = inputs.includeExcluded // --- ADDED ---
+            includeExcluded = inputs.includeExcluded, // --- ADDED ---
+            selectedTransactionType = inputs.transactionType
         )
     }.stateIn(
         scope = viewModelScope,
@@ -219,6 +235,10 @@ class AnalysisViewModel(
 
     fun selectFilterMerchant(merchant: String?) {
         _selectedFilterMerchant.value = merchant
+    }
+
+    fun selectTransactionType(type: AnalysisTransactionType) {
+        _selectedTransactionType.value = type
     }
 
     // --- NEW: Function to handle "Include Excluded" toggle ---

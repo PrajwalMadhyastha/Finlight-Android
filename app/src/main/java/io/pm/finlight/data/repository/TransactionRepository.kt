@@ -73,8 +73,8 @@ class TransactionRepository(
         return transactionDao.getIncomeByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId)
     }
 
-    fun getSpendingByMerchantForMonth(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?): Flow<List<MerchantSpendingSummary>> {
-        return transactionDao.getSpendingByMerchantForMonth(startDate, endDate, keyword, accountId, categoryId)
+    fun getSpendingByMerchantForMonth(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?, transactionType: String?): Flow<List<MerchantSpendingSummary>> {
+        return transactionDao.getSpendingByMerchantForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
     }
 
     suspend fun addImageToTransaction(transactionId: Int, imageUri: String) {
@@ -147,9 +147,10 @@ class TransactionRepository(
         endDate: Long,
         keyword: String?,
         accountId: Int?,
-        categoryId: Int?
+        categoryId: Int?,
+        transactionType: String?
     ): Flow<List<CategorySpending>> {
-        return transactionDao.getSpendingByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId)
+        return transactionDao.getSpendingByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
     }
 
     fun getMonthlyTrends(startDate: Long): Flow<List<MonthlyTrend>> {

@@ -31,7 +31,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -210,8 +212,10 @@ fun ApproveTransactionScreen(
     settingsViewModel: SettingsViewModel,
     potentialTxn: PotentialTransaction,
 ) {
-    var description by remember { mutableStateOf(potentialTxn.merchantName ?: "") }
-    var notes by remember { mutableStateOf("") }
+    var description by remember {
+        mutableStateOf(TextFieldValue(potentialTxn.merchantName ?: "", TextRange((potentialTxn.merchantName ?: "").length)))
+    }
+    var notes by remember { mutableStateOf(TextFieldValue("")) }
     var selectedTransactionType by remember(potentialTxn.transactionType) { mutableStateOf(potentialTxn.transactionType) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -230,7 +234,7 @@ fun ApproveTransactionScreen(
     val currencySymbol = if (isForeign) CurrencyHelper.getCurrencySymbol(travelModeSettings?.currencyCode) else "₹"
     val homeCurrencySymbol = "₹"
 
-    val isSaveEnabled = description.isNotBlank() && selectedCategory != null
+    val isSaveEnabled = description.text.isNotBlank() && selectedCategory != null
 
     LaunchedEffect(key1 = potentialTxn.sourceSmsId) {
         NotificationManagerCompat.from(context).cancel(potentialTxn.sourceSmsId.toInt())
@@ -281,7 +285,7 @@ fun ApproveTransactionScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = description.ifBlank { "Description" },
+                            text = description.text.ifBlank { "Description" },
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.clickable { activeSheetContent = ApproveSheetContent.Description }
@@ -398,9 +402,9 @@ fun ApproveTransactionScreen(
                             scope.launch {
                                 val success = transactionViewModel.approveSmsTransaction(
                                     potentialTxn = potentialTxn,
-                                    description = description,
+                                    description = description.text,
                                     categoryId = selectedCategory?.id,
-                                    notes = notes.takeIf { it.isNotBlank() },
+                                    notes = notes.text.takeIf { it.isNotBlank() },
                                     tags = selectedTags,
                                     isForeign = isForeign
                                 )
@@ -408,7 +412,7 @@ fun ApproveTransactionScreen(
                                     settingsViewModel.onTransactionApproved(potentialTxn.sourceSmsId)
                                     val merchantName = potentialTxn.merchantName
                                     if (merchantName != null) {
-                                        settingsViewModel.saveMerchantRenameRule(merchantName, description)
+                                        settingsViewModel.saveMerchantRenameRule(merchantName, description.text)
                                     }
 
                                     if (merchantName != null && selectedCategory != null) {
@@ -456,7 +460,9 @@ fun ApproveTransactionScreen(
                     onConfirm = { activeSheetContent = null }
                 )
                 is ApproveSheetContent.Description -> {
-                    var tempDescription by remember { mutableStateOf(description) }
+                    var tempDescription by remember {
+                        mutableStateOf(TextFieldValue(description.text, TextRange(description.text.length)))
+                    }
                     Column(
                         modifier = Modifier
                             .padding(16.dp)
@@ -549,7 +555,7 @@ private fun ApproveTagPickerSheet(
     onAddNewTag: (String) -> Unit,
     onConfirm: () -> Unit
 ) {
-    var newTagName by remember { mutableStateOf("") }
+    var newTagName by remember { mutableStateOf(TextFieldValue("")) }
 
     Column(
         modifier = Modifier
@@ -587,10 +593,10 @@ private fun ApproveTagPickerSheet(
             )
             IconButton(
                 onClick = {
-                    onAddNewTag(newTagName)
-                    newTagName = ""
+                    onAddNewTag(newTagName.text)
+                    newTagName = TextFieldValue("")
                 },
-                enabled = newTagName.isNotBlank()
+                enabled = newTagName.text.isNotBlank()
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add New Tag")
             }
@@ -603,8 +609,8 @@ private fun ApproveTagPickerSheet(
             TextButton(onClick = onConfirm) { Text("Cancel") }
             Spacer(modifier = Modifier.width(8.dp))
             Button(onClick = {
-                if (newTagName.isNotBlank()) {
-                    onAddNewTag(newTagName)
+                if (newTagName.text.isNotBlank()) {
+                    onAddNewTag(newTagName.text)
                 }
                 onConfirm()
             }) { Text("Done") }

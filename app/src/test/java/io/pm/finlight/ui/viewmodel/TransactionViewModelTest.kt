@@ -120,8 +120,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
             whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
             whenever(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
-            whenever(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
-            whenever(transactionRepository.getSpendingByMerchantForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getSpendingByMerchantForMonth(anyLong(), anyLong(), any(), any(), any(), any())).thenReturn(flowOf(emptyList()))
             whenever(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
             whenever(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
             whenever(tagRepository.allTags).thenReturn(flowOf(emptyList()))
@@ -337,6 +337,19 @@ class TransactionViewModelTest : BaseViewModelTest() {
         // ASSERT
         val updatedState = viewModel.filterState.first()
         assertEquals(newCategory, updatedState.category)
+    }
+
+    @Test
+    fun `updateFilterTransactionType updates filterState correctly`() = runTest {
+        // ARRANGE
+        val newType = AnalysisTransactionType.INCOME
+
+        // ACT
+        viewModel.updateFilterTransactionType(newType)
+
+        // ASSERT
+        val updatedState = viewModel.filterState.first()
+        assertEquals(newType, updatedState.transactionType)
     }
 
     @Test

@@ -53,7 +53,7 @@ class SbiSmsParserTest : BaseSmsParserTest() {
         assertNotNull(result)
         assertEquals(200.0, result?.amount)
         assertEquals("expense", result?.transactionType)
-        assertEquals("user27@SBI", result?.merchantName)
+        assertEquals("user27", result?.merchantName)
         assertEquals("A/cX0763", result?.potentialAccount?.formattedName)
     }
 

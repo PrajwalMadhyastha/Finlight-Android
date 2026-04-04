@@ -329,8 +329,9 @@ private fun EmphasizedMinimalStatItem(
 
 
 @Composable
-private fun AuroraProgressBar(progress: Float) {
+internal fun AuroraProgressBar(progress: Float) {
     val animatedPercentage = (progress * 100).roundToInt()
+    val clampedProgress = progress.coerceIn(0f, 1f)
     val isDark = isSystemInDarkTheme()
     
     // Vibrant gradient colors - adjusted warning to be more orange
@@ -408,11 +409,11 @@ private fun AuroraProgressBar(progress: Float) {
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
                 )
 
-                if (progress > 0) {
+                if (clampedProgress > 0) {
                     // Vibrant progress fill
                     drawRoundRect(
                         brush = Brush.horizontalGradient(colors = progressGradient),
-                        size = Size(width = size.width * progress, height = size.height),
+                        size = Size(width = size.width * clampedProgress, height = size.height),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
                     )
                     
@@ -424,7 +425,7 @@ private fun AuroraProgressBar(progress: Float) {
                                 Color.White.copy(alpha = 0.1f)
                             )
                         ),
-                        size = Size(width = size.width * progress, height = size.height * 0.5f),
+                        size = Size(width = size.width * clampedProgress, height = size.height * 0.5f),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2)
                     )
                 }
@@ -433,7 +434,7 @@ private fun AuroraProgressBar(progress: Float) {
     ) { measurables, constraints ->
         val textPlaceable = measurables[0].measure(Constraints())
         val canvasPlaceable = measurables[1].measure(constraints)
-        val progressWidth = (canvasPlaceable.width * progress).toInt()
+        val progressWidth = (canvasPlaceable.width * clampedProgress).toInt()
         val textX = (progressWidth - textPlaceable.width / 2).coerceIn(0, canvasPlaceable.width - textPlaceable.width)
         layout(canvasPlaceable.width, canvasPlaceable.height + textPlaceable.height + 4.dp.roundToPx()) {
             canvasPlaceable.placeRelative(0, textPlaceable.height + 4.dp.roundToPx())

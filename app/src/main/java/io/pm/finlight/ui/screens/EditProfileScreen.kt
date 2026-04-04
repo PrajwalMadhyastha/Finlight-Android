@@ -37,7 +37,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -69,7 +71,9 @@ fun EditProfileScreen(
     val savedProfilePictureUri by viewModel.profilePictureUri.collectAsState()
     val context = LocalContext.current
 
-    var editedName by remember(currentName) { mutableStateOf(currentName) }
+    var editedName by remember(currentName) {
+        mutableStateOf(TextFieldValue(currentName, TextRange(currentName.length)))
+    }
     var croppedImageUri by remember { mutableStateOf<Uri?>(null) }
     var tempCameraImageUri by remember { mutableStateOf<Uri?>(null) }
     var showImageSourceDialog by remember { mutableStateOf(false) }
@@ -230,13 +234,13 @@ fun EditProfileScreen(
             }
             Button(
                 onClick = {
-                    viewModel.updateUserName(editedName)
+                    viewModel.updateUserName(editedName.text)
                     croppedImageUri?.let { viewModel.saveProfilePictureUri(it) }
                     Toast.makeText(context, "Profile updated!", Toast.LENGTH_SHORT).show()
                     navController.popBackStack()
                 },
                 modifier = Modifier.weight(1f),
-                enabled = editedName.isNotBlank()
+                enabled = editedName.text.isNotBlank()
             ) {
                 Text("Save")
             }

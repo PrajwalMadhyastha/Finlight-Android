@@ -44,7 +44,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
 
         // Setup default mocks for initialization
         `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any(), eq("expense"))).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
         `when`(transactionRepository.getTopSpendingCategoriesForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
@@ -85,7 +85,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
         val previousSummary = FinancialSummary(100.0, 50.0)
         val topCategory = spendingList.first()
 
-        `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(spendingList))
+        `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any(), eq("expense"))).thenReturn(flowOf(spendingList))
         `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(trends))
         `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
             .thenReturn(flowOf(currentSummary)) // First call for current
@@ -244,7 +244,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
         var previousEndCaptured = 0L
         var summaryCallCount = 0
 
-        `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(spendingList))
+        `when`(transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any(), eq("expense"))).thenReturn(flowOf(spendingList))
         `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(trends))
         
         `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenAnswer { invocation ->

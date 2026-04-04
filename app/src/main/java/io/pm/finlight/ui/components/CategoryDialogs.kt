@@ -12,6 +12,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import io.pm.finlight.Category
 
 @Composable
@@ -20,7 +22,9 @@ fun EditCategoryDialog(
     onDismiss: () -> Unit,
     onConfirm: (Category) -> Unit,
 ) {
-    var updatedName by remember { mutableStateOf(category.name) }
+    var updatedName by remember {
+        mutableStateOf(TextFieldValue(category.name, TextRange(category.name.length)))
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -35,11 +39,11 @@ fun EditCategoryDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (updatedName.isNotBlank()) {
-                        onConfirm(category.copy(name = updatedName))
+                    if (updatedName.text.isNotBlank()) {
+                        onConfirm(category.copy(name = updatedName.text))
                     }
                 },
-                enabled = updatedName.isNotBlank(),
+                enabled = updatedName.text.isNotBlank(),
             ) {
                 Text("Update")
             }

@@ -40,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.ui.theme.PopupSurfaceDark
@@ -53,8 +55,8 @@ fun CreateAccountDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, String) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(TextFieldValue("")) }
+    var type by remember { mutableStateOf(TextFieldValue("")) }
 
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -78,8 +80,8 @@ fun CreateAccountDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(name, type) },
-                enabled = name.isNotBlank() && type.isNotBlank()
+                onClick = { onConfirm(name.text, type.text) },
+                enabled = name.text.isNotBlank() && type.text.isNotBlank()
             ) { Text("Create") }
         },
         dismissButton = {
@@ -94,7 +96,7 @@ fun CreateCategoryDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, String, String) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(TextFieldValue("")) }
     var selectedIconKey by remember { mutableStateOf("category") }
     var selectedColorKey by remember { mutableStateOf("gray_light") }
     val allIcons = remember { CategoryIconHelper.getAllIcons().entries.toList() }
@@ -161,8 +163,8 @@ fun CreateCategoryDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(name, selectedIconKey, selectedColorKey) },
-                enabled = name.isNotBlank()
+                onClick = { onConfirm(name.text, selectedIconKey, selectedColorKey) },
+                enabled = name.text.isNotBlank()
             ) { Text("Create") }
         },
         dismissButton = {

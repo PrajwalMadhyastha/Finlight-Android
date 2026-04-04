@@ -38,6 +38,16 @@ from transformers import AutoModelForTokenClassification, AutoTokenizer
 MAX_SEQ_LENGTH = 128
 TFLITE_FILENAME = "sms_ner.tflite"
 
+# PyTorch baseline F1 from training_summary.json (used for regression check)
+BASELINE_F1 = {
+    "MERCHANT": 0.9879,
+    "AMOUNT":   0.9995,
+    "ACCOUNT":  0.9958,
+    "BALANCE":  0.9958,
+    "overall":  0.9947,
+}
+F1_REGRESSION_THRESHOLD = 0.005  # Alert if any entity drops >0.5%
+
 
 # ============================================================================
 # Step 1: Convert PyTorch → TFLite via native TF path
@@ -91,14 +101,19 @@ def convert_to_tflite(model_path: str, output_path: Path):
                 training=False
             )
 
-        print("   Converting to TFLite...", file=sys.stderr)
+        print("   Converting to TFLite with INT8 dynamic-range quantization...", file=sys.stderr)
         converter = tf.lite.TFLiteConverter.from_concrete_functions(
             [serving_fn.get_concrete_function()], tf_model
         )
+        # TFLITE_BUILTINS only — flatbuffer inspection confirmed MobileBERT produces
+        # zero Flex ops, so SELECT_TF_OPS is not needed. Removing it allows the
+        # litert-select-tf-ops Gradle dependency (~80-100 MB) to be dropped.
         converter.target_spec.supported_ops = [
             tf.lite.OpsSet.TFLITE_BUILTINS,
-            tf.lite.OpsSet.SELECT_TF_OPS,
         ]
+        # INT8 dynamic-range quantization: weights → int8, activations stay float32.
+        # No calibration dataset needed. Achieves ~4x model size reduction.
+        converter.optimizations = [tf.lite.Optimize.DEFAULT]
         tflite_model = converter.convert()
 
         with open("{tflite_path}", "wb") as f:
@@ -314,10 +329,11 @@ def validate_tflite(
         tflite_preds = np.argmax(tfl_real, axis=-1)
 
         match = np.array_equal(pt_preds, tflite_preds)
-        max_diff = np.max(np.abs(pt_real - tfl_real))
+        # Note: after INT8 quantization the raw logit magnitudes are NOT comparable
+        # between PyTorch and TFLite (different scales). Only argmax matters.
 
         status = "✅" if match else "❌"
-        print(f"   Sample {i+1}: {status} (real token max diff: {max_diff:.4f})")
+        print(f"   Sample {i+1}: {status}")
 
         if not match:
             all_match = False
@@ -328,8 +344,8 @@ def validate_tflite(
             )
             for pos in diff_indices[:5]:
                 tok = tokens[pos]
-                pt_label = id2label[str(pt_preds[pos])]
-                tfl_label = id2label[str(tflite_preds[pos])]
+                pt_label  = id2label[int(pt_preds[pos])]
+                tfl_label = id2label[int(tflite_preds[pos])]
                 print(f"      pos {pos} ({tok}): PT={pt_label}, TFL={tfl_label}")
 
     if all_match:
@@ -339,13 +355,214 @@ def validate_tflite(
 
 
 # ============================================================================
+# Step 3: Full F1 Evaluation on Test Set
+# ============================================================================
+def evaluate_tflite_f1(
+    tflite_path: Path,
+    dataset_path: str,
+    label_map_path: str,
+    model_dir: str,
+):
+    """Run the full test dataset through the TFLite model and compute seqeval F1.
+
+    Compares per-entity F1 against the PyTorch baseline from training_summary.json
+    and flags any regression exceeding F1_REGRESSION_THRESHOLD.
+    """
+    print(f"\n📊 Step 3: Full F1 Evaluation on Test Set ({tflite_path.name})...")
+
+    import subprocess
+    import tempfile
+    import textwrap
+
+    eval_script = textwrap.dedent(f"""\
+        import os, sys, json
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+        os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
+        import numpy as np
+        import tensorflow as tf
+        from transformers import AutoTokenizer
+        from datasets import load_from_disk
+
+        MAX_SEQ_LENGTH = {MAX_SEQ_LENGTH}
+        LABEL_LIST = [
+            "O",
+            "B-MERCHANT", "I-MERCHANT",
+            "B-AMOUNT",   "I-AMOUNT",
+            "B-ACCOUNT",  "I-ACCOUNT",
+            "B-BALANCE",  "I-BALANCE",
+        ]
+        ID_TO_LABEL = {{i: l for i, l in enumerate(LABEL_LIST)}}
+        IGNORED_LABEL_ID = -100
+
+        # Load dataset and tokenizer
+        dataset = load_from_disk("{dataset_path}")
+        test_set  = dataset["test"]
+        with open("{label_map_path}") as f:
+            lm = json.load(f)
+        id2label = {{int(k): v for k, v in lm["id_to_label"].items()}}
+
+        tokenizer = AutoTokenizer.from_pretrained("{model_dir}")
+
+        print(f"   Test samples: {{len(test_set)}}", file=sys.stderr)
+
+        # Load TFLite interpreter
+        interp = tf.lite.Interpreter(model_path="{tflite_path}")
+        interp.allocate_tensors()
+        input_details  = interp.get_input_details()
+        output_details = interp.get_output_details()
+
+        # Map tensor indices by name
+        def get_index(name_part):
+            for d in input_details:
+                if name_part in d["name"]:
+                    return d["index"], d["dtype"]
+            return None, None
+
+        ids_idx,  ids_dtype  = get_index("input_ids")
+        mask_idx, mask_dtype = get_index("attention_mask")
+
+        true_sequences = []
+        pred_sequences = []
+
+        for i, sample in enumerate(test_set):
+            if i % 500 == 0:
+                print(f"   Evaluating sample {{i}}/{{len(test_set)}}...", file=sys.stderr)
+
+            # Tokenize (re-use pre-tokenized ids stored in the dataset)
+            input_ids_np      = np.array([sample["input_ids"]], dtype=ids_dtype)
+            attention_mask_np = np.array([sample["attention_mask"]], dtype=mask_dtype)
+
+            interp.set_tensor(ids_idx,  input_ids_np)
+            interp.set_tensor(mask_idx, attention_mask_np)
+            interp.invoke()
+
+            logits = interp.get_tensor(output_details[0]["index"])[0]  # [128, 9]
+            pred_ids = np.argmax(logits, axis=-1)
+
+            labels = sample["labels"]
+            true_seq = []
+            pred_seq = []
+            for pred_id, label_id in zip(pred_ids, labels):
+                if label_id == IGNORED_LABEL_ID:
+                    continue
+                true_seq.append(id2label[label_id])
+                pred_seq.append(id2label[pred_id])
+            true_sequences.append(true_seq)
+            pred_sequences.append(pred_seq)
+
+        # Compute F1 with seqeval (same library used during training)
+        from seqeval.metrics import (
+            f1_score as seqeval_f1,
+            precision_score as seqeval_precision,
+            recall_score as seqeval_recall,
+            classification_report,
+        )
+
+        overall_f1  = seqeval_f1(true_sequences, pred_sequences)
+        overall_pre = seqeval_precision(true_sequences, pred_sequences)
+        overall_rec = seqeval_recall(true_sequences, pred_sequences)
+
+        entity_types = ["MERCHANT", "AMOUNT", "ACCOUNT", "BALANCE"]
+        per_entity = {{}}
+        for ent in entity_types:
+            t = [[x if x.endswith(ent) else "O" for x in s] for s in true_sequences]
+            p = [[x if x.endswith(ent) else "O" for x in s] for s in pred_sequences]
+            per_entity[ent] = {{
+                "precision": round(seqeval_precision(t, p), 4),
+                "recall":    round(seqeval_recall(t, p),    4),
+                "f1":        round(seqeval_f1(t, p),        4),
+            }}
+
+        result = {{
+            "overall": {{
+                "precision": round(overall_pre, 4),
+                "recall":    round(overall_rec, 4),
+                "f1":        round(overall_f1,  4),
+            }},
+            "per_entity": per_entity,
+            "report": classification_report(true_sequences, pred_sequences, digits=4),
+        }}
+        print(json.dumps(result))
+    """)
+
+    env = os.environ.copy()
+    env.pop("USE_TF", None)
+
+    result = subprocess.run(
+        [sys.executable, "-c", eval_script],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    if result.stderr:
+        for line in result.stderr.strip().split("\n"):
+            if not any(skip in line for skip in [
+                "WARNING", "NotOpenSSL", "UserWarning", "urllib3",
+                "absl", "INFO: Created TensorFlow",
+            ]):
+                print(line)
+
+    if result.returncode != 0:
+        print(f"   ❌ F1 evaluation subprocess failed!")
+        if result.stderr:
+            for line in result.stderr.strip().split("\n")[-8:]:
+                print(f"   {line}")
+        return
+
+    try:
+        output = json.loads(result.stdout.strip().split("\n")[-1])
+    except json.JSONDecodeError:
+        print(f"   ❌ Could not parse F1 evaluation output.")
+        print(f"   stdout: {result.stdout[:500]}")
+        return
+
+    overall = output["overall"]
+    per_entity = output["per_entity"]
+
+    print(f"\n   {'Entity':<12} {'Precision':>10} {'Recall':>8} {'F1 (TFLite)':>12} {'F1 (Baseline)':>14} {'Δ F1':>8} {'Status':>8}")
+    print(f"   {'-'*76}")
+
+    all_ok = True
+    for ent in ["MERCHANT", "AMOUNT", "ACCOUNT", "BALANCE"]:
+        m     = per_entity[ent]
+        base  = BASELINE_F1[ent]
+        delta = m["f1"] - base
+        ok    = abs(delta) <= F1_REGRESSION_THRESHOLD
+        if not ok:
+            all_ok = False
+        flag  = "✅" if ok else "⚠️ REGRESSION"
+        print(f"   {ent:<12} {m['precision']:>10.4f} {m['recall']:>8.4f} {m['f1']:>12.4f} {base:>14.4f} {delta:>+8.4f} {flag:>8}")
+
+    print(f"   {'-'*76}")
+    base_overall = BASELINE_F1["overall"]
+    delta_overall = overall["f1"] - base_overall
+    ok_overall = abs(delta_overall) <= F1_REGRESSION_THRESHOLD
+    if not ok_overall:
+        all_ok = False
+    flag = "✅" if ok_overall else "⚠️ REGRESSION"
+    print(f"   {'OVERALL':<12} {overall['precision']:>10.4f} {overall['recall']:>8.4f} {overall['f1']:>12.4f} {base_overall:>14.4f} {delta_overall:>+8.4f} {flag:>8}")
+
+    print(f"\n   Full seqeval classification report:")
+    for line in output["report"].split("\n"):
+        print(f"   {line}")
+
+    if all_ok:
+        print(f"\n   ✅ F1 regression check PASSED — quantized model is safe to deploy.")
+    else:
+        print(f"\n   ⚠️  F1 regression check FAILED — review above before deploying.")
+
+
+# ============================================================================
 # Main
 # ============================================================================
 def main():
     parser = argparse.ArgumentParser(description="Convert NER model to TFLite")
-    parser.add_argument("--model", required=True, help="Path to the trained PyTorch model directory")
-    parser.add_argument("--output", required=True, help="Directory to save TFLite model")
-    parser.add_argument("--skip-validation", action="store_true", help="Skip TFLite validation")
+    parser.add_argument("--model",    required=True, help="Path to the trained PyTorch model directory")
+    parser.add_argument("--output",   required=True, help="Directory to save TFLite model")
+    parser.add_argument("--dataset",  default=None,  help="Path to HuggingFace dataset dir (for F1 eval). Defaults to <model>/../dataset")
+    parser.add_argument("--skip-validation", action="store_true", help="Skip TFLite validation and F1 evaluation")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -362,12 +579,23 @@ def main():
     model = AutoModelForTokenClassification.from_pretrained(str(model_path))
     print(f"   Labels: {model.config.id2label}")
 
-    # Step 1: PyTorch → TFLite (via native TF path)
+    # Step 1: PyTorch → TFLite (via native TF path, INT8 quantized)
     tflite_path = convert_to_tflite(str(model_path), output_path)
 
-    # Step 2: Validate
+    # Step 2: Quick prediction-match validation (10 samples)
     if not args.skip_validation and tflite_path:
         validate_tflite(model, tokenizer, tflite_path)
+
+    # Step 3: Full F1 evaluation on test set vs PyTorch baseline
+    if not args.skip_validation and tflite_path:
+        # Resolve dataset and label map alongside the model dir
+        dataset_dir  = str(model_path.parent / "dataset")
+        label_map    = str(model_path / "ner_label_map.json")
+        if not Path(dataset_dir).exists():
+            print(f"\n⚠️  Dataset not found at {dataset_dir}, skipping F1 evaluation.")
+            print(f"   Pass --dataset <path> to specify the dataset location.")
+        else:
+            evaluate_tflite_f1(tflite_path, dataset_dir, label_map, str(model_path))
 
     # Copy label map
     label_map_src = model_path / "ner_label_map.json"
