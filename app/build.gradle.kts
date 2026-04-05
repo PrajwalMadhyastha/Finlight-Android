@@ -11,7 +11,7 @@ import java.util.Properties
 import java.util.TimeZone
 
 // It's good practice to define versions in one place.
-val roomVersion = "2.6.1"
+val roomVersion = "2.7.0-alpha11"
 val lifecycleVersion = "2.8.2"
 val activityComposeVersion = "1.9.0"
 val coreKtxVersion = "1.13.1"
