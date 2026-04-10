@@ -45,4 +45,10 @@ interface RecurringPatternDao {
      */
     @Query("DELETE FROM recurring_patterns WHERE smsSignature = :signature")
     suspend fun deleteBySignature(signature: String)
+
+    /**
+     * Deletes all patterns. Used during backup restore to clear existing data before importing.
+     */
+    @Query("DELETE FROM recurring_patterns")
+    suspend fun deleteAll()
 }

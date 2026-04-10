@@ -34,5 +34,7 @@ data class AppDataBackup(
     val transactionTagCrossRefs: List<TransactionTagCrossRef> = emptyList(),
     val goals: List<Goal> = emptyList(),
     val trips: List<Trip> = emptyList(),
-    val accountAliases: List<AccountAlias> = emptyList()
+    val accountAliases: List<AccountAlias> = emptyList(),
+    // --- Phase 3: App-Learned Recurring Patterns ---
+    val recurringPatterns: List<RecurringPattern> = emptyList()
 )

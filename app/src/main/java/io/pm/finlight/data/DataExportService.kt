@@ -123,7 +123,9 @@ object DataExportService {
                         transactionTagCrossRefs = db.transactionDao().getAllCrossRefs(),
                         goals = db.goalDao().getAll(),
                         trips = db.tripDao().getAll(),
-                        accountAliases = db.accountAliasDao().getAll()
+                        accountAliases = db.accountAliasDao().getAll(),
+                        // --- Phase 3: Export App-Learned Recurring Patterns ---
+                        recurringPatterns = db.recurringPatternDao().getAllPatterns()
                     )
 
                 json.encodeToString(backupData)
@@ -176,6 +178,8 @@ object DataExportService {
             db.merchantCategoryMappingDao().deleteAll()
             db.ignoreRuleDao().deleteAll()
             db.smsParseTemplateDao().deleteAll()
+            // --- Phase 3: Clear App-Learned Recurring Patterns ---
+            db.recurringPatternDao().deleteAll()
 
             // Insert new data
             db.accountDao().insertAll(backupData.accounts)
@@ -196,6 +200,8 @@ object DataExportService {
             db.merchantCategoryMappingDao().insertAll(backupData.merchantCategoryMappings)
             db.ignoreRuleDao().insertAll(backupData.ignoreRules)
             db.smsParseTemplateDao().insertAll(backupData.smsParseTemplates)
+            // --- Phase 3: Insert App-Learned Recurring Patterns ---
+            backupData.recurringPatterns.forEach { db.recurringPatternDao().insert(it) }
             true
         } catch (e: Exception) {
             Log.e("DataExportService", "Error processing JSON string during import", e)

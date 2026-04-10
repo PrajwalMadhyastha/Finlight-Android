@@ -56,6 +56,7 @@ class DataExportServiceTest : BaseViewModelTest() {
     private val goalDao: GoalDao = mockk(relaxed = true)
     private val tripDao: TripDao = mockk(relaxed = true)
     private val accountAliasDao: AccountAliasDao = mockk(relaxed = true)
+    private val recurringPatternDao: RecurringPatternDao = mockk(relaxed = true)
 
     @Before
     override fun setup() {
@@ -83,6 +84,7 @@ class DataExportServiceTest : BaseViewModelTest() {
         every { db.goalDao() } returns goalDao
         every { db.tripDao() } returns tripDao
         every { db.accountAliasDao() } returns accountAliasDao
+        every { db.recurringPatternDao() } returns recurringPatternDao
     }
 
     @After
@@ -109,6 +111,7 @@ class DataExportServiceTest : BaseViewModelTest() {
         coEvery { goalDao.getAll() } returns listOf(Goal(id = 1, name = "Test Goal", targetAmount = 1000.0, savedAmount = 100.0, targetDate = null, accountId = 1))
         coEvery { tripDao.getAll() } returns listOf(Trip(id = 1, name = "Test Trip", startDate = 1L, endDate = 2L, tagId = 1, tripType = TripType.DOMESTIC, currencyCode = null, conversionRate = null))
         coEvery { accountAliasDao.getAll() } returns listOf(AccountAlias(aliasName = "Alias Acc", destinationAccountId = 1))
+        coEvery { recurringPatternDao.getAllPatterns() } returns emptyList()
     }
 
     @Test
@@ -212,6 +215,7 @@ class DataExportServiceTest : BaseViewModelTest() {
         coJustRun { merchantCategoryMappingDao.deleteAll() }
         coJustRun { ignoreRuleDao.deleteAll() }
         coJustRun { smsParseTemplateDao.deleteAll() }
+        coJustRun { recurringPatternDao.deleteAll() }
 
         coJustRun { accountDao.insertAll(any()) }
         coJustRun { categoryDao.insertAll(any()) }
@@ -244,6 +248,7 @@ class DataExportServiceTest : BaseViewModelTest() {
             merchantCategoryMappingDao.deleteAll()
             ignoreRuleDao.deleteAll()
             smsParseTemplateDao.deleteAll()
+            recurringPatternDao.deleteAll()
         }
 
 
@@ -252,6 +257,63 @@ class DataExportServiceTest : BaseViewModelTest() {
         coVerify { tagDao.insertAll(backupData.tags) }
         coVerify { transactionDao.insertAll(backupData.transactions) }
         coVerify { transactionDao.addTagsToTransaction(backupData.transactionTagCrossRefs) }
+    }
+
+    @Test
+    fun `restoreFromBackupSnapshot inserts recurring patterns when present`() = runTest {
+        // Arrange
+        val pattern = RecurringPattern(
+            smsSignature = "sig_abc",
+            description = "Netflix",
+            amount = 199.0,
+            transactionType = "expense",
+            accountId = 1,
+            categoryId = null,
+            occurrences = 3,
+            firstSeen = 1000L,
+            lastSeen = 2000L
+        )
+        val backupData = AppDataBackup(
+            transactions = emptyList(),
+            accounts = emptyList(),
+            categories = emptyList(),
+            budgets = emptyList(),
+            merchantMappings = emptyList(),
+            recurringPatterns = listOf(pattern)
+        )
+        val jsonString = Json.encodeToString(AppDataBackup.serializer(), backupData)
+
+        val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+        FileOutputStream(snapshotFile).use { fos ->
+            GZIPOutputStream(fos).use { gzip ->
+                gzip.write(jsonString.toByteArray())
+            }
+        }
+
+        coJustRun { splitTransactionDao.deleteAll() }
+        coJustRun { transactionDao.deleteAll() }
+        coJustRun { tagDao.deleteAll() }
+        coJustRun { accountDao.deleteAll() }
+        coJustRun { categoryDao.deleteAll() }
+        coJustRun { budgetDao.deleteAll() }
+        coJustRun { merchantMappingDao.deleteAll() }
+        coJustRun { goalDao.deleteAll() }
+        coJustRun { tripDao.deleteAll() }
+        coJustRun { accountAliasDao.deleteAll() }
+        coJustRun { customSmsRuleDao.deleteAll() }
+        coJustRun { merchantRenameRuleDao.deleteAll() }
+        coJustRun { merchantCategoryMappingDao.deleteAll() }
+        coJustRun { ignoreRuleDao.deleteAll() }
+        coJustRun { smsParseTemplateDao.deleteAll() }
+        coJustRun { recurringPatternDao.deleteAll() }
+        coJustRun { recurringPatternDao.insert(any()) }
+
+        // Act
+        val success = DataExportService.restoreFromBackupSnapshot(context)
+
+        // Assert
+        assertTrue("Restore should succeed", success)
+        coVerify(exactly = 1) { recurringPatternDao.insert(pattern) }
     }
 
     @Test
