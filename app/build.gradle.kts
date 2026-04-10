@@ -272,7 +272,7 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     implementation("androidx.appcompat:appcompat:1.7.1")
-    implementation("com.google.android.gms:play-services-base:18.9.0") // Added for Google Play Services check
+
 
     //Disabling crashlytics until 16kb page size is supported
     //implementation("com.google.firebase:firebase-crashlytics-buildtools:3.0.6")
