@@ -8,24 +8,21 @@ package io.pm.finlight
 
 import android.util.Log
 import io.pm.finlight.data.model.MerchantPrediction
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onEach
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
-import kotlin.math.min
 import kotlin.math.roundToLong
 
 class TransactionRepository(
     private val transactionDao: TransactionDao,
     private val settingsRepository: SettingsRepository,
-    private val tagRepository: TagRepository
+    private val tagRepository: TagRepository,
 ) {
-
     // --- NEW: Function for Spending Velocity feature ---
     suspend fun getTotalExpensesSince(startDate: Long): Double {
         return transactionDao.getTotalExpensesSince(startDate) ?: 0.0
@@ -57,27 +54,55 @@ class TransactionRepository(
         return transactionDao.getFirstTransactionDate()
     }
 
-    fun getFinancialSummaryForRangeFlow(startDate: Long, endDate: Long): Flow<FinancialSummary?> {
+    fun getFinancialSummaryForRangeFlow(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<FinancialSummary?> {
         return transactionDao.getFinancialSummaryForRangeFlow(startDate, endDate)
     }
 
-    fun getTopSpendingCategoriesForRangeFlow(startDate: Long, endDate: Long): Flow<CategorySpending?> {
+    fun getTopSpendingCategoriesForRangeFlow(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<CategorySpending?> {
         return transactionDao.getTopSpendingCategoriesForRangeFlow(startDate, endDate)
     }
 
-    fun getIncomeTransactionsForRange(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?): Flow<List<TransactionDetails>> {
+    fun getIncomeTransactionsForRange(
+        startDate: Long,
+        endDate: Long,
+        keyword: String?,
+        accountId: Int?,
+        categoryId: Int?,
+    ): Flow<List<TransactionDetails>> {
         return transactionDao.getIncomeTransactionsForRange(startDate, endDate, keyword, accountId, categoryId)
     }
 
-    fun getIncomeByCategoryForMonth(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?): Flow<List<CategorySpending>> {
+    fun getIncomeByCategoryForMonth(
+        startDate: Long,
+        endDate: Long,
+        keyword: String?,
+        accountId: Int?,
+        categoryId: Int?,
+    ): Flow<List<CategorySpending>> {
         return transactionDao.getIncomeByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId)
     }
 
-    fun getSpendingByMerchantForMonth(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?, transactionType: String?): Flow<List<MerchantSpendingSummary>> {
+    fun getSpendingByMerchantForMonth(
+        startDate: Long,
+        endDate: Long,
+        keyword: String?,
+        accountId: Int?,
+        categoryId: Int?,
+        transactionType: String?,
+    ): Flow<List<MerchantSpendingSummary>> {
         return transactionDao.getSpendingByMerchantForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
     }
 
-    suspend fun addImageToTransaction(transactionId: Int, imageUri: String) {
+    suspend fun addImageToTransaction(
+        transactionId: Int,
+        imageUri: String,
+    ) {
         val transactionImage = TransactionImage(transactionId = transactionId, imageUri = imageUri)
         transactionDao.insertImage(transactionImage)
     }
@@ -90,16 +115,46 @@ class TransactionRepository(
         return transactionDao.getImagesForTransaction(transactionId)
     }
 
-    suspend fun updateDescription(id: Int, description: String) = transactionDao.updateDescription(id, description)
-    suspend fun updateAmount(id: Int, amount: Double) = transactionDao.updateAmount(id, amount)
-    suspend fun updateNotes(id: Int, notes: String?) = transactionDao.updateNotes(id, notes)
-    suspend fun updateCategoryId(id: Int, categoryId: Int?) = transactionDao.updateCategoryId(id, categoryId)
-    suspend fun updateAccountId(id: Int, accountId: Int) = transactionDao.updateAccountId(id, accountId)
-    suspend fun updateDate(id: Int, date: Long) = transactionDao.updateDate(id, date)
-    suspend fun updateExclusionStatus(id: Int, isExcluded: Boolean) = transactionDao.updateExclusionStatus(id, isExcluded)
+    suspend fun updateDescription(
+        id: Int,
+        description: String,
+    ) = transactionDao.updateDescription(id, description)
+
+    suspend fun updateAmount(
+        id: Int,
+        amount: Double,
+    ) = transactionDao.updateAmount(id, amount)
+
+    suspend fun updateNotes(
+        id: Int,
+        notes: String?,
+    ) = transactionDao.updateNotes(id, notes)
+
+    suspend fun updateCategoryId(
+        id: Int,
+        categoryId: Int?,
+    ) = transactionDao.updateCategoryId(id, categoryId)
+
+    suspend fun updateAccountId(
+        id: Int,
+        accountId: Int,
+    ) = transactionDao.updateAccountId(id, accountId)
+
+    suspend fun updateDate(
+        id: Int,
+        date: Long,
+    ) = transactionDao.updateDate(id, date)
+
+    suspend fun updateExclusionStatus(
+        id: Int,
+        isExcluded: Boolean,
+    ) = transactionDao.updateExclusionStatus(id, isExcluded)
 
     // --- NEW: Function to update transaction type ---
-    suspend fun updateTransactionType(id: Int, transactionType: String) {
+    suspend fun updateTransactionType(
+        id: Int,
+        transactionType: String,
+    ) {
         transactionDao.updateTransactionType(id, transactionType)
     }
 
@@ -122,7 +177,7 @@ class TransactionRepository(
         endDate: Long,
         keyword: String?,
         accountId: Int?,
-        categoryId: Int?
+        categoryId: Int?,
     ): Flow<List<TransactionDetails>> {
         return transactionDao.getTransactionDetailsForRange(startDate, endDate, keyword, accountId, categoryId)
     }
@@ -148,7 +203,7 @@ class TransactionRepository(
         keyword: String?,
         accountId: Int?,
         categoryId: Int?,
-        transactionType: String?
+        transactionType: String?,
     ): Flow<List<CategorySpending>> {
         return transactionDao.getSpendingByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
     }
@@ -169,17 +224,24 @@ class TransactionRepository(
         return transactionDao.getTagsForTransactionSimple(transactionId)
     }
 
-    suspend fun updateTagsForTransaction(transactionId: Int, tags: Set<Tag>) {
+    suspend fun updateTagsForTransaction(
+        transactionId: Int,
+        tags: Set<Tag>,
+    ) {
         transactionDao.clearTagsForTransaction(transactionId)
         if (tags.isNotEmpty()) {
-            val crossRefs = tags.map { tag ->
-                TransactionTagCrossRef(transactionId = transactionId, tagId = tag.id)
-            }
+            val crossRefs =
+                tags.map { tag ->
+                    TransactionTagCrossRef(transactionId = transactionId, tagId = tag.id)
+                }
             transactionDao.addTagsToTransaction(crossRefs)
         }
     }
 
-    private suspend fun getFinalTagsForTransaction(transaction: Transaction, initialTags: Set<Tag>): Set<Tag> {
+    private suspend fun getFinalTagsForTransaction(
+        transaction: Transaction,
+        initialTags: Set<Tag>,
+    ): Set<Tag> {
         val finalTags = initialTags.toMutableSet()
         val travelSettings = settingsRepository.getTravelModeSettings().first()
         if (travelSettings?.isEnabled == true && transaction.date >= travelSettings.startDate && transaction.date <= travelSettings.endDate) {
@@ -189,26 +251,34 @@ class TransactionRepository(
         return finalTags
     }
 
-    suspend fun insertTransactionWithTags(transaction: Transaction, tags: Set<Tag>): Long {
+    suspend fun insertTransactionWithTags(
+        transaction: Transaction,
+        tags: Set<Tag>,
+    ): Long {
         val finalTags = getFinalTagsForTransaction(transaction, tags)
         val transactionId = transactionDao.insert(transaction)
         if (finalTags.isNotEmpty()) {
-            val crossRefs = finalTags.map { tag ->
-                TransactionTagCrossRef(transactionId = transactionId.toInt(), tagId = tag.id)
-            }
+            val crossRefs =
+                finalTags.map { tag ->
+                    TransactionTagCrossRef(transactionId = transactionId.toInt(), tagId = tag.id)
+                }
             transactionDao.addTagsToTransaction(crossRefs)
         }
         return transactionId
     }
 
-    suspend fun updateTransactionWithTags(transaction: Transaction, tags: Set<Tag>) {
+    suspend fun updateTransactionWithTags(
+        transaction: Transaction,
+        tags: Set<Tag>,
+    ) {
         val finalTags = getFinalTagsForTransaction(transaction, tags)
         transactionDao.update(transaction)
         transactionDao.clearTagsForTransaction(transaction.id)
         if (finalTags.isNotEmpty()) {
-            val crossRefs = finalTags.map { tag ->
-                TransactionTagCrossRef(transactionId = transaction.id, tagId = tag.id)
-            }
+            val crossRefs =
+                finalTags.map { tag ->
+                    TransactionTagCrossRef(transactionId = transaction.id, tagId = tag.id)
+                }
             transactionDao.addTagsToTransaction(crossRefs)
         }
     }
@@ -216,21 +286,23 @@ class TransactionRepository(
     suspend fun insertTransactionWithTagsAndImages(
         transaction: Transaction,
         tags: Set<Tag>,
-        imagePaths: List<String>
+        imagePaths: List<String>,
     ): Long {
         val finalTags = getFinalTagsForTransaction(transaction, tags)
         val newTransactionId = transactionDao.insert(transaction)
         if (finalTags.isNotEmpty()) {
-            val crossRefs = finalTags.map { tag ->
-                TransactionTagCrossRef(transactionId = newTransactionId.toInt(), tagId = tag.id)
-            }
+            val crossRefs =
+                finalTags.map { tag ->
+                    TransactionTagCrossRef(transactionId = newTransactionId.toInt(), tagId = tag.id)
+                }
             transactionDao.addTagsToTransaction(crossRefs)
         }
         imagePaths.forEach { path ->
-            val imageEntity = TransactionImage(
-                transactionId = newTransactionId.toInt(),
-                imageUri = path
-            )
+            val imageEntity =
+                TransactionImage(
+                    transactionId = newTransactionId.toInt(),
+                    imageUri = path,
+                )
             transactionDao.insertImage(imageEntity)
         }
         return newTransactionId
@@ -240,7 +312,10 @@ class TransactionRepository(
         transactionDao.delete(transaction)
     }
 
-    suspend fun setSmsHash(transactionId: Int, smsHash: String) {
+    suspend fun setSmsHash(
+        transactionId: Int,
+        smsHash: String,
+    ) {
         transactionDao.setSmsHash(transactionId, smsHash)
     }
 
@@ -248,28 +323,48 @@ class TransactionRepository(
         return transactionDao.getTransactionCountForMerchant(description)
     }
 
-    suspend fun findSimilarTransactions(description: String, excludeId: Int): List<Transaction> {
+    suspend fun findSimilarTransactions(
+        description: String,
+        excludeId: Int,
+    ): List<Transaction> {
         return transactionDao.findSimilarTransactions(description, excludeId)
     }
 
-    suspend fun updateCategoryForIds(ids: List<Int>, categoryId: Int) {
+    suspend fun updateCategoryForIds(
+        ids: List<Int>,
+        categoryId: Int,
+    ) {
         transactionDao.updateCategoryForIds(ids, categoryId)
     }
 
-    suspend fun updateDescriptionForIds(ids: List<Int>, newDescription: String) {
+    suspend fun updateDescriptionForIds(
+        ids: List<Int>,
+        newDescription: String,
+    ) {
         transactionDao.updateDescriptionForIds(ids, newDescription)
     }
 
-    fun getDailySpendingForDateRange(startDate: Long, endDate: Long): Flow<List<DailyTotal>> {
+    fun getDailySpendingForDateRange(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<DailyTotal>> {
         return transactionDao.getDailySpendingForDateRange(startDate, endDate)
     }
 
     // --- NEW: Functions for retrospective tagging ---
-    suspend fun addTagForDateRange(tagId: Int, startDate: Long, endDate: Long) {
+    suspend fun addTagForDateRange(
+        tagId: Int,
+        startDate: Long,
+        endDate: Long,
+    ) {
         transactionDao.addTagForDateRange(tagId, startDate, endDate)
     }
 
-    suspend fun removeTagForDateRange(tagId: Int, startDate: Long, endDate: Long) {
+    suspend fun removeTagForDateRange(
+        tagId: Int,
+        startDate: Long,
+        endDate: Long,
+    ) {
         transactionDao.removeTagForDateRange(tagId, startDate, endDate)
     }
 
@@ -288,31 +383,41 @@ class TransactionRepository(
     /**
      * Helper to check if cal1 is on a day *before* cal2, ignoring time.
      */
-    private fun isBeforeDay(cal1: Calendar, cal2: Calendar): Boolean {
+    private fun isBeforeDay(
+        cal1: Calendar,
+        cal2: Calendar,
+    ): Boolean {
         return cal1.get(Calendar.YEAR) < cal2.get(Calendar.YEAR) ||
-                (cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-                        cal1.get(Calendar.DAY_OF_YEAR) < cal2.get(Calendar.DAY_OF_YEAR))
+            (
+                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+                    cal1.get(Calendar.DAY_OF_YEAR) < cal2.get(Calendar.DAY_OF_YEAR)
+            )
     }
 
     /**
      * Generates the consistency data for a single month, based on that month's budget.
      * This is the new single source of truth for all heatmap/calendar logic.
      */
-    fun getMonthlyConsistencyData(year: Int, month: Int): Flow<List<CalendarDayStatus>> {
+    fun getMonthlyConsistencyData(
+        year: Int,
+        month: Int,
+    ): Flow<List<CalendarDayStatus>> {
         // Calculate start and end of the given month
-        val monthStartCal = Calendar.getInstance().apply {
-            set(Calendar.YEAR, year)
-            set(Calendar.MONTH, month - 1) // Calendar.MONTH is 0-indexed
-            set(Calendar.DAY_OF_MONTH, 1)
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val monthEndCal = (monthStartCal.clone() as Calendar).apply {
-            add(Calendar.MONTH, 1)
-            add(Calendar.MILLISECOND, -1)
-        }
+        val monthStartCal =
+            Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1) // Calendar.MONTH is 0-indexed
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+        val monthEndCal =
+            (monthStartCal.clone() as Calendar).apply {
+                add(Calendar.MONTH, 1)
+                add(Calendar.MILLISECOND, -1)
+            }
         val daysInMonth = monthStartCal.getActualMaximum(Calendar.DAY_OF_MONTH)
 
         // Combine the three flows we need
@@ -320,7 +425,7 @@ class TransactionRepository(
         return combine(
             settingsRepository.getOverallBudgetForMonth(year, month),
             transactionDao.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
-            transactionDao.getFirstTransactionDate()
+            transactionDao.getFirstTransactionDate(),
         ) { budget: Float?, dailyTotals: List<DailyTotal>, firstTransactionDate: Long? ->
             val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
             val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
@@ -364,19 +469,19 @@ class TransactionRepository(
                     val remainingDays = (daysInMonth - i + 1).coerceAtLeast(1)
                     val safeToSpend = if (remainingBudget > 0) (remainingBudget / remainingDays).roundToLong() else 0L
 
-
                     val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
                     val amountSpent = (spendingMap[dateKey] ?: 0.0)
                     val amountSpentLong = amountSpent.roundToLong()
 
                     // This is the new, more robust 'when' block that fixes the original bug
-                    val status = when {
-                        amountSpentLong == 0L && safeToSpend == 0L -> SpendingStatus.WITHIN_LIMIT // Met 0 budget (blue)
-                        amountSpentLong == 0L && safeToSpend > 0L -> SpendingStatus.NO_SPEND     // No spend on a day with a budget (green)
-                        amountSpentLong > 0L && safeToSpend == 0L -> SpendingStatus.OVER_LIMIT   // Spent > 0 on a 0 budget (red)
-                        amountSpentLong > safeToSpend -> SpendingStatus.OVER_LIMIT               // Spent > budget (red)
-                        else -> SpendingStatus.WITHIN_LIMIT // Spent <= budget (and not 0) (blue)
-                    }
+                    val status =
+                        when {
+                            amountSpentLong == 0L && safeToSpend == 0L -> SpendingStatus.WITHIN_LIMIT // Met 0 budget (blue)
+                            amountSpentLong == 0L && safeToSpend > 0L -> SpendingStatus.NO_SPEND // No spend on a day with a budget (green)
+                            amountSpentLong > 0L && safeToSpend == 0L -> SpendingStatus.OVER_LIMIT // Spent > 0 on a 0 budget (red)
+                            amountSpentLong > safeToSpend -> SpendingStatus.OVER_LIMIT // Spent > budget (red)
+                            else -> SpendingStatus.WITHIN_LIMIT // Spent <= budget (and not 0) (blue)
+                        }
                     Log.d("HeatmapDebug", "Date: $dateKey, Spent: $amountSpentLong, Threshold: $safeToSpend, Status: $status")
                     resultList.add(CalendarDayStatus(date, status, amountSpentLong, safeToSpend))
                     cumulativeSpending += amountSpent

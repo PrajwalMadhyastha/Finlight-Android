@@ -14,12 +14,12 @@ data class TransactionDetails(
     val transaction: Transaction,
     @Relation(
         parentColumn = "id",
-        entityColumn = "transactionId"
+        entityColumn = "transactionId",
     )
     val images: List<TransactionImage>,
     val accountName: String?,
     val categoryName: String?,
     val categoryIconKey: String?,
     val categoryColorKey: String?,
-    val tagNames: String? // --- NEW: To hold comma-separated tag names
+    val tagNames: String?, // --- NEW: To hold comma-separated tag names
 )

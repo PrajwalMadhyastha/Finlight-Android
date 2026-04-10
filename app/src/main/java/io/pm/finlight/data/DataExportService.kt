@@ -125,7 +125,7 @@ object DataExportService {
                         trips = db.tripDao().getAll(),
                         accountAliases = db.accountAliasDao().getAll(),
                         // --- Phase 3: Export App-Learned Recurring Patterns ---
-                        recurringPatterns = db.recurringPatternDao().getAllPatterns()
+                        recurringPatterns = db.recurringPatternDao().getAllPatterns(),
                     )
 
                 json.encodeToString(backupData)
@@ -142,8 +142,9 @@ object DataExportService {
     ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val jsonString = context.contentResolver.openInputStream(uri)?.bufferedReader()
-                    .use { it?.readText() }
+                val jsonString =
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()
+                        .use { it?.readText() }
                 if (jsonString == null) {
                     Log.e("DataExportService", "Failed to read JSON from URI.")
                     return@withContext false
@@ -156,7 +157,10 @@ object DataExportService {
         }
     }
 
-    private suspend fun importDataFromJsonString(context: Context, jsonString: String): Boolean {
+    private suspend fun importDataFromJsonString(
+        context: Context,
+        jsonString: String,
+    ): Boolean {
         return try {
             val backupData = json.decodeFromString<AppDataBackup>(jsonString)
             val db = AppDatabase.getInstance(context)
@@ -236,19 +240,20 @@ object DataExportService {
                     val escapedTags = escapeCsvField(tagsString)
 
                     if (transaction.isSplit) {
-                        val parentRow = listOf(
-                            transaction.id.toString(),
-                            "", // ParentId
-                            date,
-                            description,
-                            amount,
-                            type,
-                            "Split Transaction", // Category for parent
-                            account,
-                            notes,
-                            isExcluded,
-                            escapedTags
-                        ).joinToString(",")
+                        val parentRow =
+                            listOf(
+                                transaction.id.toString(),
+                                "", // ParentId
+                                date,
+                                description,
+                                amount,
+                                type,
+                                "Split Transaction", // Category for parent
+                                account,
+                                notes,
+                                isExcluded,
+                                escapedTags,
+                            ).joinToString(",")
                         csvBuilder.appendLine(parentRow)
 
                         // Now fetch and append its children
@@ -260,37 +265,39 @@ object DataExportService {
                             val splitCategory = escapeCsvField(splitDetails.categoryName ?: "N/A")
 
                             // Child rows have no ID of their own in this context, but link to the parent
-                            val childRow = listOf(
-                                "", // Id
-                                transaction.id.toString(), // ParentId
-                                dateFormat.format(Date(transaction.date)),
-                                splitDescription,
-                                splitAmount,
-                                type,
-                                splitCategory,
-                                account,
-                                escapeCsvField(split.notes ?: ""),
-                                isExcluded,
-                                "" // <-- THE FIX: Add an empty string for the missing Tags column
-                            ).joinToString(",")
+                            val childRow =
+                                listOf(
+                                    "", // Id
+                                    transaction.id.toString(), // ParentId
+                                    dateFormat.format(Date(transaction.date)),
+                                    splitDescription,
+                                    splitAmount,
+                                    type,
+                                    splitCategory,
+                                    account,
+                                    escapeCsvField(split.notes ?: ""),
+                                    isExcluded,
+                                    "", // <-- THE FIX: Add an empty string for the missing Tags column
+                                ).joinToString(",")
                             csvBuilder.appendLine(childRow)
                         }
                     } else {
                         // This is a standard, non-split transaction
                         val category = escapeCsvField(details.categoryName ?: "N/A")
-                        val row = listOf(
-                            transaction.id.toString(),
-                            "", // ParentId
-                            date,
-                            description,
-                            amount,
-                            type,
-                            category,
-                            account,
-                            notes,
-                            isExcluded,
-                            escapedTags
-                        ).joinToString(",")
+                        val row =
+                            listOf(
+                                transaction.id.toString(),
+                                "", // ParentId
+                                date,
+                                description,
+                                amount,
+                                type,
+                                category,
+                                account,
+                                notes,
+                                isExcluded,
+                                escapedTags,
+                            ).joinToString(",")
                         csvBuilder.appendLine(row)
                     }
                 }

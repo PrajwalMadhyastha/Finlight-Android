@@ -6,7 +6,7 @@ import java.util.Locale
 data class CurrencyInfo(
     val countryName: String,
     val currencyCode: String, // e.g., USD
-    val currencySymbol: String // e.g., $
+    val currencySymbol: String, // e.g., $
 )
 
 object CurrencyHelper {
@@ -43,7 +43,7 @@ object CurrencyHelper {
             "Qatar" to "QAR",
             "Oman" to "OMR",
             "Kuwait" to "KWD",
-            "Bahrain" to "BHD"
+            "Bahrain" to "BHD",
         ).mapNotNull { (country, code) ->
             try {
                 val currency = Currency.getInstance(code)

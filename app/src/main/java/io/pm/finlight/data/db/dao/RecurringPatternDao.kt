@@ -15,7 +15,6 @@ import androidx.room.Update
 
 @Dao
 interface RecurringPatternDao {
-
     /**
      * Inserts a new pattern. If a pattern with the same signature already exists, it is replaced.
      */

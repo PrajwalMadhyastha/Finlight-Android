@@ -17,6 +17,7 @@ import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.ShareableField
+import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.HeuristicCategorizer
 import io.pm.finlight.utils.ShareImageGenerator
@@ -28,7 +29,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -41,7 +41,7 @@ data class TransactionFilterState(
     val keyword: String = "",
     val account: Account? = null,
     val category: Category? = null,
-    val transactionType: AnalysisTransactionType = AnalysisTransactionType.EXPENSE
+    val transactionType: AnalysisTransactionType = AnalysisTransactionType.EXPENSE,
 )
 
 data class RetroUpdateSheetState(
@@ -50,7 +50,7 @@ data class RetroUpdateSheetState(
     val newCategoryId: Int? = null,
     val similarTransactions: List<Transaction> = emptyList(),
     val selectedIds: Set<Int> = emptySet(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
 )
 
 data class ManualTransactionData(
@@ -61,9 +61,8 @@ data class ManualTransactionData(
     val date: Long,
     val transactionType: String,
     val imageUris: List<Uri>,
-    val tags: Set<Tag>
+    val tags: Set<Tag>,
 )
-
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class TransactionViewModel(
@@ -79,9 +78,8 @@ class TransactionViewModel(
     private val merchantCategoryMappingRepository: MerchantCategoryMappingRepository,
     private val merchantMappingRepository: MerchantMappingRepository,
     private val splitTransactionRepository: SplitTransactionRepository,
-    private val smsParseTemplateDao: SmsParseTemplateDao
+    private val smsParseTemplateDao: SmsParseTemplateDao,
 ) : AndroidViewModel(application) {
-
     private val context = application
 
     private var areTagsLoadedForCurrentTxn = false
@@ -113,11 +111,11 @@ class TransactionViewModel(
     private val _showDeleteConfirmation = MutableStateFlow(false)
     val showDeleteConfirmation: StateFlow<Boolean> = _showDeleteConfirmation.asStateFlow()
 
-    private val _shareableFields = MutableStateFlow(
-        setOf(ShareableField.Date, ShareableField.Description, ShareableField.Amount, ShareableField.Category, ShareableField.Tags)
-    )
+    private val _shareableFields =
+        MutableStateFlow(
+            setOf(ShareableField.Date, ShareableField.Description, ShareableField.Amount, ShareableField.Category, ShareableField.Tags),
+        )
     val shareableFields: StateFlow<Set<ShareableField>> = _shareableFields.asStateFlow()
-
 
     private val combinedState: Flow<Pair<Calendar, TransactionFilterState>> =
         _selectedMonth.combine(_filterState) { month, filters ->
@@ -183,7 +181,6 @@ class TransactionViewModel(
     private val _addTransactionAccount = MutableStateFlow<Account?>(null)
     val addTransactionAccount = _addTransactionAccount.asStateFlow()
 
-
     private val _userManuallySelectedCategory = MutableStateFlow(false)
 
     // --- NEW: Expose privacy mode state ---
@@ -192,160 +189,250 @@ class TransactionViewModel(
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
-                initialValue = false
+                initialValue = false,
             )
 
-    val suggestedCategory: StateFlow<Category?> = _addTransactionDescription
-        .debounce(400)
-        .combine(_userManuallySelectedCategory) { description, manualSelect ->
-            description to manualSelect
-        }
-        .flatMapLatest { (description, manualSelect) ->
-            if (description.length > 2 && !manualSelect) {
-                flow {
-                    val allCategoriesList = allCategories.first()
-                    emit(HeuristicCategorizer.findCategoryForDescription(description, allCategoriesList))
-                }
-            } else {
-                flowOf<Category?>(null)
+    val suggestedCategory: StateFlow<Category?> =
+        _addTransactionDescription
+            .debounce(400)
+            .combine(_userManuallySelectedCategory) { description, manualSelect ->
+                description to manualSelect
             }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+            .flatMapLatest { (description, manualSelect) ->
+                if (description.length > 2 && !manualSelect) {
+                    flow {
+                        val allCategoriesList = allCategories.first()
+                        emit(HeuristicCategorizer.findCategoryForDescription(description, allCategoriesList))
+                    }
+                } else {
+                    flowOf<Category?>(null)
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     // --- NEW: Flow for Recent Manual Transactions (Suggestions) ---
-    val recentManualTransactions: StateFlow<List<TransactionDetails>> = transactionRepository.getRecentManualTransactions(limit = 10)
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    // --- NEW: Flow for History Sheet (Larger limit) ---
-    val historyManualTransactions: StateFlow<List<TransactionDetails>> = transactionRepository.getRecentManualTransactions(limit = 50)
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-
-    init {
-        merchantPredictions = _merchantSearchQuery
-            .debounce(300)
-            .flatMapLatest { query ->
-                if (query.length > 1) {
-                    transactionRepository.searchMerchants(query)
-                } else {
-                    flowOf(emptyList())
-                }
-            }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-
-        travelModeSettings = settingsRepository.getTravelModeSettings()
+    val recentManualTransactions: StateFlow<List<TransactionDetails>> =
+        transactionRepository.getRecentManualTransactions(limit = 10)
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
-                initialValue = null
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
             )
 
-        merchantAliases = merchantRenameRuleRepository.getAliasesAsMap()
-            .map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+    // --- NEW: Flow for History Sheet (Larger limit) ---
+    val historyManualTransactions: StateFlow<List<TransactionDetails>> =
+        transactionRepository.getRecentManualTransactions(limit = 50)
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
-        transactionsForSelectedMonth = combinedState.flatMapLatest { (calendar, filters) ->
-            val monthStart = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
-            val monthEnd = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, 1); set(Calendar.DAY_OF_MONTH, 1); add(Calendar.DAY_OF_MONTH, -1); set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59) }.timeInMillis
-            transactionRepository.getTransactionDetailsForRange(monthStart, monthEnd, filters.keyword.takeIf { it.isNotBlank() }, filters.account?.id, filters.category?.id)
-                .catch { e ->
-                    Log.e(TAG, "Failed to load transactions for month", e)
-                    _uiEvent.send("Failed to load transactions.")
-                    emit(emptyList())
+    init {
+        merchantPredictions =
+            _merchantSearchQuery
+                .debounce(300)
+                .flatMapLatest { query ->
+                    if (query.length > 1) {
+                        transactionRepository.searchMerchants(query)
+                    } else {
+                        flowOf(emptyList())
+                    }
                 }
-        }.combine(merchantAliases) { transactions, aliases ->
-            applyAliases(transactions, aliases)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-        val financialSummaryFlow = _selectedMonth.flatMapLatest { calendar ->
-            val monthStart = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
-            val monthEnd = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, 1); set(Calendar.DAY_OF_MONTH, 1); add(Calendar.DAY_OF_MONTH, -1); set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59) }.timeInMillis
-            transactionRepository.getFinancialSummaryForRangeFlow(monthStart, monthEnd)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        travelModeSettings =
+            settingsRepository.getTravelModeSettings()
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.Eagerly,
+                    initialValue = null,
+                )
 
-        monthlyIncome = financialSummaryFlow.map { it?.totalIncome ?: 0.0 }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+        merchantAliases =
+            merchantRenameRuleRepository.getAliasesAsMap()
+                .map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-        monthlyExpenses = financialSummaryFlow.map { it?.totalExpenses ?: 0.0 }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+        transactionsForSelectedMonth =
+            combinedState.flatMapLatest { (calendar, filters) ->
+                val monthStart =
+                    (calendar.clone() as Calendar).apply {
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                    }.timeInMillis
+                val monthEnd =
+                    (calendar.clone() as Calendar).apply {
+                        add(Calendar.MONTH, 1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.DAY_OF_MONTH, -1)
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59)
+                    }.timeInMillis
+                transactionRepository.getTransactionDetailsForRange(
+                    monthStart, monthEnd,
+                    filters.keyword.takeIf {
+                        it.isNotBlank()
+                    },
+                    filters.account?.id, filters.category?.id,
+                )
+                    .catch { e ->
+                        Log.e(TAG, "Failed to load transactions for month", e)
+                        _uiEvent.send("Failed to load transactions.")
+                        emit(emptyList())
+                    }
+            }.combine(merchantAliases) { transactions, aliases ->
+                applyAliases(transactions, aliases)
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-        categorySpendingForSelectedMonth = combinedState.flatMapLatest { (calendar, filters) ->
-            val monthStart = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
-            val monthEnd = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, 1); set(Calendar.DAY_OF_MONTH, 1); add(Calendar.DAY_OF_MONTH, -1); set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59) }.timeInMillis
-            val typeStr = when (filters.transactionType) {
-                AnalysisTransactionType.EXPENSE -> "expense"
-                AnalysisTransactionType.INCOME -> "income"
-                AnalysisTransactionType.ALL -> null
-            }
-            transactionRepository.getSpendingByCategoryForMonth(monthStart, monthEnd, filters.keyword.takeIf { it.isNotBlank() }, filters.account?.id, filters.category?.id, typeStr)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        val financialSummaryFlow =
+            _selectedMonth.flatMapLatest { calendar ->
+                val monthStart =
+                    (calendar.clone() as Calendar).apply {
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                    }.timeInMillis
+                val monthEnd =
+                    (calendar.clone() as Calendar).apply {
+                        add(Calendar.MONTH, 1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.DAY_OF_MONTH, -1)
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59)
+                    }.timeInMillis
+                transactionRepository.getFinancialSummaryForRangeFlow(monthStart, monthEnd)
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-        merchantSpendingForSelectedMonth = combinedState.flatMapLatest { (calendar, filters) ->
-            val monthStart = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }.timeInMillis
-            val monthEnd = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, 1); set(Calendar.DAY_OF_MONTH, 1); add(Calendar.DAY_OF_MONTH, -1); set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59) }.timeInMillis
-            val typeStr = when (filters.transactionType) {
-                AnalysisTransactionType.EXPENSE -> "expense"
-                AnalysisTransactionType.INCOME -> "income"
-                AnalysisTransactionType.ALL -> null
-            }
-            transactionRepository.getSpendingByMerchantForMonth(monthStart, monthEnd, filters.keyword.takeIf { it.isNotBlank() }, filters.account?.id, filters.category?.id, typeStr)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        monthlyIncome =
+            financialSummaryFlow.map { it?.totalIncome ?: 0.0 }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-        allAccounts = accountRepository.allAccounts.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        monthlyExpenses =
+            financialSummaryFlow.map { it?.totalExpenses ?: 0.0 }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+        categorySpendingForSelectedMonth =
+            combinedState.flatMapLatest { (calendar, filters) ->
+                val monthStart =
+                    (calendar.clone() as Calendar).apply {
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                    }.timeInMillis
+                val monthEnd =
+                    (calendar.clone() as Calendar).apply {
+                        add(Calendar.MONTH, 1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.DAY_OF_MONTH, -1)
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59)
+                    }.timeInMillis
+                val typeStr =
+                    when (filters.transactionType) {
+                        AnalysisTransactionType.EXPENSE -> "expense"
+                        AnalysisTransactionType.INCOME -> "income"
+                        AnalysisTransactionType.ALL -> null
+                    }
+                transactionRepository.getSpendingByCategoryForMonth(
+                    monthStart, monthEnd,
+                    filters.keyword.takeIf {
+                        it.isNotBlank()
+                    },
+                    filters.account?.id, filters.category?.id, typeStr,
+                )
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        merchantSpendingForSelectedMonth =
+            combinedState.flatMapLatest { (calendar, filters) ->
+                val monthStart =
+                    (calendar.clone() as Calendar).apply {
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                    }.timeInMillis
+                val monthEnd =
+                    (calendar.clone() as Calendar).apply {
+                        add(Calendar.MONTH, 1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.DAY_OF_MONTH, -1)
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59)
+                    }.timeInMillis
+                val typeStr =
+                    when (filters.transactionType) {
+                        AnalysisTransactionType.EXPENSE -> "expense"
+                        AnalysisTransactionType.INCOME -> "income"
+                        AnalysisTransactionType.ALL -> null
+                    }
+                transactionRepository.getSpendingByMerchantForMonth(
+                    monthStart, monthEnd,
+                    filters.keyword.takeIf {
+                        it.isNotBlank()
+                    },
+                    filters.account?.id, filters.category?.id, typeStr,
+                )
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        allAccounts =
+            accountRepository.allAccounts.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
         allCategories = categoryRepository.allCategories
-        allTags = tagRepository.allTags.onEach {
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        allTags =
+            tagRepository.allTags.onEach {
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
-        monthlySummaries = transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
-            val startDate = firstTransactionDate ?: System.currentTimeMillis()
+        monthlySummaries =
+            transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
+                val startDate = firstTransactionDate ?: System.currentTimeMillis()
 
-            transactionRepository.getMonthlyTrends(startDate)
-                .map { trends ->
-                    val dateFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-                    val monthMap = trends.associate {
-                        val cal = Calendar.getInstance().apply { time = dateFormat.parse(it.monthYear) ?: Date() }
-                        (cal.get(Calendar.YEAR) * 100 + cal.get(Calendar.MONTH)) to it.totalExpenses
+                transactionRepository.getMonthlyTrends(startDate)
+                    .map { trends ->
+                        val dateFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                        val monthMap =
+                            trends.associate {
+                                val cal = Calendar.getInstance().apply { time = dateFormat.parse(it.monthYear) ?: Date() }
+                                (cal.get(Calendar.YEAR) * 100 + cal.get(Calendar.MONTH)) to it.totalExpenses
+                            }
+
+                        val monthList = mutableListOf<MonthlySummaryItem>()
+                        val startCal = Calendar.getInstance().apply { timeInMillis = startDate }
+                        startCal.set(Calendar.DAY_OF_MONTH, 1)
+                        val endCal = Calendar.getInstance()
+
+                        while (startCal.before(endCal) || (startCal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && startCal.get(Calendar.MONTH) == endCal.get(Calendar.MONTH))) {
+                            val key = startCal.get(Calendar.YEAR) * 100 + startCal.get(Calendar.MONTH)
+                            val spent = monthMap[key] ?: 0.0
+                            monthList.add(MonthlySummaryItem(calendar = startCal.clone() as Calendar, totalSpent = spent))
+                            startCal.add(Calendar.MONTH, 1)
+                        }
+                        monthList.reversed()
                     }
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-                    val monthList = mutableListOf<MonthlySummaryItem>()
-                    val startCal = Calendar.getInstance().apply { timeInMillis = startDate }
-                    startCal.set(Calendar.DAY_OF_MONTH, 1)
-                    val endCal = Calendar.getInstance()
-
-                    while (startCal.before(endCal) || (startCal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && startCal.get(Calendar.MONTH) == endCal.get(Calendar.MONTH))) {
-                        val key = startCal.get(Calendar.YEAR) * 100 + startCal.get(Calendar.MONTH)
-                        val spent = monthMap[key] ?: 0.0
-                        monthList.add(MonthlySummaryItem(calendar = startCal.clone() as Calendar, totalSpent = spent))
-                        startCal.add(Calendar.MONTH, 1)
-                    }
-                    monthList.reversed()
-                }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-
-        overallMonthlyBudget = _selectedMonth.flatMapLatest {
-            settingsRepository.getOverallBudgetForMonth(it.get(Calendar.YEAR), it.get(Calendar.MONTH) + 1)
-        }
-            // --- UPDATED: Handle nullable Float? and map null to 0f ---
-            .map { it ?: 0f }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+        overallMonthlyBudget =
+            _selectedMonth.flatMapLatest {
+                settingsRepository.getOverallBudgetForMonth(it.get(Calendar.YEAR), it.get(Calendar.MONTH) + 1)
+            }
+                // --- UPDATED: Handle nullable Float? and map null to 0f ---
+                .map { it ?: 0f }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
 
         amountRemaining = combine(overallMonthlyBudget, monthlyExpenses) { budget, expenses -> budget - expenses.toFloat() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
 
@@ -368,14 +455,16 @@ class TransactionViewModel(
 
     fun onAttemptToLeaveScreen(onNavigationAllowed: () -> Unit) {
         viewModelScope.launch {
-            val initial = initialTransactionStateForRetroUpdate ?: run {
-                onNavigationAllowed()
-                return@launch
-            }
-            val current = transactionRepository.getTransactionById(initial.id).first() ?: run {
-                onNavigationAllowed()
-                return@launch
-            }
+            val initial =
+                initialTransactionStateForRetroUpdate ?: run {
+                    onNavigationAllowed()
+                    return@launch
+                }
+            val current =
+                transactionRepository.getTransactionById(initial.id).first() ?: run {
+                    onNavigationAllowed()
+                    return@launch
+                }
 
             val descriptionChanged = !initial.description.equals(current.description, ignoreCase = true)
             val categoryChanged = initial.categoryId != current.categoryId
@@ -389,14 +478,15 @@ class TransactionViewModel(
             val similar = transactionRepository.findSimilarTransactions(originalDescriptionForSearch, initial.id)
 
             if (similar.isNotEmpty()) {
-                _retroUpdateSheetState.value = RetroUpdateSheetState(
-                    originalDescription = originalDescriptionForSearch,
-                    newDescription = if (descriptionChanged) current.description else null,
-                    newCategoryId = if (categoryChanged) current.categoryId else null,
-                    similarTransactions = similar,
-                    selectedIds = similar.map { it.id }.toSet(),
-                    isLoading = false
-                )
+                _retroUpdateSheetState.value =
+                    RetroUpdateSheetState(
+                        originalDescription = originalDescriptionForSearch,
+                        newDescription = if (descriptionChanged) current.description else null,
+                        newCategoryId = if (categoryChanged) current.categoryId else null,
+                        similarTransactions = similar,
+                        selectedIds = similar.map { it.id }.toSet(),
+                        isLoading = false,
+                    )
             } else {
                 onNavigationAllowed()
             }
@@ -482,24 +572,24 @@ class TransactionViewModel(
             val selectedTransactionsDetails = allTransactions.filter { it.transaction.id in selectedIds }
 
             if (selectedTransactionsDetails.isNotEmpty()) {
-                val transactionsWithData = withContext(Dispatchers.IO) {
-                    selectedTransactionsDetails.map { details ->
-                        val tags = transactionRepository.getTagsForTransactionSimple(details.transaction.id)
-                        ShareImageGenerator.TransactionSnapshotData(details = details, tags = tags)
+                val transactionsWithData =
+                    withContext(Dispatchers.IO) {
+                        selectedTransactionsDetails.map { details ->
+                            val tags = transactionRepository.getTagsForTransactionSimple(details.transaction.id)
+                            ShareImageGenerator.TransactionSnapshotData(details = details, tags = tags)
+                        }
                     }
-                }
 
                 ShareImageGenerator.shareTransactionsAsImage(
                     context = context,
                     transactionsWithData = transactionsWithData,
-                    fields = _shareableFields.value
+                    fields = _shareableFields.value,
                 )
             }
             onShareSheetDismiss()
             clearSelectionMode()
         }
     }
-
 
     fun requestCategoryChange(details: TransactionDetails) {
         _transactionForCategoryChange.value = details
@@ -513,7 +603,11 @@ class TransactionViewModel(
         return splitTransactionRepository.getSplitsForParent(transactionId)
     }
 
-    fun saveTransactionSplits(parentTransactionId: Int, splitItems: List<SplitItem>, onComplete: () -> Unit) {
+    fun saveTransactionSplits(
+        parentTransactionId: Int,
+        splitItems: List<SplitItem>,
+        onComplete: () -> Unit,
+    ) {
         viewModelScope.launch {
             try {
                 val parentTxn = transactionRepository.getTransactionById(parentTransactionId).firstOrNull() ?: return@launch
@@ -523,16 +617,17 @@ class TransactionViewModel(
                     db.transactionDao().markAsSplit(parentTransactionId, true)
                     db.splitTransactionDao().deleteSplitsForParent(parentTransactionId)
 
-                    val newSplits = splitItems.map {
-                        val originalAmount = it.amount.toDoubleOrNull() ?: 0.0
-                        SplitTransaction(
-                            parentTransactionId = parentTransactionId,
-                            amount = originalAmount * conversionRate,
-                            originalAmount = if (parentTxn.currencyCode != null) originalAmount else null,
-                            categoryId = it.category?.id,
-                            notes = it.notes
-                        )
-                    }
+                    val newSplits =
+                        splitItems.map {
+                            val originalAmount = it.amount.toDoubleOrNull() ?: 0.0
+                            SplitTransaction(
+                                parentTransactionId = parentTransactionId,
+                                amount = originalAmount * conversionRate,
+                                originalAmount = if (parentTxn.currencyCode != null) originalAmount else null,
+                                categoryId = it.category?.id,
+                                notes = it.notes,
+                            )
+                        }
                     db.splitTransactionDao().insertAll(newSplits)
                 }
                 withContext(Dispatchers.Main) {
@@ -544,7 +639,10 @@ class TransactionViewModel(
         }
     }
 
-    private fun applyAliases(transactions: List<TransactionDetails>, aliases: Map<String, String>): List<TransactionDetails> {
+    private fun applyAliases(
+        transactions: List<TransactionDetails>,
+        aliases: Map<String, String>,
+    ): List<TransactionDetails> {
         return transactions.map { details ->
             val key = (details.transaction.originalDescription ?: details.transaction.description).lowercase(Locale.getDefault())
             val newDescription = aliases[key] ?: details.transaction.description
@@ -559,7 +657,10 @@ class TransactionViewModel(
             }
     }
 
-    private fun loadVisitCount(originalDescription: String?, currentDescription: String) {
+    private fun loadVisitCount(
+        originalDescription: String?,
+        currentDescription: String,
+    ) {
         val descriptionToQuery = currentDescription
         viewModelScope.launch {
             transactionRepository.getTransactionCountForMerchant(descriptionToQuery).collect { count ->
@@ -602,11 +703,12 @@ class TransactionViewModel(
 
         // Format amount: remove .0 if integer
         val amount = transactionDetails.transaction.amount
-        val formattedAmount = if (amount % 1.0 == 0.0) {
-            amount.toInt().toString()
-        } else {
-            "%.2f".format(amount)
-        }
+        val formattedAmount =
+            if (amount % 1.0 == 0.0) {
+                amount.toInt().toString()
+            } else {
+                "%.2f".format(amount)
+            }
         _addTransactionAmount.value = formattedAmount
 
         // Populate Categories and Accounts
@@ -630,7 +732,6 @@ class TransactionViewModel(
         }
     }
 
-
     fun onSaveTapped(
         description: String,
         amountStr: String,
@@ -640,7 +741,7 @@ class TransactionViewModel(
         date: Long,
         transactionType: String,
         imageUris: List<Uri>,
-        onSaveComplete: () -> Unit
+        onSaveComplete: () -> Unit,
     ) {
         viewModelScope.launch {
             _validationError.value = null
@@ -656,16 +757,17 @@ class TransactionViewModel(
 
             val finalDescription = description.ifBlank { "Unknown" }
 
-            val transactionData = ManualTransactionData(
-                description = finalDescription,
-                amountStr = amountStr,
-                accountId = accountId,
-                notes = notes,
-                date = date,
-                transactionType = transactionType,
-                imageUris = imageUris,
-                tags = _selectedTags.value
-            )
+            val transactionData =
+                ManualTransactionData(
+                    description = finalDescription,
+                    amountStr = amountStr,
+                    accountId = accountId,
+                    notes = notes,
+                    date = date,
+                    transactionType = transactionType,
+                    imageUris = imageUris,
+                    tags = _selectedTags.value,
+                )
 
             if (categoryId == null && description.isNotBlank()) {
                 _showCategoryNudge.value = transactionData
@@ -678,7 +780,10 @@ class TransactionViewModel(
         }
     }
 
-    fun saveWithSelectedCategory(categoryId: Int?, onComplete: () -> Unit) {
+    fun saveWithSelectedCategory(
+        categoryId: Int?,
+        onComplete: () -> Unit,
+    ) {
         viewModelScope.launch {
             val transactionData = _showCategoryNudge.value
             if (transactionData != null) {
@@ -691,7 +796,10 @@ class TransactionViewModel(
         }
     }
 
-    private suspend fun saveManualTransaction(data: ManualTransactionData, categoryId: Int?): Boolean {
+    private suspend fun saveManualTransaction(
+        data: ManualTransactionData,
+        categoryId: Int?,
+    ): Boolean {
         _validationError.value = null
         val enteredAmount = data.amountStr.toDoubleOrNull()
         if (enteredAmount == null || enteredAmount <= 0.0) {
@@ -700,54 +808,57 @@ class TransactionViewModel(
         }
 
         val travelSettings = travelModeSettings.value
-        val isInternationalTravel = travelSettings?.isEnabled == true &&
+        val isInternationalTravel =
+            travelSettings?.isEnabled == true &&
                 travelSettings.tripType == TripType.INTERNATIONAL &&
                 data.date >= travelSettings.startDate &&
                 data.date <= travelSettings.endDate
 
-        val transactionToSave = if (isInternationalTravel) {
-            Transaction(
-                description = data.description,
-                originalDescription = data.description,
-                categoryId = categoryId,
-                amount = enteredAmount * (travelSettings!!.conversionRate ?: 1f),
-                date = data.date,
-                accountId = data.accountId,
-                notes = data.notes,
-                transactionType = data.transactionType,
-                isExcluded = false,
-                sourceSmsId = null,
-                sourceSmsHash = null,
-                source = "Manual Entry",
-                originalAmount = enteredAmount,
-                currencyCode = travelSettings.currencyCode,
-                conversionRate = travelSettings.conversionRate?.toDouble()
-            )
-        } else {
-            Transaction(
-                description = data.description,
-                originalDescription = data.description,
-                categoryId = categoryId,
-                amount = enteredAmount,
-                date = data.date,
-                accountId = data.accountId,
-                notes = data.notes,
-                transactionType = data.transactionType,
-                isExcluded = false,
-                sourceSmsId = null,
-                sourceSmsHash = null,
-                source = "Manual Entry"
-            )
-        }
+        val transactionToSave =
+            if (isInternationalTravel) {
+                Transaction(
+                    description = data.description,
+                    originalDescription = data.description,
+                    categoryId = categoryId,
+                    amount = enteredAmount * (travelSettings!!.conversionRate ?: 1f),
+                    date = data.date,
+                    accountId = data.accountId,
+                    notes = data.notes,
+                    transactionType = data.transactionType,
+                    isExcluded = false,
+                    sourceSmsId = null,
+                    sourceSmsHash = null,
+                    source = "Manual Entry",
+                    originalAmount = enteredAmount,
+                    currencyCode = travelSettings.currencyCode,
+                    conversionRate = travelSettings.conversionRate?.toDouble(),
+                )
+            } else {
+                Transaction(
+                    description = data.description,
+                    originalDescription = data.description,
+                    categoryId = categoryId,
+                    amount = enteredAmount,
+                    date = data.date,
+                    accountId = data.accountId,
+                    notes = data.notes,
+                    transactionType = data.transactionType,
+                    isExcluded = false,
+                    sourceSmsId = null,
+                    sourceSmsHash = null,
+                    source = "Manual Entry",
+                )
+            }
 
         return try {
-            val savedImagePaths = data.imageUris.mapNotNull { uri ->
-                saveImageToInternalStorage(uri)
-            }
+            val savedImagePaths =
+                data.imageUris.mapNotNull { uri ->
+                    saveImageToInternalStorage(uri)
+                }
             transactionRepository.insertTransactionWithTagsAndImages(
                 transactionToSave,
                 data.tags,
-                savedImagePaths
+                savedImagePaths,
             )
             true
         } catch (e: Exception) {
@@ -756,7 +867,6 @@ class TransactionViewModel(
             false
         }
     }
-
 
     fun clearAddTransactionState() {
         _selectedTags.value = emptySet()
@@ -811,44 +921,58 @@ class TransactionViewModel(
 
             val existingMappings = merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
 
-            val categoryFinderProvider = object : CategoryFinderProvider {
-                override fun getCategoryIdByName(name: String): Int? {
-                    return CategoryIconHelper.getCategoryIdByName(name)
+            val categoryFinderProvider =
+                object : CategoryFinderProvider {
+                    override fun getCategoryIdByName(name: String): Int? {
+                        return CategoryIconHelper.getCategoryIdByName(name)
+                    }
                 }
-            }
-            val customSmsRuleProvider = object : CustomSmsRuleProvider {
-                override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
-            }
-            val merchantRenameRuleProvider = object : MerchantRenameRuleProvider {
-                override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
-                override suspend fun getAllRulesMap(): Map<String, String> {
-                    return db.merchantRenameRuleDao().getAllRulesList().associateBy({ it.originalName.lowercase() }, { it.newName })
+            val customSmsRuleProvider =
+                object : CustomSmsRuleProvider {
+                    override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
                 }
-            }
-            val ignoreRuleProvider = object : IgnoreRuleProvider {
-                override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
-            }
-            val merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
-                override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-                override suspend fun getAllMappings(): Map<String, Int> {
-                    return db.merchantCategoryMappingDao().getAll().associateBy({ it.parsedName.lowercase() }, { it.categoryId })
-                }
-            }
-            val smsParseTemplateProvider = object : SmsParseTemplateProvider {
-                override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
-                override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
-            }
+            val merchantRenameRuleProvider =
+                object : MerchantRenameRuleProvider {
+                    override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
 
-            val parseResult = SmsParser.parseWithReason(
-                sms = smsMessage,
-                mappings = existingMappings,
-                customSmsRuleProvider = customSmsRuleProvider,
-                merchantRenameRuleProvider = merchantRenameRuleProvider,
-                ignoreRuleProvider = ignoreRuleProvider,
-                merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                categoryFinderProvider = categoryFinderProvider,
-                smsParseTemplateProvider = smsParseTemplateProvider
-            )
+                    override suspend fun getAllRulesMap(): Map<String, String> {
+                        return db.merchantRenameRuleDao().getAllRulesList().associateBy({ it.originalName.lowercase() }, { it.newName })
+                    }
+                }
+            val ignoreRuleProvider =
+                object : IgnoreRuleProvider {
+                    override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
+                }
+            val merchantCategoryMappingProvider =
+                object : MerchantCategoryMappingProvider {
+                    override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
+                        db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+
+                    override suspend fun getAllMappings(): Map<String, Int> {
+                        return db.merchantCategoryMappingDao().getAll().associateBy({ it.parsedName.lowercase() }, { it.categoryId })
+                    }
+                }
+            val smsParseTemplateProvider =
+                object : SmsParseTemplateProvider {
+                    override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
+
+                    override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
+                        db.smsParseTemplateDao().getTemplatesBySignature(
+                            signature,
+                        )
+                }
+
+            val parseResult =
+                SmsParser.parseWithReason(
+                    sms = smsMessage,
+                    mappings = existingMappings,
+                    customSmsRuleProvider = customSmsRuleProvider,
+                    merchantRenameRuleProvider = merchantRenameRuleProvider,
+                    ignoreRuleProvider = ignoreRuleProvider,
+                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                    categoryFinderProvider = categoryFinderProvider,
+                    smsParseTemplateProvider = smsParseTemplateProvider,
+                )
 
             if (parseResult is ParseResult.Success) {
                 // --- AUTO-HEALING ---
@@ -890,7 +1014,6 @@ class TransactionViewModel(
         }
     }
 
-
     fun updateFilterKeyword(keyword: String) {
         _filterState.update { it.copy(keyword = keyword) }
     }
@@ -923,7 +1046,11 @@ class TransactionViewModel(
         _selectedMonth.value = calendar
     }
 
-    fun createAccount(name: String, type: String, onAccountCreated: (Account) -> Unit) {
+    fun createAccount(
+        name: String,
+        type: String,
+        onAccountCreated: (Account) -> Unit,
+    ) {
         if (name.isBlank() || type.isBlank()) return
         viewModelScope.launch {
             val existingAccount = db.accountDao().findByName(name)
@@ -939,7 +1066,12 @@ class TransactionViewModel(
         }
     }
 
-    fun createCategory(name: String, iconKey: String, colorKey: String, onCategoryCreated: (Category) -> Unit) {
+    fun createCategory(
+        name: String,
+        iconKey: String,
+        colorKey: String,
+        onCategoryCreated: (Category) -> Unit,
+    ) {
         if (name.isBlank()) return
         viewModelScope.launch {
             val existingCategory = db.categoryDao().findByName(name)
@@ -960,7 +1092,10 @@ class TransactionViewModel(
         }
     }
 
-    fun attachPhotoToTransaction(transactionId: Int, sourceUri: Uri) {
+    fun attachPhotoToTransaction(
+        transactionId: Int,
+        sourceUri: Uri,
+    ) {
         viewModelScope.launch {
             val localPath = saveImageToInternalStorage(sourceUri)
             if (localPath != null) {
@@ -1014,7 +1149,10 @@ class TransactionViewModel(
         }
     }
 
-    fun updateTransactionDescription(id: Int, newDescription: String) = viewModelScope.launch {
+    fun updateTransactionDescription(
+        id: Int,
+        newDescription: String,
+    ) = viewModelScope.launch {
         try {
             if (newDescription.isNotBlank()) {
                 val transaction = transactionRepository.getTransactionById(id).firstOrNull()
@@ -1030,7 +1168,7 @@ class TransactionViewModel(
                                     transaction = transaction,
                                     correctedMerchant = newDescription,
                                     originalMerchantStartIndex = merchantIndex,
-                                    originalMerchantEndIndex = merchantIndex + original.length
+                                    originalMerchantEndIndex = merchantIndex + original.length,
                                 )
                             }
                         }
@@ -1066,13 +1204,12 @@ class TransactionViewModel(
         }
     }
 
-
     private suspend fun createAndStoreTemplate(
         smsBody: String,
         transaction: Transaction,
         correctedMerchant: String,
         originalMerchantStartIndex: Int,
-        originalMerchantEndIndex: Int
+        originalMerchantEndIndex: Int,
     ) {
         val amountToFind = transaction.originalAmount ?: transaction.amount
 
@@ -1085,9 +1222,10 @@ class TransactionViewModel(
             return
         }
 
-        val amountStr = amountRegex.findAll(smsBody).find {
-            it.value.replace(",", "").toDoubleOrNull() == matchingAmountValue
-        }?.value ?: return
+        val amountStr =
+            amountRegex.findAll(smsBody).find {
+                it.value.replace(",", "").toDoubleOrNull() == matchingAmountValue
+            }?.value ?: return
 
         val amountIndex = smsBody.indexOf(amountStr)
 
@@ -1098,22 +1236,25 @@ class TransactionViewModel(
 
         val signature = SmsParser.generateSmsSignature(smsBody)
 
-        val template = SmsParseTemplate(
-            templateSignature = signature,
-            correctedMerchantName = correctedMerchant,
-            originalSmsBody = smsBody,
-            originalAmountStartIndex = amountIndex,
-            originalAmountEndIndex = amountIndex + amountStr.length,
-            originalMerchantStartIndex = originalMerchantStartIndex,
-            originalMerchantEndIndex = originalMerchantEndIndex
-        )
+        val template =
+            SmsParseTemplate(
+                templateSignature = signature,
+                correctedMerchantName = correctedMerchant,
+                originalSmsBody = smsBody,
+                originalAmountStartIndex = amountIndex,
+                originalAmountEndIndex = amountIndex + amountStr.length,
+                originalMerchantStartIndex = originalMerchantStartIndex,
+                originalMerchantEndIndex = originalMerchantEndIndex,
+            )
 
         smsParseTemplateDao.insert(template)
         Log.d(TAG, "Successfully created and stored a new SMS parse template.")
     }
 
-
-    fun updateTransactionAmount(id: Int, amountStr: String) = viewModelScope.launch {
+    fun updateTransactionAmount(
+        id: Int,
+        amountStr: String,
+    ) = viewModelScope.launch {
         amountStr.toDoubleOrNull()?.let {
             if (it > 0) {
                 transactionRepository.updateAmount(id, it)
@@ -1121,41 +1262,59 @@ class TransactionViewModel(
         }
     }
 
-    fun updateTransactionNotes(id: Int, notes: String) = viewModelScope.launch {
+    fun updateTransactionNotes(
+        id: Int,
+        notes: String,
+    ) = viewModelScope.launch {
         transactionRepository.updateNotes(id, notes.takeIf { it.isNotBlank() })
     }
 
     // --- THIS IS THE FIX ---
     // Removed `(Dispatchers.IO)` from the coroutine launch.
-    fun updateTransactionCategory(id: Int, categoryId: Int?) = viewModelScope.launch {
+    fun updateTransactionCategory(
+        id: Int,
+        categoryId: Int?,
+    ) = viewModelScope.launch {
         val transaction = transactionRepository.getTransactionById(id).first() ?: return@launch
         transactionRepository.updateCategoryId(id, categoryId)
 
         val originalDescription = transaction.originalDescription
         if (categoryId != null && !originalDescription.isNullOrBlank()) {
-            val mapping = MerchantCategoryMapping(
-                parsedName = originalDescription,
-                categoryId = categoryId
-            )
+            val mapping =
+                MerchantCategoryMapping(
+                    parsedName = originalDescription,
+                    categoryId = categoryId,
+                )
             merchantCategoryMappingRepository.insert(mapping)
         }
     }
 
-
-    fun updateTransactionAccount(id: Int, accountId: Int) = viewModelScope.launch {
+    fun updateTransactionAccount(
+        id: Int,
+        accountId: Int,
+    ) = viewModelScope.launch {
         transactionRepository.updateAccountId(id, accountId)
     }
 
-    fun updateTransactionDate(id: Int, date: Long) = viewModelScope.launch {
+    fun updateTransactionDate(
+        id: Int,
+        date: Long,
+    ) = viewModelScope.launch {
         transactionRepository.updateDate(id, date)
     }
 
-    fun updateTransactionExclusion(id: Int, isExcluded: Boolean) = viewModelScope.launch {
+    fun updateTransactionExclusion(
+        id: Int,
+        isExcluded: Boolean,
+    ) = viewModelScope.launch {
         transactionRepository.updateExclusionStatus(id, isExcluded)
     }
 
     // --- NEW: Function to update transaction type ---
-    fun updateTransactionType(id: Int, transactionType: String) = viewModelScope.launch {
+    fun updateTransactionType(
+        id: Int,
+        transactionType: String,
+    ) = viewModelScope.launch {
         try {
             transactionRepository.updateTransactionType(id, transactionType)
         } catch (e: Exception) {
@@ -1164,14 +1323,15 @@ class TransactionViewModel(
         }
     }
 
-    fun updateTagsForTransaction(transactionId: Int) = viewModelScope.launch {
-        try {
-            transactionRepository.updateTagsForTransaction(transactionId, _selectedTags.value)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to update tags", e)
-            _uiEvent.send("Failed to update tags. Please try again.")
+    fun updateTagsForTransaction(transactionId: Int) =
+        viewModelScope.launch {
+            try {
+                transactionRepository.updateTagsForTransaction(transactionId, _selectedTags.value)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update tags", e)
+                _uiEvent.send("Failed to update tags. Please try again.")
+            }
         }
-    }
 
     fun onTagSelected(tag: Tag) {
         _selectedTags.update { if (tag in it) it - tag else it + tag }
@@ -1223,7 +1383,7 @@ class TransactionViewModel(
         categoryId: Int?,
         notes: String?,
         tags: Set<Tag>,
-        isForeign: Boolean
+        isForeign: Boolean,
     ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -1239,52 +1399,54 @@ class TransactionViewModel(
 
                 if (account == null) return@withContext false
 
-                val transactionToSave = if (isForeign) {
-                    val travelSettings = settingsRepository.getTravelModeSettings().first()
-                    if (travelSettings == null) {
-                        Log.e(TAG, "Attempted to save foreign SMS transaction, but Travel Mode is not configured.")
-                        return@withContext false
+                val transactionToSave =
+                    if (isForeign) {
+                        val travelSettings = settingsRepository.getTravelModeSettings().first()
+                        if (travelSettings == null) {
+                            Log.e(TAG, "Attempted to save foreign SMS transaction, but Travel Mode is not configured.")
+                            return@withContext false
+                        }
+                        Transaction(
+                            description = description,
+                            originalDescription = potentialTxn.merchantName,
+                            categoryId = categoryId,
+                            amount = potentialTxn.amount * (travelSettings.conversionRate ?: 1f),
+                            date = potentialTxn.date,
+                            accountId = account.id,
+                            notes = notes,
+                            transactionType = potentialTxn.transactionType,
+                            sourceSmsId = potentialTxn.sourceSmsId,
+                            sourceSmsHash = potentialTxn.sourceSmsHash,
+                            source = "Imported",
+                            originalAmount = potentialTxn.amount,
+                            currencyCode = travelSettings.currencyCode,
+                            conversionRate = travelSettings.conversionRate?.toDouble(),
+                        )
+                    } else {
+                        Transaction(
+                            description = description,
+                            originalDescription = potentialTxn.merchantName,
+                            categoryId = categoryId,
+                            amount = potentialTxn.amount,
+                            date = potentialTxn.date,
+                            accountId = account.id,
+                            notes = notes,
+                            transactionType = potentialTxn.transactionType,
+                            sourceSmsId = potentialTxn.sourceSmsId,
+                            sourceSmsHash = potentialTxn.sourceSmsHash,
+                            source = "Imported",
+                        )
                     }
-                    Transaction(
-                        description = description,
-                        originalDescription = potentialTxn.merchantName,
-                        categoryId = categoryId,
-                        amount = potentialTxn.amount * (travelSettings.conversionRate ?: 1f),
-                        date = potentialTxn.date,
-                        accountId = account.id,
-                        notes = notes,
-                        transactionType = potentialTxn.transactionType,
-                        sourceSmsId = potentialTxn.sourceSmsId,
-                        sourceSmsHash = potentialTxn.sourceSmsHash,
-                        source = "Imported",
-                        originalAmount = potentialTxn.amount,
-                        currencyCode = travelSettings.currencyCode,
-                        conversionRate = travelSettings.conversionRate?.toDouble()
-                    )
-                } else {
-                    Transaction(
-                        description = description,
-                        originalDescription = potentialTxn.merchantName,
-                        categoryId = categoryId,
-                        amount = potentialTxn.amount,
-                        date = potentialTxn.date,
-                        accountId = account.id,
-                        notes = notes,
-                        transactionType = potentialTxn.transactionType,
-                        sourceSmsId = potentialTxn.sourceSmsId,
-                        sourceSmsHash = potentialTxn.sourceSmsHash,
-                        source = "Imported"
-                    )
-                }
 
                 transactionRepository.insertTransactionWithTags(transactionToSave, tags)
 
                 val merchantName = potentialTxn.merchantName
                 if (categoryId != null && merchantName != null) {
-                    val mapping = MerchantCategoryMapping(
-                        parsedName = merchantName,
-                        categoryId = categoryId
-                    )
+                    val mapping =
+                        MerchantCategoryMapping(
+                            parsedName = merchantName,
+                            categoryId = categoryId,
+                        )
                     merchantCategoryMappingRepository.insert(mapping)
                 }
 
@@ -1296,7 +1458,10 @@ class TransactionViewModel(
         }
     }
 
-    suspend fun autoSaveSmsTransaction(potentialTxn: PotentialTransaction, source: String = "Auto-Captured"): Boolean {
+    suspend fun autoSaveSmsTransaction(
+        potentialTxn: PotentialTransaction,
+        source: String = "Auto-Captured",
+    ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
@@ -1320,25 +1485,25 @@ class TransactionViewModel(
                     finalAccountId = account?.id
                 }
 
-
                 if (finalAccountId == null) {
                     Log.e(TAG, "Auto-save failed: Could not find or create account '$accountName'")
                     return@withContext false
                 }
 
-                val transactionToSave = Transaction(
-                    description = potentialTxn.merchantName ?: "Unknown Merchant",
-                    originalDescription = potentialTxn.merchantName,
-                    categoryId = potentialTxn.categoryId,
-                    amount = potentialTxn.amount,
-                    date = potentialTxn.date,
-                    accountId = finalAccountId,
-                    notes = null,
-                    transactionType = potentialTxn.transactionType,
-                    sourceSmsId = potentialTxn.sourceSmsId,
-                    sourceSmsHash = potentialTxn.sourceSmsHash,
-                    source = source
-                )
+                val transactionToSave =
+                    Transaction(
+                        description = potentialTxn.merchantName ?: "Unknown Merchant",
+                        originalDescription = potentialTxn.merchantName,
+                        categoryId = potentialTxn.categoryId,
+                        amount = potentialTxn.amount,
+                        date = potentialTxn.date,
+                        accountId = finalAccountId,
+                        notes = null,
+                        transactionType = potentialTxn.transactionType,
+                        sourceSmsId = potentialTxn.sourceSmsId,
+                        sourceSmsHash = potentialTxn.sourceSmsHash,
+                        source = source,
+                    )
 
                 transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
                 true
@@ -1362,14 +1527,16 @@ class TransactionViewModel(
     fun unsplitTransaction(transaction: Transaction) {
         viewModelScope.launch {
             db.withTransaction {
-                val firstSplitCategory = db.splitTransactionDao().getSplitsForParentSimple(transaction.id).firstOrNull()?.splitTransaction?.categoryId
+                val firstSplitCategory =
+                    db.splitTransactionDao().getSplitsForParentSimple(
+                        transaction.id,
+                    ).firstOrNull()?.splitTransaction?.categoryId
                 db.splitTransactionDao().deleteSplitsForParent(transaction.id)
                 val originalDescription = transaction.originalDescription ?: transaction.description
                 db.transactionDao().unmarkAsSplit(transaction.id, originalDescription, firstSplitCategory)
             }
         }
     }
-
 
     fun clearError() {
         _validationError.value = null
@@ -1382,9 +1549,10 @@ class TransactionViewModel(
     fun toggleRetroUpdateSelection(id: Int) {
         _retroUpdateSheetState.update { currentState ->
             currentState?.copy(
-                selectedIds = currentState.selectedIds.toMutableSet().apply {
-                    if (id in this) remove(id) else add(id)
-                }
+                selectedIds =
+                    currentState.selectedIds.toMutableSet().apply {
+                        if (id in this) remove(id) else add(id)
+                    },
             )
         }
     }
@@ -1434,5 +1602,4 @@ class TransactionViewModel(
             }
         }
     }
-
 }

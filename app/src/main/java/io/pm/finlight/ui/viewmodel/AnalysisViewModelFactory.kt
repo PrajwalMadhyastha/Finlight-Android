@@ -19,7 +19,7 @@ class AnalysisViewModelFactory(private val application: Application) : ViewModel
             return AnalysisViewModel(
                 transactionDao = db.transactionDao(),
                 categoryDao = db.categoryDao(),
-                tagDao = db.tagDao()
+                tagDao = db.tagDao(),
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

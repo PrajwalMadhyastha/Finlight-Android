@@ -34,13 +34,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import io.pm.finlight.ui.components.AuroraProgressBar
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.MonthlySummaryItem
 import io.pm.finlight.TransactionViewModel
+import io.pm.finlight.ui.components.AuroraProgressBar
 import io.pm.finlight.ui.components.FilterBottomSheet
 import io.pm.finlight.ui.components.PrivacyAwareText
 import io.pm.finlight.ui.components.ShareSnapshotSheet
@@ -60,7 +60,7 @@ import kotlin.math.roundToLong
 fun TransactionListScreen(
     navController: NavController,
     viewModel: TransactionViewModel,
-    initialTab: Int = 0
+    initialTab: Int = 0,
 ) {
     val tabs = listOf("Transactions", "Categories", "Merchants")
     val pagerState = rememberPagerState(initialPage = initialTab) { tabs.size }
@@ -97,9 +97,8 @@ fun TransactionListScreen(
         }
     }
 
-
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) {
         MonthlySummaryHeader(
             selectedMonth = selectedMonth,
@@ -108,15 +107,15 @@ fun TransactionListScreen(
             totalIncome = totalIncome.roundToLong(),
             budget = budget,
             onMonthSelected = { viewModel.setSelectedMonth(it) },
-            isPrivacyModeEnabled = isPrivacyModeEnabled // --- NEW: Pass state
+            isPrivacyModeEnabled = isPrivacyModeEnabled, // --- NEW: Pass state
         )
         TabRow(
             selectedTabIndex = pagerState.currentPage,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
-                    Modifier.pagerTabIndicatorOffset(pagerState, tabPositions)
+                    Modifier.pagerTabIndicatorOffset(pagerState, tabPositions),
                 )
-            }
+            },
         ) {
             tabs.forEachIndexed { index, title ->
                 Tab(
@@ -126,52 +125,54 @@ fun TransactionListScreen(
                             pagerState.animateScrollToPage(index)
                         }
                     },
-                    text = { Text(title) }
+                    text = { Text(title) },
                 )
             }
         }
 
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         ) { page ->
             when (page) {
-                0 -> TransactionList(
-                    transactions = transactions,
-                    navController = navController,
-                    onCategoryClick = { viewModel.requestCategoryChange(it) },
-                    isSelectionMode = isSelectionMode,
-                    selectedIds = selectedIds,
-                    onEnterSelectionMode = { viewModel.enterSelectionMode(it) },
-                    onToggleSelection = { viewModel.toggleTransactionSelection(it) }
-                )
-                1 -> CategorySpendingScreen(
-                    spendingList = categorySpending,
-                    onCategoryClick = { categorySpendingItem ->
-                        val month = selectedMonth.get(Calendar.MONTH) + 1
-                        val year = selectedMonth.get(Calendar.YEAR)
-                        val encodedCategoryName = URLEncoder.encode(categorySpendingItem.categoryName, "UTF-8")
-                        navController.navigate("category_detail/$encodedCategoryName/$month/$year")
-                    }
-                )
-                2 -> MerchantSpendingScreen(
-                    merchantList = merchantSpending,
-                    onMerchantClick = { merchantSpendingSummary ->
-                        val month = selectedMonth.get(Calendar.MONTH) + 1
-                        val year = selectedMonth.get(Calendar.YEAR)
-                        val encodedMerchantName = URLEncoder.encode(merchantSpendingSummary.merchantName, "UTF-8")
-                        navController.navigate("merchant_detail/$encodedMerchantName/$month/$year")
-                    }
-                )
+                0 ->
+                    TransactionList(
+                        transactions = transactions,
+                        navController = navController,
+                        onCategoryClick = { viewModel.requestCategoryChange(it) },
+                        isSelectionMode = isSelectionMode,
+                        selectedIds = selectedIds,
+                        onEnterSelectionMode = { viewModel.enterSelectionMode(it) },
+                        onToggleSelection = { viewModel.toggleTransactionSelection(it) },
+                    )
+                1 ->
+                    CategorySpendingScreen(
+                        spendingList = categorySpending,
+                        onCategoryClick = { categorySpendingItem ->
+                            val month = selectedMonth.get(Calendar.MONTH) + 1
+                            val year = selectedMonth.get(Calendar.YEAR)
+                            val encodedCategoryName = URLEncoder.encode(categorySpendingItem.categoryName, "UTF-8")
+                            navController.navigate("category_detail/$encodedCategoryName/$month/$year")
+                        },
+                    )
+                2 ->
+                    MerchantSpendingScreen(
+                        merchantList = merchantSpending,
+                        onMerchantClick = { merchantSpendingSummary ->
+                            val month = selectedMonth.get(Calendar.MONTH) + 1
+                            val year = selectedMonth.get(Calendar.YEAR)
+                            val encodedMerchantName = URLEncoder.encode(merchantSpendingSummary.merchantName, "UTF-8")
+                            navController.navigate("merchant_detail/$encodedMerchantName/$month/$year")
+                        },
+                    )
             }
         }
     }
 
-
     if (showFilterSheet) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.onFilterSheetDismiss() },
-            containerColor = if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight
+            containerColor = if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight,
         ) {
             FilterBottomSheet(
                 filterState = filterState,
@@ -181,7 +182,7 @@ fun TransactionListScreen(
                 onAccountChange = viewModel::updateFilterAccount,
                 onCategoryChange = viewModel::updateFilterCategory,
                 onTransactionTypeChange = viewModel::updateFilterTransactionType,
-                onClearFilters = viewModel::clearFilters
+                onClearFilters = viewModel::clearFilters,
             )
         }
     }
@@ -192,7 +193,7 @@ fun TransactionListScreen(
             onDismissRequest = { viewModel.onShareSheetDismiss() },
             sheetState = sheetState,
             containerColor = if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight,
-            windowInsets = WindowInsets(0)
+            windowInsets = WindowInsets(0),
         ) {
             ShareSnapshotSheet(
                 selectedFields = shareableFields,
@@ -200,7 +201,7 @@ fun TransactionListScreen(
                 onGenerateClick = {
                     viewModel.generateAndShareSnapshot(context)
                 },
-                onCancelClick = { viewModel.onShareSheetDismiss() }
+                onCancelClick = { viewModel.onShareSheetDismiss() },
             )
         }
     }
@@ -215,45 +216,49 @@ fun MonthlySummaryHeader(
     budget: Float,
     onMonthSelected: (Calendar) -> Unit,
     // --- NEW: Accept privacy mode state ---
-    isPrivacyModeEnabled: Boolean
+    isPrivacyModeEnabled: Boolean,
 ) {
     val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
     val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
     var showMonthScroller by remember { mutableStateOf(false) }
 
-    val currencyFormat = remember {
-        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            .apply { maximumFractionDigits = 0 }
-    }
+    val currencyFormat =
+        remember {
+            NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+                .apply { maximumFractionDigits = 0 }
+        }
 
-    val selectedTabIndex = monthlySummaries.indexOfFirst {
-        it.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
+    val selectedTabIndex =
+        monthlySummaries.indexOfFirst {
+            it.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
                 it.calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
-    }.coerceAtLeast(0)
+        }.coerceAtLeast(0)
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showMonthScroller = !showMonthScroller }
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { showMonthScroller = !showMonthScroller }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = monthYearFormat.format(selectedMonth.time),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Icon(
                     imageVector = if (showMonthScroller) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
                     contentDescription = if (showMonthScroller) "Hide month selector" else "Show month selector",
-                    tint = MaterialTheme.colorScheme.onSurface
+                    tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -261,16 +266,17 @@ fun MonthlySummaryHeader(
         AnimatedVisibility(
             visible = showMonthScroller,
             enter = expandVertically(animationSpec = tween(200)),
-            exit = shrinkVertically(animationSpec = tween(200))
+            exit = shrinkVertically(animationSpec = tween(200)),
         ) {
             ScrollableTabRow(
                 selectedTabIndex = selectedTabIndex,
                 edgePadding = 16.dp,
                 indicator = {},
-                divider = {}
+                divider = {},
             ) {
                 monthlySummaries.forEach { summaryItem ->
-                    val isSelected = summaryItem.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
+                    val isSelected =
+                        summaryItem.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
                             summaryItem.calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
                     Tab(
                         selected = isSelected,
@@ -283,29 +289,29 @@ fun MonthlySummaryHeader(
                                 Text(
                                     text = monthFormat.format(summaryItem.calendar.time),
                                     style = if (isSelected) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                 )
                                 Text(
                                     text = formatAmountInLakhs(summaryItem.totalSpent.roundToLong()),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                        }
+                        },
                     )
                 }
             }
         }
 
-
         Spacer(Modifier.height(16.dp))
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Total Spent", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -315,7 +321,7 @@ fun MonthlySummaryHeader(
                     isPrivacyMode = isPrivacyModeEnabled,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -326,7 +332,7 @@ fun MonthlySummaryHeader(
                     isPrivacyMode = isPrivacyModeEnabled,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -338,29 +344,30 @@ fun MonthlySummaryHeader(
                 spent = totalSpent,
                 budget = budget.roundToLong(),
                 modifier = Modifier.padding(horizontal = 16.dp),
-                isPrivacyModeEnabled = isPrivacyModeEnabled // --- NEW: Pass state
+                isPrivacyModeEnabled = isPrivacyModeEnabled, // --- NEW: Pass state
             )
         } else {
             Text(
                 text = "No budget set for this month.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
             )
         }
     }
 }
 
 private fun formatAmountInLakhs(amount: Long): String {
-    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-        .apply { maximumFractionDigits = 0 }
+    val currencyFormat =
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
     if (amount < 1000) return currencyFormat.format(amount)
     if (amount < 100000) return "${currencyFormat.format(amount / 1000)}K"
     return "${NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 2 }.format(amount / 100000.0)}L"
 }
-
 
 @Composable
 fun BudgetProgress(
@@ -368,14 +375,15 @@ fun BudgetProgress(
     budget: Long,
     modifier: Modifier = Modifier,
     // --- NEW: Accept privacy mode state ---
-    isPrivacyModeEnabled: Boolean = false
+    isPrivacyModeEnabled: Boolean = false,
 ) {
     val progress = if (budget > 0) (spent.toFloat() / budget.toFloat()) else 0f
 
-    val currencyFormat = remember {
-        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            .apply { maximumFractionDigits = 0 }
-    }
+    val currencyFormat =
+        remember {
+            NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+                .apply { maximumFractionDigits = 0 }
+        }
 
     Column(modifier = modifier.fillMaxWidth()) {
         AuroraProgressBar(progress = progress)
@@ -388,7 +396,7 @@ fun BudgetProgress(
                 prefix = "Spent: ",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
             // --- MODIFIED: Use PrivacyAwareText ---
             PrivacyAwareText(
@@ -396,7 +404,7 @@ fun BudgetProgress(
                 isPrivacyMode = isPrivacyModeEnabled,
                 prefix = "Budget: ",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

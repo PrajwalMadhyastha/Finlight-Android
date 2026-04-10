@@ -13,9 +13,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TransactionDao {
-
     // --- NEW: Query for calculating average daily spending for the new report logic ---
-    @Query("""
+    @Query(
+        """
         WITH AtomicExpenses AS (
             SELECT T.amount FROM transactions AS T
             WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.date BETWEEN :startDate AND :endDate
@@ -26,12 +26,16 @@ interface TransactionDao {
         )
         SELECT SUM(AE.amount) / (CAST((:endDate - :startDate) AS REAL) / 86400000.0)
         FROM AtomicExpenses AS AE
-    """)
-    suspend fun getAverageDailySpendingForRange(startDate: Long, endDate: Long): Double?
-
+    """,
+    )
+    suspend fun getAverageDailySpendingForRange(
+        startDate: Long,
+        endDate: Long,
+    ): Double?
 
     // --- NEW: Query for Spending Velocity ---
-    @Query("""
+    @Query(
+        """
         WITH AtomicExpenses AS (
             SELECT T.amount FROM transactions AS T
             WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.date >= :startDate
@@ -41,16 +45,19 @@ interface TransactionDao {
             WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.date >= :startDate
         )
         SELECT SUM(AE.amount) FROM AtomicExpenses AS AE
-    """)
+    """,
+    )
     suspend fun getTotalExpensesSince(startDate: Long): Double?
-
 
     // --- UPDATED: Spending Analysis Queries with Filtering ---
 
-    @Query("SELECT DISTINCT description FROM transactions WHERE transactionType = 'expense' AND isExcluded = 0 AND description IS NOT NULL ORDER BY description ASC")
+    @Query(
+        "SELECT DISTINCT description FROM transactions WHERE transactionType = 'expense' AND isExcluded = 0 AND description IS NOT NULL ORDER BY description ASC",
+    )
     fun getAllExpenseMerchants(): Flow<List<String>>
 
-    @Query("""
+    @Query(
+        """
         WITH AllExpenses AS (
             SELECT T.id, T.categoryId, T.amount, T.description
             FROM transactions T
@@ -78,10 +85,21 @@ interface TransactionDao {
           AND (:filterCategoryId IS NULL OR C.id = :filterCategoryId)
         GROUP BY C.id, C.name
         ORDER BY totalAmount DESC
-    """)
-    fun getSpendingAnalysisByCategory(startDate: Long, endDate: Long, filterTagId: Int?, filterMerchantName: String?, filterCategoryId: Int?, searchQuery: String?, includeExcluded: Boolean, transactionType: String?): Flow<List<SpendingAnalysisItem>>
+    """,
+    )
+    fun getSpendingAnalysisByCategory(
+        startDate: Long,
+        endDate: Long,
+        filterTagId: Int?,
+        filterMerchantName: String?,
+        filterCategoryId: Int?,
+        searchQuery: String?,
+        includeExcluded: Boolean,
+        transactionType: String?,
+    ): Flow<List<SpendingAnalysisItem>>
 
-    @Query("""
+    @Query(
+        """
         WITH AllExpenses AS (
             SELECT T.id, T.categoryId, T.amount, T.description
             FROM transactions T
@@ -107,8 +125,18 @@ interface TransactionDao {
             AND (:filterTagId IS NULL OR TG.id = :filterTagId)
         GROUP BY TG.id, TG.name
         ORDER BY totalAmount DESC
-    """)
-    fun getSpendingAnalysisByTag(startDate: Long, endDate: Long, filterCategoryId: Int?, filterMerchantName: String?, filterTagId: Int?, searchQuery: String?, includeExcluded: Boolean, transactionType: String?): Flow<List<SpendingAnalysisItem>>
+    """,
+    )
+    fun getSpendingAnalysisByTag(
+        startDate: Long,
+        endDate: Long,
+        filterCategoryId: Int?,
+        filterMerchantName: String?,
+        filterTagId: Int?,
+        searchQuery: String?,
+        includeExcluded: Boolean,
+        transactionType: String?,
+    ): Flow<List<SpendingAnalysisItem>>
 
     // =============================================================================
     // --- FIX: Corrected the merchant analysis query to prevent crashes. ---
@@ -116,7 +144,8 @@ interface TransactionDao {
     // like "Amazon" and "amazon". It also uses `MIN(AE.description)` to select a
     // consistent display name for the grouped results.
     // =============================================================================
-    @Query("""
+    @Query(
+        """
         WITH AllExpenses AS (
             SELECT T.id, T.categoryId, T.amount, T.description
             FROM transactions T
@@ -144,12 +173,22 @@ interface TransactionDao {
             AND (:filterMerchantName IS NULL OR AE.description = :filterMerchantName)
         GROUP BY dimensionId
         ORDER BY totalAmount DESC
-    """)
-    fun getSpendingAnalysisByMerchant(startDate: Long, endDate: Long, filterCategoryId: Int?, filterTagId: Int?, filterMerchantName: String?, searchQuery: String?, includeExcluded: Boolean, transactionType: String?): Flow<List<SpendingAnalysisItem>>
-
+    """,
+    )
+    fun getSpendingAnalysisByMerchant(
+        startDate: Long,
+        endDate: Long,
+        filterCategoryId: Int?,
+        filterTagId: Int?,
+        filterMerchantName: String?,
+        searchQuery: String?,
+        includeExcluded: Boolean,
+        transactionType: String?,
+    ): Flow<List<SpendingAnalysisItem>>
 
     @androidx.room.Transaction
-    @Query("""
+    @Query(
+        """
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
         (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM transactions AS T
@@ -157,11 +196,17 @@ interface TransactionDao {
         LEFT JOIN categories AS C ON T.categoryId = C.id
         WHERE T.categoryId = :categoryId AND T.date BETWEEN :startDate AND :endDate
         ORDER BY T.date DESC
-    """)
-    fun getTransactionsForCategoryInRange(categoryId: Int, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
+    """,
+    )
+    fun getTransactionsForCategoryInRange(
+        categoryId: Int,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>>
 
     @androidx.room.Transaction
-    @Query("""
+    @Query(
+        """
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
         (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM transactions AS T
@@ -170,11 +215,17 @@ interface TransactionDao {
         LEFT JOIN categories AS C ON T.categoryId = C.id
         WHERE TTCR.tagId = :tagId AND T.date BETWEEN :startDate AND :endDate
         ORDER BY T.date DESC
-    """)
-    fun getTransactionsForTagInRange(tagId: Int, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
+    """,
+    )
+    fun getTransactionsForTagInRange(
+        tagId: Int,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>>
 
     @androidx.room.Transaction
-    @Query("""
+    @Query(
+        """
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
         (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM transactions AS T
@@ -182,11 +233,16 @@ interface TransactionDao {
         LEFT JOIN categories AS C ON T.categoryId = C.id
         WHERE LOWER(T.description) = :merchantName AND T.date BETWEEN :startDate AND :endDate
         ORDER BY T.date DESC
-    """)
-    fun getTransactionsForMerchantInRange(merchantName: String, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
+    """,
+    )
+    fun getTransactionsForMerchantInRange(
+        merchantName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>>
 
-
-    @Query("""
+    @Query(
+        """
         SELECT
             T.description,
             T.categoryId,
@@ -203,7 +259,8 @@ interface TransactionDao {
         GROUP BY LOWER(T.description), T.categoryId, T.accountId -- Added T.accountId to GROUP BY
         ORDER BY MAX(T.date) DESC
         LIMIT 10
-    """)
+    """,
+    )
     fun searchMerchants(query: String): Flow<List<MerchantPrediction>>
 
     @Query("DELETE FROM transactions WHERE id IN (:transactionIds)")
@@ -213,16 +270,26 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE id = :transactionId")
     fun getTransactionWithSplits(transactionId: Int): Flow<TransactionWithSplits?>
 
-    @Query("UPDATE transactions SET isSplit = :isSplit, categoryId = CASE WHEN :isSplit = 1 THEN NULL ELSE categoryId END, description = CASE WHEN :isSplit = 1 THEN 'Split Transaction' ELSE description END WHERE id = :transactionId")
-    suspend fun markAsSplit(transactionId: Int, isSplit: Boolean)
+    @Query(
+        "UPDATE transactions SET isSplit = :isSplit, categoryId = CASE WHEN :isSplit = 1 THEN NULL ELSE categoryId END, description = CASE WHEN :isSplit = 1 THEN 'Split Transaction' ELSE description END WHERE id = :transactionId",
+    )
+    suspend fun markAsSplit(
+        transactionId: Int,
+        isSplit: Boolean,
+    )
 
-    @Query("""
+    @Query(
+        """
         UPDATE transactions 
         SET isSplit = 0, description = :originalDescription, categoryId = :newCategoryId
         WHERE id = :transactionId
-    """)
-    suspend fun unmarkAsSplit(transactionId: Int, originalDescription: String, newCategoryId: Int?)
-
+    """,
+    )
+    suspend fun unmarkAsSplit(
+        transactionId: Int,
+        originalDescription: String,
+        newCategoryId: Int?,
+    )
 
     @Query("SELECT MIN(date) FROM transactions")
     fun getFirstTransactionDate(): Flow<Long?>
@@ -232,7 +299,6 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions WHERE smsSignature = :signature ORDER BY date ASC")
     suspend fun getTransactionsBySignature(signature: String): List<Transaction>
-
 
     @Query(
         """
@@ -253,9 +319,12 @@ interface TransactionDao {
         GROUP BY C.name
         ORDER BY totalAmount DESC
         LIMIT 3
-    """
+    """,
     )
-    suspend fun getTopSpendingCategoriesForRange(startDate: Long, endDate: Long): List<CategorySpending>
+    suspend fun getTopSpendingCategoriesForRange(
+        startDate: Long,
+        endDate: Long,
+    ): List<CategorySpending>
 
     @Query(
         """
@@ -274,17 +343,25 @@ interface TransactionDao {
         GROUP BY C.name
         ORDER BY totalAmount DESC
         LIMIT 1
-    """
+    """,
     )
-    fun getTopSpendingCategoriesForRangeFlow(startDate: Long, endDate: Long): Flow<CategorySpending?>
-
+    fun getTopSpendingCategoriesForRangeFlow(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<CategorySpending?>
 
     @Query("UPDATE transactions SET isExcluded = :isExcluded WHERE id = :id")
-    suspend fun updateExclusionStatus(id: Int, isExcluded: Boolean)
+    suspend fun updateExclusionStatus(
+        id: Int,
+        isExcluded: Boolean,
+    )
 
     // --- NEW: Query to update transaction type ---
     @Query("UPDATE transactions SET transactionType = :transactionType WHERE id = :id")
-    suspend fun updateTransactionType(id: Int, transactionType: String)
+    suspend fun updateTransactionType(
+        id: Int,
+        transactionType: String,
+    )
 
     @androidx.room.Transaction
     @Query(
@@ -304,7 +381,7 @@ interface TransactionDao {
             categories AS C ON T.categoryId = C.id
         ORDER BY
             T.date DESC
-    """
+    """,
     )
     fun getAllTransactions(): Flow<List<TransactionDetails>>
 
@@ -312,7 +389,8 @@ interface TransactionDao {
     fun getAllTransactionsSimple(): Flow<List<Transaction>>
 
     @androidx.room.Transaction
-    @Query("""
+    @Query(
+        """
         WITH AtomicIncomes AS (
             SELECT T.*
             FROM transactions AS T
@@ -339,10 +417,18 @@ interface TransactionDao {
         WHERE (:keyword IS NULL OR LOWER(AI.description) LIKE '%' || LOWER(:keyword) || '%' OR LOWER(AI.notes) LIKE '%' || LOWER(:keyword) || '%')
           AND (:categoryId IS NULL OR AI.categoryId = :categoryId)
         ORDER BY AI.date DESC
-    """)
-    fun getIncomeTransactionsForRange(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?): Flow<List<TransactionDetails>>
+    """,
+    )
+    fun getIncomeTransactionsForRange(
+        startDate: Long,
+        endDate: Long,
+        keyword: String?,
+        accountId: Int?,
+        categoryId: Int?,
+    ): Flow<List<TransactionDetails>>
 
-    @Query("""
+    @Query(
+        """
         WITH AtomicIncomes AS (
             SELECT T.categoryId, T.amount, T.description, T.notes, T.accountId
             FROM transactions AS T
@@ -366,10 +452,18 @@ interface TransactionDao {
           AND (:categoryId IS NULL OR C.id = :categoryId)
         GROUP BY C.name
         ORDER BY totalAmount DESC
-    """)
-    fun getIncomeByCategoryForMonth(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?): Flow<List<CategorySpending>>
+    """,
+    )
+    fun getIncomeByCategoryForMonth(
+        startDate: Long,
+        endDate: Long,
+        keyword: String?,
+        accountId: Int?,
+        categoryId: Int?,
+    ): Flow<List<CategorySpending>>
 
-    @Query("""
+    @Query(
+        """
         SELECT
             T.description as merchantName,
             SUM(T.amount) as totalAmount,
@@ -383,11 +477,20 @@ interface TransactionDao {
           AND (:categoryId IS NULL OR T.categoryId = :categoryId)
         GROUP BY LOWER(T.description)
         ORDER BY totalAmount DESC
-    """)
-    fun getSpendingByMerchantForMonth(startDate: Long, endDate: Long, keyword: String?, accountId: Int?, categoryId: Int?, transactionType: String?): Flow<List<MerchantSpendingSummary>>
+    """,
+    )
+    fun getSpendingByMerchantForMonth(
+        startDate: Long,
+        endDate: Long,
+        keyword: String?,
+        accountId: Int?,
+        categoryId: Int?,
+        transactionType: String?,
+    ): Flow<List<MerchantSpendingSummary>>
 
     @androidx.room.Transaction
-    @Query("""
+    @Query(
+        """
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
         (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM transactions AS T
@@ -395,11 +498,17 @@ interface TransactionDao {
         LEFT JOIN categories AS C ON T.categoryId = C.id
         WHERE C.name = :categoryName AND T.date BETWEEN :startDate AND :endDate
         ORDER BY T.date DESC
-    """)
-    fun getTransactionsForCategoryName(categoryName: String, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
+    """,
+    )
+    fun getTransactionsForCategoryName(
+        categoryName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>>
 
     @androidx.room.Transaction
-    @Query("""
+    @Query(
+        """
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
         (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM transactions AS T
@@ -407,10 +516,16 @@ interface TransactionDao {
         LEFT JOIN categories AS C ON T.categoryId = C.id
         WHERE T.description = :merchantName AND T.date BETWEEN :startDate AND :endDate
         ORDER BY T.date DESC
-    """)
-    fun getTransactionsForMerchantName(merchantName: String, startDate: Long, endDate: Long): Flow<List<TransactionDetails>>
+    """,
+    )
+    fun getTransactionsForMerchantName(
+        merchantName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>>
 
-    @Query("""
+    @Query(
+        """
         WITH AtomicExpenses AS (
             SELECT P.date, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
@@ -428,10 +543,16 @@ interface TransactionDao {
         WHERE date BETWEEN :startDate AND :endDate
         GROUP BY period
         ORDER BY period ASC
-    """)
-    fun getMonthlySpendingForCategory(categoryName: String, startDate: Long, endDate: Long): Flow<List<PeriodTotal>>
+    """,
+    )
+    fun getMonthlySpendingForCategory(
+        categoryName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<PeriodTotal>>
 
-    @Query("""
+    @Query(
+        """
         WITH AtomicExpenses AS (
             SELECT P.date, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
@@ -447,9 +568,13 @@ interface TransactionDao {
         WHERE date BETWEEN :startDate AND :endDate
         GROUP BY period
         ORDER BY period ASC
-    """)
-    fun getMonthlySpendingForMerchant(merchantName: String, startDate: Long, endDate: Long): Flow<List<PeriodTotal>>
-
+    """,
+    )
+    fun getMonthlySpendingForMerchant(
+        merchantName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<PeriodTotal>>
 
     @Insert
     suspend fun insertImage(transactionImage: TransactionImage)
@@ -460,25 +585,41 @@ interface TransactionDao {
     @Query("SELECT * FROM transaction_images WHERE transactionId = :transactionId")
     fun getImagesForTransaction(transactionId: Int): Flow<List<TransactionImage>>
 
-
     @Query("UPDATE transactions SET description = :description WHERE id = :id")
-    suspend fun updateDescription(id: Int, description: String)
+    suspend fun updateDescription(
+        id: Int,
+        description: String,
+    )
 
     @Query("UPDATE transactions SET amount = :amount WHERE id = :id")
-    suspend fun updateAmount(id: Int, amount: Double)
+    suspend fun updateAmount(
+        id: Int,
+        amount: Double,
+    )
 
     @Query("UPDATE transactions SET notes = :notes WHERE id = :id")
-    suspend fun updateNotes(id: Int, notes: String?)
+    suspend fun updateNotes(
+        id: Int,
+        notes: String?,
+    )
 
     @Query("UPDATE transactions SET categoryId = :categoryId WHERE id = :id")
-    suspend fun updateCategoryId(id: Int, categoryId: Int?)
+    suspend fun updateCategoryId(
+        id: Int,
+        categoryId: Int?,
+    )
 
     @Query("UPDATE transactions SET accountId = :accountId WHERE id = :id")
-    suspend fun updateAccountId(id: Int, accountId: Int)
+    suspend fun updateAccountId(
+        id: Int,
+        accountId: Int,
+    )
 
     @Query("UPDATE transactions SET date = :date WHERE id = :id")
-    suspend fun updateDate(id: Int, date: Long)
-
+    suspend fun updateDate(
+        id: Int,
+        date: Long,
+    )
 
     @androidx.room.Transaction
     @Query(
@@ -497,10 +638,9 @@ interface TransactionDao {
         LEFT JOIN
             categories AS C ON T.categoryId = C.id
         WHERE T.id = :id
-    """
+    """,
     )
     fun getTransactionDetailsById(id: Int): Flow<TransactionDetails?>
-
 
     @androidx.room.Transaction
     @Query(
@@ -521,7 +661,7 @@ interface TransactionDao {
         ORDER BY
             T.date DESC
         LIMIT 5
-    """
+    """,
     )
     fun getRecentTransactionDetails(): Flow<List<TransactionDetails>>
 
@@ -550,14 +690,14 @@ interface TransactionDao {
           AND (:categoryId IS NULL OR T.categoryId = :categoryId)
         ORDER BY
             T.date DESC
-    """
+    """,
     )
     fun getTransactionDetailsForRange(
         startDate: Long,
         endDate: Long,
         keyword: String?,
         accountId: Int?,
-        categoryId: Int?
+        categoryId: Int?,
     ): Flow<List<TransactionDetails>>
 
     @androidx.room.Transaction
@@ -570,7 +710,7 @@ interface TransactionDao {
         LEFT JOIN categories c ON t.categoryId = c.id
         WHERE t.accountId = :accountId
         ORDER BY t.date DESC
-    """
+    """,
     )
     fun getTransactionsForAccountDetails(accountId: Int): Flow<List<TransactionDetails>>
 
@@ -611,7 +751,7 @@ interface TransactionDao {
           AND (:categoryId IS NULL OR C.id = :categoryId)
         GROUP BY C.name
         ORDER BY totalAmount DESC
-    """
+    """,
     )
     fun getSpendingByCategoryForMonth(
         startDate: Long,
@@ -619,7 +759,7 @@ interface TransactionDao {
         keyword: String?,
         accountId: Int?,
         categoryId: Int?,
-        transactionType: String?
+        transactionType: String?,
     ): Flow<List<CategorySpending>>
 
     @Query(
@@ -634,7 +774,7 @@ interface TransactionDao {
         WHERE T1.date >= :startDate AND T1.isExcluded = 0
         GROUP BY monthYear
         ORDER BY monthYear ASC
-    """
+    """,
     )
     fun getMonthlyTrends(startDate: Long): Flow<List<MonthlyTrend>>
 
@@ -644,24 +784,33 @@ interface TransactionDao {
     @Query("SELECT COUNT(*) FROM transaction_tag_cross_ref WHERE tagId = :tagId")
     suspend fun countTransactionsForTag(tagId: Int): Int
 
-    @Query("""
+    @Query(
+        """
         SELECT
             SUM(CASE WHEN T.transactionType = 'income' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'income' AND p.isExcluded = 0) as totalIncome,
             SUM(CASE WHEN T.transactionType = 'expense' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'expense' AND p.isExcluded = 0) as totalExpenses
         FROM transactions AS T
         WHERE T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
-    """)
-    suspend fun getFinancialSummaryForRange(startDate: Long, endDate: Long): FinancialSummary?
+    """,
+    )
+    suspend fun getFinancialSummaryForRange(
+        startDate: Long,
+        endDate: Long,
+    ): FinancialSummary?
 
-    @Query("""
+    @Query(
+        """
         SELECT
             SUM(CASE WHEN T.transactionType = 'income' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'income' AND p.isExcluded = 0) as totalIncome,
             SUM(CASE WHEN T.transactionType = 'expense' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'expense' AND p.isExcluded = 0) as totalExpenses
         FROM transactions AS T
         WHERE T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
-    """)
-    fun getFinancialSummaryForRangeFlow(startDate: Long, endDate: Long): Flow<FinancialSummary?>
-
+    """,
+    )
+    fun getFinancialSummaryForRangeFlow(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<FinancialSummary?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(transactions: List<Transaction>)
@@ -685,10 +834,14 @@ interface TransactionDao {
     suspend fun clearTagsForTransaction(transactionId: Int)
 
     @androidx.room.Transaction
-    @Query("SELECT T.* FROM tags T INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.tagId WHERE TTCR.transactionId = :transactionId")
+    @Query(
+        "SELECT T.* FROM tags T INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.tagId WHERE TTCR.transactionId = :transactionId",
+    )
     fun getTagsForTransaction(transactionId: Int): Flow<List<Tag>>
 
-    @Query("SELECT T.* FROM tags T INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.tagId WHERE TTCR.transactionId = :transactionId")
+    @Query(
+        "SELECT T.* FROM tags T INNER JOIN transaction_tag_cross_ref TTCR ON T.id = TTCR.tagId WHERE TTCR.transactionId = :transactionId",
+    )
     suspend fun getTagsForTransactionSimple(transactionId: Int): List<Tag>
 
     /**
@@ -703,34 +856,46 @@ interface TransactionDao {
     @Query("DELETE FROM transaction_tag_cross_ref")
     suspend fun deleteAllCrossRefs()
 
-    suspend fun updateTagsForTransaction(transactionId: Int, tags: Set<Tag>) {
+    suspend fun updateTagsForTransaction(
+        transactionId: Int,
+        tags: Set<Tag>,
+    ) {
         clearTagsForTransaction(transactionId)
         if (tags.isNotEmpty()) {
-            val crossRefs = tags.map { tag ->
-                TransactionTagCrossRef(transactionId = transactionId, tagId = tag.id)
-            }
+            val crossRefs =
+                tags.map { tag ->
+                    TransactionTagCrossRef(transactionId = transactionId, tagId = tag.id)
+                }
             addTagsToTransaction(crossRefs)
         }
     }
 
-    suspend fun insertTransactionWithTags(transaction: Transaction, tags: Set<Tag>): Long {
+    suspend fun insertTransactionWithTags(
+        transaction: Transaction,
+        tags: Set<Tag>,
+    ): Long {
         val transactionId = insert(transaction)
         if (tags.isNotEmpty()) {
-            val crossRefs = tags.map { tag ->
-                TransactionTagCrossRef(transactionId = transactionId.toInt(), tagId = tag.id)
-            }
+            val crossRefs =
+                tags.map { tag ->
+                    TransactionTagCrossRef(transactionId = transactionId.toInt(), tagId = tag.id)
+                }
             addTagsToTransaction(crossRefs)
         }
         return transactionId
     }
 
-    suspend fun updateTransactionWithTags(transaction: Transaction, tags: Set<Tag>) {
+    suspend fun updateTransactionWithTags(
+        transaction: Transaction,
+        tags: Set<Tag>,
+    ) {
         update(transaction)
         clearTagsForTransaction(transaction.id)
         if (tags.isNotEmpty()) {
-            val crossRefs = tags.map { tag ->
-                TransactionTagCrossRef(transactionId = transaction.id, tagId = tag.id)
-            }
+            val crossRefs =
+                tags.map { tag ->
+                    TransactionTagCrossRef(transactionId = transaction.id, tagId = tag.id)
+                }
             addTagsToTransaction(crossRefs)
         }
     }
@@ -738,26 +903,29 @@ interface TransactionDao {
     suspend fun insertTransactionWithTagsAndImages(
         transaction: Transaction,
         tags: Set<Tag>,
-        imagePaths: List<String>
+        imagePaths: List<String>,
     ): Long {
         val newTransactionId = insert(transaction)
         if (tags.isNotEmpty()) {
-            val crossRefs = tags.map { tag ->
-                TransactionTagCrossRef(transactionId = newTransactionId.toInt(), tagId = tag.id)
-            }
+            val crossRefs =
+                tags.map { tag ->
+                    TransactionTagCrossRef(transactionId = newTransactionId.toInt(), tagId = tag.id)
+                }
             addTagsToTransaction(crossRefs)
         }
         imagePaths.forEach { path ->
-            val imageEntity = TransactionImage(
-                transactionId = newTransactionId.toInt(),
-                imageUri = path
-            )
+            val imageEntity =
+                TransactionImage(
+                    transactionId = newTransactionId.toInt(),
+                    imageUri = path,
+                )
             insertImage(imageEntity)
         }
         return newTransactionId
     }
 
-    @Query("""
+    @Query(
+        """
         WITH AtomicExpenses AS (
             SELECT T.date, T.amount FROM transactions AS T
             WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0
@@ -773,10 +941,15 @@ interface TransactionDao {
         WHERE date BETWEEN :startDate AND :endDate
         GROUP BY strftime('%Y-%m-%d', date / 1000, 'unixepoch', 'localtime')
         ORDER BY date ASC
-    """)
-    fun getDailySpendingForDateRange(startDate: Long, endDate: Long): Flow<List<DailyTotal>>
+    """,
+    )
+    fun getDailySpendingForDateRange(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<DailyTotal>>
 
-    @Query("""
+    @Query(
+        """
         WITH AtomicExpenses AS (
             SELECT P.date, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
@@ -792,10 +965,15 @@ interface TransactionDao {
         WHERE date BETWEEN :startDate AND :endDate
         GROUP BY period
         ORDER BY period ASC
-    """)
-    fun getWeeklySpendingForDateRange(startDate: Long, endDate: Long): Flow<List<PeriodTotal>>
+    """,
+    )
+    fun getWeeklySpendingForDateRange(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<PeriodTotal>>
 
-    @Query("""
+    @Query(
+        """
         WITH AtomicExpenses AS (
             SELECT P.date, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
@@ -811,10 +989,15 @@ interface TransactionDao {
         WHERE date BETWEEN :startDate AND :endDate
         GROUP BY period
         ORDER BY period ASC
-    """)
-    fun getMonthlySpendingForDateRange(startDate: Long, endDate: Long): Flow<List<PeriodTotal>>
+    """,
+    )
+    fun getMonthlySpendingForDateRange(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<PeriodTotal>>
 
-    @Query("""
+    @Query(
+        """
         SELECT
             strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime') as date,
             SUM(CASE WHEN T1.transactionType = 'income' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
@@ -825,10 +1008,15 @@ interface TransactionDao {
         WHERE T1.date BETWEEN :startDate AND :endDate AND T1.isExcluded = 0
         GROUP BY strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime')
         ORDER BY date ASC
-    """)
-    fun getDailyTrends(startDate: Long, endDate: Long): Flow<List<DailyTrend>>
+    """,
+    )
+    fun getDailyTrends(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<DailyTrend>>
 
-    @Query("""
+    @Query(
+        """
         SELECT
             strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime') as period,
             SUM(CASE WHEN T1.transactionType = 'income' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
@@ -839,60 +1027,84 @@ interface TransactionDao {
         WHERE T1.date BETWEEN :startDate AND :endDate AND T1.isExcluded = 0
         GROUP BY strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime')
         ORDER BY period ASC
-    """)
-    fun getWeeklyTrends(startDate: Long, endDate: Long): Flow<List<WeeklyTrend>>
-
+    """,
+    )
+    fun getWeeklyTrends(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<WeeklyTrend>>
 
     @Query("UPDATE transactions SET sourceSmsHash = :smsHash WHERE id = :transactionId")
-    suspend fun setSmsHash(transactionId: Int, smsHash: String)
+    suspend fun setSmsHash(
+        transactionId: Int,
+        smsHash: String,
+    )
 
-    @Query("""
+    @Query(
+        """
         SELECT * FROM transactions
         WHERE sourceSmsHash IS NULL
           AND date BETWEEN :startDate AND :endDate
           AND amount BETWEEN :minAmount AND :maxAmount
           AND transactionType = :transactionType
         ORDER BY ABS(date - :smsDate) ASC
-    """)
+    """,
+    )
     suspend fun findLinkableTransactions(
         startDate: Long,
         endDate: Long,
         minAmount: Double,
         maxAmount: Double,
         smsDate: Long,
-        transactionType: String
+        transactionType: String,
     ): List<Transaction>
 
-    @Query("""
+    @Query(
+        """
         SELECT COUNT(*) FROM transactions
         WHERE LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description)
         AND isExcluded = 0
-    """)
+    """,
+    )
     fun getTransactionCountForMerchant(description: String): Flow<Int>
 
-    @Query("""
+    @Query(
+        """
         SELECT COUNT(*) FROM transactions
         WHERE (LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description))
         AND isExcluded = 0
-    """)
+    """,
+    )
     suspend fun getTransactionCountForMerchantSuspend(description: String): Int
 
-    @Query("""
+    @Query(
+        """
         SELECT * FROM transactions
         WHERE (LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description))
         AND id != :excludeId
         AND isExcluded = 0
-    """)
-    suspend fun findSimilarTransactions(description: String, excludeId: Int): List<Transaction>
+    """,
+    )
+    suspend fun findSimilarTransactions(
+        description: String,
+        excludeId: Int,
+    ): List<Transaction>
 
     @Query("UPDATE transactions SET categoryId = :categoryId WHERE id IN (:ids)")
-    suspend fun updateCategoryForIds(ids: List<Int>, categoryId: Int)
+    suspend fun updateCategoryForIds(
+        ids: List<Int>,
+        categoryId: Int,
+    )
 
     @Query("UPDATE transactions SET description = :newDescription WHERE id IN (:ids)")
-    suspend fun updateDescriptionForIds(ids: List<Int>, newDescription: String)
+    suspend fun updateDescriptionForIds(
+        ids: List<Int>,
+        newDescription: String,
+    )
 
     @androidx.room.Transaction
-    @Query("""
+    @Query(
+        """
         SELECT t.*, a.name as accountName, c.name as categoryName, c.iconKey as categoryIconKey, c.colorKey as categoryColorKey,
         (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = t.id) as tagNames
         FROM transactions t
@@ -907,7 +1119,8 @@ interface TransactionDao {
             (:endDate IS NULL OR t.date <= :endDate) AND
             (:tagId IS NULL OR t.id IN (SELECT transactionId FROM transaction_tag_cross_ref WHERE tagId = :tagId))
         ORDER BY t.date DESC
-    """)
+    """,
+    )
     fun searchTransactions(
         keyword: String,
         accountId: Int?,
@@ -915,24 +1128,34 @@ interface TransactionDao {
         transactionType: String?,
         startDate: Long?,
         endDate: Long?,
-        tagId: Int? // --- NEW: Add tagId parameter
+        tagId: Int?, // --- NEW: Add tagId parameter
     ): Flow<List<TransactionDetails>>
 
     // --- NEW: Reassigns transactions from source accounts to a destination account ---
     @Query("UPDATE transactions SET accountId = :destinationAccountId WHERE accountId IN (:sourceAccountIds)")
-    suspend fun reassignTransactions(sourceAccountIds: List<Int>, destinationAccountId: Int)
+    suspend fun reassignTransactions(
+        sourceAccountIds: List<Int>,
+        destinationAccountId: Int,
+    )
 
     // --- NEW: Functions for retrospective tagging ---
-    @Query("""
+    @Query(
+        """
         INSERT INTO transaction_tag_cross_ref (transactionId, tagId)
         SELECT id, :tagId
         FROM transactions
         WHERE date BETWEEN :startDate AND :endDate
         AND id NOT IN (SELECT transactionId FROM transaction_tag_cross_ref WHERE tagId = :tagId)
-    """)
-    suspend fun addTagForDateRange(tagId: Int, startDate: Long, endDate: Long)
+    """,
+    )
+    suspend fun addTagForDateRange(
+        tagId: Int,
+        startDate: Long,
+        endDate: Long,
+    )
 
-    @Query("""
+    @Query(
+        """
         DELETE FROM transaction_tag_cross_ref
         WHERE tagId = :tagId
         AND transactionId IN (
@@ -940,12 +1163,18 @@ interface TransactionDao {
             FROM transactions
             WHERE date BETWEEN :startDate AND :endDate
         )
-    """)
-    suspend fun removeTagForDateRange(tagId: Int, startDate: Long, endDate: Long)
+    """,
+    )
+    suspend fun removeTagForDateRange(
+        tagId: Int,
+        startDate: Long,
+        endDate: Long,
+    )
 
     // --- NEW: Get all transactions for a specific tag ---
     @androidx.room.Transaction
-    @Query("""
+    @Query(
+        """
         SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
         (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
         FROM transactions AS T
@@ -954,7 +1183,8 @@ interface TransactionDao {
         LEFT JOIN categories AS C ON T.categoryId = C.id
         WHERE TTCR.tagId = :tagId
         ORDER BY T.date DESC
-    """)
+    """,
+    )
     fun getTransactionsByTagId(tagId: Int): Flow<List<TransactionDetails>>
 
     // --- NEW: Remove all cross-references for a given tag ID ---
@@ -966,7 +1196,8 @@ interface TransactionDao {
     // --- FIX: Broadened query to include transactions where `source IS NULL` (legacy manual)
     // --- FIX: Added `sourceSmsId IS NULL` to ensure we don't accidentally pick up SMS txns.
     @androidx.room.Transaction
-    @Query("""
+    @Query(
+        """
         SELECT
             T.*,
             A.name as accountName,
@@ -985,6 +1216,7 @@ interface TransactionDao {
         )
         ORDER BY T.date DESC
         LIMIT :limit
-    """)
+    """,
+    )
     fun getRecentManualTransactions(limit: Int): Flow<List<TransactionDetails>>
 }

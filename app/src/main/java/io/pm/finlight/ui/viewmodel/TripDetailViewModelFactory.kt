@@ -18,7 +18,7 @@ import io.pm.finlight.data.repository.TripRepository
 class TripDetailViewModelFactory(
     private val application: Application,
     private val tripId: Int,
-    private val tagId: Int
+    private val tagId: Int,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TripDetailViewModel::class.java)) {
@@ -33,7 +33,7 @@ class TripDetailViewModelFactory(
                 tripRepository,
                 transactionRepository,
                 tripId,
-                tagId
+                tagId,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

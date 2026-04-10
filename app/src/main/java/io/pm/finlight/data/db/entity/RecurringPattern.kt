@@ -28,7 +28,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 @Entity(
     tableName = "recurring_patterns",
-    indices = [Index(value = ["lastSeen"])]
+    indices = [Index(value = ["lastSeen"])],
 )
 data class RecurringPattern(
     @PrimaryKey
@@ -40,5 +40,5 @@ data class RecurringPattern(
     val categoryId: Int?,
     var occurrences: Int,
     val firstSeen: Long,
-    var lastSeen: Long
+    var lastSeen: Long,
 )

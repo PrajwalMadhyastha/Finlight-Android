@@ -24,7 +24,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,8 +34,6 @@ import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.delay
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import kotlin.collections.isNotEmpty
 
 @Composable
@@ -43,7 +43,7 @@ fun MerchantPredictionSheet(
     onQueryChanged: (String) -> Unit,
     onPredictionSelected: (prediction: MerchantPrediction) -> Unit,
     onManualSave: (newDescription: String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     var currentDescription by remember {
         mutableStateOf(TextFieldValue(initialDescription, TextRange(initialDescription.length)))
@@ -70,15 +70,16 @@ fun MerchantPredictionSheet(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxHeight(0.9f) // Take up 90% of the screen height
-            .padding(16.dp)
-            .navigationBarsPadding()
+        modifier =
+            Modifier
+                .fillMaxHeight(0.9f) // Take up 90% of the screen height
+                .padding(16.dp)
+                .navigationBarsPadding(),
     ) {
         Text(
             "Merchant / Description",
             style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(Modifier.height(16.dp))
         OutlinedTextField(
@@ -88,10 +89,11 @@ fun MerchantPredictionSheet(
                 onQueryChanged(it.text)
             },
             label = { Text("Search or enter new merchant") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(focusRequester),
-            singleLine = true
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+            singleLine = true,
         )
         Spacer(Modifier.height(16.dp))
 
@@ -101,16 +103,17 @@ fun MerchantPredictionSheet(
                 items(predictions, key = { "${it.description}_${it.categoryId}_${it.accountId}" }) { prediction ->
                     PredictionItem(
                         prediction = prediction,
-                        onClick = { onPredictionSelected(prediction) }
+                        onClick = { onPredictionSelected(prediction) },
                     )
                 }
             }
         } else if (currentDescription.text.length > 1) {
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                contentAlignment = Alignment.Center,
             ) {
                 Text("No past transactions found matching '${currentDescription.text}'", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -118,16 +121,15 @@ fun MerchantPredictionSheet(
             Spacer(modifier = Modifier.weight(1f))
         }
 
-
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+            horizontalArrangement = Arrangement.End,
         ) {
             TextButton(onClick = onDismiss) { Text("Cancel") }
             Spacer(Modifier.width(8.dp))
             Button(
                 onClick = { onManualSave(currentDescription.text) },
-                enabled = currentDescription.text.isNotBlank()
+                enabled = currentDescription.text.isNotBlank(),
             ) {
                 Text("Save")
             }
@@ -138,14 +140,14 @@ fun MerchantPredictionSheet(
 @Composable
 private fun PredictionItem(
     prediction: MerchantPrediction,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     ListItem(
         headlineContent = {
             Text(
                 text = prediction.description,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
         },
         supportingContent = {
@@ -154,7 +156,7 @@ private fun PredictionItem(
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
@@ -162,25 +164,25 @@ private fun PredictionItem(
             if (prediction.categoryName != null) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = prediction.categoryName,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                     CategoryIconDisplay(
                         iconKey = prediction.categoryIconKey,
                         colorKey = prediction.categoryColorKey,
                         name = prediction.categoryName,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp),
                     )
                 }
             }
         },
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier.clickable(onClick = onClick),
     )
 }
 
@@ -189,34 +191,35 @@ private fun CategoryIconDisplay(
     iconKey: String?,
     colorKey: String?,
     name: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
-            .clip(CircleShape)
-            .background(CategoryIconHelper.getIconBackgroundColor(colorKey ?: "gray_light")),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .clip(CircleShape)
+                .background(CategoryIconHelper.getIconBackgroundColor(colorKey ?: "gray_light")),
+        contentAlignment = Alignment.Center,
     ) {
         if (name == "Uncategorized") {
             Icon(
                 imageVector = CategoryIconHelper.getIcon("help_outline"),
                 contentDescription = name,
                 tint = Color.Black,
-                modifier = Modifier.padding(4.dp)
+                modifier = Modifier.padding(4.dp),
             )
         } else if (iconKey == "letter_default") {
             Text(
                 text = name.firstOrNull()?.uppercase() ?: "?",
                 color = Color.Black,
                 fontWeight = FontWeight.Bold,
-                fontSize = 12.sp
+                fontSize = 12.sp,
             )
         } else {
             Icon(
                 imageVector = CategoryIconHelper.getIcon(iconKey ?: "category"),
                 contentDescription = name,
                 tint = Color.Black,
-                modifier = Modifier.padding(4.dp)
+                modifier = Modifier.padding(4.dp),
             )
         }
     }

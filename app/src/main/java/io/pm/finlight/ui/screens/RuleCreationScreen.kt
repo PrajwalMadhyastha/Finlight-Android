@@ -51,7 +51,7 @@ import kotlin.math.min
 fun RuleCreationScreen(
     navController: NavController,
     potentialTransactionJson: String?,
-    ruleId: Int?
+    ruleId: Int?,
 ) {
     val context = LocalContext.current.applicationContext as Application
     val viewModel: RuleCreationViewModel = viewModel(factory = RuleCreationViewModelFactory(context))
@@ -87,34 +87,35 @@ fun RuleCreationScreen(
                 actions = {
                     HelpActionIcon(helpKey = "rule_creation_screen")
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
     ) { innerPadding ->
         Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .padding(16.dp)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier =
+                Modifier
+                    .padding(innerPadding)
+                    .padding(16.dp)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             GlassPanel {
                 Row(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Icon(
                         Icons.Default.Info,
                         contentDescription = "Info",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = "Long-press text to select it, then tap a 'Mark as...' button below.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -125,25 +126,27 @@ fun RuleCreationScreen(
                         "Full SMS Message",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(12.dp))
-                    val customTextSelectionColors = TextSelectionColors(
-                        handleColor = MaterialTheme.colorScheme.primary,
-                        backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                    )
+                    val customTextSelectionColors =
+                        TextSelectionColors(
+                            handleColor = MaterialTheme.colorScheme.primary,
+                            backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        )
                     CompositionLocalProvider(LocalTextSelectionColors provides customTextSelectionColors) {
                         BasicTextField(
                             value = textFieldValue,
                             onValueChange = { textFieldValue = it },
                             readOnly = true,
-                            textStyle = TextStyle(
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 14.sp,
-                                lineHeight = 20.sp
-                            ),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
+                            textStyle =
+                                TextStyle(
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 14.sp,
+                                    lineHeight = 20.sp,
+                                ),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         )
                     }
                 }
@@ -161,7 +164,7 @@ fun RuleCreationScreen(
                         viewModel.onMarkAsTrigger(RuleSelection(selectedText, start, end))
                     },
                     enabled = isSelectionActive,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Mark as Trigger Phrase")
                 }
@@ -176,7 +179,7 @@ fun RuleCreationScreen(
                         },
                         enabled = isSelectionActive,
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     ) {
                         Text("Mark as Merchant")
                     }
@@ -189,7 +192,7 @@ fun RuleCreationScreen(
                         },
                         enabled = isSelectionActive,
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     ) {
                         Text("Mark as Amount")
                     }
@@ -203,12 +206,11 @@ fun RuleCreationScreen(
                     },
                     enabled = isSelectionActive,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                 ) {
                     Text("Mark as Account Info")
                 }
             }
-
 
             GlassPanel(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -216,29 +218,29 @@ fun RuleCreationScreen(
                         "Defined Rule",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     RuleSummaryItem(
                         icon = Icons.Default.Flag,
                         label = "Trigger",
                         value = uiState.triggerSelection.selectedText.ifBlank { "Not set (Required)" },
-                        isError = uiState.triggerSelection.selectedText.isBlank()
+                        isError = uiState.triggerSelection.selectedText.isBlank(),
                     )
                     RuleSummaryItem(
                         icon = Icons.Default.Store,
                         label = "Merchant",
-                        value = uiState.merchantSelection.selectedText.ifBlank { "Not set" }
+                        value = uiState.merchantSelection.selectedText.ifBlank { "Not set" },
                     )
                     RuleSummaryItem(
                         icon = Icons.Default.Paid,
                         label = "Amount",
-                        value = uiState.amountSelection.selectedText.ifBlank { "Not set" }
+                        value = uiState.amountSelection.selectedText.ifBlank { "Not set" },
                     )
                     RuleSummaryItem(
                         icon = Icons.Default.AccountBalanceWallet,
                         label = "Account",
-                        value = uiState.accountSelection.selectedText.ifBlank { "Not set" }
+                        value = uiState.accountSelection.selectedText.ifBlank { "Not set" },
                     )
 
                     // --- NEW: Transaction Type Toggle ---
@@ -249,12 +251,12 @@ fun RuleCreationScreen(
                         Icon(
                             imageVector = Icons.Default.SwapVert,
                             contentDescription = "Transaction Type",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.primary,
                         )
                         Text(
                             "Type",
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                     Spacer(Modifier.height(8.dp))
@@ -263,21 +265,21 @@ fun RuleCreationScreen(
                         SegmentedButton(
                             selected = selectedType == "expense",
                             onClick = { viewModel.onTransactionTypeChanged("expense") },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
                         ) {
                             Text("Expense")
                         }
                         SegmentedButton(
                             selected = selectedType == "income",
                             onClick = { viewModel.onTransactionTypeChanged("income") },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
                         ) {
                             Text("Income")
                         }
                         SegmentedButton(
                             selected = selectedType == null,
                             onClick = { viewModel.onTransactionTypeChanged(null) },
-                            shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3)
+                            shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
                         ) {
                             Text("Auto-Detect")
                         }
@@ -290,7 +292,8 @@ fun RuleCreationScreen(
                 OutlinedButton(onClick = { navController.popBackStack() }, modifier = Modifier.weight(1f)) {
                     Text("Cancel")
                 }
-                val isSaveEnabled = uiState.triggerSelection.selectedText.isNotBlank() &&
+                val isSaveEnabled =
+                    uiState.triggerSelection.selectedText.isNotBlank() &&
                         (uiState.merchantSelection.selectedText.isNotBlank() || uiState.amountSelection.selectedText.isNotBlank() || uiState.accountSelection.selectedText.isNotBlank())
 
                 Button(
@@ -310,7 +313,7 @@ fun RuleCreationScreen(
                         }
                     },
                     enabled = isSaveEnabled,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(if (isEditMode) "Update Rule" else "Save Rule")
                 }
@@ -324,25 +327,25 @@ private fun RuleSummaryItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     value: String,
-    isError: Boolean = false
+    isError: Boolean = false,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            tint = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         )
         Column {
             Text(
                 label,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 value,
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (isError) FontWeight.Bold else FontWeight.Normal
+                fontWeight = if (isError) FontWeight.Bold else FontWeight.Normal,
             )
         }
     }

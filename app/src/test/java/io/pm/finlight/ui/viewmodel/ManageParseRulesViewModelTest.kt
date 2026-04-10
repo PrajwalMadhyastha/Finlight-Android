@@ -30,7 +30,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class ManageParseRulesViewModelTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var customSmsRuleDao: CustomSmsRuleDao
 
@@ -42,32 +41,35 @@ class ManageParseRulesViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `allRules flow emits rules from DAO`() = runTest {
-        // Arrange
-        val rules = listOf(
-            CustomSmsRule(1, "trigger1", null, null, null, null, null, null, 10, "")
-        )
-        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(rules))
-        viewModel = ManageParseRulesViewModel(customSmsRuleDao)
+    fun `allRules flow emits rules from DAO`() =
+        runTest {
+            // Arrange
+            val rules =
+                listOf(
+                    CustomSmsRule(1, "trigger1", null, null, null, null, null, null, 10, ""),
+                )
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(rules))
+            viewModel = ManageParseRulesViewModel(customSmsRuleDao)
 
-        // Assert
-        viewModel.allRules.test {
-            assertEquals(rules, awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.allRules.test {
+                assertEquals(rules, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `deleteRule calls dao delete`() = runTest {
-        // Arrange
-        val ruleToDelete = CustomSmsRule(1, "trigger1", null, null, null, null, null, null, 10, "")
-        `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-        viewModel = ManageParseRulesViewModel(customSmsRuleDao)
+    fun `deleteRule calls dao delete`() =
+        runTest {
+            // Arrange
+            val ruleToDelete = CustomSmsRule(1, "trigger1", null, null, null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            viewModel = ManageParseRulesViewModel(customSmsRuleDao)
 
-        // Act
-        viewModel.deleteRule(ruleToDelete)
+            // Act
+            viewModel.deleteRule(ruleToDelete)
 
-        // Assert
-        verify(customSmsRuleDao).delete(ruleToDelete)
-    }
+            // Assert
+            verify(customSmsRuleDao).delete(ruleToDelete)
+        }
 }

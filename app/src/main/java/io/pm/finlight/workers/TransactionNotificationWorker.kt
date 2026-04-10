@@ -19,7 +19,7 @@ import java.util.Calendar
 
 class TransactionNotificationWorker(
     private val context: Context,
-    workerParams: WorkerParameters
+    workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) { // <-- FIX: Pass context to the parent constructor
 
     companion object {
@@ -47,20 +47,32 @@ class TransactionNotificationWorker(
 
                 // 2. Calculate monthly totals
                 val calendar = Calendar.getInstance().apply { timeInMillis = details.transaction.date }
-                val monthStart = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0) }.timeInMillis
-                val monthEnd = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, 1); set(Calendar.DAY_OF_MONTH, 1); add(Calendar.DAY_OF_MONTH, -1) }.timeInMillis
+                val monthStart =
+                    (calendar.clone() as Calendar).apply {
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                    }.timeInMillis
+                val monthEnd =
+                    (calendar.clone() as Calendar).apply {
+                        add(Calendar.MONTH, 1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.DAY_OF_MONTH, -1)
+                    }.timeInMillis
                 val summary = transactionDao.getFinancialSummaryForRange(monthStart, monthEnd)
                 val monthlyTotal = if (details.transaction.transactionType == "income") summary?.totalIncome else summary?.totalExpenses
 
                 // 3. Get visit count
-                val visitCount = transactionDao.getTransactionCountForMerchantSuspend(details.transaction.originalDescription ?: details.transaction.description)
+                val visitCount =
+                    transactionDao.getTransactionCountForMerchantSuspend(
+                        details.transaction.originalDescription ?: details.transaction.description,
+                    )
 
                 // 4. Show the rich notification
                 NotificationHelper.showRichTransactionNotification(
                     context = context,
                     details = details,
                     monthlyTotal = monthlyTotal ?: 0.0,
-                    visitCount = visitCount
+                    visitCount = visitCount,
                 )
 
                 Result.success()

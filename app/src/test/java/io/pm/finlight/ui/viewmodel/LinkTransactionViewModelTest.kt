@@ -31,7 +31,6 @@ import java.util.Calendar
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class LinkTransactionViewModelTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var transactionRepository: TransactionRepository
 
@@ -46,15 +45,16 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
 
     private lateinit var viewModel: LinkTransactionViewModel
 
-    private val potentialTxn = PotentialTransaction(
-        sourceSmsId = 123L,
-        smsSender = "TestSender",
-        amount = 100.0,
-        transactionType = "expense",
-        merchantName = "Test Merchant",
-        originalMessage = "Test message",
-        sourceSmsHash = "test_hash_123"
-    )
+    private val potentialTxn =
+        PotentialTransaction(
+            sourceSmsId = 123L,
+            smsSender = "TestSender",
+            amount = 100.0,
+            transactionType = "expense",
+            merchantName = "Test Merchant",
+            originalMessage = "Test message",
+            sourceSmsHash = "test_hash_123",
+        )
 
     @Before
     override fun setup() {
@@ -62,71 +62,75 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `init calls findMatches and populates linkableTransactions`() = runTest {
-        // Arrange
-        val mockTransactions = listOf(
-            Transaction(id = 1, description = "Txn 1", amount = 50.0, date = 0L, accountId = 1, categoryId = 1, notes = null),
-            Transaction(id = 2, description = "Txn 2", amount = 50.0, date = 0L, accountId = 1, categoryId = 1, notes = null)
-        )
-        `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(mockTransactions))
+    fun `init calls findMatches and populates linkableTransactions`() =
+        runTest {
+            // Arrange
+            val mockTransactions =
+                listOf(
+                    Transaction(id = 1, description = "Txn 1", amount = 50.0, date = 0L, accountId = 1, categoryId = 1, notes = null),
+                    Transaction(id = 2, description = "Txn 2", amount = 50.0, date = 0L, accountId = 1, categoryId = 1, notes = null),
+                )
+            `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(mockTransactions))
 
-        // Act
-        viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionDao, potentialTxn)
+            // Act
+            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionDao, potentialTxn)
 
-        // Assert
-        viewModel.linkableTransactions.test {
-            assertEquals(mockTransactions, awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.linkableTransactions.test {
+                assertEquals(mockTransactions, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+            verify(transactionRepository).getAllTransactionsForRange(anyLong(), anyLong())
         }
-        verify(transactionRepository).getAllTransactionsForRange(anyLong(), anyLong())
-    }
 
     @Test
-    fun `linkTransaction calls repository and dao methods correctly`() = runTest {
-        // Arrange
-        `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-        viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionDao, potentialTxn)
-        val selectedTxnId = 99
-        var onCompleteCalled = false
+    fun `linkTransaction calls repository and dao methods correctly`() =
+        runTest {
+            // Arrange
+            `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionDao, potentialTxn)
+            val selectedTxnId = 99
+            var onCompleteCalled = false
 
-        // Act
-        viewModel.linkTransaction(selectedTxnId) { onCompleteCalled = true }
+            // Act
+            viewModel.linkTransaction(selectedTxnId) { onCompleteCalled = true }
 
-        // Assert
-        verify(transactionRepository).setSmsHash(selectedTxnId, potentialTxn.sourceSmsHash!!)
-        verify(recurringTransactionDao).updateLastRunDate(intCaptor.capture(), longCaptor.capture())
+            // Assert
+            verify(transactionRepository).setSmsHash(selectedTxnId, potentialTxn.sourceSmsHash!!)
+            verify(recurringTransactionDao).updateLastRunDate(intCaptor.capture(), longCaptor.capture())
 
-        val capturedRuleId = intCaptor.value
-        val capturedTimestamp = longCaptor.value
+            val capturedRuleId = intCaptor.value
+            val capturedTimestamp = longCaptor.value
 
-        assertEquals(potentialTxn.sourceSmsId.toInt(), capturedRuleId)
-        assertTrue("Timestamp should be recent", System.currentTimeMillis() - capturedTimestamp < 1000)
-        assertTrue("onComplete lambda should be called", onCompleteCalled)
-    }
+            assertEquals(potentialTxn.sourceSmsId.toInt(), capturedRuleId)
+            assertTrue("Timestamp should be recent", System.currentTimeMillis() - capturedTimestamp < 1000)
+            assertTrue("onComplete lambda should be called", onCompleteCalled)
+        }
 
     @Test
-    fun `remindTomorrow calls dao with yesterday's date`() = runTest {
-        // Arrange
-        `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-        viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionDao, potentialTxn)
-        var onCompleteCalled = false
+    fun `remindTomorrow calls dao with yesterday's date`() =
+        runTest {
+            // Arrange
+            `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionDao, potentialTxn)
+            var onCompleteCalled = false
 
-        // Act
-        viewModel.remindTomorrow { onCompleteCalled = true }
+            // Act
+            viewModel.remindTomorrow { onCompleteCalled = true }
 
-        // Assert
-        verify(recurringTransactionDao).updateLastRunDate(intCaptor.capture(), longCaptor.capture())
-        val capturedRuleId = intCaptor.value
-        val capturedTimestamp = longCaptor.value
+            // Assert
+            verify(recurringTransactionDao).updateLastRunDate(intCaptor.capture(), longCaptor.capture())
+            val capturedRuleId = intCaptor.value
+            val capturedTimestamp = longCaptor.value
 
-        val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }.timeInMillis
-        val oneSecondInMillis = 1000
+            val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }.timeInMillis
+            val oneSecondInMillis = 1000
 
-        assertEquals(potentialTxn.sourceSmsId.toInt(), capturedRuleId)
-        assertTrue(
-            "Captured timestamp should be approximately yesterday",
-            kotlin.math.abs(capturedTimestamp - yesterday) < oneSecondInMillis
-        )
-        assertTrue("onComplete lambda should be called", onCompleteCalled)
-    }
+            assertEquals(potentialTxn.sourceSmsId.toInt(), capturedRuleId)
+            assertTrue(
+                "Captured timestamp should be approximately yesterday",
+                kotlin.math.abs(capturedTimestamp - yesterday) < oneSecondInMillis,
+            )
+            assertTrue("onComplete lambda should be called", onCompleteCalled)
+        }
 }

@@ -19,20 +19,17 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.room.withTransaction
 import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.data.TransactionRunner
-import io.pm.finlight.ml.SmsEntityExtractor
+import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ml.SmsClassifier
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.CategoryIconHelper
-import io.pm.finlight.utils.ReminderManager
-import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.DefaultDispatcherProvider
-import kotlinx.coroutines.Dispatchers
+import io.pm.finlight.utils.DispatcherProvider
+import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
@@ -44,6 +41,7 @@ import java.util.*
 
 sealed class ScanResult {
     data class Success(val count: Int) : ScanResult()
+
     object Error : ScanResult()
 }
 
@@ -60,9 +58,8 @@ class SettingsViewModel(
     private val smsClassifier: SmsClassifier,
     private val nerExtractor: SmsEntityExtractor,
     private val transactionRunner: TransactionRunner,
-    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider()
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
 ) : AndroidViewModel(application) {
-
     private val context = application
     private val tagDao = db.tagDao()
     private val splitTransactionDao = db.splitTransactionDao()
@@ -73,7 +70,6 @@ class SettingsViewModel(
 
     private val _showBackupSuccessDialog = MutableStateFlow(false)
     val showBackupSuccessDialog = _showBackupSuccessDialog.asStateFlow()
-
 
     val smsScanStartDate: StateFlow<Long>
 
@@ -98,7 +94,7 @@ class SettingsViewModel(
         settingsRepository.getMonthlySummaryEnabled().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = true
+            initialValue = true,
         )
 
     val appLockEnabled: StateFlow<Boolean> =
@@ -119,7 +115,7 @@ class SettingsViewModel(
         settingsRepository.getAutoCaptureNotificationEnabled().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = true
+            initialValue = true,
         )
 
     private val _potentialTransactions = MutableStateFlow<List<PotentialTransaction>>(emptyList())
@@ -135,47 +131,46 @@ class SettingsViewModel(
     private val _processedSmsCount = MutableStateFlow(0)
     val processedSmsCount: StateFlow<Int> = _processedSmsCount.asStateFlow()
 
-
     val dailyReportTime: StateFlow<Pair<Int, Int>> =
         settingsRepository.getDailyReportTime().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = Pair(9, 0)
+            initialValue = Pair(9, 0),
         )
 
     val weeklyReportTime: StateFlow<Triple<Int, Int, Int>> =
         settingsRepository.getWeeklyReportTime().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = Triple(Calendar.MONDAY, 9, 0)
+            initialValue = Triple(Calendar.MONDAY, 9, 0),
         )
 
     val monthlyReportTime: StateFlow<Triple<Int, Int, Int>> =
         settingsRepository.getMonthlyReportTime().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = Triple(1, 9, 0)
+            initialValue = Triple(1, 9, 0),
         )
 
     val selectedTheme: StateFlow<AppTheme> =
         settingsRepository.getSelectedTheme().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = AppTheme.SYSTEM_DEFAULT
+            initialValue = AppTheme.SYSTEM_DEFAULT,
         )
 
     val autoBackupEnabled: StateFlow<Boolean> =
         settingsRepository.getAutoBackupEnabled().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = true
+            initialValue = true,
         )
 
     val autoBackupNotificationEnabled: StateFlow<Boolean> =
         settingsRepository.getAutoBackupNotificationEnabled().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = false // Changed default value to false
+            initialValue = false, // Changed default value to false
         )
 
     val privacyModeEnabled: StateFlow<Boolean> =
@@ -189,7 +184,7 @@ class SettingsViewModel(
         settingsRepository.getLastBackupTimestamp().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 0L
+            initialValue = 0L,
         )
 
     init {
@@ -248,60 +243,76 @@ class SettingsViewModel(
             var newTransactionsFound = 0
             try {
                 val startDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -30) }.timeInMillis
-                val rawMessages = withContext(dispatchers.io) {
-                    smsRepository.fetchAllSms(startDate)
-                }
-
-                val existingMappings = withContext(dispatchers.io) {
-                    merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
-                }
-                val existingSmsHashes = withContext(dispatchers.io) {
-                    transactionRepository.getAllSmsHashes().first().toSet()
-                }
-
-                val categoryFinderProvider = object : CategoryFinderProvider {
-                    override fun getCategoryIdByName(name: String): Int? {
-                        return CategoryIconHelper.getCategoryIdByName(name)
+                val rawMessages =
+                    withContext(dispatchers.io) {
+                        smsRepository.fetchAllSms(startDate)
                     }
-                }
-                val customSmsRuleProvider = object : CustomSmsRuleProvider {
-                    override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
-                }
-                val merchantRenameRuleProvider = object : MerchantRenameRuleProvider {
-                    override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
-                }
-                val ignoreRuleProvider = object : IgnoreRuleProvider {
-                    override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
-                }
-                val merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
-                    override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-                }
-                val smsParseTemplateProvider = object : SmsParseTemplateProvider {
-                    override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
-                    override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
-                }
 
-                val parsedList = withContext(dispatchers.default) {
-                    rawMessages.map { sms ->
-                        async {
-                            SmsParser.parse(
-                                sms,
-                                existingMappings,
-                                customSmsRuleProvider,
-                                merchantRenameRuleProvider,
-                                ignoreRuleProvider,
-                                merchantCategoryMappingProvider,
-                                categoryFinderProvider,
-                                smsParseTemplateProvider,
-                                nerEntities = nerExtractor.extract(sms.body),
-                            )
+                val existingMappings =
+                    withContext(dispatchers.io) {
+                        merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
+                    }
+                val existingSmsHashes =
+                    withContext(dispatchers.io) {
+                        transactionRepository.getAllSmsHashes().first().toSet()
+                    }
+
+                val categoryFinderProvider =
+                    object : CategoryFinderProvider {
+                        override fun getCategoryIdByName(name: String): Int? {
+                            return CategoryIconHelper.getCategoryIdByName(name)
                         }
-                    }.awaitAll().filterNotNull()
-                }
+                    }
+                val customSmsRuleProvider =
+                    object : CustomSmsRuleProvider {
+                        override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
+                    }
+                val merchantRenameRuleProvider =
+                    object : MerchantRenameRuleProvider {
+                        override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+                    }
+                val ignoreRuleProvider =
+                    object : IgnoreRuleProvider {
+                        override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
+                    }
+                val merchantCategoryMappingProvider =
+                    object : MerchantCategoryMappingProvider {
+                        override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
+                            db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+                    }
+                val smsParseTemplateProvider =
+                    object : SmsParseTemplateProvider {
+                        override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
 
-                val newPotentialTransactions = parsedList.filter { potential ->
-                    !existingSmsHashes.contains(potential.sourceSmsHash)
-                }
+                        override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
+                            db.smsParseTemplateDao().getTemplatesBySignature(
+                                signature,
+                            )
+                    }
+
+                val parsedList =
+                    withContext(dispatchers.default) {
+                        rawMessages.map { sms ->
+                            async {
+                                SmsParser.parse(
+                                    sms,
+                                    existingMappings,
+                                    customSmsRuleProvider,
+                                    merchantRenameRuleProvider,
+                                    ignoreRuleProvider,
+                                    merchantCategoryMappingProvider,
+                                    categoryFinderProvider,
+                                    smsParseTemplateProvider,
+                                    nerEntities = nerExtractor.extract(sms.body),
+                                )
+                            }
+                        }.awaitAll().filterNotNull()
+                    }
+
+                val newPotentialTransactions =
+                    parsedList.filter { potential ->
+                        !existingSmsHashes.contains(potential.sourceSmsHash)
+                    }
 
                 for (potentialTxn in newPotentialTransactions) {
                     val success = transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")
@@ -319,7 +330,10 @@ class SettingsViewModel(
     }
 
     // --- REFACTORED: This function now implements chunked processing with progress reporting ---
-    fun startSmsScanAndIdentifyMappings(startDate: Long?, onComplete: (importedCount: Int) -> Unit) {
+    fun startSmsScanAndIdentifyMappings(
+        startDate: Long?,
+        onComplete: (importedCount: Int) -> Unit,
+    ) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             viewModelScope.launch { _uiEvent.send("SMS Read permission is required.") }
             onComplete(0) // Return 0 imported
@@ -346,28 +360,42 @@ class SettingsViewModel(
                 }
 
                 // 4. Get all DB lookups *before* the loop
-                val existingMappings = withContext(dispatchers.io) { merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName }) }
+                val existingMappings =
+                    withContext(
+                        dispatchers.io,
+                    ) { merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName }) }
                 val existingSmsHashes = withContext(dispatchers.io) { transactionRepository.getAllSmsHashes().first().toSet() }
 
-                val categoryFinderProvider = object : CategoryFinderProvider {
-                    override fun getCategoryIdByName(name: String): Int? = CategoryIconHelper.getCategoryIdByName(name)
-                }
-                val customSmsRuleProvider = object : CustomSmsRuleProvider {
-                    override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
-                }
-                val merchantRenameRuleProvider = object : MerchantRenameRuleProvider {
-                    override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
-                }
-                val ignoreRuleProvider = object : IgnoreRuleProvider {
-                    override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
-                }
-                val merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
-                    override suspend fun getCategoryIdForMerchant(merchantName: String): Int? = db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-                }
-                val smsParseTemplateProvider = object : SmsParseTemplateProvider {
-                    override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
-                    override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = db.smsParseTemplateDao().getTemplatesBySignature(signature)
-                }
+                val categoryFinderProvider =
+                    object : CategoryFinderProvider {
+                        override fun getCategoryIdByName(name: String): Int? = CategoryIconHelper.getCategoryIdByName(name)
+                    }
+                val customSmsRuleProvider =
+                    object : CustomSmsRuleProvider {
+                        override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
+                    }
+                val merchantRenameRuleProvider =
+                    object : MerchantRenameRuleProvider {
+                        override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+                    }
+                val ignoreRuleProvider =
+                    object : IgnoreRuleProvider {
+                        override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
+                    }
+                val merchantCategoryMappingProvider =
+                    object : MerchantCategoryMappingProvider {
+                        override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
+                            db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+                    }
+                val smsParseTemplateProvider =
+                    object : SmsParseTemplateProvider {
+                        override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
+
+                        override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
+                            db.smsParseTemplateDao().getTemplatesBySignature(
+                                signature,
+                            )
+                    }
 
                 // 5. Chunk the list
                 val chunks = rawMessages.chunked(100) // Process 100 messages at a time
@@ -375,38 +403,41 @@ class SettingsViewModel(
                 // 6. Loop through chunks
                 for (chunk in chunks) {
                     // Process one chunk in parallel
-                    val parsedList = withContext(dispatchers.default) {
-                        chunk.map { sms ->
-                            async {
-                                // Run the full parsing pipeline (Custom Rules, ML, Heuristics)
-                                var parseResult = SmsParser.parseWithOnlyCustomRules(
-                                    sms = sms,
-                                    customSmsRuleProvider = customSmsRuleProvider,
-                                    merchantRenameRuleProvider = merchantRenameRuleProvider,
-                                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                                    categoryFinderProvider = categoryFinderProvider
-                                )
-
-                                if (parseResult == null) {
-                                    val transactionConfidence = smsClassifier.classify(sms.body)
-                                    if (transactionConfidence >= 0.1) {
-                                        parseResult = SmsParser.parseWithReason(
+                    val parsedList =
+                        withContext(dispatchers.default) {
+                            chunk.map { sms ->
+                                async {
+                                    // Run the full parsing pipeline (Custom Rules, ML, Heuristics)
+                                    var parseResult =
+                                        SmsParser.parseWithOnlyCustomRules(
                                             sms = sms,
-                                            mappings = existingMappings,
                                             customSmsRuleProvider = customSmsRuleProvider,
                                             merchantRenameRuleProvider = merchantRenameRuleProvider,
-                                            ignoreRuleProvider = ignoreRuleProvider,
                                             merchantCategoryMappingProvider = merchantCategoryMappingProvider,
                                             categoryFinderProvider = categoryFinderProvider,
-                                            smsParseTemplateProvider = smsParseTemplateProvider,
-                                            nerEntities = nerExtractor.extract(sms.body),
                                         )
+
+                                    if (parseResult == null) {
+                                        val transactionConfidence = smsClassifier.classify(sms.body)
+                                        if (transactionConfidence >= 0.1) {
+                                            parseResult =
+                                                SmsParser.parseWithReason(
+                                                    sms = sms,
+                                                    mappings = existingMappings,
+                                                    customSmsRuleProvider = customSmsRuleProvider,
+                                                    merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                                    ignoreRuleProvider = ignoreRuleProvider,
+                                                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                                    categoryFinderProvider = categoryFinderProvider,
+                                                    smsParseTemplateProvider = smsParseTemplateProvider,
+                                                    nerEntities = nerExtractor.extract(sms.body),
+                                                )
+                                        }
                                     }
+                                    (parseResult as? ParseResult.Success)?.transaction
                                 }
-                                (parseResult as? ParseResult.Success)?.transaction
-                            }
-                        }.awaitAll().filterNotNull()
-                    }
+                            }.awaitAll().filterNotNull()
+                        }
 
                     // Filter and Save this chunk
                     val newPotentialTransactions = parsedList.filter { !existingSmsHashes.contains(it.sourceSmsHash) }
@@ -425,7 +456,6 @@ class SettingsViewModel(
                 val message = if (autoImportedCount > 0) "Successfully imported $autoImportedCount new transactions." else "No new transactions found."
                 _uiEvent.send(message)
                 onComplete(autoImportedCount)
-
             } catch (e: Exception) {
                 Log.e("SettingsViewModel", "Error during SMS scan", e)
                 _uiEvent.send("An error occurred during scan.")
@@ -452,7 +482,6 @@ class SettingsViewModel(
         settingsRepository.saveAutoBackupNotificationEnabled(enabled)
     }
 
-
     fun saveSelectedTheme(theme: AppTheme) {
         settingsRepository.saveSelectedTheme(theme)
     }
@@ -473,7 +502,10 @@ class SettingsViewModel(
         }
     }
 
-    fun saveMerchantRenameRule(originalName: String, newName: String) {
+    fun saveMerchantRenameRule(
+        originalName: String,
+        newName: String,
+    ) {
         if (originalName.isBlank() || newName.isBlank()) return
         viewModelScope.launch {
             if (originalName.equals(newName, ignoreCase = true)) {
@@ -496,7 +528,10 @@ class SettingsViewModel(
         if (enabled) ReminderManager.scheduleDailyReport(context) else ReminderManager.cancelDailyReport(context)
     }
 
-    fun saveDailyReportTime(hour: Int, minute: Int) {
+    fun saveDailyReportTime(
+        hour: Int,
+        minute: Int,
+    ) {
         settingsRepository.saveDailyReportTime(hour, minute)
         if (dailyReportEnabled.value) {
             ReminderManager.scheduleDailyReport(context)
@@ -508,7 +543,11 @@ class SettingsViewModel(
         if (enabled) ReminderManager.scheduleWeeklySummary(context) else ReminderManager.cancelWeeklySummary(context)
     }
 
-    fun saveWeeklyReportTime(dayOfWeek: Int, hour: Int, minute: Int) {
+    fun saveWeeklyReportTime(
+        dayOfWeek: Int,
+        hour: Int,
+        minute: Int,
+    ) {
         settingsRepository.saveWeeklyReportTime(dayOfWeek, hour, minute)
         if (weeklySummaryEnabled.value) {
             ReminderManager.scheduleWeeklySummary(context)
@@ -524,7 +563,11 @@ class SettingsViewModel(
         }
     }
 
-    fun saveMonthlyReportTime(dayOfMonth: Int, hour: Int, minute: Int) {
+    fun saveMonthlyReportTime(
+        dayOfMonth: Int,
+        hour: Int,
+        minute: Int,
+    ) {
         settingsRepository.saveMonthlyReportTime(dayOfMonth, hour, minute)
         if (monthlySummaryEnabled.value) {
             ReminderManager.scheduleMonthlySummary(context)
@@ -567,7 +610,11 @@ class SettingsViewModel(
                 initialData.map {
                     createReviewableRow(it.lineNumber, it.rowData, accountsMap, categoriesMap)
                 }
-            return CsvValidationReport(header = _csvValidationReport.value?.header ?: emptyList(), reviewableRows = revalidatedRows, totalRowCount = revalidatedRows.size)
+            return CsvValidationReport(
+                header = _csvValidationReport.value?.header ?: emptyList(),
+                reviewableRows = revalidatedRows,
+                totalRowCount = revalidatedRows.size,
+            )
         }
 
         val reviewableRows = mutableListOf<ReviewableRow>()
@@ -591,14 +638,20 @@ class SettingsViewModel(
         return CsvValidationReport(header, reviewableRows, lineNumber)
     }
 
-
     private fun createReviewableRow(
         lineNumber: Int,
         tokens: List<String>,
         accounts: Map<String, Account>,
         categories: Map<String, Category>,
     ): ReviewableRow {
-        if (tokens.size < 8) return ReviewableRow(lineNumber, tokens, CsvRowStatus.INVALID_COLUMN_COUNT, "Invalid column count. Expected at least 8.")
+        if (tokens.size < 8) {
+            return ReviewableRow(
+                lineNumber,
+                tokens,
+                CsvRowStatus.INVALID_COLUMN_COUNT,
+                "Invalid column count. Expected at least 8.",
+            )
+        }
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         try {
@@ -668,10 +721,11 @@ class SettingsViewModel(
 
     fun commitCsvImport(rowsToImport: List<ReviewableRow>) {
         viewModelScope.launch(dispatchers.io) {
-            val header = _csvValidationReport.value?.header ?: run {
-                Log.e("CsvImport", "Header not found in validation report. Aborting.")
-                return@launch
-            }
+            val header =
+                _csvValidationReport.value?.header ?: run {
+                    Log.e("CsvImport", "Header not found in validation report. Aborting.")
+                    return@launch
+                }
             val rows = rowsToImport.map { it.rowData }
             val isFinlightExport = header.contains("Id") && header.contains("ParentId")
 
@@ -687,9 +741,10 @@ class SettingsViewModel(
                 }
 
                 if (learnedMappings.isNotEmpty()) {
-                    val newMappings = learnedMappings.map { (merchant, categoryId) ->
-                        MerchantCategoryMapping(parsedName = merchant, categoryId = categoryId)
-                    }
+                    val newMappings =
+                        learnedMappings.map { (merchant, categoryId) ->
+                            MerchantCategoryMapping(parsedName = merchant, categoryId = categoryId)
+                        }
                     db.merchantCategoryMappingDao().insertAll(newMappings)
                     Log.d("CsvImport", "Learned and saved ${newMappings.size} new merchant-category mappings.")
                 }
@@ -701,7 +756,7 @@ class SettingsViewModel(
         header: List<String>,
         rows: List<List<String>>,
         learnedMappings: MutableMap<String, Int>,
-        usedColorKeys: MutableList<String>
+        usedColorKeys: MutableList<String>,
     ) {
         val idMap = mutableMapOf<String, Long>()
         val parents = rows.filter { it[header.indexOf("ParentId")].isBlank() }
@@ -710,7 +765,8 @@ class SettingsViewModel(
         for (row in parents) {
             val oldId = row[header.indexOf("Id")]
             val isSplit = row[header.indexOf("Category")] == "Split Transaction"
-            val transaction = createTransactionFromRow(row, header, isSplit = isSplit, learnedMappings = learnedMappings, usedColorKeys = usedColorKeys)
+            val transaction =
+                createTransactionFromRow(row, header, isSplit = isSplit, learnedMappings = learnedMappings, usedColorKeys = usedColorKeys)
             val newId = transactionRepository.insertTransactionWithTags(transaction, getTagsFromRow(row, header))
             idMap[oldId] = newId
         }
@@ -731,10 +787,11 @@ class SettingsViewModel(
         header: List<String>,
         rows: List<List<String>>,
         learnedMappings: MutableMap<String, Int>,
-        usedColorKeys: MutableList<String>
+        usedColorKeys: MutableList<String>,
     ) {
         for (row in rows) {
-            val transaction = createTransactionFromRow(row, header, isSplit = false, learnedMappings = learnedMappings, usedColorKeys = usedColorKeys)
+            val transaction =
+                createTransactionFromRow(row, header, isSplit = false, learnedMappings = learnedMappings, usedColorKeys = usedColorKeys)
             transactionRepository.insertTransactionWithTags(transaction, getTagsFromRow(row, header))
         }
     }
@@ -744,7 +801,7 @@ class SettingsViewModel(
         header: List<String>,
         isSplit: Boolean,
         learnedMappings: MutableMap<String, Int>,
-        usedColorKeys: MutableList<String>
+        usedColorKeys: MutableList<String>,
     ): Transaction {
         val h = header.associateWith { header.indexOf(it) }.withDefault { -1 }
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
@@ -775,11 +832,16 @@ class SettingsViewModel(
             notes = notes,
             isExcluded = isExcluded,
             source = "Imported",
-            isSplit = isSplit
+            isSplit = isSplit,
         )
     }
 
-    private suspend fun createSplitFromRow(row: List<String>, header: List<String>, parentId: Int, usedColorKeys: MutableList<String>): SplitTransaction {
+    private suspend fun createSplitFromRow(
+        row: List<String>,
+        header: List<String>,
+        parentId: Int,
+        usedColorKeys: MutableList<String>,
+    ): SplitTransaction {
         val h = header.associateWith { header.indexOf(it) }.withDefault { -1 }
 
         val amount = row[h.getValue("Amount")].toDouble()
@@ -792,11 +854,14 @@ class SettingsViewModel(
             parentTransactionId = parentId,
             amount = amount,
             categoryId = category.id,
-            notes = notes
+            notes = notes,
         )
     }
 
-    private suspend fun getTagsFromRow(row: List<String>, header: List<String>): Set<Tag> {
+    private suspend fun getTagsFromRow(
+        row: List<String>,
+        header: List<String>,
+    ): Set<Tag> {
         val h = header.associateWith { header.indexOf(it) }.withDefault { -1 }
         val tagsString = row.getOrNull(h.getValue("Tags"))
         val tagsToAssociate = mutableSetOf<Tag>()
@@ -814,7 +879,10 @@ class SettingsViewModel(
         return tagsToAssociate
     }
 
-    private suspend fun findOrCreateCategory(name: String, usedColorKeys: MutableList<String>): Category {
+    private suspend fun findOrCreateCategory(
+        name: String,
+        usedColorKeys: MutableList<String>,
+    ): Category {
         var category = categoryRepository.allCategories.first().find { it.name.equals(name, ignoreCase = true) }
         if (category == null) {
             val nextColor = CategoryIconHelper.getNextAvailableColor(usedColorKeys)
@@ -834,16 +902,16 @@ class SettingsViewModel(
         return account
     }
 
-
     fun clearCsvValidationReport() {
         _csvValidationReport.value = null
     }
 
     fun createBackupSnapshot() {
         viewModelScope.launch {
-            val success = withContext(dispatchers.io) {
-                DataExportService.createBackupSnapshot(context)
-            }
+            val success =
+                withContext(dispatchers.io) {
+                    DataExportService.createBackupSnapshot(context)
+                }
             if (success) {
                 backupManager.dataChanged()
                 _showBackupSuccessDialog.value = true

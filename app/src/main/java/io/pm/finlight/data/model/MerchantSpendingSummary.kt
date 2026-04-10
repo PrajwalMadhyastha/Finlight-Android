@@ -10,5 +10,5 @@ package io.pm.finlight
 data class MerchantSpendingSummary(
     val merchantName: String,
     val totalAmount: Double,
-    val transactionCount: Int
+    val transactionCount: Int,
 )

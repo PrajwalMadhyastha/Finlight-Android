@@ -38,8 +38,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CallSplit
@@ -62,10 +60,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -78,9 +78,16 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.google.gson.Gson
 import io.pm.finlight.*
+import io.pm.finlight.R
 import io.pm.finlight.ui.components.*
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.AccountViewModel
+import io.pm.finlight.ui.viewmodel.SettingsViewModel
+import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
+import io.pm.finlight.utils.BankLogoHelper
+import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.CurrencyHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -88,28 +95,28 @@ import java.net.URLEncoder
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
-import io.pm.finlight.R
-import io.pm.finlight.ui.viewmodel.AccountViewModel
-import io.pm.finlight.ui.viewmodel.SettingsViewModel
-import io.pm.finlight.utils.CategoryIconHelper
-import io.pm.finlight.utils.CurrencyHelper
-import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
-import io.pm.finlight.utils.BankLogoHelper
 
 private const val TAG = "DetailScreenDebug"
 
 private sealed class SheetContent {
     object Amount : SheetContent()
+
     object Notes : SheetContent()
+
     object Account : SheetContent()
+
     object Category : SheetContent()
+
     object Tags : SheetContent()
+
     object Merchant : SheetContent()
 }
 
 private sealed interface DetailScreenState {
     object Loading : DetailScreenState
+
     data class Success(val details: TransactionDetails) : DetailScreenState
+
     object Exit : DetailScreenState
 }
 
@@ -122,12 +129,13 @@ fun TransactionDetailScreen(
     transactionId: Int,
     viewModel: TransactionViewModel = viewModel(),
     accountViewModel: AccountViewModel = viewModel(),
-    onSaveRenameRule: (originalName: String, newName: String) -> Unit
+    onSaveRenameRule: (originalName: String, newName: String) -> Unit,
 ) {
     val context = LocalContext.current
-    val settingsViewModel: SettingsViewModel = viewModel(
-        factory = SettingsViewModelFactory(context.applicationContext as android.app.Application, viewModel)
-    )
+    val settingsViewModel: SettingsViewModel =
+        viewModel(
+            factory = SettingsViewModelFactory(context.applicationContext as android.app.Application, viewModel),
+        )
 
     val detailsState by viewModel.findTransactionDetailsById(transactionId).collectAsState(initial = null)
     val details = detailsState
@@ -170,7 +178,6 @@ fun TransactionDetailScreen(
     val scope = rememberCoroutineScope()
     val retroUpdateSheetState by viewModel.retroUpdateSheetState.collectAsState()
 
-
     var showMenu by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -184,14 +191,14 @@ fun TransactionDetailScreen(
     var showCreateAccountDialog by remember { mutableStateOf(false) }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
 
-
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            viewModel.attachPhotoToTransaction(transactionId, it)
+    val imagePickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent(),
+        ) { uri: Uri? ->
+            uri?.let {
+                viewModel.attachPhotoToTransaction(transactionId, it)
+            }
         }
-    }
 
     LaunchedEffect(transactionId) {
         NotificationManagerCompat.from(context).cancel(transactionId)
@@ -210,15 +217,15 @@ fun TransactionDetailScreen(
             CircularProgressIndicator()
         }
     } else {
-        val title = when (details.transaction.transactionType) {
-            "expense" -> "Debit transaction"
-            "income" -> "Credit transaction"
-            else -> "Transaction Details"
-        }
+        val title =
+            when (details.transaction.transactionType) {
+                "expense" -> "Debit transaction"
+                "income" -> "Credit transaction"
+                else -> "Transaction Details"
+            }
         var selectedDateTime by remember(details) {
             mutableStateOf(Calendar.getInstance().apply { timeInMillis = details.transaction.date })
         }
-
 
         val isThemeDark = MaterialTheme.colorScheme.background.isDark()
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -233,7 +240,7 @@ fun TransactionDetailScreen(
                 sheetState = retroSheetState,
                 windowInsets = WindowInsets(0),
                 containerColor = popupContainerColor,
-                dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant) },
             ) {
                 RetrospectiveUpdateSheetContent(
                     state = retroUpdateSheetState!!,
@@ -246,7 +253,7 @@ fun TransactionDetailScreen(
                     onDismiss = {
                         viewModel.dismissRetroUpdateSheet()
                         navigateBack()
-                    }
+                    },
                 )
             }
         }
@@ -269,7 +276,7 @@ fun TransactionDetailScreen(
                             DropdownMenu(
                                 expanded = showMenu,
                                 onDismissRequest = { showMenu = false },
-                                modifier = Modifier.background(popupContainerColor.copy(alpha = 1f))
+                                modifier = Modifier.background(popupContainerColor.copy(alpha = 1f)),
                             ) {
                                 if (details.transaction.isSplit) {
                                     DropdownMenuItem(
@@ -278,7 +285,7 @@ fun TransactionDetailScreen(
                                             showMenu = false
                                             viewModel.unsplitTransaction(details.transaction)
                                         },
-                                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Un-split") }
+                                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Un-split") },
                                     )
                                 }
                                 DropdownMenuItem(
@@ -287,19 +294,19 @@ fun TransactionDetailScreen(
                                         showMenu = false
                                         showDeleteDialog = true
                                     },
-                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = "Delete") }
+                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = "Delete") },
                                 )
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                     )
                 },
-                containerColor = Color.Transparent
+                containerColor = Color.Transparent,
             ) { innerPadding ->
                 LazyColumn(
                     modifier = Modifier.padding(innerPadding),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 16.dp)
+                    contentPadding = PaddingValues(bottom = 16.dp),
                 ) {
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -327,7 +334,7 @@ fun TransactionDetailScreen(
                                 },
                                 onVisitCountClick = {
                                     navController.navigate("search_screen?query=${details.transaction.description}")
-                                }
+                                },
                             )
                         }
                     }
@@ -357,7 +364,7 @@ fun TransactionDetailScreen(
                                 },
                                 onExcludeToggled = { newIsExcludedValue ->
                                     viewModel.updateTransactionExclusion(details.transaction.id, newIsExcludedValue)
-                                }
+                                },
                             )
                         }
                     }
@@ -366,7 +373,7 @@ fun TransactionDetailScreen(
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             AccountCard(
                                 details = details,
-                                onAccountClick = { activeSheetContent = SheetContent.Account }
+                                onAccountClick = { activeSheetContent = SheetContent.Account },
                             )
                         }
                     }
@@ -377,14 +384,14 @@ fun TransactionDetailScreen(
                                 Column {
                                     NotesRow(
                                         details = details,
-                                        onClick = { activeSheetContent = SheetContent.Notes }
+                                        onClick = { activeSheetContent = SheetContent.Notes },
                                     )
                                     if (selectedTags.isNotEmpty() || details.transaction.notes?.isNotBlank() == true) {
                                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                                     }
                                     TagsRow(
                                         selectedTags = selectedTags,
-                                        onClick = { activeSheetContent = SheetContent.Tags }
+                                        onClick = { activeSheetContent = SheetContent.Tags },
                                     )
                                 }
                             }
@@ -403,15 +410,16 @@ fun TransactionDetailScreen(
                                     scope.launch {
                                         val smsMessage = viewModel.getOriginalSmsMessage(details.transaction.sourceSmsId!!)
                                         if (smsMessage != null) {
-                                            val potentialTxn = PotentialTransaction(
-                                                sourceSmsId = smsMessage.id,
-                                                smsSender = smsMessage.sender,
-                                                amount = details.transaction.amount,
-                                                transactionType = details.transaction.transactionType,
-                                                merchantName = details.transaction.description,
-                                                originalMessage = smsMessage.body,
-                                                sourceSmsHash = details.transaction.sourceSmsHash
-                                            )
+                                            val potentialTxn =
+                                                PotentialTransaction(
+                                                    sourceSmsId = smsMessage.id,
+                                                    smsSender = smsMessage.sender,
+                                                    amount = details.transaction.amount,
+                                                    transactionType = details.transaction.transactionType,
+                                                    merchantName = details.transaction.description,
+                                                    originalMessage = smsMessage.body,
+                                                    sourceSmsHash = details.transaction.sourceSmsHash,
+                                                )
                                             val json = Gson().toJson(potentialTxn)
                                             val encodedJson = URLEncoder.encode(json, "UTF-8")
                                             navController.navigate("rule_creation_screen?potentialTransactionJson=$encodedJson")
@@ -419,33 +427,32 @@ fun TransactionDetailScreen(
                                             Toast.makeText(context, "Original SMS not found.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
-                                }
+                                },
                             )
                         }
                     }
-
 
                     if (!originalSms.isNullOrBlank()) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 GlassPanel(
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     Column(Modifier.padding(16.dp)) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(16.dp),
                                         ) {
                                             Icon(
                                                 Icons.AutoMirrored.Filled.Message,
                                                 contentDescription = "Original SMS",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                             Text(
                                                 "Original SMS Message",
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurface
+                                                color = MaterialTheme.colorScheme.onSurface,
                                             )
                                         }
                                         Spacer(Modifier.height(12.dp))
@@ -454,7 +461,7 @@ fun TransactionDetailScreen(
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontFamily = FontFamily.Monospace,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            lineHeight = 20.sp
+                                            lineHeight = 20.sp,
                                         )
                                     }
                                 }
@@ -469,7 +476,7 @@ fun TransactionDetailScreen(
                         sheetState = sheetState,
                         windowInsets = WindowInsets(0),
                         containerColor = popupContainerColor,
-                        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     ) {
                         TransactionEditSheetContent(
                             sheetContent = activeSheetContent!!,
@@ -489,7 +496,7 @@ fun TransactionDetailScreen(
                             onAddNewCategory = {
                                 activeSheetContent = null
                                 showCreateCategoryDialog = true
-                            }
+                            },
                         )
                     }
                 }
@@ -502,7 +509,7 @@ fun TransactionDetailScreen(
                                 viewModel.updateTransactionAccount(transactionId, newAccount.id)
                             }
                             showCreateAccountDialog = false
-                        }
+                        },
                     )
                 }
 
@@ -514,7 +521,7 @@ fun TransactionDetailScreen(
                                 viewModel.updateTransactionCategory(transactionId, newCategory.id)
                             }
                             showCreateCategoryDialog = false
-                        }
+                        },
                     )
                 }
 
@@ -532,16 +539,20 @@ fun TransactionDetailScreen(
                             }) { Text("OK") }
                         },
                         dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
-                        colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                        colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
                     ) {
                         DatePicker(
                             state = datePickerState,
-                            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
                         )
                     }
                 }
                 if (showTimePicker) {
-                    val timePickerState = rememberTimePickerState(initialHour = selectedDateTime.get(Calendar.HOUR_OF_DAY), initialMinute = selectedDateTime.get(Calendar.MINUTE))
+                    val timePickerState =
+                        rememberTimePickerState(
+                            initialHour = selectedDateTime.get(Calendar.HOUR_OF_DAY),
+                            initialMinute = selectedDateTime.get(Calendar.MINUTE),
+                        )
                     AlertDialog(
                         onDismissRequest = { showTimePicker = false },
                         containerColor = popupContainerColor.copy(alpha = 1f),
@@ -553,16 +564,17 @@ fun TransactionDetailScreen(
                         },
                         confirmButton = {
                             TextButton(onClick = {
-                                val finalDateTime = (selectedDateTime.clone() as Calendar).apply {
-                                    set(Calendar.HOUR_OF_DAY, timePickerState.hour)
-                                    set(Calendar.MINUTE, timePickerState.minute)
-                                }
+                                val finalDateTime =
+                                    (selectedDateTime.clone() as Calendar).apply {
+                                        set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                                        set(Calendar.MINUTE, timePickerState.minute)
+                                    }
                                 selectedDateTime = finalDateTime
                                 viewModel.updateTransactionDate(transactionId, finalDateTime.timeInMillis)
                                 showTimePicker = false
                             }) { Text("OK") }
                         },
-                        dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("Cancel") } }
+                        dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("Cancel") } },
                     )
                 }
 
@@ -571,7 +583,12 @@ fun TransactionDetailScreen(
                         onDismissRequest = { showDeleteDialog = false },
                         containerColor = popupContainerColor.copy(alpha = 1f),
                         title = { Text("Delete Transaction?", color = MaterialTheme.colorScheme.onSurface) },
-                        text = { Text("Are you sure you want to permanently delete this transaction? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        text = {
+                            Text(
+                                "Are you sure you want to permanently delete this transaction? This action cannot be undone.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
                         confirmButton = {
                             Button(
                                 onClick = {
@@ -580,10 +597,10 @@ fun TransactionDetailScreen(
                                     navigateBack()
                                 },
                                 shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                             ) { Text("Delete") }
                         },
-                        dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } }
+                        dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } },
                     )
                 }
 
@@ -592,9 +609,10 @@ fun TransactionDetailScreen(
                         AsyncImage(
                             model = showImageViewer,
                             contentDescription = "Full screen image",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp)),
                         )
                     }
                 }
@@ -604,7 +622,12 @@ fun TransactionDetailScreen(
                         onDismissRequest = { showImageDeleteDialog = null },
                         containerColor = popupContainerColor.copy(alpha = 1f),
                         title = { Text("Delete Attachment?", color = MaterialTheme.colorScheme.onSurface) },
-                        text = { Text("Are you sure you want to delete this attachment? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        text = {
+                            Text(
+                                "Are you sure you want to delete this attachment? This action cannot be undone.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
                         confirmButton = {
                             Button(
                                 onClick = {
@@ -612,12 +635,12 @@ fun TransactionDetailScreen(
                                     showImageDeleteDialog = null
                                 },
                                 shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                             ) { Text("Delete") }
                         },
                         dismissButton = {
                             TextButton(onClick = { showImageDeleteDialog = null }) { Text("Cancel") }
-                        }
+                        },
                     )
                 }
             }
@@ -629,70 +652,72 @@ fun TransactionDetailScreen(
 private fun TransactionPropertiesCard(
     details: TransactionDetails,
     onTypeSelected: (String) -> Unit,
-    onExcludeToggled: (Boolean) -> Unit
+    onExcludeToggled: (Boolean) -> Unit,
 ) {
     GlassPanel {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 TransactionTypeToggle(
                     selectedType = details.transaction.transactionType,
                     onTypeSelected = onTypeSelected,
-                    enabled = !details.transaction.isSplit
+                    enabled = !details.transaction.isSplit,
                 )
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onExcludeToggled(!details.transaction.isExcluded) }
-                    .padding(horizontal = 16.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onExcludeToggled(!details.transaction.isExcluded) }
+                        .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         "Exclude from Totals",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         "Will not affect budgets or reports.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
                 Switch(
                     checked = details.transaction.isExcluded,
-                    onCheckedChange = onExcludeToggled
+                    onCheckedChange = onExcludeToggled,
                 )
             }
         }
     }
 }
 
-
 @Composable
 private fun SplitSummaryCard(splits: List<SplitTransactionDetails>) {
     GlassPanel {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 "Split Details",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -710,41 +735,41 @@ private fun SplitSummaryItem(details: SplitTransactionDetails) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(
-                    CategoryIconHelper.getIconBackgroundColor(
-                        details.categoryColorKey ?: "gray_light"
-                    )
-                ),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        CategoryIconHelper.getIconBackgroundColor(
+                            details.categoryColorKey ?: "gray_light",
+                        ),
+                    ),
+            contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = CategoryIconHelper.getIcon(details.categoryIconKey ?: "category"),
                 contentDescription = details.categoryName,
                 tint = Color.Black,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(22.dp),
             )
         }
         Text(
             text = details.categoryName ?: "Uncategorized",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         )
         Text(
             text = currencyFormat.format(details.splitTransaction.amount),
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
-
 
 @Composable
 private fun CurrencyConversionInfoCard(transaction: Transaction) {
@@ -754,49 +779,50 @@ private fun CurrencyConversionInfoCard(transaction: Transaction) {
 
     GlassPanel {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 "Currency Conversion",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text("Original Amount:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
                     "${foreignCurrencySymbol}${numberFormat.format(transaction.originalAmount)}",
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text("Conversion Rate:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
                     "1 ${transaction.currencyCode} = $homeCurrencySymbol${numberFormat.format(transaction.conversionRate)}",
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text("Converted Amount:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
                     "$homeCurrencySymbol${numberFormat.format(transaction.amount)}",
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -804,19 +830,22 @@ private fun CurrencyConversionInfoCard(transaction: Transaction) {
 }
 
 @Composable
-private fun DynamicCategoryBackground(category: Category, isSplit: Boolean) {
+private fun DynamicCategoryBackground(
+    category: Category,
+    isSplit: Boolean,
+) {
     val color = CategoryIconHelper.getIconBackgroundColor(category.colorKey)
 
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         if (isSplit) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.CallSplit,
                 contentDescription = "Split Transaction Background",
                 modifier = Modifier.size(250.dp),
-                tint = color.copy(alpha = 0.15f)
+                tint = color.copy(alpha = 0.15f),
             )
         } else {
             val letter = if (category.name == "Uncategorized") "?" else category.name.firstOrNull()?.uppercase() ?: "?"
@@ -824,7 +853,7 @@ private fun DynamicCategoryBackground(category: Category, isSplit: Boolean) {
                 text = letter,
                 fontSize = 250.sp,
                 fontWeight = FontWeight.Bold,
-                color = color.copy(alpha = 0.15f)
+                color = color.copy(alpha = 0.15f),
             )
         }
     }
@@ -841,13 +870,14 @@ private fun TransactionSpotlightHeader(
     onCategoryClick: () -> Unit,
     onDateTimeClick: () -> Unit,
     onSplitClick: () -> Unit,
-    onVisitCountClick: () -> Unit
+    onVisitCountClick: () -> Unit,
 ) {
-    val displayCategory = if (isSplit) {
-        Category(name = "Multiple Categories", iconKey = "call_split", colorKey = "gray_light")
-    } else {
-        details.toCategory()
-    }
+    val displayCategory =
+        if (isSplit) {
+            Category(name = "Multiple Categories", iconKey = "call_split", colorKey = "gray_light")
+        } else {
+            details.toCategory()
+        }
 
     val headerDescription = if (isSplit) "Split Transaction" else details.transaction.description
 
@@ -857,17 +887,18 @@ private fun TransactionSpotlightHeader(
     val animatedAmount by animateFloatAsState(
         targetValue = details.transaction.amount.toFloat(),
         animationSpec = tween(1500, easing = EaseOutCubic),
-        label = "AmountAnimation"
+        label = "AmountAnimation",
     )
 
     GlassPanel(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(350.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(350.dp),
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             val isPredefined = CategoryIconHelper.getCategoryBackground(displayCategory.iconKey) != R.drawable.bg_cat_general
             if (isPredefined && !isSplit) {
@@ -876,20 +907,21 @@ private fun TransactionSpotlightHeader(
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.matchParentSize(),
-                    alpha = 0.3f
+                    alpha = 0.3f,
                 )
             } else {
                 DynamicCategoryBackground(category = displayCategory, isSplit = isSplit)
             }
 
             Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color.Black.copy(alpha = 0.2f), Color.Black.copy(alpha = 0.6f))
-                        )
-                    )
+                modifier =
+                    Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Black.copy(alpha = 0.2f), Color.Black.copy(alpha = 0.6f)),
+                            ),
+                        ),
             )
             Canvas(modifier = Modifier.matchParentSize()) {
                 drawIntoCanvas {
@@ -902,7 +934,7 @@ private fun TransactionSpotlightHeader(
                         0f,
                         categoryColor
                             .copy(alpha = 0.4f)
-                            .toArgb()
+                            .toArgb(),
                     )
                     it.drawCircle(center, radius / 2, Paint().apply { this.color = Color.Transparent })
                 }
@@ -911,7 +943,7 @@ private fun TransactionSpotlightHeader(
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 Spacer(modifier = Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -920,16 +952,17 @@ private fun TransactionSpotlightHeader(
                         style = MaterialTheme.typography.headlineMedium,
                         color = Color.White,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .clickable(onClick = onDescriptionClick)
-                            .padding(horizontal = 16.dp)
+                        modifier =
+                            Modifier
+                                .clickable(onClick = onDescriptionClick)
+                                .padding(horizontal = 16.dp),
                     )
                     if (details.transaction.isSplit) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.CallSplit,
                             contentDescription = "Split Transaction",
                             tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                     }
                 }
@@ -938,21 +971,21 @@ private fun TransactionSpotlightHeader(
                     style = MaterialTheme.typography.displayMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    modifier = Modifier.clickable(onClick = onAmountClick)
+                    modifier = Modifier.clickable(onClick = onAmountClick),
                 )
                 Spacer(Modifier.height(16.dp))
                 if (!isSplit) {
                     ChipWithIcon(
                         text = displayCategory.name,
                         onClick = onCategoryClick,
-                        category = displayCategory
+                        category = displayCategory,
                     )
                 }
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = onSplitClick,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f))
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f)),
                 ) {
                     val icon = if (isSplit) Icons.Default.Edit else Icons.AutoMirrored.Filled.CallSplit
                     val text = if (isSplit) "Edit Splits" else "Split Transaction"
@@ -963,32 +996,33 @@ private fun TransactionSpotlightHeader(
 
                 Spacer(modifier = Modifier.weight(1f))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = dateFormatter.format(displayDate),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.clickable(onClick = onDateTimeClick)
+                        modifier = Modifier.clickable(onClick = onDateTimeClick),
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Info,
                             contentDescription = "Transaction Source",
                             tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(16.dp),
                         )
                         Text(
                             text = details.transaction.source,
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.8f)
+                            color = Color.White.copy(alpha = 0.8f),
                         )
                     }
                 }
@@ -996,41 +1030,43 @@ private fun TransactionSpotlightHeader(
 
             if (visitCount > 1) {
                 AssistChip(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(16.dp),
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(16.dp),
                     onClick = onVisitCountClick,
                     label = { Text("$visitCount visits") },
                     leadingIcon = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    colors = AssistChipDefaults.assistChipColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    colors =
+                        AssistChipDefaults.assistChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
                 )
             }
         }
     }
 }
 
-
 @Composable
 private fun AccountCard(
     details: TransactionDetails,
-    onAccountClick: () -> Unit
+    onAccountClick: () -> Unit,
 ) {
     GlassPanel {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onAccountClick)
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onAccountClick)
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
                 painter = painterResource(id = BankLogoHelper.getLogoForAccount(details.accountName ?: "")),
                 contentDescription = "${details.accountName} Logo",
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(40.dp),
             )
             Spacer(Modifier.width(16.dp))
 
@@ -1038,7 +1074,7 @@ private fun AccountCard(
                 Text(
                     text = "Account",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -1047,49 +1083,52 @@ private fun AccountCard(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Icon(
                 imageVector = Icons.Default.Edit,
                 contentDescription = "Edit Account",
                 modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
 
-
 @Composable
-private fun NotesRow(details: TransactionDetails, onClick: () -> Unit) {
+private fun NotesRow(
+    details: TransactionDetails,
+    onClick: () -> Unit,
+) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.Notes,
                 contentDescription = "Notes",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 "Notes",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Icon(
                 Icons.Default.Edit,
                 contentDescription = "Edit Notes",
                 modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -1097,32 +1136,37 @@ private fun NotesRow(details: TransactionDetails, onClick: () -> Unit) {
             details.transaction.notes ?: "Tap to add",
             fontWeight = if (details.transaction.notes.isNullOrBlank()) FontWeight.Normal else FontWeight.SemiBold,
             color = if (details.transaction.notes.isNullOrBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = 40.dp)
+            modifier = Modifier.padding(start = 40.dp),
         )
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TagsRow(selectedTags: Set<Tag>, onClick: () -> Unit) {
+private fun TagsRow(
+    selectedTags: Set<Tag>,
+    onClick: () -> Unit,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(16.dp),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Icon(Icons.Default.NewLabel, contentDescription = "Tags", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Column(modifier = Modifier.weight(1f)) {
             Text("Tags", color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(8.dp))
-            if(selectedTags.isEmpty()){
-                Text("Tap to add", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
+            if (selectedTags.isEmpty())
+                {
+                    Text("Tap to add", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     selectedTags.forEach { tag ->
                         AssistChip(onClick = {}, label = { Text(tag.name) })
@@ -1130,7 +1174,12 @@ private fun TagsRow(selectedTags: Set<Tag>, onClick: () -> Unit) {
                 }
             }
         }
-        Icon(Icons.Default.Edit, contentDescription = "Edit Tags", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(
+            Icons.Default.Edit,
+            contentDescription = "Edit Tags",
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -1141,30 +1190,31 @@ private fun TransactionActionsCard(
     onViewClick: (Uri) -> Unit,
     onDeleteClick: (TransactionImage) -> Unit,
     sourceSmsId: Long?,
-    onFixParsingClick: () -> Unit
+    onFixParsingClick: () -> Unit,
 ) {
     GlassPanel {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
                 "Actions",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 ActionItem(
                     icon = Icons.Default.AddAPhoto,
                     label = "Attach",
                     onClick = onAddClick,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
 
                 if (sourceSmsId != null) {
@@ -1172,7 +1222,7 @@ private fun TransactionActionsCard(
                         icon = Icons.Default.Build,
                         label = "Fix Parsing",
                         onClick = onFixParsingClick,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     )
                 } else {
                     Spacer(modifier = Modifier.weight(1f))
@@ -1187,12 +1237,12 @@ private fun TransactionActionsCard(
                 Text(
                     "Attachments (${images.size})",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(vertical = 4.dp)
+                    contentPadding = PaddingValues(vertical = 4.dp),
                 ) {
                     items(images) { image ->
                         Box {
@@ -1200,25 +1250,27 @@ private fun TransactionActionsCard(
                                 model = File(image.imageUri),
                                 contentDescription = "Attachment",
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .size(90.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable { onViewClick(File(image.imageUri).toUri()) }
-                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                                modifier =
+                                    Modifier
+                                        .size(90.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable { onViewClick(File(image.imageUri).toUri()) }
+                                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
                             )
                             IconButton(
                                 onClick = { onDeleteClick(image) },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(4.dp)
-                                    .size(24.dp)
-                                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f), CircleShape)
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(4.dp)
+                                        .size(24.dp)
+                                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f), CircleShape),
                             ) {
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = "Delete",
                                     tint = MaterialTheme.colorScheme.onErrorContainer,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(14.dp),
                                 )
                             }
                         }
@@ -1234,25 +1286,25 @@ private fun ActionItem(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
     ) {
         Column(
             modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             )
             Spacer(Modifier.height(6.dp))
             Text(
@@ -1262,12 +1314,11 @@ private fun ActionItem(
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
 }
-
 
 @Composable
 private fun TransactionEditSheetContent(
@@ -1282,7 +1333,7 @@ private fun TransactionEditSheetContent(
     selectedTags: Set<Tag>,
     onDismiss: () -> Unit,
     onAddNewAccount: () -> Unit,
-    onAddNewCategory: () -> Unit
+    onAddNewCategory: () -> Unit,
 ) {
     val transactionId = details.transaction.id
 
@@ -1303,7 +1354,7 @@ private fun TransactionEditSheetContent(
                     viewModel.updateTransactionDescription(transactionId, newDescription)
                     onDismiss()
                 },
-                onDismiss = onDismiss
+                onDismiss = onDismiss,
             )
         }
         is SheetContent.Amount -> {
@@ -1315,7 +1366,7 @@ private fun TransactionEditSheetContent(
                     viewModel.updateTransactionAmount(transactionId, it)
                     onDismiss()
                 },
-                onDismiss = onDismiss
+                onDismiss = onDismiss,
             )
         }
         is SheetContent.Notes -> {
@@ -1326,7 +1377,7 @@ private fun TransactionEditSheetContent(
                     viewModel.updateTransactionNotes(transactionId, it)
                     onDismiss()
                 },
-                onDismiss = onDismiss
+                onDismiss = onDismiss,
             )
         }
         is SheetContent.Account -> {
@@ -1340,7 +1391,7 @@ private fun TransactionEditSheetContent(
                 },
                 onDismiss = onDismiss,
                 onAddNew = onAddNewAccount,
-                accountViewModel = accountViewModel
+                accountViewModel = accountViewModel,
             )
         }
         is SheetContent.Category -> {
@@ -1352,7 +1403,7 @@ private fun TransactionEditSheetContent(
                     onDismiss()
                 },
                 onDismiss = onDismiss,
-                onAddNew = onAddNewCategory
+                onAddNew = onAddNewCategory,
             )
         }
         is SheetContent.Tags -> {
@@ -1365,7 +1416,7 @@ private fun TransactionEditSheetContent(
                     viewModel.updateTagsForTransaction(transactionId)
                     onDismiss()
                 },
-                onDismiss = onDismiss
+                onDismiss = onDismiss,
             )
         }
     }
@@ -1379,7 +1430,7 @@ private fun AccountPickerSheet(
     onItemSelected: (Account) -> Unit,
     onDismiss: () -> Unit,
     onAddNew: () -> Unit,
-    accountViewModel: AccountViewModel
+    accountViewModel: AccountViewModel,
 ) {
     var editingAccount by remember { mutableStateOf<Account?>(null) }
     var editingName by remember { mutableStateOf("") }
@@ -1392,7 +1443,7 @@ private fun AccountPickerSheet(
             title,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
 
         currentAccount?.let { account ->
@@ -1411,7 +1462,7 @@ private fun AccountPickerSheet(
                 },
                 onCancelClick = { editingAccount = null },
                 onSelectClick = { onItemSelected(account) },
-                isCurrent = true
+                isCurrent = true,
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
         }
@@ -1432,14 +1483,20 @@ private fun AccountPickerSheet(
                         editingAccount = null
                     },
                     onCancelClick = { editingAccount = null },
-                    onSelectClick = { onItemSelected(account) }
+                    onSelectClick = { onItemSelected(account) },
                 )
             }
             item {
                 ListItem(
                     headlineContent = { Text("Create New Account", color = MaterialTheme.colorScheme.onSurface) },
-                    leadingContent = { Icon(Icons.Default.Add, contentDescription = "Create New Account", tint = MaterialTheme.colorScheme.primary) },
-                    modifier = Modifier.clickable(onClick = onAddNew)
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Create New Account",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                    modifier = Modifier.clickable(onClick = onAddNew),
                 )
             }
         }
@@ -1457,7 +1514,7 @@ private fun AccountPickerItem(
     onSaveClick: () -> Unit,
     onCancelClick: () -> Unit,
     onSelectClick: () -> Unit,
-    isCurrent: Boolean = false
+    isCurrent: Boolean = false,
 ) {
     val focusRequester = remember { FocusRequester() }
     // Local TextFieldValue to preserve selection state; parent receives plain String on change
@@ -1467,11 +1524,12 @@ private fun AccountPickerItem(
 
     if (isEditing) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedTextField(
                 value = localTextFieldValue,
@@ -1479,11 +1537,12 @@ private fun AccountPickerItem(
                     localTextFieldValue = it
                     onEditingNameChange(it.text)
                 },
-                modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester),
                 singleLine = true,
-                label = { Text("Account Name") }
+                label = { Text("Account Name") },
             )
             IconButton(onClick = onSaveClick, enabled = editingName.isNotBlank()) {
                 Icon(Icons.Default.Check, contentDescription = "Save Name", tint = MaterialTheme.colorScheme.primary)
@@ -1496,18 +1555,19 @@ private fun AccountPickerItem(
             focusRequester.requestFocus()
         }
     } else {
-        val colors = if (isCurrent) {
-            ListItemDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                headlineColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                supportingColor = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        } else {
-            ListItemDefaults.colors(
-                headlineColor = MaterialTheme.colorScheme.onSurface,
-                supportingColor = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        val colors =
+            if (isCurrent) {
+                ListItemDefaults.colors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    headlineColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    supportingColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            } else {
+                ListItemDefaults.colors(
+                    headlineColor = MaterialTheme.colorScheme.onSurface,
+                    supportingColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
         ListItem(
             colors = colors,
@@ -1520,7 +1580,7 @@ private fun AccountPickerItem(
                 IconButton(onClick = onEditClick) {
                     Icon(Icons.Default.Edit, contentDescription = "Edit Account Name", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            }
+            },
         )
     }
 }
@@ -1532,7 +1592,7 @@ private fun EditTextFieldSheet(
     keyboardType: KeyboardType = KeyboardType.Text,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
-    additionalContent: @Composable (() -> Unit)? = null
+    additionalContent: @Composable (() -> Unit)? = null,
 ) {
     var textFieldValue by remember {
         mutableStateOf(TextFieldValue(initialValue, TextRange(initialValue.length)))
@@ -1540,43 +1600,47 @@ private fun EditTextFieldSheet(
     val focusRequester = remember { FocusRequester() }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
         OutlinedTextField(
             value = textFieldValue,
             onValueChange = { textFieldValue = it },
             label = { Text("Value") },
-            keyboardOptions = KeyboardOptions(
-                keyboardType = keyboardType,
-                capitalization = if (keyboardType == KeyboardType.Text) KeyboardCapitalization.Sentences else KeyboardCapitalization.None
-            ),
+            keyboardOptions =
+                KeyboardOptions(
+                    keyboardType = keyboardType,
+                    capitalization = if (keyboardType == KeyboardType.Text) KeyboardCapitalization.Sentences else KeyboardCapitalization.None,
+                ),
             singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("value_input")
-                .focusRequester(focusRequester),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                focusedLabelColor = MaterialTheme.colorScheme.primary,
-                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                cursorColor = MaterialTheme.colorScheme.primary
-            )
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .testTag("value_input")
+                    .focusRequester(focusRequester),
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                ),
         )
         additionalContent?.invoke()
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(onClick = onDismiss) { Text("Cancel") }
             Spacer(modifier = Modifier.width(8.dp))
@@ -1598,19 +1662,19 @@ internal fun CategoryPickerSheet(
     items: List<Category>,
     onItemSelected: (Category) -> Unit,
     onDismiss: () -> Unit,
-    onAddNew: (() -> Unit)? = null
+    onAddNew: (() -> Unit)? = null,
 ) {
     Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {
         Text(
             title,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         CategorySelectionGrid(
             categories = items,
             onCategorySelected = onItemSelected,
-            onAddNew = onAddNew
+            onAddNew = onAddNew,
         )
         Spacer(Modifier.height(16.dp))
     }
@@ -1629,30 +1693,32 @@ private fun TagPickerSheet(
     var newTagFieldValue by remember { mutableStateOf(TextFieldValue("")) }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .fillMaxHeight()
-            .navigationBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .fillMaxHeight()
+                .navigationBarsPadding(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("Manage Tags", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
 
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
         ) {
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 allTags.forEach { tag ->
                     FilterChip(
                         selected = tag in selectedTags,
                         onClick = { onTagSelected(tag) },
-                        label = { Text(tag.name) }
+                        label = { Text(tag.name) },
                     )
                 }
             }
@@ -1662,28 +1728,29 @@ private fun TagPickerSheet(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedTextField(
                 value = newTagFieldValue,
                 onValueChange = { newTagFieldValue = it },
                 label = { Text("New Tag Name") },
                 modifier = Modifier.weight(1f),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
             )
             IconButton(
                 onClick = {
                     onAddNewTag(newTagFieldValue.text)
                     newTagFieldValue = TextFieldValue("")
                 },
-                enabled = newTagFieldValue.text.isNotBlank()
+                enabled = newTagFieldValue.text.isNotBlank(),
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add New Tag", tint = MaterialTheme.colorScheme.primary)
             }
@@ -1691,7 +1758,7 @@ private fun TagPickerSheet(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(onClick = onDismiss) { Text("Cancel") }
             Spacer(modifier = Modifier.width(8.dp))
@@ -1708,32 +1775,33 @@ private fun TagPickerSheet(
 @Composable
 private fun CategoryIconDisplay(category: Category) {
     Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-        contentAlignment = Alignment.Center
+        modifier =
+            Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
+        contentAlignment = Alignment.Center,
     ) {
         if (category.name == "Uncategorized") {
             Icon(
                 imageVector = CategoryIconHelper.getIcon("help_outline"),
                 contentDescription = category.name,
                 tint = Color.Black,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             )
         } else if (category.iconKey == "letter_default") {
             Text(
                 text = category.name.firstOrNull()?.uppercase() ?: "?",
                 color = Color.Black,
                 fontWeight = FontWeight.Bold,
-                fontSize = 22.sp
+                fontSize = 22.sp,
             )
         } else {
             Icon(
                 imageVector = CategoryIconHelper.getIcon(category.iconKey),
                 contentDescription = category.name,
                 tint = Color.Black,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             )
         }
     }
@@ -1745,14 +1813,14 @@ private fun TransactionDetails.toCategory(): Category {
             id = 0,
             name = "Uncategorized",
             iconKey = "help_outline",
-            colorKey = "red_light"
+            colorKey = "red_light",
         )
     } else {
         Category(
             id = this.transaction.categoryId ?: 0,
             name = this.categoryName,
             iconKey = this.categoryIconKey ?: "category",
-            colorKey = this.categoryColorKey ?: "gray_light"
+            colorKey = this.categoryColorKey ?: "gray_light",
         )
     }
 }
@@ -1761,48 +1829,49 @@ private fun TransactionDetails.toCategory(): Category {
 private fun ChipWithIcon(
     text: String,
     onClick: () -> Unit,
-    category: Category
+    category: Category,
 ) {
     Row(
-        modifier = Modifier
-            .clip(CircleShape)
-            .clickable(onClick = onClick)
-            .background(
-                CategoryIconHelper
-                    .getIconBackgroundColor(category.colorKey)
-                    .copy(alpha = 0.9f)
-            )
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+        modifier =
+            Modifier
+                .clip(CircleShape)
+                .clickable(onClick = onClick)
+                .background(
+                    CategoryIconHelper
+                        .getIconBackgroundColor(category.colorKey)
+                        .copy(alpha = 0.9f),
+                )
+                .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (category.name == "Uncategorized") {
             Icon(
                 imageVector = CategoryIconHelper.getIcon("help_outline"),
                 contentDescription = null,
                 tint = Color.Black,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(20.dp),
             )
         } else if (category.iconKey == "letter_default") {
             Text(
                 text = category.name.firstOrNull()?.uppercase() ?: "?",
                 color = Color.Black,
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                fontSize = 16.sp,
             )
         } else {
             Icon(
                 imageVector = CategoryIconHelper.getIcon(category.iconKey),
                 contentDescription = null,
                 tint = Color.Black,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(20.dp),
             )
         }
         Text(
             text = text,
             fontWeight = FontWeight.SemiBold,
             color = Color.Black,
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodyMedium,
         )
     }
 }
@@ -1813,68 +1882,72 @@ private fun RetrospectiveUpdateSheetContent(
     onToggleSelection: (Int) -> Unit,
     onToggleSelectAll: () -> Unit,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     val changeType = if (state.newDescription != null) "description" else "category"
 
     Column(
-        modifier = Modifier
-            .fillMaxHeight()
-            .navigationBarsPadding()
-            .padding(16.dp)
+        modifier =
+            Modifier
+                .fillMaxHeight()
+                .navigationBarsPadding()
+                .padding(16.dp),
     ) {
         Text(
             "Update Similar Transactions",
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(bottom = 8.dp),
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             "You've changed the $changeType for transactions like '${state.originalDescription}'. Apply this change to other similar transactions?",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(bottom = 16.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         if (state.isLoading) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(150.dp), contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(150.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator()
             }
         } else {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 val allSelected = state.selectedIds.size == state.similarTransactions.size
                 Checkbox(
                     checked = allSelected,
                     onCheckedChange = { onToggleSelectAll() },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = MaterialTheme.colorScheme.primary,
-                        uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        checkmarkColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                    colors =
+                        CheckboxDefaults.colors(
+                            checkedColor = MaterialTheme.colorScheme.primary,
+                            uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            checkmarkColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
                 )
                 Text(
                     text = if (allSelected) "Deselect All" else "Select All",
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(state.similarTransactions, key = { it.id }) { transaction ->
                     SelectableTransactionItem(
                         transaction = transaction,
                         isSelected = transaction.id in state.selectedIds,
-                        onToggle = { onToggleSelection(transaction.id) }
+                        onToggle = { onToggleSelection(transaction.id) },
                     )
                 }
             }
@@ -1884,18 +1957,18 @@ private fun RetrospectiveUpdateSheetContent(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             OutlinedButton(
                 onClick = onDismiss,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 Text("Just This One")
             }
             Button(
                 onClick = onConfirm,
                 modifier = Modifier.weight(1f),
-                enabled = state.selectedIds.isNotEmpty()
+                enabled = state.selectedIds.isNotEmpty(),
             ) {
                 Text("Update ${state.selectedIds.size} Items")
             }
@@ -1907,28 +1980,30 @@ private fun RetrospectiveUpdateSheetContent(
 private fun SelectableTransactionItem(
     transaction: Transaction,
     isSelected: Boolean,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
 ) {
     val dateFormatter = remember { SimpleDateFormat("dd MMM, yy", Locale.getDefault()) }
 
     GlassPanel(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onToggle)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Checkbox(
                 checked = isSelected,
                 onCheckedChange = null,
-                colors = CheckboxDefaults.colors(
-                    checkedColor = MaterialTheme.colorScheme.primary,
-                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    checkmarkColor = MaterialTheme.colorScheme.onPrimary
-                )
+                colors =
+                    CheckboxDefaults.colors(
+                        checkedColor = MaterialTheme.colorScheme.primary,
+                        uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        checkmarkColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -1937,19 +2012,19 @@ private fun SelectableTransactionItem(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = dateFormatter.format(Date(transaction.date)),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Text(
                 text = "₹${"%,.2f".format(transaction.amount)}",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }

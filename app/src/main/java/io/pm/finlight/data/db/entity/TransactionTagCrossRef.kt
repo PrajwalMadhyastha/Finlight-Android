@@ -25,17 +25,17 @@ import kotlinx.serialization.Serializable
             entity = Transaction::class,
             parentColumns = ["id"],
             childColumns = ["transactionId"],
-            onDelete = ForeignKey.CASCADE // If a transaction is deleted, remove its tag links
+            onDelete = ForeignKey.CASCADE, // If a transaction is deleted, remove its tag links
         ),
         ForeignKey(
             entity = Tag::class,
             parentColumns = ["id"],
             childColumns = ["tagId"],
-            onDelete = ForeignKey.CASCADE // If a tag is deleted, remove its links from transactions
-        )
-    ]
+            onDelete = ForeignKey.CASCADE, // If a tag is deleted, remove its links from transactions
+        ),
+    ],
 )
 data class TransactionTagCrossRef(
     val transactionId: Int,
-    val tagId: Int
+    val tagId: Int,
 )

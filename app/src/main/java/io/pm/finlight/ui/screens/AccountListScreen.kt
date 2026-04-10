@@ -73,7 +73,7 @@ fun AccountListScreen(
             AnimatedVisibility(
                 visible = isSelectionMode,
                 enter = fadeIn(),
-                exit = fadeOut()
+                exit = fadeOut(),
             ) {
                 TopAppBar(
                     title = { Text("${selectedIds.size} selected") },
@@ -87,26 +87,27 @@ fun AccountListScreen(
                     actions = {
                         TextButton(
                             onClick = { showMergeDialog = true },
-                            enabled = selectedIds.size >= 2
+                            enabled = selectedIds.size >= 2,
                         ) {
                             Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge Accounts")
                             Spacer(Modifier.width(4.dp))
                             Text("Merge")
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
-                    )
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
+                        ),
                 )
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.padding(innerPadding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 80.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (suggestedMerges.isNotEmpty() && !isSelectionMode) {
                 item {
@@ -117,7 +118,7 @@ fun AccountListScreen(
                         },
                         onDismissClick = {
                             viewModel.dismissMergeSuggestion(it)
-                        }
+                        },
                     )
                 }
             }
@@ -131,7 +132,7 @@ fun AccountListScreen(
                     onToggleSelection = { viewModel.toggleAccountSelection(accountWithBalance.account.id) },
                     onEnterSelectionMode = { viewModel.enterSelectionMode(accountWithBalance.account.id) },
                     onNavigateToDetail = { navController.navigate("account_detail/${accountWithBalance.account.id}") },
-                    onEditClick = { navController.navigate("edit_account/${accountWithBalance.account.id}") }
+                    onEditClick = { navController.navigate("edit_account/${accountWithBalance.account.id}") },
                 )
             }
         }
@@ -145,7 +146,7 @@ fun AccountListScreen(
             onConfirm = { destinationAccountId ->
                 viewModel.mergeSelectedAccounts(destinationAccountId)
                 showMergeDialog = false
-            }
+            },
         )
     }
 }
@@ -154,7 +155,7 @@ fun AccountListScreen(
 private fun MergeSuggestionCard(
     suggestion: Pair<Account, Account>,
     onViewClick: (Pair<Account, Account>) -> Unit,
-    onDismissClick: (Pair<Account, Account>) -> Unit
+    onDismissClick: (Pair<Account, Account>) -> Unit,
 ) {
     GlassPanel {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -163,30 +164,30 @@ private fun MergeSuggestionCard(
                     Icons.Default.Info,
                     contentDescription = "Suggestion",
                     tint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(end = 12.dp)
+                    modifier = Modifier.padding(end = 12.dp),
                 )
                 Text(
                     "Potential Duplicates Found",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             Spacer(Modifier.height(8.dp))
             Text(
                 "We found accounts with similar names that you might want to merge:",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 "• ${suggestion.first.name}\n• ${suggestion.second.name}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp)
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp),
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.End,
             ) {
                 TextButton(onClick = { onDismissClick(suggestion) }) {
                     Text("Dismiss")
@@ -200,7 +201,6 @@ private fun MergeSuggestionCard(
     }
 }
 
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AccountListItem(
@@ -211,30 +211,31 @@ private fun AccountListItem(
     onToggleSelection: () -> Unit,
     onEnterSelectionMode: () -> Unit,
     onNavigateToDetail: () -> Unit,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent
 
     GlassPanel(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(backgroundColor)
-            .combinedClickable(
-                onClick = { if (isSelectionMode) onToggleSelection() else onNavigateToDetail() },
-                onLongClick = { if (!isSelectionMode) onEnterSelectionMode() }
-            )
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(backgroundColor)
+                .combinedClickable(
+                    onClick = { if (isSelectionMode) onToggleSelection() else onNavigateToDetail() },
+                    onLongClick = { if (!isSelectionMode) onEnterSelectionMode() },
+                ),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Image(
                 painter = painterResource(id = BankLogoHelper.getLogoForAccount(accountWithBalance.account.name)),
                 contentDescription = "${accountWithBalance.account.name} Logo",
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(40.dp),
             )
 
             Column(modifier = Modifier.weight(1f)) {
@@ -242,26 +243,26 @@ private fun AccountListItem(
                     text = accountWithBalance.account.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = "Balance: ${currencyFormat.format(accountWithBalance.balance)}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             if (isSelectionMode) {
                 Checkbox(
                     checked = isSelected,
-                    onCheckedChange = { onToggleSelection() }
+                    onCheckedChange = { onToggleSelection() },
                 )
             } else {
                 IconButton(onClick = onEditClick) {
                     Icon(
                         Icons.Default.Edit,
                         contentDescription = "Edit Account",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -273,7 +274,7 @@ private fun AccountListItem(
 private fun MergeConfirmationDialog(
     accountsToMerge: List<AccountWithBalance>,
     onDismiss: () -> Unit,
-    onConfirm: (destinationAccountId: Int) -> Unit
+    onConfirm: (destinationAccountId: Int) -> Unit,
 ) {
     var selectedDestinationId by remember { mutableStateOf<Int?>(null) }
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
@@ -289,7 +290,7 @@ private fun MergeConfirmationDialog(
                 Text(
                     "Select one account to keep. All transactions from the other accounts will be moved to this one, and the other accounts will be permanently deleted.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(16.dp))
                 accountsToMerge.forEach { accountWithBalance ->
@@ -298,20 +299,20 @@ private fun MergeConfirmationDialog(
                             .fillMaxWidth()
                             .selectable(
                                 selected = (accountWithBalance.account.id == selectedDestinationId),
-                                onClick = { selectedDestinationId = accountWithBalance.account.id }
+                                onClick = { selectedDestinationId = accountWithBalance.account.id },
                             )
                             .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
                             selected = (accountWithBalance.account.id == selectedDestinationId),
-                            onClick = { selectedDestinationId = accountWithBalance.account.id }
+                            onClick = { selectedDestinationId = accountWithBalance.account.id },
                         )
                         Text(
                             text = accountWithBalance.account.name,
                             style = MaterialTheme.typography.bodyLarge,
                             modifier = Modifier.padding(start = 16.dp),
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 }
@@ -321,7 +322,7 @@ private fun MergeConfirmationDialog(
             Button(
                 onClick = { selectedDestinationId?.let { onConfirm(it) } },
                 enabled = selectedDestinationId != null,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             ) {
                 Text("Confirm Merge")
             }
@@ -330,6 +331,6 @@ private fun MergeConfirmationDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }

@@ -17,12 +17,11 @@ val AuroraDarkOnSurface = Color(0xFFE6E1E5) // Off-white for text
 val AuroraDarkOnSurfaceVariant = Color(0xFFC4C7C5) // Brighter gray for secondary text
 
 // --- Daybreak Theme (Light Purple) ---
-val DaybreakPrimary = Color(0xFF6750A4)       // Muted, professional purple
-val DaybreakSecondary = Color(0xFF81D4FA)      // Soft, light blue for secondary accents
-val DaybreakBackground = Color(0xFFEADDFF)      // Light lavender background
-val DaybreakOnSurface = Color(0xFF1D1B20)       // Dark, readable text
+val DaybreakPrimary = Color(0xFF6750A4) // Muted, professional purple
+val DaybreakSecondary = Color(0xFF81D4FA) // Soft, light blue for secondary accents
+val DaybreakBackground = Color(0xFFEADDFF) // Light lavender background
+val DaybreakOnSurface = Color(0xFF1D1B20) // Dark, readable text
 val DaybreakOnSurfaceVariant = Color(0xFF49454F) // Softer gray for secondary text
-
 
 // --- Midnight Theme (Monochrome Dark) ---
 val MidnightPrimary = Color(0xFFBBBBBB) // A bright, neutral gray for accents
@@ -38,10 +37,10 @@ val PaperBackground = Color(0xFFFDFCF7) // A soft, off-white/creme
 val PaperOnSurface = Color(0xFF1C1C1C) // Near-black for maximum readability
 val PaperOnSurfaceVariant = Color(0xFF555555) // Dark gray for secondary text
 
-
 // --- Shared Colors ---
 val GlassPanelBorder = Color(0x33FFFFFF) // White with 20% opacity
 val AuroraNumpadHighlight = Color(0x29FFFFFF) // White with 16% opacity
+
 // --- UPDATED: Increased opacity from 85% (0xD9) to 95% (0xF2) ---
 val PopupSurfaceDark = Color(0xF2212125) // 95% opaque dark charcoal
 val PopupSurfaceLight = Color(0xF2FFFFFF) // 95% opaque white

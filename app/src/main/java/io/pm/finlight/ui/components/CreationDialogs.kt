@@ -40,12 +40,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.CategoryIconHelper
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -53,7 +52,7 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun CreateAccountDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit
+    onConfirm: (String, String) -> Unit,
 ) {
     var name by remember { mutableStateOf(TextFieldValue("")) }
     var type by remember { mutableStateOf(TextFieldValue("")) }
@@ -69,32 +68,32 @@ fun CreateAccountDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Account Name (e.g., Chase Sapphire)") }
+                    label = { Text("Account Name (e.g., Chase Sapphire)") },
                 )
                 OutlinedTextField(
                     value = type,
                     onValueChange = { type = it },
-                    label = { Text("Account Type (e.g., Credit Card)") }
+                    label = { Text("Account Type (e.g., Credit Card)") },
                 )
             }
         },
         confirmButton = {
             Button(
                 onClick = { onConfirm(name.text, type.text) },
-                enabled = name.text.isNotBlank() && type.text.isNotBlank()
+                enabled = name.text.isNotBlank() && type.text.isNotBlank(),
             ) { Text("Create") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
-        containerColor = popupContainerColor
+        containerColor = popupContainerColor,
     )
 }
 
 @Composable
 fun CreateCategoryDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, String, String) -> Unit
+    onConfirm: (String, String, String) -> Unit,
 ) {
     var name by remember { mutableStateOf(TextFieldValue("")) }
     var selectedIconKey by remember { mutableStateOf("category") }
@@ -114,24 +113,25 @@ fun CreateCategoryDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Category Name") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(16.dp))
                 Text("Select Icon", style = MaterialTheme.typography.titleMedium)
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 48.dp),
-                    modifier = Modifier.heightIn(max = 150.dp)
+                    modifier = Modifier.heightIn(max = 150.dp),
                 ) {
                     items(allIcons) { (key, icon) ->
                         IconButton(
                             onClick = { selectedIconKey = key },
-                            modifier = Modifier
-                                .padding(4.dp)
-                                .border(
-                                    width = 1.dp,
-                                    color = if (selectedIconKey == key) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                    shape = MaterialTheme.shapes.medium
-                                )
+                            modifier =
+                                Modifier
+                                    .padding(4.dp)
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (selectedIconKey == key) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        shape = MaterialTheme.shapes.medium,
+                                    ),
                         ) {
                             Icon(imageVector = icon, contentDescription = key)
                         }
@@ -141,21 +141,22 @@ fun CreateCategoryDialog(
                 Text("Select Color", style = MaterialTheme.typography.titleMedium)
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 48.dp),
-                    modifier = Modifier.heightIn(max = 100.dp)
+                    modifier = Modifier.heightIn(max = 100.dp),
                 ) {
                     items(allColors) { (key, color) ->
                         Box(
-                            modifier = Modifier
-                                .padding(6.dp)
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .clickable { selectedColorKey = key }
-                                .border(
-                                    width = 2.dp,
-                                    color = if (selectedColorKey == key) MaterialTheme.colorScheme.outline else Color.Transparent,
-                                    shape = CircleShape
-                                )
+                            modifier =
+                                Modifier
+                                    .padding(6.dp)
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .clickable { selectedColorKey = key }
+                                    .border(
+                                        width = 2.dp,
+                                        color = if (selectedColorKey == key) MaterialTheme.colorScheme.outline else Color.Transparent,
+                                        shape = CircleShape,
+                                    ),
                         )
                     }
                 }
@@ -164,12 +165,12 @@ fun CreateCategoryDialog(
         confirmButton = {
             Button(
                 onClick = { onConfirm(name.text, selectedIconKey, selectedColorKey) },
-                enabled = name.text.isNotBlank()
+                enabled = name.text.isNotBlank(),
             ) { Text("Create") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
-        containerColor = popupContainerColor
+        containerColor = popupContainerColor,
     )
 }

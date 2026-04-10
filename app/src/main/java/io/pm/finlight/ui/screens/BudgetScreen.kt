@@ -29,7 +29,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -63,10 +62,10 @@ import androidx.navigation.NavController
 import io.pm.finlight.Budget
 import io.pm.finlight.BudgetViewModel
 import io.pm.finlight.BudgetWithSpending
-import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.CategoryIconHelper
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -78,13 +77,13 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 // --- NEW: Copied from TransactionListScreen for the header ---
 private fun formatAmountInLakhs(amount: Long): String {
-    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-        .apply { maximumFractionDigits = 0 }
+    val currencyFormat =
+        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            .apply { maximumFractionDigits = 0 }
     if (amount < 1000) return currencyFormat.format(amount)
     if (amount < 100000) return "${currencyFormat.format(amount / 1000)}K"
     return "${NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 2 }.format(amount / 100000.0)}L"
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,14 +108,14 @@ fun BudgetScreen(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // --- NEW: Add MonthlySummaryHeader for navigation ---
         item {
             MonthlySummaryHeader(
                 selectedMonth = selectedMonth,
                 monthlySummaries = monthlySummaries,
-                onMonthSelected = { viewModel.setSelectedMonth(it) }
+                onMonthSelected = { viewModel.setSelectedMonth(it) },
             )
         }
 
@@ -125,7 +124,7 @@ fun BudgetScreen(
                 // --- REFACTORED: Pass dynamic state ---
                 totalBudget = overallBudgetForSelectedMonth,
                 totalSpent = totalSpendingForSelectedMonth,
-                onEditClick = { showOverallBudgetDialog = true }
+                onEditClick = { showOverallBudgetDialog = true },
             )
         }
 
@@ -133,18 +132,18 @@ fun BudgetScreen(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     "Category Budgets",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 IconButton(onClick = { navController.navigate("add_budget") }) {
                     Icon(
                         Icons.Default.Add,
                         contentDescription = "Add Category Budget",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -154,15 +153,16 @@ fun BudgetScreen(
         if (budgetsForSelectedMonth.isEmpty()) {
             item {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 48.dp),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 48.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         "No category budgets set. Tap the '+' icon to add one.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
@@ -174,7 +174,7 @@ fun BudgetScreen(
                     onDelete = {
                         budgetToDelete = budgetWithSpending.budget
                         showDeleteDialog = true
-                    }
+                    },
                 )
             }
         }
@@ -191,11 +191,11 @@ fun BudgetScreen(
                         budgetToDelete?.let { viewModel.deleteBudget(it) }
                         showDeleteDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) { Text("Delete") }
             },
             dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } },
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         )
     }
 
@@ -208,7 +208,7 @@ fun BudgetScreen(
                 // --- UPDATED: Pass the selectedMonth to the save function ---
                 viewModel.saveOverallBudget(newAmount, selectedMonth)
                 showOverallBudgetDialog = false
-            }
+            },
         )
     }
 }
@@ -218,40 +218,43 @@ fun BudgetScreen(
 private fun MonthlySummaryHeader(
     selectedMonth: Calendar,
     monthlySummaries: List<Pair<Calendar, Float?>>,
-    onMonthSelected: (Calendar) -> Unit
+    onMonthSelected: (Calendar) -> Unit,
 ) {
     val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
     val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
     var showMonthScroller by remember { mutableStateOf(false) }
 
-    val selectedTabIndex = monthlySummaries.indexOfFirst { (calendar, _) ->
-        calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
+    val selectedTabIndex =
+        monthlySummaries.indexOfFirst { (calendar, _) ->
+            calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
                 calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
-    }.coerceAtLeast(0)
+        }.coerceAtLeast(0)
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showMonthScroller = !showMonthScroller }
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { showMonthScroller = !showMonthScroller }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = monthYearFormat.format(selectedMonth.time),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Icon(
                     imageVector = if (showMonthScroller) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
                     contentDescription = if (showMonthScroller) "Hide month selector" else "Show month selector",
-                    tint = MaterialTheme.colorScheme.onSurface
+                    tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -259,16 +262,17 @@ private fun MonthlySummaryHeader(
         AnimatedVisibility(
             visible = showMonthScroller,
             enter = expandVertically(animationSpec = tween(200)),
-            exit = shrinkVertically(animationSpec = tween(200))
+            exit = shrinkVertically(animationSpec = tween(200)),
         ) {
             ScrollableTabRow(
                 selectedTabIndex = selectedTabIndex,
                 edgePadding = 16.dp,
                 indicator = {},
-                divider = {}
+                divider = {},
             ) {
                 monthlySummaries.forEach { (calendar, totalBudget) ->
-                    val isSelected = calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
+                    val isSelected =
+                        calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
                             calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
                     Tab(
                         selected = isSelected,
@@ -281,18 +285,25 @@ private fun MonthlySummaryHeader(
                                 Text(
                                     text = monthFormat.format(calendar.time),
                                     style = if (isSelected) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                 )
                                 // --- THIS IS THE FIX ---
                                 val budgetText = totalBudget?.let { formatAmountInLakhs(it.roundToLong()) } ?: "Not Set"
-                                val budgetColor = if (totalBudget != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                val budgetColor =
+                                    if (totalBudget != null) {
+                                        MaterialTheme.colorScheme.onSurface
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                            alpha = 0.7f,
+                                        )
+                                    }
                                 Text(
                                     text = budgetText,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (isSelected) budgetColor else budgetColor.copy(alpha = 0.7f)
+                                    color = if (isSelected) budgetColor else budgetColor.copy(alpha = 0.7f),
                                 )
                             }
-                        }
+                        },
                     )
                 }
             }
@@ -300,13 +311,12 @@ private fun MonthlySummaryHeader(
     }
 }
 
-
 @Composable
 private fun OverallBudgetHub(
     // --- REFACTORED: Accept nullable Float? ---
     totalBudget: Float?,
     totalSpent: Long,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
 ) {
     // --- REFACTORED: Handle null budget ---
     val budgetValue = totalBudget ?: 0f
@@ -314,23 +324,24 @@ private fun OverallBudgetHub(
     val remaining = budgetValue - totalSpent
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = 1500), label = "OverallBudgetProgress"
+        animationSpec = tween(durationMillis = 1500),
+        label = "OverallBudgetProgress",
     )
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 0 } }
 
-
     GlassPanel(modifier = Modifier.clickable(onClick = onEditClick)) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
                 "Overall Monthly Budget",
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
 
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(180.dp)) {
@@ -339,7 +350,7 @@ private fun OverallBudgetHub(
                     Text(
                         "Remaining",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     // --- REFACTORED: Handle null budget display ---
                     if (totalBudget == null) {
@@ -347,14 +358,14 @@ private fun OverallBudgetHub(
                             "Not Set",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
                         Text(
                             currencyFormat.format(remaining),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 }
@@ -362,19 +373,19 @@ private fun OverallBudgetHub(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     "Spent: ${currencyFormat.format(totalSpent)}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 // --- REFACTORED: Handle null budget display ---
                 val budgetText = if (totalBudget == null) "Not Set" else currencyFormat.format(budgetValue)
                 Text(
                     "Budget: $budgetText",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -383,13 +394,15 @@ private fun OverallBudgetHub(
 
 @Composable
 private fun OverallBudgetGauge(progress: Float) {
-    val progressBrush = Brush.sweepGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.primary,
-            MaterialTheme.colorScheme.secondary,
-            MaterialTheme.colorScheme.primary
+    val progressBrush =
+        Brush.sweepGradient(
+            colors =
+                listOf(
+                    MaterialTheme.colorScheme.primary,
+                    MaterialTheme.colorScheme.secondary,
+                    MaterialTheme.colorScheme.primary,
+                ),
         )
-    )
     // --- FIX: Read color from theme outside the Canvas scope ---
     val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
 
@@ -403,7 +416,7 @@ private fun OverallBudgetGauge(progress: Float) {
             color = trackColor, // Use the variable here
             style = Stroke(width = strokeWidth),
             radius = radius,
-            center = center
+            center = center,
         )
 
         drawArc(
@@ -413,7 +426,7 @@ private fun OverallBudgetGauge(progress: Float) {
             useCenter = false,
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
             size = Size(diameter, diameter),
-            topLeft = Offset(center.x - radius, center.y - radius)
+            topLeft = Offset(center.x - radius, center.y - radius),
         )
     }
 }
@@ -422,56 +435,57 @@ private fun OverallBudgetGauge(progress: Float) {
 private fun CategoryBudgetItem(
     budgetWithSpending: BudgetWithSpending,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
 ) {
     val progress = if (budgetWithSpending.budget.amount > 0) (budgetWithSpending.spent / budgetWithSpending.budget.amount).toFloat() else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
         animationSpec = tween(1000),
-        label = "CategoryProgress"
+        label = "CategoryProgress",
     )
-    val progressColor = when {
-        progress > 1f -> MaterialTheme.colorScheme.error
-        progress > 0.8f -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.primary
-    }
+    val progressColor =
+        when {
+            progress > 1f -> MaterialTheme.colorScheme.error
+            progress > 0.8f -> MaterialTheme.colorScheme.secondary
+            else -> MaterialTheme.colorScheme.primary
+        }
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 0 } }
-
 
     GlassPanel {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(
-                            CategoryIconHelper.getIconBackgroundColor(
-                                budgetWithSpending.colorKey ?: "gray_light"
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(
+                                CategoryIconHelper.getIconBackgroundColor(
+                                    budgetWithSpending.colorKey ?: "gray_light",
+                                ),
+                            ),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = CategoryIconHelper.getIcon(budgetWithSpending.iconKey ?: "category"),
                         contentDescription = budgetWithSpending.budget.categoryName,
                         tint = Color.Black,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(22.dp),
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         budgetWithSpending.budget.categoryName,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         "${currencyFormat.format(budgetWithSpending.spent)} of ${currencyFormat.format(budgetWithSpending.budget.amount)}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Row {
@@ -486,13 +500,14 @@ private fun CategoryBudgetItem(
             Spacer(modifier = Modifier.height(8.dp))
             LinearProgressIndicator(
                 progress = { animatedProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(CircleShape),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(CircleShape),
                 color = progressColor,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                strokeCap = StrokeCap.Round
+                strokeCap = StrokeCap.Round,
             )
         }
     }
@@ -503,15 +518,16 @@ fun EditOverallBudgetDialog(
     // --- REFACTORED: Accept nullable Float? ---
     currentBudget: Float?,
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
+    onConfirm: (String) -> Unit,
 ) {
     // --- REFACTORED: Handle null/0f for initial display ---
     var budgetInput by remember {
-        val initial = if (currentBudget != null && currentBudget > 0f) {
-            currentBudget.roundToLong().toString()
-        } else {
-            ""
-        }
+        val initial =
+            if (currentBudget != null && currentBudget > 0f) {
+                currentBudget.roundToLong().toString()
+            } else {
+                ""
+            }
         mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
     }
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
@@ -529,16 +545,16 @@ fun EditOverallBudgetDialog(
                 label = { Text("Total Monthly Budget Amount") },
                 leadingIcon = { Text("₹") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true
+                singleLine = true,
             )
         },
         confirmButton = {
             Button(
                 onClick = { onConfirm(budgetInput.text) },
-                enabled = budgetInput.text.isNotBlank()
+                enabled = budgetInput.text.isNotBlank(),
             ) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-        containerColor = popupContainerColor
+        containerColor = popupContainerColor,
     )
 }

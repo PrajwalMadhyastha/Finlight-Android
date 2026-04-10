@@ -15,20 +15,19 @@ import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.AccountRepository
 import io.pm.finlight.CategoryRepository
 import io.pm.finlight.MerchantMappingRepository
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.SmsRepository
 import io.pm.finlight.SettingsRepository
+import io.pm.finlight.SmsRepository
 import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionViewModel
+import io.pm.finlight.data.RoomTransactionRunner
+import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 
-import io.pm.finlight.data.RoomTransactionRunner
-
 class SettingsViewModelFactory(
     private val application: Application,
-    private val transactionViewModel: TransactionViewModel
+    private val transactionViewModel: TransactionViewModel,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
@@ -58,7 +57,7 @@ class SettingsViewModelFactory(
                 transactionViewModel,
                 smsClassifier,
                 nerExtractor,
-                transactionRunner
+                transactionRunner,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

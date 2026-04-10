@@ -17,23 +17,26 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class ManageIgnoreRulesViewModel(private val ignoreRuleDao: IgnoreRuleDao) : ViewModel() {
-
     /**
      * A flow of all ignore rules, collected as a StateFlow for the UI.
      */
-    val allRules: StateFlow<List<IgnoreRule>> = ignoreRuleDao.getAll()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    val allRules: StateFlow<List<IgnoreRule>> =
+        ignoreRuleDao.getAll()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
     /**
      * Adds a new ignore rule to the database.
      * @param pattern The pattern to be added (e.g., a sender name or a body phrase).
      * @param type The type of the rule (SENDER or BODY_PHRASE).
      */
-    fun addIgnoreRule(pattern: String, type: RuleType) {
+    fun addIgnoreRule(
+        pattern: String,
+        type: RuleType,
+    ) {
         if (pattern.isNotBlank()) {
             viewModelScope.launch {
                 // User-added rules are not default rules

@@ -41,7 +41,6 @@ interface SmsParseTemplateDao {
     @Query("SELECT * FROM sms_parse_templates WHERE templateSignature = :signature")
     suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate>
 
-
     /**
      * Deletes all SMS parse templates from the database.
      */

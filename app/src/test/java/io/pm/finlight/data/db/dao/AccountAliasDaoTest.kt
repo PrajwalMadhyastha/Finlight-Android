@@ -21,7 +21,6 @@ import kotlin.test.assertTrue
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class AccountAliasDaoTest {
-
     @get:Rule
     val dbRule = DatabaseTestRule()
 
@@ -29,60 +28,66 @@ class AccountAliasDaoTest {
     private lateinit var accountDao: AccountDao
 
     @Before
-    fun setup() = runTest {
-        accountAliasDao = dbRule.db.accountAliasDao()
-        accountDao = dbRule.db.accountDao()
-    }
+    fun setup() =
+        runTest {
+            accountAliasDao = dbRule.db.accountAliasDao()
+            accountDao = dbRule.db.accountDao()
+        }
 
     @Test
-    fun `findByAlias is case insensitive`() = runTest {
-        // Arrange
-        val destAccountId = accountDao.insert(Account(name = "ICICI Bank", type = "Bank")).toInt()
-        val alias = AccountAlias(aliasName = "ICICI - xx1234", destinationAccountId = destAccountId)
-        accountAliasDao.insertAll(listOf(alias))
+    fun `findByAlias is case insensitive`() =
+        runTest {
+            // Arrange
+            val destAccountId = accountDao.insert(Account(name = "ICICI Bank", type = "Bank")).toInt()
+            val alias = AccountAlias(aliasName = "ICICI - xx1234", destinationAccountId = destAccountId)
+            accountAliasDao.insertAll(listOf(alias))
 
-        // Act
-        val foundAlias = accountAliasDao.findByAlias("icici - xx1234")
+            // Act
+            val foundAlias = accountAliasDao.findByAlias("icici - xx1234")
 
-        // Assert
-        assertNotNull(foundAlias)
-        assertEquals(destAccountId, foundAlias?.destinationAccountId)
-    }
-
-    @Test
-    fun `getAll returns all inserted aliases`() = runTest {
-        // Arrange
-        val destAccountId1 = accountDao.insert(Account(name = "Account 1", type = "Bank")).toInt()
-        val destAccountId2 = accountDao.insert(Account(name = "Account 2", type = "Bank")).toInt()
-        val aliases = listOf(
-            AccountAlias(aliasName = "Alias 1", destinationAccountId = destAccountId1),
-            AccountAlias(aliasName = "Alias 2", destinationAccountId = destAccountId2)
-        )
-        accountAliasDao.insertAll(aliases)
-
-        // Act
-        val allAliases = accountAliasDao.getAll()
-
-        // Assert
-        assertEquals(2, allAliases.size)
-        assertTrue(allAliases.containsAll(aliases))
-    }
+            // Assert
+            assertNotNull(foundAlias)
+            assertEquals(destAccountId, foundAlias?.destinationAccountId)
+        }
 
     @Test
-    fun `deleteAll removes all aliases`() = runTest {
-        // Arrange
-        val destAccountId = accountDao.insert(Account(name = "Account 1", type = "Bank")).toInt()
-        val aliases = listOf(
-            AccountAlias(aliasName = "Alias 1", destinationAccountId = destAccountId),
-            AccountAlias(aliasName = "Alias 2", destinationAccountId = destAccountId)
-        )
-        accountAliasDao.insertAll(aliases)
+    fun `getAll returns all inserted aliases`() =
+        runTest {
+            // Arrange
+            val destAccountId1 = accountDao.insert(Account(name = "Account 1", type = "Bank")).toInt()
+            val destAccountId2 = accountDao.insert(Account(name = "Account 2", type = "Bank")).toInt()
+            val aliases =
+                listOf(
+                    AccountAlias(aliasName = "Alias 1", destinationAccountId = destAccountId1),
+                    AccountAlias(aliasName = "Alias 2", destinationAccountId = destAccountId2),
+                )
+            accountAliasDao.insertAll(aliases)
 
-        // Act
-        accountAliasDao.deleteAll()
+            // Act
+            val allAliases = accountAliasDao.getAll()
 
-        // Assert
-        val allAliases = accountAliasDao.getAll()
-        assertTrue(allAliases.isEmpty())
-    }
+            // Assert
+            assertEquals(2, allAliases.size)
+            assertTrue(allAliases.containsAll(aliases))
+        }
+
+    @Test
+    fun `deleteAll removes all aliases`() =
+        runTest {
+            // Arrange
+            val destAccountId = accountDao.insert(Account(name = "Account 1", type = "Bank")).toInt()
+            val aliases =
+                listOf(
+                    AccountAlias(aliasName = "Alias 1", destinationAccountId = destAccountId),
+                    AccountAlias(aliasName = "Alias 2", destinationAccountId = destAccountId),
+                )
+            accountAliasDao.insertAll(aliases)
+
+            // Act
+            accountAliasDao.deleteAll()
+
+            // Assert
+            val allAliases = accountAliasDao.getAll()
+            assertTrue(allAliases.isEmpty())
+        }
 }

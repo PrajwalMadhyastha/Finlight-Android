@@ -33,7 +33,6 @@ val turbineVersion = "1.2.0"
 val mockitoInlineVersion = "5.2.0"
 val mockitoKotlinVersion = "5.2.1"
 
-
 // Read properties from local.properties
 val keystorePropertiesFile = rootProject.file("local.properties")
 val keystoreProperties = Properties()
@@ -57,7 +56,6 @@ fun generateVersionCode(): Int {
     return sdf.format(Date()).toInt()
 }
 
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -74,34 +72,38 @@ sonar {
         property("sonar.projectKey", "PrajwalMadhyastha_Finlight-Android")
         property("sonar.organization", "prajwalmadhyastha-1")
         property("sonar.host.url", "https://sonarcloud.io")
-        
+
         // Securely read token from Environment Variable (CI) or local.properties (Local)
-        val sonarToken = System.getenv("SONAR_TOKEN") ?: project.rootProject.file("local.properties").let { file ->
-            if (file.exists()) {
-                val props = Properties()
-                props.load(FileInputStream(file))
-                props.getProperty("sonar.token")
-            } else null
-        }
+        val sonarToken =
+            System.getenv("SONAR_TOKEN") ?: project.rootProject.file("local.properties").let { file ->
+                if (file.exists()) {
+                    val props = Properties()
+                    props.load(FileInputStream(file))
+                    props.getProperty("sonar.token")
+                } else {
+                    null
+                }
+            }
         property("sonar.token", sonarToken ?: "")
-        
+
         // Point to Kover report - FIXED: Use variant-specific report for Debug
         property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/kover/reportDebug.xml")
-        
+
         // Exclude from coverage (will be tested with instrumented tests later)
         // These exclusions match Kover's exclusions to ensure consistent coverage reporting
-        property("sonar.coverage.exclusions", 
+        property(
+            "sonar.coverage.exclusions",
             "**/*ViewModelFactory*.kt," +
-            "**/*Screen.kt," +
-            "**/ui/screens/**," +
-            "**/ui/components/**," +
-            "**/ui/theme/**," +
-            "**/ui/NavItems.kt," +
-            "**/MainActivity.kt," +
-            "**/MainApplication.kt," +
-            "**/utils/ShareImageGenerator.kt," +
-            "**/data/db/**," + // Exclude DB package
-            "**/*_Impl*" // Exclude generated implementations
+                "**/*Screen.kt," +
+                "**/ui/screens/**," +
+                "**/ui/components/**," +
+                "**/ui/theme/**," +
+                "**/ui/NavItems.kt," +
+                "**/MainActivity.kt," +
+                "**/MainApplication.kt," +
+                "**/utils/ShareImageGenerator.kt," +
+                "**/data/db/**," + // Exclude DB package
+                "**/*_Impl*", // Exclude generated implementations
         )
         property("sonar.exclusions", "**/*ViewModelFactory*.kt")
     }
@@ -115,7 +117,7 @@ kover {
                 classes(
                     "*ViewModelFactory*",
                     "*Screen",
-                    "*Screen$*"
+                    "*Screen$*",
                 )
                 packages(
                     "io.pm.finlight.ui.screens",
@@ -123,17 +125,17 @@ kover {
                     "io.pm.finlight.ui.theme",
                     "io.pm.finlight.data.db", // Exclude DB package from unit tests
                     "io.pm.finlight.data.db.dao",
-                    "io.pm.finlight.data.db.entity"
+                    "io.pm.finlight.data.db.entity",
                 )
                 classes(
                     "*_Impl",
-                    "*_Impl$*"
+                    "*_Impl$*",
                 )
                 // Exclude navigation items (defined in NavItems.kt)
                 classes(
                     "io.pm.finlight.ui.BottomNavItem",
                     "io.pm.finlight.ui.BottomNavItem$*",
-                    "io.pm.finlight.ui.NavItemsKt"
+                    "io.pm.finlight.ui.NavItemsKt",
                 )
                 // Exclude MainActivity (Pure Compose UI)
                 classes(
@@ -141,7 +143,7 @@ kover {
                     "io.pm.finlight.MainActivity$*",
                     "io.pm.finlight.MainActivityKt",
                     "io.pm.finlight.MainActivityKt$*",
-                    "io.pm.finlight.ComposableSingletons$*MainActivityKt*"
+                    "io.pm.finlight.ComposableSingletons$*MainActivityKt*",
                 )
                 // Exclude MainApplication (Framework initialization)
                 classes("io.pm.finlight.MainApplication")
@@ -150,7 +152,7 @@ kover {
                     "io.pm.finlight.utils.ShareImageGenerator",
                     "io.pm.finlight.utils.ShareImageGenerator$*",
                     "io.pm.finlight.utils.ShareImageGeneratorKt",
-                    "io.pm.finlight.utils.ShareImageGeneratorKt$*"
+                    "io.pm.finlight.utils.ShareImageGeneratorKt$*",
                 )
             }
         }
@@ -220,14 +222,14 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
-    
+
     // Include Room schema files in androidTest assets for migration testing
     sourceSets {
         getByName("androidTest") {
             assets.srcDirs("schemas")
         }
     }
-    
+
     @Suppress("UnstableApiUsage")
     testOptions {
         unitTests {
@@ -256,7 +258,6 @@ dependencies {
     testImplementation(project(":core"))
     implementation("androidx.profileinstaller:profileinstaller:1.3.1")
 
-
     implementation("androidx.core:core-ktx:$coreKtxVersion")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
     implementation("androidx.activity:activity-compose:$activityComposeVersion")
@@ -273,9 +274,8 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     implementation("androidx.appcompat:appcompat:1.7.1")
 
-
-    //Disabling crashlytics until 16kb page size is supported
-    //implementation("com.google.firebase:firebase-crashlytics-buildtools:3.0.6")
+    // Disabling crashlytics until 16kb page size is supported
+    // implementation("com.google.firebase:firebase-crashlytics-buildtools:3.0.6")
 
     ksp("androidx.room:room-compiler:$roomVersion")
 
@@ -299,7 +299,6 @@ dependencies {
     // Explicitly add the SQLite dependency as recommended by SQLCipher docs
     implementation("androidx.sqlite:sqlite-ktx:2.2.0")
 
-
     // Local unit tests
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:$mockitoVersion")
@@ -318,7 +317,6 @@ dependencies {
     testImplementation("androidx.room:room-testing:$roomVersion")
     testImplementation("androidx.compose.ui:ui-test-junit4")
 
-
     // Instrumented UI tests
     androidTestImplementation("androidx.tracing:tracing-ktx:$tracingVersion")
     androidTestImplementation("androidx.test:runner:$androidxTestVersion")
@@ -328,7 +326,7 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:$espressoVersion")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.06.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-    
+
     // Room testing for migration tests
     androidTestImplementation("androidx.room:room-testing:$roomVersion")
 

@@ -20,7 +20,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class RecurringTransactionRepositoryTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var recurringTransactionDao: RecurringTransactionDao
 
@@ -51,32 +50,64 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `insert calls DAO`() = runTest {
-        // Arrange
-        val rule = RecurringTransaction(description = "Netflix", amount = 149.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
-        // Act
-        repository.insert(rule)
-        // Assert
-        verify(recurringTransactionDao).insert(rule)
-    }
+    fun `insert calls DAO`() =
+        runTest {
+            // Arrange
+            val rule =
+                RecurringTransaction(
+                    description = "Netflix",
+                    amount = 149.0,
+                    transactionType = "expense",
+                    recurrenceInterval = "Monthly",
+                    startDate = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                )
+            // Act
+            repository.insert(rule)
+            // Assert
+            verify(recurringTransactionDao).insert(rule)
+        }
 
     @Test
-    fun `update calls DAO`() = runTest {
-        // Arrange
-        val rule = RecurringTransaction(id = 1, description = "Netflix", amount = 149.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
-        // Act
-        repository.update(rule)
-        // Assert
-        verify(recurringTransactionDao).update(rule)
-    }
+    fun `update calls DAO`() =
+        runTest {
+            // Arrange
+            val rule =
+                RecurringTransaction(
+                    id = 1,
+                    description = "Netflix",
+                    amount = 149.0,
+                    transactionType = "expense",
+                    recurrenceInterval = "Monthly",
+                    startDate = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                )
+            // Act
+            repository.update(rule)
+            // Assert
+            verify(recurringTransactionDao).update(rule)
+        }
 
     @Test
-    fun `delete calls DAO`() = runTest {
-        // Arrange
-        val rule = RecurringTransaction(id = 1, description = "Netflix", amount = 149.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
-        // Act
-        repository.delete(rule)
-        // Assert
-        verify(recurringTransactionDao).delete(rule)
-    }
+    fun `delete calls DAO`() =
+        runTest {
+            // Arrange
+            val rule =
+                RecurringTransaction(
+                    id = 1,
+                    description = "Netflix",
+                    amount = 149.0,
+                    transactionType = "expense",
+                    recurrenceInterval = "Monthly",
+                    startDate = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                )
+            // Act
+            repository.delete(rule)
+            // Assert
+            verify(recurringTransactionDao).delete(rule)
+        }
 }

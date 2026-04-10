@@ -22,4 +22,3 @@ interface SmsEntityExtractor : Closeable {
     /** Default no-op close for implementations that don't hold resources. */
     override fun close() {}
 }
-

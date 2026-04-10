@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface IgnoreRuleDao {
-
     /**
      * Retrieves all ignore rules from the database, ordered alphabetically.
      * @return A Flow emitting a list of all IgnoreRule objects.

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,15 +27,15 @@ import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.viewmodel.SmsDebugViewModelFactory
+import kotlinx.coroutines.launch
 import java.net.URLEncoder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmsDebugScreen(
     navController: NavController,
-    transactionViewModel: TransactionViewModel
+    transactionViewModel: TransactionViewModel,
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = SmsDebugViewModelFactory(application, transactionViewModel)
@@ -45,10 +44,11 @@ fun SmsDebugScreen(
     val uiState by viewModel.uiState.collectAsState()
     val filteredResults by viewModel.filteredDebugResults.collectAsState()
 
-    val autoImportResult = navController.currentBackStackEntry
-        ?.savedStateHandle
-        ?.getLiveData<Boolean>("auto_import_after_rule_creation")
-        ?.observeAsState()
+    val autoImportResult =
+        navController.currentBackStackEntry
+            ?.savedStateHandle
+            ?.getLiveData<Boolean>("auto_import_after_rule_creation")
+            ?.observeAsState()
 
     LaunchedEffect(autoImportResult?.value) {
         if (autoImportResult?.value == true) {
@@ -65,21 +65,21 @@ fun SmsDebugScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     SegmentedButton(
                         selected = uiState.selectedFilter == SmsDebugFilter.PROBLEMATIC,
                         onClick = { viewModel.setFilter(SmsDebugFilter.PROBLEMATIC) },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                     ) {
                         Text("Ignored")
                     }
                     SegmentedButton(
                         selected = uiState.selectedFilter == SmsDebugFilter.ALL,
                         onClick = { viewModel.setFilter(SmsDebugFilter.ALL) },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                     ) {
                         Text("All")
                     }
@@ -90,7 +90,7 @@ fun SmsDebugScreen(
                 Text(
                     "Showing the last ${uiState.loadCount} SMS messages received.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -99,13 +99,13 @@ fun SmsDebugScreen(
                     Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
                         Text(
                             "No problematic messages found in the last ${uiState.loadCount} SMS.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             } else {
                 items(filteredResults, key = { it.smsMessage.id }) { result ->
-                    SmsDebugItem(result = result, navController = navController)
+                    SmsDebugItem(result = result, navController = navController, transactionViewModel = transactionViewModel)
                 }
             }
 
@@ -114,7 +114,7 @@ fun SmsDebugScreen(
                 Button(
                     onClick = { viewModel.loadMore() },
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !uiState.isLoading
+                    enabled = !uiState.isLoading,
                 ) {
                     if (uiState.isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
@@ -128,33 +128,42 @@ fun SmsDebugScreen(
 }
 
 @Composable
-private fun SmsDebugItem(result: SmsDebugResult, navController: NavController) {
+internal fun SmsDebugItem(
+    result: SmsDebugResult,
+    navController: NavController,
+    transactionViewModel: TransactionViewModel,
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     // --- UPDATED: Handle the new IgnoredByClassifier state ---
-    val statusColor = when (result.parseResult) {
-        is ParseResult.Success -> MaterialTheme.colorScheme.primary
-        is ParseResult.Ignored -> MaterialTheme.colorScheme.onSurfaceVariant
-        is ParseResult.NotParsed -> MaterialTheme.colorScheme.error
-        is ParseResult.IgnoredByClassifier -> MaterialTheme.colorScheme.secondary
-    }
-    val icon = when (result.parseResult) {
-        is ParseResult.Success -> Icons.Default.CheckCircle
-        is ParseResult.Ignored -> Icons.Default.Block
-        is ParseResult.NotParsed -> Icons.Default.Warning
-        is ParseResult.IgnoredByClassifier -> Icons.Default.AutoAwesome
-    }
-    val title = when (result.parseResult) {
-        is ParseResult.Success -> "Parsed Successfully"
-        is ParseResult.Ignored -> "Ignored by Rule"
-        is ParseResult.NotParsed -> "Not Parsed"
-        is ParseResult.IgnoredByClassifier -> "Ignored by ML Model"
-    }
-
+    val statusColor =
+        when (result.parseResult) {
+            is ParseResult.Success -> MaterialTheme.colorScheme.primary
+            is ParseResult.Ignored -> MaterialTheme.colorScheme.onSurfaceVariant
+            is ParseResult.NotParsed -> MaterialTheme.colorScheme.error
+            is ParseResult.IgnoredByClassifier -> MaterialTheme.colorScheme.secondary
+        }
+    val icon =
+        when (result.parseResult) {
+            is ParseResult.Success -> Icons.Default.CheckCircle
+            is ParseResult.Ignored -> Icons.Default.Block
+            is ParseResult.NotParsed -> Icons.Default.Warning
+            is ParseResult.IgnoredByClassifier -> Icons.Default.AutoAwesome
+        }
+    val title =
+        when (result.parseResult) {
+            is ParseResult.Success -> "Parsed Successfully"
+            is ParseResult.Ignored -> "Ignored by Rule"
+            is ParseResult.NotParsed -> "Not Parsed"
+            is ParseResult.IgnoredByClassifier -> "Ignored by ML Model"
+        }
 
     GlassPanel {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(imageVector = icon, contentDescription = "Status", tint = statusColor)
@@ -164,17 +173,21 @@ private fun SmsDebugItem(result: SmsDebugResult, navController: NavController) {
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "From: ${result.smsMessage.sender}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Text(text = result.smsMessage.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = result.smsMessage.body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(Modifier.height(12.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
             Spacer(Modifier.height(12.dp))
@@ -183,6 +196,33 @@ private fun SmsDebugItem(result: SmsDebugResult, navController: NavController) {
                 is ParseResult.Success -> {
                     val txn = parseResult.transaction
                     Text("Result: ${txn.merchantName ?: "Unknown"} (${txn.amount})", color = statusColor)
+
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                val success = transactionViewModel.autoSaveSmsTransaction(txn, source = "Manual Import")
+                                if (success) {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Force saved successfully!",
+                                        android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                                } else {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Failed to force save transaction.",
+                                        android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Force Save Transaction")
+                    }
                 }
                 is ParseResult.Ignored -> {
                     Text("Reason: ${parseResult.reason}", color = statusColor)
@@ -197,7 +237,7 @@ private fun SmsDebugItem(result: SmsDebugResult, navController: NavController) {
                     val confidencePercent = (1 - parseResult.confidence) * 100
                     Text(
                         "Reason: ${parseResult.reason} (${"%.1f".format(confidencePercent)}% confident it's not a transaction)",
-                        color = statusColor
+                        color = statusColor,
                     )
                     CreateRuleButton(result.smsMessage, navController)
                 }
@@ -207,25 +247,29 @@ private fun SmsDebugItem(result: SmsDebugResult, navController: NavController) {
 }
 
 @Composable
-private fun CreateRuleButton(sms: SmsMessage, navController: NavController) {
+private fun CreateRuleButton(
+    sms: SmsMessage,
+    navController: NavController,
+) {
     Spacer(Modifier.height(8.dp))
     Button(
         onClick = {
             // Create a temporary PotentialTransaction just to pass the message body
-            val potentialTxn = PotentialTransaction(
-                sourceSmsId = sms.id,
-                smsSender = sms.sender,
-                amount = 0.0, // Amount is not relevant here, rule screen will re-parse
-                transactionType = "expense", // Default, can be changed in rule screen
-                merchantName = null,
-                originalMessage = sms.body,
-                date = sms.date
-            )
+            val potentialTxn =
+                PotentialTransaction(
+                    sourceSmsId = sms.id,
+                    smsSender = sms.sender,
+                    amount = 0.0, // Amount is not relevant here, rule screen will re-parse
+                    transactionType = "expense", // Default, can be changed in rule screen
+                    merchantName = null,
+                    originalMessage = sms.body,
+                    date = sms.date,
+                )
             val json = Gson().toJson(potentialTxn)
             val encodedJson = URLEncoder.encode(json, "UTF-8")
             navController.navigate("rule_creation_screen?potentialTransactionJson=$encodedJson")
         },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Icon(Icons.Default.Add, contentDescription = null)
         Spacer(Modifier.width(8.dp))

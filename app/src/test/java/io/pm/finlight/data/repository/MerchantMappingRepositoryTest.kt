@@ -23,37 +23,36 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class MerchantMappingRepositoryTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var merchantMappingDao: MerchantMappingDao
 
     @Test
-    fun `allMappings flow proxies call to DAO`() = runTest {
-        // Arrange
-        val mockMappings = listOf(MerchantMapping(smsSender = "AM-HDFCBK", merchantName = "HDFC Bank"))
-        `when`(merchantMappingDao.getAllMappings()).thenReturn(flowOf(mockMappings))
-        val repository = MerchantMappingRepository(merchantMappingDao)
+    fun `allMappings flow proxies call to DAO`() =
+        runTest {
+            // Arrange
+            val mockMappings = listOf(MerchantMapping(smsSender = "AM-HDFCBK", merchantName = "HDFC Bank"))
+            `when`(merchantMappingDao.getAllMappings()).thenReturn(flowOf(mockMappings))
+            val repository = MerchantMappingRepository(merchantMappingDao)
 
-
-        // Act & Assert
-        repository.allMappings.test {
-            assertEquals(mockMappings, awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Act & Assert
+            repository.allMappings.test {
+                assertEquals(mockMappings, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+            verify(merchantMappingDao).getAllMappings()
         }
-        verify(merchantMappingDao).getAllMappings()
-    }
 
     @Test
-    fun `insert calls DAO`() = runTest {
-        // Arrange
-        val repository = MerchantMappingRepository(merchantMappingDao)
-        val newMapping = MerchantMapping(smsSender = "VM-ICICIB", merchantName = "ICICI Bank")
+    fun `insert calls DAO`() =
+        runTest {
+            // Arrange
+            val repository = MerchantMappingRepository(merchantMappingDao)
+            val newMapping = MerchantMapping(smsSender = "VM-ICICIB", merchantName = "ICICI Bank")
 
-        // Act
-        repository.insert(newMapping)
+            // Act
+            repository.insert(newMapping)
 
-        // Assert
-        verify(merchantMappingDao).insert(newMapping)
-    }
+            // Assert
+            verify(merchantMappingDao).insert(newMapping)
+        }
 }
-

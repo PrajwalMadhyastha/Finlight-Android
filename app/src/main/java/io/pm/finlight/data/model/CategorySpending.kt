@@ -8,5 +8,5 @@ data class CategorySpending(
     val categoryName: String,
     val totalAmount: Double,
     val colorKey: String?,
-    val iconKey: String?
+    val iconKey: String?,
 )

@@ -34,7 +34,6 @@ import java.util.Calendar
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class ReminderManagerTest : BaseViewModelTest() {
-
     private lateinit var context: Context
     private lateinit var workManager: WorkManager
     private lateinit var prefs: SharedPreferences
@@ -47,10 +46,11 @@ class ReminderManagerTest : BaseViewModelTest() {
         prefs.edit().clear().apply()
 
         // Initialize WorkManager for testing
-        val config = Configuration.Builder()
-            .setMinimumLoggingLevel(Log.DEBUG)
-            .setExecutor(SynchronousExecutor())
-            .build()
+        val config =
+            Configuration.Builder()
+                .setMinimumLoggingLevel(Log.DEBUG)
+                .setExecutor(SynchronousExecutor())
+                .build()
         WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
         workManager = WorkManager.getInstance(context)
     }
@@ -62,24 +62,32 @@ class ReminderManagerTest : BaseViewModelTest() {
         workManager.cancelAllWork()
     }
 
-    private fun assertWorkIsEnqueued(uniqueWorkName: String, workerClass: Class<out ListenableWorker>) {
+    private fun assertWorkIsEnqueued(
+        uniqueWorkName: String,
+        workerClass: Class<out ListenableWorker>,
+    ) {
         val workInfos = workManager.getWorkInfosForUniqueWork(uniqueWorkName).get()
         assertEquals("Work request should be enqueued for $uniqueWorkName", 1, workInfos.size)
         val workInfo = workInfos[0]
         // --- FIX: Periodic work can be ENQUEUED or RUNNING immediately in tests ---
         assertTrue(
             "Work state should be ENQUEUED or RUNNING, but was ${workInfo.state}",
-            workInfo.state == WorkInfo.State.ENQUEUED || workInfo.state == WorkInfo.State.RUNNING
+            workInfo.state == WorkInfo.State.ENQUEUED || workInfo.state == WorkInfo.State.RUNNING,
         )
         assertTrue(
             "Worker class name should contain ${workerClass.simpleName}",
-            workInfo.tags.any { it.contains(workerClass.simpleName) }
+            workInfo.tags.any { it.contains(workerClass.simpleName) },
         )
     }
 
     private fun assertWorkIsCancelled(uniqueWorkName: String) {
         val workInfos = workManager.getWorkInfosForUniqueWork(uniqueWorkName).get()
-        assertTrue("Work request for $uniqueWorkName should be cancelled or finished", workInfos.all { it.state == WorkInfo.State.CANCELLED || it.state == WorkInfo.State.SUCCEEDED })
+        assertTrue(
+            "Work request for $uniqueWorkName should be cancelled or finished",
+            workInfos.all {
+                it.state == WorkInfo.State.CANCELLED || it.state == WorkInfo.State.SUCCEEDED
+            },
+        )
     }
 
     @Test

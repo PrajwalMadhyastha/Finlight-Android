@@ -6,34 +6,28 @@
 // =================================================================================
 package io.pm.finlight.ui.screens
 
-import android.app.Application
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.*
 import java.util.Calendar
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     navController: NavController,
     dashboardViewModel: DashboardViewModel,
-    transactionViewModel: TransactionViewModel
+    transactionViewModel: TransactionViewModel,
 ) {
     val visibleCards by dashboardViewModel.visibleCards.collectAsState()
     val yearlyConsistencyData by dashboardViewModel.yearlyConsistencyData.collectAsState()
@@ -44,7 +38,6 @@ fun DashboardScreen(
     val showLastMonthSummary by dashboardViewModel.showLastMonthSummaryCard.collectAsState()
     val lastMonthSummary by dashboardViewModel.lastMonthSummary.collectAsState()
 
-
     LaunchedEffect(Unit) {
         dashboardViewModel.refreshBudgetSummary()
     }
@@ -52,7 +45,7 @@ fun DashboardScreen(
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.testTag("dashboard_lazy_column")
+        modifier = Modifier.testTag("dashboard_lazy_column"),
     ) {
         // Always render the hero card first if it's visible.
         val heroCard = visibleCards.find { it == DashboardCardType.HERO_BUDGET }
@@ -65,7 +58,7 @@ fun DashboardScreen(
                     transactionViewModel = transactionViewModel,
                     yearlyConsistencyData = yearlyConsistencyData,
                     budgetHealthSummary = budgetHealthSummary,
-                    isPrivacyModeEnabled = isPrivacyModeEnabled
+                    isPrivacyModeEnabled = isPrivacyModeEnabled,
                 )
             }
         }
@@ -76,7 +69,7 @@ fun DashboardScreen(
                 LastMonthSummaryCard(
                     summary = lastMonthSummary!!,
                     navController = navController,
-                    onDismiss = { dashboardViewModel.dismissLastMonthSummaryCard() }
+                    onDismiss = { dashboardViewModel.dismissLastMonthSummaryCard() },
                 )
             }
         }
@@ -92,7 +85,7 @@ fun DashboardScreen(
                     transactionViewModel = transactionViewModel,
                     yearlyConsistencyData = yearlyConsistencyData,
                     budgetHealthSummary = budgetHealthSummary,
-                    isPrivacyModeEnabled = isPrivacyModeEnabled
+                    isPrivacyModeEnabled = isPrivacyModeEnabled,
                 )
             }
         }
@@ -107,7 +100,7 @@ private fun DashboardCard(
     transactionViewModel: TransactionViewModel,
     yearlyConsistencyData: List<CalendarDayStatus>,
     budgetHealthSummary: String,
-    isPrivacyModeEnabled: Boolean
+    isPrivacyModeEnabled: Boolean,
 ) {
     val monthlyIncome by dashboardViewModel.monthlyIncome.collectAsState()
     val monthlyExpenses by dashboardViewModel.monthlyExpenses.collectAsState()
@@ -120,69 +113,75 @@ private fun DashboardCard(
     val monthYear = dashboardViewModel.monthYear
 
     when (cardType) {
-        DashboardCardType.HERO_BUDGET -> DashboardHeroCard(
-            totalBudget = overallBudget,
-            amountSpent = monthlyExpenses,
-            amountRemaining = amountRemaining,
-            income = monthlyIncome,
-            safeToSpend = safeToSpendPerDay,
-            navController = navController,
-            monthYear = monthYear,
-            budgetHealthSummary = budgetHealthSummary,
-            isPrivacyModeEnabled = isPrivacyModeEnabled
-        )
+        DashboardCardType.HERO_BUDGET ->
+            DashboardHeroCard(
+                totalBudget = overallBudget,
+                amountSpent = monthlyExpenses,
+                amountRemaining = amountRemaining,
+                income = monthlyIncome,
+                safeToSpend = safeToSpendPerDay,
+                navController = navController,
+                monthYear = monthYear,
+                budgetHealthSummary = budgetHealthSummary,
+                isPrivacyModeEnabled = isPrivacyModeEnabled,
+            )
         DashboardCardType.QUICK_ACTIONS -> AuroraQuickActionsCard(navController = navController)
-        DashboardCardType.RECENT_TRANSACTIONS -> AuroraRecentTransactionsCard(
-            transactions = recentTransactions,
-            navController = navController,
-            onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
-        )
+        DashboardCardType.RECENT_TRANSACTIONS ->
+            AuroraRecentTransactionsCard(
+                transactions = recentTransactions,
+                navController = navController,
+                onCategoryClick = { transactionViewModel.requestCategoryChange(it) },
+            )
         DashboardCardType.ACCOUNTS_CAROUSEL -> AccountsCarouselCard(accounts = accountsSummary, navController = navController)
-        DashboardCardType.BUDGET_WATCH -> BudgetWatchCard(
-            budgetStatus = budgetStatus,
-            navController = navController,
-        )
+        DashboardCardType.BUDGET_WATCH ->
+            BudgetWatchCard(
+                budgetStatus = budgetStatus,
+                navController = navController,
+            )
         DashboardCardType.SPENDING_CONSISTENCY -> {
             GlassPanel {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Text(
                         "Yearly Spending Consistency",
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     if (yearlyConsistencyData.isEmpty()) {
                         CircularProgressIndicator()
                     } else {
                         // FIX: Calculate year from data or default to current year
-                        val year = remember(yearlyConsistencyData) {
-                            if (yearlyConsistencyData.isNotEmpty()) {
-                                val cal = Calendar.getInstance()
-                                cal.time = yearlyConsistencyData.first().date
-                                cal.get(Calendar.YEAR)
-                            } else {
-                                Calendar.getInstance().get(Calendar.YEAR)
+                        val year =
+                            remember(yearlyConsistencyData) {
+                                if (yearlyConsistencyData.isNotEmpty()) {
+                                    val cal = Calendar.getInstance()
+                                    cal.time = yearlyConsistencyData.first().date
+                                    cal.get(Calendar.YEAR)
+                                } else {
+                                    Calendar.getInstance().get(Calendar.YEAR)
+                                }
                             }
-                        }
 
                         ConsistencyCalendar(
                             data = yearlyConsistencyData,
                             year = year,
                             onDayClick = { date ->
                                 // FIX: Now passing safeToSpend argument to search_screen from dashboard calendar too.
-                                val dayData = yearlyConsistencyData.find {
-                                    val cal1 = Calendar.getInstance().apply { time = it.date }
-                                    val cal2 = Calendar.getInstance().apply { time = date }
-                                    cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
-                                }
+                                val dayData =
+                                    yearlyConsistencyData.find {
+                                        val cal1 = Calendar.getInstance().apply { time = it.date }
+                                        val cal2 = Calendar.getInstance().apply { time = date }
+                                        cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+                                    }
                                 val safeToSpend = dayData?.safeToSpend ?: 0L
                                 navController.navigate("search_screen?date=${date.time}&safeToSpend=$safeToSpend&focusSearch=false")
-                            }
+                            },
                         )
                     }
                 }

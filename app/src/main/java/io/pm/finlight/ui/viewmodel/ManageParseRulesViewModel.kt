@@ -14,16 +14,16 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class ManageParseRulesViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : ViewModel() {
-
     /**
      * A flow of all custom SMS parsing rules, collected as StateFlow for the UI.
      */
-    val allRules: StateFlow<List<CustomSmsRule>> = customSmsRuleDao.getAllRules()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    val allRules: StateFlow<List<CustomSmsRule>> =
+        customSmsRuleDao.getAllRules()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
     /**
      * Deletes a given custom rule from the database.

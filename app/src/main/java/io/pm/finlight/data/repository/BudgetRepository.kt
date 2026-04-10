@@ -9,13 +9,19 @@ package io.pm.finlight
 import kotlinx.coroutines.flow.Flow
 
 class BudgetRepository(private val budgetDao: BudgetDao) {
-
     // --- NEW: Function to get budgets for a specific month ---
-    fun getBudgetsForMonth(month: Int, year: Int): Flow<List<Budget>> {
+    fun getBudgetsForMonth(
+        month: Int,
+        year: Int,
+    ): Flow<List<Budget>> {
         return budgetDao.getBudgetsForMonth(month, year)
     }
 
-    fun getBudgetsForMonthWithSpending(yearMonth: String, month: Int, year: Int): Flow<List<BudgetWithSpending>> {
+    fun getBudgetsForMonthWithSpending(
+        yearMonth: String,
+        month: Int,
+        year: Int,
+    ): Flow<List<BudgetWithSpending>> {
         return budgetDao.getBudgetsWithSpendingForMonth(yearMonth, month, year)
     }
 

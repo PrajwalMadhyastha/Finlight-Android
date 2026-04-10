@@ -24,7 +24,7 @@ import java.util.Locale
  */
 enum class TripType {
     DOMESTIC,
-    INTERNATIONAL
+    INTERNATIONAL,
 }
 
 data class TravelModeSettings(
@@ -34,13 +34,13 @@ data class TravelModeSettings(
     val startDate: Long,
     val endDate: Long,
     val currencyCode: String?,
-    val conversionRate: Float?
+    val conversionRate: Float?,
 )
 
 class SettingsRepository(context: Context) {
-
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+
     // --- NEW: A separate, non-backed-up preferences file for internal state ---
     private val internalPrefs: SharedPreferences =
         context.getSharedPreferences(INTERNAL_PREF_NAME, Context.MODE_PRIVATE)
@@ -74,6 +74,7 @@ class SettingsRepository(context: Context) {
         private const val KEY_HOME_CURRENCY = "home_currency_code"
         private const val KEY_TRAVEL_MODE_SETTINGS = "travel_mode_settings"
         private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
+
         // --- DELETED: KEY_AUTO_BACKUP_HOUR ---
         // --- DELETED: KEY_AUTO_BACKUP_MINUTE ---
         private const val KEY_AUTO_BACKUP_NOTIFICATION_ENABLED = "auto_backup_notification_enabled"
@@ -81,10 +82,13 @@ class SettingsRepository(context: Context) {
         private const val KEY_LAST_MONTH_SUMMARY_DISMISSED = "last_month_summary_dismissed_"
         private const val KEY_DISMISSED_MERGES = "dismissed_merge_suggestions"
         private const val KEY_PRIVACY_MODE_ENABLED = "privacy_mode_enabled"
+
         // --- NEW: Key for the first launch flag ---
         private const val KEY_IS_FIRST_LAUNCH_COMPLETE = "is_first_launch_complete"
+
         // --- NEW: Key for the ignore rules checksum ---
         private const val KEY_IGNORE_RULES_CHECKSUM = "ignore_rules_checksum"
+
         // --- NEW: Key for the last backup timestamp ---
         private const val KEY_LAST_BACKUP_TIMESTAMP = "last_backup_timestamp"
 
@@ -106,11 +110,12 @@ class SettingsRepository(context: Context) {
 
     fun getRecurringTransactionsEnabled(): Flow<Boolean> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_RECURRING_TRANSACTIONS_ENABLED) {
-                    trySend(sp.getBoolean(key, false))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_RECURRING_TRANSACTIONS_ENABLED) {
+                        trySend(sp.getBoolean(key, false))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             // Default to false (disabled)
             trySend(prefs.getBoolean(KEY_RECURRING_TRANSACTIONS_ENABLED, false))
@@ -121,6 +126,7 @@ class SettingsRepository(context: Context) {
     // --- NEW: Outlier Month Management Functions ---
 
     fun getExcludedIncomeMonths(): Flow<Set<String>> = getSetFlow(KEY_EXCLUDED_INCOME_MONTHS)
+
     fun getExcludedExpenseMonths(): Flow<Set<String>> = getSetFlow(KEY_EXCLUDED_EXPENSE_MONTHS)
 
     fun toggleIncomeMonthExclusion(monthKey: String) {
@@ -131,25 +137,30 @@ class SettingsRepository(context: Context) {
         toggleInSet(KEY_EXCLUDED_EXPENSE_MONTHS, monthKey)
     }
 
-    private fun getSetFlow(key: String): Flow<Set<String>> = callbackFlow {
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, k ->
-            if (k == key) trySend(sp.getStringSet(key, emptySet()) ?: emptySet())
+    private fun getSetFlow(key: String): Flow<Set<String>> =
+        callbackFlow {
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, k ->
+                    if (k == key) trySend(sp.getStringSet(key, emptySet()) ?: emptySet())
+                }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(prefs.getStringSet(key, emptySet()) ?: emptySet())
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-        trySend(prefs.getStringSet(key, emptySet()) ?: emptySet())
-        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-    }
 
-    private fun toggleInSet(key: String, value: String) {
+    private fun toggleInSet(
+        key: String,
+        value: String,
+    ) {
         val current = prefs.getStringSet(key, emptySet()) ?: emptySet()
-        val newSet = if (current.contains(value)) {
-            current.toMutableSet().apply { remove(value) }
-        } else {
-            current.toMutableSet().apply { add(value) }
-        }
+        val newSet =
+            if (current.contains(value)) {
+                current.toMutableSet().apply { remove(value) }
+            } else {
+                current.toMutableSet().apply { add(value) }
+            }
         prefs.edit { putStringSet(key, newSet) }
     }
-
 
     // --- NEW: Functions to manage the last backup timestamp ---
     fun saveLastBackupTimestamp(timestamp: Long) {
@@ -160,17 +171,17 @@ class SettingsRepository(context: Context) {
 
     fun getLastBackupTimestamp(): Flow<Long> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_LAST_BACKUP_TIMESTAMP) {
-                    trySend(sp.getLong(key, 0L))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_LAST_BACKUP_TIMESTAMP) {
+                        trySend(sp.getLong(key, 0L))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getLong(KEY_LAST_BACKUP_TIMESTAMP, 0L))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
-
 
     // --- NEW: Functions to manage the ignore rules checksum ---
     fun saveIgnoreRulesChecksum(checksum: Int) {
@@ -183,14 +194,14 @@ class SettingsRepository(context: Context) {
         return prefs.getInt(KEY_IGNORE_RULES_CHECKSUM, 0)
     }
 
-
     fun getDismissedMergeSuggestions(): Flow<Set<String>> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_DISMISSED_MERGES) {
-                    trySend(sp.getStringSet(key, emptySet()) ?: emptySet())
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_DISMISSED_MERGES) {
+                        trySend(sp.getStringSet(key, emptySet()) ?: emptySet())
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getStringSet(KEY_DISMISSED_MERGES, emptySet()) ?: emptySet())
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -223,11 +234,12 @@ class SettingsRepository(context: Context) {
 
     fun getAutoCaptureNotificationEnabled(): Flow<Boolean> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_AUTOCAPTURE_NOTIFICATION_ENABLED) {
-                    trySend(sp.getBoolean(key, true))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_AUTOCAPTURE_NOTIFICATION_ENABLED) {
+                        trySend(sp.getBoolean(key, true))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_AUTOCAPTURE_NOTIFICATION_ENABLED, true))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -244,11 +256,12 @@ class SettingsRepository(context: Context) {
 
     fun getAutoBackupEnabled(): Flow<Boolean> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_AUTO_BACKUP_ENABLED) {
-                    trySend(sp.getBoolean(key, true))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_AUTO_BACKUP_ENABLED) {
+                        trySend(sp.getBoolean(key, true))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_AUTO_BACKUP_ENABLED, true))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -261,11 +274,12 @@ class SettingsRepository(context: Context) {
 
     fun getAutoBackupNotificationEnabled(): Flow<Boolean> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_AUTO_BACKUP_NOTIFICATION_ENABLED) {
-                    trySend(sp.getBoolean(key, false))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_AUTO_BACKUP_NOTIFICATION_ENABLED) {
+                        trySend(sp.getBoolean(key, false))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, false))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -289,11 +303,12 @@ class SettingsRepository(context: Context) {
 
     fun getHomeCurrency(): Flow<String> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_HOME_CURRENCY) {
-                    trySend(sp.getString(key, "INR") ?: "INR")
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_HOME_CURRENCY) {
+                        trySend(sp.getString(key, "INR") ?: "INR")
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getString(KEY_HOME_CURRENCY, "INR") ?: "INR")
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -309,13 +324,14 @@ class SettingsRepository(context: Context) {
 
     fun getTravelModeSettings(): Flow<TravelModeSettings?> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_TRAVEL_MODE_SETTINGS) {
-                    val json = sp.getString(key, null)
-                    val settings = if (json == null) null else gson.fromJson(json, TravelModeSettings::class.java)
-                    trySend(settings)
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_TRAVEL_MODE_SETTINGS) {
+                        val json = sp.getString(key, null)
+                        val settings = if (json == null) null else gson.fromJson(json, TravelModeSettings::class.java)
+                        trySend(settings)
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             val initialJson = prefs.getString(KEY_TRAVEL_MODE_SETTINGS, null)
             val initialSettings = if (initialJson == null) null else gson.fromJson(initialJson, TravelModeSettings::class.java)
@@ -325,17 +341,21 @@ class SettingsRepository(context: Context) {
     }
 
     // --- UPDATED: Return type is now nullable Float? ---
-    fun getOverallBudgetForMonthBlocking(year: Int, month: Int): Float? {
+    fun getOverallBudgetForMonthBlocking(
+        year: Int,
+        month: Int,
+    ): Float? {
         val currentMonthKey = getBudgetKey(year, month)
 
         if (prefs.contains(currentMonthKey)) {
             return prefs.getFloat(currentMonthKey, 0f)
         }
 
-        val searchCal = Calendar.getInstance().apply {
-            set(Calendar.YEAR, year)
-            set(Calendar.MONTH, month - 1)
-        }
+        val searchCal =
+            Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1)
+            }
 
         for (i in 0..11) {
             searchCal.add(Calendar.MONTH, -1)
@@ -358,12 +378,13 @@ class SettingsRepository(context: Context) {
 
     fun getSelectedTheme(): Flow<AppTheme> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_SELECTED_THEME) {
-                    val themeKey = sp.getString(key, AppTheme.SYSTEM_DEFAULT.key)
-                    trySend(AppTheme.fromKey(themeKey))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_SELECTED_THEME) {
+                        val themeKey = sp.getString(key, AppTheme.SYSTEM_DEFAULT.key)
+                        trySend(AppTheme.fromKey(themeKey))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             val initialThemeKey = prefs.getString(KEY_SELECTED_THEME, AppTheme.SYSTEM_DEFAULT.key)
             trySend(AppTheme.fromKey(initialThemeKey))
@@ -371,7 +392,10 @@ class SettingsRepository(context: Context) {
         }
     }
 
-    fun saveDashboardLayout(order: List<DashboardCardType>, visible: Set<DashboardCardType>) {
+    fun saveDashboardLayout(
+        order: List<DashboardCardType>,
+        visible: Set<DashboardCardType>,
+    ) {
         val orderJson = gson.toJson(order.map { it.name })
         val visibleJson = gson.toJson(visible.map { it.name })
         prefs.edit {
@@ -382,11 +406,12 @@ class SettingsRepository(context: Context) {
 
     fun getDashboardCardOrder(): Flow<List<DashboardCardType>> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_DASHBOARD_CARD_ORDER) {
-                    trySend(loadCardOrder(sp))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_DASHBOARD_CARD_ORDER) {
+                        trySend(loadCardOrder(sp))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(loadCardOrder(prefs))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -395,11 +420,12 @@ class SettingsRepository(context: Context) {
 
     fun getDashboardVisibleCards(): Flow<Set<DashboardCardType>> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_DASHBOARD_VISIBLE_CARDS) {
-                    trySend(loadVisibleCards(sp))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_DASHBOARD_VISIBLE_CARDS) {
+                        trySend(loadVisibleCards(sp))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(loadVisibleCards(prefs))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -427,7 +453,7 @@ class SettingsRepository(context: Context) {
                 DashboardCardType.RECENT_TRANSACTIONS,
                 DashboardCardType.SPENDING_CONSISTENCY,
                 DashboardCardType.BUDGET_WATCH,
-                DashboardCardType.ACCOUNTS_CAROUSEL
+                DashboardCardType.ACCOUNTS_CAROUSEL,
             )
         }
     }
@@ -459,11 +485,12 @@ class SettingsRepository(context: Context) {
 
     fun getBackupEnabled(): Flow<Boolean> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
-                if (changedKey == KEY_BACKUP_ENABLED) {
-                    trySend(sharedPreferences.getBoolean(KEY_BACKUP_ENABLED, true))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
+                    if (changedKey == KEY_BACKUP_ENABLED) {
+                        trySend(sharedPreferences.getBoolean(KEY_BACKUP_ENABLED, true))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_BACKUP_ENABLED, true))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -478,11 +505,12 @@ class SettingsRepository(context: Context) {
 
     fun getUserName(): Flow<String> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
-                if (changedKey == KEY_USER_NAME) {
-                    trySend(sharedPreferences.getString(KEY_USER_NAME, "User") ?: "User")
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
+                    if (changedKey == KEY_USER_NAME) {
+                        trySend(sharedPreferences.getString(KEY_USER_NAME, "User") ?: "User")
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getString(KEY_USER_NAME, "User") ?: "User")
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -498,11 +526,12 @@ class SettingsRepository(context: Context) {
 
     fun getProfilePictureUri(): Flow<String?> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
-                if (changedKey == KEY_PROFILE_PICTURE_URI) {
-                    trySend(sharedPreferences.getString(KEY_PROFILE_PICTURE_URI, null))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
+                    if (changedKey == KEY_PROFILE_PICTURE_URI) {
+                        trySend(sharedPreferences.getString(KEY_PROFILE_PICTURE_URI, null))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getString(KEY_PROFILE_PICTURE_URI, null))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -520,7 +549,10 @@ class SettingsRepository(context: Context) {
         }
     }
 
-    private fun getBudgetKey(year: Int, month: Int): String {
+    private fun getBudgetKey(
+        year: Int,
+        month: Int,
+    ): String {
         return String.format(Locale.ROOT, "%s%d_%02d", KEY_BUDGET_PREFIX, year, month)
     }
 
@@ -535,7 +567,11 @@ class SettingsRepository(context: Context) {
     }
 
     // --- NEW: Function to save budget for a specific month ---
-    fun saveOverallBudgetForMonth(year: Int, month: Int, amount: Float) {
+    fun saveOverallBudgetForMonth(
+        year: Int,
+        month: Int,
+        amount: Float,
+    ) {
         val key = getBudgetKey(year, month)
         prefs.edit {
             putFloat(key, amount)
@@ -550,11 +586,12 @@ class SettingsRepository(context: Context) {
 
     fun getSmsScanStartDate(): Flow<Long> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
-                if (changedKey == KEY_SMS_SCAN_START_DATE) {
-                    trySend(sharedPreferences.getLong(KEY_SMS_SCAN_START_DATE, 0L))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
+                    if (changedKey == KEY_SMS_SCAN_START_DATE) {
+                        trySend(sharedPreferences.getLong(KEY_SMS_SCAN_START_DATE, 0L))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             val thirtyDaysAgo = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -30) }.timeInMillis
             trySend(prefs.getLong(KEY_SMS_SCAN_START_DATE, thirtyDaysAgo))
@@ -576,11 +613,12 @@ class SettingsRepository(context: Context) {
 
     fun getDailyReportEnabled(): Flow<Boolean> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                if (key == KEY_DAILY_REPORT_ENABLED) {
-                    trySend(prefs.getBoolean(key, true))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                    if (key == KEY_DAILY_REPORT_ENABLED) {
+                        trySend(prefs.getBoolean(key, true))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_DAILY_REPORT_ENABLED, true))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -589,11 +627,12 @@ class SettingsRepository(context: Context) {
 
     fun getAppLockEnabled(): Flow<Boolean> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
-                if (changedKey == KEY_APP_LOCK_ENABLED) {
-                    trySend(sharedPreferences.getBoolean(KEY_APP_LOCK_ENABLED, false))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
+                    if (changedKey == KEY_APP_LOCK_ENABLED) {
+                        trySend(sharedPreferences.getBoolean(KEY_APP_LOCK_ENABLED, false))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_APP_LOCK_ENABLED, false))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -605,7 +644,10 @@ class SettingsRepository(context: Context) {
     }
 
     // --- UPDATED: Return type is now nullable Flow<Float?> ---
-    fun getOverallBudgetForMonth(year: Int, month: Int): Flow<Float?> {
+    fun getOverallBudgetForMonth(
+        year: Int,
+        month: Int,
+    ): Flow<Float?> {
         return callbackFlow {
             // Helper function to find the correct carried-over budget.
             // This is the same logic as the blocking version.
@@ -614,10 +656,11 @@ class SettingsRepository(context: Context) {
                 if (prefs.contains(currentMonthKey)) {
                     return prefs.getFloat(currentMonthKey, 0f)
                 }
-                val searchCal = Calendar.getInstance().apply {
-                    set(Calendar.YEAR, year)
-                    set(Calendar.MONTH, month - 1)
-                }
+                val searchCal =
+                    Calendar.getInstance().apply {
+                        set(Calendar.YEAR, year)
+                        set(Calendar.MONTH, month - 1)
+                    }
                 for (i in 0..11) { // Look back a maximum of 12 months
                     searchCal.add(Calendar.MONTH, -1)
                     val prevYear = searchCal.get(Calendar.YEAR)
@@ -631,11 +674,12 @@ class SettingsRepository(context: Context) {
             }
 
             // The listener now re-runs the entire lookback logic whenever ANY budget key changes.
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                if (key?.startsWith(KEY_BUDGET_PREFIX) == true) {
-                    trySend(findCarriedOverBudget())
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                    if (key?.startsWith(KEY_BUDGET_PREFIX) == true) {
+                        trySend(findCarriedOverBudget())
+                    }
                 }
-            }
 
             prefs.registerOnSharedPreferenceChangeListener(listener)
             // Emit the initial correct value.
@@ -655,11 +699,12 @@ class SettingsRepository(context: Context) {
 
     fun getWeeklySummaryEnabled(): Flow<Boolean> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                if (key == KEY_WEEKLY_SUMMARY_ENABLED) {
-                    trySend(prefs.getBoolean(key, true))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                    if (key == KEY_WEEKLY_SUMMARY_ENABLED) {
+                        trySend(prefs.getBoolean(key, true))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_WEEKLY_SUMMARY_ENABLED, true))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -674,11 +719,12 @@ class SettingsRepository(context: Context) {
 
     fun getMonthlySummaryEnabled(): Flow<Boolean> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                if (key == KEY_MONTHLY_SUMMARY_ENABLED) {
-                    trySend(prefs.getBoolean(key, true))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                    if (key == KEY_MONTHLY_SUMMARY_ENABLED) {
+                        trySend(prefs.getBoolean(key, true))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_MONTHLY_SUMMARY_ENABLED, true))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -693,11 +739,12 @@ class SettingsRepository(context: Context) {
 
     fun getUnknownTransactionPopupEnabled(): Flow<Boolean> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                if (key == KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED) {
-                    trySend(prefs.getBoolean(key, true))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                    if (key == KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED) {
+                        trySend(prefs.getBoolean(key, true))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(prefs.getBoolean(KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED, true))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -708,7 +755,10 @@ class SettingsRepository(context: Context) {
         return prefs.getBoolean(KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED, true)
     }
 
-    fun saveDailyReportTime(hour: Int, minute: Int) {
+    fun saveDailyReportTime(
+        hour: Int,
+        minute: Int,
+    ) {
         prefs.edit {
             putInt(KEY_DAILY_REPORT_HOUR, hour)
             putInt(KEY_DAILY_REPORT_MINUTE, minute)
@@ -717,28 +767,33 @@ class SettingsRepository(context: Context) {
 
     fun getDailyReportTime(): Flow<Pair<Int, Int>> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
-                if (changedKey == KEY_DAILY_REPORT_HOUR || changedKey == KEY_DAILY_REPORT_MINUTE) {
-                    trySend(
-                        Pair(
-                            sharedPreferences.getInt(KEY_DAILY_REPORT_HOUR, 23),
-                            sharedPreferences.getInt(KEY_DAILY_REPORT_MINUTE, 0)
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
+                    if (changedKey == KEY_DAILY_REPORT_HOUR || changedKey == KEY_DAILY_REPORT_MINUTE) {
+                        trySend(
+                            Pair(
+                                sharedPreferences.getInt(KEY_DAILY_REPORT_HOUR, 23),
+                                sharedPreferences.getInt(KEY_DAILY_REPORT_MINUTE, 0),
+                            ),
                         )
-                    )
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             trySend(
                 Pair(
                     prefs.getInt(KEY_DAILY_REPORT_HOUR, 23),
-                    prefs.getInt(KEY_DAILY_REPORT_MINUTE, 0)
-                )
+                    prefs.getInt(KEY_DAILY_REPORT_MINUTE, 0),
+                ),
             )
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
 
-    fun saveWeeklyReportTime(dayOfWeek: Int, hour: Int, minute: Int) {
+    fun saveWeeklyReportTime(
+        dayOfWeek: Int,
+        hour: Int,
+        minute: Int,
+    ) {
         prefs.edit {
             putInt(KEY_WEEKLY_REPORT_DAY, dayOfWeek)
             putInt(KEY_WEEKLY_REPORT_HOUR, hour)
@@ -748,26 +803,35 @@ class SettingsRepository(context: Context) {
 
     fun getWeeklyReportTime(): Flow<Triple<Int, Int, Int>> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_WEEKLY_REPORT_DAY || key == KEY_WEEKLY_REPORT_HOUR || key == KEY_WEEKLY_REPORT_MINUTE) {
-                    trySend(Triple(
-                        sp.getInt(KEY_WEEKLY_REPORT_DAY, Calendar.SUNDAY),
-                        sp.getInt(KEY_WEEKLY_REPORT_HOUR, 9),
-                        sp.getInt(KEY_WEEKLY_REPORT_MINUTE, 0)
-                    ))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_WEEKLY_REPORT_DAY || key == KEY_WEEKLY_REPORT_HOUR || key == KEY_WEEKLY_REPORT_MINUTE) {
+                        trySend(
+                            Triple(
+                                sp.getInt(KEY_WEEKLY_REPORT_DAY, Calendar.SUNDAY),
+                                sp.getInt(KEY_WEEKLY_REPORT_HOUR, 9),
+                                sp.getInt(KEY_WEEKLY_REPORT_MINUTE, 0),
+                            ),
+                        )
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(Triple(
-                prefs.getInt(KEY_WEEKLY_REPORT_DAY, Calendar.SUNDAY),
-                prefs.getInt(KEY_WEEKLY_REPORT_HOUR, 9),
-                prefs.getInt(KEY_WEEKLY_REPORT_MINUTE, 0)
-            ))
+            trySend(
+                Triple(
+                    prefs.getInt(KEY_WEEKLY_REPORT_DAY, Calendar.SUNDAY),
+                    prefs.getInt(KEY_WEEKLY_REPORT_HOUR, 9),
+                    prefs.getInt(KEY_WEEKLY_REPORT_MINUTE, 0),
+                ),
+            )
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
 
-    fun saveMonthlyReportTime(dayOfMonth: Int, hour: Int, minute: Int) {
+    fun saveMonthlyReportTime(
+        dayOfMonth: Int,
+        hour: Int,
+        minute: Int,
+    ) {
         prefs.edit {
             putInt(KEY_MONTHLY_REPORT_DAY, dayOfMonth)
             putInt(KEY_MONTHLY_REPORT_HOUR, hour)
@@ -777,21 +841,26 @@ class SettingsRepository(context: Context) {
 
     fun getMonthlyReportTime(): Flow<Triple<Int, Int, Int>> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_MONTHLY_REPORT_DAY || key == KEY_MONTHLY_REPORT_HOUR || key == KEY_MONTHLY_REPORT_MINUTE) {
-                    trySend(Triple(
-                        sp.getInt(KEY_MONTHLY_REPORT_DAY, 1),
-                        sp.getInt(KEY_MONTHLY_REPORT_HOUR, 9),
-                        sp.getInt(KEY_MONTHLY_REPORT_MINUTE, 0)
-                    ))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_MONTHLY_REPORT_DAY || key == KEY_MONTHLY_REPORT_HOUR || key == KEY_MONTHLY_REPORT_MINUTE) {
+                        trySend(
+                            Triple(
+                                sp.getInt(KEY_MONTHLY_REPORT_DAY, 1),
+                                sp.getInt(KEY_MONTHLY_REPORT_HOUR, 9),
+                                sp.getInt(KEY_MONTHLY_REPORT_MINUTE, 0),
+                            ),
+                        )
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(Triple(
-                prefs.getInt(KEY_MONTHLY_REPORT_DAY, 1),
-                prefs.getInt(KEY_MONTHLY_REPORT_HOUR, 9),
-                prefs.getInt(KEY_MONTHLY_REPORT_MINUTE, 0)
-            ))
+            trySend(
+                Triple(
+                    prefs.getInt(KEY_MONTHLY_REPORT_DAY, 1),
+                    prefs.getInt(KEY_MONTHLY_REPORT_HOUR, 9),
+                    prefs.getInt(KEY_MONTHLY_REPORT_MINUTE, 0),
+                ),
+            )
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
@@ -804,11 +873,12 @@ class SettingsRepository(context: Context) {
 
     fun getPrivacyModeEnabled(): Flow<Boolean> {
         return callbackFlow {
-            val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                if (key == KEY_PRIVACY_MODE_ENABLED) {
-                    trySend(sp.getBoolean(key, false))
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_PRIVACY_MODE_ENABLED) {
+                        trySend(sp.getBoolean(key, false))
+                    }
                 }
-            }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             // Default to false (disabled)
             trySend(prefs.getBoolean(KEY_PRIVACY_MODE_ENABLED, false))

@@ -29,7 +29,7 @@ class CurrencyViewModelFactory(private val application: Application) : ViewModel
                 settingsRepository,
                 tripRepository,
                 transactionRepository,
-                tagRepository
+                tagRepository,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

@@ -21,7 +21,7 @@ import java.util.*
 
 enum class DrilldownType {
     CATEGORY,
-    MERCHANT
+    MERCHANT,
 }
 
 class DrilldownViewModelFactory(
@@ -29,7 +29,7 @@ class DrilldownViewModelFactory(
     private val drilldownType: DrilldownType,
     private val entityName: String,
     private val month: Int,
-    private val year: Int
+    private val year: Int,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(DrilldownViewModel::class.java)) {
@@ -40,7 +40,7 @@ class DrilldownViewModelFactory(
                 drilldownType = drilldownType,
                 entityName = entityName,
                 month = month,
-                year = year
+                year = year,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
@@ -52,69 +52,83 @@ class DrilldownViewModel(
     private val drilldownType: DrilldownType,
     val entityName: String,
     private val month: Int,
-    private val year: Int
+    private val year: Int,
 ) : ViewModel() {
-
     val transactionsForMonth: StateFlow<List<TransactionDetails>>
     val monthlyTrendChartData: StateFlow<Pair<BarData, List<String>>?>
 
     init {
-        val calendar = Calendar.getInstance().apply {
-            set(Calendar.YEAR, year)
-            set(Calendar.MONTH, month - 1)
-        }
-        val monthStart = (calendar.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0) }.timeInMillis
-        val monthEnd = (calendar.clone() as Calendar).apply { add(Calendar.MONTH, 1); add(Calendar.DAY_OF_MONTH, -1); set(Calendar.HOUR_OF_DAY, 23) }.timeInMillis
-
-        transactionsForMonth = when (drilldownType) {
-            DrilldownType.CATEGORY -> transactionDao.getTransactionsForCategoryName(entityName, monthStart, monthEnd)
-            DrilldownType.MERCHANT -> transactionDao.getTransactionsForMerchantName(entityName, monthStart, monthEnd)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-        monthlyTrendChartData = flow {
-            val endCal = Calendar.getInstance().apply {
+        val calendar =
+            Calendar.getInstance().apply {
                 set(Calendar.YEAR, year)
                 set(Calendar.MONTH, month - 1)
-                set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
             }
-            val startCal = (endCal.clone() as Calendar).apply {
-                add(Calendar.MONTH, -5)
+        val monthStart =
+            (calendar.clone() as Calendar).apply {
                 set(Calendar.DAY_OF_MONTH, 1)
-            }
+                set(Calendar.HOUR_OF_DAY, 0)
+            }.timeInMillis
+        val monthEnd =
+            (calendar.clone() as Calendar).apply {
+                add(Calendar.MONTH, 1)
+                add(Calendar.DAY_OF_MONTH, -1)
+                set(Calendar.HOUR_OF_DAY, 23)
+            }.timeInMillis
 
-            // Use getMonthlyTrends to show both income and expense
-            val monthlyTrends = transactionDao.getMonthlyTrends(startCal.timeInMillis).first()
+        transactionsForMonth =
+            when (drilldownType) {
+                DrilldownType.CATEGORY -> transactionDao.getTransactionsForCategoryName(entityName, monthStart, monthEnd)
+                DrilldownType.MERCHANT -> transactionDao.getTransactionsForMerchantName(entityName, monthStart, monthEnd)
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-            if (monthlyTrends.isEmpty()) {
-                emit(null)
-                return@flow
-            }
+        monthlyTrendChartData =
+            flow {
+                val endCal =
+                    Calendar.getInstance().apply {
+                        set(Calendar.YEAR, year)
+                        set(Calendar.MONTH, month - 1)
+                        set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
+                    }
+                val startCal =
+                    (endCal.clone() as Calendar).apply {
+                        add(Calendar.MONTH, -5)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                    }
 
-            val incomeEntries = mutableListOf<BarEntry>()
-            val expenseEntries = mutableListOf<BarEntry>()
-            val labels = mutableListOf<String>()
-            val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
-            val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-            val trendsMap = monthlyTrends.associateBy { it.monthYear }
+                // Use getMonthlyTrends to show both income and expense
+                val monthlyTrends = transactionDao.getMonthlyTrends(startCal.timeInMillis).first()
 
-            for (i in 0..5) {
-                val monthCal = (startCal.clone() as Calendar).apply { add(Calendar.MONTH, i) }
-                val yearMonth = yearMonthFormat.format(monthCal.time)
+                if (monthlyTrends.isEmpty()) {
+                    emit(null)
+                    return@flow
+                }
 
-                val trend = trendsMap[yearMonth]
-                incomeEntries.add(BarEntry(i.toFloat(), trend?.totalIncome?.toFloat() ?: 0f))
-                expenseEntries.add(BarEntry(i.toFloat(), trend?.totalExpenses?.toFloat() ?: 0f))
-                labels.add(monthFormat.format(monthCal.time))
-            }
+                val incomeEntries = mutableListOf<BarEntry>()
+                val expenseEntries = mutableListOf<BarEntry>()
+                val labels = mutableListOf<String>()
+                val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
+                val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                val trendsMap = monthlyTrends.associateBy { it.monthYear }
 
-            val incomeDataSet = BarDataSet(incomeEntries, "Income").apply {
-                color = 0xFF66BB6A.toInt() // Green
-            }
-            val expenseDataSet = BarDataSet(expenseEntries, "Expense").apply {
-                color = 0xFFEF5350.toInt() // Red
-            }
-            emit(Pair(BarData(incomeDataSet, expenseDataSet), labels))
+                for (i in 0..5) {
+                    val monthCal = (startCal.clone() as Calendar).apply { add(Calendar.MONTH, i) }
+                    val yearMonth = yearMonthFormat.format(monthCal.time)
 
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+                    val trend = trendsMap[yearMonth]
+                    incomeEntries.add(BarEntry(i.toFloat(), trend?.totalIncome?.toFloat() ?: 0f))
+                    expenseEntries.add(BarEntry(i.toFloat(), trend?.totalExpenses?.toFloat() ?: 0f))
+                    labels.add(monthFormat.format(monthCal.time))
+                }
+
+                val incomeDataSet =
+                    BarDataSet(incomeEntries, "Income").apply {
+                        color = 0xFF66BB6A.toInt() // Green
+                    }
+                val expenseDataSet =
+                    BarDataSet(expenseEntries, "Expense").apply {
+                        color = 0xFFEF5350.toInt() // Red
+                    }
+                emit(Pair(BarData(incomeDataSet, expenseDataSet), labels))
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     }
 }

@@ -6,7 +6,9 @@
 // =================================================================================
 package io.pm.finlight.ml
 
+import android.content.Context
 import android.os.Build
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
 import io.mockk.mockk
@@ -21,10 +23,6 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.tensorflow.lite.Interpreter
 import java.nio.ByteBuffer
-import androidx.test.core.app.ApplicationProvider
-import android.content.Context
-import io.mockk.mockkConstructor
-import io.mockk.unmockkConstructor
 
 /**
  * Comprehensive unit tests for [SmsClassifier].
@@ -38,31 +36,31 @@ import io.mockk.unmockkConstructor
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class SmsClassifierTest {
-
     private lateinit var mockInterpreter: Interpreter
-    
+
     // Sample vocabulary for testing (index 0 = empty, 1 = [UNK], 2+ = words)
-    private val testVocab = mapOf(
-        "" to 0,
-        "[UNK]" to 1,
-        "bank" to 2,
-        "debited" to 3,
-        "credited" to 4,
-        "rs" to 5,
-        "your" to 6,
-        "account" to 7,
-        "for" to 8,
-        "on" to 9,
-        "at" to 10,
-        "from" to 11,
-        "to" to 12,
-        "hello" to 13,
-        "world" to 14,
-        "yes" to 15,
-        "ok" to 16,
-        "good" to 17,
-        "done" to 18
-    )
+    private val testVocab =
+        mapOf(
+            "" to 0,
+            "[UNK]" to 1,
+            "bank" to 2,
+            "debited" to 3,
+            "credited" to 4,
+            "rs" to 5,
+            "your" to 6,
+            "account" to 7,
+            "for" to 8,
+            "on" to 9,
+            "at" to 10,
+            "from" to 11,
+            "to" to 12,
+            "hello" to 13,
+            "world" to 14,
+            "yes" to 15,
+            "ok" to 16,
+            "good" to 17,
+            "done" to 18,
+        )
 
     @Before
     fun setUp() {
@@ -138,7 +136,7 @@ class SmsClassifierTest {
     @Test
     fun `tokenize converts text to lowercase`() {
         val classifier = SmsClassifier(testVocab, null)
-        
+
         val tokens = classifier.tokenize("BANK DEBITED")
         val tokensLower = classifier.tokenize("bank debited")
 
@@ -148,7 +146,7 @@ class SmsClassifierTest {
     @Test
     fun `tokenize removes punctuation`() {
         val classifier = SmsClassifier(testVocab, null)
-        
+
         val withPunctuation = classifier.tokenize("bank, debited!")
         val withoutPunctuation = classifier.tokenize("bank debited")
 
@@ -158,7 +156,7 @@ class SmsClassifierTest {
     @Test
     fun `tokenize collapses multiple spaces`() {
         val classifier = SmsClassifier(testVocab, null)
-        
+
         val multipleSpaces = classifier.tokenize("bank    debited")
         val singleSpace = classifier.tokenize("bank debited")
 
@@ -168,7 +166,7 @@ class SmsClassifierTest {
     @Test
     fun `tokenize pads short sequences to MAX_SEQUENCE_LENGTH`() {
         val classifier = SmsClassifier(testVocab, null)
-        
+
         val tokens = classifier.tokenize("bank")
 
         assertEquals("Token array should have MAX_SEQUENCE_LENGTH elements", 250, tokens.size)
@@ -178,7 +176,7 @@ class SmsClassifierTest {
     @Test
     fun `tokenize truncates long sequences to MAX_SEQUENCE_LENGTH`() {
         val classifier = SmsClassifier(testVocab, null)
-        
+
         val longText = (1..300).joinToString(" ") { "word$it" }
         val tokens = classifier.tokenize(longText)
 
@@ -188,7 +186,7 @@ class SmsClassifierTest {
     @Test
     fun `tokenize maps unknown words to UNKNOWN_TOKEN`() {
         val classifier = SmsClassifier(testVocab, null)
-        
+
         val tokens = classifier.tokenize("unknownxyzword")
 
         assertEquals("Unknown word should map to UNKNOWN_TOKEN (1)", 1L, tokens[0])
@@ -197,7 +195,7 @@ class SmsClassifierTest {
     @Test
     fun `tokenize maps known vocabulary words correctly`() {
         val classifier = SmsClassifier(testVocab, null)
-        
+
         // 'bank' is in our test vocabulary at index 2
         val tokens = classifier.tokenize("bank")
 
@@ -207,7 +205,7 @@ class SmsClassifierTest {
     @Test
     fun `tokenize handles common punctuation characters`() {
         val classifier = SmsClassifier(testVocab, null)
-        
+
         val textWithPunctuation = "hello! world? yes. ok, good; done:"
         val expected = classifier.tokenize("hello world yes ok good done")
         val actual = classifier.tokenize(textWithPunctuation)
@@ -218,7 +216,7 @@ class SmsClassifierTest {
     @Test
     fun `tokenize handles leading and trailing whitespace`() {
         val classifier = SmsClassifier(testVocab, null)
-        
+
         val withWhitespace = classifier.tokenize("   bank   ")
         val withoutWhitespace = classifier.tokenize("bank")
 
@@ -228,7 +226,7 @@ class SmsClassifierTest {
     @Test
     fun `tokenize handles text with only punctuation`() {
         val classifier = SmsClassifier(testVocab, null)
-        
+
         val tokens = classifier.tokenize("!!!...???")
 
         assertEquals("Should have MAX_SEQUENCE_LENGTH elements", 250, tokens.size)
@@ -243,7 +241,7 @@ class SmsClassifierTest {
     @Test
     fun `close calls interpreter close method`() {
         val classifier = SmsClassifier(testVocab, mockInterpreter)
-        
+
         classifier.close()
 
         verify { mockInterpreter.close() }
@@ -252,7 +250,7 @@ class SmsClassifierTest {
     @Test
     fun `classify returns 0 after close is called`() {
         val classifier = SmsClassifier(testVocab, mockInterpreter)
-        
+
         classifier.close()
         val result = classifier.classify("bank debited rs 500")
 
@@ -266,7 +264,7 @@ class SmsClassifierTest {
     @Test
     fun `classify is thread-safe with concurrent calls`() {
         val outputSlot = slot<ByteBuffer>()
-        
+
         every { mockInterpreter.run(any(), capture(outputSlot)) } answers {
             Thread.sleep(10)
             outputSlot.captured.putFloat(0.5f)
@@ -274,18 +272,19 @@ class SmsClassifierTest {
 
         val classifier = SmsClassifier(testVocab, mockInterpreter)
         val results = mutableListOf<Float>()
-        val threads = (1..5).map { index ->
-            Thread {
-                try {
-                    val result = classifier.classify("Transaction $index")
-                    synchronized(results) {
-                        results.add(result)
+        val threads =
+            (1..5).map { index ->
+                Thread {
+                    try {
+                        val result = classifier.classify("Transaction $index")
+                        synchronized(results) {
+                            results.add(result)
+                        }
+                    } catch (e: Exception) {
+                        fail("Thread $index threw exception: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    fail("Thread $index threw exception: ${e.message}")
                 }
             }
-        }
 
         threads.forEach { it.start() }
         threads.forEach { it.join(5000) }
@@ -350,29 +349,29 @@ class SmsClassifierTest {
     @Test
     fun `public constructor loads model and vocabulary from assets`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        
+
         var factoryCalled = false
-        
+
         // Create classifier using the testing constructor with factory
-        val classifier = SmsClassifier(context) { buffer, options ->
-            factoryCalled = true
-            assertNotNull("Model buffer should not be null", buffer)
-            assertTrue("Model buffer should have capacity > 0", buffer.capacity() > 0)
-            mockInterpreter
-        }
-        
+        val classifier =
+            SmsClassifier(context) { buffer, options ->
+                factoryCalled = true
+                assertNotNull("Model buffer should not be null", buffer)
+                assertTrue("Model buffer should have capacity > 0", buffer.capacity() > 0)
+                mockInterpreter
+            }
+
         try {
             // Verify vocabulary is loaded
             assertTrue("Vocabulary should be loaded from assets", classifier.vocab.isNotEmpty())
             assertTrue("Vocabulary should contain > 100 words", classifier.vocab.size > 100)
-            
+
             // Verify factory was usage
             assertTrue("Interpreter factory should have been called", factoryCalled)
-            
+
             // Verify integration: calling classify uses the mocked interpreter
             classifier.classify("test")
             verify { mockInterpreter.run(any(), any()) }
-            
         } finally {
             classifier.close()
         }

@@ -12,7 +12,10 @@ import org.junit.runners.model.Statement
  * ensuring the onboarding flow does not interfere with UI tests.
  */
 class DisableOnboardingRule : TestRule {
-    override fun apply(base: Statement, description: Description): Statement {
+    override fun apply(
+        base: Statement,
+        description: Description,
+    ): Statement {
         return object : Statement() {
             override fun evaluate() {
                 try {
@@ -34,7 +37,10 @@ class DisableOnboardingRule : TestRule {
  * ensuring the lock screen does not interfere with UI tests.
  */
 class DisableAppLockRule : TestRule {
-    override fun apply(base: Statement, description: Description): Statement {
+    override fun apply(
+        base: Statement,
+        description: Description,
+    ): Statement {
         return object : Statement() {
             override fun evaluate() {
                 try {

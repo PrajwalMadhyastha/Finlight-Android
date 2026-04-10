@@ -5,7 +5,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScanResultTest {
-
     @Test
     fun `ScanResult subclasses can be instantiated`() {
         // Test Success data class

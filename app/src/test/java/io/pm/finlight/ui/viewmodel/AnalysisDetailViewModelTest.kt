@@ -30,7 +30,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class AnalysisDetailViewModelTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var transactionDao: TransactionDao
 
@@ -41,69 +40,84 @@ class AnalysisDetailViewModelTest : BaseViewModelTest() {
         super.setup()
     }
 
-    private val mockTransactionDetails = listOf(
-        TransactionDetails(
-            Transaction(id = 1, description = "Test", categoryId = 1, amount = 100.0, date = 0, accountId = 1, notes = null),
-            emptyList(), "Account", "Category", "icon", "color", null
+    private val mockTransactionDetails =
+        listOf(
+            TransactionDetails(
+                Transaction(id = 1, description = "Test", categoryId = 1, amount = 100.0, date = 0, accountId = 1, notes = null),
+                emptyList(),
+                "Account",
+                "Category",
+                "icon",
+                "color",
+                null,
+            ),
         )
-    )
 
     @Test
-    fun `when dimension is CATEGORY, it calls getTransactionsForCategoryInRange`() = runTest {
-        // Arrange
-        val categoryId = "123"
-        val startDate = 1000L
-        val endDate = 2000L
-        `when`(transactionDao.getTransactionsForCategoryInRange(categoryId.toInt(), startDate, endDate)).thenReturn(flowOf(mockTransactionDetails))
+    fun `when dimension is CATEGORY, it calls getTransactionsForCategoryInRange`() =
+        runTest {
+            // Arrange
+            val categoryId = "123"
+            val startDate = 1000L
+            val endDate = 2000L
+            `when`(
+                transactionDao.getTransactionsForCategoryInRange(categoryId.toInt(), startDate, endDate),
+            ).thenReturn(flowOf(mockTransactionDetails))
 
-        // Act
-        viewModel = AnalysisDetailViewModel(transactionDao, AnalysisDimension.CATEGORY, categoryId, startDate, endDate)
+            // Act
+            viewModel = AnalysisDetailViewModel(transactionDao, AnalysisDimension.CATEGORY, categoryId, startDate, endDate)
 
-        // Assert
-        viewModel.transactions.test {
-            assertEquals(mockTransactionDetails, awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.transactions.test {
+                assertEquals(mockTransactionDetails, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+            verify(transactionDao).getTransactionsForCategoryInRange(categoryId.toInt(), startDate, endDate)
         }
-        verify(transactionDao).getTransactionsForCategoryInRange(categoryId.toInt(), startDate, endDate)
-    }
 
     @Test
-    fun `when dimension is TAG, it calls getTransactionsForTagInRange`() = runTest {
-        // Arrange
-        val tagId = "456"
-        val startDate = 1000L
-        val endDate = 2000L
-        `when`(transactionDao.getTransactionsForTagInRange(tagId.toInt(), startDate, endDate)).thenReturn(flowOf(mockTransactionDetails))
+    fun `when dimension is TAG, it calls getTransactionsForTagInRange`() =
+        runTest {
+            // Arrange
+            val tagId = "456"
+            val startDate = 1000L
+            val endDate = 2000L
+            `when`(
+                transactionDao.getTransactionsForTagInRange(tagId.toInt(), startDate, endDate),
+            ).thenReturn(flowOf(mockTransactionDetails))
 
-        // Act
-        viewModel = AnalysisDetailViewModel(transactionDao, AnalysisDimension.TAG, tagId, startDate, endDate)
+            // Act
+            viewModel = AnalysisDetailViewModel(transactionDao, AnalysisDimension.TAG, tagId, startDate, endDate)
 
-        // Assert
-        viewModel.transactions.test {
-            assertEquals(mockTransactionDetails, awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.transactions.test {
+                assertEquals(mockTransactionDetails, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+            verify(transactionDao).getTransactionsForTagInRange(tagId.toInt(), startDate, endDate)
         }
-        verify(transactionDao).getTransactionsForTagInRange(tagId.toInt(), startDate, endDate)
-    }
 
     @Test
-    fun `when dimension is MERCHANT, it calls getTransactionsForMerchantInRange with lowercase name`() = runTest {
-        // Arrange
-        val merchantName = "amazon" // Simulate lowercase name from navigation
-        val startDate = 1000L
-        val endDate = 2000L
-        `when`(transactionDao.getTransactionsForMerchantInRange(merchantName, startDate, endDate)).thenReturn(flowOf(mockTransactionDetails))
+    fun `when dimension is MERCHANT, it calls getTransactionsForMerchantInRange with lowercase name`() =
+        runTest {
+            // Arrange
+            val merchantName = "amazon" // Simulate lowercase name from navigation
+            val startDate = 1000L
+            val endDate = 2000L
+            `when`(
+                transactionDao.getTransactionsForMerchantInRange(merchantName, startDate, endDate),
+            ).thenReturn(flowOf(mockTransactionDetails))
 
-        // Act
-        viewModel = AnalysisDetailViewModel(transactionDao, AnalysisDimension.MERCHANT, merchantName, startDate, endDate)
+            // Act
+            viewModel = AnalysisDetailViewModel(transactionDao, AnalysisDimension.MERCHANT, merchantName, startDate, endDate)
 
-        // Assert
-        viewModel.transactions.test {
-            assertEquals(mockTransactionDetails, awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.transactions.test {
+                assertEquals(mockTransactionDetails, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+            // Verify that the DAO is called with the same lowercase name the ViewModel received.
+            // This confirms the ViewModel logic is correct. The DAO test will confirm the query itself works.
+            verify(transactionDao).getTransactionsForMerchantInRange(merchantName, startDate, endDate)
         }
-        // Verify that the DAO is called with the same lowercase name the ViewModel received.
-        // This confirms the ViewModel logic is correct. The DAO test will confirm the query itself works.
-        verify(transactionDao).getTransactionsForMerchantInRange(merchantName, startDate, endDate)
-    }
 }

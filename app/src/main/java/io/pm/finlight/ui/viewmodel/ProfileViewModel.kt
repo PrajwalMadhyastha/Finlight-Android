@@ -24,24 +24,25 @@ import java.io.FileOutputStream
 
 class ProfileViewModel(
     application: Application,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
 ) : AndroidViewModel(application) {
-
     private val context = application
 
-    val userName: StateFlow<String> = settingsRepository.getUserName()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = "User"
-        )
+    val userName: StateFlow<String> =
+        settingsRepository.getUserName()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = "User",
+            )
 
-    val profilePictureUri: StateFlow<String?> = settingsRepository.getProfilePictureUri()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
-        )
+    val profilePictureUri: StateFlow<String?> =
+        settingsRepository.getProfilePictureUri()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = null,
+            )
 
     init {
         // --- MIGRATION: Move profile picture from attachments/ to profile/ on first run ---
@@ -56,11 +57,12 @@ class ProfileViewModel(
      */
     private suspend fun migrateProfilePictureIfNeeded() {
         withContext(Dispatchers.IO) {
-            val currentUri = settingsRepository.getProfilePictureUri().let {
-                // Read the current value once (blocking-style from prefs)
-                context.getSharedPreferences("finance_app_settings", android.content.Context.MODE_PRIVATE)
-                    .getString("profile_picture_uri", null)
-            } ?: return@withContext
+            val currentUri =
+                settingsRepository.getProfilePictureUri().let {
+                    // Read the current value once (blocking-style from prefs)
+                    context.getSharedPreferences("finance_app_settings", android.content.Context.MODE_PRIVATE)
+                        .getString("profile_picture_uri", null)
+                } ?: return@withContext
 
             val oldAttachmentsDir = File(context.filesDir, "attachments")
             val oldFile = File(currentUri)

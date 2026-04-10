@@ -16,20 +16,13 @@
 package io.pm.finlight.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -39,7 +32,6 @@ import io.pm.finlight.Category
 import io.pm.finlight.RecurringTransactionViewModel
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 
@@ -49,7 +41,7 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun AddRecurringTransactionScreen(
     navController: NavController,
-    ruleId: Int?
+    ruleId: Int?,
 ) {
     val recurringViewModel: RecurringTransactionViewModel = viewModel()
     val transactionViewModel: TransactionViewModel = viewModel()
@@ -97,15 +89,16 @@ fun AddRecurringTransactionScreen(
     }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier =
+            Modifier
+                .fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             TransactionTypeToggle(
                 selectedType = transactionType,
-                onTypeSelected = { transactionType = it }
+                onTypeSelected = { transactionType = it },
             )
         }
 
@@ -117,7 +110,7 @@ fun AddRecurringTransactionScreen(
                         onValueChange = { description = it },
                         label = { Text("Description") },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = auroraTextFieldColors()
+                        colors = auroraTextFieldColors(),
                     )
                     OutlinedTextField(
                         value = amount,
@@ -126,7 +119,7 @@ fun AddRecurringTransactionScreen(
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         leadingIcon = { Text("₹") },
-                        colors = auroraTextFieldColors()
+                        colors = auroraTextFieldColors(),
                     )
                 }
             }
@@ -142,15 +135,16 @@ fun AddRecurringTransactionScreen(
                             readOnly = true,
                             label = { Text("Repeats") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = intervalExpanded) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(),
-                            colors = auroraTextFieldColors()
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(),
+                            colors = auroraTextFieldColors(),
                         )
                         ExposedDropdownMenu(
                             expanded = intervalExpanded,
                             onDismissRequest = { intervalExpanded = false },
-                            modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
+                            modifier = Modifier.background(popupContainerColor), // --- UPDATED ---
                         ) {
                             recurrenceIntervals.forEach { interval ->
                                 DropdownMenuItem(text = { Text(interval) }, onClick = {
@@ -168,15 +162,16 @@ fun AddRecurringTransactionScreen(
                             readOnly = true,
                             label = { Text("Account") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = accountExpanded) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(),
-                            colors = auroraTextFieldColors()
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(),
+                            colors = auroraTextFieldColors(),
                         )
                         ExposedDropdownMenu(
                             expanded = accountExpanded,
                             onDismissRequest = { accountExpanded = false },
-                            modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
+                            modifier = Modifier.background(popupContainerColor), // --- UPDATED ---
                         ) {
                             accounts.forEach { account ->
                                 DropdownMenuItem(text = { Text(account.name) }, onClick = {
@@ -194,15 +189,16 @@ fun AddRecurringTransactionScreen(
                             readOnly = true,
                             label = { Text("Category") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(),
-                            colors = auroraTextFieldColors()
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(),
+                            colors = auroraTextFieldColors(),
                         )
                         ExposedDropdownMenu(
                             expanded = categoryExpanded,
                             onDismissRequest = { categoryExpanded = false },
-                            modifier = Modifier.background(popupContainerColor) // --- UPDATED ---
+                            modifier = Modifier.background(popupContainerColor), // --- UPDATED ---
                         ) {
                             categories.forEach { category ->
                                 DropdownMenuItem(text = { Text(category.name) }, onClick = {
@@ -218,9 +214,10 @@ fun AddRecurringTransactionScreen(
 
         item {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 OutlinedButton(onClick = { navController.popBackStack() }, modifier = Modifier.weight(1f)) {
@@ -239,7 +236,7 @@ fun AddRecurringTransactionScreen(
                                 startDate = ruleToEdit?.startDate ?: System.currentTimeMillis(),
                                 accountId = selectedAccount!!.id,
                                 categoryId = selectedCategory?.id,
-                                lastRunDate = ruleToEdit?.lastRunDate
+                                lastRunDate = ruleToEdit?.lastRunDate,
                             )
                             navController.popBackStack()
                         }
@@ -255,18 +252,19 @@ fun AddRecurringTransactionScreen(
 }
 
 @Composable
-private fun auroraTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = MaterialTheme.colorScheme.primary,
-    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-    focusedLabelColor = MaterialTheme.colorScheme.primary,
-    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    cursorColor = MaterialTheme.colorScheme.primary,
-    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-    focusedContainerColor = Color.Transparent,
-    unfocusedContainerColor = Color.Transparent,
-    focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
-    unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
-    unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-)
+private fun auroraTextFieldColors() =
+    OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+        focusedLabelColor = MaterialTheme.colorScheme.primary,
+        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        cursorColor = MaterialTheme.colorScheme.primary,
+        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+        focusedContainerColor = Color.Transparent,
+        unfocusedContainerColor = Color.Transparent,
+        focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
+        unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    )

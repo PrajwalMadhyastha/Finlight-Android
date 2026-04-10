@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,7 +62,7 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 fun SplitTransactionScreen(
     navController: NavController,
     transactionId: Int,
-    transactionViewModel: TransactionViewModel // --- FIX: Accept shared ViewModel
+    transactionViewModel: TransactionViewModel, // --- FIX: Accept shared ViewModel
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = SplitTransactionViewModelFactory(application, transactionId)
@@ -92,25 +91,26 @@ fun SplitTransactionScreen(
                 actions = {
                     HelpActionIcon(helpKey = "split_transaction")
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
     ) { innerPadding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
         ) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 item {
                     SplitHeader(
                         parentTransaction = uiState.parentTransaction,
-                        remainingAmount = uiState.remainingAmount
+                        remainingAmount = uiState.remainingAmount,
                     )
                 }
 
@@ -121,21 +121,20 @@ fun SplitTransactionScreen(
                     }
                 }
 
-
                 items(uiState.splitItems, key = { it.id }) { item ->
                     SplitItemRow(
                         item = item,
                         currencyCode = uiState.parentTransaction?.currencyCode,
                         onAmountChange = { newAmount -> viewModel.updateSplitAmount(item, newAmount) },
                         onCategoryClick = { activeSheetTarget = item },
-                        onDeleteClick = { viewModel.removeSplitItem(item) }
+                        onDeleteClick = { viewModel.removeSplitItem(item) },
                     )
                 }
 
                 item {
                     OutlinedButton(
                         onClick = { viewModel.addSplitItem() },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Add Split")
                         Spacer(Modifier.width(8.dp))
@@ -144,26 +143,28 @@ fun SplitTransactionScreen(
                 }
             }
 
-            val glassFillColor = if (MaterialTheme.colorScheme.background.isDark()) {
-                Color.White.copy(alpha = 0.08f)
-            } else {
-                Color.Black.copy(alpha = 0.04f)
-            }
+            val glassFillColor =
+                if (MaterialTheme.colorScheme.background.isDark()) {
+                    Color.White.copy(alpha = 0.08f)
+                } else {
+                    Color.Black.copy(alpha = 0.04f)
+                }
             Surface(
                 shadowElevation = 0.dp,
-                color = glassFillColor
+                color = glassFillColor,
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .navigationBarsPadding(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .navigationBarsPadding(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     OutlinedButton(
                         onClick = { navController.popBackStack() },
-                        modifier = Modifier.weight(1f).height(48.dp)
+                        modifier = Modifier.weight(1f).height(48.dp),
                     ) {
                         Text("Cancel")
                     }
@@ -175,7 +176,7 @@ fun SplitTransactionScreen(
                             }
                         },
                         modifier = Modifier.weight(1f).height(48.dp),
-                        enabled = isSaveEnabled
+                        enabled = isSaveEnabled,
                     ) { Text("Save Splits") }
                 }
             }
@@ -189,7 +190,7 @@ fun SplitTransactionScreen(
         ModalBottomSheet(
             onDismissRequest = { activeSheetTarget = null },
             sheetState = sheetState,
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         ) {
             SplitCategoryPickerSheet(
                 categories = categories,
@@ -198,52 +199,58 @@ fun SplitTransactionScreen(
                         viewModel.updateSplitCategory(it, category)
                     }
                     activeSheetTarget = null
-                }
+                },
             )
         }
     }
 }
 
 @Composable
-private fun SplitHeader(parentTransaction: Transaction?, remainingAmount: Double) {
+private fun SplitHeader(
+    parentTransaction: Transaction?,
+    remainingAmount: Double,
+) {
     // --- UPDATED: Use foreign currency info if available ---
     val isTravelMode = parentTransaction?.originalAmount != null
     val totalAmount = parentTransaction?.originalAmount ?: parentTransaction?.amount ?: 0.0
-    val currencySymbol = if (isTravelMode) {
-        CurrencyHelper.getCurrencySymbol(parentTransaction?.currencyCode)
-    } else {
-        "₹"
-    }
+    val currencySymbol =
+        if (isTravelMode) {
+            CurrencyHelper.getCurrencySymbol(parentTransaction?.currencyCode)
+        } else {
+            "₹"
+        }
 
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
-    val remainingColor = when {
-        remainingAmount > 0.001 || remainingAmount < -0.001 -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.primary
-    }
+    val remainingColor =
+        when {
+            remainingAmount > 0.001 || remainingAmount < -0.001 -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.primary
+        }
 
     GlassPanel {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 "Total Amount",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 "$currencySymbol${currencyFormat.format(totalAmount).drop(1)}",
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 "Remaining: $currencySymbol${currencyFormat.format(remainingAmount).drop(1)}",
                 style = MaterialTheme.typography.titleMedium,
-                color = remainingColor
+                color = remainingColor,
             )
         }
     }
@@ -255,44 +262,47 @@ private fun SplitItemRow(
     currencyCode: String?,
     onAmountChange: (String) -> Unit,
     onCategoryClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
 ) {
     // --- UPDATED: Use foreign currency symbol if available ---
-    val currencySymbol = if (currencyCode != null) {
-        CurrencyHelper.getCurrencySymbol(currencyCode)
-    } else {
-        "₹"
-    }
+    val currencySymbol =
+        if (currencyCode != null) {
+            CurrencyHelper.getCurrencySymbol(currencyCode)
+        } else {
+            "₹"
+        }
 
     GlassPanel {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Column(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable(onClick = onCategoryClick)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                modifier =
+                    Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = onCategoryClick)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
             ) {
                 val icon = item.category?.let { CategoryIconHelper.getIcon(it.iconKey) } ?: Icons.Default.Add
                 Icon(
                     imageVector = icon,
                     contentDescription = "Category",
-                    tint = if (item.category != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = if (item.category != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     item.category?.name ?: "Set",
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = if (item.category != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (item.category != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -303,7 +313,7 @@ private fun SplitItemRow(
                 label = { Text("Amount") },
                 leadingIcon = { Text(currencySymbol) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true
+                singleLine = true,
             )
 
             IconButton(onClick = onDeleteClick) {
@@ -316,18 +326,18 @@ private fun SplitItemRow(
 @Composable
 private fun SplitCategoryPickerSheet(
     categories: List<Category>,
-    onCategorySelected: (Category) -> Unit
+    onCategorySelected: (Category) -> Unit,
 ) {
     Column(modifier = Modifier.navigationBarsPadding()) {
         Text(
             "Select Category for Split",
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(16.dp),
         )
         // --- UPDATED: Replaced the LazyVerticalGrid with the new reusable component ---
         CategorySelectionGrid(
             categories = categories,
-            onCategorySelected = onCategorySelected
+            onCategorySelected = onCategorySelected,
         )
         Spacer(Modifier.height(16.dp))
     }
@@ -342,23 +352,23 @@ private fun ConversionInfoCard(transaction: Transaction) {
 
     GlassPanel {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Icon(
                 Icons.Default.Info,
                 contentDescription = "Conversion Info",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 "Rate: 1 ${transaction.currencyCode} = $homeCurrencySymbol${numberFormat.format(transaction.conversionRate)}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
-

@@ -8,7 +8,6 @@ package io.pm.finlight
 import kotlinx.coroutines.flow.Flow
 
 class GoalRepository(private val goalDao: GoalDao) {
-
     fun getAllGoalsWithAccountName(): Flow<List<GoalWithAccountName>> = goalDao.getAllGoalsWithAccountName()
 
     fun getGoalById(id: Int): Flow<Goal?> = goalDao.getGoalById(id)

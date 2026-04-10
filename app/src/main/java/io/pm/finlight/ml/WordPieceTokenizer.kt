@@ -14,7 +14,6 @@ package io.pm.finlight.ml
  * correct NER predictions on-device.
  */
 class WordPieceTokenizer(private val vocab: Map<String, Int>) {
-
     companion object {
         const val MAX_SEQ_LENGTH = 128
 
@@ -167,11 +166,12 @@ class WordPieceTokenizer(private val vocab: Map<String, Int>) {
             var found = false
 
             while (start < end) {
-                val substr = if (start > 0) {
-                    "$SUBWORD_PREFIX${word.substring(start, end)}"
-                } else {
-                    word.substring(start, end)
-                }
+                val substr =
+                    if (start > 0) {
+                        "$SUBWORD_PREFIX${word.substring(start, end)}"
+                    } else {
+                        word.substring(start, end)
+                    }
 
                 if (vocab.containsKey(substr)) {
                     tokens.add(substr)
@@ -203,11 +203,11 @@ class WordPieceTokenizer(private val vocab: Map<String, Int>) {
         // Unicode punctuation category
         val category = Character.getType(char).toByte()
         return category == Character.CONNECTOR_PUNCTUATION ||
-                category == Character.DASH_PUNCTUATION ||
-                category == Character.END_PUNCTUATION ||
-                category == Character.FINAL_QUOTE_PUNCTUATION ||
-                category == Character.INITIAL_QUOTE_PUNCTUATION ||
-                category == Character.OTHER_PUNCTUATION ||
-                category == Character.START_PUNCTUATION
+            category == Character.DASH_PUNCTUATION ||
+            category == Character.END_PUNCTUATION ||
+            category == Character.FINAL_QUOTE_PUNCTUATION ||
+            category == Character.INITIAL_QUOTE_PUNCTUATION ||
+            category == Character.OTHER_PUNCTUATION ||
+            category == Character.START_PUNCTUATION
     }
 }

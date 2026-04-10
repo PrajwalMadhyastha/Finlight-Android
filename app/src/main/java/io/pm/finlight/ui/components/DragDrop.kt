@@ -30,7 +30,7 @@ fun rememberDragDropState(
 
 class DragDropState(
     val lazyListState: LazyListState,
-    private val onMove: (Int, Int) -> Unit
+    private val onMove: (Int, Int) -> Unit,
 ) {
     var draggingItemKey by mutableStateOf<Any?>(null)
         private set
@@ -39,9 +39,10 @@ class DragDropState(
         private set
 
     private val currentDraggingItemInfo: LazyListItemInfo?
-        get() = draggingItemKey?.let { key ->
-            lazyListState.layoutInfo.visibleItemsInfo.find { it.key == key }
-        }
+        get() =
+            draggingItemKey?.let { key ->
+                lazyListState.layoutInfo.visibleItemsInfo.find { it.key == key }
+            }
 
     fun onDragStart(offset: Offset) {
         lazyListState.layoutInfo.visibleItemsInfo
@@ -62,10 +63,11 @@ class DragDropState(
         val draggedItemCenterY = draggingItem.offset + draggingItemTranslationY + (draggingItem.size / 2f)
 
         // Find the target item by checking which item's vertical range the dragged item's center is currently in.
-        val targetItem = lazyListState.layoutInfo.visibleItemsInfo.find {
-            it.key != draggingItemKey && it.index != 0 &&
+        val targetItem =
+            lazyListState.layoutInfo.visibleItemsInfo.find {
+                it.key != draggingItemKey && it.index != 0 &&
                     draggedItemCenterY in it.offset.toFloat()..(it.offset + it.size).toFloat()
-        }
+            }
 
         if (targetItem != null && targetItem.index != draggingItemIndex) {
             // A swap is needed.

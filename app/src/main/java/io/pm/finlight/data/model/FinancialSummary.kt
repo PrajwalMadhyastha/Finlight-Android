@@ -9,5 +9,5 @@ package io.pm.finlight
  */
 data class FinancialSummary(
     val totalIncome: Double,
-    val totalExpenses: Double
+    val totalExpenses: Double,
 )

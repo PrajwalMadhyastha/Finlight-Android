@@ -28,12 +28,11 @@ data class TripWithStats(
     val tagId: Int,
     val tripType: TripType,
     val currencyCode: String?,
-    val conversionRate: Float?
+    val conversionRate: Float?,
 )
 
 @Dao
 interface TripDao {
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(trip: Trip): Long
 
@@ -59,7 +58,8 @@ interface TripDao {
     suspend fun getAll(): List<Trip>
 
     @Transaction
-    @Query("""
+    @Query(
+        """
         SELECT
             t.id as tripId,
             t.name as tripName,
@@ -90,11 +90,13 @@ interface TripDao {
         LEFT JOIN transactions tx_main ON ttcr_main.transactionId = tx_main.id
         GROUP BY t.id
         ORDER BY t.startDate DESC
-    """)
+    """,
+    )
     fun getAllTripsWithStats(): Flow<List<TripWithStats>>
 
     @Transaction
-    @Query("""
+    @Query(
+        """
         SELECT
             t.id as tripId,
             t.name as tripName,
@@ -122,7 +124,8 @@ interface TripDao {
         LEFT JOIN transactions tx_main ON ttcr_main.transactionId = tx_main.id
         WHERE t.id = :tripId
         GROUP BY t.id
-    """)
+    """,
+    )
     fun getTripWithStatsById(tripId: Int): Flow<TripWithStats?>
 
     @Query("DELETE FROM trips WHERE id = :tripId")

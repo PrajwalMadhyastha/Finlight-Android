@@ -36,5 +36,5 @@ data class AppDataBackup(
     val trips: List<Trip> = emptyList(),
     val accountAliases: List<AccountAlias> = emptyList(),
     // --- Phase 3: App-Learned Recurring Patterns ---
-    val recurringPatterns: List<RecurringPattern> = emptyList()
+    val recurringPatterns: List<RecurringPattern> = emptyList(),
 )

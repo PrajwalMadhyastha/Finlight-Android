@@ -13,17 +13,17 @@ import org.junit.runner.Description
  * database environment.
  */
 class DatabaseTestRule : TestWatcher() {
-
     lateinit var db: AppDatabase
         private set
 
     override fun starting(description: Description) {
         super.starting(description)
         val context = ApplicationProvider.getApplicationContext<Context>()
-        db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
-            // Allowing main thread queries is only advisable for testing.
-            .allowMainThreadQueries()
-            .build()
+        db =
+            Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+                // Allowing main thread queries is only advisable for testing.
+                .allowMainThreadQueries()
+                .build()
     }
 
     override fun finished(description: Description) {

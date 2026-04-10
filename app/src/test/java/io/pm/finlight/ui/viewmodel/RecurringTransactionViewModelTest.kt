@@ -39,7 +39,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class RecurringTransactionViewModelTest : BaseViewModelTest() {
-
     private val application: Application = ApplicationProvider.getApplicationContext()
 
     @Mock
@@ -54,10 +53,11 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
     override fun setup() {
         super.setup()
         // Manually initialize WorkManager for testing to prevent crash.
-        val config = Configuration.Builder()
-            .setMinimumLoggingLevel(android.util.Log.DEBUG)
-            .setExecutor(SynchronousExecutor())
-            .build()
+        val config =
+            Configuration.Builder()
+                .setMinimumLoggingLevel(android.util.Log.DEBUG)
+                .setExecutor(SynchronousExecutor())
+                .build()
         WorkManagerTestInitHelper.initializeTestWorkManager(application, config)
     }
 
@@ -67,82 +67,87 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `allRecurringTransactions flow emits rules from repository`() = runTest {
-        // Arrange
-        val rules = listOf(
-            RecurringTransaction(1, "Netflix", 149.0, "expense", "Monthly", 0L, 1, 1, null)
-        )
-        initializeViewModel(rules)
+    fun `allRecurringTransactions flow emits rules from repository`() =
+        runTest {
+            // Arrange
+            val rules =
+                listOf(
+                    RecurringTransaction(1, "Netflix", 149.0, "expense", "Monthly", 0L, 1, 1, null),
+                )
+            initializeViewModel(rules)
 
-        // Assert
-        viewModel.allRecurringTransactions.test {
-            assertEquals(rules, awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.allRecurringTransactions.test {
+                assertEquals(rules, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `getRuleById calls repository getById`() = runTest {
-        // Arrange
-        val ruleId = 1
-        val rule = RecurringTransaction(ruleId, "Netflix", 149.0, "expense", "Monthly", 0L, 1, 1, null)
-        `when`(recurringTransactionRepository.getById(ruleId)).thenReturn(flowOf(rule))
-        initializeViewModel()
+    fun `getRuleById calls repository getById`() =
+        runTest {
+            // Arrange
+            val ruleId = 1
+            val rule = RecurringTransaction(ruleId, "Netflix", 149.0, "expense", "Monthly", 0L, 1, 1, null)
+            `when`(recurringTransactionRepository.getById(ruleId)).thenReturn(flowOf(rule))
+            initializeViewModel()
 
-        // Act
-        viewModel.getRuleById(ruleId)
+            // Act
+            viewModel.getRuleById(ruleId)
 
-        // Assert
-        verify(recurringTransactionRepository).getById(ruleId)
-    }
-
-    @Test
-    fun `saveRule with null id calls repository insert`() = runTest {
-        // Arrange
-        initializeViewModel()
-
-        // Act
-        viewModel.saveRule(null, "Spotify", 129.0, "expense", "Monthly", 0L, 1, 1, null)
-        advanceUntilIdle()
-
-        // Assert
-        verify(recurringTransactionRepository).insert(capture(recurringTransactionCaptor))
-        val capturedRule = recurringTransactionCaptor.value
-        assertEquals("Spotify", capturedRule.description)
-        assertEquals(129.0, capturedRule.amount, 0.0)
-        assertEquals(0, capturedRule.id) // ID is 0 for new entities
-    }
+            // Assert
+            verify(recurringTransactionRepository).getById(ruleId)
+        }
 
     @Test
-    fun `saveRule with existing id calls repository update`() = runTest {
-        // Arrange
-        initializeViewModel()
-        val ruleId = 10
+    fun `saveRule with null id calls repository insert`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
 
-        // Act
-        viewModel.saveRule(ruleId, "Updated Spotify", 199.0, "expense", "Monthly", 0L, 1, 1, null)
-        advanceUntilIdle()
+            // Act
+            viewModel.saveRule(null, "Spotify", 129.0, "expense", "Monthly", 0L, 1, 1, null)
+            advanceUntilIdle()
 
-        // Assert
-        verify(recurringTransactionRepository).update(capture(recurringTransactionCaptor))
-        val capturedRule = recurringTransactionCaptor.value
-        assertEquals("Updated Spotify", capturedRule.description)
-        assertEquals(199.0, capturedRule.amount, 0.0)
-        assertEquals(ruleId, capturedRule.id)
-    }
+            // Assert
+            verify(recurringTransactionRepository).insert(capture(recurringTransactionCaptor))
+            val capturedRule = recurringTransactionCaptor.value
+            assertEquals("Spotify", capturedRule.description)
+            assertEquals(129.0, capturedRule.amount, 0.0)
+            assertEquals(0, capturedRule.id) // ID is 0 for new entities
+        }
 
     @Test
-    fun `deleteRule calls repository delete`() = runTest {
-        // Arrange
-        initializeViewModel()
-        val ruleToDelete = RecurringTransaction(1, "Old Subscription", 99.0, "expense", "Monthly", 0L, 1, 1, null)
+    fun `saveRule with existing id calls repository update`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val ruleId = 10
 
-        // Act
-        viewModel.deleteRule(ruleToDelete)
-        advanceUntilIdle()
+            // Act
+            viewModel.saveRule(ruleId, "Updated Spotify", 199.0, "expense", "Monthly", 0L, 1, 1, null)
+            advanceUntilIdle()
 
-        // Assert
-        verify(recurringTransactionRepository).delete(ruleToDelete)
-    }
+            // Assert
+            verify(recurringTransactionRepository).update(capture(recurringTransactionCaptor))
+            val capturedRule = recurringTransactionCaptor.value
+            assertEquals("Updated Spotify", capturedRule.description)
+            assertEquals(199.0, capturedRule.amount, 0.0)
+            assertEquals(ruleId, capturedRule.id)
+        }
+
+    @Test
+    fun `deleteRule calls repository delete`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val ruleToDelete = RecurringTransaction(1, "Old Subscription", 99.0, "expense", "Monthly", 0L, 1, 1, null)
+
+            // Act
+            viewModel.deleteRule(ruleToDelete)
+            advanceUntilIdle()
+
+            // Assert
+            verify(recurringTransactionRepository).delete(ruleToDelete)
+        }
 }
-

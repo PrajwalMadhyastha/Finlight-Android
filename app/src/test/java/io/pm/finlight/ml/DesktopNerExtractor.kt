@@ -24,7 +24,6 @@ class DesktopNerExtractor(
     private val pythonPath: String = "python3",
     private val inferenceScriptPath: String,
 ) : SmsEntityExtractor {
-
     private val tokenizer: WordPieceTokenizer
     private val idToLabel: Map<Int, String>
 
@@ -61,10 +60,14 @@ class DesktopNerExtractor(
             writeNpz(inputFile, result.inputIds, result.attentionMask)
 
             // Step 3: Run Python inference
-            val process = ProcessBuilder(
-                pythonPath, inferenceScriptPath,
-                modelPath, inputFile.absolutePath, outputFile.absolutePath
-            ).redirectErrorStream(true).start()
+            val process =
+                ProcessBuilder(
+                    pythonPath,
+                    inferenceScriptPath,
+                    modelPath,
+                    inputFile.absolutePath,
+                    outputFile.absolutePath,
+                ).redirectErrorStream(true).start()
 
             val exitCode = process.waitFor()
             if (exitCode != 0) {
@@ -78,19 +81,22 @@ class DesktopNerExtractor(
 
             // Step 5: Argmax → label IDs
             val numLabels = idToLabel.size
-            val predictions = IntArray(WordPieceTokenizer.MAX_SEQ_LENGTH) { pos ->
-                var maxIdx = 0
-                var maxVal = logits[pos * numLabels]
-                for (l in 1 until numLabels) {
-                    val v = logits[pos * numLabels + l]
-                    if (v > maxVal) { maxVal = v; maxIdx = l }
+            val predictions =
+                IntArray(WordPieceTokenizer.MAX_SEQ_LENGTH) { pos ->
+                    var maxIdx = 0
+                    var maxVal = logits[pos * numLabels]
+                    for (l in 1 until numLabels) {
+                        val v = logits[pos * numLabels + l]
+                        if (v > maxVal) {
+                            maxVal = v
+                            maxIdx = l
+                        }
+                    }
+                    maxIdx
                 }
-                maxIdx
-            }
 
             // Step 6: BIO post-processing (identical to NerExtractor.extractEntities)
             return extractEntities(predictions, result)
-
         } finally {
             inputFile.delete()
             outputFile.delete()
@@ -110,7 +116,10 @@ class DesktopNerExtractor(
 
         for (i in predictions.indices) {
             if (tokenResult.wordIds[i] == -1) {
-                if (currentSpan != null) { spans.add(currentSpan); currentSpan = null }
+                if (currentSpan != null) {
+                    spans.add(currentSpan)
+                    currentSpan = null
+                }
                 continue
             }
 
@@ -131,7 +140,10 @@ class DesktopNerExtractor(
                     }
                 }
                 else -> {
-                    if (currentSpan != null) { spans.add(currentSpan); currentSpan = null }
+                    if (currentSpan != null) {
+                        spans.add(currentSpan)
+                        currentSpan = null
+                    }
                 }
             }
         }
@@ -144,13 +156,14 @@ class DesktopNerExtractor(
                 entityMap.getOrPut(span.type) { mutableListOf() }.add(merged)
             }
         }
-        return entityMap.mapValues { (type, values) -> 
+        return entityMap.mapValues { (type, values) ->
             val uniqueValues = values.distinct()
             var joined = uniqueValues.joinToString(", ")
-            
+
             if (type == "AMOUNT") {
-                joined = joined.replace(Regex("(?i)^(?:rs\\.?|inr\\.?|₹)\\s*"), "")
-                               .replace(Regex(",(?=\\d{2,3})"), "")
+                joined =
+                    joined.replace(Regex("(?i)^(?:rs\\.?|inr\\.?|₹)\\s*"), "")
+                        .replace(Regex(",(?=\\d{2,3})"), "")
             }
             joined
         }
@@ -182,16 +195,25 @@ class DesktopNerExtractor(
      * Write a minimal .npz (zip of .npy arrays) containing input_ids and attention_mask.
      * Uses the NumPy v1.0 format: magic + version + header + raw data.
      */
-    private fun writeNpz(file: File, inputIds: IntArray, attentionMask: IntArray) {
+    private fun writeNpz(
+        file: File,
+        inputIds: IntArray,
+        attentionMask: IntArray,
+    ) {
         val zipOut = java.util.zip.ZipOutputStream(file.outputStream())
 
-        fun writeNpyEntry(name: String, data: IntArray) {
+        fun writeNpyEntry(
+            name: String,
+            data: IntArray,
+        ) {
             zipOut.putNextEntry(java.util.zip.ZipEntry("$name.npy"))
             val header = "{'descr': '<i4', 'fortran_order': False, 'shape': (1, ${data.size}), }"
             val padLen = 64 - ((10 + header.length) % 64)
             val paddedHeader = header + " ".repeat(padLen - 1) + "\n"
             // NumPy magic: \x93NUMPY
-            zipOut.write(byteArrayOf(0x93.toByte(), 'N'.code.toByte(), 'U'.code.toByte(), 'M'.code.toByte(), 'P'.code.toByte(), 'Y'.code.toByte()))
+            zipOut.write(
+                byteArrayOf(0x93.toByte(), 'N'.code.toByte(), 'U'.code.toByte(), 'M'.code.toByte(), 'P'.code.toByte(), 'Y'.code.toByte()),
+            )
             // Version 1.0
             zipOut.write(byteArrayOf(1, 0))
             // Header length (little-endian uint16)
@@ -221,13 +243,14 @@ class DesktopNerExtractor(
 
         // Version
         val major = bytes[6].toInt()
-        val headerLen = if (major >= 2) {
-            // v2.0: 4-byte little-endian header length at offset 8
-            ByteBuffer.wrap(bytes, 8, 4).order(ByteOrder.LITTLE_ENDIAN).int
-        } else {
-            // v1.0: 2-byte little-endian header length at offset 8
-            ByteBuffer.wrap(bytes, 8, 2).order(ByteOrder.LITTLE_ENDIAN).short.toInt() and 0xFFFF
-        }
+        val headerLen =
+            if (major >= 2) {
+                // v2.0: 4-byte little-endian header length at offset 8
+                ByteBuffer.wrap(bytes, 8, 4).order(ByteOrder.LITTLE_ENDIAN).int
+            } else {
+                // v1.0: 2-byte little-endian header length at offset 8
+                ByteBuffer.wrap(bytes, 8, 2).order(ByteOrder.LITTLE_ENDIAN).short.toInt() and 0xFFFF
+            }
         val dataOffset = if (major >= 2) 12 + headerLen else 10 + headerLen
 
         // Parse as float32 little-endian

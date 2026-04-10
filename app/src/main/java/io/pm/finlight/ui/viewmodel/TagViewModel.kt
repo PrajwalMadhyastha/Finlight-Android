@@ -21,17 +21,17 @@ import kotlinx.coroutines.launch
 class TagViewModel(
     application: Application,
     private val tagRepository: TagRepository,
-    private val tripRepository: TripRepository
+    private val tripRepository: TripRepository,
 ) : AndroidViewModel(application) {
-
     private val _uiEvent = Channel<String>()
     val uiEvent = _uiEvent.receiveAsFlow()
 
-    val allTags: StateFlow<List<Tag>> = tagRepository.allTags.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
+    val allTags: StateFlow<List<Tag>> =
+        tagRepository.allTags.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList(),
+        )
 
     /**
      * Called from the 'Manage Tags' screen. Inserts a new tag into the database.

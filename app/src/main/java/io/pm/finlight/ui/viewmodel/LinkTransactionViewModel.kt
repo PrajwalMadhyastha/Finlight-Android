@@ -21,9 +21,8 @@ import java.util.Calendar
 class LinkTransactionViewModel(
     private val transactionRepository: TransactionRepository,
     private val recurringTransactionDao: RecurringTransactionDao,
-    val potentialTransaction: PotentialTransaction
+    val potentialTransaction: PotentialTransaction,
 ) : ViewModel() {
-
     private val _linkableTransactions = MutableStateFlow<List<Transaction>>(emptyList())
     val linkableTransactions = _linkableTransactions.asStateFlow()
 
@@ -33,18 +32,20 @@ class LinkTransactionViewModel(
 
     private fun findMatches() {
         viewModelScope.launch {
-            val todayEnd = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 23)
-                set(Calendar.MINUTE, 59)
-                set(Calendar.SECOND, 59)
-            }.timeInMillis
+            val todayEnd =
+                Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                }.timeInMillis
 
-            val yesterdayStart = Calendar.getInstance().apply {
-                add(Calendar.DAY_OF_YEAR, -1)
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-            }.timeInMillis
+            val yesterdayStart =
+                Calendar.getInstance().apply {
+                    add(Calendar.DAY_OF_YEAR, -1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                }.timeInMillis
 
             // Use the existing DAO method to get all transactions in the date range.
             // This returns a Flow, so we collect it to update our state.
@@ -55,7 +56,10 @@ class LinkTransactionViewModel(
         }
     }
 
-    fun linkTransaction(selectedTransactionId: Int, onComplete: () -> Unit) {
+    fun linkTransaction(
+        selectedTransactionId: Int,
+        onComplete: () -> Unit,
+    ) {
         viewModelScope.launch {
             // Link the transaction by setting its hash
             potentialTransaction.sourceSmsHash?.let { hash ->

@@ -37,7 +37,7 @@ import java.net.URLEncoder
 @Composable
 fun CsvValidationScreen(
     navController: NavController,
-    viewModel: SettingsViewModel
+    viewModel: SettingsViewModel,
 ) {
     val report by viewModel.csvValidationReport.collectAsState()
     val context = LocalContext.current
@@ -74,24 +74,26 @@ fun CsvValidationScreen(
                 actions = {
                     HelpActionIcon(helpKey = "csv_validation_screen")
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
         bottomBar = {
-            val importableRowCount = report?.reviewableRows?.count {
-                it.status == CsvRowStatus.VALID ||
+            val importableRowCount =
+                report?.reviewableRows?.count {
+                    it.status == CsvRowStatus.VALID ||
                         it.status == CsvRowStatus.NEEDS_ACCOUNT_CREATION ||
                         it.status == CsvRowStatus.NEEDS_CATEGORY_CREATION ||
                         it.status == CsvRowStatus.NEEDS_BOTH_CREATION
-            } ?: 0
+                } ?: 0
 
             Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .navigationBarsPadding(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .navigationBarsPadding(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     OutlinedButton(onClick = {
                         viewModel.clearCsvValidationReport()
@@ -101,11 +103,12 @@ fun CsvValidationScreen(
                     Button(
                         onClick = {
                             scope.launch {
-                                val rowsToImport = report?.reviewableRows?.filter {
-                                    it.status != CsvRowStatus.INVALID_AMOUNT &&
+                                val rowsToImport =
+                                    report?.reviewableRows?.filter {
+                                        it.status != CsvRowStatus.INVALID_AMOUNT &&
                                             it.status != CsvRowStatus.INVALID_DATE &&
                                             it.status != CsvRowStatus.INVALID_COLUMN_COUNT
-                                }
+                                    }
                                 if (!rowsToImport.isNullOrEmpty()) {
                                     viewModel.commitCsvImport(rowsToImport)
                                     Toast.makeText(context, "$importableRowCount transactions imported!", Toast.LENGTH_LONG).show()
@@ -114,42 +117,44 @@ fun CsvValidationScreen(
                             }
                         },
                         modifier = Modifier.weight(1f),
-                        enabled = importableRowCount > 0
+                        enabled = importableRowCount > 0,
                     ) { Text("Import ($importableRowCount)") }
                 }
             }
         },
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
     ) { innerPadding ->
         val currentReport = report
         if (currentReport == null) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator()
             }
         } else {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
                     Text(
                         "Validation Complete",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         "Tap a row to edit it, or use the trash icon to ignore it.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
@@ -163,11 +168,13 @@ fun CsvValidationScreen(
                             // Serialize the Map, not the List.
                             val rowDataJson = gson.toJson(rowDataMap)
                             val encodedJson = URLEncoder.encode(rowDataJson, "UTF-8")
-                            navController.navigate("add_transaction?isCsvEdit=true&csvLineNumber=${row.lineNumber}&initialDataJson=$encodedJson")
+                            navController.navigate(
+                                "add_transaction?isCsvEdit=true&csvLineNumber=${row.lineNumber}&initialDataJson=$encodedJson",
+                            )
                         },
                         onDeleteClick = {
                             viewModel.removeRowFromReport(row)
-                        }
+                        },
                     )
                 }
             }
@@ -176,40 +183,48 @@ fun CsvValidationScreen(
 }
 
 @Composable
-fun EditableRowItem(row: ReviewableRow, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
-    val statusColor = when (row.status) {
-        CsvRowStatus.VALID -> MaterialTheme.colorScheme.primary
-        CsvRowStatus.NEEDS_ACCOUNT_CREATION, CsvRowStatus.NEEDS_CATEGORY_CREATION, CsvRowStatus.NEEDS_BOTH_CREATION -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.error
-    }
-    val icon = when (row.status) {
-        CsvRowStatus.VALID -> Icons.Default.CheckCircle
-        CsvRowStatus.NEEDS_ACCOUNT_CREATION, CsvRowStatus.NEEDS_CATEGORY_CREATION, CsvRowStatus.NEEDS_BOTH_CREATION -> Icons.Default.AddCircle
-        else -> Icons.Default.Warning
-    }
+fun EditableRowItem(
+    row: ReviewableRow,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+) {
+    val statusColor =
+        when (row.status) {
+            CsvRowStatus.VALID -> MaterialTheme.colorScheme.primary
+            CsvRowStatus.NEEDS_ACCOUNT_CREATION, CsvRowStatus.NEEDS_CATEGORY_CREATION, CsvRowStatus.NEEDS_BOTH_CREATION -> MaterialTheme.colorScheme.secondary
+            else -> MaterialTheme.colorScheme.error
+        }
+    val icon =
+        when (row.status) {
+            CsvRowStatus.VALID -> Icons.Default.CheckCircle
+            CsvRowStatus.NEEDS_ACCOUNT_CREATION, CsvRowStatus.NEEDS_CATEGORY_CREATION, CsvRowStatus.NEEDS_BOTH_CREATION -> Icons.Default.AddCircle
+            else -> Icons.Default.Warning
+        }
 
     GlassPanel(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .padding(start = 16.dp)
-                .clickable(onClick = onEditClick),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .padding(start = 16.dp)
+                    .clickable(onClick = onEditClick),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = "Status",
                 tint = statusColor,
-                modifier = Modifier.padding(end = 16.dp)
+                modifier = Modifier.padding(end = 16.dp),
             )
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(vertical = 16.dp)
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .padding(vertical = 16.dp),
             ) {
                 Text(
                     "Line ${row.lineNumber}: ${row.rowData.getOrNull(1) ?: "N/A"}",
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -217,7 +232,7 @@ fun EditableRowItem(row: ReviewableRow, onEditClick: () -> Unit, onDeleteClick: 
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             IconButton(onClick = onDeleteClick) {

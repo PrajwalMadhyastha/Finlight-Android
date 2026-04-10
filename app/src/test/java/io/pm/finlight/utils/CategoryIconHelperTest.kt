@@ -19,7 +19,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class CategoryIconHelperTest : BaseViewModelTest() {
-
     @Test
     fun `getIcon returns correct icon for known key`() {
         val icon = CategoryIconHelper.getIcon("restaurant")

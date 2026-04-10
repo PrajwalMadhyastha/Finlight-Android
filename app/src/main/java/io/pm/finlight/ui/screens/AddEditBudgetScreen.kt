@@ -65,9 +65,10 @@ fun AddEditBudgetScreen(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(titleText, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
@@ -85,16 +86,21 @@ fun AddEditBudgetScreen(
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isCategoryDropdownExpanded && isDropdownEnabled) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(
+                                expanded = isCategoryDropdownExpanded && isDropdownEnabled,
+                            )
+                        },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
                         enabled = isDropdownEnabled,
                     )
                     ExposedDropdownMenu(
                         expanded = isCategoryDropdownExpanded && isDropdownEnabled,
                         onDismissRequest = { isCategoryDropdownExpanded = false },
-                        modifier = Modifier.background(if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight)
+                        modifier = Modifier.background(if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight),
                     ) {
                         availableCategories.forEach { category ->
                             DropdownMenuItem(
@@ -150,8 +156,8 @@ fun AddEditBudgetScreen(
                                         // Update month/year in case the user is editing a *carried-over* budget
                                         // This pins it to the currently selected month.
                                         month = month,
-                                        year = year
-                                    )
+                                        year = year,
+                                    ),
                                 )
                             }
                         } else {

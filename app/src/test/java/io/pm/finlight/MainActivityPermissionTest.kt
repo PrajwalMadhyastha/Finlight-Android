@@ -15,13 +15,13 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(application = TestApplication::class)
 class MainActivityPermissionTest {
-
     // Mimic the logic in MainActivity.kt
     private fun getPermissionsToRequest(sdkInt: Int): Array<String> {
-        val list = mutableListOf(
-            Manifest.permission.READ_SMS,
-            Manifest.permission.RECEIVE_SMS
-        )
+        val list =
+            mutableListOf(
+                Manifest.permission.READ_SMS,
+                Manifest.permission.RECEIVE_SMS,
+            )
         if (sdkInt >= Build.VERSION_CODES.TIRAMISU) {
             list.add(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -32,7 +32,7 @@ class MainActivityPermissionTest {
     @Config(sdk = [Build.VERSION_CODES.S]) // API 31
     fun `permissions array on Android 12 excludes POST_NOTIFICATIONS`() {
         val permissions = getPermissionsToRequest(Build.VERSION.SDK_INT)
-        
+
         assertEquals("Should have 2 permissions on API 31", 2, permissions.size)
         assertTrue(permissions.contains(Manifest.permission.READ_SMS))
         assertTrue(permissions.contains(Manifest.permission.RECEIVE_SMS))
@@ -43,7 +43,7 @@ class MainActivityPermissionTest {
     @Config(sdk = [Build.VERSION_CODES.TIRAMISU]) // API 33
     fun `permissions array on Android 13 includes POST_NOTIFICATIONS`() {
         val permissions = getPermissionsToRequest(Build.VERSION.SDK_INT)
-        
+
         assertEquals("Should have 3 permissions on API 33", 3, permissions.size)
         assertTrue(permissions.contains(Manifest.permission.READ_SMS))
         assertTrue(permissions.contains(Manifest.permission.RECEIVE_SMS))

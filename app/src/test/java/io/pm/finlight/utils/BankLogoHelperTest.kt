@@ -1,7 +1,6 @@
 package io.pm.finlight.utils
 
 import android.os.Build
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.R
 import io.pm.finlight.TestApplication
@@ -15,9 +14,8 @@ import org.robolectric.annotation.Config
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class BankLogoHelperTest(
     private val accountName: String,
-    private val expectedLogoRes: Int
+    private val expectedLogoRes: Int,
 ) : BaseViewModelTest() {
-
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{index}: getLogoForAccount(\"{0}\") should return {1}")
@@ -31,7 +29,7 @@ class BankLogoHelperTest(
                 arrayOf("Amazon Pay Balance", R.drawable.ic_amazon_logo),
                 arrayOf("Cash Spends", R.drawable.ic_cash_spends),
                 arrayOf("PhonePe Wallet", R.drawable.ic_phonepe_logo),
-                arrayOf("Unknown Financial Institution", R.drawable.ic_default_bank_logo)
+                arrayOf("Unknown Financial Institution", R.drawable.ic_default_bank_logo),
             )
         }
     }
