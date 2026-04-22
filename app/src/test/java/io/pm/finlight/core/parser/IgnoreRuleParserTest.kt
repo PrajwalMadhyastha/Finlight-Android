@@ -252,7 +252,7 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
                 ignoreRules =
                     listOf(
                         IgnoreRule(
-                            pattern = "is declined",
+                            pattern = "declined",
                             isDefault = true,
                             isEnabled = true,
                         ),
@@ -279,6 +279,42 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
                 )
 
             assertNull("Parser should ignore declined transactions", result)
+        }
+
+    @Test
+    fun `test ignores TXN DECLINED message`() =
+        runBlocking {
+            setupTest(
+                ignoreRules =
+                    listOf(
+                        IgnoreRule(
+                            pattern = "declined",
+                            isDefault = true,
+                            isEnabled = true,
+                        ),
+                    ),
+            )
+            val smsBody = "TXN DECLINED: Rs.5527.50 on 12-04-2026 at MAKEMYTRIP INDIA PVT L on HDFC Bank Credit Card 1234. Reason: Online usage disabled. Enable it: https://1.hdfc.bank.in/HDFCBK/jf/2b617bd8"
+            val mockSms =
+                SmsMessage(
+                    id = 1051L,
+                    sender = "AM-HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNull("Parser should ignore TXN DECLINED transactions", result)
         }
 
     @Test
