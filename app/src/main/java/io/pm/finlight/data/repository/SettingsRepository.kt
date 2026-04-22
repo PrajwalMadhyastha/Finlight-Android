@@ -328,13 +328,23 @@ class SettingsRepository(context: Context) {
                 SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
                     if (key == KEY_TRAVEL_MODE_SETTINGS) {
                         val json = sp.getString(key, null)
-                        val settings = if (json == null) null else gson.fromJson(json, TravelModeSettings::class.java)
+                        var settings = if (json == null) null else gson.fromJson(json, TravelModeSettings::class.java)
+                        
+                        if (settings != null && System.currentTimeMillis() > settings.endDate) {
+                            saveTravelModeSettings(null)
+                            settings = null
+                        }
                         trySend(settings)
                     }
                 }
             prefs.registerOnSharedPreferenceChangeListener(listener)
             val initialJson = prefs.getString(KEY_TRAVEL_MODE_SETTINGS, null)
-            val initialSettings = if (initialJson == null) null else gson.fromJson(initialJson, TravelModeSettings::class.java)
+            var initialSettings = if (initialJson == null) null else gson.fromJson(initialJson, TravelModeSettings::class.java)
+            
+            if (initialSettings != null && System.currentTimeMillis() > initialSettings.endDate) {
+                saveTravelModeSettings(null)
+                initialSettings = null
+            }
             trySend(initialSettings)
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }

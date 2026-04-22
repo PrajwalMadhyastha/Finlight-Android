@@ -121,7 +121,8 @@ class SettingsRepositoryTest : BaseViewModelTest() {
     @Test
     fun `save and get travel mode settings`() =
         runTest {
-            val settings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 1L, 2L, "USD", 83.5f)
+            val futureEndDate = System.currentTimeMillis() + 100000L
+            val settings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 1L, futureEndDate, "USD", 83.5f)
 
             repository.getTravelModeSettings().test {
                 assertNull(awaitItem()) // Initial
@@ -129,6 +130,25 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(settings, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `getTravelModeSettings auto-expires past trips`() =
+        runTest {
+            val pastEndDate = 0L
+            val expiredSettings = TravelModeSettings(true, "Old Trip", TripType.DOMESTIC, 1L, pastEndDate, null, null)
+            
+            // Bypass saveTravelModeSettings to directly inject an "expired" state
+            prefs.edit().putString("travel_mode_settings", gson.toJson(expiredSettings)).commit()
+
+            repository.getTravelModeSettings().test {
+                val item = awaitItem()
+                assertEquals(null, item, "Item was $item")
+                cancelAndIgnoreRemainingEvents()
+            }
+            
+            // Verify it was actually removed from prefs
+            assertNull(prefs.getString("travel_mode_settings", null))
         }
 
     @Test
