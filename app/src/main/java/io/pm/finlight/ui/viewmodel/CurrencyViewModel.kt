@@ -46,6 +46,13 @@ class CurrencyViewModel(
     private val _tripToEdit = MutableStateFlow<TripWithStats?>(null)
     val tripToEdit: StateFlow<TripWithStats?> = _tripToEdit.asStateFlow()
 
+    val allTags: StateFlow<List<Tag>> =
+        tagRepository.allTags.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList(),
+        )
+
     // --- NEW: This flow gets ALL trips from the database ---
     private val allTrips: StateFlow<List<TripWithStats>> =
         tripRepository.getAllTripsWithStats()

@@ -48,6 +48,7 @@ class CurrencyViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getHomeCurrency()).thenReturn(flowOf("INR"))
         `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
         `when`(tripRepository.getAllTripsWithStats()).thenReturn(flowOf(emptyList()))
+        `when`(tagRepository.allTags).thenReturn(flowOf(emptyList()))
 
         viewModel =
             CurrencyViewModel(
@@ -69,6 +70,21 @@ class CurrencyViewModelTest : BaseViewModelTest() {
             // Assert
             viewModel.homeCurrency.test {
                 assertEquals("USD", awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `allTags flow emits values from repository`() =
+        runTest {
+            // Arrange
+            val tags = listOf(Tag(id = 1, name = "Tag1"), Tag(id = 2, name = "Tag2"))
+            `when`(tagRepository.allTags).thenReturn(flowOf(tags))
+            initializeViewModel()
+
+            // Assert
+            viewModel.allTags.test {
+                assertEquals(tags, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
         }

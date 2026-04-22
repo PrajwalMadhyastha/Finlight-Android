@@ -11,12 +11,15 @@ import android.os.Build
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -25,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -61,6 +66,7 @@ fun CurrencyTravelScreen(
     val activeTravelSettings by viewModel.travelModeSettings.collectAsState()
     val tripToEdit by viewModel.tripToEdit.collectAsState()
     val historicTrips by viewModel.historicTrips.collectAsState()
+    val allTags by viewModel.allTags.collectAsState()
     val context = LocalContext.current
 
     DisposableEffect(Unit) {
@@ -166,6 +172,7 @@ fun CurrencyTravelScreen(
                     tripName = tripName.text, onTripNameChange = { str ->
                         tripName = TextFieldValue(str, TextRange(str.length))
                     },
+                    allTags = allTags,
                     tripType = tripType, onTripTypeChange = { tripType = it },
                     selectedCurrency = selectedCurrency, onSelectCurrencyClick = { showTravelCurrencyPicker = true },
                     conversionRate = conversionRate.text, onConversionRateChange = { str ->
@@ -394,6 +401,7 @@ fun CurrencyTravelScreen(
 private fun TripSettingsForm(
     tripName: String,
     onTripNameChange: (String) -> Unit,
+    allTags: List<io.pm.finlight.Tag>,
     tripType: TripType,
     onTripTypeChange: (TripType) -> Unit,
     selectedCurrency: CurrencyInfo?,
@@ -406,16 +414,64 @@ private fun TripSettingsForm(
     endDate: Long?,
     onEndDateClick: () -> Unit,
 ) {
+    var expanded by remember { mutableStateOf(false) }
+    var textFieldWidth by remember { mutableStateOf(0) }
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+    val popupContainerColor = if (isThemeDark) io.pm.finlight.ui.theme.PopupSurfaceDark else io.pm.finlight.ui.theme.PopupSurfaceLight
+
     Column {
         ListItem(
             headlineContent = {
-                OutlinedTextField(
-                    value = tripName,
-                    onValueChange = onTripNameChange,
-                    label = { Text("Trip Name / Tag*") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = tripName,
+                        onValueChange = { 
+                            onTripNameChange(it)
+                            expanded = true // Show suggestions when typing
+                        },
+                        label = { Text("Trip Name / Tag*") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onGloballyPositioned { coordinates ->
+                                textFieldWidth = coordinates.size.width
+                            },
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { expanded = !expanded }) {
+                                Icon(
+                                    imageVector = if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown,
+                                    contentDescription = "Toggle Dropdown"
+                                )
+                            }
+                        }
+                    )
+                    
+                    // Filter tags based on current input, or show all if empty
+                    val filteredTags = if (tripName.isBlank()) {
+                        allTags
+                    } else {
+                        allTags.filter { it.name.contains(tripName, ignoreCase = true) }
+                    }
+                    
+                    DropdownMenu(
+                        expanded = expanded && filteredTags.isNotEmpty(),
+                        onDismissRequest = { expanded = false },
+                        properties = androidx.compose.ui.window.PopupProperties(focusable = false),
+                        modifier = Modifier
+                            .width(with(LocalDensity.current) { textFieldWidth.toDp() })
+                            .background(popupContainerColor)
+                    ) {
+                        filteredTags.forEach { tag ->
+                            DropdownMenuItem(
+                                text = { Text(tag.name, color = MaterialTheme.colorScheme.onSurface) },
+                                onClick = {
+                                    onTripNameChange(tag.name)
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
             },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
