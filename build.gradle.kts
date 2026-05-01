@@ -10,7 +10,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "2.0.0" apply false
     id("org.jetbrains.kotlin.jvm") version "2.0.0" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.4" apply false
-    id("org.sonarqube") version "5.0.0.4638" apply false
+    id("org.sonarqube") version "7.3.0.8198" apply false
     // --- ADDED: Compose Multiplatform Plugin for Desktop Analyzer ---
     id("org.jetbrains.compose") version "1.6.11" apply false
 }

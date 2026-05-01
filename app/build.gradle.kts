@@ -109,6 +109,12 @@ sonar {
     }
 }
 
+// WORKAROUND: SonarQube Gradle Plugin crashes when querying KSP generated source sets
+// before the KSP tasks have finished executing.
+tasks.matching { it.name == "sonarResolver" }.configureEach {
+    dependsOn(tasks.matching { it.name.startsWith("ksp") })
+}
+
 // --- Kover configuration: Exclude files that will be tested with instrumented tests ---
 kover {
     reports {
