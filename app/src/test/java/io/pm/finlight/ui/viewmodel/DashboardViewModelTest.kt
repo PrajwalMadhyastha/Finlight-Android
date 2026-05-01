@@ -254,8 +254,8 @@ class DashboardViewModelTest : BaseViewModelTest() {
     fun `safeToSpendPerDay is calculated correctly`() =
         runTest {
             // ARRANGE
-            // The ViewModel uses the real current date, so the test must do the same.
-            val calendar = Calendar.getInstance()
+            // The ViewModel uses timeProvider, so the test must use the same mocked date (the 15th).
+            val calendar = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 15) }
             val daysInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH)
             val remainingDays = (daysInMonth - calendar.get(Calendar.DAY_OF_MONTH) + 1).toLong()
 
@@ -464,45 +464,27 @@ class DashboardViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `dismissLastMonthSummaryCard calls repository and updates state`() {
-        // This test assumes it's the first of the month to make the card visible initially
-        val today = Calendar.getInstance()
-        if (today.get(Calendar.DAY_OF_MONTH) == 1) {
-            runTest {
-                // Arrange
-                `when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
-                `when`(
-                    transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()),
-                ).thenReturn(flowOf(FinancialSummary(1.0, 1.0)))
-                initializeViewModel()
-                advanceUntilIdle()
-                assertTrue(viewModel.showLastMonthSummaryCard.value) // Pre-condition
+    fun `dismissLastMonthSummaryCard calls repository and updates state`() =
+        runTest {
+            // Arrange - Force the time to be the 1st of the month
+            val firstOfMonth = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1) }
+            `when`(timeProvider.now()).thenReturn(firstOfMonth)
+            `when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
+            `when`(
+                transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()),
+            ).thenReturn(flowOf(FinancialSummary(1.0, 1.0)))
+            initializeViewModel()
+            advanceUntilIdle()
+            assertTrue(viewModel.showLastMonthSummaryCard.value) // Pre-condition
 
-                // Act
-                viewModel.dismissLastMonthSummaryCard()
-                advanceUntilIdle()
+            // Act
+            viewModel.dismissLastMonthSummaryCard()
+            advanceUntilIdle()
 
-                // Assert
-                verify(settingsRepository).setLastMonthSummaryDismissed()
-                assertFalse(viewModel.showLastMonthSummaryCard.value)
-            }
-        } else {
-            // If it's not the first, the card is never shown, so the test is trivial
-            runTest {
-                // Arrange
-                initializeViewModel()
-                advanceUntilIdle()
-                assertFalse(viewModel.showLastMonthSummaryCard.value) // Pre-condition
-
-                // Act
-                viewModel.dismissLastMonthSummaryCard()
-
-                // Assert
-                verify(settingsRepository).setLastMonthSummaryDismissed()
-                assertFalse(viewModel.showLastMonthSummaryCard.value)
-            }
+            // Assert
+            verify(settingsRepository).setLastMonthSummaryDismissed()
+            assertFalse(viewModel.showLastMonthSummaryCard.value)
         }
-    }
 
     @Test
     fun `refreshBudgetSummary triggers recalculation of budgetHealthSummary`() =

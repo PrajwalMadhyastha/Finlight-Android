@@ -136,7 +136,7 @@ class DashboardViewModel(
                 order.filter { it in visible }
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-        val calendar = Calendar.getInstance()
+        val calendar = timeProvider.now()
         monthYear = SimpleDateFormat("MMMM", Locale.getDefault()).format(calendar.time)
 
         checkForLastMonthSummary()
@@ -188,7 +188,7 @@ class DashboardViewModel(
 
         safeToSpendPerDay =
             amountRemaining.map { remaining ->
-                val today = Calendar.getInstance()
+                val today = timeProvider.now()
                 val lastDayOfMonth = today.getActualMaximum(Calendar.DAY_OF_MONTH)
                 val remainingDays = (lastDayOfMonth - today.get(Calendar.DAY_OF_MONTH) + 1).coerceAtLeast(1)
 
@@ -209,7 +209,7 @@ class DashboardViewModel(
 
                 flow {
                     // --- Spending Velocity & Forecasting Logic ---
-                    val cal = Calendar.getInstance()
+                    val cal = timeProvider.now()
                     val lookbackPeriodDays = 3
                     val lookbackStartDate = (cal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -lookbackPeriodDays) }.timeInMillis
                     val recentSpend = transactionRepository.getTotalExpensesSince(lookbackStartDate)
@@ -326,7 +326,7 @@ class DashboardViewModel(
         // --- REFACTORED: Use the new "Monthly-First" centralized logic ---
         yearlyConsistencyData =
             flow {
-                val today = Calendar.getInstance()
+                val today = timeProvider.now()
                 val year = today.get(Calendar.YEAR)
 
                 // Create a flow for each month of the current year

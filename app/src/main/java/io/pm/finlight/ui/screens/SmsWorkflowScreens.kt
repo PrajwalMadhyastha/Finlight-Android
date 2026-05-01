@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -43,6 +44,8 @@ import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.CategorySelectionGrid
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.InlineTextToolbarActionBar
+import io.pm.finlight.ui.components.rememberInlineTextToolbar
 import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
@@ -492,30 +495,34 @@ fun ApproveTransactionScreen(
                     var tempDescription by remember {
                         mutableStateOf(TextFieldValue(description.text, TextRange(description.text.length)))
                     }
-                    Column(
-                        modifier =
-                            Modifier
-                                .padding(16.dp)
-                                .navigationBarsPadding(),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Text("Edit Description", style = MaterialTheme.typography.titleLarge)
-                        OutlinedTextField(
-                            value = tempDescription,
-                            onValueChange = { tempDescription = it },
-                            label = { Text("Description") },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
+                    val inlineToolbar = rememberInlineTextToolbar()
+                    CompositionLocalProvider(LocalTextToolbar provides inlineToolbar) {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .padding(16.dp)
+                                    .navigationBarsPadding(),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
-                            TextButton(onClick = { activeSheetContent = null }) { Text("Cancel") }
-                            Spacer(Modifier.width(8.dp))
-                            Button(onClick = {
-                                description = tempDescription
-                                activeSheetContent = null
-                            }) { Text("Done") }
+                            Text("Edit Description", style = MaterialTheme.typography.titleLarge)
+                            InlineTextToolbarActionBar(inlineToolbar)
+                            OutlinedTextField(
+                                value = tempDescription,
+                                onValueChange = { tempDescription = it },
+                                label = { Text("Description") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                TextButton(onClick = { activeSheetContent = null }) { Text("Cancel") }
+                                Spacer(Modifier.width(8.dp))
+                                Button(onClick = {
+                                    description = tempDescription
+                                    activeSheetContent = null
+                                }) { Text("Done") }
+                            }
                         }
                     }
                 }
