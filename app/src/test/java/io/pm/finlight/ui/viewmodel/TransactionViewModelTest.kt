@@ -1416,6 +1416,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
      * This simulates the sheet being opened by onAttemptToLeaveScreen.
      */
     private fun setupRetroSheet(
+        initialDesc: String = "Starbucks",
         newDesc: String? = "Starbucks Coffee",
         newCatId: Int? = null,
         numSimilar: Int = 2,
@@ -1423,7 +1424,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         val initialTxn =
             Transaction(
                 id = 1,
-                description = "Starbucks",
+                description = initialDesc,
                 categoryId = 1,
                 amount = 10.0,
                 date = 0L,
@@ -1508,7 +1509,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `performBatchUpdate updates all fields, creates rule, and dismisses`() =
+    fun `performBatchUpdate updates all fields, creates rule, and dismisses when all selected`() =
         runTest {
             // ARRANGE
             setupRetroSheet(newDesc = "Starbucks Coffee", newCatId = 5, numSimilar = 2)
@@ -1520,6 +1521,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
             assertEquals(setOf(2, 3), state?.selectedIds)
             assertEquals("Starbucks Coffee", state?.newDescription)
             assertEquals(5, state?.newCategoryId)
+            assertEquals(state?.similarTransactions?.size, state?.selectedIds?.size)
 
             // ACT & ASSERT
             viewModel.uiEvent.test {
@@ -1536,6 +1538,70 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
                 // Verify dismiss
                 assertNull("Sheet should be dismissed", viewModel.retroUpdateSheetState.value)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `performBatchUpdate does NOT create rule when not all selected`() =
+        runTest {
+            // ARRANGE
+            setupRetroSheet(newDesc = "Starbucks Coffee", newCatId = 5, numSimilar = 2)
+            
+            // ACT: Deselect one to make it not 'all selected'
+            viewModel.toggleRetroUpdateSelection(3) // Now only 2 is selected out of {2, 3}
+            advanceUntilIdle()
+            
+            val state = viewModel.retroUpdateSheetState.value
+            assertEquals(setOf(2), state?.selectedIds) // Only 1 selected
+            val expectedIdsToUpdate = listOf(2)
+
+            viewModel.uiEvent.test {
+                viewModel.performBatchUpdate()
+                advanceUntilIdle()
+
+                // Verify it DOES NOT insert rule
+                verify(merchantRenameRuleRepository, never()).insert(any())
+                
+                // Verify it still updates DB for the selected ID
+                verify(transactionRepository).updateDescriptionForIds(expectedIdsToUpdate, "Starbucks Coffee")
+                verify(transactionRepository).updateCategoryForIds(expectedIdsToUpdate, 5)
+
+                assertEquals("Updated 1 transaction(s).", awaitItem())
+                assertNull("Sheet should be dismissed", viewModel.retroUpdateSheetState.value)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `performBatchUpdate deletes rule when reverting to original name and all selected`() =
+        runTest {
+            // ARRANGE
+            // The original description is "Starbucks".
+            // We simulate that it was currently "Starbucks Coffee" (aliased) and we change it back to "Starbucks".
+            setupRetroSheet(initialDesc = "Starbucks Coffee", newDesc = "Starbucks", newCatId = 5, numSimilar = 2)
+            val expectedIdsToUpdate = listOf(2, 3)
+
+            val state = viewModel.retroUpdateSheetState.value
+            assertNotNull("Retro update sheet should be shown", state)
+            assertEquals(setOf(2, 3), state?.selectedIds)
+            assertEquals("Starbucks", state?.newDescription)
+            assertEquals("Starbucks", state?.originalDescription)
+
+            // ACT & ASSERT
+            viewModel.uiEvent.test {
+                viewModel.performBatchUpdate()
+                advanceUntilIdle()
+
+                // Verify repo calls
+                verify(merchantRenameRuleRepository, never()).insert(any())
+                verify(merchantRenameRuleRepository).deleteByOriginalName("Starbucks")
+                
+                verify(transactionRepository).updateDescriptionForIds(expectedIdsToUpdate, "Starbucks")
+                verify(transactionRepository).updateCategoryForIds(expectedIdsToUpdate, 5)
+
+                assertEquals("Updated 2 transaction(s).", awaitItem())
+                assertNull(viewModel.retroUpdateSheetState.value)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -2361,5 +2427,75 @@ class TransactionViewModelTest : BaseViewModelTest() {
             // Assert: account is NOT cleared because it matches the default (the if-branch is false)
             // The _addTransactionAccount should NOT be set to null
             assertEquals(defaultAccount, viewModel.addTransactionAccount.value)
+        }
+
+    // --- NEW: applyAliases Tests via findTransactionDetailsById ---
+    
+    @Test
+    fun `applyAliases applies alias when description equals originalDescription`() =
+        runTest {
+            // Arrange
+            val aliases = mapOf("gateway" to "Water Charges")
+            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
+            
+            val transaction = Transaction(id = 1, description = "Gateway", originalDescription = "Gateway", amount = 1.0, date = 0L, accountId = 1, categoryId = 1, notes = null)
+            val details = TransactionDetails(transaction, emptyList(), "Account", "Category", "icon", "color", null)
+            whenever(transactionRepository.getTransactionDetailsById(1)).thenReturn(flowOf(details))
+            
+            initializeViewModel()
+            advanceUntilIdle()
+
+            // Act & Assert
+            viewModel.findTransactionDetailsById(1).test {
+                val result = awaitItem()
+                assertEquals("Water Charges", result?.transaction?.description)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `applyAliases applies alias when description equals alias`() =
+        runTest {
+            // Arrange
+            val aliases = mapOf("gateway" to "Water Charges")
+            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
+            
+            // Description is already the alias, meaning it was applied by SmsParser
+            val transaction = Transaction(id = 1, description = "Water Charges", originalDescription = "Gateway", amount = 1.0, date = 0L, accountId = 1, categoryId = 1, notes = null)
+            val details = TransactionDetails(transaction, emptyList(), "Account", "Category", "icon", "color", null)
+            whenever(transactionRepository.getTransactionDetailsById(1)).thenReturn(flowOf(details))
+            
+            initializeViewModel()
+            advanceUntilIdle()
+
+            // Act & Assert
+            viewModel.findTransactionDetailsById(1).test {
+                val result = awaitItem()
+                assertEquals("Water Charges", result?.transaction?.description)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `applyAliases preserves description when it differs from both originalDescription and alias`() =
+        runTest {
+            // Arrange
+            val aliases = mapOf("gateway" to "Water Charges")
+            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
+            
+            // Description is DIFFERENT from original ("Gateway") AND alias ("Water Charges")
+            val transaction = Transaction(id = 1, description = "Gas Bill", originalDescription = "Gateway", amount = 1.0, date = 0L, accountId = 1, categoryId = 1, notes = null)
+            val details = TransactionDetails(transaction, emptyList(), "Account", "Category", "icon", "color", null)
+            whenever(transactionRepository.getTransactionDetailsById(1)).thenReturn(flowOf(details))
+            
+            initializeViewModel()
+            advanceUntilIdle()
+
+            // Act & Assert
+            viewModel.findTransactionDetailsById(1).test {
+                val result = awaitItem()
+                assertEquals("Gas Bill", result?.transaction?.description) // Keep manual exception
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 }

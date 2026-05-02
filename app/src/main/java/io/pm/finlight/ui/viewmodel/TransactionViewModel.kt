@@ -644,8 +644,23 @@ class TransactionViewModel(
         aliases: Map<String, String>,
     ): List<TransactionDetails> {
         return transactions.map { details ->
-            val key = (details.transaction.originalDescription ?: details.transaction.description).lowercase(Locale.getDefault())
-            val newDescription = aliases[key] ?: details.transaction.description
+            val original = details.transaction.originalDescription
+            val currentDesc = details.transaction.description
+            val key = (original ?: currentDesc).lowercase(Locale.getDefault())
+            val alias = aliases[key]
+
+            val newDescription = if (alias != null) {
+                // If it matches original, apply alias.
+                // If it was already matching the alias, applying it changes nothing.
+                // If it matches neither, it's a manual exception, so preserve currentDesc.
+                if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
+                    alias
+                } else {
+                    currentDesc
+                }
+            } else {
+                currentDesc
+            }
             details.copy(transaction = details.transaction.copy(description = newDescription))
         }
     }
@@ -1175,26 +1190,8 @@ class TransactionViewModel(
                     }
                 }
 
-                // --- FIX: Check if we need to update or delete a Rename Rule ---
-                val currentTransaction = transactionRepository.getTransactionById(id).firstOrNull()
-                if (currentTransaction?.originalDescription != null) {
-                    val original = currentTransaction.originalDescription
-                    val aliases = merchantAliases.value
-                    // The map key is lowercase original name
-                    val existingAlias = aliases[original.lowercase()]
-
-                    if (existingAlias != null) {
-                        if (newDescription.equals(original, ignoreCase = true)) {
-                            // User is reverting to the original name -> Delete the rule
-                            merchantRenameRuleRepository.deleteByOriginalName(original)
-                        } else if (!newDescription.equals(existingAlias, ignoreCase = true)) {
-                            // User is changing to a DIFFERENT name -> Update the rule
-                            val rule = MerchantRenameRule(originalName = original, newName = newDescription)
-                            merchantRenameRuleRepository.insert(rule)
-                        }
-                    }
-                }
-                // --- End of Fix ---
+                // We do not automatically update global MerchantRenameRule here.
+                // Global rules should only be updated via performBatchUpdate when applying to all similar transactions.
 
                 transactionRepository.updateDescription(id, newDescription)
             }
@@ -1581,9 +1578,14 @@ class TransactionViewModel(
             try {
                 state.newDescription?.let { newDesc ->
                     val originalDesc = state.originalDescription
-                    if (originalDesc.isNotBlank() && !originalDesc.equals(newDesc, ignoreCase = true)) {
-                        val rule = MerchantRenameRule(originalName = originalDesc, newName = newDesc)
-                        merchantRenameRuleRepository.insert(rule)
+                    val isAllSelected = idsToUpdate.size == state.similarTransactions.size
+                    if (isAllSelected) {
+                        if (originalDesc.isNotBlank() && !originalDesc.equals(newDesc, ignoreCase = true)) {
+                            val rule = MerchantRenameRule(originalName = originalDesc, newName = newDesc)
+                            merchantRenameRuleRepository.insert(rule)
+                        } else if (originalDesc.isNotBlank() && originalDesc.equals(newDesc, ignoreCase = true)) {
+                            merchantRenameRuleRepository.deleteByOriginalName(originalDesc)
+                        }
                     }
                 }
 
