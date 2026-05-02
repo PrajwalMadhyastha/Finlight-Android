@@ -360,8 +360,20 @@ class DashboardViewModel(
         aliases: Map<String, String>,
     ): List<TransactionDetails> {
         return transactions.map { details ->
-            val key = (details.transaction.originalDescription ?: details.transaction.description).lowercase(Locale.getDefault())
-            val newDescription = aliases[key] ?: details.transaction.description
+            val original = details.transaction.originalDescription
+            val currentDesc = details.transaction.description
+            val key = (original ?: currentDesc).lowercase(Locale.getDefault())
+            val alias = aliases[key]
+
+            val newDescription = if (alias != null) {
+                if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
+                    alias
+                } else {
+                    currentDesc
+                }
+            } else {
+                currentDesc
+            }
             details.copy(transaction = details.transaction.copy(description = newDescription))
         }
     }
