@@ -50,6 +50,10 @@ import io.pm.finlight.utils.CategoryIconHelper
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @Composable
+private fun getPopupContainerColor() =
+    if (MaterialTheme.colorScheme.background.isDark()) PopupSurfaceDark else PopupSurfaceLight
+
+@Composable
 fun CreateAccountDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, String) -> Unit,
@@ -57,8 +61,7 @@ fun CreateAccountDialog(
     var name by remember { mutableStateOf(TextFieldValue("")) }
     var type by remember { mutableStateOf(TextFieldValue("")) }
 
-    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+    val popupContainerColor = getPopupContainerColor()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -101,8 +104,7 @@ fun CreateCategoryDialog(
     val allIcons = remember { CategoryIconHelper.getAllIcons().entries.toList() }
     val allColors = remember { CategoryIconHelper.getAllIconColors().entries.toList() }
 
-    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+    val popupContainerColor = getPopupContainerColor()
 
     AlertDialog(
         onDismissRequest = onDismiss,

@@ -39,6 +39,11 @@ import androidx.compose.ui.unit.sp
 import io.pm.finlight.Category
 import io.pm.finlight.utils.CategoryIconHelper
 
+private fun Modifier.categoryGridItem(onClick: () -> Unit) = this
+    .clip(RoundedCornerShape(12.dp))
+    .clickable(onClick = onClick)
+    .padding(vertical = 12.dp)
+
 @Composable
 fun CategorySelectionGrid(
     categories: List<Category>,
@@ -71,11 +76,7 @@ private fun CategoryGridItem(
     onSelected: () -> Unit,
 ) {
     Column(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(onClick = onSelected)
-                .padding(vertical = 12.dp),
+        modifier = Modifier.categoryGridItem(onClick = onSelected),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -94,12 +95,7 @@ private fun CategoryGridItem(
 @Composable
 private fun AddNewCategoryGridItem(onAddNew: () -> Unit) {
     Column(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(onClick = onAddNew)
-                .padding(vertical = 12.dp)
-                .height(80.dp),
+        modifier = Modifier.categoryGridItem(onClick = onAddNew).height(80.dp),
         // Match the approximate height of other items
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

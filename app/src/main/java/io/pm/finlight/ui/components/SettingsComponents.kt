@@ -40,6 +40,18 @@ import java.util.*
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @Composable
+private fun transparentListItemColors(enabled: Boolean) = ListItemDefaults.colors(
+    containerColor = Color.Transparent, // Make transparent to show GlassPanel behind
+    headlineColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+    supportingColor = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+    leadingIconColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.38f),
+)
+
+@Composable
+private fun getPopupContainerColor() =
+    if (MaterialTheme.colorScheme.background.isDark()) PopupSurfaceDark else PopupSurfaceLight
+
+@Composable
 fun SettingsToggleItem(
     title: String,
     subtitle: String,
@@ -54,34 +66,7 @@ fun SettingsToggleItem(
         leadingContent = { Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp)) },
         trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled) },
         modifier = Modifier.clickable(enabled = enabled) { onCheckedChange(!checked) },
-        colors =
-            ListItemDefaults.colors(
-                containerColor = Color.Transparent, // Make transparent to show GlassPanel behind
-                headlineColor =
-                    if (enabled) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(
-                            alpha = 0.38f,
-                        )
-                    },
-                supportingColor =
-                    if (enabled) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                            alpha = 0.38f,
-                        )
-                    },
-                leadingIconColor =
-                    if (enabled) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.primary.copy(
-                            alpha = 0.38f,
-                        )
-                    },
-            ),
+        colors = transparentListItemColors(enabled = enabled),
     )
 }
 
@@ -98,34 +83,7 @@ fun SettingsActionItem(
         supportingContent = { subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall) } },
         leadingContent = { Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp)) },
         modifier = Modifier.clickable(enabled = enabled, onClick = onClick),
-        colors =
-            ListItemDefaults.colors(
-                containerColor = Color.Transparent, // Make transparent to show GlassPanel behind
-                headlineColor =
-                    if (enabled) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(
-                            alpha = 0.38f,
-                        )
-                    },
-                supportingColor =
-                    if (enabled) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                            alpha = 0.38f,
-                        )
-                    },
-                leadingIconColor =
-                    if (enabled) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.primary.copy(
-                            alpha = 0.38f,
-                        )
-                    },
-            ),
+        colors = transparentListItemColors(enabled = enabled),
     )
 }
 
@@ -146,8 +104,7 @@ fun WeeklyReportTimePicker(
             Pair(it, cal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.getDefault()))
         }
 
-    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+    val popupContainerColor = getPopupContainerColor()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -218,8 +175,7 @@ fun MonthlyReportTimePicker(
     val timePickerState = rememberTimePickerState(initialHour, initialMinute, false)
     var isDayPickerExpanded by remember { mutableStateOf(false) }
 
-    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+    val popupContainerColor = getPopupContainerColor()
 
     AlertDialog(
         onDismissRequest = onDismiss,

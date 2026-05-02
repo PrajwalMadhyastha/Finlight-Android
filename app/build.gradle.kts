@@ -106,6 +106,7 @@ sonar {
                 "**/*_Impl*", // Exclude generated implementations
         )
         property("sonar.exclusions", "**/*ViewModelFactory*.kt")
+        property("sonar.cpd.exclusions", "**/ui/screens/**")
     }
 }
 

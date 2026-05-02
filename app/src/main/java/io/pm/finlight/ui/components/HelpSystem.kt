@@ -61,10 +61,14 @@ data class HelpInfo(
  * without needing to modify individual screen composables.
  */
 object HelpContentRegistry {
+    /** Convenience builder so each entry doesn't repeat `HelpInfo` + `.trimIndent()`. */
+    private fun helpEntry(title: String, content: String) =
+        HelpInfo(title = title, content = content.trimIndent())
+
     val content =
         mapOf(
             "automation_settings" to
-                HelpInfo(
+                helpEntry(
                     title = "About Automation",
                     content =
                         """
@@ -74,10 +78,10 @@ object HelpContentRegistry {
                         - **Manage Parse Rules:** View and delete the custom rules you've created for parsing tricky SMS formats.
                         - **Manage Ignore List:** Tell the parser to permanently ignore messages from certain senders or with specific phrases.
                         - **Debug SMS Parsing:** A tool to see exactly why a recent message was parsed or ignored.
-                        """.trimIndent(),
+                        """,
                 ),
             "data_settings" to
-                HelpInfo(
+                helpEntry(
                     title = "About Security & Data",
                     content =
                         """
@@ -87,10 +91,10 @@ object HelpContentRegistry {
                         - **Automatic Daily Backup:** Your data is automatically backed up to your personal Google Drive. This backs up a compressed snapshot, not the live database.
                         - **Create Backup Now:** Manually create a new snapshot and request a backup. This is useful before moving to a new device.
                         - **Import/Export:** Create a full local backup (JSON) or a spreadsheet-friendly version of your transactions (CSV).
-                        """.trimIndent(),
+                        """,
                 ),
             "dashboard_customize" to
-                HelpInfo(
+                helpEntry(
                     title = "Customizing Your Dashboard",
                     content =
                         """
@@ -98,12 +102,12 @@ object HelpContentRegistry {
 
                         - **Toggle Visibility:** Use the switch to show or hide a card.
                         - **Reorder Cards:** Long-press the drag handle (:::) and drag any card (except the main budget card) up or down to change its position.
-                        """.trimIndent(),
+                        """,
                     // visual = R.drawable.help_gif_reorder // Temporarily commented out as requested.
                 ),
             // --- NEW CONTENT FROM AUDIT ---
             "manage_parse_rules" to
-                HelpInfo(
+                helpEntry(
                     title = "About Parse Rules",
                     content =
                         """
@@ -111,10 +115,10 @@ object HelpContentRegistry {
 
                         - **How they are created:** When you edit a transaction that came from an SMS, you can choose to 'Fix Parsing'. This takes you to a screen where you can highlight the parts of the message to create a new, high-priority rule.
                         - **Management:** This screen lists all the rules you have created. You can **Edit** them to refine the parsing logic or **Delete** them if they are no longer needed.
-                        """.trimIndent(),
+                        """,
                 ),
             "manage_ignore_rules" to
-                HelpInfo(
+                helpEntry(
                     title = "About the Ignore List",
                     content =
                         """
@@ -123,10 +127,10 @@ object HelpContentRegistry {
                         - **Rule Types:** You can ignore messages based on the **Sender** (e.g., `*Jio*`) or a **Body Phrase** (e.g., "Your OTP is").
                         - **Wildcards:** For sender rules, you can use an asterisk `*` as a wildcard to match any characters.
                         - **Default vs. Custom:** The app comes with a set of default rules that you can disable. You can also add your own custom rules which can be deleted.
-                        """.trimIndent(),
+                        """,
                 ),
             "reports_screen" to
-                HelpInfo(
+                helpEntry(
                     title = "About Reports",
                     content =
                         """
@@ -136,10 +140,10 @@ object HelpContentRegistry {
                         - **Consistency Calendar:** This heatmap visualizes your spending habits. You can toggle between a detailed **Monthly** view and a condensed **Yearly** overview. Tap on any day to see the transactions for that date.
                         - **Spending by Category:** This donut chart shows where your money went. **Tap on a slice** of the chart to see all transactions for that category in the selected period.
                         - **Trend Chart:** This bar chart compares your income versus your expenses over the last several months.
-                        """.trimIndent(),
+                        """,
                 ),
             "budget_screen" to
-                HelpInfo(
+                helpEntry(
                     title = "About Budgets",
                     content =
                         """
@@ -148,10 +152,10 @@ object HelpContentRegistry {
                         - **Overall Budget:** This is your main spending target for the entire month. Tap the large card at the top to set or edit it.
                         - **Category Budgets:** You can set specific budgets for individual categories (e.g., ₹5,000 for Food). This helps you track spending in more detail.
                         - **Budget Rollover:** If you don't set a budget for a category this month, Finlight will automatically use the budget you set for it in the most recent previous month.
-                        """.trimIndent(),
+                        """,
                 ),
             "currency_travel_settings" to
-                HelpInfo(
+                helpEntry(
                     title = "Currency & Travel Mode",
                     content =
                         """
@@ -161,10 +165,10 @@ object HelpContentRegistry {
                         - **Travel Mode:** When you create a trip plan, Finlight will automatically tag all transactions that occur within the trip's date range.
                         - **International Trips:** For international trips, the app can automatically convert foreign currency amounts to your home currency based on the rate you provide.
                         - **Travel History:** All past and future trips are listed here. You can edit their details or delete them.
-                        """.trimIndent(),
+                        """,
                 ),
             "appearance_settings" to
-                HelpInfo(
+                helpEntry(
                     title = "About Appearance",
                     content =
                         """
@@ -173,10 +177,10 @@ object HelpContentRegistry {
                         - **System:** Automatically switches between a light and dark theme based on your phone's system settings.
                         - **Aurora & Midnight:** Dark themes.
                         - **Daybreak & Paper:** Light themes.
-                        """.trimIndent(),
+                        """,
                 ),
             "notification_settings" to
-                HelpInfo(
+                helpEntry(
                     title = "About Notifications",
                     content =
                         """
@@ -184,10 +188,10 @@ object HelpContentRegistry {
 
                         - **Auto-Captured Transactions:** Get a notification each time Finlight successfully saves a new transaction from an SMS.
                         - **Summaries & Reports:** Receive daily, weekly, and monthly notifications that summarize your spending activity. You can configure the time for each summary.
-                        """.trimIndent(),
+                        """,
                 ),
             "account_list" to
-                HelpInfo(
+                helpEntry(
                     title = "Managing Accounts",
                     content =
                         """
@@ -195,10 +199,10 @@ object HelpContentRegistry {
 
                         - **View Details:** Tap any account to see its transaction history.
                         - **Merge Duplicates:** If you have duplicate accounts (e.g., "ICICI" and "ICICI Bank"), **long-press** any item to enter selection mode. Select two or more accounts and tap 'Merge' to combine them into one. The app will learn from this and auto-map future transactions correctly.
-                        """.trimIndent(),
+                        """,
                 ),
             "rule_creation_screen" to
-                HelpInfo(
+                helpEntry(
                     title = "How to Create a Rule",
                     content =
                         """
@@ -209,10 +213,10 @@ object HelpContentRegistry {
                         - **Trigger Phrase:** This is the most important part. Select a piece of text that is **unique and unchanging** in every similar SMS (e.g., "spent on HDFC Bank Card"). This tells Finlight when to use your rule.
                         - **Merchant, Amount, Account:** Mark these if the parser missed them. Finlight will create smart patterns to find them in future messages.
                         - **Save:** You must define at least a Trigger Phrase and one other part to save the rule.
-                        """.trimIndent(),
+                        """,
                 ),
             "sms_debug_screen" to
-                HelpInfo(
+                helpEntry(
                     title = "About the SMS Debugger",
                     content =
                         """
@@ -223,10 +227,10 @@ object HelpContentRegistry {
                         - **Ignored by ML Model:** The app's AI model predicted with high confidence that this was **not** a financial transaction (e.g., an OTP or promotional message).
                         - **Not Parsed:** The parser identified it as potentially transactional but couldn't understand its format.
                         - **Create Rule:** For messages that were not parsed correctly, you can tap this button to manually teach Finlight how to read them in the future.
-                        """.trimIndent(),
+                        """,
                 ),
             "csv_validation_screen" to
-                HelpInfo(
+                helpEntry(
                     title = "Reviewing Your CSV Import",
                     content =
                         """
@@ -236,10 +240,10 @@ object HelpContentRegistry {
                         - **Edit a Row:** **Tap on any row** to open an editor and correct mistakes.
                         - **Ignore a Row:** Tap the **trash icon** to exclude a specific row from the import.
                         - **Import:** When you're ready, tap the "Import" button to save all valid and auto-fixable rows.
-                        """.trimIndent(),
+                        """,
                 ),
             "account_mapping_screen" to
-                HelpInfo(
+                helpEntry(
                     title = "Why Map Accounts?",
                     content =
                         """
@@ -249,11 +253,11 @@ object HelpContentRegistry {
 
                         - **How it works:** For each sender in the list, use the dropdown to either select one of your existing accounts or create a new one.
                         - **Learning:** You only have to do this once per sender. Finlight will remember your choice and automatically map all future transactions from that sender to the correct account.
-                        """.trimIndent(),
+                        """,
                 ),
             // --- NEW: Phase 2 Help Content ---
             "transaction_detail" to
-                HelpInfo(
+                helpEntry(
                     title = "Editing a Transaction",
                     content =
                         """
@@ -263,10 +267,10 @@ object HelpContentRegistry {
                         - **Splitting:** If a single payment was for multiple things (e.g., groceries and a bill payment), tap "Split Transaction" to break it down into multiple categorized items.
                         - **Fix Parsing:** If this transaction came from an SMS and the details were wrong, tap this button. It will take you to the Rule Creation screen to teach Finlight how to parse it correctly next time.
                         - **Attachments & Tags:** Use the icons at the bottom to add photo receipts or organize the transaction with custom tags.
-                        """.trimIndent(),
+                        """,
                 ),
             "add_transaction" to
-                HelpInfo(
+                helpEntry(
                     title = "Adding a Transaction",
                     content =
                         """
@@ -276,10 +280,10 @@ object HelpContentRegistry {
                         - **Guidance:** After you enter an amount, a simple checklist will appear to guide you through the required fields, making the process quick and easy.
                         - **Orbital Chips:** Tap the 'Category', 'Account', or 'Date' chips to change their values.
                         - **Actions:** Use the icons at the bottom to add optional details like notes, tags, or photo attachments.
-                        """.trimIndent(),
+                        """,
                 ),
             "split_transaction" to
-                HelpInfo(
+                helpEntry(
                     title = "How to Split a Transaction",
                     content =
                         """
@@ -289,10 +293,10 @@ object HelpContentRegistry {
                         - **Add Item:** Tap the "Add Item" button to create a new line for another category.
                         - **Set Category:** Tap the '+' icon on any line to assign a category to that part of the payment.
                         - **Save:** The "Save Splits" button will only become active when the total of your split items exactly matches the original transaction amount and every item has a category.
-                        """.trimIndent(),
+                        """,
                 ),
             "transaction_list" to
-                HelpInfo(
+                helpEntry(
                     title = "Navigating Your Transactions",
                     content =
                         """
@@ -302,10 +306,10 @@ object HelpContentRegistry {
                         - **Filter:** Tap the filter icon in the top-right to search by keyword or narrow down the list by a specific account or category.
                         - **Multi-Select:** **Long-press** on any transaction to enter selection mode. This allows you to delete or share multiple items at once.
                         - **Drill Down:** In the 'Categories' or 'Merchants' tab, tap any item to see a detailed list of all transactions for that item in the selected month.
-                        """.trimIndent(),
+                        """,
                 ),
             "income_screen" to
-                HelpInfo(
+                helpEntry(
                     title = "Tracking Your Income",
                     content =
                         """
@@ -313,10 +317,10 @@ object HelpContentRegistry {
 
                         - **Tabs:** Switch between viewing individual income **Credits** or seeing a summary grouped by **Categories**.
                         - **Filter:** Tap the filter icon in the top-right to search or narrow down the list by account or category.
-                        """.trimIndent(),
+                        """,
                 ),
             "search_screen" to
-                HelpInfo(
+                helpEntry(
                     title = "How to Search",
                     content =
                         """
@@ -325,10 +329,10 @@ object HelpContentRegistry {
                         - **Keyword:** Searches the **Description** and **Notes** of your transactions.
                         - **Filters:** Use the dropdowns to narrow your search by a specific Account, Category, or Tag.
                         - **Date Range:** You can also filter for transactions that occurred between a specific start and end date.
-                        """.trimIndent(),
+                        """,
                 ),
             "analysis_screen" to
-                HelpInfo(
+                helpEntry(
                     title = "About Spending Analysis",
                     content =
                         """
@@ -337,11 +341,11 @@ object HelpContentRegistry {
                         - **Dimensions:** The tabs at the top let you group your spending by **Category**, **Tag**, or **Merchant**.
                         - **Time Period:** The chips below the tabs let you change the time window for the analysis (e.g., Last Week, Last Month, etc.).
                         - **Advanced Filters:** Tap the filter icon to drill down even further. For example, you can see your spending in the "Food" category, but only for transactions tagged as "Work Lunch".
-                        """.trimIndent(),
+                        """,
                 ),
             // --- NEW: Phase 3 (Low Priority) Help Content ---
             "time_period_report_screen" to
-                HelpInfo(
+                helpEntry(
                     title = "About Reports",
                     content =
                         """
@@ -351,10 +355,10 @@ object HelpContentRegistry {
                         - **Insights:** The top card gives you a quick summary, comparing your spending to the previous period and highlighting your top spending category.
                         - **Spending Chart:** This bar chart visualizes your spending trend over a longer duration (e.g., the last 6 months for a monthly report).
                         - **Consistency Calendar (Monthly Report):** This heatmap shows your daily spending habits relative to your overall monthly budget. Tap any day to see the transactions for that date.
-                        """.trimIndent(),
+                        """,
                 ),
             "account_detail" to
-                HelpInfo(
+                helpEntry(
                     title = "About Account Details",
                     content =
                         """
@@ -362,10 +366,10 @@ object HelpContentRegistry {
 
                         - **View & Edit:** Tap on any transaction in the list to navigate to its detail screen, where you can make edits.
                         - **Balance:** The 'Current Balance' at the top is a calculated total of all income and expenses for this specific account.
-                        """.trimIndent(),
+                        """,
                 ),
             "category_list" to
-                HelpInfo(
+                helpEntry(
                     title = "Managing Categories",
                     content =
                         """
@@ -374,10 +378,10 @@ object HelpContentRegistry {
                         - **Create:** Tap the 'Add New Category' button to create a new one. You can choose a name, icon, and color.
                         - **Edit:** Tap the pencil icon on any category to change its name, icon, or color.
                         - **Delete:** Tap the trash icon to delete a category. **Note:** You can only delete a category if it is not currently used by any transactions.
-                        """.trimIndent(),
+                        """,
                 ),
             "tag_management" to
-                HelpInfo(
+                helpEntry(
                     title = "Managing Tags",
                     content =
                         """
@@ -385,10 +389,10 @@ object HelpContentRegistry {
 
                         - **Create:** Type a name in the text field at the top and tap the '+' button.
                         - **Edit & Delete:** Use the icons next to each tag to rename or delete it. **Note:** You cannot delete a tag if it is currently in use by a transaction or linked to a trip plan.
-                        """.trimIndent(),
+                        """,
                 ),
             "review_sms_screen" to
-                HelpInfo(
+                helpEntry(
                     title = "Reviewing SMS Transactions",
                     content =
                         """
@@ -397,7 +401,7 @@ object HelpContentRegistry {
                         - **Why it's important:** To correctly import these transactions, you must first map each new sender to one of your accounts.
                         - **Approve:** Tapping 'Approve' will take you to a confirmation screen where you can add more details (like a category or tags) before saving the transaction.
                         - **Link:** If this SMS is for a transaction you've already entered manually (e.g., a cash payment that was later confirmed via SMS), tap 'Link' to connect the SMS to the existing entry.
-                        """.trimIndent(),
+                        """,
                 ),
         )
 }
