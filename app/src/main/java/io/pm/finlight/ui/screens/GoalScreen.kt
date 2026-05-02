@@ -12,14 +12,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -49,32 +46,33 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun GoalScreen(
     navController: NavController,
-    goalViewModel: GoalViewModel = viewModel()
+    goalViewModel: GoalViewModel = viewModel(),
 ) {
     val goals by goalViewModel.allGoals.collectAsState()
     var goalToDelete by remember { mutableStateOf<Goal?>(null) }
 
     Scaffold(
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
     ) { innerPadding ->
         if (goals.isEmpty()) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     "No savings goals yet. Tap '+' to add one!",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
             }
         } else {
             LazyColumn(
                 modifier = Modifier.padding(innerPadding),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 items(goals, key = { it.id }) { goal ->
                     GoalItem(
@@ -82,15 +80,16 @@ fun GoalScreen(
                         goal = goal,
                         onEdit = { navController.navigate("add_edit_goal/${goal.id}") },
                         onDelete = {
-                            goalToDelete = Goal(
-                                id = goal.id,
-                                name = goal.name,
-                                targetAmount = goal.targetAmount,
-                                savedAmount = goal.savedAmount,
-                                targetDate = goal.targetDate,
-                                accountId = goal.accountId
-                            )
-                        }
+                            goalToDelete =
+                                Goal(
+                                    id = goal.id,
+                                    name = goal.name,
+                                    targetAmount = goal.targetAmount,
+                                    savedAmount = goal.savedAmount,
+                                    targetDate = goal.targetDate,
+                                    accountId = goal.accountId,
+                                )
+                        },
                     )
                 }
             }
@@ -104,7 +103,7 @@ fun GoalScreen(
             onConfirm = {
                 goalViewModel.deleteGoal(goal)
                 goalToDelete = null
-            }
+            },
         )
     }
 }
@@ -114,13 +113,13 @@ private fun GoalItem(
     modifier: Modifier = Modifier,
     goal: GoalWithAccountName,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
 ) {
     val progress = (goal.savedAmount / goal.targetAmount).toFloat().coerceIn(0f, 1f)
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(durationMillis = 400, easing = EaseOutCubic),
-        label = "GoalProgress"
+        label = "GoalProgress",
     )
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     val dateFormat = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
@@ -132,12 +131,12 @@ private fun GoalItem(
                     Text(
                         text = goal.name,
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "Linked to: ${goal.accountName}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 IconButton(onClick = onEdit) {
@@ -150,29 +149,30 @@ private fun GoalItem(
             Spacer(Modifier.height(16.dp))
             LinearProgressIndicator(
                 progress = { animatedProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(CircleShape),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(CircleShape),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                strokeCap = StrokeCap.Round
+                strokeCap = StrokeCap.Round,
             )
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     text = "${(progress * 100).roundToInt()}% Complete",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = "${currencyFormat.format(goal.savedAmount)} / ${currencyFormat.format(goal.targetAmount)}",
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             goal.targetDate?.let {
@@ -180,7 +180,7 @@ private fun GoalItem(
                 Text(
                     text = "Target Date: ${dateFormat.format(Date(it))}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -191,7 +191,7 @@ private fun GoalItem(
 private fun DeleteGoalDialog(
     goalName: String,
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
 ) {
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -204,9 +204,9 @@ private fun DeleteGoalDialog(
         confirmButton = {
             Button(
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             ) { Text("Delete") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

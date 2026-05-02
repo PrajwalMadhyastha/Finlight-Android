@@ -7,7 +7,6 @@ import io.pm.finlight.R
  * A helper object to provide logos for various Indian banks.
  */
 object BankLogoHelper {
-
     /**
      * Returns the drawable resource ID for a bank's logo based on the account name.
      *

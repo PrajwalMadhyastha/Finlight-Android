@@ -41,7 +41,6 @@ object ReminderManager {
     // New preference key for enabling/disabling the recurring transaction feature
     private const val KEY_RECURRING_TRANSACTION_FEATURE_ENABLED = "recurring_transactions_enabled"
 
-
     fun rescheduleAllWork(context: Context) {
         Log.d("ReminderManager", "Rescheduling all background work...")
         val settings = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
@@ -79,13 +78,14 @@ object ReminderManager {
         // This removes the 2 AM hardcoding and runs the backup snapshot
         // 3 times per day to reduce data staleness, per our discussion.
 
-        val backupRequest = PeriodicWorkRequestBuilder<BackupWorker>(8, TimeUnit.HOURS)
-            .build()
+        val backupRequest =
+            PeriodicWorkRequestBuilder<BackupWorker>(8, TimeUnit.HOURS)
+                .build()
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             AUTO_BACKUP_WORK_TAG,
             ExistingPeriodicWorkPolicy.KEEP, // Keep the existing work if it's already scheduled
-            backupRequest
+            backupRequest,
         )
         Log.d("ReminderManager", "Auto backup (WorkManager) scheduled to run periodically every 8 hours.")
     }
@@ -97,47 +97,50 @@ object ReminderManager {
 
     fun scheduleRecurringPatternWorker(context: Context) {
         val now = Calendar.getInstance()
-        val nextRun = Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, 1)
-            set(Calendar.HOUR_OF_DAY, 3)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-        }
+        val nextRun =
+            Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, 1)
+                set(Calendar.HOUR_OF_DAY, 3)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+            }
 
         val initialDelay = nextRun.timeInMillis - now.timeInMillis
 
-        val recurringRequest = OneTimeWorkRequestBuilder<RecurringPatternWorker>()
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .build()
+        val recurringRequest =
+            OneTimeWorkRequestBuilder<RecurringPatternWorker>()
+                .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
             RECURRING_PATTERN_WORK_TAG,
             ExistingWorkPolicy.REPLACE,
-            recurringRequest
+            recurringRequest,
         )
         Log.d("ReminderManager", "Recurring pattern worker scheduled for ${nextRun.time}")
     }
 
-
     fun scheduleRecurringTransactionWorker(context: Context) {
         val now = Calendar.getInstance()
-        val nextRun = Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, 1)
-            set(Calendar.HOUR_OF_DAY, 2)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-        }
+        val nextRun =
+            Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, 1)
+                set(Calendar.HOUR_OF_DAY, 2)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+            }
 
         val initialDelay = nextRun.timeInMillis - now.timeInMillis
 
-        val recurringRequest = OneTimeWorkRequestBuilder<RecurringTransactionWorker>()
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .build()
+        val recurringRequest =
+            OneTimeWorkRequestBuilder<RecurringTransactionWorker>()
+                .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
             RECURRING_TRANSACTION_WORK_TAG,
             ExistingWorkPolicy.REPLACE,
-            recurringRequest
+            recurringRequest,
         )
         Log.d("ReminderManager", "Recurring transaction worker scheduled for ${nextRun.time}")
     }
@@ -149,27 +152,28 @@ object ReminderManager {
         Log.d("ReminderManager", "Cancelled all recurring transaction workers.")
     }
 
-
     fun scheduleDailyReport(context: Context) {
         val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
         val hour = prefs.getInt("daily_report_hour", 9)
         val minute = prefs.getInt("daily_report_minute", 0)
 
         val now = Calendar.getInstance()
-        val nextRun = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-        }
+        val nextRun =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+            }
 
         if (nextRun.before(now)) {
             nextRun.add(Calendar.DAY_OF_YEAR, 1)
         }
 
         val initialDelay = nextRun.timeInMillis - now.timeInMillis
-        val dailyReportRequest = OneTimeWorkRequestBuilder<DailyReportWorker>()
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .build()
+        val dailyReportRequest =
+            OneTimeWorkRequestBuilder<DailyReportWorker>()
+                .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
             DAILY_EXPENSE_REPORT_WORK_TAG,
@@ -190,12 +194,13 @@ object ReminderManager {
         val minute = prefs.getInt("weekly_report_minute", 0)
 
         val now = Calendar.getInstance()
-        val nextRun = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
+        val nextRun =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
 
         // If today is the target day but the time has already passed, start checking from tomorrow
         if (nextRun.get(Calendar.DAY_OF_WEEK) == dayOfWeek && nextRun.before(now)) {
@@ -207,11 +212,11 @@ object ReminderManager {
             nextRun.add(Calendar.DAY_OF_YEAR, 1)
         }
 
-
         val initialDelay = nextRun.timeInMillis - now.timeInMillis
-        val weeklyReportRequest = OneTimeWorkRequestBuilder<WeeklySummaryWorker>()
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .build()
+        val weeklyReportRequest =
+            OneTimeWorkRequestBuilder<WeeklySummaryWorker>()
+                .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
             WEEKLY_SUMMARY_WORK_TAG,
@@ -220,7 +225,6 @@ object ReminderManager {
         )
         Log.d("ReminderManager", "Weekly summary scheduled for ${nextRun.time}")
     }
-
 
     fun cancelWeeklySummary(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(WEEKLY_SUMMARY_WORK_TAG)
@@ -233,21 +237,23 @@ object ReminderManager {
         val minute = prefs.getInt("monthly_report_minute", 0)
 
         val now = Calendar.getInstance()
-        val nextRun = Calendar.getInstance().apply {
-            set(Calendar.DAY_OF_MONTH, dayOfMonth)
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-        }
+        val nextRun =
+            Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+            }
 
         if (nextRun.before(now)) {
             nextRun.add(Calendar.MONTH, 1)
         }
 
         val initialDelay = nextRun.timeInMillis - now.timeInMillis
-        val monthlyReportRequest = OneTimeWorkRequestBuilder<MonthlySummaryWorker>()
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .build()
+        val monthlyReportRequest =
+            OneTimeWorkRequestBuilder<MonthlySummaryWorker>()
+                .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                .build()
 
         WorkManager.getInstance(context).enqueueUniqueWork(
             MONTHLY_SUMMARY_WORK_TAG,

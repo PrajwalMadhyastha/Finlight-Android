@@ -16,7 +16,6 @@ import java.util.Locale
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class CurrencyHelperTest : BaseViewModelTest() {
-
     @Test
     fun `getCurrencySymbol returns correct symbol for valid code`() {
         val expectedSymbol = Currency.getInstance("USD").getSymbol(Locale.getDefault())

@@ -10,6 +10,7 @@ package io.pm.finlight
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /**
  * Represents a potential recurring transaction pattern identified from SMS messages.
@@ -24,9 +25,10 @@ import androidx.room.PrimaryKey
  * @param firstSeen The timestamp of the first time this pattern was recorded.
  * @param lastSeen The timestamp of the most recent occurrence.
  */
+@Serializable
 @Entity(
     tableName = "recurring_patterns",
-    indices = [Index(value = ["lastSeen"])]
+    indices = [Index(value = ["lastSeen"])],
 )
 data class RecurringPattern(
     @PrimaryKey
@@ -38,5 +40,5 @@ data class RecurringPattern(
     val categoryId: Int?,
     var occurrences: Int,
     val firstSeen: Long,
-    var lastSeen: Long
+    var lastSeen: Long,
 )

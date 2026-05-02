@@ -10,11 +10,8 @@ import android.app.Application
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -39,7 +36,7 @@ fun AnalysisDetailScreen(
     title: String,
     startDate: Long,
     endDate: Long,
-    transactionViewModel: TransactionViewModel // --- FIX: Inject ViewModel ---
+    transactionViewModel: TransactionViewModel, // --- FIX: Inject ViewModel ---
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = AnalysisDetailViewModelFactory(application, dimension, dimensionId, startDate, endDate)
@@ -51,13 +48,13 @@ fun AnalysisDetailScreen(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         items(transactions, key = { it.transaction.id }) { transaction ->
             TransactionItem(
                 transactionDetails = transaction,
                 onClick = { navController.navigate("transaction_detail/${transaction.transaction.id}") },
-                onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
+                onCategoryClick = { transactionViewModel.requestCategoryChange(it) },
             )
         }
     }

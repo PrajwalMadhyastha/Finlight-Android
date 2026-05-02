@@ -27,19 +27,21 @@ fun ReportPeriodSelector(
     timePeriod: TimePeriod,
     selectedDate: Date,
     onPrevious: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
 ) {
-    val (title, subtitle) = remember(timePeriod, selectedDate) {
-        getFormattedDateStrings(timePeriod, selectedDate)
-    }
+    val (title, subtitle) =
+        remember(timePeriod, selectedDate) {
+            getFormattedDateStrings(timePeriod, selectedDate)
+        }
 
     GlassPanel {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 12.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             IconButton(onClick = onPrevious) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous Period")
@@ -47,18 +49,18 @@ fun ReportPeriodSelector(
 
             Column(
                 modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -69,7 +71,10 @@ fun ReportPeriodSelector(
     }
 }
 
-private fun getFormattedDateStrings(timePeriod: TimePeriod, date: Date): Pair<String, String> {
+private fun getFormattedDateStrings(
+    timePeriod: TimePeriod,
+    date: Date,
+): Pair<String, String> {
     val cal = Calendar.getInstance().apply { time = date }
     return when (timePeriod) {
         TimePeriod.DAILY -> {

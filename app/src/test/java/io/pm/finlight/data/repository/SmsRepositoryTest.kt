@@ -18,15 +18,14 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mock
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class SmsRepositoryTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var contentResolver: ContentResolver
 
@@ -35,12 +34,13 @@ class SmsRepositoryTest : BaseViewModelTest() {
 
     private lateinit var repository: SmsRepository
 
-    private val smsColumns = arrayOf(
-        Telephony.Sms._ID,
-        Telephony.Sms.ADDRESS,
-        Telephony.Sms.BODY,
-        Telephony.Sms.DATE
-    )
+    private val smsColumns =
+        arrayOf(
+            Telephony.Sms._ID,
+            Telephony.Sms.ADDRESS,
+            Telephony.Sms.BODY,
+            Telephony.Sms.DATE,
+        )
 
     @Before
     override fun setup() {
@@ -67,7 +67,7 @@ class SmsRepositoryTest : BaseViewModelTest() {
             any(),
             eq(null), // No date selection
             eq(null),
-            eq("date DESC")
+            eq("date DESC"),
         )
     }
 
@@ -86,7 +86,7 @@ class SmsRepositoryTest : BaseViewModelTest() {
             any(),
             eq("${Telephony.Sms.DATE} >= ?"),
             eq(arrayOf(startDate.toString())),
-            any()
+            any(),
         )
     }
 
@@ -112,7 +112,9 @@ class SmsRepositoryTest : BaseViewModelTest() {
         // Arrange
         val timestamp = 2000L
         // First query by ID returns an empty cursor
-        `when`(contentResolver.query(any(), any(), eq("${Telephony.Sms._ID} = ?"), eq(arrayOf(timestamp.toString())), any())).thenReturn(MatrixCursor(smsColumns))
+        `when`(
+            contentResolver.query(any(), any(), eq("${Telephony.Sms._ID} = ?"), eq(arrayOf(timestamp.toString())), any()),
+        ).thenReturn(MatrixCursor(smsColumns))
 
         // Second query by closest date returns a result
         val dateCursor = MatrixCursor(smsColumns)
@@ -128,4 +130,3 @@ class SmsRepositoryTest : BaseViewModelTest() {
         assertEquals("SenderDate", result?.sender)
     }
 }
-

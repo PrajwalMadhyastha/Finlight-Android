@@ -23,12 +23,12 @@ import io.pm.finlight.ui.theme.ExpenseRedDark
 @Composable
 fun MerchantSpendingScreen(
     merchantList: List<MerchantSpendingSummary>,
-    onMerchantClick: (MerchantSpendingSummary) -> Unit
+    onMerchantClick: (MerchantSpendingSummary) -> Unit,
 ) {
     if (merchantList.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Text("No merchant data for this month.")
         }
@@ -37,12 +37,12 @@ fun MerchantSpendingScreen(
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(merchantList) { merchant ->
             MerchantSpendingCard(
                 merchant = merchant,
-                onClick = { onMerchantClick(merchant) }
+                onClick = { onMerchantClick(merchant) },
             )
         }
     }
@@ -51,37 +51,38 @@ fun MerchantSpendingScreen(
 @Composable
 fun MerchantSpendingCard(
     merchant: MerchantSpendingSummary,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     GlassPanel(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     merchant.merchantName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 val visitText = if (merchant.transactionCount == 1) "1 visit" else "${merchant.transactionCount} visits"
                 Text(
                     visitText,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Text(
                 "₹${"%,.2f".format(merchant.totalAmount)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = ExpenseRedDark
+                color = ExpenseRedDark,
             )
         }
     }

@@ -29,7 +29,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.EditCalendar
@@ -51,7 +50,6 @@ import io.pm.finlight.Category
 import io.pm.finlight.Tag
 import io.pm.finlight.data.model.SpendingAnalysisItem
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.AnalysisDimension
@@ -67,9 +65,7 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AnalysisScreen(
-    navController: NavController
-) {
+fun AnalysisScreen(navController: NavController) {
     val application = LocalContext.current.applicationContext as Application
     val factory = AnalysisViewModelFactory(application)
     val viewModel: AnalysisViewModel = viewModel(factory = factory)
@@ -79,15 +75,16 @@ fun AnalysisScreen(
     val areFiltersActive by remember(uiState) {
         derivedStateOf {
             uiState.selectedFilterCategory != null ||
-                    uiState.selectedFilterTag != null ||
-                    uiState.selectedFilterMerchant != null ||
-                    uiState.includeExcluded // --- ADDED ---
+                uiState.selectedFilterTag != null ||
+                uiState.selectedFilterMerchant != null ||
+                uiState.includeExcluded // --- ADDED ---
         }
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
+        modifier =
+            Modifier
+                .fillMaxSize(),
     ) {
         TabRow(
             selectedTabIndex = uiState.selectedDimension.ordinal,
@@ -96,7 +93,7 @@ fun AnalysisScreen(
                 Tab(
                     selected = uiState.selectedDimension == dimension,
                     onClick = { viewModel.selectDimension(dimension) },
-                    text = { Text(dimension.name.replaceFirstChar { it.titlecase() }) }
+                    text = { Text(dimension.name.replaceFirstChar { it.titlecase() }) },
                 )
             }
         }
@@ -118,47 +115,48 @@ fun AnalysisScreen(
                     }
                 },
                 singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    cursorColor = MaterialTheme.colorScheme.primary
-                )
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                    ),
             )
         }
 
-
         // --- NEW: Filter Bar ---
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp, start = 16.dp, end = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp, start = 16.dp, end = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             TimePeriodFilter(
                 modifier = Modifier.weight(1f),
                 selectedPeriod = uiState.selectedTimePeriod,
                 onPeriodSelected = { viewModel.selectTimePeriod(it) },
-                onCustomRangeClick = { showDateRangePicker = true }
+                onCustomRangeClick = { showDateRangePicker = true },
             )
             BadgedBox(
                 badge = {
                     if (areFiltersActive) {
                         Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary)
+                            modifier =
+                                Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary),
                         )
                     }
                 },
-                modifier = Modifier.padding(end = 8.dp)
+                modifier = Modifier.padding(end = 8.dp),
             ) {
                 IconButton(onClick = { viewModel.onFilterSheetToggled(true) }) {
                     Icon(Icons.Default.FilterList, "Advanced Filters")
                 }
             }
         }
-
 
         if (uiState.isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -167,27 +165,28 @@ fun AnalysisScreen(
         } else {
             LazyColumn(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 item {
                     TotalSpendingHero(
                         total = uiState.totalSpending,
                         dimension = uiState.selectedDimension,
-                        timePeriod = uiState.selectedTimePeriod
+                        timePeriod = uiState.selectedTimePeriod,
                     )
                 }
 
                 if (uiState.analysisItems.isEmpty()) {
                     item {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 48.dp),
-                            contentAlignment = Alignment.Center
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 48.dp),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 "No spending data for this selection.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -197,12 +196,20 @@ fun AnalysisScreen(
                             item = item,
                             onClick = {
                                 val encodedName = URLEncoder.encode(item.dimensionName, "UTF-8")
-                                val (start, end) = viewModel.run {
-                                    val (s, e) = calculateDateRange(uiState.selectedTimePeriod, uiState.customStartDate, uiState.customEndDate)
-                                    s to e
-                                }
-                                navController.navigate("analysis_detail_screen/${uiState.selectedDimension.name}/${item.dimensionId}/${start}/${end}?title=$encodedName")
-                            }
+                                val (start, end) =
+                                    viewModel.run {
+                                        val (s, e) =
+                                            calculateDateRange(
+                                                uiState.selectedTimePeriod,
+                                                uiState.customStartDate,
+                                                uiState.customEndDate,
+                                            )
+                                        s to e
+                                    }
+                                navController.navigate(
+                                    "analysis_detail_screen/${uiState.selectedDimension.name}/${item.dimensionId}/$start/$end?title=$encodedName",
+                                )
+                            },
                         )
                     }
                 }
@@ -210,52 +217,55 @@ fun AnalysisScreen(
         }
     }
 
-
     if (showDateRangePicker) {
-        val dateRangePickerState = rememberDateRangePickerState(
-            initialSelectedStartDateMillis = uiState.customStartDate,
-            initialSelectedEndDateMillis = uiState.customEndDate
-        )
+        val dateRangePickerState =
+            rememberDateRangePickerState(
+                initialSelectedStartDateMillis = uiState.customStartDate,
+                initialSelectedEndDateMillis = uiState.customEndDate,
+            )
         val isThemeDark = MaterialTheme.colorScheme.background.isDark()
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
         ModalBottomSheet(
             onDismissRequest = { showDateRangePicker = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxHeight(0.9f)
-                    .navigationBarsPadding()
+                modifier =
+                    Modifier
+                        .fillMaxHeight(0.9f)
+                        .navigationBarsPadding(),
             ) {
                 Text(
                     "Select Date Range",
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(16.dp),
                 )
                 DateRangePicker(
                     state = dateRangePickerState,
                     modifier = Modifier.weight(1f),
-                    colors = DatePickerDefaults.colors(
-                        containerColor = Color.Transparent,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface,
-                        headlineContentColor = MaterialTheme.colorScheme.onSurface,
-                        weekdayContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        dayContentColor = MaterialTheme.colorScheme.onSurface,
-                        disabledDayContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                        selectedDayContentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledSelectedDayContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                        selectedDayContainerColor = MaterialTheme.colorScheme.primary,
-                        todayContentColor = MaterialTheme.colorScheme.primary,
-                        todayDateBorderColor = MaterialTheme.colorScheme.primary,
-                    )
+                    colors =
+                        DatePickerDefaults.colors(
+                            containerColor = Color.Transparent,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                            headlineContentColor = MaterialTheme.colorScheme.onSurface,
+                            weekdayContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            dayContentColor = MaterialTheme.colorScheme.onSurface,
+                            disabledDayContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                            selectedDayContentColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledSelectedDayContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                            selectedDayContainerColor = MaterialTheme.colorScheme.primary,
+                            todayContentColor = MaterialTheme.colorScheme.primary,
+                            todayDateBorderColor = MaterialTheme.colorScheme.primary,
+                        ),
                 )
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.End
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                    horizontalArrangement = Arrangement.End,
                 ) {
                     TextButton(onClick = { showDateRangePicker = false }) {
                         Text("Cancel")
@@ -265,11 +275,11 @@ fun AnalysisScreen(
                         onClick = {
                             viewModel.setCustomDateRange(
                                 dateRangePickerState.selectedStartDateMillis,
-                                dateRangePickerState.selectedEndDateMillis
+                                dateRangePickerState.selectedEndDateMillis,
                             )
                             showDateRangePicker = false
                         },
-                        enabled = dateRangePickerState.selectedEndDateMillis != null
+                        enabled = dateRangePickerState.selectedEndDateMillis != null,
                     ) {
                         Text("Apply")
                     }
@@ -283,7 +293,7 @@ fun AnalysisScreen(
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
         ModalBottomSheet(
             onDismissRequest = { viewModel.onFilterSheetToggled(false) },
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         ) {
             FilterSheetContent(
                 uiState = uiState,
@@ -293,7 +303,7 @@ fun AnalysisScreen(
                 // --- NEW: Pass the handler to the sheet ---
                 onIncludeExcludedChanged = viewModel::onIncludeExcludedChanged,
                 onTransactionTypeSelected = viewModel::selectTransactionType,
-                onClearFilters = viewModel::clearFilters
+                onClearFilters = viewModel::clearFilters,
             )
         }
     }
@@ -304,20 +314,23 @@ private fun TimePeriodFilter(
     modifier: Modifier = Modifier,
     selectedPeriod: AnalysisTimePeriod,
     onPeriodSelected: (AnalysisTimePeriod) -> Unit,
-    onCustomRangeClick: () -> Unit
+    onCustomRangeClick: () -> Unit,
 ) {
     LazyRow(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(AnalysisTimePeriod.entries.filter { it != AnalysisTimePeriod.CUSTOM }) { period ->
             FilterChip(
                 selected = selectedPeriod == period,
                 onClick = { onPeriodSelected(period) },
                 label = { Text(period.name.replaceFirstChar { it.titlecase() }.replace("_", " ")) },
-                leadingIcon = if (selectedPeriod == period) {
-                    { Icon(Icons.Default.Check, "Selected", Modifier.size(FilterChipDefaults.IconSize)) }
-                } else null
+                leadingIcon =
+                    if (selectedPeriod == period) {
+                        { Icon(Icons.Default.Check, "Selected", Modifier.size(FilterChipDefaults.IconSize)) }
+                    } else {
+                        null
+                    },
             )
         }
         item {
@@ -325,7 +338,7 @@ private fun TimePeriodFilter(
                 selected = selectedPeriod == AnalysisTimePeriod.CUSTOM,
                 onClick = onCustomRangeClick,
                 label = { Text("Custom") },
-                leadingIcon = { Icon(Icons.Default.EditCalendar, "Custom Range", Modifier.size(FilterChipDefaults.IconSize)) }
+                leadingIcon = { Icon(Icons.Default.EditCalendar, "Custom Range", Modifier.size(FilterChipDefaults.IconSize)) },
             )
         }
     }
@@ -335,37 +348,39 @@ private fun TimePeriodFilter(
 private fun TotalSpendingHero(
     total: Double,
     dimension: AnalysisDimension,
-    timePeriod: AnalysisTimePeriod
+    timePeriod: AnalysisTimePeriod,
 ) {
-    val currencyFormat = remember {
-        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            .apply { maximumFractionDigits = 0 }
-    }
-    val timeText = when (timePeriod) {
-        AnalysisTimePeriod.CUSTOM -> "in custom range"
-        AnalysisTimePeriod.ALL_TIME -> "for all time"
-        else -> "in the last ${timePeriod.name.lowercase()}"
-    }
-
+    val currencyFormat =
+        remember {
+            NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+                .apply { maximumFractionDigits = 0 }
+        }
+    val timeText =
+        when (timePeriod) {
+            AnalysisTimePeriod.CUSTOM -> "in custom range"
+            AnalysisTimePeriod.ALL_TIME -> "for all time"
+            else -> "in the last ${timePeriod.name.lowercase()}"
+        }
 
     GlassPanel {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 "Total spent by ${dimension.name.lowercase()} $timeText",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 currencyFormat.format(total),
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -374,17 +389,18 @@ private fun TotalSpendingHero(
 @Composable
 private fun AnalysisItemRow(
     item: SpendingAnalysisItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     GlassPanel(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -392,19 +408,19 @@ private fun AnalysisItemRow(
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     "${item.transactionCount} transaction(s)",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Text(
                 currencyFormat.format(item.totalAmount),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.error
+                color = MaterialTheme.colorScheme.error,
             )
         }
     }
@@ -418,32 +434,33 @@ private fun FilterSheetContent(
     onMerchantSelected: (String?) -> Unit,
     onIncludeExcludedChanged: (Boolean) -> Unit, // --- NEW ---
     onTransactionTypeSelected: (io.pm.finlight.ui.viewmodel.AnalysisTransactionType) -> Unit,
-    onClearFilters: () -> Unit
+    onClearFilters: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .padding(16.dp)
-            .navigationBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .padding(16.dp)
+                .navigationBarsPadding(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             "Filter Analysis",
             style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 "Transaction Type",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 io.pm.finlight.ui.viewmodel.AnalysisTransactionType.values().forEach { type ->
                     FilterChip(
                         selected = uiState.selectedTransactionType == type,
                         onClick = { onTransactionTypeSelected(type) },
-                        label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                        label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
                     )
                 }
             }
@@ -454,7 +471,7 @@ private fun FilterSheetContent(
             options = uiState.allCategories,
             selectedOption = uiState.selectedFilterCategory,
             onOptionSelected = onCategorySelected,
-            getDisplayName = { it.name }
+            getDisplayName = { it.name },
         )
 
         AnalysisSearchableDropdown(
@@ -462,7 +479,7 @@ private fun FilterSheetContent(
             options = uiState.allTags,
             selectedOption = uiState.selectedFilterTag,
             onOptionSelected = onTagSelected,
-            getDisplayName = { it.name }
+            getDisplayName = { it.name },
         )
 
         AnalysisSearchableDropdown(
@@ -470,34 +487,35 @@ private fun FilterSheetContent(
             options = uiState.allMerchants,
             selectedOption = uiState.selectedFilterMerchant,
             onOptionSelected = onMerchantSelected,
-            getDisplayName = { it }
+            getDisplayName = { it },
         )
 
         // --- NEW: "Include Excluded" Toggle ---
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onIncludeExcludedChanged(!uiState.includeExcluded) }
-                .padding(vertical = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onIncludeExcludedChanged(!uiState.includeExcluded) }
+                    .padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
                 "Include Excluded Transactions",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
             Switch(
                 checked = uiState.includeExcluded,
-                onCheckedChange = onIncludeExcludedChanged
+                onCheckedChange = onIncludeExcludedChanged,
             )
         }
         // --- END NEW ---
 
         Button(
             onClick = onClearFilters,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Clear All Filters")
         }
@@ -542,9 +560,10 @@ private fun <T> AnalysisSearchableDropdown(
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(
-                if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight
-            )
+            modifier =
+                Modifier.background(
+                    if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight,
+                ),
         ) {
             options.forEach { option ->
                 DropdownMenuItem(
@@ -559,11 +578,10 @@ private fun <T> AnalysisSearchableDropdown(
     }
 }
 
-
 private fun AnalysisViewModel.calculateDateRange(
     period: AnalysisTimePeriod,
     customStart: Long?,
-    customEnd: Long?
+    customEnd: Long?,
 ): Pair<Long, Long> {
     val calendar = Calendar.getInstance()
     calendar.set(Calendar.HOUR_OF_DAY, 23)
@@ -571,13 +589,14 @@ private fun AnalysisViewModel.calculateDateRange(
     calendar.set(Calendar.SECOND, 59)
     val endDate = calendar.timeInMillis
 
-    val startDate = when (period) {
-        AnalysisTimePeriod.WEEK -> (calendar.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -7) }.timeInMillis
-        AnalysisTimePeriod.MONTH -> (calendar.clone() as Calendar).apply { add(Calendar.MONTH, -1) }.timeInMillis
-        AnalysisTimePeriod.YEAR -> (calendar.clone() as Calendar).apply { add(Calendar.YEAR, -1) }.timeInMillis
-        AnalysisTimePeriod.ALL_TIME -> 0L
-        AnalysisTimePeriod.CUSTOM -> customStart ?: 0L
-    }
+    val startDate =
+        when (period) {
+            AnalysisTimePeriod.WEEK -> (calendar.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -7) }.timeInMillis
+            AnalysisTimePeriod.MONTH -> (calendar.clone() as Calendar).apply { add(Calendar.MONTH, -1) }.timeInMillis
+            AnalysisTimePeriod.YEAR -> (calendar.clone() as Calendar).apply { add(Calendar.YEAR, -1) }.timeInMillis
+            AnalysisTimePeriod.ALL_TIME -> 0L
+            AnalysisTimePeriod.CUSTOM -> customStart ?: 0L
+        }
     val finalEndDate = if (period == AnalysisTimePeriod.CUSTOM) customEnd ?: endDate else endDate
     return Pair(startDate, finalEndDate)
 }

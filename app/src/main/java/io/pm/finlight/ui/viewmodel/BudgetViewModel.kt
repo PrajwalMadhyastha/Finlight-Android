@@ -45,10 +45,10 @@ class BudgetViewModel(
     private val settingsRepository: SettingsRepository,
     categoryRepository: CategoryRepository,
     // --- NEW: Add TransactionRepository dependency ---
-    transactionRepository: TransactionRepository
+    transactionRepository: TransactionRepository,
 ) : ViewModel() {
-
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
+
     // --- FIX: Corrected typo from receiveAsStateFlow to receiveAsFlow ---
     val uiEvent = _uiEvent.receiveAsFlow()
 
@@ -67,61 +67,68 @@ class BudgetViewModel(
 
     init {
         // --- REFACTORED: Logic to fetch monthly budgets for the scroller ---
-        monthlySummaries = transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
-            val startDate = firstTransactionDate ?: System.currentTimeMillis()
-            val monthList = mutableListOf<Calendar>()
-            val startCal = Calendar.getInstance().apply { timeInMillis = startDate; set(Calendar.DAY_OF_MONTH, 1) }
-            val endCal = Calendar.getInstance()
+        monthlySummaries =
+            transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
+                val startDate = firstTransactionDate ?: System.currentTimeMillis()
+                val monthList = mutableListOf<Calendar>()
+                val startCal =
+                    Calendar.getInstance().apply {
+                        timeInMillis = startDate
+                        set(Calendar.DAY_OF_MONTH, 1)
+                    }
+                val endCal = Calendar.getInstance()
 
-            while (startCal.before(endCal) || (startCal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && startCal.get(Calendar.MONTH) == endCal.get(Calendar.MONTH))) {
-                monthList.add(startCal.clone() as Calendar)
-                startCal.add(Calendar.MONTH, 1)
-            }
-
-            // Create a list of flows, one for each month's budget
-            val budgetFlows: List<Flow<Pair<Calendar, Float?>>> = monthList.map { cal ->
-                val year = cal.get(Calendar.YEAR)
-                val month = cal.get(Calendar.MONTH) + 1
-                settingsRepository.getOverallBudgetForMonth(year, month).map { budget ->
-                    Pair(cal, budget) // Pair the calendar with its fetched budget
+                while (startCal.before(endCal) || (startCal.get(Calendar.YEAR) == endCal.get(Calendar.YEAR) && startCal.get(Calendar.MONTH) == endCal.get(Calendar.MONTH))) {
+                    monthList.add(startCal.clone() as Calendar)
+                    startCal.add(Calendar.MONTH, 1)
                 }
-            }
 
-            if (budgetFlows.isEmpty()) {
-                flowOf(emptyList())
-            } else {
-                // Combine all budget flows into a single flow that emits the full list
-                combine(budgetFlows) { summaries ->
-                    summaries.toList().reversed() // Reverse to show most recent first
+                // Create a list of flows, one for each month's budget
+                val budgetFlows: List<Flow<Pair<Calendar, Float?>>> =
+                    monthList.map { cal ->
+                        val year = cal.get(Calendar.YEAR)
+                        val month = cal.get(Calendar.MONTH) + 1
+                        settingsRepository.getOverallBudgetForMonth(year, month).map { budget ->
+                            Pair(cal, budget) // Pair the calendar with its fetched budget
+                        }
+                    }
+
+                if (budgetFlows.isEmpty()) {
+                    flowOf(emptyList())
+                } else {
+                    // Combine all budget flows into a single flow that emits the full list
+                    combine(budgetFlows) { summaries ->
+                        summaries.toList().reversed() // Reverse to show most recent first
+                    }
                 }
-            }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         // --- REFACTORED: Use flatMapLatest on _selectedMonth ---
-        budgetsForSelectedMonth = _selectedMonth.flatMapLatest { calendar ->
-            val yearMonthString = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
-            val month = calendar.get(Calendar.MONTH) + 1
-            val year = calendar.get(Calendar.YEAR)
-            budgetRepository.getBudgetsForMonthWithSpending(yearMonthString, month, year)
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+        budgetsForSelectedMonth =
+            _selectedMonth.flatMapLatest { calendar ->
+                val yearMonthString = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
+                val month = calendar.get(Calendar.MONTH) + 1
+                val year = calendar.get(Calendar.YEAR)
+                budgetRepository.getBudgetsForMonthWithSpending(yearMonthString, month, year)
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
         allCategories = categoryRepository.allCategories
 
         // --- REFACTORED: Use flatMapLatest on _selectedMonth and return nullable Float ---
-        overallBudgetForSelectedMonth = _selectedMonth.flatMapLatest {
-            val month = it.get(Calendar.MONTH) + 1
-            val year = it.get(Calendar.YEAR)
-            settingsRepository.getOverallBudgetForMonth(year, month)
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null,
-        )
+        overallBudgetForSelectedMonth =
+            _selectedMonth.flatMapLatest {
+                val month = it.get(Calendar.MONTH) + 1
+                val year = it.get(Calendar.YEAR)
+                settingsRepository.getOverallBudgetForMonth(year, month)
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = null,
+            )
 
         // --- REFACTORED: Combine dynamic flows ---
         availableCategoriesForNewBudget =
@@ -131,32 +138,35 @@ class BudgetViewModel(
             }
 
         // --- FIX: Use real total spending for the selected month, not just budgeted categories ---
-        totalSpendingForSelectedMonth = _selectedMonth.flatMapLatest { calendar ->
-            val monthStart = (calendar.clone() as Calendar).apply {
-                set(Calendar.DAY_OF_MONTH, 1)
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
+        totalSpendingForSelectedMonth =
+            _selectedMonth.flatMapLatest { calendar ->
+                val monthStart =
+                    (calendar.clone() as Calendar).apply {
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }.timeInMillis
 
-            val monthEnd = (calendar.clone() as Calendar).apply {
-                add(Calendar.MONTH, 1)
-                set(Calendar.DAY_OF_MONTH, 1)
-                add(Calendar.DAY_OF_MONTH, -1)
-                set(Calendar.HOUR_OF_DAY, 23)
-                set(Calendar.MINUTE, 59)
-                set(Calendar.SECOND, 59)
-                set(Calendar.MILLISECOND, 999)
-            }.timeInMillis
+                val monthEnd =
+                    (calendar.clone() as Calendar).apply {
+                        add(Calendar.MONTH, 1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.DAY_OF_MONTH, -1)
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59)
+                        set(Calendar.MILLISECOND, 999)
+                    }.timeInMillis
 
-            transactionRepository.getFinancialSummaryForRangeFlow(monthStart, monthEnd)
-                .map { (it?.totalExpenses ?: 0.0).roundToLong() }
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 0L
-        )
+                transactionRepository.getFinancialSummaryForRangeFlow(monthStart, monthEnd)
+                    .map { (it?.totalExpenses ?: 0.0).roundToLong() }
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = 0L,
+            )
     }
 
     // --- NEW: Add function to update selected month ---
@@ -202,7 +212,10 @@ class BudgetViewModel(
     }
 
     // --- REFACTORED: Function signature changed and logic updated ---
-    fun saveOverallBudget(budgetStr: String, forCalendar: Calendar) {
+    fun saveOverallBudget(
+        budgetStr: String,
+        forCalendar: Calendar,
+    ) {
         val budgetFloat = budgetStr.toFloatOrNull() ?: 0f
         val year = forCalendar.get(Calendar.YEAR)
         val month = forCalendar.get(Calendar.MONTH) + 1

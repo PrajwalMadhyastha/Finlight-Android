@@ -27,7 +27,7 @@ data class MerchantPrediction(
     val categoryIconKey: String?,
     val categoryColorKey: String?,
     val accountId: Int?,
-    val accountName: String?
+    val accountName: String?,
 ) {
     /**
      * Generates a unique key for this prediction, suitable for use in

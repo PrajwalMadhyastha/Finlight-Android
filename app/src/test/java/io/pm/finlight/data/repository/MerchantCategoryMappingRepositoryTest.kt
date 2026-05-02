@@ -20,7 +20,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class MerchantCategoryMappingRepositoryTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var merchantCategoryMappingDao: MerchantCategoryMappingDao
 
@@ -33,15 +32,15 @@ class MerchantCategoryMappingRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `insert calls DAO`() = runTest {
-        // Arrange
-        val newMapping = MerchantCategoryMapping(parsedName = "Zomato", categoryId = 1)
+    fun `insert calls DAO`() =
+        runTest {
+            // Arrange
+            val newMapping = MerchantCategoryMapping(parsedName = "Zomato", categoryId = 1)
 
-        // Act
-        repository.insert(newMapping)
+            // Act
+            repository.insert(newMapping)
 
-        // Assert
-        verify(merchantCategoryMappingDao).insert(newMapping)
-    }
+            // Assert
+            verify(merchantCategoryMappingDao).insert(newMapping)
+        }
 }
-

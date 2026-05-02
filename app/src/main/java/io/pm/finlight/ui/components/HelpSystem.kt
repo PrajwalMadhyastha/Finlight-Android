@@ -6,10 +6,7 @@
 // =================================================================================
 package io.pm.finlight.ui.components
 
-import androidx.annotation.DrawableRes
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -36,15 +33,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import io.pm.finlight.R
 
 /**
  * A data class to hold the title, content (with Markdown support), and an optional
@@ -67,290 +61,349 @@ data class HelpInfo(
  * without needing to modify individual screen composables.
  */
 object HelpContentRegistry {
-    val content = mapOf(
-        "automation_settings" to HelpInfo(
-            title = "About Automation",
-            content = """
-                This screen controls how Finlight automatically processes your SMS messages.
+    /** Convenience builder so each entry doesn't repeat `HelpInfo` + `.trimIndent()`. */
+    private fun helpEntry(title: String, content: String) =
+        HelpInfo(title = title, content = content.trimIndent())
 
-                - **Scan Inbox:** Manually trigger a scan of your SMS inbox to find new transactions.
-                - **Manage Parse Rules:** View and delete the custom rules you've created for parsing tricky SMS formats.
-                - **Manage Ignore List:** Tell the parser to permanently ignore messages from certain senders or with specific phrases.
-                - **Debug SMS Parsing:** A tool to see exactly why a recent message was parsed or ignored.
-            """.trimIndent()
-        ),
-        "data_settings" to HelpInfo(
-            title = "About Security & Data",
-            content = """
-                Your data's security and portability are managed here.
+    val content =
+        mapOf(
+            "automation_settings" to
+                helpEntry(
+                    title = "About Automation",
+                    content =
+                        """
+                        This screen controls how Finlight automatically processes your SMS messages.
 
-                - **App Lock:** Secure the app with your device's biometrics (fingerprint/face).
-                - **Automatic Daily Backup:** Your data is automatically backed up to your personal Google Drive. This backs up a compressed snapshot, not the live database.
-                - **Create Backup Now:** Manually create a new snapshot and request a backup. This is useful before moving to a new device.
-                - **Import/Export:** Create a full local backup (JSON) or a spreadsheet-friendly version of your transactions (CSV).
-            """.trimIndent()
-        ),
-        "dashboard_customize" to HelpInfo(
-            title = "Customizing Your Dashboard",
-            content = """
-                Tailor the dashboard to your needs.
+                        - **Scan Inbox:** Manually trigger a scan of your SMS inbox to find new transactions.
+                        - **Manage Parse Rules:** View and delete the custom rules you've created for parsing tricky SMS formats.
+                        - **Manage Ignore List:** Tell the parser to permanently ignore messages from certain senders or with specific phrases.
+                        - **Debug SMS Parsing:** A tool to see exactly why a recent message was parsed or ignored.
+                        """,
+                ),
+            "data_settings" to
+                helpEntry(
+                    title = "About Security & Data",
+                    content =
+                        """
+                        Your data's security and portability are managed here.
 
-                - **Toggle Visibility:** Use the switch to show or hide a card.
-                - **Reorder Cards:** Long-press the drag handle (:::) and drag any card (except the main budget card) up or down to change its position.
-            """.trimIndent(),
-            // visual = R.drawable.help_gif_reorder // Temporarily commented out as requested.
-        ),
-        // --- NEW CONTENT FROM AUDIT ---
-        "manage_parse_rules" to HelpInfo(
-            title = "About Parse Rules",
-            content = """
-                Custom Parse Rules are powerful tools that teach Finlight how to read new or tricky SMS formats.
+                        - **App Lock:** Secure the app with your device's biometrics (fingerprint/face).
+                        - **Automatic Daily Backup:** Your data is automatically backed up to your personal Google Drive. This backs up a compressed snapshot, not the live database.
+                        - **Create Backup Now:** Manually create a new snapshot and request a backup. This is useful before moving to a new device.
+                        - **Import/Export:** Create a full local backup (JSON) or a spreadsheet-friendly version of your transactions (CSV).
+                        """,
+                ),
+            "dashboard_customize" to
+                helpEntry(
+                    title = "Customizing Your Dashboard",
+                    content =
+                        """
+                        Tailor the dashboard to your needs.
 
-                - **How they are created:** When you edit a transaction that came from an SMS, you can choose to 'Fix Parsing'. This takes you to a screen where you can highlight the parts of the message to create a new, high-priority rule.
-                - **Management:** This screen lists all the rules you have created. You can **Edit** them to refine the parsing logic or **Delete** them if they are no longer needed.
-            """.trimIndent()
-        ),
-        "manage_ignore_rules" to HelpInfo(
-            title = "About the Ignore List",
-            content = """
-                The ignore list tells the SMS parser to completely skip messages that match certain patterns, reducing clutter from non-transactional messages.
+                        - **Toggle Visibility:** Use the switch to show or hide a card.
+                        - **Reorder Cards:** Long-press the drag handle (:::) and drag any card (except the main budget card) up or down to change its position.
+                        """,
+                    // visual = R.drawable.help_gif_reorder // Temporarily commented out as requested.
+                ),
+            // --- NEW CONTENT FROM AUDIT ---
+            "manage_parse_rules" to
+                helpEntry(
+                    title = "About Parse Rules",
+                    content =
+                        """
+                        Custom Parse Rules are powerful tools that teach Finlight how to read new or tricky SMS formats.
 
-                - **Rule Types:** You can ignore messages based on the **Sender** (e.g., `*Jio*`) or a **Body Phrase** (e.g., "Your OTP is").
-                - **Wildcards:** For sender rules, you can use an asterisk `*` as a wildcard to match any characters.
-                - **Default vs. Custom:** The app comes with a set of default rules that you can disable. You can also add your own custom rules which can be deleted.
-            """.trimIndent()
-        ),
-        "reports_screen" to HelpInfo(
-            title = "About Reports",
-            content = """
-                This screen provides a high-level overview of your financial health.
+                        - **How they are created:** When you edit a transaction that came from an SMS, you can choose to 'Fix Parsing'. This takes you to a screen where you can highlight the parts of the message to create a new, high-priority rule.
+                        - **Management:** This screen lists all the rules you have created. You can **Edit** them to refine the parsing logic or **Delete** them if they are no longer needed.
+                        """,
+                ),
+            "manage_ignore_rules" to
+                helpEntry(
+                    title = "About the Ignore List",
+                    content =
+                        """
+                        The ignore list tells the SMS parser to completely skip messages that match certain patterns, reducing clutter from non-transactional messages.
 
-                - **Time Period:** Select a time period at the top to change the scope of the entire report.
-                - **Consistency Calendar:** This heatmap visualizes your spending habits. You can toggle between a detailed **Monthly** view and a condensed **Yearly** overview. Tap on any day to see the transactions for that date.
-                - **Spending by Category:** This donut chart shows where your money went. **Tap on a slice** of the chart to see all transactions for that category in the selected period.
-                - **Trend Chart:** This bar chart compares your income versus your expenses over the last several months.
-            """.trimIndent()
-        ),
-        "budget_screen" to HelpInfo(
-            title = "About Budgets",
-            content = """
-                The Budget Hub helps you track and control your spending.
+                        - **Rule Types:** You can ignore messages based on the **Sender** (e.g., `*Jio*`) or a **Body Phrase** (e.g., "Your OTP is").
+                        - **Wildcards:** For sender rules, you can use an asterisk `*` as a wildcard to match any characters.
+                        - **Default vs. Custom:** The app comes with a set of default rules that you can disable. You can also add your own custom rules which can be deleted.
+                        """,
+                ),
+            "reports_screen" to
+                helpEntry(
+                    title = "About Reports",
+                    content =
+                        """
+                        This screen provides a high-level overview of your financial health.
 
-                - **Overall Budget:** This is your main spending target for the entire month. Tap the large card at the top to set or edit it.
-                - **Category Budgets:** You can set specific budgets for individual categories (e.g., ₹5,000 for Food). This helps you track spending in more detail.
-                - **Budget Rollover:** If you don't set a budget for a category this month, Finlight will automatically use the budget you set for it in the most recent previous month.
-            """.trimIndent()
-        ),
-        "currency_travel_settings" to HelpInfo(
-            title = "Currency & Travel Mode",
-            content = """
-                Manage your home currency and automate tracking for your trips.
+                        - **Time Period:** Select a time period at the top to change the scope of the entire report.
+                        - **Consistency Calendar:** This heatmap visualizes your spending habits. You can toggle between a detailed **Monthly** view and a condensed **Yearly** overview. Tap on any day to see the transactions for that date.
+                        - **Spending by Category:** This donut chart shows where your money went. **Tap on a slice** of the chart to see all transactions for that category in the selected period.
+                        - **Trend Chart:** This bar chart compares your income versus your expenses over the last several months.
+                        """,
+                ),
+            "budget_screen" to
+                helpEntry(
+                    title = "About Budgets",
+                    content =
+                        """
+                        The Budget Hub helps you track and control your spending.
 
-                - **Home Currency:** This is the default currency for all your budgets and reports.
-                - **Travel Mode:** When you create a trip plan, Finlight will automatically tag all transactions that occur within the trip's date range.
-                - **International Trips:** For international trips, the app can automatically convert foreign currency amounts to your home currency based on the rate you provide.
-                - **Travel History:** All past and future trips are listed here. You can edit their details or delete them.
-            """.trimIndent()
-        ),
-        "appearance_settings" to HelpInfo(
-            title = "About Appearance",
-            content = """
-                Customize the look and feel of the app.
+                        - **Overall Budget:** This is your main spending target for the entire month. Tap the large card at the top to set or edit it.
+                        - **Category Budgets:** You can set specific budgets for individual categories (e.g., ₹5,000 for Food). This helps you track spending in more detail.
+                        - **Budget Rollover:** If you don't set a budget for a category this month, Finlight will automatically use the budget you set for it in the most recent previous month.
+                        """,
+                ),
+            "currency_travel_settings" to
+                helpEntry(
+                    title = "Currency & Travel Mode",
+                    content =
+                        """
+                        Manage your home currency and automate tracking for your trips.
 
-                - **System:** Automatically switches between a light and dark theme based on your phone's system settings.
-                - **Aurora & Midnight:** Dark themes.
-                - **Daybreak & Paper:** Light themes.
-            """.trimIndent()
-        ),
-        "notification_settings" to HelpInfo(
-            title = "About Notifications",
-            content = """
-                Control the alerts and summaries you receive from Finlight.
+                        - **Home Currency:** This is the default currency for all your budgets and reports.
+                        - **Travel Mode:** When you create a trip plan, Finlight will automatically tag all transactions that occur within the trip's date range.
+                        - **International Trips:** For international trips, the app can automatically convert foreign currency amounts to your home currency based on the rate you provide.
+                        - **Travel History:** All past and future trips are listed here. You can edit their details or delete them.
+                        """,
+                ),
+            "appearance_settings" to
+                helpEntry(
+                    title = "About Appearance",
+                    content =
+                        """
+                        Customize the look and feel of the app.
 
-                - **Auto-Captured Transactions:** Get a notification each time Finlight successfully saves a new transaction from an SMS.
-                - **Summaries & Reports:** Receive daily, weekly, and monthly notifications that summarize your spending activity. You can configure the time for each summary.
-            """.trimIndent()
-        ),
-        "account_list" to HelpInfo(
-            title = "Managing Accounts",
-            content = """
-                This screen lists all your financial accounts.
+                        - **System:** Automatically switches between a light and dark theme based on your phone's system settings.
+                        - **Aurora & Midnight:** Dark themes.
+                        - **Daybreak & Paper:** Light themes.
+                        """,
+                ),
+            "notification_settings" to
+                helpEntry(
+                    title = "About Notifications",
+                    content =
+                        """
+                        Control the alerts and summaries you receive from Finlight.
 
-                - **View Details:** Tap any account to see its transaction history.
-                - **Merge Duplicates:** If you have duplicate accounts (e.g., "ICICI" and "ICICI Bank"), **long-press** any item to enter selection mode. Select two or more accounts and tap 'Merge' to combine them into one. The app will learn from this and auto-map future transactions correctly.
-            """.trimIndent()
-        ),
-        "rule_creation_screen" to HelpInfo(
-            title = "How to Create a Rule",
-            content = """
-                This screen teaches Finlight how to read new SMS formats.
+                        - **Auto-Captured Transactions:** Get a notification each time Finlight successfully saves a new transaction from an SMS.
+                        - **Summaries & Reports:** Receive daily, weekly, and monthly notifications that summarize your spending activity. You can configure the time for each summary.
+                        """,
+                ),
+            "account_list" to
+                helpEntry(
+                    title = "Managing Accounts",
+                    content =
+                        """
+                        This screen lists all your financial accounts.
 
-                - **1. Select Text:** **Long-press and drag** on the message text above to highlight the part you want to define (like the merchant name or amount).
-                - **2. Mark the Part:** Tap one of the "Mark as..." buttons below.
-                - **Trigger Phrase:** This is the most important part. Select a piece of text that is **unique and unchanging** in every similar SMS (e.g., "spent on HDFC Bank Card"). This tells Finlight when to use your rule.
-                - **Merchant, Amount, Account:** Mark these if the parser missed them. Finlight will create smart patterns to find them in future messages.
-                - **Save:** You must define at least a Trigger Phrase and one other part to save the rule.
-            """.trimIndent()
-        ),
-        "sms_debug_screen" to HelpInfo(
-            title = "About the SMS Debugger",
-            content = """
-                This is a power-user tool that shows exactly how Finlight's parser interpreted your most recent SMS messages.
+                        - **View Details:** Tap any account to see its transaction history.
+                        - **Merge Duplicates:** If you have duplicate accounts (e.g., "ICICI" and "ICICI Bank"), **long-press** any item to enter selection mode. Select two or more accounts and tap 'Merge' to combine them into one. The app will learn from this and auto-map future transactions correctly.
+                        """,
+                ),
+            "rule_creation_screen" to
+                helpEntry(
+                    title = "How to Create a Rule",
+                    content =
+                        """
+                        This screen teaches Finlight how to read new SMS formats.
 
-                - **Parsed Successfully:** The parser understood the message and it was likely saved as a transaction.
-                - **Ignored by Rule:** The message contained a word or sender pattern from your **Ignore List**.
-                - **Ignored by ML Model:** The app's AI model predicted with high confidence that this was **not** a financial transaction (e.g., an OTP or promotional message).
-                - **Not Parsed:** The parser identified it as potentially transactional but couldn't understand its format.
-                - **Create Rule:** For messages that were not parsed correctly, you can tap this button to manually teach Finlight how to read them in the future.
-            """.trimIndent()
-        ),
-        "csv_validation_screen" to HelpInfo(
-            title = "Reviewing Your CSV Import",
-            content = """
-                This screen shows a preview of the transactions from your CSV file before they are permanently added to your database.
+                        - **1. Select Text:** **Long-press and drag** on the message text above to highlight the part you want to define (like the merchant name or amount).
+                        - **2. Mark the Part:** Tap one of the "Mark as..." buttons below.
+                        - **Trigger Phrase:** This is the most important part. Select a piece of text that is **unique and unchanging** in every similar SMS (e.g., "spent on HDFC Bank Card"). This tells Finlight when to use your rule.
+                        - **Merchant, Amount, Account:** Mark these if the parser missed them. Finlight will create smart patterns to find them in future messages.
+                        - **Save:** You must define at least a Trigger Phrase and one other part to save the rule.
+                        """,
+                ),
+            "sms_debug_screen" to
+                helpEntry(
+                    title = "About the SMS Debugger",
+                    content =
+                        """
+                        This is a power-user tool that shows exactly how Finlight's parser interpreted your most recent SMS messages.
 
-                - **Status Icons:** Each row has a status icon. Green means the row is valid. Yellow means the app needs to create a new Category or Account, which it will do automatically. Red indicates an error (like a wrong date format) that you must fix.
-                - **Edit a Row:** **Tap on any row** to open an editor and correct mistakes.
-                - **Ignore a Row:** Tap the **trash icon** to exclude a specific row from the import.
-                - **Import:** When you're ready, tap the "Import" button to save all valid and auto-fixable rows.
-            """.trimIndent()
-        ),
-        "account_mapping_screen" to HelpInfo(
-            title = "Why Map Accounts?",
-            content = """
-                During a bulk SMS scan, Finlight found transactions from new senders it hasn't seen before (e.g., "VK-ICIBNK").
+                        - **Parsed Successfully:** The parser understood the message and it was likely saved as a transaction.
+                        - **Ignored by Rule:** The message contained a word or sender pattern from your **Ignore List**.
+                        - **Ignored by ML Model:** The app's AI model predicted with high confidence that this was **not** a financial transaction (e.g., an OTP or promotional message).
+                        - **Not Parsed:** The parser identified it as potentially transactional but couldn't understand its format.
+                        - **Create Rule:** For messages that were not parsed correctly, you can tap this button to manually teach Finlight how to read them in the future.
+                        """,
+                ),
+            "csv_validation_screen" to
+                helpEntry(
+                    title = "Reviewing Your CSV Import",
+                    content =
+                        """
+                        This screen shows a preview of the transactions from your CSV file before they are permanently added to your database.
 
-                To import these transactions correctly, you need to tell the app which of your accounts they belong to.
+                        - **Status Icons:** Each row has a status icon. Green means the row is valid. Yellow means the app needs to create a new Category or Account, which it will do automatically. Red indicates an error (like a wrong date format) that you must fix.
+                        - **Edit a Row:** **Tap on any row** to open an editor and correct mistakes.
+                        - **Ignore a Row:** Tap the **trash icon** to exclude a specific row from the import.
+                        - **Import:** When you're ready, tap the "Import" button to save all valid and auto-fixable rows.
+                        """,
+                ),
+            "account_mapping_screen" to
+                helpEntry(
+                    title = "Why Map Accounts?",
+                    content =
+                        """
+                        During a bulk SMS scan, Finlight found transactions from new senders it hasn't seen before (e.g., "VK-ICIBNK").
 
-                - **How it works:** For each sender in the list, use the dropdown to either select one of your existing accounts or create a new one.
-                - **Learning:** You only have to do this once per sender. Finlight will remember your choice and automatically map all future transactions from that sender to the correct account.
-            """.trimIndent()
-        ),
-        // --- NEW: Phase 2 Help Content ---
-        "transaction_detail" to HelpInfo(
-            title = "Editing a Transaction",
-            content = """
-                This screen gives you full control over a single transaction.
+                        To import these transactions correctly, you need to tell the app which of your accounts they belong to.
 
-                - **Tap to Edit:** Almost every field on this screen is tappable! Tap the description, amount, category, or date to change them.
-                - **Splitting:** If a single payment was for multiple things (e.g., groceries and a bill payment), tap "Split Transaction" to break it down into multiple categorized items.
-                - **Fix Parsing:** If this transaction came from an SMS and the details were wrong, tap this button. It will take you to the Rule Creation screen to teach Finlight how to parse it correctly next time.
-                - **Attachments & Tags:** Use the icons at the bottom to add photo receipts or organize the transaction with custom tags.
-            """.trimIndent()
-        ),
-        "add_transaction" to HelpInfo(
-            title = "Adding a Transaction",
-            content = """
-                This is the composer for manually adding a new expense or income.
+                        - **How it works:** For each sender in the list, use the dropdown to either select one of your existing accounts or create a new one.
+                        - **Learning:** You only have to do this once per sender. Finlight will remember your choice and automatically map all future transactions from that sender to the correct account.
+                        """,
+                ),
+            // --- NEW: Phase 2 Help Content ---
+            "transaction_detail" to
+                helpEntry(
+                    title = "Editing a Transaction",
+                    content =
+                        """
+                        This screen gives you full control over a single transaction.
 
-                - **Smart Suggestions:** As you type in the "Description", the app will try to automatically suggest a category for you based on your past habits and common keywords.
-                - **Guidance:** After you enter an amount, a simple checklist will appear to guide you through the required fields, making the process quick and easy.
-                - **Orbital Chips:** Tap the 'Category', 'Account', or 'Date' chips to change their values.
-                - **Actions:** Use the icons at the bottom to add optional details like notes, tags, or photo attachments.
-            """.trimIndent()
-        ),
-        "split_transaction" to HelpInfo(
-            title = "How to Split a Transaction",
-            content = """
-                Splitting is useful when one payment covers multiple categories.
+                        - **Tap to Edit:** Almost every field on this screen is tappable! Tap the description, amount, category, or date to change them.
+                        - **Splitting:** If a single payment was for multiple things (e.g., groceries and a bill payment), tap "Split Transaction" to break it down into multiple categorized items.
+                        - **Fix Parsing:** If this transaction came from an SMS and the details were wrong, tap this button. It will take you to the Rule Creation screen to teach Finlight how to parse it correctly next time.
+                        - **Attachments & Tags:** Use the icons at the bottom to add photo receipts or organize the transaction with custom tags.
+                        """,
+                ),
+            "add_transaction" to
+                helpEntry(
+                    title = "Adding a Transaction",
+                    content =
+                        """
+                        This is the composer for manually adding a new expense or income.
 
-                - **The Goal:** Adjust the amounts and categories for each item until the "Remaining" amount at the top is exactly zero.
-                - **Add Item:** Tap the "Add Item" button to create a new line for another category.
-                - **Set Category:** Tap the '+' icon on any line to assign a category to that part of the payment.
-                - **Save:** The "Save Splits" button will only become active when the total of your split items exactly matches the original transaction amount and every item has a category.
-            """.trimIndent()
-        ),
-        "transaction_list" to HelpInfo(
-            title = "Navigating Your Transactions",
-            content = """
-                This is your main transaction feed.
+                        - **Smart Suggestions:** As you type in the "Description", the app will try to automatically suggest a category for you based on your past habits and common keywords.
+                        - **Guidance:** After you enter an amount, a simple checklist will appear to guide you through the required fields, making the process quick and easy.
+                        - **Orbital Chips:** Tap the 'Category', 'Account', or 'Date' chips to change their values.
+                        - **Actions:** Use the icons at the bottom to add optional details like notes, tags, or photo attachments.
+                        """,
+                ),
+            "split_transaction" to
+                helpEntry(
+                    title = "How to Split a Transaction",
+                    content =
+                        """
+                        Splitting is useful when one payment covers multiple categories.
 
-                - **Tabs:** Switch between viewing individual **Transactions**, a summary grouped by **Categories**, or a summary grouped by **Merchants**.
-                - **Filter:** Tap the filter icon in the top-right to search by keyword or narrow down the list by a specific account or category.
-                - **Multi-Select:** **Long-press** on any transaction to enter selection mode. This allows you to delete or share multiple items at once.
-                - **Drill Down:** In the 'Categories' or 'Merchants' tab, tap any item to see a detailed list of all transactions for that item in the selected month.
-            """.trimIndent()
-        ),
-        "income_screen" to HelpInfo(
-            title = "Tracking Your Income",
-            content = """
-                This screen works just like the main transaction list but is filtered to only show your income.
+                        - **The Goal:** Adjust the amounts and categories for each item until the "Remaining" amount at the top is exactly zero.
+                        - **Add Item:** Tap the "Add Item" button to create a new line for another category.
+                        - **Set Category:** Tap the '+' icon on any line to assign a category to that part of the payment.
+                        - **Save:** The "Save Splits" button will only become active when the total of your split items exactly matches the original transaction amount and every item has a category.
+                        """,
+                ),
+            "transaction_list" to
+                helpEntry(
+                    title = "Navigating Your Transactions",
+                    content =
+                        """
+                        This is your main transaction feed.
 
-                - **Tabs:** Switch between viewing individual income **Credits** or seeing a summary grouped by **Categories**.
-                - **Filter:** Tap the filter icon in the top-right to search or narrow down the list by account or category.
-            """.trimIndent()
-        ),
-        "search_screen" to HelpInfo(
-            title = "How to Search",
-            content = """
-                Use the search screen to find specific transactions across your entire history.
+                        - **Tabs:** Switch between viewing individual **Transactions**, a summary grouped by **Categories**, or a summary grouped by **Merchants**.
+                        - **Filter:** Tap the filter icon in the top-right to search by keyword or narrow down the list by a specific account or category.
+                        - **Multi-Select:** **Long-press** on any transaction to enter selection mode. This allows you to delete or share multiple items at once.
+                        - **Drill Down:** In the 'Categories' or 'Merchants' tab, tap any item to see a detailed list of all transactions for that item in the selected month.
+                        """,
+                ),
+            "income_screen" to
+                helpEntry(
+                    title = "Tracking Your Income",
+                    content =
+                        """
+                        This screen works just like the main transaction list but is filtered to only show your income.
 
-                - **Keyword:** Searches the **Description** and **Notes** of your transactions.
-                - **Filters:** Use the dropdowns to narrow your search by a specific Account, Category, or Tag.
-                - **Date Range:** You can also filter for transactions that occurred between a specific start and end date.
-            """.trimIndent()
-        ),
-        "analysis_screen" to HelpInfo(
-            title = "About Spending Analysis",
-            content = """
-                This hub provides powerful tools to understand your spending habits over time.
+                        - **Tabs:** Switch between viewing individual income **Credits** or seeing a summary grouped by **Categories**.
+                        - **Filter:** Tap the filter icon in the top-right to search or narrow down the list by account or category.
+                        """,
+                ),
+            "search_screen" to
+                helpEntry(
+                    title = "How to Search",
+                    content =
+                        """
+                        Use the search screen to find specific transactions across your entire history.
 
-                - **Dimensions:** The tabs at the top let you group your spending by **Category**, **Tag**, or **Merchant**.
-                - **Time Period:** The chips below the tabs let you change the time window for the analysis (e.g., Last Week, Last Month, etc.).
-                - **Advanced Filters:** Tap the filter icon to drill down even further. For example, you can see your spending in the "Food" category, but only for transactions tagged as "Work Lunch".
-            """.trimIndent()
-        ),
-        // --- NEW: Phase 3 (Low Priority) Help Content ---
-        "time_period_report_screen" to HelpInfo(
-            title = "About Reports",
-            content = """
-                These screens provide a detailed look at your finances over a specific period (Day, Week, or Month).
+                        - **Keyword:** Searches the **Description** and **Notes** of your transactions.
+                        - **Filters:** Use the dropdowns to narrow your search by a specific Account, Category, or Tag.
+                        - **Date Range:** You can also filter for transactions that occurred between a specific start and end date.
+                        """,
+                ),
+            "analysis_screen" to
+                helpEntry(
+                    title = "About Spending Analysis",
+                    content =
+                        """
+                        This hub provides powerful tools to understand your spending habits over time.
 
-                - **Navigation:** **Swipe left or right** anywhere on the screen to move to the next or previous period.
-                - **Insights:** The top card gives you a quick summary, comparing your spending to the previous period and highlighting your top spending category.
-                - **Spending Chart:** This bar chart visualizes your spending trend over a longer duration (e.g., the last 6 months for a monthly report).
-                - **Consistency Calendar (Monthly Report):** This heatmap shows your daily spending habits relative to your overall monthly budget. Tap any day to see the transactions for that date.
-            """.trimIndent()
-        ),
-        "account_detail" to HelpInfo(
-            title = "About Account Details",
-            content = """
-                This screen shows the complete, unfiltered transaction history for a single account.
+                        - **Dimensions:** The tabs at the top let you group your spending by **Category**, **Tag**, or **Merchant**.
+                        - **Time Period:** The chips below the tabs let you change the time window for the analysis (e.g., Last Week, Last Month, etc.).
+                        - **Advanced Filters:** Tap the filter icon to drill down even further. For example, you can see your spending in the "Food" category, but only for transactions tagged as "Work Lunch".
+                        """,
+                ),
+            // --- NEW: Phase 3 (Low Priority) Help Content ---
+            "time_period_report_screen" to
+                helpEntry(
+                    title = "About Reports",
+                    content =
+                        """
+                        These screens provide a detailed look at your finances over a specific period (Day, Week, or Month).
 
-                - **View & Edit:** Tap on any transaction in the list to navigate to its detail screen, where you can make edits.
-                - **Balance:** The 'Current Balance' at the top is a calculated total of all income and expenses for this specific account.
-            """.trimIndent()
-        ),
-        "category_list" to HelpInfo(
-            title = "Managing Categories",
-            content = """
-                Categories are the primary way to organize your transactions.
+                        - **Navigation:** **Swipe left or right** anywhere on the screen to move to the next or previous period.
+                        - **Insights:** The top card gives you a quick summary, comparing your spending to the previous period and highlighting your top spending category.
+                        - **Spending Chart:** This bar chart visualizes your spending trend over a longer duration (e.g., the last 6 months for a monthly report).
+                        - **Consistency Calendar (Monthly Report):** This heatmap shows your daily spending habits relative to your overall monthly budget. Tap any day to see the transactions for that date.
+                        """,
+                ),
+            "account_detail" to
+                helpEntry(
+                    title = "About Account Details",
+                    content =
+                        """
+                        This screen shows the complete, unfiltered transaction history for a single account.
 
-                - **Create:** Tap the 'Add New Category' button to create a new one. You can choose a name, icon, and color.
-                - **Edit:** Tap the pencil icon on any category to change its name, icon, or color.
-                - **Delete:** Tap the trash icon to delete a category. **Note:** You can only delete a category if it is not currently used by any transactions.
-            """.trimIndent()
-        ),
-        "tag_management" to HelpInfo(
-            title = "Managing Tags",
-            content = """
-                Tags offer a flexible, secondary way to group transactions that might span multiple categories. They are perfect for tracking specific events like "Vacation 2025" or "Work Project X".
+                        - **View & Edit:** Tap on any transaction in the list to navigate to its detail screen, where you can make edits.
+                        - **Balance:** The 'Current Balance' at the top is a calculated total of all income and expenses for this specific account.
+                        """,
+                ),
+            "category_list" to
+                helpEntry(
+                    title = "Managing Categories",
+                    content =
+                        """
+                        Categories are the primary way to organize your transactions.
 
-                - **Create:** Type a name in the text field at the top and tap the '+' button.
-                - **Edit & Delete:** Use the icons next to each tag to rename or delete it. **Note:** You cannot delete a tag if it is currently in use by a transaction or linked to a trip plan.
-            """.trimIndent()
-        ),
-        "review_sms_screen" to HelpInfo(
-            title = "Reviewing SMS Transactions",
-            content = """
-                This screen appears after a bulk SMS scan if Finlight found transactions from new senders it doesn't recognize.
+                        - **Create:** Tap the 'Add New Category' button to create a new one. You can choose a name, icon, and color.
+                        - **Edit:** Tap the pencil icon on any category to change its name, icon, or color.
+                        - **Delete:** Tap the trash icon to delete a category. **Note:** You can only delete a category if it is not currently used by any transactions.
+                        """,
+                ),
+            "tag_management" to
+                helpEntry(
+                    title = "Managing Tags",
+                    content =
+                        """
+                        Tags offer a flexible, secondary way to group transactions that might span multiple categories. They are perfect for tracking specific events like "Vacation 2025" or "Work Project X".
 
-                - **Why it's important:** To correctly import these transactions, you must first map each new sender to one of your accounts.
-                - **Approve:** Tapping 'Approve' will take you to a confirmation screen where you can add more details (like a category or tags) before saving the transaction.
-                - **Link:** If this SMS is for a transaction you've already entered manually (e.g., a cash payment that was later confirmed via SMS), tap 'Link' to connect the SMS to the existing entry.
-            """.trimIndent()
+                        - **Create:** Type a name in the text field at the top and tap the '+' button.
+                        - **Edit & Delete:** Use the icons next to each tag to rename or delete it. **Note:** You cannot delete a tag if it is currently in use by a transaction or linked to a trip plan.
+                        """,
+                ),
+            "review_sms_screen" to
+                helpEntry(
+                    title = "Reviewing SMS Transactions",
+                    content =
+                        """
+                        This screen appears after a bulk SMS scan if Finlight found transactions from new senders it doesn't recognize.
+
+                        - **Why it's important:** To correctly import these transactions, you must first map each new sender to one of your accounts.
+                        - **Approve:** Tapping 'Approve' will take you to a confirmation screen where you can add more details (like a category or tags) before saving the transaction.
+                        - **Link:** If this SMS is for a transaction you've already entered manually (e.g., a cash payment that was later confirmed via SMS), tap 'Link' to connect the SMS to the existing entry.
+                        """,
+                ),
         )
-    )
 }
 
 /**
@@ -363,7 +416,7 @@ object HelpContentRegistry {
 @Composable
 fun HelpBottomSheet(
     info: HelpInfo,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -371,30 +424,32 @@ fun HelpBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
-        windowInsets = WindowInsets(0) // Edge-to-edge
+        windowInsets = WindowInsets(0), // Edge-to-edge
     ) {
         GlassPanel {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(24.dp)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(24.dp),
             ) {
                 Text(
                     text = info.title,
                     style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(Modifier.height(8.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
                 Spacer(Modifier.height(16.dp))
 
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 400.dp) // Limit height to prevent overly tall sheets
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp) // Limit height to prevent overly tall sheets
+                            .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     MarkdownText(markdown = info.content)
 
@@ -415,7 +470,7 @@ fun HelpBottomSheet(
                             )
                         }
                     }
-                    */
+                     */
                 }
             }
         }
@@ -436,14 +491,14 @@ fun HelpActionIcon(helpKey: String) {
     IconButton(onClick = { showSheet = true }) {
         Icon(
             imageVector = Icons.AutoMirrored.Filled.HelpOutline,
-            contentDescription = "Help"
+            contentDescription = "Help",
         )
     }
 
     if (showSheet && helpInfo != null) {
         HelpBottomSheet(
             info = helpInfo,
-            onDismiss = { showSheet = false }
+            onDismiss = { showSheet = false },
         )
     }
 }
@@ -491,6 +546,6 @@ private fun MarkdownText(markdown: String) {
             }
         },
         style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }

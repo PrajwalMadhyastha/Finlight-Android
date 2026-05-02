@@ -15,9 +15,8 @@ import kotlinx.coroutines.launch
 
 class RecurringTransactionViewModel(
     private val application: Application,
-    private val repository: RecurringTransactionRepository
+    private val repository: RecurringTransactionRepository,
 ) : ViewModel() {
-
     val allRecurringTransactions: Flow<List<RecurringTransaction>> = repository.getAll()
 
     fun getRuleById(id: Int): Flow<RecurringTransaction?> = repository.getById(id)
@@ -31,19 +30,20 @@ class RecurringTransactionViewModel(
         startDate: Long,
         accountId: Int,
         categoryId: Int?,
-        lastRunDate: Long? // Preserve last run date on edit
+        lastRunDate: Long?, // Preserve last run date on edit
     ) = viewModelScope.launch {
-        val rule = RecurringTransaction(
-            id = ruleId ?: 0,
-            description = description,
-            amount = amount,
-            transactionType = transactionType,
-            recurrenceInterval = recurrenceInterval,
-            startDate = startDate,
-            accountId = accountId,
-            categoryId = categoryId,
-            lastRunDate = lastRunDate
-        )
+        val rule =
+            RecurringTransaction(
+                id = ruleId ?: 0,
+                description = description,
+                amount = amount,
+                transactionType = transactionType,
+                recurrenceInterval = recurrenceInterval,
+                startDate = startDate,
+                accountId = accountId,
+                categoryId = categoryId,
+                lastRunDate = lastRunDate,
+            )
 
         if (ruleId != null) {
             repository.update(rule)
@@ -54,7 +54,8 @@ class RecurringTransactionViewModel(
         }
     }
 
-    fun deleteRule(rule: RecurringTransaction) = viewModelScope.launch {
-        repository.delete(rule)
-    }
+    fun deleteRule(rule: RecurringTransaction) =
+        viewModelScope.launch {
+            repository.delete(rule)
+        }
 }

@@ -13,7 +13,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.test.core.app.ApplicationProvider
@@ -46,7 +45,6 @@ import java.util.Locale
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class NotificationHelperTest : BaseViewModelTest() {
-
     private lateinit var context: Application
     private lateinit var shadowNotificationManager: ShadowNotificationManager
 
@@ -62,12 +60,17 @@ class NotificationHelperTest : BaseViewModelTest() {
 
         // Create all necessary notification channels for the tests
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channels = listOf(
-                NotificationChannel(MainApplication.BACKUP_CHANNEL_ID, "Backups", NotificationManager.IMPORTANCE_LOW),
-                NotificationChannel(MainApplication.DAILY_REPORT_CHANNEL_ID, "Daily Reports", NotificationManager.IMPORTANCE_DEFAULT),
-                NotificationChannel(MainApplication.RICH_TRANSACTION_CHANNEL_ID, "Rich Transactions", NotificationManager.IMPORTANCE_HIGH),
-                NotificationChannel(MainApplication.TRANSACTION_CHANNEL_ID, "Transactions", NotificationManager.IMPORTANCE_DEFAULT)
-            )
+            val channels =
+                listOf(
+                    NotificationChannel(MainApplication.BACKUP_CHANNEL_ID, "Backups", NotificationManager.IMPORTANCE_LOW),
+                    NotificationChannel(MainApplication.DAILY_REPORT_CHANNEL_ID, "Daily Reports", NotificationManager.IMPORTANCE_DEFAULT),
+                    NotificationChannel(
+                        MainApplication.RICH_TRANSACTION_CHANNEL_ID,
+                        "Rich Transactions",
+                        NotificationManager.IMPORTANCE_HIGH,
+                    ),
+                    NotificationChannel(MainApplication.TRANSACTION_CHANNEL_ID, "Transactions", NotificationManager.IMPORTANCE_DEFAULT),
+                )
             channels.forEach(notificationManager::createNotificationChannel)
         }
     }
@@ -82,7 +85,6 @@ class NotificationHelperTest : BaseViewModelTest() {
         val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
         val formattedTime = sdf.format(Date(backupTime))
         val expectedText = "Your Finlight data was successfully backed up at $formattedTime."
-
 
         // Act
         NotificationHelper.showAutoBackupNotification(context, backupTime)
@@ -123,15 +125,16 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showRichTransactionNotification_buildsCorrectlyWithActionsAndDeepLink`() {
         // Arrange
         val transactionId = 123
-        val details = TransactionDetails(
-            transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
-            images = emptyList(),
-            accountName = "Test Account",
-            categoryName = "Food",
-            categoryIconKey = "restaurant",
-            categoryColorKey = "red_light",
-            tagNames = null
-        )
+        val details =
+            TransactionDetails(
+                transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
+                images = emptyList(),
+                accountName = "Test Account",
+                categoryName = "Food",
+                categoryIconKey = "restaurant",
+                categoryColorKey = "red_light",
+                tagNames = null,
+            )
         val expectedUri = "app://finlight.pm.io/transaction_detail/$transactionId"
 
         // Act
@@ -166,7 +169,16 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showRecurringTransactionDueNotification_buildsCorrectlyWithDeepLinkAndAction`() {
         // Arrange
-        val potentialTxn = PotentialTransaction(456L, "RecurringSender", 599.0, "expense", "Netflix", "Recurring payment for Netflix", date = System.currentTimeMillis())
+        val potentialTxn =
+            PotentialTransaction(
+                456L,
+                "RecurringSender",
+                599.0,
+                "expense",
+                "Netflix",
+                "Recurring payment for Netflix",
+                date = System.currentTimeMillis(),
+            )
         val gson = Gson()
         val encodedJson = java.net.URLEncoder.encode(gson.toJson(potentialTxn), "UTF-8")
         val expectedUri = "app://finlight.pm.io/link_recurring/$encodedJson"
@@ -193,7 +205,8 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showTravelModeSmsNotification_buildsCorrectlyWithTwoActions`() {
         // Arrange
-        val potentialTxn = PotentialTransaction(789L, "TravelSender", 50.0, "expense", "Uber", "Uber ride", date = System.currentTimeMillis())
+        val potentialTxn =
+            PotentialTransaction(789L, "TravelSender", 50.0, "expense", "Uber", "Uber ride", date = System.currentTimeMillis())
         val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 83.5f)
 
         // Act
@@ -231,16 +244,17 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showRecurringPatternDetectedNotification_buildsCorrectly`() {
         // Arrange
-        val rule = io.pm.finlight.RecurringTransaction(
-            id = 1,
-            description = "Netflix",
-            amount = 199.0,
-            transactionType = "expense",
-            recurrenceInterval = "MONTHLY",
-            startDate = System.currentTimeMillis(),
-            accountId = 1,
-            categoryId = null
-        )
+        val rule =
+            io.pm.finlight.RecurringTransaction(
+                id = 1,
+                description = "Netflix",
+                amount = 199.0,
+                transactionType = "expense",
+                recurrenceInterval = "MONTHLY",
+                startDate = System.currentTimeMillis(),
+                accountId = 1,
+                categoryId = null,
+            )
         val expectedUri = "app://finlight.pm.io/add_recurring_transaction?ruleId=1"
 
         // Act
@@ -250,11 +264,11 @@ class NotificationHelperTest : BaseViewModelTest() {
         val notification = shadowNotificationManager.getNotification("pattern_${rule.id}".hashCode())
         assertNotNull(notification)
         assertEquals("New Recurring Transaction Found", notification.extras.getString(Notification.EXTRA_TITLE))
-        
+
         val contentPI = notification.contentIntent
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals(expectedUri, contentIntent.data.toString())
-        
+
         assertEquals(1, notification.actions.size)
         assertEquals("Review Rule", notification.actions[0].title)
     }
@@ -264,10 +278,11 @@ class NotificationHelperTest : BaseViewModelTest() {
         // Arrange
         val totalExpenses = 5000.0
         val percentageChange = 10 // +10%
-        val topCategories = listOf(
-            CategorySpending("Food", 2000.0, "red_light", "restaurant"),
-            CategorySpending("Travel", 1500.0, "blue_light", "travel_explore")
-        )
+        val topCategories =
+            listOf(
+                CategorySpending("Food", 2000.0, "red_light", "restaurant"),
+                CategorySpending("Travel", 1500.0, "blue_light", "travel_explore"),
+            )
         val expectedUri = "app://finlight.pm.io/report/WEEKLY"
 
         // Act
@@ -306,11 +321,11 @@ class NotificationHelperTest : BaseViewModelTest() {
         val notification = shadowNotificationManager.getNotification(4) // ID for Monthly Summary
         assertNotNull(notification)
         assertEquals("Spends down by 5% in January", notification.extras.getString(Notification.EXTRA_TITLE))
-        
+
         val contentPI = notification.contentIntent
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals(expectedUri, contentIntent.data.toString())
-        
+
         val inboxLines = notification.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
         assertNotNull(inboxLines)
         // Should show "No expenses recorded" since topCategories is empty
@@ -320,7 +335,17 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showAutoSaveConfirmationNotification_buildsCorrectly`() {
         // Arrange
-        val transaction = Transaction(id = 101, description = "Uber Ride", amount = 150.0, transactionType = "expense", date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null)
+        val transaction =
+            Transaction(
+                id = 101,
+                description = "Uber Ride",
+                amount = 150.0,
+                transactionType = "expense",
+                date = System.currentTimeMillis(),
+                accountId = 1,
+                categoryId = 1,
+                notes = null,
+            )
         val expectedUri = "app://finlight.pm.io/transaction_detail/101"
 
         // Act
@@ -331,11 +356,11 @@ class NotificationHelperTest : BaseViewModelTest() {
         assertNotNull(notification)
         assertEquals("Transaction Auto-Saved", notification.extras.getString(Notification.EXTRA_TITLE))
         assertTrue(notification.extras.getString(Notification.EXTRA_TEXT)?.contains("Saved Uber Ride (₹150.00)") == true)
-        
+
         val contentPI = notification.contentIntent
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals(expectedUri, contentIntent.data.toString())
-        
+
         assertEquals("finlight_transaction_group_101", notification.group)
         assertEquals(1, notification.actions.size)
         assertEquals("Edit", notification.actions[0].title)
@@ -344,7 +369,17 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showTransactionNotification_buildsCorrectly`() {
         // Arrange
-        val transaction = Transaction(id = 202, description = "Salary", amount = 50000.0, transactionType = "income", date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null)
+        val transaction =
+            Transaction(
+                id = 202,
+                description = "Salary",
+                amount = 50000.0,
+                transactionType = "income",
+                date = System.currentTimeMillis(),
+                accountId = 1,
+                categoryId = 1,
+                notes = null,
+            )
         val expectedUri = "app://finlight.pm.io/transaction_detail/202"
 
         // Act
@@ -354,14 +389,14 @@ class NotificationHelperTest : BaseViewModelTest() {
         val notification = shadowNotificationManager.getNotification(202)
         assertNotNull(notification)
         assertEquals("New Transaction Found", notification.extras.getString(Notification.EXTRA_TITLE))
-        
+
         val bigText = notification.extras.getString(NotificationCompat.EXTRA_BIG_TEXT)
         assertTrue(bigText?.contains("Income of ₹50000.00 from Salary detected") == true)
-        
+
         val contentPI = notification.contentIntent
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals(expectedUri, contentIntent.data.toString())
-        
+
         assertEquals(1, notification.actions.size)
         assertEquals("Review & Categorize", notification.actions[0].title)
     }
@@ -385,19 +420,23 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showRichTransactionNotification_withDifferentVisitCounts`() {
         // Arrange
         val transactionId = 123
-        val baseDetails = TransactionDetails(
-            transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
-            images = emptyList(),
-            accountName = "Test Account",
-            categoryName = "Food",
-            categoryIconKey = "restaurant",
-            categoryColorKey = "red_light",
-            tagNames = null
-        )
+        val baseDetails =
+            TransactionDetails(
+                transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
+                images = emptyList(),
+                accountName = "Test Account",
+                categoryName = "Food",
+                categoryIconKey = "restaurant",
+                categoryColorKey = "red_light",
+                tagNames = null,
+            )
 
         // Test visitCount = 1
         NotificationHelper.showRichTransactionNotification(context, baseDetails, 789.0, 1)
-        var inboxLines = shadowNotificationManager.getNotification(transactionId).extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
+        var inboxLines =
+            shadowNotificationManager.getNotification(
+                transactionId,
+            ).extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
         assertTrue(inboxLines!![1].toString().contains("This is your first visit here."))
 
         // Test visitCount = 2
@@ -420,15 +459,26 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showRichTransactionNotification_withIncomeType`() {
         // Arrange
         val transactionId = 123
-        val details = TransactionDetails(
-            transaction = Transaction(id = transactionId, description = "Salary", amount = 50000.0, transactionType = "income", date = 0L, accountId = 1, categoryId = 1, notes = null),
-            images = emptyList(),
-            accountName = "Test Account",
-            categoryName = "Salary",
-            categoryIconKey = "account_balance",
-            categoryColorKey = "green_light",
-            tagNames = null
-        )
+        val details =
+            TransactionDetails(
+                transaction =
+                    Transaction(
+                        id = transactionId,
+                        description = "Salary",
+                        amount = 50000.0,
+                        transactionType = "income",
+                        date = 0L,
+                        accountId = 1,
+                        categoryId = 1,
+                        notes = null,
+                    ),
+                images = emptyList(),
+                accountName = "Test Account",
+                categoryName = "Salary",
+                categoryIconKey = "account_balance",
+                categoryColorKey = "green_light",
+                tagNames = null,
+            )
 
         // Act
         NotificationHelper.showRichTransactionNotification(context, details, 50000.0, 0)
@@ -443,15 +493,26 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showRichTransactionNotification_withMissingIconKey`() {
         // Arrange
         val transactionId = 123
-        val details = TransactionDetails(
-            transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null),
-            images = emptyList(),
-            accountName = "Test Account",
-            categoryName = "Food",
-            categoryIconKey = null, // Will trigger letter icon
-            categoryColorKey = "red_light",
-            tagNames = null
-        )
+        val details =
+            TransactionDetails(
+                transaction =
+                    Transaction(
+                        id = transactionId,
+                        description = "Test Coffee",
+                        amount = 4.56,
+                        transactionType = "expense",
+                        date = 0L,
+                        accountId = 1,
+                        categoryId = 1,
+                        notes = null,
+                    ),
+                images = emptyList(),
+                accountName = "Test Account",
+                categoryName = "Food",
+                categoryIconKey = null, // Will trigger letter icon
+                categoryColorKey = "red_light",
+                tagNames = null,
+            )
 
         // Act
         NotificationHelper.showRichTransactionNotification(context, details, 789.0, 0)
@@ -505,15 +566,16 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showRichTransactionNotification_withVisitCount3`() {
         // Arrange
         val transactionId = 123
-        val details = TransactionDetails(
-            transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
-            images = emptyList(),
-            accountName = "Test Account",
-            categoryName = "Food",
-            categoryIconKey = "restaurant",
-            categoryColorKey = "red_light",
-            tagNames = null
-        )
+        val details =
+            TransactionDetails(
+                transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
+                images = emptyList(),
+                accountName = "Test Account",
+                categoryName = "Food",
+                categoryIconKey = "restaurant",
+                categoryColorKey = "red_light",
+                tagNames = null,
+            )
 
         // Act
         NotificationHelper.showRichTransactionNotification(context, details, 789.0, 3)
@@ -522,7 +584,7 @@ class NotificationHelperTest : BaseViewModelTest() {
         val notification = shadowNotificationManager.getNotification(transactionId)
         val inboxLines = notification.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
         assertTrue(inboxLines!![1].toString().contains("This is your 3rd visit here."))
-        
+
         // Assert random emoji is present from the list
         val emojis = listOf("🛍️", "✨", "🎉", "👍", "💸", "💳", "🛒", "✅", "💯", "🤩", "🚀", "🙌", "🔥")
         val line = inboxLines[1].toString()
@@ -533,15 +595,26 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showRichTransactionNotification_withLetterDefaultIconKey`() {
         // Arrange
         val transactionId = 321
-        val details = TransactionDetails(
-            transaction = Transaction(id = transactionId, description = "Misc", amount = 1.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null),
-            images = emptyList(),
-            accountName = "Test Account",
-            categoryName = "Other",
-            categoryIconKey = "letter_default",
-            categoryColorKey = "gray_light",
-            tagNames = null
-        )
+        val details =
+            TransactionDetails(
+                transaction =
+                    Transaction(
+                        id = transactionId,
+                        description = "Misc",
+                        amount = 1.0,
+                        transactionType = "expense",
+                        date = 0L,
+                        accountId = 1,
+                        categoryId = 1,
+                        notes = null,
+                    ),
+                images = emptyList(),
+                accountName = "Test Account",
+                categoryName = "Other",
+                categoryIconKey = "letter_default",
+                categoryColorKey = "gray_light",
+                tagNames = null,
+            )
 
         // Act
         NotificationHelper.showRichTransactionNotification(context, details, 1.0, 0)
@@ -555,15 +628,26 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showRichTransactionNotification_withCategoryIconKey`() {
         // Arrange
         val transactionId = 322
-        val details = TransactionDetails(
-            transaction = Transaction(id = transactionId, description = "Misc", amount = 1.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null),
-            images = emptyList(),
-            accountName = "Test Account",
-            categoryName = "Other",
-            categoryIconKey = "category",
-            categoryColorKey = "gray_light",
-            tagNames = null
-        )
+        val details =
+            TransactionDetails(
+                transaction =
+                    Transaction(
+                        id = transactionId,
+                        description = "Misc",
+                        amount = 1.0,
+                        transactionType = "expense",
+                        date = 0L,
+                        accountId = 1,
+                        categoryId = 1,
+                        notes = null,
+                    ),
+                images = emptyList(),
+                accountName = "Test Account",
+                categoryName = "Other",
+                categoryIconKey = "category",
+                categoryColorKey = "gray_light",
+                tagNames = null,
+            )
 
         // Act
         NotificationHelper.showRichTransactionNotification(context, details, 1.0, 0)
@@ -599,25 +683,37 @@ class NotificationHelperTest : BaseViewModelTest() {
 
     @Test
     fun `getFallbackDrawableRes_coversVariousIcons`() {
-        val iconsToTest = listOf(
-            "fastfood", "shopping_cart", "local_gas_station", "travel_explore",
-            "work", "school", "directions_car", "home", "shield", "star",
-            "swap_horiz", "trending_up", "redo", "add_card", "two_wheeler",
-            "credit_score", "pets", "account_balance", "more_horiz", "unknown_key"
-        )
-        
+        val iconsToTest =
+            listOf(
+                "fastfood", "shopping_cart", "local_gas_station", "travel_explore",
+                "work", "school", "directions_car", "home", "shield", "star",
+                "swap_horiz", "trending_up", "redo", "add_card", "two_wheeler",
+                "credit_score", "pets", "account_balance", "more_horiz", "unknown_key",
+            )
+
         iconsToTest.forEachIndexed { index, iconKey ->
             val transactionId = 1000 + index
-            val details = TransactionDetails(
-                transaction = Transaction(id = transactionId, description = "Icon Test", amount = 1.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null),
-                images = emptyList(),
-                accountName = "Test Account",
-                categoryName = "Test Category",
-                categoryIconKey = iconKey,
-                categoryColorKey = "blue_light",
-                tagNames = null
-            )
-            
+            val details =
+                TransactionDetails(
+                    transaction =
+                        Transaction(
+                            id = transactionId,
+                            description = "Icon Test",
+                            amount = 1.0,
+                            transactionType = "expense",
+                            date = 0L,
+                            accountId = 1,
+                            categoryId = 1,
+                            notes = null,
+                        ),
+                    images = emptyList(),
+                    accountName = "Test Account",
+                    categoryName = "Test Category",
+                    categoryIconKey = iconKey,
+                    categoryColorKey = "blue_light",
+                    tagNames = null,
+                )
+
             NotificationHelper.showRichTransactionNotification(context, details, 1.0, 0)
             val notification = shadowNotificationManager.getNotification(transactionId)
             assertNotNull("Icon should not be null for $iconKey", notification.getLargeIcon())
@@ -628,7 +724,17 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showNotification_onOlderSdk_worksWithoutPermissionCheck`() {
         // Arrange
-        val transaction = Transaction(id = 505, description = "Old SDK Test", amount = 10.0, transactionType = "expense", date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null)
+        val transaction =
+            Transaction(
+                id = 505,
+                description = "Old SDK Test",
+                amount = 10.0,
+                transactionType = "expense",
+                date = System.currentTimeMillis(),
+                accountId = 1,
+                categoryId = 1,
+                notes = null,
+            )
 
         // Act
         NotificationHelper.showTransactionNotification(context, transaction)
@@ -642,7 +748,8 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showTravelModeSmsNotification_whenPermissionDenied_doesNotPostNotification`() {
         // Arrange
         shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
-        val potentialTxn = PotentialTransaction(789L, "TravelSender", 50.0, "expense", "Uber", "Uber ride", date = System.currentTimeMillis())
+        val potentialTxn =
+            PotentialTransaction(789L, "TravelSender", 50.0, "expense", "Uber", "Uber ride", date = System.currentTimeMillis())
         val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 83.5f)
 
         // Act
@@ -657,7 +764,17 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showRecurringPatternDetectedNotification_whenPermissionDenied_doesNotPost`() {
         // Arrange
         shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
-        val rule = io.pm.finlight.RecurringTransaction(id = 8, description = "Test", amount = 1.0, transactionType = "expense", recurrenceInterval = "DAILY", startDate = 0L, accountId = 1, categoryId = null)
+        val rule =
+            io.pm.finlight.RecurringTransaction(
+                id = 8,
+                description = "Test",
+                amount = 1.0,
+                transactionType = "expense",
+                recurrenceInterval = "DAILY",
+                startDate = 0L,
+                accountId = 1,
+                categoryId = null,
+            )
 
         // Act
         NotificationHelper.showRecurringPatternDetectedNotification(context, rule)

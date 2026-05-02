@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -43,7 +44,8 @@ import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.CategorySelectionGrid
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.HelpActionIcon
+import io.pm.finlight.ui.components.InlineTextToolbarActionBar
+import io.pm.finlight.ui.components.rememberInlineTextToolbar
 import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
@@ -56,12 +58,13 @@ import java.text.NumberFormat
 
 private sealed class ApproveSheetContent {
     object Category : ApproveSheetContent()
+
     object Tags : ApproveSheetContent()
+
     object Description : ApproveSheetContent()
 }
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,10 +77,11 @@ fun ReviewSmsScreen(
 
     var hasLoadedOnce by remember { mutableStateOf(false) }
 
-    val linkedSmsIdState = navController.currentBackStackEntry
-        ?.savedStateHandle
-        ?.getLiveData<Long>("linked_sms_id")
-        ?.observeAsState()
+    val linkedSmsIdState =
+        navController.currentBackStackEntry
+            ?.savedStateHandle
+            ?.getLiveData<Long>("linked_sms_id")
+            ?.observeAsState()
     val linkedSmsId = linkedSmsIdState?.value
 
     LaunchedEffect(linkedSmsId) {
@@ -136,7 +140,7 @@ fun ReviewSmsScreen(
                         val json = Gson().toJson(transaction)
                         val encodedJson = URLEncoder.encode(json, "UTF-8")
                         navController.navigate("link_transaction_screen/$encodedJson")
-                    }
+                    },
                 )
             }
         }
@@ -149,7 +153,7 @@ fun PotentialTransactionItem(
     onDismiss: (PotentialTransaction) -> Unit,
     onApprove: (PotentialTransaction) -> Unit,
     onCreateRule: (PotentialTransaction) -> Unit,
-    onLink: (PotentialTransaction) -> Unit
+    onLink: (PotentialTransaction) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(2.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -174,7 +178,7 @@ fun PotentialTransactionItem(
                     text = "Account: ${it.formattedName} (${it.accountType})",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.secondary
+                    color = MaterialTheme.colorScheme.secondary,
                 )
             }
             Spacer(Modifier.height(4.dp))
@@ -263,17 +267,18 @@ fun ApproveTransactionScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
                 GlassPanel {
@@ -282,19 +287,19 @@ fun ApproveTransactionScreen(
                             .padding(vertical = 24.dp, horizontal = 16.dp)
                             .fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
                             text = description.text.ifBlank { "Description" },
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.clickable { activeSheetContent = ApproveSheetContent.Description }
+                            modifier = Modifier.clickable { activeSheetContent = ApproveSheetContent.Description },
                         )
                         Text(
                             "$currencySymbol${"%,.2f".format(potentialTxn.amount)}",
                             style = MaterialTheme.typography.displaySmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         val currentTravelSettings = travelModeSettings
                         if (isForeign && currentTravelSettings != null) {
@@ -302,7 +307,7 @@ fun ApproveTransactionScreen(
                             Text(
                                 "≈ $homeCurrencySymbol${NumberFormat.getInstance().format(convertedAmount)}",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -311,39 +316,44 @@ fun ApproveTransactionScreen(
             item {
                 val glassFillColor = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.04f)
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(CircleShape)
-                        .background(glassFillColor)
-                        .border(1.dp, GlassPanelBorder, CircleShape)
-                        .padding(4.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(CircleShape)
+                            .background(glassFillColor)
+                            .border(1.dp, GlassPanelBorder, CircleShape)
+                            .padding(4.dp),
                     horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Button(
                         onClick = { selectedTransactionType = "expense" },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .height(48.dp),
                         shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selectedTransactionType == "expense") MaterialTheme.colorScheme.primary else Color.Transparent,
-                            contentColor = if (selectedTransactionType == "expense") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                        ),
-                        elevation = null
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = if (selectedTransactionType == "expense") MaterialTheme.colorScheme.primary else Color.Transparent,
+                                contentColor = if (selectedTransactionType == "expense") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            ),
+                        elevation = null,
                     ) { Text("Expense", fontWeight = FontWeight.Bold) }
 
                     Button(
                         onClick = { selectedTransactionType = "income" },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .height(48.dp),
                         shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selectedTransactionType == "income") MaterialTheme.colorScheme.primary else Color.Transparent,
-                            contentColor = if (selectedTransactionType == "income") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                        ),
-                        elevation = null
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = if (selectedTransactionType == "income") MaterialTheme.colorScheme.primary else Color.Transparent,
+                                contentColor = if (selectedTransactionType == "income") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            ),
+                        elevation = null,
                     ) { Text("Income", fontWeight = FontWeight.Bold) }
                 }
             }
@@ -355,7 +365,7 @@ fun ApproveTransactionScreen(
                             icon = Icons.Default.AccountBalanceWallet,
                             label = "Account",
                             value = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account",
-                            onClick = null
+                            onClick = null,
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                         DetailRow(
@@ -364,14 +374,14 @@ fun ApproveTransactionScreen(
                             value = selectedCategory?.name ?: "Select category",
                             onClick = { activeSheetContent = ApproveSheetContent.Category },
                             valueColor = if (selectedCategory == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                            leadingIcon = { selectedCategory?.let { CategoryIcon(it, Modifier.size(24.dp)) } }
+                            leadingIcon = { selectedCategory?.let { CategoryIcon(it, Modifier.size(24.dp)) } },
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                         DetailRow(
                             icon = Icons.Default.NewLabel,
                             label = "Tags",
                             value = if (selectedTags.isEmpty()) "Add tags" else selectedTags.joinToString { it.name },
-                            onClick = { activeSheetContent = ApproveSheetContent.Tags }
+                            onClick = { activeSheetContent = ApproveSheetContent.Tags },
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                         OutlinedTextField(
@@ -379,35 +389,47 @@ fun ApproveTransactionScreen(
                             onValueChange = { notes = it },
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("Add notes...") },
-                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = "Notes", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                unfocusedBorderColor = Color.Transparent,
-                                focusedBorderColor = Color.Transparent,
-                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                            )
+                            leadingIcon = {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Notes,
+                                    contentDescription = "Notes",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            colors =
+                                OutlinedTextFieldDefaults.colors(
+                                    unfocusedBorderColor = Color.Transparent,
+                                    focusedBorderColor = Color.Transparent,
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                ),
                         )
                     }
                 }
             }
             item {
-                Row(modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
                     OutlinedButton(onClick = { navController.popBackStack() }, modifier = Modifier.weight(1f)) {
                         Text("Cancel")
                     }
                     Button(
                         onClick = {
                             scope.launch {
-                                val success = transactionViewModel.approveSmsTransaction(
-                                    potentialTxn = potentialTxn,
-                                    description = description.text,
-                                    categoryId = selectedCategory?.id,
-                                    notes = notes.text.takeIf { it.isNotBlank() },
-                                    tags = selectedTags,
-                                    isForeign = isForeign
-                                )
+                                val success =
+                                    transactionViewModel.approveSmsTransaction(
+                                        potentialTxn = potentialTxn,
+                                        description = description.text,
+                                        categoryId = selectedCategory?.id,
+                                        notes = notes.text.takeIf { it.isNotBlank() },
+                                        tags = selectedTags,
+                                        isForeign = isForeign,
+                                    )
                                 if (success) {
                                     settingsViewModel.onTransactionApproved(potentialTxn.sourceSmsId)
                                     val merchantName = potentialTxn.merchantName
@@ -416,13 +438,18 @@ fun ApproveTransactionScreen(
                                     }
 
                                     if (merchantName != null && selectedCategory != null) {
-                                        val mapping = MerchantCategoryMapping(
-                                            parsedName = merchantName,
-                                            categoryId = selectedCategory!!.id
-                                        )
+                                        val mapping =
+                                            MerchantCategoryMapping(
+                                                parsedName = merchantName,
+                                                categoryId = selectedCategory!!.id,
+                                            )
                                         val autoImportedCount = settingsViewModel.applyLearningAndAutoImport(mapping)
                                         if (autoImportedCount > 0) {
-                                            Toast.makeText(context, "Auto-saved $autoImportedCount similar transaction(s)!", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(
+                                                context,
+                                                "Auto-saved $autoImportedCount similar transaction(s)!",
+                                                Toast.LENGTH_LONG,
+                                            ).show()
                                         }
                                     }
 
@@ -445,47 +472,57 @@ fun ApproveTransactionScreen(
             onDismissRequest = { activeSheetContent = null },
             sheetState = sheetState,
             windowInsets = WindowInsets(0),
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         ) {
             when (activeSheetContent) {
-                is ApproveSheetContent.Category -> ApproveCategoryPickerSheet(
-                    items = categories,
-                    onItemSelected = { selectedCategory = it; activeSheetContent = null }
-                )
-                is ApproveSheetContent.Tags -> ApproveTagPickerSheet(
-                    allTags = allTags,
-                    selectedTags = selectedTags,
-                    onTagSelected = transactionViewModel::onTagSelected,
-                    onAddNewTag = transactionViewModel::addTagOnTheGo,
-                    onConfirm = { activeSheetContent = null }
-                )
+                is ApproveSheetContent.Category ->
+                    ApproveCategoryPickerSheet(
+                        items = categories,
+                        onItemSelected = {
+                            selectedCategory = it
+                            activeSheetContent = null
+                        },
+                    )
+                is ApproveSheetContent.Tags ->
+                    ApproveTagPickerSheet(
+                        allTags = allTags,
+                        selectedTags = selectedTags,
+                        onTagSelected = transactionViewModel::onTagSelected,
+                        onAddNewTag = transactionViewModel::addTagOnTheGo,
+                        onConfirm = { activeSheetContent = null },
+                    )
                 is ApproveSheetContent.Description -> {
                     var tempDescription by remember {
                         mutableStateOf(TextFieldValue(description.text, TextRange(description.text.length)))
                     }
-                    Column(
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .navigationBarsPadding(),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text("Edit Description", style = MaterialTheme.typography.titleLarge)
-                        OutlinedTextField(
-                            value = tempDescription,
-                            onValueChange = { tempDescription = it },
-                            label = { Text("Description") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
+                    val inlineToolbar = rememberInlineTextToolbar()
+                    CompositionLocalProvider(LocalTextToolbar provides inlineToolbar) {
+                        Column(
+                            modifier =
+                                Modifier
+                                    .padding(16.dp)
+                                    .navigationBarsPadding(),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
-                            TextButton(onClick = { activeSheetContent = null }) { Text("Cancel") }
-                            Spacer(Modifier.width(8.dp))
-                            Button(onClick = {
-                                description = tempDescription
-                                activeSheetContent = null
-                            }) { Text("Done") }
+                            Text("Edit Description", style = MaterialTheme.typography.titleLarge)
+                            InlineTextToolbarActionBar(inlineToolbar)
+                            OutlinedTextField(
+                                value = tempDescription,
+                                onValueChange = { tempDescription = it },
+                                label = { Text("Description") },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                TextButton(onClick = { activeSheetContent = null }) { Text("Cancel") }
+                                Spacer(Modifier.width(8.dp))
+                                Button(onClick = {
+                                    description = tempDescription
+                                    activeSheetContent = null
+                                }) { Text("Done") }
+                            }
                         }
                     }
                 }
@@ -502,14 +539,15 @@ private fun DetailRow(
     value: String,
     onClick: (() -> Unit)?,
     valueColor: Color = MaterialTheme.colorScheme.onSurface,
-    leadingIcon: (@Composable () -> Unit)? = null
+    leadingIcon: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+                .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leadingIcon != null) {
             leadingIcon()
@@ -528,19 +566,22 @@ private fun DetailRow(
 @Composable
 private fun ApproveCategoryPickerSheet(
     items: List<Category>,
-    onItemSelected: (Category) -> Unit
+    onItemSelected: (Category) -> Unit,
 ) {
-    Column(modifier = Modifier
-        .navigationBarsPadding()
-        .fillMaxHeight()) {
+    Column(
+        modifier =
+            Modifier
+                .navigationBarsPadding()
+                .fillMaxHeight(),
+    ) {
         Text(
             "Select Category",
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(16.dp),
         )
         CategorySelectionGrid(
             categories = items,
-            onCategorySelected = onItemSelected
+            onCategorySelected = onItemSelected,
         )
         Spacer(Modifier.height(16.dp))
     }
@@ -553,29 +594,30 @@ private fun ApproveTagPickerSheet(
     selectedTags: Set<Tag>,
     onTagSelected: (Tag) -> Unit,
     onAddNewTag: (String) -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
 ) {
     var newTagName by remember { mutableStateOf(TextFieldValue("")) }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .navigationBarsPadding()
-            .fillMaxHeight(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .navigationBarsPadding()
+                .fillMaxHeight(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("Manage Tags", style = MaterialTheme.typography.titleLarge)
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             allTags.forEach { tag ->
                 FilterChip(
                     selected = tag in selectedTags,
                     onClick = { onTagSelected(tag) },
-                    label = { Text(tag.name) }
+                    label = { Text(tag.name) },
                 )
             }
         }
@@ -583,20 +625,20 @@ private fun ApproveTagPickerSheet(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedTextField(
                 value = newTagName,
                 onValueChange = { newTagName = it },
                 label = { Text("New Tag Name") },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
             IconButton(
                 onClick = {
                     onAddNewTag(newTagName.text)
                     newTagName = TextFieldValue("")
                 },
-                enabled = newTagName.text.isNotBlank()
+                enabled = newTagName.text.isNotBlank(),
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add New Tag")
             }
@@ -604,7 +646,7 @@ private fun ApproveTagPickerSheet(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(onClick = onConfirm) { Text("Cancel") }
             Spacer(modifier = Modifier.width(8.dp))
@@ -619,26 +661,30 @@ private fun ApproveTagPickerSheet(
 }
 
 @Composable
-private fun CategoryIcon(category: Category, modifier: Modifier = Modifier) {
+private fun CategoryIcon(
+    category: Category,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        modifier = modifier
-            .clip(CircleShape)
-            .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .clip(CircleShape)
+                .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
+        contentAlignment = Alignment.Center,
     ) {
         if (category.iconKey == "letter_default") {
             Text(
                 text = category.name.firstOrNull()?.uppercase() ?: "?",
                 fontWeight = FontWeight.Bold,
                 color = Color.Black,
-                fontSize = 22.sp
+                fontSize = 22.sp,
             )
         } else {
             Icon(
                 imageVector = CategoryIconHelper.getIcon(category.iconKey),
                 contentDescription = null,
                 tint = Color.Black,
-                modifier = Modifier.padding(12.dp)
+                modifier = Modifier.padding(12.dp),
             )
         }
     }

@@ -42,13 +42,17 @@ class AccountRepository(private val db: AppDatabase) {
      * @param destinationAccountId The ID of the account to keep.
      * @param sourceAccountIds The IDs of the accounts to merge and delete.
      */
-    suspend fun mergeAccounts(destinationAccountId: Int, sourceAccountIds: List<Int>) {
+    suspend fun mergeAccounts(
+        destinationAccountId: Int,
+        sourceAccountIds: List<Int>,
+    ) {
         db.withTransaction {
             // --- NEW: Create aliases for the source accounts before deleting them ---
             val sourceAccounts = sourceAccountIds.mapNotNull { db.accountDao().getAccountByIdBlocking(it) }
-            val aliases = sourceAccounts.map {
-                AccountAlias(aliasName = it.name, destinationAccountId = destinationAccountId)
-            }
+            val aliases =
+                sourceAccounts.map {
+                    AccountAlias(aliasName = it.name, destinationAccountId = destinationAccountId)
+                }
             if (aliases.isNotEmpty()) {
                 db.accountAliasDao().insertAll(aliases)
             }

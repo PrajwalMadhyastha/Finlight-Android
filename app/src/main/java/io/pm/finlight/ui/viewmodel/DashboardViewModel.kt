@@ -29,7 +29,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -39,7 +38,7 @@ data class ConsistencyStats(val goodDays: Int, val badDays: Int, val noSpendDays
 
 data class LastMonthSummary(
     val totalIncome: Double,
-    val totalExpenses: Double
+    val totalExpenses: Double,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -49,11 +48,10 @@ class DashboardViewModel(
     private val budgetDao: BudgetDao,
     private val settingsRepository: SettingsRepository,
     private val merchantRenameRuleRepository: MerchantRenameRuleRepository,
-    private val timeProvider: TimeProvider // Added dependency
+    private val timeProvider: TimeProvider, // Added dependency
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
-
 
     val netWorth: StateFlow<Long>
     val monthlyIncome: StateFlow<Long>
@@ -74,6 +72,7 @@ class DashboardViewModel(
 
     val yearlyConsistencyData: StateFlow<List<CalendarDayStatus>>
     val budgetHealthSummary: StateFlow<String>
+
     // --- FIX: Use a counter instead of a timestamp to avoid race conditions in tests ---
     private val _summaryRefreshTrigger = MutableStateFlow(0L)
 
@@ -86,33 +85,35 @@ class DashboardViewModel(
     val privacyModeEnabled: StateFlow<Boolean>
     private val merchantAliases: StateFlow<Map<String, String>>
 
-
     init {
-        userName = settingsRepository.getUserName()
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = "User"
-            )
+        userName =
+            settingsRepository.getUserName()
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5000),
+                    initialValue = "User",
+                )
 
-        profilePictureUri = settingsRepository.getProfilePictureUri()
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = null
-            )
+        profilePictureUri =
+            settingsRepository.getProfilePictureUri()
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5000),
+                    initialValue = null,
+                )
 
-        privacyModeEnabled = settingsRepository.getPrivacyModeEnabled()
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = false
-            )
+        privacyModeEnabled =
+            settingsRepository.getPrivacyModeEnabled()
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5000),
+                    initialValue = false,
+                )
 
-        merchantAliases = merchantRenameRuleRepository.getAliasesAsMap()
-            .map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
-
+        merchantAliases =
+            merchantRenameRuleRepository.getAliasesAsMap()
+                .map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
         viewModelScope.launch {
             settingsRepository.getDashboardCardOrder().collect {
@@ -127,14 +128,15 @@ class DashboardViewModel(
 
         allCards = _cardOrder.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-        visibleCards = combine(
-            _cardOrder,
-            _visibleCardsSet
-        ) { order, visible ->
-            order.filter { it in visible }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        visibleCards =
+            combine(
+                _cardOrder,
+                _visibleCardsSet,
+            ) { order, visible ->
+                order.filter { it in visible }
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-        val calendar = Calendar.getInstance()
+        val calendar = timeProvider.now()
         monthYear = SimpleDateFormat("MMMM", Locale.getDefault()).format(calendar.time)
 
         checkForLastMonthSummary()
@@ -158,14 +160,17 @@ class DashboardViewModel(
                 set(Calendar.MILLISECOND, 999)
             }.timeInMillis
 
-        val financialSummaryFlow = transactionRepository.getFinancialSummaryForRangeFlow(monthStart, monthEnd)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        val financialSummaryFlow =
+            transactionRepository.getFinancialSummaryForRangeFlow(monthStart, monthEnd)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-        monthlyIncome = financialSummaryFlow.map { (it?.totalIncome ?: 0.0).roundToLong() }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+        monthlyIncome =
+            financialSummaryFlow.map { (it?.totalIncome ?: 0.0).roundToLong() }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-        monthlyExpenses = financialSummaryFlow.map { (it?.totalExpenses ?: 0.0).roundToLong() }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+        monthlyExpenses =
+            financialSummaryFlow.map { (it?.totalExpenses ?: 0.0).roundToLong() }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
         val currentYear = calendar.get(Calendar.YEAR)
         val currentMonth = calendar.get(Calendar.MONTH) + 1
@@ -183,113 +188,115 @@ class DashboardViewModel(
 
         safeToSpendPerDay =
             amountRemaining.map { remaining ->
-                val today = Calendar.getInstance()
+                val today = timeProvider.now()
                 val lastDayOfMonth = today.getActualMaximum(Calendar.DAY_OF_MONTH)
                 val remainingDays = (lastDayOfMonth - today.get(Calendar.DAY_OF_MONTH) + 1).coerceAtLeast(1)
 
                 if (remaining > 0) (remaining.toDouble() / remainingDays).roundToLong() else 0L
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-        budgetHealthSummary = combine(
-            monthlyExpenses,
-            overallMonthlyBudget,
-            _summaryRefreshTrigger
-        ) { expenses, budget, trigger ->
-            Triple(expenses, budget, trigger)
-        }.flatMapLatest { (expenses, budget) ->
-            if (budget <= 0L) {
-                return@flatMapLatest flowOf("Set a budget to see insights")
-            }
-
-            flow {
-                // --- Spending Velocity & Forecasting Logic ---
-                val cal = Calendar.getInstance()
-                val lookbackPeriodDays = 3
-                val lookbackStartDate = (cal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -lookbackPeriodDays) }.timeInMillis
-                val recentSpend = transactionRepository.getTotalExpensesSince(lookbackStartDate)
-                val spendingVelocity = if (lookbackPeriodDays > 0) recentSpend / lookbackPeriodDays.toDouble() else 0.0
-
-                val dayOfMonth = cal.get(Calendar.DAY_OF_MONTH)
-                val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
-                val daysLeft = (daysInMonth - dayOfMonth).coerceAtLeast(0)
-                val forecastedSpend = expenses + (spendingVelocity * daysLeft)
-
-                val percentOfMonthPassed = dayOfMonth.toFloat() / daysInMonth.toFloat()
-                val percentOfBudgetSpent = if (budget > 0) (expenses.toFloat() / budget.toFloat()) else 0f
-
-                val message = when {
-                    // Scenario C: Still Pacing High (High total spend AND high recent spend)
-                    percentOfBudgetSpent > percentOfMonthPassed && forecastedSpend > budget -> {
-                        listOf(
-                            "Pacing high this month",
-                            "Time to ease up on spending",
-                            "Still trending over budget",
-                            "Let's slow things down",
-                            "Watch the spending a bit",
-                            "Pacing is still high",
-                            "A bit too fast this month",
-                            "Time to pump the brakes",
-                            "Budget feeling the pressure",
-                            "Trending to overspend",
-                            "Ease up for a bit",
-                            "Spending's running hot"
-                        ).random()
-                    }
-                    // Scenario D: Recently Slipped Up (OK total spend, but high recent spend)
-                    percentOfBudgetSpent <= percentOfMonthPassed && forecastedSpend > budget -> {
-                        listOf(
-                            "Spending picked up recently",
-                            "Careful, trending over",
-                            "Watch the recent spending",
-                            "Pace increased lately",
-                            "A recent slip-up",
-                            "Let's get back on track",
-                            "Trending high lately",
-                            "A small adjustment helps",
-                            "Avoid a spending spree",
-                            "Back on the brakes",
-                            "Recent uptick in spending",
-                            "Tighten up a bit"
-                        ).random()
-                    }
-                    // Scenario A: Back on Track (High total spend, but low recent spend)
-                    percentOfBudgetSpent > percentOfMonthPassed && forecastedSpend <= budget -> {
-                        listOf(
-                            "Nice recovery! On pace now",
-                            "Spending slowed nicely",
-                            "Back on track!",
-                            "Great spending adjustment",
-                            "You've course-corrected!",
-                            "Well done reining it in",
-                            "Pacing is now under control",
-                            "Rest of month looks good",
-                            "Good save! Keep it up",
-                            "Back within your plan",
-                            "Perfect correction",
-                            "Nicely rebalanced"
-                        ).random()
-                    }
-                    // Scenario B: Consistently Good
-                    else -> {
-                        listOf(
-                            "Excellent pacing!",
-                            "On track with room to spare",
-                            "Well within budget!",
-                            "Budget looking healthy",
-                            "Consistently great spending",
-                            "Keep this momentum going!",
-                            "Smooth sailing this month",
-                            "Building a nice buffer",
-                            "Perfectly on track",
-                            "Another great spending day",
-                            "Crushing it this month",
-                            "Budget in great shape"
-                        ).random()
-                    }
+        budgetHealthSummary =
+            combine(
+                monthlyExpenses,
+                overallMonthlyBudget,
+                _summaryRefreshTrigger,
+            ) { expenses, budget, trigger ->
+                Triple(expenses, budget, trigger)
+            }.flatMapLatest { (expenses, budget) ->
+                if (budget <= 0L) {
+                    return@flatMapLatest flowOf("Set a budget to see insights")
                 }
-                emit(message)
-            }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Monthly Budget")
+
+                flow {
+                    // --- Spending Velocity & Forecasting Logic ---
+                    val cal = timeProvider.now()
+                    val lookbackPeriodDays = 3
+                    val lookbackStartDate = (cal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -lookbackPeriodDays) }.timeInMillis
+                    val recentSpend = transactionRepository.getTotalExpensesSince(lookbackStartDate)
+                    val spendingVelocity = if (lookbackPeriodDays > 0) recentSpend / lookbackPeriodDays.toDouble() else 0.0
+
+                    val dayOfMonth = cal.get(Calendar.DAY_OF_MONTH)
+                    val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                    val daysLeft = (daysInMonth - dayOfMonth).coerceAtLeast(0)
+                    val forecastedSpend = expenses + (spendingVelocity * daysLeft)
+
+                    val percentOfMonthPassed = dayOfMonth.toFloat() / daysInMonth.toFloat()
+                    val percentOfBudgetSpent = if (budget > 0) (expenses.toFloat() / budget.toFloat()) else 0f
+
+                    val message =
+                        when {
+                            // Scenario C: Still Pacing High (High total spend AND high recent spend)
+                            percentOfBudgetSpent > percentOfMonthPassed && forecastedSpend > budget -> {
+                                listOf(
+                                    "Pacing high this month",
+                                    "Time to ease up on spending",
+                                    "Still trending over budget",
+                                    "Let's slow things down",
+                                    "Watch the spending a bit",
+                                    "Pacing is still high",
+                                    "A bit too fast this month",
+                                    "Time to pump the brakes",
+                                    "Budget feeling the pressure",
+                                    "Trending to overspend",
+                                    "Ease up for a bit",
+                                    "Spending's running hot",
+                                ).random()
+                            }
+                            // Scenario D: Recently Slipped Up (OK total spend, but high recent spend)
+                            percentOfBudgetSpent <= percentOfMonthPassed && forecastedSpend > budget -> {
+                                listOf(
+                                    "Spending picked up recently",
+                                    "Careful, trending over",
+                                    "Watch the recent spending",
+                                    "Pace increased lately",
+                                    "A recent slip-up",
+                                    "Let's get back on track",
+                                    "Trending high lately",
+                                    "A small adjustment helps",
+                                    "Avoid a spending spree",
+                                    "Back on the brakes",
+                                    "Recent uptick in spending",
+                                    "Tighten up a bit",
+                                ).random()
+                            }
+                            // Scenario A: Back on Track (High total spend, but low recent spend)
+                            percentOfBudgetSpent > percentOfMonthPassed && forecastedSpend <= budget -> {
+                                listOf(
+                                    "Nice recovery! On pace now",
+                                    "Spending slowed nicely",
+                                    "Back on track!",
+                                    "Great spending adjustment",
+                                    "You've course-corrected!",
+                                    "Well done reining it in",
+                                    "Pacing is now under control",
+                                    "Rest of month looks good",
+                                    "Good save! Keep it up",
+                                    "Back within your plan",
+                                    "Perfect correction",
+                                    "Nicely rebalanced",
+                                ).random()
+                            }
+                            // Scenario B: Consistently Good
+                            else -> {
+                                listOf(
+                                    "Excellent pacing!",
+                                    "On track with room to spare",
+                                    "Well within budget!",
+                                    "Budget looking healthy",
+                                    "Consistently great spending",
+                                    "Keep this momentum going!",
+                                    "Smooth sailing this month",
+                                    "Building a nice buffer",
+                                    "Perfectly on track",
+                                    "Another great spending day",
+                                    "Crushing it this month",
+                                    "Budget in great shape",
+                                ).random()
+                            }
+                        }
+                    emit(message)
+                }
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Monthly Budget")
 
         netWorth =
             accountRepository.accountsWithBalance.map { list ->
@@ -304,8 +311,9 @@ class DashboardViewModel(
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         val yearMonthString = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
-        budgetStatus = budgetDao.getBudgetsWithSpendingForMonth(yearMonthString, currentMonth, currentYear)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        budgetStatus =
+            budgetDao.getBudgetsWithSpendingForMonth(yearMonthString, currentMonth, currentYear)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         accountsSummary =
             accountRepository.accountsWithBalance
@@ -316,35 +324,41 @@ class DashboardViewModel(
                 )
 
         // --- REFACTORED: Use the new "Monthly-First" centralized logic ---
-        yearlyConsistencyData = flow {
-            val today = Calendar.getInstance()
-            val year = today.get(Calendar.YEAR)
+        yearlyConsistencyData =
+            flow {
+                val today = timeProvider.now()
+                val year = today.get(Calendar.YEAR)
 
-            // Create a flow for each month of the current year
-            // --- FIX: Add explicit types to resolve build error ---
-            val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> = (1..12).map { month ->
-                transactionRepository.getMonthlyConsistencyData(year, month)
-            }
+                // Create a flow for each month of the current year
+                // --- FIX: Add explicit types to resolve build error ---
+                val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> =
+                    (1..12).map { month ->
+                        transactionRepository.getMonthlyConsistencyData(year, month)
+                    }
 
-            // Combine all 12 flows
-            // --- FIX: This is the corrected logic ---
-            val combinedFlow: Flow<List<CalendarDayStatus>> = combine(monthlyDataFlows) { monthlyDataArray: Array<List<CalendarDayStatus>> ->
-                monthlyDataArray.toList().flatten() // Flatten the Array<List> into a single List
-            }
+                // Combine all 12 flows
+                // --- FIX: This is the corrected logic ---
+                val combinedFlow: Flow<List<CalendarDayStatus>> =
+                    combine(monthlyDataFlows) { monthlyDataArray: Array<List<CalendarDayStatus>> ->
+                        monthlyDataArray.toList().flatten() // Flatten the Array<List> into a single List
+                    }
 
-            // Collect the combined flow and emit its single list result
-            combinedFlow.collect { combinedYearlyData: List<CalendarDayStatus> ->
-                emit(combinedYearlyData)
-            }
-        }.flowOn(Dispatchers.Default)
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
+                // Collect the combined flow and emit its single list result
+                combinedFlow.collect { combinedYearlyData: List<CalendarDayStatus> ->
+                    emit(combinedYearlyData)
+                }
+            }.flowOn(Dispatchers.Default)
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5000),
+                    initialValue = emptyList(),
+                )
     }
 
-    private fun applyAliases(transactions: List<TransactionDetails>, aliases: Map<String, String>): List<TransactionDetails> {
+    private fun applyAliases(
+        transactions: List<TransactionDetails>,
+        aliases: Map<String, String>,
+    ): List<TransactionDetails> {
         return transactions.map { details ->
             val key = (details.transaction.originalDescription ?: details.transaction.description).lowercase(Locale.getDefault())
             val newDescription = aliases[key] ?: details.transaction.description
@@ -365,16 +379,16 @@ class DashboardViewModel(
                 val (start, end) = DateUtils.getPreviousMonthDateRange()
                 transactionRepository.getFinancialSummaryForRangeFlow(start, end).collect { summary ->
                     if (summary != null) {
-                        _lastMonthSummary.value = LastMonthSummary(
-                            totalIncome = summary.totalIncome,
-                            totalExpenses = summary.totalExpenses
-                        )
+                        _lastMonthSummary.value =
+                            LastMonthSummary(
+                                totalIncome = summary.totalIncome,
+                                totalExpenses = summary.totalExpenses,
+                            )
                     }
                 }
             }
         }
     }
-
 
     fun refreshBudgetSummary() {
         // --- FIX: Use a counter to guarantee a new value ---
@@ -383,7 +397,10 @@ class DashboardViewModel(
 
     // --- DELETED: generateYearlyConsistencyData function ---
 
-    fun updateCardOrder(from: Int, to: Int) {
+    fun updateCardOrder(
+        from: Int,
+        to: Int,
+    ) {
         _cardOrder.update { currentList ->
             currentList.toMutableList().apply {
                 add(to, removeAt(from))

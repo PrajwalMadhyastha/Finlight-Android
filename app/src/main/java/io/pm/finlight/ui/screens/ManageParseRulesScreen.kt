@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -37,7 +36,6 @@ import androidx.navigation.NavController
 import io.pm.finlight.CustomSmsRule
 import io.pm.finlight.ManageParseRulesViewModel
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 
@@ -48,27 +46,28 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun ManageParseRulesScreen(
     navController: NavController,
-    viewModel: ManageParseRulesViewModel = viewModel()
+    viewModel: ManageParseRulesViewModel = viewModel(),
 ) {
     val rules by viewModel.allRules.collectAsState()
     var ruleToDelete by remember { mutableStateOf<CustomSmsRule?>(null) }
 
     if (rules.isEmpty()) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 "No custom parsing rules have been created yet.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     } else {
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             items(rules, key = { it.id }) { rule ->
                 RuleItemCard(
@@ -77,7 +76,7 @@ fun ManageParseRulesScreen(
                     onEditClick = {
                         navController.navigate("rule_creation_screen?ruleId=${rule.id}")
                     },
-                    onDeleteClick = { ruleToDelete = rule }
+                    onDeleteClick = { ruleToDelete = rule },
                 )
             }
         }
@@ -97,7 +96,7 @@ fun ManageParseRulesScreen(
                         viewModel.deleteRule(ruleToDelete!!)
                         ruleToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) {
                     Text("Delete")
                 }
@@ -107,7 +106,7 @@ fun ManageParseRulesScreen(
                     Text("Cancel")
                 }
             },
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         )
     }
 }
@@ -117,18 +116,18 @@ private fun RuleItemCard(
     modifier: Modifier = Modifier,
     rule: CustomSmsRule,
     onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
 ) {
     GlassPanel(
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = rule.triggerPhrase,
@@ -137,20 +136,20 @@ private fun RuleItemCard(
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 IconButton(onClick = onEditClick) {
                     Icon(
                         Icons.Default.Edit,
                         contentDescription = "Edit Rule",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 IconButton(onClick = onDeleteClick) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Delete Rule",
-                        tint = MaterialTheme.colorScheme.error
+                        tint = MaterialTheme.colorScheme.error,
                     )
                 }
             }
@@ -171,18 +170,21 @@ private fun RuleItemCard(
 }
 
 @Composable
-private fun RuleDetailRow(label: String, value: String) {
+private fun RuleDetailRow(
+    label: String,
+    value: String,
+) {
     Column {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

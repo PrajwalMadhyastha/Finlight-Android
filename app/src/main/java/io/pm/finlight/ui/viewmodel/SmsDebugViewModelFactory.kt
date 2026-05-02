@@ -18,7 +18,7 @@ import io.pm.finlight.ml.SmsClassifier
 
 class SmsDebugViewModelFactory(
     private val application: Application,
-    private val transactionViewModel: TransactionViewModel
+    private val transactionViewModel: TransactionViewModel,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SmsDebugViewModel::class.java)) {
@@ -34,7 +34,7 @@ class SmsDebugViewModelFactory(
                 db,
                 smsClassifier,
                 nerExtractor,
-                transactionViewModel
+                transactionViewModel,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

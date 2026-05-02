@@ -19,7 +19,6 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class NerExtractorTest {
-
     companion object {
         private const val TAG = "NerExtractorTest"
     }
@@ -52,29 +51,33 @@ class NerExtractorTest {
      */
     @Test
     fun testExtraction_withKnownTransactionalSms() {
-        val testCases = listOf(
-            TestCase(
-                message = "Your HDFC Bank A/C XX1234 debited Rs 500 at Amazon",
-                expectedEntities = mapOf(
-                    "AMOUNT" to listOf("rs", "500"),
-                    "MERCHANT" to listOf("amazon"),
+        val testCases =
+            listOf(
+                TestCase(
+                    message = "Your HDFC Bank A/C XX1234 debited Rs 500 at Amazon",
+                    expectedEntities =
+                        mapOf(
+                            "AMOUNT" to listOf("rs", "500"),
+                            "MERCHANT" to listOf("amazon"),
+                        ),
                 ),
-            ),
-            TestCase(
-                message = "INR 1200 charged to card XX5678 for Swiggy order",
-                expectedEntities = mapOf(
-                    "AMOUNT" to listOf("1200"),
-                    "MERCHANT" to listOf("swiggy"),
+                TestCase(
+                    message = "INR 1200 charged to card XX5678 for Swiggy order",
+                    expectedEntities =
+                        mapOf(
+                            "AMOUNT" to listOf("1200"),
+                            "MERCHANT" to listOf("swiggy"),
+                        ),
                 ),
-            ),
-            TestCase(
-                message = "Rs.267.00 spent on your SBI Credit Card ending with 3201 at DAKSHIN CAFE",
-                expectedEntities = mapOf(
-                    "AMOUNT" to listOf("267"),
-                    "MERCHANT" to listOf("dakshin", "cafe"),
+                TestCase(
+                    message = "Rs.267.00 spent on your SBI Credit Card ending with 3201 at DAKSHIN CAFE",
+                    expectedEntities =
+                        mapOf(
+                            "AMOUNT" to listOf("267"),
+                            "MERCHANT" to listOf("dakshin", "cafe"),
+                        ),
                 ),
-            ),
-        )
+            )
 
         testCases.forEach { tc ->
             val entities = extractor.extract(tc.message)
@@ -104,20 +107,21 @@ class NerExtractorTest {
      */
     @Test
     fun testExtraction_withVariousSmsFormats_doesNotCrash() {
-        val messages = listOf(
-            // Standard debit
-            "Sent Rs.11.00 From HDFC Bank A/C *1243 To Raju On 07/08/25",
-            // UPI transaction
-            "Rs.267.00 spent on your SBI Credit Card ending with 3201 at HALLI THOTA via UPI",
-            // Credit
-            "Your A/C XXXXX650077 Credited INR 1,41,453.00 on 15/07/25 - Deposit by transfer",
-            // ICICI
-            "ICICI Bank Acct XX823 debited for Rs 240.00 on 21-Jun-25; DAKSHIN CAFE credited.",
-            // Short message
-            "Rs 500 debited",
-            // Long message with noise
-            "Dear Customer, Your a/c XXXX1234 is debited with Rs.2,500.00 for purchase at FLIPKART on 01-Jan-26. Avl Bal Rs.15,234.56. If not done by you, call 18001234567.",
-        )
+        val messages =
+            listOf(
+                // Standard debit
+                "Sent Rs.11.00 From HDFC Bank A/C *1243 To Raju On 07/08/25",
+                // UPI transaction
+                "Rs.267.00 spent on your SBI Credit Card ending with 3201 at HALLI THOTA via UPI",
+                // Credit
+                "Your A/C XXXXX650077 Credited INR 1,41,453.00 on 15/07/25 - Deposit by transfer",
+                // ICICI
+                "ICICI Bank Acct XX823 debited for Rs 240.00 on 21-Jun-25; DAKSHIN CAFE credited.",
+                // Short message
+                "Rs 500 debited",
+                // Long message with noise
+                "Dear Customer, Your a/c XXXX1234 is debited with Rs.2,500.00 for purchase at FLIPKART on 01-Jan-26. Avl Bal Rs.15,234.56. If not done by you, call 18001234567.",
+            )
 
         val validEntityTypes = setOf("MERCHANT", "AMOUNT", "ACCOUNT", "BALANCE")
 
@@ -149,11 +153,12 @@ class NerExtractorTest {
      */
     @Test
     fun testExtraction_withNonTransactionalSms_producesMinimalEntities() {
-        val messages = listOf(
-            "Your OTP for login is 123456. Do not share this with anyone.",
-            "Congratulations! You have been selected for our exclusive rewards program.",
-            "Your Amazon order has been shipped and will arrive by tomorrow.",
-        )
+        val messages =
+            listOf(
+                "Your OTP for login is 123456. Do not share this with anyone.",
+                "Congratulations! You have been selected for our exclusive rewards program.",
+                "Your Amazon order has been shipped and will arrive by tomorrow.",
+            )
 
         messages.forEach { message ->
             val entities = extractor.extract(message)

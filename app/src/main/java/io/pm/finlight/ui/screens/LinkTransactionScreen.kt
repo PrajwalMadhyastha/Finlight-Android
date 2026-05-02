@@ -42,11 +42,12 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun LinkTransactionScreen(
     navController: NavController,
-    potentialTransactionJson: String
+    potentialTransactionJson: String,
 ) {
-    val potentialTxn = remember(potentialTransactionJson) {
-        Gson().fromJson(URLDecoder.decode(potentialTransactionJson, "UTF-8"), PotentialTransaction::class.java)
-    }
+    val potentialTxn =
+        remember(potentialTransactionJson) {
+            Gson().fromJson(URLDecoder.decode(potentialTransactionJson, "UTF-8"), PotentialTransaction::class.java)
+        }
 
     val application = LocalContext.current.applicationContext as Application
     val factory = LinkTransactionViewModelFactory(application, potentialTxn)
@@ -57,10 +58,11 @@ fun LinkTransactionScreen(
     var transactionToLink by remember { mutableStateOf<Transaction?>(null) }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         SmsDetailsCard(potentialTxn)
 
@@ -78,7 +80,7 @@ fun LinkTransactionScreen(
                         onClick = {
                             transactionToLink = transaction
                             showConfirmationDialog = true
-                        }
+                        },
                     )
                 }
             }
@@ -112,7 +114,7 @@ fun LinkTransactionScreen(
                     Text("Cancel")
                 }
             },
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         )
     }
 }
@@ -121,7 +123,7 @@ fun LinkTransactionScreen(
 private fun SmsDetailsCard(pt: PotentialTransaction) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(2.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("SMS Details", style = MaterialTheme.typography.titleLarge)
@@ -134,17 +136,20 @@ private fun SmsDetailsCard(pt: PotentialTransaction) {
 }
 
 @Composable
-private fun LinkCandidateItem(transaction: Transaction, onClick: () -> Unit) {
+private fun LinkCandidateItem(
+    transaction: Transaction,
+    onClick: () -> Unit,
+) {
     val dateFormatter = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(2.dp),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(transaction.description, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)

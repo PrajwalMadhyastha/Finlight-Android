@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -40,9 +39,7 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun TravelHistoryScreen(
-    navController: NavController
-) {
+fun TravelHistoryScreen(navController: NavController) {
     val application = LocalContext.current.applicationContext as Application
     val factory = HistoricTripsViewModelFactory(application)
     val viewModel: HistoricTripsViewModel = viewModel(factory = factory)
@@ -52,23 +49,25 @@ fun TravelHistoryScreen(
 
     if (trips.isEmpty()) {
         Box(
-            modifier = Modifier
-                .fillMaxSize(),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 "No past trips recorded.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
             )
         }
     } else {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize(),
+            modifier =
+                Modifier
+                    .fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             items(trips, key = { it.tripId }) { trip ->
                 HistoricTripItem(
@@ -76,7 +75,7 @@ fun TravelHistoryScreen(
                     trip = trip,
                     onClick = { navController.navigate("trip_detail/${trip.tripId}/${trip.tagId}") },
                     onEditClick = { navController.navigate("currency_travel_settings?tripId=${trip.tripId}") },
-                    onDeleteClick = { tripToDelete = trip }
+                    onDeleteClick = { tripToDelete = trip },
                 )
             }
         }
@@ -86,19 +85,23 @@ fun TravelHistoryScreen(
         AlertDialog(
             onDismissRequest = { tripToDelete = null },
             title = { Text("Delete Trip?") },
-            text = { Text("Are you sure you want to delete '${tripToDelete?.tripName}'? This will untag ${tripToDelete?.transactionCount} transaction(s). This action cannot be undone.") },
+            text = {
+                Text(
+                    "Are you sure you want to delete '${tripToDelete?.tripName}'? This will untag ${tripToDelete?.transactionCount} transaction(s). This action cannot be undone.",
+                )
+            },
             confirmButton = {
                 Button(
                     onClick = {
                         viewModel.deleteTrip(tripToDelete!!.tripId, tripToDelete!!.tagId)
                         tripToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) { Text("Delete") }
             },
             dismissButton = {
                 TextButton(onClick = { tripToDelete = null }) { Text("Cancel") }
-            }
+            },
         )
     }
 }
@@ -109,7 +112,7 @@ private fun HistoricTripItem(
     trip: TripWithStats,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     val dateFormat = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
@@ -122,12 +125,12 @@ private fun HistoricTripItem(
                         text = trip.tripName,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "${dateFormat.format(Date(trip.startDate))} - ${dateFormat.format(Date(trip.endDate))}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 IconButton(onClick = onEditClick) {
@@ -137,10 +140,13 @@ private fun HistoricTripItem(
                     Icon(Icons.Default.Delete, "Delete Trip", tint = MaterialTheme.colorScheme.error)
                 }
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column {
                     Text("Total Spend", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -148,7 +154,7 @@ private fun HistoricTripItem(
                         currencyFormat.format(trip.totalSpend),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
@@ -157,7 +163,7 @@ private fun HistoricTripItem(
                         "${trip.transactionCount}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }

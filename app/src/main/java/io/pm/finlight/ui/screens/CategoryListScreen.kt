@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,12 +32,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import io.pm.finlight.Category
-import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.CategoryViewModel
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.CategoryIconHelper
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -63,21 +61,22 @@ fun CategoryListScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
     ) { innerPadding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Button(
                 onClick = {
                     selectedCategory = null
                     showEditDialog = true
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(imageVector = Icons.Default.Add, contentDescription = "Add")
                 Spacer(modifier = Modifier.width(8.dp))
@@ -89,28 +88,29 @@ fun CategoryListScreen(
                     GlassPanel {
                         Row(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-                                contentAlignment = Alignment.Center
+                                modifier =
+                                    Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
+                                contentAlignment = Alignment.Center,
                             ) {
                                 if (category.iconKey == "letter_default") {
                                     Text(
                                         text = category.name.firstOrNull()?.uppercase() ?: "?",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 18.sp,
-                                        color = Color.Black
+                                        color = Color.Black,
                                     )
                                 } else {
                                     Icon(
                                         imageVector = CategoryIconHelper.getIcon(category.iconKey),
                                         contentDescription = category.name,
                                         tint = Color.Black,
-                                        modifier = Modifier.size(22.dp)
+                                        modifier = Modifier.size(22.dp),
                                     )
                                 }
                             }
@@ -118,7 +118,7 @@ fun CategoryListScreen(
                             Text(
                                 text = category.name,
                                 modifier = Modifier.weight(1f),
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                             Row {
                                 IconButton(onClick = {
@@ -128,7 +128,7 @@ fun CategoryListScreen(
                                     Icon(
                                         imageVector = Icons.Default.Edit,
                                         contentDescription = "Edit Category",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                                 IconButton(onClick = {
@@ -175,11 +175,10 @@ fun CategoryListScreen(
                 viewModel.deleteCategory(selectedCategory!!)
                 showDeleteDialog = false
             },
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         )
     }
 }
-
 
 @Composable
 fun EditCategoryDialog(
@@ -205,24 +204,25 @@ fun EditCategoryDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Category Name") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(16.dp))
                 Text("Select Icon", style = MaterialTheme.typography.titleMedium)
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 48.dp),
-                    modifier = Modifier.heightIn(max = 150.dp)
+                    modifier = Modifier.heightIn(max = 150.dp),
                 ) {
                     items(allIcons) { (key, icon) ->
                         IconButton(
                             onClick = { selectedIconKey = key },
-                            modifier = Modifier
-                                .padding(4.dp)
-                                .border(
-                                    width = 1.dp,
-                                    color = if (selectedIconKey == key) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                    shape = MaterialTheme.shapes.medium
-                                )
+                            modifier =
+                                Modifier
+                                    .padding(4.dp)
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (selectedIconKey == key) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        shape = MaterialTheme.shapes.medium,
+                                    ),
                         ) {
                             Icon(imageVector = icon, contentDescription = key)
                         }
@@ -232,21 +232,22 @@ fun EditCategoryDialog(
                 Text("Select Color", style = MaterialTheme.typography.titleMedium)
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 48.dp),
-                    modifier = Modifier.heightIn(max = 100.dp)
+                    modifier = Modifier.heightIn(max = 100.dp),
                 ) {
                     items(allColors) { (key, color) ->
                         Box(
-                            modifier = Modifier
-                                .padding(6.dp)
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .clickable { selectedColorKey = key }
-                                .border(
-                                    width = 2.dp,
-                                    color = if (selectedColorKey == key) MaterialTheme.colorScheme.outline else Color.Transparent,
-                                    shape = CircleShape
-                                )
+                            modifier =
+                                Modifier
+                                    .padding(6.dp)
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .clickable { selectedColorKey = key }
+                                    .border(
+                                        width = 2.dp,
+                                        color = if (selectedColorKey == key) MaterialTheme.colorScheme.outline else Color.Transparent,
+                                        shape = CircleShape,
+                                    ),
                         )
                     }
                 }
@@ -269,7 +270,7 @@ fun EditCategoryDialog(
                 Text("Cancel")
             }
         },
-        containerColor = popupContainerColor
+        containerColor = popupContainerColor,
     )
 }
 
@@ -278,7 +279,7 @@ fun DeleteCategoryDialog(
     category: Category,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
-    containerColor: Color
+    containerColor: Color,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -297,6 +298,6 @@ fun DeleteCategoryDialog(
                 Text("Cancel")
             }
         },
-        containerColor = containerColor
+        containerColor = containerColor,
     )
 }

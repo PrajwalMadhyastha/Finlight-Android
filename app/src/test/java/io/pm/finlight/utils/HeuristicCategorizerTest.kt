@@ -14,12 +14,12 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class HeuristicCategorizerTest : BaseViewModelTest() {
-
-    private val mockCategories = listOf(
-        Category(id = 1, name = "Food & Drinks", iconKey = "", colorKey = ""),
-        Category(id = 2, name = "Shopping", iconKey = "", colorKey = ""),
-        Category(id = 3, name = "Travel", iconKey = "", colorKey = "")
-    )
+    private val mockCategories =
+        listOf(
+            Category(id = 1, name = "Food & Drinks", iconKey = "", colorKey = ""),
+            Category(id = 2, name = "Shopping", iconKey = "", colorKey = ""),
+            Category(id = 3, name = "Travel", iconKey = "", colorKey = ""),
+        )
 
     @Test
     fun `findCategoryForDescription returns correct category for known keyword`() {

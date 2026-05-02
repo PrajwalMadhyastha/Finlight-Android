@@ -10,7 +10,6 @@ package io.pm.finlight
  * This provides a clean API for the ViewModel to interact with the learning feature.
  */
 class MerchantCategoryMappingRepository(private val dao: MerchantCategoryMappingDao) {
-
     /**
      * Inserts or updates a merchant-category mapping.
      *

@@ -27,7 +27,6 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class SmsClassifierTest {
-
     private lateinit var classifier: SmsClassifier
 
     @Before
@@ -60,17 +59,18 @@ class SmsClassifierTest {
      */
     @Test
     fun testClassification_withKnownTransactionalSms_returnsHighConfidence() {
-        val transactionalMessages = listOf(
-            // HDFC
-            "Sent Rs.11.00\nFrom HDFC Bank A/C *1243\nTo Raju\nOn 07/08/25\nRef 558523453508\nNot You?\nCall 18002586161/SMS BLOCK UPI to 7308080808",
-            "You've spent Rs.349 On HDFC Bank CREDIT Card xx1335 At RAZ*StickON...",
-            // SBI
-            "Rs.267.00 spent on your SBI Credit Card ending with 3201 at HALLI THOTA on 29-06-25 via UPI",
-            "Your A/C XXXXX650077 Credited INR 1,41,453.00 on 15/07/25 -Deposit by transfer from ESIC MODEL HOSP. RJJ. Avl Bal INR 3,89,969.28-SBI",
-            // ICICI
-            "ICICI Bank Acct XX823 debited for Rs 240.00 on 21-Jun-25; DAKSHIN CAFE credited.",
-            "Dear Customer, Acct XX823 is credited with Rs 6000.00 on 26-Jun-25 from GANGA MANGA."
-        )
+        val transactionalMessages =
+            listOf(
+                // HDFC
+                "Sent Rs.11.00\nFrom HDFC Bank A/C *1243\nTo Raju\nOn 07/08/25\nRef 558523453508\nNot You?\nCall 18002586161/SMS BLOCK UPI to 7308080808",
+                "You've spent Rs.349 On HDFC Bank CREDIT Card xx1335 At RAZ*StickON...",
+                // SBI
+                "Rs.267.00 spent on your SBI Credit Card ending with 3201 at HALLI THOTA on 29-06-25 via UPI",
+                "Your A/C XXXXX650077 Credited INR 1,41,453.00 on 15/07/25 -Deposit by transfer from ESIC MODEL HOSP. RJJ. Avl Bal INR 3,89,969.28-SBI",
+                // ICICI
+                "ICICI Bank Acct XX823 debited for Rs 240.00 on 21-Jun-25; DAKSHIN CAFE credited.",
+                "Dear Customer, Acct XX823 is credited with Rs 6000.00 on 26-Jun-25 from GANGA MANGA.",
+            )
 
         transactionalMessages.forEach { message ->
             val score = classifier.classify(message)
@@ -82,7 +82,7 @@ class SmsClassifierTest {
 
             assertTrue(
                 "Expected high confidence for transactional message, but got $score. Message: '$message'",
-                score > 0.8f
+                score > 0.8f,
             )
         }
     }
@@ -93,26 +93,26 @@ class SmsClassifierTest {
      */
     @Test
     fun testClassification_withKnownNonTransactionalSms_returnsLowConfidence() {
-        val nonTransactionalMessages = listOf(
-            // OTP
-            "Your OTP for login is 123456. Do not share this with anyone.",
-            // Promotion
-            "Congratulations! You are eligible for a pre-approved loan of Rs. 5,00,000.",
-            // Delivery
-            "Your order from Amazon has been shipped and will arrive tomorrow.",
-            // Bill Reminder
-            "Your credit card statement for the month of August is generated. Total amount due is Rs. 5,432.10.",
-            // General Info
-            "Your Application No. GJ005S250467224 for Gruha Jyoti Scheme received & sent to your ESCOM for Processing."
-        )
+        val nonTransactionalMessages =
+            listOf(
+                // OTP
+                "Your OTP for login is 123456. Do not share this with anyone.",
+                // Promotion
+                "Congratulations! You are eligible for a pre-approved loan of Rs. 5,00,000.",
+                // Delivery
+                "Your order from Amazon has been shipped and will arrive tomorrow.",
+                // Bill Reminder
+                "Your credit card statement for the month of August is generated. Total amount due is Rs. 5,432.10.",
+                // General Info
+                "Your Application No. GJ005S250467224 for Gruha Jyoti Scheme received & sent to your ESCOM for Processing.",
+            )
 
         nonTransactionalMessages.forEach { message ->
             val score = classifier.classify(message)
             assertTrue(
                 "Expected low confidence for non-transactional message, but got $score. Message: '$message'",
-                score < 0.1f
+                score < 0.1f,
             )
         }
     }
 }
-

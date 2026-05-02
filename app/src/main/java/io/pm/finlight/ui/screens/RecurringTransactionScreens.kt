@@ -45,20 +45,21 @@ fun RecurringTransactionScreen(navController: NavController) {
 
     if (recurringTransactions.isEmpty()) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 "No recurring transactions set up. Tap the '+' to add one.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     } else {
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             items(recurringTransactions, key = { it.id }) { rule ->
                 RecurringTransactionItem(
@@ -69,7 +70,7 @@ fun RecurringTransactionScreen(navController: NavController) {
                     },
                     onDeleteClick = {
                         ruleToDelete = rule
-                    }
+                    },
                 )
             }
         }
@@ -88,13 +89,13 @@ fun RecurringTransactionScreen(navController: NavController) {
                         viewModel.deleteRule(rule)
                         ruleToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) { Text("Delete") }
             },
             dismissButton = {
                 TextButton(onClick = { ruleToDelete = null }) { Text("Cancel") }
             },
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         )
     }
 }
@@ -104,31 +105,32 @@ private fun RecurringTransactionItem(
     modifier: Modifier = Modifier,
     rule: RecurringTransaction,
     onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
-    val amountColor = if (rule.transactionType == "expense") {
-        MaterialTheme.colorScheme.error
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
+    val amountColor =
+        if (rule.transactionType == "expense") {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.primary
+        }
 
     GlassPanel(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = rule.description,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = "Repeats ${rule.recurrenceInterval}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Spacer(Modifier.width(8.dp))
@@ -136,7 +138,7 @@ private fun RecurringTransactionItem(
                 text = currencyFormat.format(rule.amount),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = amountColor
+                color = amountColor,
             )
             IconButton(onClick = onEditClick) {
                 Icon(Icons.Default.Edit, contentDescription = "Edit Rule", tint = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -94,7 +94,7 @@ class SmsRepository(private val context: Context) {
             projection,
             selection,
             selectionArgs,
-            null
+            null,
         )?.use { cursor ->
             if (cursor.moveToFirst()) {
                 val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
@@ -106,7 +106,7 @@ class SmsRepository(private val context: Context) {
                     id = cursor.getLong(idIndex),
                     sender = cursor.getString(addressIndex) ?: "Unknown",
                     body = cursor.getString(bodyIndex) ?: "",
-                    date = cursor.getLong(dateIndex)
+                    date = cursor.getLong(dateIndex),
                 )
             }
         }
@@ -121,7 +121,7 @@ class SmsRepository(private val context: Context) {
             projection,
             null, // Selection is not needed, we use the sort order
             null, // Selection args are not needed
-            sortOrder
+            sortOrder,
         )?.use { cursor ->
             if (cursor.moveToFirst()) {
                 val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
@@ -133,11 +133,10 @@ class SmsRepository(private val context: Context) {
                     id = cursor.getLong(idIndex),
                     sender = cursor.getString(addressIndex) ?: "Unknown",
                     body = cursor.getString(bodyIndex) ?: "",
-                    date = cursor.getLong(dateIndex)
+                    date = cursor.getLong(dateIndex),
                 )
             }
         }
-
 
         // If neither query found a result, return null.
         return null

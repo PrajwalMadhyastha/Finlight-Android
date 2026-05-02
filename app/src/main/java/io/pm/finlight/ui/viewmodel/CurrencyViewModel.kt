@@ -23,58 +23,67 @@ class CurrencyViewModel(
     private val settingsRepository: SettingsRepository,
     private val tripRepository: TripRepository,
     private val transactionRepository: TransactionRepository,
-    private val tagRepository: TagRepository
+    private val tagRepository: TagRepository,
 ) : AndroidViewModel(application) {
-
     private val mutex = Mutex()
 
+    val homeCurrency: StateFlow<String> =
+        settingsRepository.getHomeCurrency()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = "INR",
+            )
 
-    val homeCurrency: StateFlow<String> = settingsRepository.getHomeCurrency()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = "INR"
-        )
-
-    val travelModeSettings: StateFlow<TravelModeSettings?> = settingsRepository.getTravelModeSettings()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
-        )
+    val travelModeSettings: StateFlow<TravelModeSettings?> =
+        settingsRepository.getTravelModeSettings()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = null,
+            )
 
     private val _tripToEdit = MutableStateFlow<TripWithStats?>(null)
     val tripToEdit: StateFlow<TripWithStats?> = _tripToEdit.asStateFlow()
 
-    // --- NEW: This flow gets ALL trips from the database ---
-    private val allTrips: StateFlow<List<TripWithStats>> = tripRepository.getAllTripsWithStats()
-        .stateIn(
+    val allTags: StateFlow<List<Tag>> =
+        tagRepository.allTags.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
+            initialValue = emptyList(),
         )
 
+    // --- NEW: This flow gets ALL trips from the database ---
+    private val allTrips: StateFlow<List<TripWithStats>> =
+        tripRepository.getAllTripsWithStats()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
+
     // --- NEW: This flow filters out the active trip for the UI ---
-    val historicTrips: StateFlow<List<TripWithStats>> = combine(
-        allTrips,
-        travelModeSettings
-    ) { trips, activeSettings ->
-        if (activeSettings == null) {
-            // If no trip is active, all trips are considered historic
-            trips
-        } else {
-            // If a trip is active, filter it out from the history list
-            trips.filterNot { trip ->
-                trip.tripName == activeSettings.tripName &&
+    val historicTrips: StateFlow<List<TripWithStats>> =
+        combine(
+            allTrips,
+            travelModeSettings,
+        ) { trips, activeSettings ->
+            if (activeSettings == null) {
+                // If no trip is active, all trips are considered historic
+                trips
+            } else {
+                // If a trip is active, filter it out from the history list
+                trips.filterNot { trip ->
+                    trip.tripName == activeSettings.tripName &&
                         trip.startDate == activeSettings.startDate &&
                         trip.endDate == activeSettings.endDate
+                }
             }
-        }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList(),
+        )
 
     fun loadTripForEditing(tripId: Int) {
         viewModelScope.launch {
@@ -88,13 +97,15 @@ class CurrencyViewModel(
         _tripToEdit.value = null
     }
 
-    fun deleteTrip(tripId: Int, tagId: Int) {
+    fun deleteTrip(
+        tripId: Int,
+        tagId: Int,
+    ) {
         viewModelScope.launch {
             transactionRepository.removeAllTransactionsForTag(tagId)
             tripRepository.deleteTripById(tripId)
         }
     }
-
 
     fun saveHomeCurrency(currencyCode: String) {
         viewModelScope.launch {
@@ -124,16 +135,17 @@ class CurrencyViewModel(
                 val oldTag = oldSettings?.let { tagRepository.findOrCreateTag(it.tripName) }
                 val existingTrip = oldTag?.let { tripRepository.getTripByTagId(it.id) }
 
-                val tripRecord = Trip(
-                    id = existingTrip?.id ?: 0,
-                    name = newSettings.tripName,
-                    startDate = newSettings.startDate,
-                    endDate = newSettings.endDate,
-                    tagId = newTripTag.id,
-                    tripType = newSettings.tripType,
-                    currencyCode = newSettings.currencyCode,
-                    conversionRate = newSettings.conversionRate
-                )
+                val tripRecord =
+                    Trip(
+                        id = existingTrip?.id ?: 0,
+                        name = newSettings.tripName,
+                        startDate = newSettings.startDate,
+                        endDate = newSettings.endDate,
+                        tagId = newTripTag.id,
+                        tripType = newSettings.tripType,
+                        currencyCode = newSettings.currencyCode,
+                        conversionRate = newSettings.conversionRate,
+                    )
                 tripRepository.insert(tripRecord)
             }
         }
@@ -160,21 +172,20 @@ class CurrencyViewModel(
                 }
             }
 
-
-            val updatedTripRecord = Trip(
-                id = originalTrip.tripId,
-                name = updatedSettings.tripName,
-                startDate = updatedSettings.startDate,
-                endDate = updatedSettings.endDate,
-                tagId = newTag.id,
-                tripType = updatedSettings.tripType,
-                currencyCode = updatedSettings.currencyCode,
-                conversionRate = updatedSettings.conversionRate
-            )
+            val updatedTripRecord =
+                Trip(
+                    id = originalTrip.tripId,
+                    name = updatedSettings.tripName,
+                    startDate = updatedSettings.startDate,
+                    endDate = updatedSettings.endDate,
+                    tagId = newTag.id,
+                    tripType = updatedSettings.tripType,
+                    currencyCode = updatedSettings.currencyCode,
+                    conversionRate = updatedSettings.conversionRate,
+                )
             tripRepository.insert(updatedTripRecord)
         }
     }
-
 
     fun completeTrip() {
         viewModelScope.launch {

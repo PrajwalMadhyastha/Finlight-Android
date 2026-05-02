@@ -35,7 +35,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class ManageIgnoreRulesViewModelTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var ignoreRuleDao: IgnoreRuleDao
 
@@ -56,84 +55,88 @@ class ManageIgnoreRulesViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `allRules flow emits rules from DAO`() = runTest {
-        // Arrange
-        val rules = listOf(IgnoreRule(1, RuleType.SENDER, "*spam*", true, true))
-        initializeViewModel(rules)
+    fun `allRules flow emits rules from DAO`() =
+        runTest {
+            // Arrange
+            val rules = listOf(IgnoreRule(1, RuleType.SENDER, "*spam*", true, true))
+            initializeViewModel(rules)
 
-        // Assert
-        viewModel.allRules.test {
-            assertEquals(rules, awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.allRules.test {
+                assertEquals(rules, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `addIgnoreRule calls dao insert with correct non-default rule`() = runTest {
-        // Arrange
-        val pattern = " new rule "
-        val type = RuleType.BODY_PHRASE
+    fun `addIgnoreRule calls dao insert with correct non-default rule`() =
+        runTest {
+            // Arrange
+            val pattern = " new rule "
+            val type = RuleType.BODY_PHRASE
 
-        // Act
-        viewModel.addIgnoreRule(pattern, type)
-        advanceUntilIdle()
+            // Act
+            viewModel.addIgnoreRule(pattern, type)
+            advanceUntilIdle()
 
-        // Assert
-        verify(ignoreRuleDao).insert(capture(ignoreRuleCaptor))
-        val capturedRule = ignoreRuleCaptor.value
-        assertEquals(pattern.trim(), capturedRule.pattern)
-        assertEquals(type, capturedRule.type)
-        assertEquals(false, capturedRule.isDefault)
-    }
-
-    @Test
-    fun `addIgnoreRule does not insert blank pattern`() = runTest {
-        // Act
-        viewModel.addIgnoreRule("  ", RuleType.SENDER)
-        advanceUntilIdle()
-
-        // Assert
-        verify(ignoreRuleDao, never()).insert(anyObject())
-    }
+            // Assert
+            verify(ignoreRuleDao).insert(capture(ignoreRuleCaptor))
+            val capturedRule = ignoreRuleCaptor.value
+            assertEquals(pattern.trim(), capturedRule.pattern)
+            assertEquals(type, capturedRule.type)
+            assertEquals(false, capturedRule.isDefault)
+        }
 
     @Test
-    fun `updateIgnoreRule calls dao update`() = runTest {
-        // Arrange
-        val ruleToUpdate = IgnoreRule(1, RuleType.BODY_PHRASE, "pattern", isEnabled = false)
+    fun `addIgnoreRule does not insert blank pattern`() =
+        runTest {
+            // Act
+            viewModel.addIgnoreRule("  ", RuleType.SENDER)
+            advanceUntilIdle()
 
-        // Act
-        viewModel.updateIgnoreRule(ruleToUpdate)
-        advanceUntilIdle()
-
-
-        // Assert
-        verify(ignoreRuleDao).update(ruleToUpdate)
-    }
+            // Assert
+            verify(ignoreRuleDao, never()).insert(anyObject())
+        }
 
     @Test
-    fun `deleteIgnoreRule calls dao delete for non-default rule`() = runTest {
-        // Arrange
-        val ruleToDelete = IgnoreRule(1, RuleType.SENDER, "custom", isDefault = false)
+    fun `updateIgnoreRule calls dao update`() =
+        runTest {
+            // Arrange
+            val ruleToUpdate = IgnoreRule(1, RuleType.BODY_PHRASE, "pattern", isEnabled = false)
 
-        // Act
-        viewModel.deleteIgnoreRule(ruleToDelete)
-        advanceUntilIdle()
+            // Act
+            viewModel.updateIgnoreRule(ruleToUpdate)
+            advanceUntilIdle()
 
-        // Assert
-        verify(ignoreRuleDao).delete(ruleToDelete)
-    }
+            // Assert
+            verify(ignoreRuleDao).update(ruleToUpdate)
+        }
 
     @Test
-    fun `deleteIgnoreRule does NOT call dao delete for default rule`() = runTest {
-        // Arrange
-        val defaultRule = IgnoreRule(1, RuleType.SENDER, "default", isDefault = true)
+    fun `deleteIgnoreRule calls dao delete for non-default rule`() =
+        runTest {
+            // Arrange
+            val ruleToDelete = IgnoreRule(1, RuleType.SENDER, "custom", isDefault = false)
 
-        // Act
-        viewModel.deleteIgnoreRule(defaultRule)
-        advanceUntilIdle()
+            // Act
+            viewModel.deleteIgnoreRule(ruleToDelete)
+            advanceUntilIdle()
 
-        // Assert
-        verify(ignoreRuleDao, never()).delete(defaultRule)
-    }
+            // Assert
+            verify(ignoreRuleDao).delete(ruleToDelete)
+        }
+
+    @Test
+    fun `deleteIgnoreRule does NOT call dao delete for default rule`() =
+        runTest {
+            // Arrange
+            val defaultRule = IgnoreRule(1, RuleType.SENDER, "default", isDefault = true)
+
+            // Act
+            viewModel.deleteIgnoreRule(defaultRule)
+            advanceUntilIdle()
+
+            // Assert
+            verify(ignoreRuleDao, never()).delete(defaultRule)
+        }
 }
-

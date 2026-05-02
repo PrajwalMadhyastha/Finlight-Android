@@ -16,7 +16,6 @@ import java.io.IOException
  */
 @RunWith(AndroidJUnit4::class)
 abstract class BaseDaoTest {
-
     protected lateinit var db: AppDatabase
 
     @Before
@@ -24,9 +23,10 @@ abstract class BaseDaoTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         // Using an in-memory database because the information stored here disappears when the
         // process is killed.
-        db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
-            .allowMainThreadQueries() // Allowed for testing to keep tests synchronous
-            .build()
+        db =
+            Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+                .allowMainThreadQueries() // Allowed for testing to keep tests synchronous
+                .build()
     }
 
     @After

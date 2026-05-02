@@ -15,8 +15,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -24,7 +22,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,7 +29,6 @@ import androidx.navigation.NavController
 import io.pm.finlight.Account
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
@@ -57,15 +53,16 @@ fun AccountDetailScreen(
     val currentAccount = account ?: return // Don't compose if account is not loaded yet
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier =
+            Modifier
+                .fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             AccountDetailHeader(
                 account = currentAccount,
-                balance = balance
+                balance = balance,
             )
         }
 
@@ -75,7 +72,7 @@ fun AccountDetailScreen(
                     text = "Recent Transactions",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp)
+                    modifier = Modifier.padding(start = 8.dp),
                 )
             }
             items(transactions, key = { it.transaction.id }) { details ->
@@ -84,7 +81,7 @@ fun AccountDetailScreen(
                     transactionDetails = details,
                     onClick = {
                         navController.navigate("transaction_detail/${details.transaction.id}")
-                    }
+                    },
                 )
             }
         } else {
@@ -92,13 +89,14 @@ fun AccountDetailScreen(
                 GlassPanel(modifier = Modifier.fillMaxWidth()) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
                     ) {
                         Text(
                             "No transactions for this account yet.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -108,41 +106,47 @@ fun AccountDetailScreen(
 }
 
 @Composable
-private fun AccountDetailHeader(account: Account, balance: Long) {
-    val currencyFormat = remember {
-        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            .apply { maximumFractionDigits = 0 }
-    }
-    val balanceColor = when {
-        balance > 0 -> MaterialTheme.colorScheme.primary
-        balance < 0 -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurface
-    }
+private fun AccountDetailHeader(
+    account: Account,
+    balance: Long,
+) {
+    val currencyFormat =
+        remember {
+            NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+                .apply { maximumFractionDigits = 0 }
+        }
+    val balanceColor =
+        when {
+            balance > 0 -> MaterialTheme.colorScheme.primary
+            balance < 0 -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.onSurface
+        }
 
     GlassPanel {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Image(
                 painter = painterResource(id = BankLogoHelper.getLogoForAccount(account.name)),
                 contentDescription = "${account.name} Logo",
-                modifier = Modifier.size(50.dp)
+                modifier = Modifier.size(50.dp),
             )
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "Current Balance",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = currencyFormat.format(balance),
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
-                    color = balanceColor
+                    color = balanceColor,
                 )
             }
         }
@@ -152,7 +156,7 @@ private fun AccountDetailHeader(account: Account, balance: Long) {
 @Composable
 private fun AccountDetailTransactionItem(
     transactionDetails: TransactionDetails,
-    onClick: () -> Unit // --- NEW: Accept an onClick lambda ---
+    onClick: () -> Unit, // --- NEW: Accept an onClick lambda ---
 ) {
     val contentAlpha = if (transactionDetails.transaction.isExcluded) 0.5f else 1f
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
@@ -160,9 +164,10 @@ private fun AccountDetailTransactionItem(
 
     // --- UPDATED: Apply the clickable modifier to the GlassPanel ---
     GlassPanel(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
@@ -173,22 +178,23 @@ private fun AccountDetailTransactionItem(
                     text = transactionDetails.transaction.description,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
                 )
                 Text(
                     text = dateFormatter.format(Date(transactionDetails.transaction.date)),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
                 )
             }
             Spacer(Modifier.width(16.dp))
 
             val isIncome = transactionDetails.transaction.transactionType == "income"
-            val amountColor = if (isSystemInDarkTheme()) {
-                if (isIncome) IncomeGreenDark else ExpenseRedDark
-            } else {
-                if (isIncome) IncomeGreenLight else ExpenseRedLight
-            }.copy(alpha = contentAlpha)
+            val amountColor =
+                if (isSystemInDarkTheme()) {
+                    if (isIncome) IncomeGreenDark else ExpenseRedDark
+                } else {
+                    if (isIncome) IncomeGreenLight else ExpenseRedLight
+                }.copy(alpha = contentAlpha)
 
             Text(
                 text = currencyFormat.format(transactionDetails.transaction.amount),

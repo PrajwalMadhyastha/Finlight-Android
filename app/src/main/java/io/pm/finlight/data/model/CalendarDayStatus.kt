@@ -14,5 +14,5 @@ data class CalendarDayStatus(
     val date: Date,
     val status: SpendingStatus,
     val amountSpent: Long,
-    val safeToSpend: Long
+    val safeToSpend: Long,
 )

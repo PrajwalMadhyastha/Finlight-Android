@@ -12,7 +12,6 @@ import io.pm.finlight.data.db.entity.Trip
 import kotlinx.coroutines.flow.Flow
 
 class TripRepository(private val tripDao: TripDao) {
-
     suspend fun insert(trip: Trip): Long {
         return tripDao.insert(trip)
     }

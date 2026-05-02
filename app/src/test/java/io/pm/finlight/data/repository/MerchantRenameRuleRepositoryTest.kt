@@ -24,7 +24,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class MerchantRenameRuleRepositoryTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var merchantRenameRuleDao: MerchantRenameRuleDao
 
@@ -37,44 +36,49 @@ class MerchantRenameRuleRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `getAliasesAsMap correctly transforms list to map`() = runTest {
-        // Arrange
-        val rules = listOf(
-            MerchantRenameRule(originalName = "AMZN", newName = "Amazon"),
-            MerchantRenameRule(originalName = "FLPKRT", newName = "Flipkart")
-        )
-        `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(rules))
+    fun `getAliasesAsMap correctly transforms list to map`() =
+        runTest {
+            // Arrange
+            val rules =
+                listOf(
+                    MerchantRenameRule(originalName = "AMZN", newName = "Amazon"),
+                    MerchantRenameRule(originalName = "FLPKRT", newName = "Flipkart"),
+                )
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(rules))
 
-        // Act & Assert
-        repository.getAliasesAsMap().test {
-            val aliasMap = awaitItem()
-            assertEquals(2, aliasMap.size)
-            assertEquals("Amazon", aliasMap["AMZN"])
-            assertEquals("Flipkart", aliasMap["FLPKRT"])
-            cancelAndIgnoreRemainingEvents()
+            // Act & Assert
+            repository.getAliasesAsMap().test {
+                val aliasMap = awaitItem()
+                assertEquals(2, aliasMap.size)
+                assertEquals("Amazon", aliasMap["AMZN"])
+                assertEquals("Flipkart", aliasMap["FLPKRT"])
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `insert calls DAO`() = runTest {
-        // Arrange
-        val newRule = MerchantRenameRule(originalName = "SWGY", newName = "Swiggy")
+    fun `insert calls DAO`() =
+        runTest {
+            // Arrange
+            val newRule = MerchantRenameRule(originalName = "SWGY", newName = "Swiggy")
 
-        // Act
-        repository.insert(newRule)
+            // Act
+            repository.insert(newRule)
 
-        // Assert
-        verify(merchantRenameRuleDao).insert(newRule)
-    }
+            // Assert
+            verify(merchantRenameRuleDao).insert(newRule)
+        }
+
     @Test
-    fun `deleteByOriginalName calls DAO`() = runTest {
-        // Arrange
-        val originalName = "UBER"
+    fun `deleteByOriginalName calls DAO`() =
+        runTest {
+            // Arrange
+            val originalName = "UBER"
 
-        // Act
-        repository.deleteByOriginalName(originalName)
+            // Act
+            repository.deleteByOriginalName(originalName)
 
-        // Assert
-        verify(merchantRenameRuleDao).deleteByOriginalName(originalName)
-    }
+            // Assert
+            verify(merchantRenameRuleDao).deleteByOriginalName(originalName)
+        }
 }

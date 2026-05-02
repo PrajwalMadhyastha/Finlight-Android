@@ -21,7 +21,6 @@ import kotlin.test.assertTrue
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class MerchantCategoryMappingDaoTest {
-
     @get:Rule
     val dbRule = DatabaseTestRule()
 
@@ -33,50 +32,55 @@ class MerchantCategoryMappingDaoTest {
     }
 
     @Test
-    fun `getCategoryIdForMerchant retrieves correct category ID`() = runTest {
-        // Arrange
-        val mapping = MerchantCategoryMapping(parsedName = "Zomato", categoryId = 4) // Assuming 4 is Food
-        merchantCategoryMappingDao.insert(mapping)
+    fun `getCategoryIdForMerchant retrieves correct category ID`() =
+        runTest {
+            // Arrange
+            val mapping = MerchantCategoryMapping(parsedName = "Zomato", categoryId = 4) // Assuming 4 is Food
+            merchantCategoryMappingDao.insert(mapping)
 
-        // Act
-        val categoryId = merchantCategoryMappingDao.getCategoryIdForMerchant("Zomato")
-        val nullResult = merchantCategoryMappingDao.getCategoryIdForMerchant("Swiggy")
+            // Act
+            val categoryId = merchantCategoryMappingDao.getCategoryIdForMerchant("Zomato")
+            val nullResult = merchantCategoryMappingDao.getCategoryIdForMerchant("Swiggy")
 
-        // Assert
-        assertEquals(4, categoryId)
-        assertNull(nullResult)
-    }
-
-    @Test
-    fun `getAll returns all mappings`() = runTest {
-        // Arrange
-        val mappings = listOf(
-            MerchantCategoryMapping("Zomato", 1),
-            MerchantCategoryMapping("Swiggy", 1)
-        )
-        merchantCategoryMappingDao.insertAll(mappings)
-
-        // Act
-        val result = merchantCategoryMappingDao.getAll()
-
-        // Assert
-        assertEquals(2, result.size)
-    }
+            // Assert
+            assertEquals(4, categoryId)
+            assertNull(nullResult)
+        }
 
     @Test
-    fun `deleteAll removes all mappings`() = runTest {
-        // Arrange
-        val mappings = listOf(
-            MerchantCategoryMapping("Zomato", 1),
-            MerchantCategoryMapping("Swiggy", 1)
-        )
-        merchantCategoryMappingDao.insertAll(mappings)
+    fun `getAll returns all mappings`() =
+        runTest {
+            // Arrange
+            val mappings =
+                listOf(
+                    MerchantCategoryMapping("Zomato", 1),
+                    MerchantCategoryMapping("Swiggy", 1),
+                )
+            merchantCategoryMappingDao.insertAll(mappings)
 
-        // Act
-        merchantCategoryMappingDao.deleteAll()
+            // Act
+            val result = merchantCategoryMappingDao.getAll()
 
-        // Assert
-        val result = merchantCategoryMappingDao.getAll()
-        assertTrue(result.isEmpty())
-    }
+            // Assert
+            assertEquals(2, result.size)
+        }
+
+    @Test
+    fun `deleteAll removes all mappings`() =
+        runTest {
+            // Arrange
+            val mappings =
+                listOf(
+                    MerchantCategoryMapping("Zomato", 1),
+                    MerchantCategoryMapping("Swiggy", 1),
+                )
+            merchantCategoryMappingDao.insertAll(mappings)
+
+            // Act
+            merchantCategoryMappingDao.deleteAll()
+
+            // Assert
+            val result = merchantCategoryMappingDao.getAll()
+            assertTrue(result.isEmpty())
+        }
 }

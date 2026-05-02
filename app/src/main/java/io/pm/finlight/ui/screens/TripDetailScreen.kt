@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CardTravel
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -43,7 +42,7 @@ import java.util.*
 fun TripDetailScreen(
     navController: NavController,
     tripId: Int,
-    tagId: Int
+    tagId: Int,
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = TripDetailViewModelFactory(application, tripId, tagId)
@@ -54,10 +53,11 @@ fun TripDetailScreen(
     val transactions by viewModel.transactions.collectAsState()
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier =
+            Modifier
+                .fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             tripDetails?.let {
@@ -70,14 +70,14 @@ fun TripDetailScreen(
                 Text(
                     "Transactions",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             items(transactions, key = { it.transaction.id }) { transaction ->
                 TransactionItem(
                     transactionDetails = transaction,
                     onClick = { navController.navigate("transaction_detail/${transaction.transaction.id}") },
-                    onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
+                    onCategoryClick = { transactionViewModel.requestCategoryChange(it) },
                 )
             }
         }
@@ -91,34 +91,35 @@ private fun TripDetailHeader(trip: TripWithStats) {
 
     GlassPanel {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Icon(
                 Icons.Default.CardTravel,
                 contentDescription = "Trip",
                 modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.primary,
             )
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "Total Spent on this Trip",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = currencyFormat.format(trip.totalSpend),
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = "${dateFormat.format(Date(trip.startDate))} - ${dateFormat.format(Date(trip.endDate))}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

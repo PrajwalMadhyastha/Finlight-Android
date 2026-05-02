@@ -32,9 +32,8 @@ class AccountViewModel(
     application: Application,
     private val repository: AccountRepository,
     private val transactionRepository: TransactionRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
 ) : AndroidViewModel(application) {
-
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
@@ -53,7 +52,7 @@ class AccountViewModel(
         viewModelScope.launch {
             combine(
                 repository.accountsWithBalance,
-                settingsRepository.getDismissedMergeSuggestions()
+                settingsRepository.getDismissedMergeSuggestions(),
             ) { accountsWithBalance, dismissedKeys ->
                 checkForPotentialMerges(accountsWithBalance.map { it.account }, dismissedKeys)
             }.collect()
@@ -73,7 +72,10 @@ class AccountViewModel(
             .trim()
     }
 
-    private fun checkForPotentialMerges(accounts: List<Account>, dismissedKeys: Set<String>) {
+    private fun checkForPotentialMerges(
+        accounts: List<Account>,
+        dismissedKeys: Set<String>,
+    ) {
         if (accounts.size < 2) {
             _suggestedMerges.value = emptyList()
             return
@@ -113,7 +115,10 @@ class AccountViewModel(
         _selectedAccountIds.value = accounts.map { it.id }.toSet()
     }
 
-    private fun calculateSimilarity(s1: String, s2: String): Double {
+    private fun calculateSimilarity(
+        s1: String,
+        s2: String,
+    ): Double {
         val longer = if (s1.length > s2.length) s1 else s2
         val shorter = if (s1.length > s2.length) s2 else s1
         if (longer.isEmpty()) return 1.0
@@ -121,7 +126,10 @@ class AccountViewModel(
         return (longer.length - distance) / longer.length.toDouble()
     }
 
-    private fun levenshteinDistance(s1: String, s2: String): Int {
+    private fun levenshteinDistance(
+        s1: String,
+        s2: String,
+    ): Int {
         val costs = IntArray(s2.length + 1)
         for (i in 0..s1.length) {
             var lastValue = i
@@ -153,11 +161,12 @@ class AccountViewModel(
 
     fun toggleAccountSelection(accountId: Int) {
         _selectedAccountIds.update { currentSelection ->
-            val newSelection = if (accountId in currentSelection) {
-                currentSelection - accountId
-            } else {
-                currentSelection + accountId
-            }
+            val newSelection =
+                if (accountId in currentSelection) {
+                    currentSelection - accountId
+                } else {
+                    currentSelection + accountId
+                }
 
             if (newSelection.isEmpty() && isSelectionModeActive.value) {
                 // Keep selection mode active even if count is 0,
@@ -234,7 +243,10 @@ class AccountViewModel(
             repository.update(account)
         }
 
-    fun renameAccount(accountId: Int, newName: String) {
+    fun renameAccount(
+        accountId: Int,
+        newName: String,
+    ) {
         if (newName.isBlank()) return
         viewModelScope.launch {
             val accountToUpdate = repository.getAccountById(accountId).firstOrNull()

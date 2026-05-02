@@ -25,7 +25,6 @@ import org.mockito.junit.MockitoJUnitRunner
  */
 @RunWith(MockitoJUnitRunner.Silent::class)
 abstract class BaseSmsParserTest {
-
     @Mock
     protected lateinit var mockCustomSmsRuleDao: CustomSmsRuleDao
 
@@ -55,28 +54,36 @@ abstract class BaseSmsParserTest {
     fun setUp() {
         // Create anonymous implementations of the providers that use our DAO mocks.
         // This adapts the test to the new decoupled architecture.
-        customSmsRuleProvider = object : CustomSmsRuleProvider {
-            override suspend fun getAllRules(): List<CustomSmsRule> = mockCustomSmsRuleDao.getAllRules().first()
-        }
-        merchantRenameRuleProvider = object : MerchantRenameRuleProvider {
-            override suspend fun getAllRules(): List<MerchantRenameRule> = mockMerchantRenameRuleDao.getAllRules().first()
-        }
-        ignoreRuleProvider = object : IgnoreRuleProvider {
-            override suspend fun getEnabledRules(): List<IgnoreRule> = mockIgnoreRuleDao.getEnabledRules()
-        }
-        merchantCategoryMappingProvider = object : MerchantCategoryMappingProvider {
-            override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
-                mockMerchantCategoryMappingDao.getCategoryIdForMerchant(merchantName)
-        }
-        categoryFinderProvider = object : CategoryFinderProvider {
-            override fun getCategoryIdByName(name: String): Int? {
-                return CategoryIconHelper.getCategoryIdByName(name)
+        customSmsRuleProvider =
+            object : CustomSmsRuleProvider {
+                override suspend fun getAllRules(): List<CustomSmsRule> = mockCustomSmsRuleDao.getAllRules().first()
             }
-        }
-        smsParseTemplateProvider = object : SmsParseTemplateProvider {
-            override suspend fun getAllTemplates(): List<SmsParseTemplate> = mockSmsParseTemplateDao.getAllTemplates()
-            override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> = mockSmsParseTemplateDao.getTemplatesBySignature(signature)
-        }
+        merchantRenameRuleProvider =
+            object : MerchantRenameRuleProvider {
+                override suspend fun getAllRules(): List<MerchantRenameRule> = mockMerchantRenameRuleDao.getAllRules().first()
+            }
+        ignoreRuleProvider =
+            object : IgnoreRuleProvider {
+                override suspend fun getEnabledRules(): List<IgnoreRule> = mockIgnoreRuleDao.getEnabledRules()
+            }
+        merchantCategoryMappingProvider =
+            object : MerchantCategoryMappingProvider {
+                override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
+                    mockMerchantCategoryMappingDao.getCategoryIdForMerchant(merchantName)
+            }
+        categoryFinderProvider =
+            object : CategoryFinderProvider {
+                override fun getCategoryIdByName(name: String): Int? {
+                    return CategoryIconHelper.getCategoryIdByName(name)
+                }
+            }
+        smsParseTemplateProvider =
+            object : SmsParseTemplateProvider {
+                override suspend fun getAllTemplates(): List<SmsParseTemplate> = mockSmsParseTemplateDao.getAllTemplates()
+
+                override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
+                    mockSmsParseTemplateDao.getTemplatesBySignature(signature)
+            }
     }
 
     /**
@@ -85,7 +92,7 @@ abstract class BaseSmsParserTest {
     protected suspend fun setupTest(
         customRules: List<CustomSmsRule> = emptyList(),
         renameRules: List<MerchantRenameRule> = emptyList(),
-        ignoreRules: List<IgnoreRule> = DEFAULT_IGNORE_PHRASES
+        ignoreRules: List<IgnoreRule> = DEFAULT_IGNORE_PHRASES,
     ) {
         // Mock the DAO methods. The providers above will then use these mocks.
         `when`(mockCustomSmsRuleDao.getAllRules()).thenReturn(flowOf(customRules))

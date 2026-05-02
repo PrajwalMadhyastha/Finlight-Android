@@ -5,11 +5,11 @@ import android.content.Intent
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.mockk.*
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.BootReceiver
 import io.pm.finlight.TestApplication
 import io.pm.finlight.utils.ReminderManager
-import io.mockk.*
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -19,7 +19,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class BootReceiverTest : BaseViewModelTest() {
-
     private lateinit var context: Context
     private lateinit var receiver: BootReceiver
 

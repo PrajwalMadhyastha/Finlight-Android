@@ -20,9 +20,8 @@ import kotlinx.coroutines.launch
 class CategoryViewModel(
     private val categoryRepository: CategoryRepository,
     private val transactionRepository: TransactionRepository,
-    private val categoryDao: CategoryDao
+    private val categoryDao: CategoryDao,
 ) : ViewModel() {
-
     val allCategories: Flow<List<Category>>
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
@@ -31,30 +30,34 @@ class CategoryViewModel(
         allCategories = categoryRepository.allCategories
     }
 
-    fun addCategory(name: String, iconKey: String, colorKey: String) =
-        viewModelScope.launch {
-            try {
-                // Check if a category with this name already exists
-                val existingCategory = categoryDao.findByName(name)
-                if (existingCategory != null) {
-                    _uiEvent.send("A category named '$name' already exists.")
-                    return@launch
-                }
+    fun addCategory(
+        name: String,
+        iconKey: String,
+        colorKey: String,
+    ) = viewModelScope.launch {
+        try {
+            // Check if a category with this name already exists
+            val existingCategory = categoryDao.findByName(name)
+            if (existingCategory != null) {
+                _uiEvent.send("A category named '$name' already exists.")
+                return@launch
+            }
 
-                val usedColorKeys = allCategories.firstOrNull()?.map { it.colorKey } ?: emptyList()
-                val finalIconKey = if (iconKey == "category") "letter_default" else iconKey
-                val finalColorKey = if (colorKey == "gray_light") {
+            val usedColorKeys = allCategories.firstOrNull()?.map { it.colorKey } ?: emptyList()
+            val finalIconKey = if (iconKey == "category") "letter_default" else iconKey
+            val finalColorKey =
+                if (colorKey == "gray_light") {
                     CategoryIconHelper.getNextAvailableColor(usedColorKeys)
                 } else {
                     colorKey
                 }
 
-                categoryRepository.insert(Category(name = name, iconKey = finalIconKey, colorKey = finalColorKey))
-                _uiEvent.send("Category '$name' created.")
-            } catch (e: Exception) {
-                _uiEvent.send("Error creating category: ${e.message}")
-            }
+            categoryRepository.insert(Category(name = name, iconKey = finalIconKey, colorKey = finalColorKey))
+            _uiEvent.send("Category '$name' created.")
+        } catch (e: Exception) {
+            _uiEvent.send("Error creating category: ${e.message}")
         }
+    }
 
     fun updateCategory(category: Category) =
         viewModelScope.launch {

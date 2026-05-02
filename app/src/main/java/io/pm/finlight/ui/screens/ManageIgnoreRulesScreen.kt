@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
@@ -26,7 +25,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -35,7 +33,6 @@ import io.pm.finlight.IgnoreRule
 import io.pm.finlight.ManageIgnoreRulesViewModel
 import io.pm.finlight.RuleType
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 
@@ -46,7 +43,7 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun ManageIgnoreRulesScreen(
     navController: NavController,
-    viewModel: ManageIgnoreRulesViewModel
+    viewModel: ManageIgnoreRulesViewModel,
 ) {
     val rules by viewModel.allRules.collectAsState()
     var newPattern by remember { mutableStateOf(TextFieldValue("")) }
@@ -58,36 +55,37 @@ fun ManageIgnoreRulesScreen(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             Text(
                 "Ignore SMS messages based on the sender's name or phrases in the message body. Use '*' as a wildcard for sender patterns.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
         item {
             GlassPanel {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         SegmentedButton(
                             selected = selectedRuleType == RuleType.BODY_PHRASE,
                             onClick = { selectedRuleType = RuleType.BODY_PHRASE },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                         ) {
                             Text("Body Phrase")
                         }
                         SegmentedButton(
                             selected = selectedRuleType == RuleType.SENDER,
                             onClick = { selectedRuleType = RuleType.SENDER },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                         ) {
                             Text("Sender")
                         }
@@ -95,31 +93,36 @@ fun ManageIgnoreRulesScreen(
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         OutlinedTextField(
                             value = newPattern,
                             onValueChange = { newPattern = it },
-                            label = { Text(if (selectedRuleType == RuleType.BODY_PHRASE) "Phrase to ignore" else "Sender pattern to ignore") },
+                            label = {
+                                Text(
+                                    if (selectedRuleType == RuleType.BODY_PHRASE) "Phrase to ignore" else "Sender pattern to ignore",
+                                )
+                            },
                             modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                focusedLabelColor = MaterialTheme.colorScheme.primary,
-                                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                cursorColor = MaterialTheme.colorScheme.primary,
-                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                            )
+                            colors =
+                                OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    cursorColor = MaterialTheme.colorScheme.primary,
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                ),
                         )
                         Button(
                             onClick = {
                                 viewModel.addIgnoreRule(newPattern.text, selectedRuleType)
                                 newPattern = TextFieldValue("") // Clear input
                             },
-                            enabled = newPattern.text.isNotBlank()
+                            enabled = newPattern.text.isNotBlank(),
                         ) {
                             Icon(Icons.Default.Add, contentDescription = "Add Rule")
                         }
@@ -134,7 +137,7 @@ fun ManageIgnoreRulesScreen(
                     "Your Custom Rules",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
             items(customRules, key = { "custom-${it.id}" }) { rule ->
@@ -145,7 +148,7 @@ fun ManageIgnoreRulesScreen(
                             Text(
                                 text = if (rule.type == RuleType.SENDER) "Sender Rule" else "Body Phrase Rule",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         },
                         trailingContent = {
@@ -153,11 +156,11 @@ fun ManageIgnoreRulesScreen(
                                 Icon(
                                     Icons.Default.Delete,
                                     contentDescription = "Delete rule",
-                                    tint = MaterialTheme.colorScheme.error
+                                    tint = MaterialTheme.colorScheme.error,
                                 )
                             }
                         },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
                 }
             }
@@ -169,7 +172,7 @@ fun ManageIgnoreRulesScreen(
                     "Default App Rules",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
             items(defaultRules, key = { "default-${it.id}" }) { rule ->
@@ -180,7 +183,7 @@ fun ManageIgnoreRulesScreen(
                             Text(
                                 text = if (rule.type == RuleType.SENDER) "Sender Rule" else "Body Phrase Rule",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         },
                         trailingContent = {
@@ -188,16 +191,15 @@ fun ManageIgnoreRulesScreen(
                                 checked = rule.isEnabled,
                                 onCheckedChange = { isEnabled ->
                                     viewModel.updateIgnoreRule(rule.copy(isEnabled = isEnabled))
-                                }
+                                },
                             )
                         },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     )
                 }
             }
         }
     }
-
 
     if (ruleToDelete != null) {
         val isThemeDark = MaterialTheme.colorScheme.background.isDark()
@@ -213,13 +215,13 @@ fun ManageIgnoreRulesScreen(
                         viewModel.deleteIgnoreRule(ruleToDelete!!)
                         ruleToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) { Text("Delete") }
             },
             dismissButton = {
                 TextButton(onClick = { ruleToDelete = null }) { Text("Cancel") }
             },
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         )
     }
 }

@@ -15,8 +15,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,27 +35,26 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 // Helper to detect perceived luminance.
-private fun Color.isDark() =
-    (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
+private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditGoalScreen(
     navController: NavController,
-    goalId: Int? = null
+    goalId: Int? = null,
 ) {
-    /* View-models */
+    // View-models
     val goalViewModel: GoalViewModel = viewModel()
     val txnViewModel: TransactionViewModel = viewModel()
 
-    /* Screen mode */
+    // Screen mode
     val isEditMode = goalId != null
     val screenTitle = if (isEditMode) "Edit Savings Goal" else "New Savings Goal"
 
-    /* Live data */
+    // Live data
     val accounts by txnViewModel.allAccounts.collectAsState(initial = emptyList())
 
-    /* Local UI state */
+    // Local UI state
     var name by remember { mutableStateOf(TextFieldValue("")) }
     var targetAmount by remember { mutableStateOf(TextFieldValue("")) }
     var savedAmount by remember { mutableStateOf(TextFieldValue("")) }
@@ -67,7 +64,7 @@ fun AddEditGoalScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var accountExpanded by remember { mutableStateOf(false) }
 
-    /* Pre-populate when editing */
+    // Pre-populate when editing
     val goalToEdit by if (isEditMode) {
         goalViewModel.getGoalById(goalId!!).collectAsState(initial = null)
     } else {
@@ -87,18 +84,19 @@ fun AddEditGoalScreen(
         }
     }
 
-    /* Theme-aware popup background for dialogs (transparency fix) */
+    // Theme-aware popup background for dialogs (transparency fix)
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor =
         if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        /* ------------ Goal Basics ------------ */
+        // ------------ Goal Basics ------------
         item {
             GlassPanel {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -108,7 +106,7 @@ fun AddEditGoalScreen(
                         label = { Text("Goal Name") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = auroraTextFieldColors()
+                        colors = auroraTextFieldColors(),
                     )
                     OutlinedTextField(
                         value = targetAmount,
@@ -120,7 +118,7 @@ fun AddEditGoalScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         leadingIcon = { Text("₹") },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = auroraTextFieldColors()
+                        colors = auroraTextFieldColors(),
                     )
                     OutlinedTextField(
                         value = savedAmount,
@@ -132,19 +130,19 @@ fun AddEditGoalScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         leadingIcon = { Text("₹") },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = auroraTextFieldColors()
+                        colors = auroraTextFieldColors(),
                     )
                 }
             }
         }
 
-        /* ------------ Account Picker ------------ */
+        // ------------ Account Picker ------------
         item {
             GlassPanel {
                 Column(Modifier.padding(16.dp)) {
                     ExposedDropdownMenuBox(
                         expanded = accountExpanded,
-                        onExpandedChange = { accountExpanded = !accountExpanded }
+                        onExpandedChange = { accountExpanded = !accountExpanded },
                     ) {
                         OutlinedTextField(
                             value = selectedAccount?.name ?: "Select Account",
@@ -153,20 +151,22 @@ fun AddEditGoalScreen(
                             label = { Text("Allocate To Account") },
                             trailingIcon = {
                                 ExposedDropdownMenuDefaults.TrailingIcon(
-                                    expanded = accountExpanded
+                                    expanded = accountExpanded,
                                 )
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(),
-                            colors = auroraTextFieldColors()
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(),
+                            colors = auroraTextFieldColors(),
                         )
                         ExposedDropdownMenu(
                             expanded = accountExpanded,
                             onDismissRequest = { accountExpanded = false },
-                            modifier = Modifier.background(
-                                if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight
-                            )
+                            modifier =
+                                Modifier.background(
+                                    if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight,
+                                ),
                         ) {
                             accounts.forEach { account ->
                                 DropdownMenuItem(
@@ -174,7 +174,7 @@ fun AddEditGoalScreen(
                                     onClick = {
                                         selectedAccount = account
                                         accountExpanded = false
-                                    }
+                                    },
                                 )
                             }
                         }
@@ -183,24 +183,26 @@ fun AddEditGoalScreen(
             }
         }
 
-        /* ------------ Target Date ------------ */
+        // ------------ Target Date ------------
         item {
             GlassPanel {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = "Target Date",
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
-                    val dateDisplay = targetDateMillis?.let {
-                        SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(it))
-                    } ?: "Select"
+                    val dateDisplay =
+                        targetDateMillis?.let {
+                            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(it))
+                        } ?: "Select"
                     TextButton(onClick = { showDatePicker = true }) {
                         Text(dateDisplay)
                     }
@@ -208,22 +210,24 @@ fun AddEditGoalScreen(
             }
         }
 
-        /* ------------ Save / Cancel Buttons ------------ */
+        // ------------ Save / Cancel Buttons ------------
         item {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 OutlinedButton(
                     onClick = { navController.popBackStack() },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) { Text("Cancel") }
 
-                val saveEnabled = name.text.isNotBlank()
-                        && targetAmount.text.toDoubleOrNull() != null
-                        && selectedAccount != null
+                val saveEnabled =
+                    name.text.isNotBlank() &&
+                        targetAmount.text.toDoubleOrNull() != null &&
+                        selectedAccount != null
 
                 Button(
                     onClick = {
@@ -236,23 +240,23 @@ fun AddEditGoalScreen(
                             targetAmount = tgtAmt,
                             savedAmount = svdAmt,
                             targetDate = targetDateMillis,
-                            accountId = selectedAccount!!.id
+                            accountId = selectedAccount!!.id,
                         )
                         navController.popBackStack()
                     },
                     enabled = saveEnabled,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 ) { Text(if (isEditMode) "Update" else "Save") }
             }
         }
     }
 
-
-    /* ---------- Date Picker Dialog (with transparency fix) ---------- */
+    // ---------- Date Picker Dialog (with transparency fix) ----------
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = targetDateMillis ?: System.currentTimeMillis()
-        )
+        val datePickerState =
+            rememberDatePickerState(
+                initialSelectedDateMillis = targetDateMillis ?: System.currentTimeMillis(),
+            )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
@@ -264,31 +268,32 @@ fun AddEditGoalScreen(
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
             },
-            /* FIX: Explicit containerColor so the dialog is not transparent */
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            // FIX: Explicit containerColor so the dialog is not transparent
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
         ) {
             DatePicker(
                 state = datePickerState,
-                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
             )
         }
     }
 }
 
-/* ---------- Re-usable Aurora-style TextField colors ---------- */
+// ---------- Re-usable Aurora-style TextField colors ----------
 @Composable
-private fun auroraTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = MaterialTheme.colorScheme.primary,
-    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-    focusedLabelColor = MaterialTheme.colorScheme.primary,
-    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    cursorColor = MaterialTheme.colorScheme.primary,
-    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-    focusedContainerColor = Color.Transparent,
-    unfocusedContainerColor = Color.Transparent,
-    focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
-    unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
-    unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-)
+private fun auroraTextFieldColors() =
+    OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+        focusedLabelColor = MaterialTheme.colorScheme.primary,
+        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        cursorColor = MaterialTheme.colorScheme.primary,
+        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+        focusedContainerColor = Color.Transparent,
+        unfocusedContainerColor = Color.Transparent,
+        focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
+        unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    )

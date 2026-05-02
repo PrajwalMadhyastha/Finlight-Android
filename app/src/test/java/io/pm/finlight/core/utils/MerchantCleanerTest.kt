@@ -8,7 +8,6 @@ import org.junit.runners.JUnit4
 
 @RunWith(JUnit4::class)
 class MerchantCleanerTest {
-
     @Test
     fun `test returns null for null input`() {
         assertNull(MerchantCleaner.clean(null))
@@ -58,9 +57,12 @@ class MerchantCleanerTest {
     fun `test preserves valid merchants without matching patterns`() {
         assertEquals("Pinnacle Stock Broker", MerchantCleaner.clean("Pinnacle Stock Broker"))
         assertEquals("Starbucks", MerchantCleaner.clean("Starbucks"))
-        assertEquals("My Company Limited Edition", MerchantCleaner.clean("My Company Limited Edition")) // Limited shouldn't be stripped if it's not the last word (wait, regex requires it to be at the end, so "Edition" is at the end, "Limited" is not - safe!)
+        assertEquals(
+            "My Company Limited Edition",
+            MerchantCleaner.clean("My Company Limited Edition"),
+        ) // Limited shouldn't be stripped if it's not the last word (wait, regex requires it to be at the end, so "Edition" is at the end, "Limited" is not - safe!)
     }
-    
+
     @Test
     fun `test returns raw if cleaning strips everything`() {
         // Edge case: what if the merchant name literally was just "PYU*"? It should strip it and return empty, triggering the ifBlank fallback.

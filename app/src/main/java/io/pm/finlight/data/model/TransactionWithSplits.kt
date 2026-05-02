@@ -12,10 +12,9 @@ import androidx.room.Relation
 data class TransactionWithSplits(
     @Embedded
     val transaction: Transaction,
-
     @Relation(
         parentColumn = "id",
-        entityColumn = "parentTransactionId"
+        entityColumn = "parentTransactionId",
     )
-    val splits: List<SplitTransaction>
+    val splits: List<SplitTransaction>,
 )

@@ -34,7 +34,7 @@ data class SearchUiState(
     val showStartDatePicker: Boolean = false,
     val showEndDatePicker: Boolean = false,
     val displayDate: String? = null,
-    val isDrilldown: Boolean = false // --- NEW: Flag for drilldown mode
+    val isDrilldown: Boolean = false, // --- NEW: Flag for drilldown mode
 )
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -45,7 +45,7 @@ class SearchViewModel(
     private val tagDao: TagDao,
     private val initialCategoryId: Int?,
     private val initialDateMillis: Long?,
-    private val initialQuery: String?
+    private val initialQuery: String?,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
@@ -53,39 +53,49 @@ class SearchViewModel(
     private val _daySummary = MutableStateFlow<FinancialSummary?>(null)
     val daySummary: StateFlow<FinancialSummary?> = _daySummary.asStateFlow()
 
+    val searchResults: StateFlow<List<TransactionDetails>> =
+        uiState
+            .debounce(300L) // Debounce user input for performance
+            .flatMapLatest { state ->
+                val filtersAreActive =
+                    state.selectedAccount != null ||
+                        state.selectedCategory != null ||
+                        state.selectedTag != null ||
+                        state.transactionType != "All" ||
+                        state.startDate != null ||
+                        state.endDate != null
 
-    val searchResults: StateFlow<List<TransactionDetails>> = uiState
-        .debounce(300L) // Debounce user input for performance
-        .flatMapLatest { state ->
-            val filtersAreActive = state.selectedAccount != null ||
-                    state.selectedCategory != null ||
-                    state.selectedTag != null ||
-                    state.transactionType != "All" ||
-                    state.startDate != null ||
-                    state.endDate != null
+                val shouldSearch = state.keyword.isNotBlank() || filtersAreActive || state.isDrilldown
+                _uiState.update { it.copy(hasSearched = shouldSearch) }
 
-            val shouldSearch = state.keyword.isNotBlank() || filtersAreActive || state.isDrilldown
-            _uiState.update { it.copy(hasSearched = shouldSearch) }
-
-            if (shouldSearch) {
-                transactionDao.searchTransactions(
-                    keyword = state.keyword,
-                    accountId = state.selectedAccount?.id,
-                    categoryId = state.selectedCategory?.id,
-                    tagId = state.selectedTag?.id,
-                    transactionType = if (state.transactionType.equals("All", ignoreCase = true)) null else state.transactionType.lowercase(),
-                    startDate = state.startDate,
-                    endDate = state.endDate
-                )
-            } else {
-                flowOf(emptyList())
+                if (shouldSearch) {
+                    transactionDao.searchTransactions(
+                        keyword = state.keyword,
+                        accountId = state.selectedAccount?.id,
+                        categoryId = state.selectedCategory?.id,
+                        tagId = state.selectedTag?.id,
+                        transactionType =
+                            if (state.transactionType.equals(
+                                    "All",
+                                    ignoreCase = true,
+                                )
+                            ) {
+                                null
+                            } else {
+                                state.transactionType.lowercase()
+                            },
+                        startDate = state.startDate,
+                        endDate = state.endDate,
+                    )
+                } else {
+                    flowOf(emptyList())
+                }
             }
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
     init {
         viewModelScope.launch {
@@ -112,10 +122,12 @@ class SearchViewModel(
 
         // --- UPDATED: Handle initial query and set Drilldown mode ---
         if (!initialQuery.isNullOrBlank()) {
-            _uiState.update { it.copy(
-                keyword = initialQuery,
-                isDrilldown = true // Enable drilldown mode
-            ) }
+            _uiState.update {
+                it.copy(
+                    keyword = initialQuery,
+                    isDrilldown = true, // Enable drilldown mode
+                )
+            }
         }
 
         if (initialDateMillis != null && initialDateMillis != -1L) {
@@ -133,11 +145,13 @@ class SearchViewModel(
             val dateFormatter = SimpleDateFormat("MMMM d, yyyy", Locale.getDefault())
             val formattedDate = dateFormatter.format(cal.time)
 
-            _uiState.update { it.copy(
-                startDate = start,
-                endDate = end,
-                displayDate = formattedDate
-            ) }
+            _uiState.update {
+                it.copy(
+                    startDate = start,
+                    endDate = end,
+                    displayDate = formattedDate,
+                )
+            }
 
             viewModelScope.launch {
                 transactionDao.getFinancialSummaryForRangeFlow(start, end).collect { summary ->
@@ -172,15 +186,16 @@ class SearchViewModel(
     }
 
     fun onEndDateSelected(endDateMillis: Long?) {
-        val adjustedEnd = endDateMillis?.let {
-            Calendar.getInstance().apply {
-                timeInMillis = it
-                set(Calendar.HOUR_OF_DAY, 23)
-                set(Calendar.MINUTE, 59)
-                set(Calendar.SECOND, 59)
-                set(Calendar.MILLISECOND, 999)
-            }.timeInMillis
-        }
+        val adjustedEnd =
+            endDateMillis?.let {
+                Calendar.getInstance().apply {
+                    timeInMillis = it
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }.timeInMillis
+            }
         _uiState.update { it.copy(endDate = adjustedEnd) }
     }
 

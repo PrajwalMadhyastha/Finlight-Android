@@ -6,5 +6,5 @@ package io.pm.finlight
 data class WeeklyTrend(
     val period: String, // Format: "YYYY-WW" (year-week)
     val totalIncome: Double,
-    val totalExpenses: Double
+    val totalExpenses: Double,
 )

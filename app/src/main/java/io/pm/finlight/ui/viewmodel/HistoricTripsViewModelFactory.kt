@@ -17,7 +17,7 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.repository.TripRepository
 
 class HistoricTripsViewModelFactory(
-    private val application: Application
+    private val application: Application,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(HistoricTripsViewModel::class.java)) {
@@ -30,7 +30,7 @@ class HistoricTripsViewModelFactory(
             @Suppress("UNCHECKED_CAST")
             return HistoricTripsViewModel(
                 tripRepository,
-                transactionRepository
+                transactionRepository,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

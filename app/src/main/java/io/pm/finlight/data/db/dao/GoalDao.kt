@@ -24,7 +24,7 @@ data class GoalWithAccountName(
     val savedAmount: Double,
     val targetDate: Long?,
     val accountId: Int,
-    val accountName: String
+    val accountName: String,
 )
 
 @Dao
@@ -59,13 +59,15 @@ interface GoalDao {
     @Query("SELECT * FROM goals")
     suspend fun getAll(): List<Goal>
 
-    @Query("""
+    @Query(
+        """
         SELECT
             g.id, g.name, g.targetAmount, g.savedAmount, g.targetDate, g.accountId, a.name as accountName
         FROM goals as g
         INNER JOIN accounts as a ON g.accountId = a.id
         ORDER BY g.targetDate ASC
-    """)
+    """,
+    )
     fun getAllGoalsWithAccountName(): Flow<List<GoalWithAccountName>>
 
     @Query("SELECT * FROM goals WHERE accountId = :accountId")
@@ -73,5 +75,8 @@ interface GoalDao {
 
     // --- NEW: Reassigns goals from source accounts to a destination account ---
     @Query("UPDATE goals SET accountId = :destinationAccountId WHERE accountId IN (:sourceAccountIds)")
-    suspend fun reassignGoals(sourceAccountIds: List<Int>, destinationAccountId: Int)
+    suspend fun reassignGoals(
+        sourceAccountIds: List<Int>,
+        destinationAccountId: Int,
+    )
 }

@@ -2,13 +2,12 @@ package io.pm.finlight.ml
 
 import android.content.Context
 import androidx.annotation.VisibleForTesting
-import java.io.Closeable
+import org.json.JSONObject
+import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
-import org.json.JSONObject
-import org.tensorflow.lite.Interpreter
 
 /**
  * On-device NER (Named Entity Recognition) extractor using a MobileBERT TFLite model.
@@ -32,7 +31,6 @@ class NerExtractor private constructor(
     preloadedInterpreter: Interpreter?,
     preloadedLabelMap: Map<Int, String>?,
 ) : SmsEntityExtractor {
-
     companion object {
         private const val DEFAULT_MODEL = "sms_ner.tflite"
         private const val DEFAULT_VOCAB = "ner_vocab.txt"
@@ -58,7 +56,7 @@ class NerExtractor private constructor(
         modelName: String = DEFAULT_MODEL,
         vocabName: String = DEFAULT_VOCAB,
         labelMapName: String = DEFAULT_LABEL_MAP,
-        interpreterFactory: ((ByteBuffer, Interpreter.Options) -> Interpreter)? = null
+        interpreterFactory: ((ByteBuffer, Interpreter.Options) -> Interpreter)? = null,
     ) : this(context, modelName, vocabName, labelMapName, null, null, null) {
         if (interpreterFactory != null) {
             this.interpreterFactory = interpreterFactory
@@ -83,11 +81,12 @@ class NerExtractor private constructor(
         val fd = ctx.assets.openFd(modelName)
         val fis = FileInputStream(fd.fileDescriptor)
         val channel = fis.channel
-        val modelBuffer = channel.map(
-            FileChannel.MapMode.READ_ONLY,
-            fd.startOffset,
-            fd.declaredLength,
-        )
+        val modelBuffer =
+            channel.map(
+                FileChannel.MapMode.READ_ONLY,
+                fd.startOffset,
+                fd.declaredLength,
+            )
 
         val options = Interpreter.Options()
         options.setNumThreads(4)
@@ -132,65 +131,70 @@ class NerExtractor private constructor(
         val result = tok.tokenize(text)
 
         // Step 2: Prepare input buffers (int32, 4 bytes each)
-        val inputIdsBuffer = ByteBuffer.allocateDirect(
-            WordPieceTokenizer.MAX_SEQ_LENGTH * 4
-        ).apply {
-            order(ByteOrder.nativeOrder())
-            for (id in result.inputIds) putInt(id)
-            rewind()
-        }
+        val inputIdsBuffer =
+            ByteBuffer.allocateDirect(
+                WordPieceTokenizer.MAX_SEQ_LENGTH * 4,
+            ).apply {
+                order(ByteOrder.nativeOrder())
+                for (id in result.inputIds) putInt(id)
+                rewind()
+            }
 
-        val attentionMaskBuffer = ByteBuffer.allocateDirect(
-            WordPieceTokenizer.MAX_SEQ_LENGTH * 4
-        ).apply {
-            order(ByteOrder.nativeOrder())
-            for (mask in result.attentionMask) putInt(mask)
-            rewind()
-        }
+        val attentionMaskBuffer =
+            ByteBuffer.allocateDirect(
+                WordPieceTokenizer.MAX_SEQ_LENGTH * 4,
+            ).apply {
+                order(ByteOrder.nativeOrder())
+                for (mask in result.attentionMask) putInt(mask)
+                rewind()
+            }
 
         // Step 3: Prepare output buffer [1, 128, 9] float32
         val numLabels = idToLabel.size
-        val outputBuffer = ByteBuffer.allocateDirect(
-            1 * WordPieceTokenizer.MAX_SEQ_LENGTH * numLabels * 4
-        ).apply {
-            order(ByteOrder.nativeOrder())
-        }
-
-        // Step 4: Run inference — match inputs by NAME, not index
-        val logits = synchronized(interpreterLock) {
-            val inputMap = mutableMapOf<Int, Any>()
-            val inputCount = interp.inputTensorCount
-
-            for (i in 0 until inputCount) {
-                val tensor = interp.getInputTensor(i)
-                val name = tensor.name()
-                when {
-                    name.contains("input_ids") -> inputMap[i] = inputIdsBuffer
-                    name.contains("attention_mask") -> inputMap[i] = attentionMaskBuffer
-                }
+        val outputBuffer =
+            ByteBuffer.allocateDirect(
+                1 * WordPieceTokenizer.MAX_SEQ_LENGTH * numLabels * 4,
+            ).apply {
+                order(ByteOrder.nativeOrder())
             }
 
-            val outputMap = mapOf(0 to outputBuffer)
-            interp.runForMultipleInputsOutputs(
-                inputMap.toSortedMap().values.toTypedArray(),
-                outputMap,
-            )
+        // Step 4: Run inference — match inputs by NAME, not index
+        val logits =
+            synchronized(interpreterLock) {
+                val inputMap = mutableMapOf<Int, Any>()
+                val inputCount = interp.inputTensorCount
 
-            // Parse output logits
-            outputBuffer.rewind()
-            Array(WordPieceTokenizer.MAX_SEQ_LENGTH) { FloatArray(numLabels) }.also { arr ->
-                for (pos in 0 until WordPieceTokenizer.MAX_SEQ_LENGTH) {
-                    for (label in 0 until numLabels) {
-                        arr[pos][label] = outputBuffer.float
+                for (i in 0 until inputCount) {
+                    val tensor = interp.getInputTensor(i)
+                    val name = tensor.name()
+                    when {
+                        name.contains("input_ids") -> inputMap[i] = inputIdsBuffer
+                        name.contains("attention_mask") -> inputMap[i] = attentionMaskBuffer
+                    }
+                }
+
+                val outputMap = mapOf(0 to outputBuffer)
+                interp.runForMultipleInputsOutputs(
+                    inputMap.toSortedMap().values.toTypedArray(),
+                    outputMap,
+                )
+
+                // Parse output logits
+                outputBuffer.rewind()
+                Array(WordPieceTokenizer.MAX_SEQ_LENGTH) { FloatArray(numLabels) }.also { arr ->
+                    for (pos in 0 until WordPieceTokenizer.MAX_SEQ_LENGTH) {
+                        for (label in 0 until numLabels) {
+                            arr[pos][label] = outputBuffer.float
+                        }
                     }
                 }
             }
-        }
 
         // Step 5: Argmax → label IDs
-        val predictions = IntArray(WordPieceTokenizer.MAX_SEQ_LENGTH) { pos ->
-            logits[pos].indices.maxByOrNull { logits[pos][it] } ?: 0
-        }
+        val predictions =
+            IntArray(WordPieceTokenizer.MAX_SEQ_LENGTH) { pos ->
+                logits[pos].indices.maxByOrNull { logits[pos][it] } ?: 0
+            }
 
         // Step 6: Post-process BIO tags into entity spans
         return extractEntities(predictions, result)
@@ -265,14 +269,15 @@ class NerExtractor private constructor(
             }
         }
 
-        return entityMap.mapValues { (type, values) -> 
+        return entityMap.mapValues { (type, values) ->
             val uniqueValues = values.distinct()
             var joined = uniqueValues.joinToString(", ")
-            
+
             // Post-process AMOUNT to remove currency prefixes and commas
             if (type == "AMOUNT") {
-                joined = joined.replace(Regex("(?i)^(?:rs\\.?|inr\\.?|₹)\\s*"), "")
-                               .replace(Regex(",(?=\\d{2,3})"), "") // Remove Indian-style commas
+                joined =
+                    joined.replace(Regex("(?i)^(?:rs\\.?|inr\\.?|₹)\\s*"), "")
+                        .replace(Regex(",(?=\\d{2,3})"), "") // Remove Indian-style commas
             }
             joined
         }

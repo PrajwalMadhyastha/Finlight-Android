@@ -18,7 +18,7 @@ class TimePeriodReportViewModelFactory(
     private val application: Application,
     private val timePeriod: TimePeriod,
     private val initialDateMillis: Long?,
-    private val showPreviousMonth: Boolean // --- NEW: Add parameter
+    private val showPreviousMonth: Boolean, // --- NEW: Add parameter
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TimePeriodReportViewModel::class.java)) {
@@ -36,7 +36,7 @@ class TimePeriodReportViewModelFactory(
                 settingsRepository = settingsRepository, // --- NEW: Added ---
                 timePeriod = timePeriod,
                 initialDateMillis = initialDateMillis,
-                showPreviousMonth = showPreviousMonth
+                showPreviousMonth = showPreviousMonth,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

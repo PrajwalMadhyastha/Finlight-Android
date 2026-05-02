@@ -35,9 +35,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.CategorySpending
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.utils.CategoryIconHelper
 import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.pow
@@ -46,12 +46,12 @@ import kotlin.math.sqrt
 @Composable
 fun CategorySpendingScreen(
     spendingList: List<CategorySpending>,
-    onCategoryClick: (CategorySpending) -> Unit
+    onCategoryClick: (CategorySpending) -> Unit,
 ) {
     if (spendingList.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.Center,
         ) {
             Text("No spending data for this month.")
         }
@@ -62,34 +62,35 @@ fun CategorySpendingScreen(
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             GlassPanel(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
                         "Category Breakdown",
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(16.dp))
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(300.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         DonutChart(
                             modifier = Modifier.weight(1.6f),
                             data = spendingList,
-                            onSliceClick = onCategoryClick // Pass the click handler down
+                            onSliceClick = onCategoryClick, // Pass the click handler down
                         )
                         ChartLegend(
                             modifier = Modifier.weight(1.6f),
-                            spendingList = spendingList
+                            spendingList = spendingList,
                         )
                     }
                 }
@@ -100,7 +101,7 @@ fun CategorySpendingScreen(
             CategorySpendingCard(
                 categorySpending = categorySpending,
                 totalSpending = totalSpending,
-                onClick = { onCategoryClick(categorySpending) }
+                onClick = { onCategoryClick(categorySpending) },
             )
         }
     }
@@ -113,7 +114,7 @@ fun CategorySpendingScreen(
 private fun DonutChart(
     modifier: Modifier = Modifier,
     data: List<CategorySpending>,
-    onSliceClick: (CategorySpending) -> Unit
+    onSliceClick: (CategorySpending) -> Unit,
 ) {
     val totalAmount = remember(data) { data.sumOf { it.totalAmount }.toFloat() }
     val animationProgress = remember { Animatable(0f) }
@@ -123,44 +124,45 @@ private fun DonutChart(
     }
 
     Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .pointerInput(data) { // Key to data to ensure the lambda has the latest list
-                detectTapGestures { tapOffset ->
-                    val centerX = size.width / 2f
-                    val centerY = size.height / 2f
-                    val diameter = min(size.width, size.height) * 0.8f
-                    val radius = diameter / 2f
-                    val strokeWidth = 32.dp.toPx()
+        modifier =
+            modifier
+                .fillMaxSize()
+                .pointerInput(data) { // Key to data to ensure the lambda has the latest list
+                    detectTapGestures { tapOffset ->
+                        val centerX = size.width / 2f
+                        val centerY = size.height / 2f
+                        val diameter = min(size.width, size.height) * 0.8f
+                        val radius = diameter / 2f
+                        val strokeWidth = 32.dp.toPx()
 
-                    // Check if the tap is within the donut's bounds (not in the center hole or outside)
-                    val distance = sqrt((tapOffset.x - centerX).pow(2) + (tapOffset.y - centerY).pow(2))
-                    if (distance < radius - strokeWidth / 2 || distance > radius + strokeWidth / 2) {
-                        return@detectTapGestures
-                    }
-
-                    // Calculate the angle of the tap relative to the center
-                    val dx = tapOffset.x - centerX
-                    val dy = tapOffset.y - centerY
-                    val angleRad = atan2(dy.toDouble(), dx.toDouble())
-                    var angleDeg = Math.toDegrees(angleRad).toFloat()
-                    if (angleDeg < 0) angleDeg += 360
-
-                    // Convert the angle to the chart's coordinate system (starts at -90 degrees)
-                    val tapAngle = (angleDeg + 90) % 360
-
-                    // Find which slice corresponds to the tap angle
-                    var currentAngle = 0f
-                    for (item in data) {
-                        val sweepAngle = (item.totalAmount.toFloat() / totalAmount) * 360f
-                        if (tapAngle in currentAngle..(currentAngle + sweepAngle)) {
-                            onSliceClick(item)
+                        // Check if the tap is within the donut's bounds (not in the center hole or outside)
+                        val distance = sqrt((tapOffset.x - centerX).pow(2) + (tapOffset.y - centerY).pow(2))
+                        if (distance < radius - strokeWidth / 2 || distance > radius + strokeWidth / 2) {
                             return@detectTapGestures
                         }
-                        currentAngle += sweepAngle
+
+                        // Calculate the angle of the tap relative to the center
+                        val dx = tapOffset.x - centerX
+                        val dy = tapOffset.y - centerY
+                        val angleRad = atan2(dy.toDouble(), dx.toDouble())
+                        var angleDeg = Math.toDegrees(angleRad).toFloat()
+                        if (angleDeg < 0) angleDeg += 360
+
+                        // Convert the angle to the chart's coordinate system (starts at -90 degrees)
+                        val tapAngle = (angleDeg + 90) % 360
+
+                        // Find which slice corresponds to the tap angle
+                        var currentAngle = 0f
+                        for (item in data) {
+                            val sweepAngle = (item.totalAmount.toFloat() / totalAmount) * 360f
+                            if (tapAngle in currentAngle..(currentAngle + sweepAngle)) {
+                                onSliceClick(item)
+                                return@detectTapGestures
+                            }
+                            currentAngle += sweepAngle
+                        }
                     }
-                }
-            }
+                },
     ) {
         val strokeWidth = 32.dp.toPx()
         val diameter = min(size.width, size.height) * 0.8f
@@ -179,74 +181,78 @@ private fun DonutChart(
                 useCenter = false,
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Butt),
                 topLeft = topLeft,
-                size = size
+                size = size,
             )
             startAngle += sweepAngle
         }
     }
 }
 
-
 @Composable
 fun CategorySpendingCard(
     categorySpending: CategorySpending,
     totalSpending: Double,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val percentage = if (totalSpending > 0) (categorySpending.totalAmount / totalSpending * 100) else 0.0
 
     GlassPanel(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(
-                        CategoryIconHelper.getIconBackgroundColor(
-                            categorySpending.colorKey ?: "gray_light"
-                        )
-                    ),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(
+                            CategoryIconHelper.getIconBackgroundColor(
+                                categorySpending.colorKey ?: "gray_light",
+                            ),
+                        ),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = CategoryIconHelper.getIcon(categorySpending.iconKey ?: "category"),
                     contentDescription = categorySpending.categoryName,
                     tint = Color.Black,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(22.dp),
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     categorySpending.categoryName,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     "${"%.1f".format(percentage)}% of total spending",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Text(
                 "₹${"%,.2f".format(categorySpending.totalAmount)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
 }
 
 @Composable
-private fun ChartLegend(modifier: Modifier = Modifier, spendingList: List<CategorySpending>) {
+private fun ChartLegend(
+    modifier: Modifier = Modifier,
+    spendingList: List<CategorySpending>,
+) {
     val totalValue = remember(spendingList) { spendingList.sumOf { it.totalAmount } }
 
     LazyColumn(
@@ -261,10 +267,11 @@ private fun ChartLegend(modifier: Modifier = Modifier, spendingList: List<Catego
                 modifier = Modifier.padding(vertical = 4.dp),
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(color),
+                    modifier =
+                        Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(color),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -273,13 +280,13 @@ private fun ChartLegend(modifier: Modifier = Modifier, spendingList: List<Catego
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = "${"%.1f".format(percentage)}%",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }

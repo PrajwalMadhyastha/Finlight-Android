@@ -21,9 +21,8 @@ import java.util.Calendar
 
 class RecurringTransactionWorker(
     private val context: Context,
-    workerParams: WorkerParameters
+    workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
-
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
@@ -46,16 +45,17 @@ class RecurringTransactionWorker(
 
                 allRules.forEach { rule ->
                     if (isDue(rule)) {
-                        val potentialTxn = PotentialTransaction(
-                            sourceSmsId = rule.id.toLong(),
-                            smsSender = "Recurring Rule",
-                            amount = rule.amount,
-                            transactionType = rule.transactionType,
-                            merchantName = rule.description,
-                            originalMessage = "Recurring payment for ${rule.description}",
-                            sourceSmsHash = "recurring_${rule.id}",
-                            date = System.currentTimeMillis() // Use current time for due transactions
-                        )
+                        val potentialTxn =
+                            PotentialTransaction(
+                                sourceSmsId = rule.id.toLong(),
+                                smsSender = "Recurring Rule",
+                                amount = rule.amount,
+                                transactionType = rule.transactionType,
+                                merchantName = rule.description,
+                                originalMessage = "Recurring payment for ${rule.description}",
+                                sourceSmsHash = "recurring_${rule.id}",
+                                date = System.currentTimeMillis(), // Use current time for due transactions
+                            )
                         NotificationHelper.showRecurringTransactionDueNotification(context, potentialTxn)
                     }
                 }
@@ -82,25 +82,27 @@ class RecurringTransactionWorker(
         }
 
         val lastRunCal = Calendar.getInstance().apply { timeInMillis = rule.lastRunDate }
-        val nextDueDate = (lastRunCal.clone() as Calendar).apply {
-            when (rule.recurrenceInterval) {
-                "Daily" -> add(Calendar.DAY_OF_YEAR, 1)
-                "Weekly" -> add(Calendar.WEEK_OF_YEAR, 1)
-                "Monthly" -> add(Calendar.MONTH, 1)
-                "Yearly" -> add(Calendar.YEAR, 1)
+        val nextDueDate =
+            (lastRunCal.clone() as Calendar).apply {
+                when (rule.recurrenceInterval) {
+                    "Daily" -> add(Calendar.DAY_OF_YEAR, 1)
+                    "Weekly" -> add(Calendar.WEEK_OF_YEAR, 1)
+                    "Monthly" -> add(Calendar.MONTH, 1)
+                    "Yearly" -> add(Calendar.YEAR, 1)
+                }
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
             }
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
 
-        val todayStartOfDay = (today.clone() as Calendar).apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
+        val todayStartOfDay =
+            (today.clone() as Calendar).apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
 
         return !todayStartOfDay.before(nextDueDate)
     }

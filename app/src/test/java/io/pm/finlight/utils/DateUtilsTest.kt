@@ -16,7 +16,6 @@ import java.util.TimeZone
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class DateUtilsTest : BaseViewModelTest() {
-
     private val originalTimeZone: TimeZone = TimeZone.getDefault()
     private val testTimeZone: TimeZone = TimeZone.getTimeZone("Asia/Kolkata") // IST
 
@@ -34,7 +33,11 @@ class DateUtilsTest : BaseViewModelTest() {
         super.tearDown()
     }
 
-    private fun getTestTime(year: Int, month: Int, day: Int): Long {
+    private fun getTestTime(
+        year: Int,
+        month: Int,
+        day: Int,
+    ): Long {
         return Calendar.getInstance(testTimeZone).apply {
             set(year, month, day, 10, 0, 0)
             set(Calendar.MILLISECOND, 0)
@@ -50,15 +53,17 @@ class DateUtilsTest : BaseViewModelTest() {
         val (start, end) = DateUtils.getPreviousMonthDateRange(currentTime)
 
         // Assert: Previous month is September 2025
-        val expectedStart = Calendar.getInstance(testTimeZone).apply {
-            set(2025, Calendar.SEPTEMBER, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        val expectedStart =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2025, Calendar.SEPTEMBER, 1, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
 
-        val expectedEnd = Calendar.getInstance(testTimeZone).apply {
-            set(2025, Calendar.SEPTEMBER, 30, 23, 59, 59)
-            set(Calendar.MILLISECOND, 999)
-        }.timeInMillis
+        val expectedEnd =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2025, Calendar.SEPTEMBER, 30, 23, 59, 59)
+                set(Calendar.MILLISECOND, 999)
+            }.timeInMillis
 
         assertEquals(expectedStart, start)
         assertEquals(expectedEnd, end)
@@ -73,15 +78,17 @@ class DateUtilsTest : BaseViewModelTest() {
         val (start, end) = DateUtils.getPreviousMonthDateRange(currentTime)
 
         // Assert: Previous month is December 2024
-        val expectedStart = Calendar.getInstance(testTimeZone).apply {
-            set(2024, Calendar.DECEMBER, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        val expectedStart =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2024, Calendar.DECEMBER, 1, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
 
-        val expectedEnd = Calendar.getInstance(testTimeZone).apply {
-            set(2024, Calendar.DECEMBER, 31, 23, 59, 59)
-            set(Calendar.MILLISECOND, 999)
-        }.timeInMillis
+        val expectedEnd =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2024, Calendar.DECEMBER, 31, 23, 59, 59)
+                set(Calendar.MILLISECOND, 999)
+            }.timeInMillis
 
         assertEquals(expectedStart, start)
         assertEquals(expectedEnd, end)
@@ -96,15 +103,17 @@ class DateUtilsTest : BaseViewModelTest() {
         val (start, end) = DateUtils.getPreviousMonthDateRange(currentTime)
 
         // Assert: Previous month is February 2024, which has 29 days
-        val expectedStart = Calendar.getInstance(testTimeZone).apply {
-            set(2024, Calendar.FEBRUARY, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        val expectedStart =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2024, Calendar.FEBRUARY, 1, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
 
-        val expectedEnd = Calendar.getInstance(testTimeZone).apply {
-            set(2024, Calendar.FEBRUARY, 29, 23, 59, 59)
-            set(Calendar.MILLISECOND, 999)
-        }.timeInMillis
+        val expectedEnd =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2024, Calendar.FEBRUARY, 29, 23, 59, 59)
+                set(Calendar.MILLISECOND, 999)
+            }.timeInMillis
 
         assertEquals(expectedStart, start)
         assertEquals(expectedEnd, end)
@@ -119,15 +128,17 @@ class DateUtilsTest : BaseViewModelTest() {
         val (start, end) = DateUtils.getPreviousMonthDateRange(currentTime)
 
         // Assert: Previous month is February 2025, which has 28 days
-        val expectedStart = Calendar.getInstance(testTimeZone).apply {
-            set(2025, Calendar.FEBRUARY, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        val expectedStart =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2025, Calendar.FEBRUARY, 1, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
 
-        val expectedEnd = Calendar.getInstance(testTimeZone).apply {
-            set(2025, Calendar.FEBRUARY, 28, 23, 59, 59)
-            set(Calendar.MILLISECOND, 999)
-        }.timeInMillis
+        val expectedEnd =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2025, Calendar.FEBRUARY, 28, 23, 59, 59)
+                set(Calendar.MILLISECOND, 999)
+            }.timeInMillis
 
         assertEquals(expectedStart, start)
         assertEquals(expectedEnd, end)

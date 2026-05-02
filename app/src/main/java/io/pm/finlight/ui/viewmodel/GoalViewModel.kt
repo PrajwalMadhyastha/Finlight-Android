@@ -21,16 +21,16 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class GoalViewModel(private val goalRepository: GoalRepository) : ViewModel() {
-
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
-    val allGoals: StateFlow<List<GoalWithAccountName>> = goalRepository.getAllGoalsWithAccountName()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    val allGoals: StateFlow<List<GoalWithAccountName>> =
+        goalRepository.getAllGoalsWithAccountName()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
     fun getGoalById(id: Int): Flow<Goal?> {
         return goalRepository.getGoalById(id)
@@ -42,18 +42,19 @@ class GoalViewModel(private val goalRepository: GoalRepository) : ViewModel() {
         targetAmount: Double,
         savedAmount: Double,
         targetDate: Long?,
-        accountId: Int
+        accountId: Int,
     ) {
         viewModelScope.launch {
             try {
-                val goal = Goal(
-                    id = id ?: 0,
-                    name = name,
-                    targetAmount = targetAmount,
-                    savedAmount = savedAmount,
-                    targetDate = targetDate,
-                    accountId = accountId
-                )
+                val goal =
+                    Goal(
+                        id = id ?: 0,
+                        name = name,
+                        targetAmount = targetAmount,
+                        savedAmount = savedAmount,
+                        targetDate = targetDate,
+                        accountId = accountId,
+                    )
                 if (id == null) {
                     goalRepository.insert(goal)
                     _uiEvent.send("Goal '${goal.name}' created.")

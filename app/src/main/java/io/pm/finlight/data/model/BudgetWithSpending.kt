@@ -8,5 +8,5 @@ data class BudgetWithSpending(
     val spent: Double,
     // --- NEW: Add fields for category icon and color ---
     val iconKey: String?,
-    val colorKey: String?
+    val colorKey: String?,
 )

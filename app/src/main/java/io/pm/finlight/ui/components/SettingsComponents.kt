@@ -40,6 +40,18 @@ import java.util.*
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @Composable
+private fun transparentListItemColors(enabled: Boolean) = ListItemDefaults.colors(
+    containerColor = Color.Transparent, // Make transparent to show GlassPanel behind
+    headlineColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+    supportingColor = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+    leadingIconColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.38f),
+)
+
+@Composable
+private fun getPopupContainerColor() =
+    if (MaterialTheme.colorScheme.background.isDark()) PopupSurfaceDark else PopupSurfaceLight
+
+@Composable
 fun SettingsToggleItem(
     title: String,
     subtitle: String,
@@ -54,12 +66,7 @@ fun SettingsToggleItem(
         leadingContent = { Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp)) },
         trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled) },
         modifier = Modifier.clickable(enabled = enabled) { onCheckedChange(!checked) },
-        colors = ListItemDefaults.colors(
-            containerColor = Color.Transparent, // Make transparent to show GlassPanel behind
-            headlineColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-            supportingColor = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-            leadingIconColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
-        )
+        colors = transparentListItemColors(enabled = enabled),
     )
 }
 
@@ -69,19 +76,14 @@ fun SettingsActionItem(
     subtitle: String? = null,
     icon: ImageVector,
     onClick: () -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
 ) {
     ListItem(
         headlineContent = { Text(text) },
         supportingContent = { subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall) } },
         leadingContent = { Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp)) },
         modifier = Modifier.clickable(enabled = enabled, onClick = onClick),
-        colors = ListItemDefaults.colors(
-            containerColor = Color.Transparent, // Make transparent to show GlassPanel behind
-            headlineColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-            supportingColor = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-            leadingIconColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
-        )
+        colors = transparentListItemColors(enabled = enabled),
     )
 }
 
@@ -92,17 +94,17 @@ fun WeeklyReportTimePicker(
     initialHour: Int,
     initialMinute: Int,
     onDismiss: () -> Unit,
-    onConfirm: (Int, Int, Int) -> Unit
+    onConfirm: (Int, Int, Int) -> Unit,
 ) {
     var selectedDay by remember { mutableStateOf(initialDay) }
     val timePickerState = rememberTimePickerState(initialHour, initialMinute, false)
-    val days = (1..7).map {
-        val cal = Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, it) }
-        Pair(it, cal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.getDefault()))
-    }
+    val days =
+        (1..7).map {
+            val cal = Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, it) }
+            Pair(it, cal.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, Locale.getDefault()))
+        }
 
-    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+    val popupContainerColor = getPopupContainerColor()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -115,7 +117,7 @@ fun WeeklyReportTimePicker(
                     days.chunked(4).forEach { rowDays ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             rowDays.forEach { (dayInt, dayName) ->
                                 val isSelected = dayInt == selectedDay
@@ -123,8 +125,15 @@ fun WeeklyReportTimePicker(
                                     modifier = Modifier.weight(1f),
                                     shape = MaterialTheme.shapes.medium,
                                     onClick = { selectedDay = dayInt },
-                                    colors = if (isSelected) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.outlinedButtonColors(),
-                                    contentPadding = PaddingValues(vertical = 12.dp)
+                                    colors =
+                                        if (isSelected) {
+                                            ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                            )
+                                        } else {
+                                            ButtonDefaults.outlinedButtonColors()
+                                        },
+                                    contentPadding = PaddingValues(vertical = 12.dp),
                                 ) {
                                     Text(dayName)
                                 }
@@ -149,7 +158,7 @@ fun WeeklyReportTimePicker(
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
-        containerColor = popupContainerColor
+        containerColor = popupContainerColor,
     )
 }
 
@@ -160,14 +169,13 @@ fun MonthlyReportTimePicker(
     initialHour: Int,
     initialMinute: Int,
     onDismiss: () -> Unit,
-    onConfirm: (Int, Int, Int) -> Unit
+    onConfirm: (Int, Int, Int) -> Unit,
 ) {
     var selectedDay by remember { mutableStateOf(initialDay) }
     val timePickerState = rememberTimePickerState(initialHour, initialMinute, false)
     var isDayPickerExpanded by remember { mutableStateOf(false) }
 
-    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+    val popupContainerColor = getPopupContainerColor()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -178,20 +186,20 @@ fun MonthlyReportTimePicker(
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = { isDayPickerExpanded = !isDayPickerExpanded },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Day: $selectedDay")
                     Spacer(Modifier.weight(1f))
                     Icon(
                         imageVector = if (isDayPickerExpanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
-                        contentDescription = "Toggle day picker"
+                        contentDescription = "Toggle day picker",
                     )
                 }
                 AnimatedVisibility(visible = isDayPickerExpanded) {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 52.dp),
                         modifier = Modifier.heightIn(max = 240.dp),
-                        contentPadding = PaddingValues(vertical = 8.dp)
+                        contentPadding = PaddingValues(vertical = 8.dp),
                     ) {
                         items((1..28).toList()) { day ->
                             val isSelected = day == selectedDay
@@ -201,9 +209,16 @@ fun MonthlyReportTimePicker(
                                     isDayPickerExpanded = false
                                 },
                                 shape = CircleShape,
-                                colors = if (isSelected) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.outlinedButtonColors(),
+                                colors =
+                                    if (isSelected) {
+                                        ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                        )
+                                    } else {
+                                        ButtonDefaults.outlinedButtonColors()
+                                    },
                                 modifier = Modifier.size(48.dp),
-                                contentPadding = PaddingValues(0.dp)
+                                contentPadding = PaddingValues(0.dp),
                             ) {
                                 Text("$day")
                             }
@@ -224,6 +239,6 @@ fun MonthlyReportTimePicker(
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
-        containerColor = popupContainerColor
+        containerColor = popupContainerColor,
     )
 }

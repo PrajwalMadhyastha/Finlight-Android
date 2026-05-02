@@ -15,7 +15,6 @@ import androidx.room.Update
 
 @Dao
 interface RecurringPatternDao {
-
     /**
      * Inserts a new pattern. If a pattern with the same signature already exists, it is replaced.
      */
@@ -45,4 +44,10 @@ interface RecurringPatternDao {
      */
     @Query("DELETE FROM recurring_patterns WHERE smsSignature = :signature")
     suspend fun deleteBySignature(signature: String)
+
+    /**
+     * Deletes all patterns. Used during backup restore to clear existing data before importing.
+     */
+    @Query("DELETE FROM recurring_patterns")
+    suspend fun deleteAll()
 }

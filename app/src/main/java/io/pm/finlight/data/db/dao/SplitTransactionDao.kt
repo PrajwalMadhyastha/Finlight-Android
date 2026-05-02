@@ -16,28 +16,30 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SplitTransactionDao {
-
     @Transaction
-    @Query("""
+    @Query(
+        """
         SELECT s.*, c.name as categoryName, c.iconKey as categoryIconKey, c.colorKey as categoryColorKey
         FROM split_transactions s
         LEFT JOIN categories c ON s.categoryId = c.id
         WHERE s.parentTransactionId = :parentTransactionId
         ORDER BY s.amount DESC
-    """)
+    """,
+    )
     fun getSplitsForParent(parentTransactionId: Int): Flow<List<SplitTransactionDetails>>
 
     // --- NEW: Query to get simple split details for CSV export ---
     @Transaction
-    @Query("""
+    @Query(
+        """
         SELECT s.*, c.name as categoryName, c.iconKey as categoryIconKey, c.colorKey as categoryColorKey
         FROM split_transactions s
         LEFT JOIN categories c ON s.categoryId = c.id
         WHERE s.parentTransactionId = :parentTransactionId
         ORDER BY s.id ASC
-    """)
+    """,
+    )
     suspend fun getSplitsForParentSimple(parentTransactionId: Int): List<SplitTransactionDetails>
-
 
     // --- NEW: Query to get all splits for JSON backup ---
     @Query("SELECT * FROM split_transactions")

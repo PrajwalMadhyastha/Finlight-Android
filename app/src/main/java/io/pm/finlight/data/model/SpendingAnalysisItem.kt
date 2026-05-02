@@ -18,5 +18,5 @@ data class SpendingAnalysisItem(
     val dimensionId: String,
     val dimensionName: String,
     val totalAmount: Double,
-    val transactionCount: Int
+    val transactionCount: Int,
 )

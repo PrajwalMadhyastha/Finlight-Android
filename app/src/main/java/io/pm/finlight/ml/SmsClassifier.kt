@@ -45,8 +45,8 @@ package io.pm.finlight.ml
 
 import android.content.Context
 import androidx.annotation.VisibleForTesting
-import java.io.Closeable
 import org.tensorflow.lite.Interpreter
+import java.io.Closeable
 import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -66,18 +66,19 @@ class SmsClassifier private constructor(
     private val vocabName: String,
     preloadedVocab: Map<String, Int>?,
     preloadedInterpreter: Interpreter?,
-    private val interpreterFactory: ((ByteBuffer, Interpreter.Options) -> Interpreter)? = null
+    private val interpreterFactory: ((ByteBuffer, Interpreter.Options) -> Interpreter)? = null,
 ) : Closeable {
-
     companion object {
         // Must match the Python script's configuration
         @VisibleForTesting
         internal const val MAX_SEQUENCE_LENGTH = 250
+
         @VisibleForTesting
         internal const val UNKNOWN_TOKEN = 1L // '[UNK]' is typically the second item in the vocab
     }
 
     private var interpreter: Interpreter? = preloadedInterpreter
+
     @VisibleForTesting
     internal val vocab = preloadedVocab?.toMutableMap() ?: mutableMapOf()
 
@@ -90,7 +91,7 @@ class SmsClassifier private constructor(
     constructor(
         context: Context,
         modelName: String = "sms_classifier.tflite",
-        vocabName: String = "vocab.txt"
+        vocabName: String = "vocab.txt",
     ) : this(context, modelName, vocabName, null, null) {
         loadModel()
         loadVocabulary()
@@ -103,7 +104,7 @@ class SmsClassifier private constructor(
     @VisibleForTesting
     internal constructor(
         vocab: Map<String, Int>,
-        interpreter: Interpreter?
+        interpreter: Interpreter?,
     ) : this(null, "", "", vocab, interpreter)
 
     /**
@@ -112,7 +113,7 @@ class SmsClassifier private constructor(
     @VisibleForTesting
     internal constructor(
         context: Context,
-        factory: (ByteBuffer, Interpreter.Options) -> Interpreter
+        factory: (ByteBuffer, Interpreter.Options) -> Interpreter,
     ) : this(context, "sms_classifier.tflite", "vocab.txt", null, null, factory) {
         loadVocabulary()
         loadModel()
@@ -132,7 +133,7 @@ class SmsClassifier private constructor(
 
         val options = Interpreter.Options()
         options.setNumThreads(4)
-        
+
         // Use the injected factory or default to creating a real Interpreter
         if (interpreterFactory != null) {
             interpreter = interpreterFactory.invoke(modelBuffer, options)
@@ -159,6 +160,7 @@ class SmsClassifier private constructor(
      * @param text The raw SMS body.
      * @return A padded long array representing the tokenized text.
      */
+
     /**
      * Cleans and tokenizes the input text into a sequence of integers.
      * Uses the shared SmsTokenizer from the core module to ensure consistency.
@@ -167,7 +169,6 @@ class SmsClassifier private constructor(
     internal fun tokenize(text: String): LongArray {
         return io.pm.finlight.core.SmsTokenizer(vocab).tokenize(text)
     }
-
 
     /**
      * Preprocesses and classifies a given SMS message.
@@ -185,29 +186,31 @@ class SmsClassifier private constructor(
 
         // 2. Prepare the input ByteBuffer for the TFLite model.
         // A Long is 8 bytes, so we allocate MAX_SEQUENCE_LENGTH * 8 bytes.
-        val inputBuffer = ByteBuffer.allocateDirect(MAX_SEQUENCE_LENGTH * 8).apply {
-            order(ByteOrder.nativeOrder())
-            for (token in tokens) {
-                putLong(token)
+        val inputBuffer =
+            ByteBuffer.allocateDirect(MAX_SEQUENCE_LENGTH * 8).apply {
+                order(ByteOrder.nativeOrder())
+                for (token in tokens) {
+                    putLong(token)
+                }
+                rewind()
             }
-            rewind()
-        }
 
         // 3. Prepare the output buffer. A Float is 4 bytes.
-        val outputBuffer = ByteBuffer.allocateDirect(1 * 4).apply {
-            order(ByteOrder.nativeOrder())
-        }
+        val outputBuffer =
+            ByteBuffer.allocateDirect(1 * 4).apply {
+                order(ByteOrder.nativeOrder())
+            }
 
-        val result = synchronized(interpreterLock) {
-            interpreter?.run(inputBuffer, outputBuffer)
+        val result =
+            synchronized(interpreterLock) {
+                interpreter?.run(inputBuffer, outputBuffer)
 
-            outputBuffer.rewind()
-            outputBuffer.float
-        }
+                outputBuffer.rewind()
+                outputBuffer.float
+            }
 
         return result
     }
-
 
     /**
      * Closes the interpreter to release resources.

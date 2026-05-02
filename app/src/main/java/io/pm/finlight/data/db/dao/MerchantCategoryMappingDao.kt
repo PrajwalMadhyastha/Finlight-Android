@@ -10,7 +10,6 @@ import androidx.room.Query
  */
 @Dao
 interface MerchantCategoryMappingDao {
-
     /**
      * Inserts a new merchant-category mapping. If a mapping for the merchant
      * already exists, it will be replaced with the new one.

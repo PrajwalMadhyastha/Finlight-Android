@@ -77,18 +77,18 @@ fun ReportsScreen(
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) {
         item {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val periods = ReportPeriod.entries
                 periods.chunked(2).forEach { rowPeriods ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         rowPeriods.forEach { period ->
                             FilterChip(
@@ -96,17 +96,18 @@ fun ReportsScreen(
                                 selected = period == selectedPeriod,
                                 onClick = { viewModel.selectPeriod(period) },
                                 label = { Text(period.displayName) },
-                                leadingIcon = if (period == selectedPeriod) {
-                                    {
-                                        Icon(
-                                            imageVector = Icons.Filled.Check,
-                                            contentDescription = "Selected",
-                                            modifier = Modifier.size(FilterChipDefaults.IconSize)
-                                        )
-                                    }
-                                } else {
-                                    null
-                                }
+                                leadingIcon =
+                                    if (period == selectedPeriod) {
+                                        {
+                                            Icon(
+                                                imageVector = Icons.Filled.Check,
+                                                contentDescription = "Selected",
+                                                modifier = Modifier.size(FilterChipDefaults.IconSize),
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
                             )
                         }
                     }
@@ -124,12 +125,12 @@ fun ReportsScreen(
             GlassPanel(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
                         "Spending Consistency",
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(16.dp))
 
@@ -137,14 +138,14 @@ fun ReportsScreen(
                         SegmentedButton(
                             selected = reportViewType == ReportViewType.MONTHLY,
                             onClick = { viewModel.setReportView(ReportViewType.MONTHLY) },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                         ) {
                             Text("Monthly")
                         }
                         SegmentedButton(
                             selected = reportViewType == ReportViewType.YEARLY,
                             onClick = { viewModel.setReportView(ReportViewType.YEARLY) },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                         ) {
                             Text("Yearly")
                         }
@@ -153,10 +154,11 @@ fun ReportsScreen(
                     Spacer(Modifier.height(16.dp))
 
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
                         when (reportViewType) {
                             ReportViewType.YEARLY -> {
@@ -164,24 +166,28 @@ fun ReportsScreen(
                                     CircularProgressIndicator()
                                 } else {
                                     // Extract year from the first data item
-                                    val year = remember(yearlyCalendarData) {
-                                        val cal = Calendar.getInstance()
-                                        cal.time = yearlyCalendarData.first().date
-                                        cal.get(Calendar.YEAR)
-                                    }
+                                    val year =
+                                        remember(yearlyCalendarData) {
+                                            val cal = Calendar.getInstance()
+                                            cal.time = yearlyCalendarData.first().date
+                                            cal.get(Calendar.YEAR)
+                                        }
 
                                     ConsistencyCalendar(
                                         data = yearlyCalendarData,
                                         year = year,
                                         onDayClick = { date ->
-                                            val dayData = yearlyCalendarData.find {
-                                                val cal1 = Calendar.getInstance().apply { time = it.date }
-                                                val cal2 = Calendar.getInstance().apply { time = date }
-                                                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
-                                            }
+                                            val dayData =
+                                                yearlyCalendarData.find {
+                                                    val cal1 = Calendar.getInstance().apply { time = it.date }
+                                                    val cal2 = Calendar.getInstance().apply { time = date }
+                                                    cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+                                                }
                                             val safeToSpend = dayData?.safeToSpend ?: 0L
-                                            navController.navigate("search_screen?date=${date.time}&safeToSpend=$safeToSpend&focusSearch=false")
-                                        }
+                                            navController.navigate(
+                                                "search_screen?date=${date.time}&safeToSpend=$safeToSpend&focusSearch=false",
+                                            )
+                                        },
                                     )
                                 }
                             }
@@ -195,14 +201,17 @@ fun ReportsScreen(
                                         onPreviousMonth = viewModel::selectPreviousMonth,
                                         onNextMonth = viewModel::selectNextMonth,
                                         onDayClick = { date ->
-                                            val dayData = detailedMonthData.find {
-                                                val cal1 = Calendar.getInstance().apply { time = it.date }
-                                                val cal2 = Calendar.getInstance().apply { time = date }
-                                                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
-                                            }
+                                            val dayData =
+                                                detailedMonthData.find {
+                                                    val cal1 = Calendar.getInstance().apply { time = it.date }
+                                                    val cal2 = Calendar.getInstance().apply { time = date }
+                                                    cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) && cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+                                                }
                                             val safeToSpend = dayData?.safeToSpend ?: 0L
-                                            navController.navigate("search_screen?date=${date.time}&safeToSpend=$safeToSpend&focusSearch=false")
-                                        }
+                                            navController.navigate(
+                                                "search_screen?date=${date.time}&safeToSpend=$safeToSpend&focusSearch=false",
+                                            )
+                                        },
                                     )
                                 }
                             }
@@ -214,7 +223,7 @@ fun ReportsScreen(
                     Spacer(Modifier.height(16.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
+                        horizontalArrangement = Arrangement.SpaceAround,
                     ) {
                         StatItem(consistencyStats.noSpendDays, "No Spend")
                         StatItem(consistencyStats.goodDays, "Good Days")
@@ -225,38 +234,39 @@ fun ReportsScreen(
             }
         }
 
-
         item {
             GlassPanel(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
                         "Spending by Category for ${reportData.periodTitle}",
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(16.dp))
                     val pieData = reportData.pieData
                     if (pieData == null || pieData.entryCount == 0) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(300.dp),
-                            contentAlignment = Alignment.Center
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 "No expense data for this period.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     } else {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(300.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             DonutChart(
                                 modifier = Modifier.weight(1.6f),
@@ -267,11 +277,11 @@ fun ReportsScreen(
                                     category?.let {
                                         navController.navigate("search_screen?categoryId=${it.id}&expandFilters=false&focusSearch=false")
                                     }
-                                }
+                                },
                             )
                             ChartLegend(
                                 modifier = Modifier.weight(1.6f),
-                                pieData = pieData
+                                pieData = pieData,
                             )
                         }
                     }
@@ -283,12 +293,12 @@ fun ReportsScreen(
             GlassPanel(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
                         "Income vs. Expense Trend",
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(16.dp))
                     val trendDataPair = reportData.trendData
@@ -301,18 +311,19 @@ fun ReportsScreen(
                                 calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH))
                                 val dateMillis = calendar.timeInMillis
                                 navController.navigate("time_period_report_screen/${TimePeriod.MONTHLY}?date=$dateMillis")
-                            }
+                            },
                         )
                     } else {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(250.dp),
-                            contentAlignment = Alignment.Center
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(250.dp),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 "Not enough data for trend analysis.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -325,7 +336,7 @@ fun ReportsScreen(
             Text(
                 "Detailed Reports",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -334,7 +345,7 @@ fun ReportsScreen(
                 title = "Spending Analysis",
                 subtitle = "Break down spending by category, tag, or merchant.",
                 icon = Icons.Default.Analytics,
-                onClick = { navController.navigate("analysis_screen") }
+                onClick = { navController.navigate("analysis_screen") },
             )
         }
         item {
@@ -342,7 +353,7 @@ fun ReportsScreen(
                 title = "Daily Report",
                 subtitle = "See a summary of yesterday's spending.",
                 icon = Icons.Default.CalendarViewDay,
-                onClick = { navController.navigate("time_period_report_screen/${TimePeriod.DAILY}") }
+                onClick = { navController.navigate("time_period_report_screen/${TimePeriod.DAILY}") },
             )
         }
         item {
@@ -350,7 +361,7 @@ fun ReportsScreen(
                 title = "Weekly Report",
                 subtitle = "Analyze your spending week by week.",
                 icon = Icons.Default.CalendarViewWeek,
-                onClick = { navController.navigate("time_period_report_screen/${TimePeriod.WEEKLY}") }
+                onClick = { navController.navigate("time_period_report_screen/${TimePeriod.WEEKLY}") },
             )
         }
         item {
@@ -358,7 +369,7 @@ fun ReportsScreen(
                 title = "Monthly Report",
                 subtitle = "Get a high-level overview of your monthly habits.",
                 icon = Icons.Default.CalendarViewMonth,
-                onClick = { navController.navigate("time_period_report_screen/${TimePeriod.MONTHLY}") }
+                onClick = { navController.navigate("time_period_report_screen/${TimePeriod.MONTHLY}") },
             )
         }
         item {
@@ -366,7 +377,7 @@ fun ReportsScreen(
                 title = "Yearly Report",
                 subtitle = "Review your financial performance for the year.",
                 icon = Icons.AutoMirrored.Filled.ShowChart,
-                onClick = { navController.navigate("time_period_report_screen/${TimePeriod.YEARLY}") }
+                onClick = { navController.navigate("time_period_report_screen/${TimePeriod.YEARLY}") },
             )
         }
     }
@@ -376,12 +387,13 @@ fun ReportsScreen(
 private fun DonutChart(
     modifier: Modifier = Modifier,
     pieData: PieData,
-    onSliceClick: (PieEntry) -> Unit
+    onSliceClick: (PieEntry) -> Unit,
 ) {
     val dataSet = pieData.dataSet as? PieDataSet ?: return
-    val totalAmount = remember(dataSet) {
-        (0 until dataSet.entryCount).sumOf { dataSet.getEntryForIndex(it).y.toDouble() }.toFloat()
-    }
+    val totalAmount =
+        remember(dataSet) {
+            (0 until dataSet.entryCount).sumOf { dataSet.getEntryForIndex(it).y.toDouble() }.toFloat()
+        }
     val animationProgress = remember { Animatable(0f) }
 
     LaunchedEffect(pieData) {
@@ -389,41 +401,42 @@ private fun DonutChart(
     }
 
     Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .pointerInput(pieData) {
-                detectTapGestures { tapOffset ->
-                    val centerX = size.width / 2f
-                    val centerY = size.height / 2f
-                    val diameter = min(size.width, size.height) * 0.8f
-                    val radius = diameter / 2f
-                    val strokeWidth = 32.dp.toPx()
+        modifier =
+            modifier
+                .fillMaxSize()
+                .pointerInput(pieData) {
+                    detectTapGestures { tapOffset ->
+                        val centerX = size.width / 2f
+                        val centerY = size.height / 2f
+                        val diameter = min(size.width, size.height) * 0.8f
+                        val radius = diameter / 2f
+                        val strokeWidth = 32.dp.toPx()
 
-                    val distance = sqrt((tapOffset.x - centerX).pow(2) + (tapOffset.y - centerY).pow(2))
-                    if (distance < radius - strokeWidth / 2 || distance > radius + strokeWidth / 2) {
-                        return@detectTapGestures
-                    }
-
-                    val dx = tapOffset.x - centerX
-                    val dy = tapOffset.y - centerY
-                    val angleRad = atan2(dy.toDouble(), dx.toDouble())
-                    var angleDeg = Math.toDegrees(angleRad).toFloat()
-                    if (angleDeg < 0) angleDeg += 360
-
-                    val tapAngle = (angleDeg + 90) % 360
-
-                    var currentAngle = 0f
-                    for (i in 0 until dataSet.entryCount) {
-                        val entry = dataSet.getEntryForIndex(i) as PieEntry
-                        val sweepAngle = (entry.y / totalAmount) * 360f
-                        if (tapAngle in currentAngle..(currentAngle + sweepAngle)) {
-                            onSliceClick(entry)
+                        val distance = sqrt((tapOffset.x - centerX).pow(2) + (tapOffset.y - centerY).pow(2))
+                        if (distance < radius - strokeWidth / 2 || distance > radius + strokeWidth / 2) {
                             return@detectTapGestures
                         }
-                        currentAngle += sweepAngle
+
+                        val dx = tapOffset.x - centerX
+                        val dy = tapOffset.y - centerY
+                        val angleRad = atan2(dy.toDouble(), dx.toDouble())
+                        var angleDeg = Math.toDegrees(angleRad).toFloat()
+                        if (angleDeg < 0) angleDeg += 360
+
+                        val tapAngle = (angleDeg + 90) % 360
+
+                        var currentAngle = 0f
+                        for (i in 0 until dataSet.entryCount) {
+                            val entry = dataSet.getEntryForIndex(i) as PieEntry
+                            val sweepAngle = (entry.y / totalAmount) * 360f
+                            if (tapAngle in currentAngle..(currentAngle + sweepAngle)) {
+                                onSliceClick(entry)
+                                return@detectTapGestures
+                            }
+                            currentAngle += sweepAngle
+                        }
                     }
-                }
-            }
+                },
     ) {
         val strokeWidth = 32.dp.toPx()
         val diameter = min(size.width, size.height) * 0.8f
@@ -443,7 +456,7 @@ private fun DonutChart(
                 useCenter = false,
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Butt),
                 topLeft = topLeft,
-                size = size
+                size = size,
             )
             startAngle += sweepAngle
         }
@@ -454,20 +467,22 @@ private fun DonutChart(
 fun ReportInsightsCard(insights: ReportInsights) {
     GlassPanel {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Change", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                val (text, color) = when {
-                    insights.percentageChange == null -> "--" to MaterialTheme.colorScheme.onSurface
-                    insights.percentageChange > 0 -> "↑ ${insights.percentageChange}%" to MaterialTheme.colorScheme.error
-                    insights.percentageChange < 0 -> "↓ ${abs(insights.percentageChange)}%" to MaterialTheme.colorScheme.primary
-                    else -> "No Change" to MaterialTheme.colorScheme.onSurface
-                }
+                val (text, color) =
+                    when {
+                        insights.percentageChange == null -> "--" to MaterialTheme.colorScheme.onSurface
+                        insights.percentageChange > 0 -> "↑ ${insights.percentageChange}%" to MaterialTheme.colorScheme.error
+                        insights.percentageChange < 0 -> "↓ ${abs(insights.percentageChange)}%" to MaterialTheme.colorScheme.primary
+                        else -> "No Change" to MaterialTheme.colorScheme.onSurface
+                    }
                 Text(text, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = color)
                 Text("vs. previous period", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -478,16 +493,26 @@ fun ReportInsightsCard(insights: ReportInsights) {
                     Icon(
                         imageVector = CategoryIconHelper.getIcon(insights.topCategory.iconKey ?: "category"),
                         contentDescription = insights.topCategory.categoryName,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(CategoryIconHelper.getIconBackgroundColor(insights.topCategory.colorKey ?: "gray_light"))
-                            .padding(8.dp),
-                        tint = Color.Black
+                        modifier =
+                            Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(CategoryIconHelper.getIconBackgroundColor(insights.topCategory.colorKey ?: "gray_light"))
+                                .padding(8.dp),
+                        tint = Color.Black,
                     )
-                    Text(insights.topCategory.categoryName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        insights.topCategory.categoryName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 } else {
-                    Text("--", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(
+                        "--",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
             }
         }
@@ -499,34 +524,35 @@ fun GlassReportNavigationCard(
     title: String,
     subtitle: String,
     icon: ImageVector,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     GlassPanel(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = title,
                 modifier = Modifier.size(28.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.primary,
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -534,28 +560,35 @@ fun GlassReportNavigationCard(
 }
 
 @Composable
-private fun StatItem(count: Int, label: String) {
+private fun StatItem(
+    count: Int,
+    label: String,
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = "$count",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
 @Composable
-private fun ChartLegend(modifier: Modifier = Modifier, pieData: PieData?) {
+private fun ChartLegend(
+    modifier: Modifier = Modifier,
+    pieData: PieData?,
+) {
     val dataSet = pieData?.dataSet as? PieDataSet ?: return
-    val totalValue = remember(dataSet) {
-        (0 until dataSet.entryCount).sumOf { dataSet.getEntryForIndex(it).y.toDouble() }.toFloat()
-    }
+    val totalValue =
+        remember(dataSet) {
+            (0 until dataSet.entryCount).sumOf { dataSet.getEntryForIndex(it).y.toDouble() }.toFloat()
+        }
 
     LazyColumn(
         modifier = modifier.padding(start = 16.dp),
@@ -570,10 +603,11 @@ private fun ChartLegend(modifier: Modifier = Modifier, pieData: PieData?) {
                 modifier = Modifier.padding(vertical = 4.dp),
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(androidx.compose.ui.graphics.Color(color)),
+                    modifier =
+                        Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(androidx.compose.ui.graphics.Color(color)),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -582,13 +616,13 @@ private fun ChartLegend(modifier: Modifier = Modifier, pieData: PieData?) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = "${"%.1f".format(percentage)}%",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }

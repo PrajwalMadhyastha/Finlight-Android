@@ -18,7 +18,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -40,8 +39,6 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.PrivacyAwareText
 import io.pm.finlight.ui.components.TransactionList
 import io.pm.finlight.ui.components.pagerTabIndicatorOffset
-import io.pm.finlight.ui.theme.PopupSurfaceDark
-import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
@@ -54,7 +51,7 @@ import kotlin.math.roundToLong
 fun IncomeScreen(
     navController: NavController,
     incomeViewModel: IncomeViewModel = viewModel(),
-    transactionViewModel: TransactionViewModel
+    transactionViewModel: TransactionViewModel,
 ) {
     val tabs = listOf("Credits", "Categories")
     val pagerState = rememberPagerState { tabs.size }
@@ -75,24 +72,25 @@ fun IncomeScreen(
     val isPrivacyModeEnabled by incomeViewModel.isPrivacyModeEnabled.collectAsState()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
+        modifier =
+            Modifier
+                .fillMaxSize(),
     ) {
         IncomeHeader(
             totalIncome = totalIncome,
             selectedMonth = selectedMonth,
             monthlySummaries = monthlySummaries,
             onMonthSelected = { incomeViewModel.setSelectedMonth(it) },
-            isPrivacyModeEnabled = isPrivacyModeEnabled // --- NEW: Pass state
+            isPrivacyModeEnabled = isPrivacyModeEnabled, // --- NEW: Pass state
         )
 
         TabRow(
             selectedTabIndex = pagerState.currentPage,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
-                    Modifier.pagerTabIndicatorOffset(pagerState, tabPositions)
+                    Modifier.pagerTabIndicatorOffset(pagerState, tabPositions),
                 )
-            }
+            },
         ) {
             tabs.forEachIndexed { index, title ->
                 Tab(
@@ -102,33 +100,34 @@ fun IncomeScreen(
                             pagerState.animateScrollToPage(index)
                         }
                     },
-                    text = { Text(title) }
+                    text = { Text(title) },
                 )
             }
         }
 
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
         ) { page ->
             when (page) {
-                0 -> TransactionList(
-                    transactions = incomeTransactions,
-                    navController = navController,
-                    onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
-                )
-                1 -> CategorySpendingScreen(
-                    spendingList = incomeByCategory,
-                    onCategoryClick = { categorySpendingItem ->
-                        val category = allCategories.find { it.name == categorySpendingItem.categoryName }
-                        incomeViewModel.updateFilterCategory(category)
-                        scope.launch { pagerState.animateScrollToPage(0) }
-                    }
-                )
+                0 ->
+                    TransactionList(
+                        transactions = incomeTransactions,
+                        navController = navController,
+                        onCategoryClick = { transactionViewModel.requestCategoryChange(it) },
+                    )
+                1 ->
+                    CategorySpendingScreen(
+                        spendingList = incomeByCategory,
+                        onCategoryClick = { categorySpendingItem ->
+                            val category = allCategories.find { it.name == categorySpendingItem.categoryName }
+                            incomeViewModel.updateFilterCategory(category)
+                            scope.launch { pagerState.animateScrollToPage(0) }
+                        },
+                    )
             }
         }
     }
-
 
     if (showFilterSheet) {
         ModalBottomSheet(onDismissRequest = { showFilterSheet = false }) {
@@ -140,7 +139,7 @@ fun IncomeScreen(
                 onAccountChange = incomeViewModel::updateFilterAccount,
                 onCategoryChange = incomeViewModel::updateFilterCategory,
                 showTransactionTypeFilter = false,
-                onClearFilters = incomeViewModel::clearFilters
+                onClearFilters = incomeViewModel::clearFilters,
             )
         }
     }
@@ -153,45 +152,49 @@ fun IncomeHeader(
     totalIncome: Long,
     onMonthSelected: (Calendar) -> Unit,
     // --- NEW: Accept privacy mode state ---
-    isPrivacyModeEnabled: Boolean
+    isPrivacyModeEnabled: Boolean,
 ) {
     val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
     val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
     var showMonthScroller by remember { mutableStateOf(false) }
 
-    val currencyFormat = remember {
-        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            .apply { maximumFractionDigits = 0 }
-    }
+    val currencyFormat =
+        remember {
+            NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+                .apply { maximumFractionDigits = 0 }
+        }
 
-    val selectedTabIndex = monthlySummaries.indexOfFirst {
-        it.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
+    val selectedTabIndex =
+        monthlySummaries.indexOfFirst {
+            it.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
                 it.calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
-    }.coerceAtLeast(0)
+        }.coerceAtLeast(0)
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showMonthScroller = !showMonthScroller }
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { showMonthScroller = !showMonthScroller }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = monthYearFormat.format(selectedMonth.time),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Icon(
                     imageVector = if (showMonthScroller) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
                     contentDescription = if (showMonthScroller) "Hide month selector" else "Show month selector",
-                    tint = MaterialTheme.colorScheme.onSurface
+                    tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -199,16 +202,17 @@ fun IncomeHeader(
         AnimatedVisibility(
             visible = showMonthScroller,
             enter = expandVertically(),
-            exit = shrinkVertically()
+            exit = shrinkVertically(),
         ) {
             ScrollableTabRow(
                 selectedTabIndex = selectedTabIndex,
                 edgePadding = 16.dp,
                 indicator = {},
-                divider = {}
+                divider = {},
             ) {
                 monthlySummaries.forEach { summaryItem ->
-                    val isSelected = summaryItem.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
+                    val isSelected =
+                        summaryItem.calendar.get(Calendar.MONTH) == selectedMonth.get(Calendar.MONTH) &&
                             summaryItem.calendar.get(Calendar.YEAR) == selectedMonth.get(Calendar.YEAR)
                     Tab(
                         selected = isSelected,
@@ -222,15 +226,15 @@ fun IncomeHeader(
                                     text = monthFormat.format(summaryItem.calendar.time),
                                     style = if (isSelected) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 Text(
                                     text = currencyFormat.format(summaryItem.totalSpent.roundToLong()),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                        }
+                        },
                     )
                 }
             }
@@ -239,13 +243,14 @@ fun IncomeHeader(
         Spacer(Modifier.height(16.dp))
 
         GlassPanel(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.Start
+                horizontalAlignment = Alignment.Start,
             ) {
                 Text("Total Income", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 // --- MODIFIED: Use PrivacyAwareText ---
@@ -254,7 +259,7 @@ fun IncomeHeader(
                     isPrivacyMode = isPrivacyModeEnabled,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }

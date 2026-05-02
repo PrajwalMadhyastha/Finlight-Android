@@ -36,5 +36,8 @@ interface RecurringTransactionDao {
     fun getById(id: Int): Flow<RecurringTransaction?>
 
     @Query("UPDATE recurring_transactions SET lastRunDate = :lastRunDate WHERE id = :id")
-    suspend fun updateLastRunDate(id: Int, lastRunDate: Long)
+    suspend fun updateLastRunDate(
+        id: Int,
+        lastRunDate: Long,
+    )
 }

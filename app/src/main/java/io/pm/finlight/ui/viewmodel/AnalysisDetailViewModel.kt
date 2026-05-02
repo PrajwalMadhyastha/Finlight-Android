@@ -22,7 +22,7 @@ class AnalysisDetailViewModelFactory(
     private val dimension: AnalysisDimension,
     private val dimensionId: String,
     private val startDate: Long,
-    private val endDate: Long
+    private val endDate: Long,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AnalysisDetailViewModel::class.java)) {
@@ -39,17 +39,17 @@ class AnalysisDetailViewModel(
     dimension: AnalysisDimension,
     dimensionId: String,
     startDate: Long,
-    endDate: Long
+    endDate: Long,
 ) : ViewModel() {
-
     val transactions: StateFlow<List<TransactionDetails>>
 
     init {
-        val transactionFlow = when (dimension) {
-            AnalysisDimension.CATEGORY -> transactionDao.getTransactionsForCategoryInRange(dimensionId.toInt(), startDate, endDate)
-            AnalysisDimension.TAG -> transactionDao.getTransactionsForTagInRange(dimensionId.toInt(), startDate, endDate)
-            AnalysisDimension.MERCHANT -> transactionDao.getTransactionsForMerchantInRange(dimensionId, startDate, endDate)
-        }
+        val transactionFlow =
+            when (dimension) {
+                AnalysisDimension.CATEGORY -> transactionDao.getTransactionsForCategoryInRange(dimensionId.toInt(), startDate, endDate)
+                AnalysisDimension.TAG -> transactionDao.getTransactionsForTagInRange(dimensionId.toInt(), startDate, endDate)
+                AnalysisDimension.MERCHANT -> transactionDao.getTransactionsForMerchantInRange(dimensionId, startDate, endDate)
+            }
         transactions = transactionFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     }
 }

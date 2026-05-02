@@ -34,29 +34,33 @@ fun PrivacyAwareText(
     textAlign: TextAlign? = null,
     style: TextStyle = LocalTextStyle.current,
     prefix: String = "",
-    isCurrency: Boolean = true
+    isCurrency: Boolean = true,
 ) {
     // --- FIX: Apply maximumFractionDigits = 0 to remove decimal points ---
-    val currencyFormat = remember {
-        NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply {
-            maximumFractionDigits = 0
+    val currencyFormat =
+        remember {
+            NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply {
+                maximumFractionDigits = 0
+            }
         }
-    }
-    val numberFormat = remember {
-        NumberFormat.getNumberInstance(Locale("en", "IN")).apply {
-            maximumFractionDigits = 0
+    val numberFormat =
+        remember {
+            NumberFormat.getNumberInstance(Locale("en", "IN")).apply {
+                maximumFractionDigits = 0
+            }
         }
-    }
 
-    val textToShow = if (isPrivacyMode) {
-        prefix + if (isCurrency) "₹ ****" else "****"
-    } else {
-        prefix + if (isCurrency) {
-            currencyFormat.format(amount)
+    val textToShow =
+        if (isPrivacyMode) {
+            prefix + if (isCurrency) "₹ ****" else "****"
         } else {
-            numberFormat.format(amount)
+            prefix +
+                if (isCurrency) {
+                    currencyFormat.format(amount)
+                } else {
+                    numberFormat.format(amount)
+                }
         }
-    }
 
     Text(
         text = textToShow,
@@ -64,6 +68,6 @@ fun PrivacyAwareText(
         color = color,
         fontWeight = fontWeight,
         textAlign = textAlign,
-        style = style
+        style = style,
     )
 }

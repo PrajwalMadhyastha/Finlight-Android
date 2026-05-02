@@ -30,7 +30,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class HistoricTripsViewModelTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var tripRepository: TripRepository
 
@@ -50,36 +49,39 @@ class HistoricTripsViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `historicTrips flow emits trips from repository`() = runTest {
-        // Arrange
-        val mockTrips = listOf(
-            TripWithStats(
-                tripId = 1, tripName = "Goa Trip", startDate = 1000L, endDate = 2000L,
-                totalSpend = 500.0, transactionCount = 5, tagId = 1,
-                tripType = io.pm.finlight.TripType.DOMESTIC, currencyCode = null, conversionRate = null
-            )
-        )
-        initializeViewModel(mockTrips)
+    fun `historicTrips flow emits trips from repository`() =
+        runTest {
+            // Arrange
+            val mockTrips =
+                listOf(
+                    TripWithStats(
+                        tripId = 1, tripName = "Goa Trip", startDate = 1000L, endDate = 2000L,
+                        totalSpend = 500.0, transactionCount = 5, tagId = 1,
+                        tripType = io.pm.finlight.TripType.DOMESTIC, currencyCode = null, conversionRate = null,
+                    ),
+                )
+            initializeViewModel(mockTrips)
 
-        // Assert
-        viewModel.historicTrips.test {
-            assertEquals(mockTrips, awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.historicTrips.test {
+                assertEquals(mockTrips, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `deleteTrip calls repositories to remove tag associations and delete trip`() = runTest {
-        // Arrange
-        initializeViewModel()
-        val tripId = 1
-        val tagId = 10
+    fun `deleteTrip calls repositories to remove tag associations and delete trip`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val tripId = 1
+            val tagId = 10
 
-        // Act
-        viewModel.deleteTrip(tripId, tagId)
+            // Act
+            viewModel.deleteTrip(tripId, tagId)
 
-        // Assert
-        verify(transactionRepository).removeAllTransactionsForTag(tagId)
-        verify(tripRepository).deleteTripById(tripId)
-    }
+            // Assert
+            verify(transactionRepository).removeAllTransactionsForTag(tagId)
+            verify(tripRepository).deleteTripById(tripId)
+        }
 }

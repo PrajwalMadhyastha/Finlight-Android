@@ -22,11 +22,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 @Entity(
     tableName = "tags",
-    indices = [Index(value = ["name"], unique = true, name = "index_tags_name_nocase")]
+    indices = [Index(value = ["name"], unique = true, name = "index_tags_name_nocase")],
 )
 data class Tag(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     @ColumnInfo(name = "name", collate = ColumnInfo.NOCASE)
-    val name: String
+    val name: String,
 )

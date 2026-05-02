@@ -13,5 +13,5 @@ package io.pm.finlight
  */
 data class PeriodTotal(
     val period: String,
-    val totalAmount: Double
+    val totalAmount: Double,
 )

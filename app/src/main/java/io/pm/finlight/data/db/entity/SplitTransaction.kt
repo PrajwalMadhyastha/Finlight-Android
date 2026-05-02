@@ -20,19 +20,19 @@ import kotlinx.serialization.Serializable
             entity = Transaction::class,
             parentColumns = ["id"],
             childColumns = ["parentTransactionId"],
-            onDelete = ForeignKey.CASCADE // If the parent is deleted, its splits are also deleted.
+            onDelete = ForeignKey.CASCADE, // If the parent is deleted, its splits are also deleted.
         ),
         ForeignKey(
             entity = Category::class,
             parentColumns = ["id"],
             childColumns = ["categoryId"],
-            onDelete = ForeignKey.SET_NULL // If a category is deleted, the split remains but uncategorized.
-        )
+            onDelete = ForeignKey.SET_NULL, // If a category is deleted, the split remains but uncategorized.
+        ),
     ],
     indices = [
         Index(value = ["parentTransactionId"]),
-        Index(value = ["categoryId"])
-    ]
+        Index(value = ["categoryId"]),
+    ],
 )
 data class SplitTransaction(
     @PrimaryKey(autoGenerate = true)
@@ -41,5 +41,5 @@ data class SplitTransaction(
     val amount: Double, // ALWAYS in home currency
     val categoryId: Int?,
     val notes: String?,
-    val originalAmount: Double? = null
+    val originalAmount: Double? = null,
 )

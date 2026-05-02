@@ -13,7 +13,7 @@ import io.pm.finlight.data.db.AppDatabase
 
 class SplitTransactionViewModelFactory(
     private val application: Application,
-    private val transactionId: Int
+    private val transactionId: Int,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SplitTransactionViewModel::class.java)) {
@@ -29,7 +29,7 @@ class SplitTransactionViewModelFactory(
                 transactionRepository = transactionRepository,
                 categoryRepository = categoryRepository,
                 splitTransactionRepository = splitTransactionRepository,
-                transactionId = transactionId
+                transactionId = transactionId,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

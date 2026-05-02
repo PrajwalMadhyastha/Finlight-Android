@@ -6,5 +6,5 @@ package io.pm.finlight
  */
 data class DailyTotal(
     val date: String, // Format: "YYYY-MM-DD"
-    val totalAmount: Double
+    val totalAmount: Double,
 )

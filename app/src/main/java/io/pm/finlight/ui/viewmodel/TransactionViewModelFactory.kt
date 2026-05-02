@@ -34,7 +34,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                 merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao()),
                 merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao()),
                 splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao()),
-                smsParseTemplateDao = db.smsParseTemplateDao()
+                smsParseTemplateDao = db.smsParseTemplateDao(),
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
