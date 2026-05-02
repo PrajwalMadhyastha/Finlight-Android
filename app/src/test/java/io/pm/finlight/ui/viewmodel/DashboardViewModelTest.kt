@@ -550,11 +550,42 @@ class DashboardViewModelTest : BaseViewModelTest() {
 
             // Assert
             viewModel.recentTransactions.test {
-                // FIX: Advance time INSIDE the test block to resolve the deadlock
                 advanceUntilIdle()
                 val result = awaitItem()
                 assertEquals(1, result.size)
                 assertEquals("Amazon", result.first().transaction.description)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `recentTransactions preserves description when it is a manual exception`() =
+        runTest {
+            // Arrange
+            val transaction =
+                Transaction(
+                    id = 1,
+                    description = "Manual Edit", // Different from original and alias
+                    originalDescription = "amzn",
+                    amount = 100.0,
+                    date = 1L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                )
+            val transactionDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
+            val aliases = mapOf("amzn" to "Amazon")
+
+            `when`(transactionRepository.recentTransactions).thenReturn(flowOf(listOf(transactionDetails)))
+            `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
+            initializeViewModel()
+
+            // Assert
+            viewModel.recentTransactions.test {
+                advanceUntilIdle()
+                val result = awaitItem()
+                assertEquals(1, result.size)
+                assertEquals("Manual Edit", result.first().transaction.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }
