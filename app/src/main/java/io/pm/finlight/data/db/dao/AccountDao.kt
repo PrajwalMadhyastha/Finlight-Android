@@ -37,7 +37,7 @@ interface AccountDao {
         ON A.id = TxSums.accountId
         ORDER BY
             A.name ASC
-    """
+    """,
     )
     fun getAccountsWithBalance(): Flow<List<AccountWithBalance>>
 

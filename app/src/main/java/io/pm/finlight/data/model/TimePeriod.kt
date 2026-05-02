@@ -4,5 +4,5 @@ enum class TimePeriod {
     DAILY,
     WEEKLY,
     MONTHLY,
-    YEARLY
+    YEARLY,
 }

@@ -55,28 +55,29 @@ fun MonthlyConsistencyCalendarCard(
     selectedMonth: Calendar,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    onDayClick: (Date) -> Unit
+    onDayClick: (Date) -> Unit,
 ) {
     GlassPanel(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
                 "Spending Consistency",
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
 
             if (data.isEmpty()) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator()
                 }
@@ -86,7 +87,7 @@ fun MonthlyConsistencyCalendarCard(
                     selectedMonth = selectedMonth,
                     onPreviousMonth = onPreviousMonth,
                     onNextMonth = onNextMonth,
-                    onDayClick = onDayClick
+                    onDayClick = onDayClick,
                 )
 
                 Spacer(Modifier.height(16.dp))
@@ -96,7 +97,7 @@ fun MonthlyConsistencyCalendarCard(
                 // Stats displayed horizontally below calendar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround
+                    horizontalArrangement = Arrangement.SpaceAround,
                 ) {
                     StatItem(stats.noSpendDays, "No Spend")
                     StatItem(stats.goodDays, "Good Days")
@@ -109,29 +110,31 @@ fun MonthlyConsistencyCalendarCard(
 }
 
 @Composable
-private fun StatItem(count: Int, label: String) {
+private fun StatItem(
+    count: Int,
+    label: String,
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = "$count",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
-
 
 @Composable
 fun ConsistencyCalendar(
     data: List<CalendarDayStatus>,
     year: Int, // Added year parameter to support navigation
     modifier: Modifier = Modifier,
-    onDayClick: (Date) -> Unit
+    onDayClick: (Date) -> Unit,
 ) {
     if (data.isEmpty()) return
 
@@ -142,14 +145,16 @@ fun ConsistencyCalendar(
     // We now use the passed 'year' instead of hardcoding today's year.
     // This allows the calendar structure to reflect the year of the data being viewed.
 
-    val months = (0..11).map { monthIndex ->
-        val cal = Calendar.getInstance().apply {
-            set(Calendar.YEAR, year)
-            set(Calendar.MONTH, monthIndex)
-            set(Calendar.DAY_OF_MONTH, 1)
+    val months =
+        (0..11).map { monthIndex ->
+            val cal =
+                Calendar.getInstance().apply {
+                    set(Calendar.YEAR, year)
+                    set(Calendar.MONTH, monthIndex)
+                    set(Calendar.DAY_OF_MONTH, 1)
+                }
+            MonthData.fromCalendar(cal)
         }
-        MonthData.fromCalendar(cal)
-    }
 
     val lazyListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -177,7 +182,7 @@ fun ConsistencyCalendar(
         LazyRow(
             state = lazyListState,
             modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DAY_SPACING * 2)
+            horizontalArrangement = Arrangement.spacedBy(DAY_SPACING * 2),
         ) {
             items(months) { monthData ->
                 MonthColumn(
@@ -185,7 +190,7 @@ fun ConsistencyCalendar(
                     year = year,
                     today = today,
                     dataMap = dataMap,
-                    onDayClick = onDayClick
+                    onDayClick = onDayClick,
                 )
             }
         }
@@ -200,15 +205,16 @@ fun DetailedMonthlyCalendar(
     selectedMonth: Calendar,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
-    onDayClick: (Date) -> Unit
+    onDayClick: (Date) -> Unit,
 ) {
     val monthData = MonthData.fromCalendar(selectedMonth)
     val dataMap = data.associateByDate()
     val monthYearFormat = remember { SimpleDateFormat("MMMM yyyy", Locale.getDefault()) }
     val dayOfWeekFormat = remember { SimpleDateFormat("EE", Locale.getDefault()) }
-    val weekDays = (Calendar.SUNDAY..Calendar.SATURDAY).map {
-        dayOfWeekFormat.format(Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, it) }.time)
-    }
+    val weekDays =
+        (Calendar.SUNDAY..Calendar.SATURDAY).map {
+            dayOfWeekFormat.format(Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, it) }.time)
+        }
     val today = remember { Calendar.getInstance() }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -216,7 +222,7 @@ fun DetailedMonthlyCalendar(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             IconButton(onClick = onPreviousMonth) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous Month")
@@ -224,7 +230,7 @@ fun DetailedMonthlyCalendar(
             Text(
                 text = monthYearFormat.format(selectedMonth.time),
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
             IconButton(onClick = onNextMonth) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next Month")
@@ -234,7 +240,7 @@ fun DetailedMonthlyCalendar(
         // Day of week headers
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround
+            horizontalArrangement = Arrangement.SpaceAround,
         ) {
             weekDays.forEach { day ->
                 Text(
@@ -243,7 +249,7 @@ fun DetailedMonthlyCalendar(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(28.dp),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
             }
         }
@@ -260,9 +266,10 @@ fun DetailedMonthlyCalendar(
                         val cellIndex = week * 7 + dayOfWeek
                         if (cellIndex >= monthData.startOffset && cellIndex < totalCells) {
                             val dayOfMonth = cellIndex - monthData.startOffset + 1
-                            val currentDayCal = (selectedMonth.clone() as Calendar).apply {
-                                set(Calendar.DAY_OF_MONTH, dayOfMonth)
-                            }
+                            val currentDayCal =
+                                (selectedMonth.clone() as Calendar).apply {
+                                    set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                                }
 
                             if (currentDayCal.after(today)) {
                                 Spacer(Modifier.size(28.dp))
@@ -272,7 +279,7 @@ fun DetailedMonthlyCalendar(
                                     day = dayOfMonth,
                                     data = dayData,
                                     isToday = isSameDay(currentDayCal, today),
-                                    onClick = { onDayClick(currentDayCal.time) }
+                                    onClick = { onDayClick(currentDayCal.time) },
                                 )
                             }
                         } else {
@@ -291,62 +298,66 @@ private fun DetailedDayCell(
     day: Int,
     data: CalendarDayStatus?,
     isToday: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
-    val color = when (data?.status) {
-        SpendingStatus.NO_SPEND -> Color(0xFF39D353)
-        SpendingStatus.WITHIN_LIMIT -> {
-            val fraction = if (data.safeToSpend > 0) {
-                data.amountSpent.toFloat() / data.safeToSpend
-            } else {
-                0f
+    val color =
+        when (data?.status) {
+            SpendingStatus.NO_SPEND -> Color(0xFF39D353)
+            SpendingStatus.WITHIN_LIMIT -> {
+                val fraction =
+                    if (data.safeToSpend > 0) {
+                        data.amountSpent.toFloat() / data.safeToSpend
+                    } else {
+                        0f
+                    }
+                lerp(Color(0xFFACD5F2), Color(0xFF006DAB), fraction.coerceIn(0f, 1f))
             }
-            lerp(Color(0xFFACD5F2), Color(0xFF006DAB), fraction.coerceIn(0f, 1f))
-        }
-        SpendingStatus.OVER_LIMIT -> {
-            val fraction = if (data.safeToSpend > 0) {
-                min((data.amountSpent.toFloat() / data.safeToSpend), 2f) - 1f
-            } else {
-                1f
+            SpendingStatus.OVER_LIMIT -> {
+                val fraction =
+                    if (data.safeToSpend > 0) {
+                        min((data.amountSpent.toFloat() / data.safeToSpend), 2f) - 1f
+                    } else {
+                        1f
+                    }
+                lerp(Color(0xFFF87171), Color(0xFFB91C1C), fraction.coerceIn(0f, 1f))
             }
-            lerp(Color(0xFFF87171), Color(0xFFB91C1C), fraction.coerceIn(0f, 1f))
+            else -> Color.Transparent
         }
-        else -> Color.Transparent
-    }
 
-    val textColor = if (data?.status == SpendingStatus.NO_DATA) {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
+    val textColor =
+        if (data?.status == SpendingStatus.NO_DATA) {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        }
 
     // Theme-aware border color for current day
     val borderColor = MaterialTheme.colorScheme.primary
 
     Box(
-        modifier = Modifier
-            .size(26.dp)
-            .clip(CircleShape)
-            .background(color)
-            .then(if (isToday) Modifier.border(1.5.dp, borderColor, CircleShape) else Modifier)
-            .clickable(enabled = data?.status != SpendingStatus.NO_DATA, onClick = onClick),
-        contentAlignment = Alignment.Center
+        modifier =
+            Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(color)
+                .then(if (isToday) Modifier.border(1.5.dp, borderColor, CircleShape) else Modifier)
+                .clickable(enabled = data?.status != SpendingStatus.NO_DATA, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = day.toString(),
             color = textColor,
             style = MaterialTheme.typography.bodySmall,
-            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
+            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
         )
     }
 }
-
 
 private data class MonthData(
     val name: String,
     val dayCount: Int,
     val startOffset: Int,
-    val monthIndex: Int
+    val monthIndex: Int,
 ) {
     companion object {
         fun fromCalendar(cal: Calendar): MonthData {
@@ -366,13 +377,14 @@ private fun MonthColumn(
     year: Int,
     today: Calendar,
     dataMap: Map<Pair<Int, Int>, CalendarDayStatus>,
-    onDayClick: (Date) -> Unit
+    onDayClick: (Date) -> Unit,
 ) {
     val textMeasurer = rememberTextMeasurer()
     val monthNameStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
-    val textLayoutResult = remember(monthData.name) {
-        textMeasurer.measure(monthData.name, monthNameStyle)
-    }
+    val textLayoutResult =
+        remember(monthData.name) {
+            textMeasurer.measure(monthData.name, monthNameStyle)
+        }
 
     val daySizePx = with(LocalDensity.current) { DAY_SIZE.toPx() }
     val daySpacingPx = with(LocalDensity.current) { DAY_SPACING.toPx() }
@@ -392,40 +404,43 @@ private fun MonthColumn(
     val noDataColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
     // Theme-aware border color for current day
     val isThemeDark = androidx.compose.foundation.isSystemInDarkTheme()
-    val todayBorderColor = if (isThemeDark) {
-        Color.White.copy(alpha = 0.8f) // White for dark mode
-    } else {
-        Color(0xFF1976D2) // Dark blue for light mode
-    }
+    val todayBorderColor =
+        if (isThemeDark) {
+            Color.White.copy(alpha = 0.8f) // White for dark mode
+        } else {
+            Color(0xFF1976D2) // Dark blue for light mode
+        }
 
     Canvas(
-        modifier = Modifier
-            .width(canvasWidthDp)
-            .height(canvasHeightDp)
-            .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    val week = floor(offset.x / totalCellSize).toInt()
-                    val dayOfWeek = floor((offset.y - (textLayoutResult.size.height + additionalSpacingPx)) / totalCellSize).toInt()
+        modifier =
+            Modifier
+                .width(canvasWidthDp)
+                .height(canvasHeightDp)
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        val week = floor(offset.x / totalCellSize).toInt()
+                        val dayOfWeek = floor((offset.y - (textLayoutResult.size.height + additionalSpacingPx)) / totalCellSize).toInt()
 
-                    val cellIndex = week * 7 + dayOfWeek
-                    if (cellIndex >= monthData.startOffset && cellIndex < totalCells) {
-                        val dayOfMonth = cellIndex - monthData.startOffset + 1
-                        val currentDayCal = Calendar
-                            .getInstance()
-                            .apply {
-                                set(year, monthData.monthIndex, dayOfMonth)
+                        val cellIndex = week * 7 + dayOfWeek
+                        if (cellIndex >= monthData.startOffset && cellIndex < totalCells) {
+                            val dayOfMonth = cellIndex - monthData.startOffset + 1
+                            val currentDayCal =
+                                Calendar
+                                    .getInstance()
+                                    .apply {
+                                        set(year, monthData.monthIndex, dayOfMonth)
+                                    }
+                            if (!currentDayCal.after(today)) {
+                                onDayClick(currentDayCal.time)
                             }
-                        if (!currentDayCal.after(today)) {
-                            onDayClick(currentDayCal.time)
                         }
                     }
-                }
-            }
+                },
     ) {
         // Draw month name
         drawText(
             textLayoutResult = textLayoutResult,
-            topLeft = Offset(x = (size.width - textLayoutResult.size.width) / 2, y = 0f)
+            topLeft = Offset(x = (size.width - textLayoutResult.size.width) / 2, y = 0f),
         )
 
         val yOffset = textLayoutResult.size.height + additionalSpacingPx
@@ -435,47 +450,55 @@ private fun MonthColumn(
                 val cellIndex = week * 7 + day
                 if (cellIndex >= monthData.startOffset && cellIndex < totalCells) {
                     val dayOfMonth = cellIndex - monthData.startOffset + 1
-                    val currentDayCal = Calendar.getInstance().apply {
-                        set(year, monthData.monthIndex, dayOfMonth)
-                    }
+                    val currentDayCal =
+                        Calendar.getInstance().apply {
+                            set(year, monthData.monthIndex, dayOfMonth)
+                        }
 
                     // Check if date is in the future (day-level comparison)
-                    val isFuture = currentDayCal.get(Calendar.YEAR) > today.get(Calendar.YEAR) ||
-                            (currentDayCal.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
-                                    currentDayCal.get(Calendar.DAY_OF_YEAR) > today.get(Calendar.DAY_OF_YEAR))
+                    val isFuture =
+                        currentDayCal.get(Calendar.YEAR) > today.get(Calendar.YEAR) ||
+                            (
+                                currentDayCal.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
+                                    currentDayCal.get(Calendar.DAY_OF_YEAR) > today.get(Calendar.DAY_OF_YEAR)
+                            )
 
-                    val dayData = if (!isFuture) {
-                        dataMap[currentDayCal.get(Calendar.DAY_OF_YEAR) to year]
-                    } else {
-                        null
-                    }
+                    val dayData =
+                        if (!isFuture) {
+                            dataMap[currentDayCal.get(Calendar.DAY_OF_YEAR) to year]
+                        } else {
+                            null
+                        }
 
-                    val color = when (dayData?.status) {
-                        SpendingStatus.NO_SPEND -> Color(0xFF39D353)
-                        SpendingStatus.WITHIN_LIMIT -> {
-                            val fraction = if (dayData.safeToSpend > 0) {
-                                (dayData.amountSpent / dayData.safeToSpend).toFloat()
-                            } else {
-                                0f
+                    val color =
+                        when (dayData?.status) {
+                            SpendingStatus.NO_SPEND -> Color(0xFF39D353)
+                            SpendingStatus.WITHIN_LIMIT -> {
+                                val fraction =
+                                    if (dayData.safeToSpend > 0) {
+                                        (dayData.amountSpent / dayData.safeToSpend).toFloat()
+                                    } else {
+                                        0f
+                                    }
+                                lerp(Color(0xFFACD5F2), Color(0xFF006DAB), fraction.coerceIn(0f, 1f))
                             }
-                            lerp(Color(0xFFACD5F2), Color(0xFF006DAB), fraction.coerceIn(0f, 1f))
-                        }
-                        SpendingStatus.OVER_LIMIT -> {
-                            val fraction = if (dayData.safeToSpend > 0) {
-                                min((dayData.amountSpent / dayData.safeToSpend).toFloat(), 2f) - 1f
-                            } else {
-                                1f
+                            SpendingStatus.OVER_LIMIT -> {
+                                val fraction =
+                                    if (dayData.safeToSpend > 0) {
+                                        min((dayData.amountSpent / dayData.safeToSpend).toFloat(), 2f) - 1f
+                                    } else {
+                                        1f
+                                    }
+                                lerp(Color(0xFFF87171), Color(0xFFB91C1C), fraction.coerceIn(0f, 1f))
                             }
-                            lerp(Color(0xFFF87171), Color(0xFFB91C1C), fraction.coerceIn(0f, 1f))
+                            else -> noDataColor
                         }
-                        else -> noDataColor
-                    }
 
                     drawRoundRect(
                         color = color,
                         topLeft = Offset(x = week * totalCellSize, y = day * totalCellSize + yOffset),
                         size = Size(daySizePx, daySizePx),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
                     )
 
                     // Draw border around today's cell
@@ -486,7 +509,7 @@ private fun MonthColumn(
                             topLeft = Offset(x = week * totalCellSize, y = day * totalCellSize + yOffset),
                             size = Size(daySizePx, daySizePx),
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()),
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx())
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx()),
                         )
                     }
                 }
@@ -503,7 +526,10 @@ private fun List<CalendarDayStatus>.associateByDate(): Map<Pair<Int, Int>, Calen
     }
 }
 
-private fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {
+private fun isSameDay(
+    cal1: Calendar,
+    cal2: Calendar,
+): Boolean {
     return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-            cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+        cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
 }

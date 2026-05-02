@@ -33,13 +33,12 @@ class BudgetViewModelFactory(private val application: Application) : ViewModelPr
             val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
             val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
 
-
             @Suppress("UNCHECKED_CAST")
             return BudgetViewModel(
                 budgetRepository,
                 settingsRepository,
                 categoryRepository,
-                transactionRepository // --- NEW: Pass repository to ViewModel ---
+                transactionRepository, // --- NEW: Pass repository to ViewModel ---
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

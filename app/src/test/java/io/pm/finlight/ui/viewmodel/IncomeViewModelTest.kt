@@ -30,10 +30,12 @@ import java.util.Calendar
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class IncomeViewModelTest : BaseViewModelTest() {
-
     @Mock private lateinit var transactionRepository: TransactionRepository
+
     @Mock private lateinit var accountRepository: AccountRepository
+
     @Mock private lateinit var categoryRepository: CategoryRepository
+
     // --- NEW: Mock for SettingsRepository ---
     @Mock private lateinit var settingsRepository: SettingsRepository
 
@@ -48,182 +50,264 @@ class IncomeViewModelTest : BaseViewModelTest() {
         `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
         `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
-        `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+        `when`(
+            transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), any(), any(), any()),
+        ).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getIncomeByCategoryForMonth(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
         // --- NEW: Add default mock for privacy mode ---
         `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
     }
 
     private fun initializeViewModel() {
-        viewModel = IncomeViewModel(
-            transactionRepository,
-            accountRepository,
-            categoryRepository,
-            settingsRepository // --- NEW: Pass dependency ---
-        )
+        viewModel =
+            IncomeViewModel(
+                transactionRepository,
+                accountRepository,
+                categoryRepository,
+                settingsRepository, // --- NEW: Pass dependency ---
+            )
     }
 
     @Test
-    fun `totalIncomeForSelectedMonth calculates sum correctly`() = runTest {
-        // Arrange
-        val transactions = listOf(
-            TransactionDetails(Transaction(id = 1, description = "Salary", amount = 5000.0, transactionType = "income", date = 0L, accountId = 1, categoryId = 1, notes = null), emptyList(), null, null, null, null, null),
-            TransactionDetails(Transaction(id = 2, description = "Freelance", amount = 1500.50, transactionType = "income", date = 0L, accountId = 1, categoryId = 1, notes = null), emptyList(), null, null, null, null, null)
-        )
-        `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
-        initializeViewModel()
+    fun `totalIncomeForSelectedMonth calculates sum correctly`() =
+        runTest {
+            // Arrange
+            val transactions =
+                listOf(
+                    TransactionDetails(
+                        Transaction(
+                            id = 1,
+                            description = "Salary",
+                            amount = 5000.0,
+                            transactionType = "income",
+                            date = 0L,
+                            accountId = 1,
+                            categoryId = 1,
+                            notes = null,
+                        ),
+                        emptyList(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                    ),
+                    TransactionDetails(
+                        Transaction(
+                            id = 2,
+                            description = "Freelance",
+                            amount = 1500.50,
+                            transactionType = "income",
+                            date = 0L,
+                            accountId = 1,
+                            categoryId = 1,
+                            notes = null,
+                        ),
+                        emptyList(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                    ),
+                )
+            `when`(
+                transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), any(), any(), any()),
+            ).thenReturn(flowOf(transactions))
+            initializeViewModel()
 
-        // Assert
-        viewModel.totalIncomeForSelectedMonth.test {
-            assertEquals(6501L, awaitItem()) // 5000.0 + 1500.50 = 6500.50, rounded to 6501
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.totalIncomeForSelectedMonth.test {
+                assertEquals(6501L, awaitItem()) // 5000.0 + 1500.50 = 6500.50, rounded to 6501
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `setSelectedMonth triggers refetch of data`() = runTest {
-        // Arrange
-        val initialTransactions = listOf(
-            TransactionDetails(Transaction(id = 1, description = "Initial Tx", amount = 100.0, transactionType = "income", date = 0L, accountId = 1, categoryId = 1, notes = null), emptyList(), null, null, null, null, null)
-        )
-        val newTransactions = listOf(
-            TransactionDetails(Transaction(id = 2, description = "New Month Tx", amount = 200.0, transactionType = "income", date = 0L, accountId = 1, categoryId = 1, notes = null), emptyList(), null, null, null, null, null)
-        )
-        // This chained 'thenReturn' is crucial. The first time the mock is called (in init), it returns the initial list.
-        // The second time (after changing the month), it returns the new list.
-        `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), any(), any(), any()))
-            .thenReturn(flowOf(initialTransactions))
-            .thenReturn(flowOf(newTransactions))
+    fun `setSelectedMonth triggers refetch of data`() =
+        runTest {
+            // Arrange
+            val initialTransactions =
+                listOf(
+                    TransactionDetails(
+                        Transaction(
+                            id = 1,
+                            description = "Initial Tx",
+                            amount = 100.0,
+                            transactionType = "income",
+                            date = 0L,
+                            accountId = 1,
+                            categoryId = 1,
+                            notes = null,
+                        ),
+                        emptyList(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                    ),
+                )
+            val newTransactions =
+                listOf(
+                    TransactionDetails(
+                        Transaction(
+                            id = 2,
+                            description = "New Month Tx",
+                            amount = 200.0,
+                            transactionType = "income",
+                            date = 0L,
+                            accountId = 1,
+                            categoryId = 1,
+                            notes = null,
+                        ),
+                        emptyList(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                    ),
+                )
+            // This chained 'thenReturn' is crucial. The first time the mock is called (in init), it returns the initial list.
+            // The second time (after changing the month), it returns the new list.
+            `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), any(), any(), any()))
+                .thenReturn(flowOf(initialTransactions))
+                .thenReturn(flowOf(newTransactions))
 
-        initializeViewModel()
-        val newMonth = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
+            initializeViewModel()
+            val newMonth = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
 
-        // Act & Assert
-        viewModel.incomeTransactionsForSelectedMonth.test {
-            // Await the emission from the first repository call. This is different from the initial `emptyList()`
-            assertEquals(initialTransactions, awaitItem())
+            // Act & Assert
+            viewModel.incomeTransactionsForSelectedMonth.test {
+                // Await the emission from the first repository call. This is different from the initial `emptyList()`
+                assertEquals(initialTransactions, awaitItem())
 
-            // Act: Change the month, which triggers the second repository call
-            viewModel.setSelectedMonth(newMonth)
+                // Act: Change the month, which triggers the second repository call
+                viewModel.setSelectedMonth(newMonth)
 
-            // Await the emission from the second repository call. Since the list is different, StateFlow emits.
-            assertEquals(newTransactions, awaitItem())
+                // Await the emission from the second repository call. Since the list is different, StateFlow emits.
+                assertEquals(newTransactions, awaitItem())
 
-            cancelAndIgnoreRemainingEvents()
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
-
 
     @Test
-    fun `updateFilterKeyword updates filter state`() = runTest {
-        // Arrange
-        initializeViewModel()
-        val keyword = "test"
+    fun `updateFilterKeyword updates filter state`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val keyword = "test"
 
-        // Assert
-        viewModel.filterState.test {
-            // 1. Await the initial default state
-            assertEquals(TransactionFilterState(), awaitItem())
+            // Assert
+            viewModel.filterState.test {
+                // 1. Await the initial default state
+                assertEquals(TransactionFilterState(), awaitItem())
 
-            // 2. Perform the action
-            viewModel.updateFilterKeyword(keyword)
+                // 2. Perform the action
+                viewModel.updateFilterKeyword(keyword)
 
-            // 3. Await the updated state
-            val updatedState = awaitItem()
-            assertEquals(keyword, updatedState.keyword)
+                // 3. Await the updated state
+                val updatedState = awaitItem()
+                assertEquals(keyword, updatedState.keyword)
 
-            cancelAndIgnoreRemainingEvents()
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `updateFilterAccount updates filter state`() = runTest {
-        // Arrange
-        initializeViewModel()
-        val account = Account(1, "Test Account", "Bank")
+    fun `updateFilterAccount updates filter state`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val account = Account(1, "Test Account", "Bank")
 
-        // Assert
-        viewModel.filterState.test {
-            // 1. Await the initial default state
-            assertEquals(TransactionFilterState(), awaitItem())
+            // Assert
+            viewModel.filterState.test {
+                // 1. Await the initial default state
+                assertEquals(TransactionFilterState(), awaitItem())
 
-            // 2. Perform the action
-            viewModel.updateFilterAccount(account)
+                // 2. Perform the action
+                viewModel.updateFilterAccount(account)
 
-            // 3. Await the updated state
-            val updatedState = awaitItem()
-            assertEquals(account, updatedState.account)
+                // 3. Await the updated state
+                val updatedState = awaitItem()
+                assertEquals(account, updatedState.account)
 
-            cancelAndIgnoreRemainingEvents()
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `updateFilterCategory updates filter state`() = runTest {
-        // Arrange
-        initializeViewModel()
-        val category = Category(1, "Test Category", "", "")
+    fun `updateFilterCategory updates filter state`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val category = Category(1, "Test Category", "", "")
 
-        // Assert
-        viewModel.filterState.test {
-            // 1. Await the initial default state
-            assertEquals(TransactionFilterState(), awaitItem())
+            // Assert
+            viewModel.filterState.test {
+                // 1. Await the initial default state
+                assertEquals(TransactionFilterState(), awaitItem())
 
-            // 2. Perform the action
-            viewModel.updateFilterCategory(category)
+                // 2. Perform the action
+                viewModel.updateFilterCategory(category)
 
-            // 3. Await the updated state
-            val updatedState = awaitItem()
-            assertEquals(category, updatedState.category)
+                // 3. Await the updated state
+                val updatedState = awaitItem()
+                assertEquals(category, updatedState.category)
 
-            cancelAndIgnoreRemainingEvents()
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `clearFilters resets filter state to default`() = runTest {
-        // Arrange
-        initializeViewModel()
+    fun `clearFilters resets filter state to default`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
 
-        // Assert
-        viewModel.filterState.test {
-            // 1. Await initial state
-            assertEquals(TransactionFilterState(), awaitItem())
+            // Assert
+            viewModel.filterState.test {
+                // 1. Await initial state
+                assertEquals(TransactionFilterState(), awaitItem())
 
-            // 2. Set some filters to create a non-default state
-            viewModel.updateFilterKeyword("test")
-            viewModel.updateFilterAccount(Account(1, "Test Account", "Bank"))
+                // 2. Set some filters to create a non-default state
+                viewModel.updateFilterKeyword("test")
+                viewModel.updateFilterAccount(Account(1, "Test Account", "Bank"))
 
-            // 3. Consume the intermediate states to ensure we are at the non-default state
-            awaitItem() // After keyword update
-            awaitItem() // After account update
+                // 3. Consume the intermediate states to ensure we are at the non-default state
+                awaitItem() // After keyword update
+                awaitItem() // After account update
 
-            // 4. Perform the clear action
-            viewModel.clearFilters()
+                // 4. Perform the clear action
+                viewModel.clearFilters()
 
-            // 5. Await the final, reset state
-            val clearedState = awaitItem()
-            assertEquals("", clearedState.keyword)
-            assertNull(clearedState.account)
-            assertNull(clearedState.category)
+                // 5. Await the final, reset state
+                val clearedState = awaitItem()
+                assertEquals("", clearedState.keyword)
+                assertNull(clearedState.account)
+                assertNull(clearedState.category)
 
-            cancelAndIgnoreRemainingEvents()
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     // --- NEW TEST ---
     @Test
-    fun `isPrivacyModeEnabled flow emits value from settingsRepository`() = runTest {
-        // Arrange
-        val privacyFlow = flowOf(true)
-        `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(privacyFlow)
-        initializeViewModel()
+    fun `isPrivacyModeEnabled flow emits value from settingsRepository`() =
+        runTest {
+            // Arrange
+            val privacyFlow = flowOf(true)
+            `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(privacyFlow)
+            initializeViewModel()
 
-        // Act & Assert
-        viewModel.isPrivacyModeEnabled.test {
-            assertTrue(awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Act & Assert
+            viewModel.isPrivacyModeEnabled.test {
+                assertTrue(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+            verify(settingsRepository).getPrivacyModeEnabled()
         }
-        verify(settingsRepository).getPrivacyModeEnabled()
-    }
 }

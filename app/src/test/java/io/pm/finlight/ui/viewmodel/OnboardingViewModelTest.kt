@@ -17,17 +17,17 @@ import androidx.work.Configuration
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.cash.turbine.test
-import io.pm.finlight.*
-import io.pm.finlight.utils.CategoryIconHelper
-import io.pm.finlight.utils.CurrencyHelper
-import io.pm.finlight.utils.CurrencyInfo
-import io.pm.finlight.utils.ReminderManager
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockkObject
 import io.mockk.runs
 import io.mockk.unmockkObject
 import io.mockk.verify
+import io.pm.finlight.*
+import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.CurrencyHelper
+import io.pm.finlight.utils.CurrencyInfo
+import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -45,7 +45,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class OnboardingViewModelTest : BaseViewModelTest() {
-
     private val application: Application = ApplicationProvider.getApplicationContext()
 
     @Mock
@@ -62,10 +61,11 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         // --- FIX: Manually initialize WorkManager for testing ---
         // This is required because the OnboardingViewModel now triggers WorkManager
         // tasks via ReminderManager.
-        val config = Configuration.Builder()
-            .setMinimumLoggingLevel(android.util.Log.DEBUG)
-            .setExecutor(SynchronousExecutor())
-            .build()
+        val config =
+            Configuration.Builder()
+                .setMinimumLoggingLevel(android.util.Log.DEBUG)
+                .setExecutor(SynchronousExecutor())
+                .build()
         WorkManagerTestInitHelper.initializeTestWorkManager(application, config)
 
         viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
@@ -78,215 +78,227 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         super.tearDown()
     }
 
-
     @Test
-    fun `detects currency from network country iso`() = runTest {
-        // Arrange
-        val shadowTelephonyManager = org.robolectric.Shadows.shadowOf(
-            application.getSystemService(android.content.Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager
-        )
-        shadowTelephonyManager.setNetworkCountryIso("us") // United States -> USD
+    fun `detects currency from network country iso`() =
+        runTest {
+            // Arrange
+            val shadowTelephonyManager =
+                org.robolectric.Shadows.shadowOf(
+                    application.getSystemService(android.content.Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager,
+                )
+            shadowTelephonyManager.setNetworkCountryIso("us") // United States -> USD
 
-        // Act
-        // Re-init viewModel to trigger init block
-        viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
+            // Act
+            // Re-init viewModel to trigger init block
+            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
 
-        // Assert
-        viewModel.homeCurrency.test {
-            val currencyInfo = awaitItem()
-            assertNotNull(currencyInfo)
-            assertEquals("USD", currencyInfo?.currencyCode)
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.homeCurrency.test {
+                val currencyInfo = awaitItem()
+                assertNotNull(currencyInfo)
+                assertEquals("USD", currencyInfo?.currencyCode)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `detects currency from resource configuration locale when network iso missing`() = runTest {
-        // Arrange
-        val shadowTelephonyManager = org.robolectric.Shadows.shadowOf(
-            application.getSystemService(android.content.Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager
-        )
-        shadowTelephonyManager.setNetworkCountryIso("") // Missing Network ISO
+    fun `detects currency from resource configuration locale when network iso missing`() =
+        runTest {
+            // Arrange
+            val shadowTelephonyManager =
+                org.robolectric.Shadows.shadowOf(
+                    application.getSystemService(android.content.Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager,
+                )
+            shadowTelephonyManager.setNetworkCountryIso("") // Missing Network ISO
 
-        // Set configuration locale to Japan (JPY)
-        val res = application.resources
-        val config = res.configuration
-        config.setLocale(java.util.Locale.JAPAN)
-        res.updateConfiguration(config, res.displayMetrics)
+            // Set configuration locale to Japan (JPY)
+            val res = application.resources
+            val config = res.configuration
+            config.setLocale(java.util.Locale.JAPAN)
+            res.updateConfiguration(config, res.displayMetrics)
 
-        // Act
-        viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
+            // Act
+            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
 
-        // Assert
-        viewModel.homeCurrency.test {
-            val currencyInfo = awaitItem()
-            assertNotNull(currencyInfo)
-            assertEquals("JPY", currencyInfo?.currencyCode)
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.homeCurrency.test {
+                val currencyInfo = awaitItem()
+                assertNotNull(currencyInfo)
+                assertEquals("JPY", currencyInfo?.currencyCode)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `detects currency from default locale when others missing`() = runTest {
-        // Arrange
-        val shadowTelephonyManager = org.robolectric.Shadows.shadowOf(
-            application.getSystemService(android.content.Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager
-        )
-        shadowTelephonyManager.setNetworkCountryIso("") // Missing Network ISO
+    fun `detects currency from default locale when others missing`() =
+        runTest {
+            // Arrange
+            val shadowTelephonyManager =
+                org.robolectric.Shadows.shadowOf(
+                    application.getSystemService(android.content.Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager,
+                )
+            shadowTelephonyManager.setNetworkCountryIso("") // Missing Network ISO
 
-        // Clear configuration locale (roughly speaking, or set to something neutral if possible, but Robolectric keeps defaults)
-        // Ideally we set Default Locale and ensure Config is empty or ignored.
-        // However, OnboardingViewModel prioritizes Config over Default.
-        // So we must ensure Config is "invalid" or "empty" country to fall through?
-        // Code: if (configLocale != null && configLocale.country.isNotBlank())
-        
-        // Let's set Config to a locale with no country, e.g. just "en"
-        val res = application.resources
-        val config = res.configuration
-        config.setLocale(java.util.Locale("en", "")) // No country
-        res.updateConfiguration(config, res.displayMetrics)
+            // Clear configuration locale (roughly speaking, or set to something neutral if possible, but Robolectric keeps defaults)
+            // Ideally we set Default Locale and ensure Config is empty or ignored.
+            // However, OnboardingViewModel prioritizes Config over Default.
+            // So we must ensure Config is "invalid" or "empty" country to fall through?
+            // Code: if (configLocale != null && configLocale.country.isNotBlank())
 
-        // Set Default Locale to UK (GBP)
-        java.util.Locale.setDefault(java.util.Locale.UK)
+            // Let's set Config to a locale with no country, e.g. just "en"
+            val res = application.resources
+            val config = res.configuration
+            config.setLocale(java.util.Locale("en", "")) // No country
+            res.updateConfiguration(config, res.displayMetrics)
 
-        // Act
-        viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
+            // Set Default Locale to UK (GBP)
+            java.util.Locale.setDefault(java.util.Locale.UK)
 
-        // Assert
-        viewModel.homeCurrency.test {
-            val currencyInfo = awaitItem()
-            assertNotNull(currencyInfo)
-            assertEquals("GBP", currencyInfo?.currencyCode)
-            cancelAndIgnoreRemainingEvents()
+            // Act
+            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
+
+            // Assert
+            viewModel.homeCurrency.test {
+                val currencyInfo = awaitItem()
+                assertNotNull(currencyInfo)
+                assertEquals("GBP", currencyInfo?.currencyCode)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `falls back to INR on exception`() = runTest {
-        // Arrange
-        // Mock application to throw exception when accessing system service
-        val mockApp = mock(Application::class.java)
-        `when`(mockApp.getSystemService(anyString())).thenThrow(RuntimeException("System Service Error"))
+    fun `falls back to INR on exception`() =
+        runTest {
+            // Arrange
+            // Mock application to throw exception when accessing system service
+            val mockApp = mock(Application::class.java)
+            `when`(mockApp.getSystemService(anyString())).thenThrow(RuntimeException("System Service Error"))
 
-        // Act
-        viewModel = OnboardingViewModel(mockApp, categoryRepository, settingsRepository)
+            // Act
+            viewModel = OnboardingViewModel(mockApp, categoryRepository, settingsRepository)
 
-        // Assert
-        viewModel.homeCurrency.test {
-            val currencyInfo = awaitItem()
-            assertNotNull(currencyInfo)
-            assertEquals("INR", currencyInfo?.currencyCode) // Fallback
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.homeCurrency.test {
+                val currencyInfo = awaitItem()
+                assertNotNull(currencyInfo)
+                assertEquals("INR", currencyInfo?.currencyCode) // Fallback
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `onNameChanged updates userName state`() = runTest {
-        // Act
-        val newName = "Test User"
-        viewModel.onNameChanged(newName)
+    fun `onNameChanged updates userName state`() =
+        runTest {
+            // Act
+            val newName = "Test User"
+            viewModel.onNameChanged(newName)
 
-        // Assert
-        assertEquals(newName, viewModel.userName.value)
-    }
-
-    @Test
-    fun `onBudgetChanged updates monthlyBudget state with valid input`() = runTest {
-        // Act
-        val newBudget = "5000"
-        viewModel.onBudgetChanged(newBudget)
-
-        // Assert
-        assertEquals(newBudget, viewModel.monthlyBudget.value)
-    }
+            // Assert
+            assertEquals(newName, viewModel.userName.value)
+        }
 
     @Test
-    fun `onBudgetChanged ignores non-digit input`() = runTest {
-        // Act
-        viewModel.onBudgetChanged("abc")
-        // Assert
-        assertEquals("", viewModel.monthlyBudget.value)
+    fun `onBudgetChanged updates monthlyBudget state with valid input`() =
+        runTest {
+            // Act
+            val newBudget = "5000"
+            viewModel.onBudgetChanged(newBudget)
 
-        // Act
-        viewModel.onBudgetChanged("12a34")
-        // Assert
-        assertEquals("", viewModel.monthlyBudget.value)
-    }
+            // Assert
+            assertEquals(newBudget, viewModel.monthlyBudget.value)
+        }
 
     @Test
-    fun `onHomeCurrencyChanged updates homeCurrency state`() = runTest {
-        // Arrange
-        val newCurrency = CurrencyInfo("Testland", "TSD", "T")
+    fun `onBudgetChanged ignores non-digit input`() =
+        runTest {
+            // Act
+            viewModel.onBudgetChanged("abc")
+            // Assert
+            assertEquals("", viewModel.monthlyBudget.value)
 
-        // Act
-        viewModel.onHomeCurrencyChanged(newCurrency)
-
-        // Assert
-        assertEquals(newCurrency, viewModel.homeCurrency.value)
-    }
-
-    @Test
-    fun `finishOnboarding saves user name, currency, categories, and budget`() = runTest {
-        // Arrange
-        val name = "Test User"
-        val budget = "25000"
-        val currency = CurrencyHelper.getCurrencyInfo("USD")!!
-
-        // Act
-        viewModel.onNameChanged(name)
-        viewModel.onBudgetChanged(budget)
-        viewModel.onHomeCurrencyChanged(currency)
-        viewModel.finishOnboarding()
-        advanceUntilIdle()
-
-
-        // Assert
-        verify(settingsRepository).saveUserName(name)
-        verify(settingsRepository).saveHomeCurrency(currency.currencyCode)
-        verify(categoryRepository).insertAll(CategoryIconHelper.predefinedCategories)
-        verify(settingsRepository).saveOverallBudgetForCurrentMonth(budget.toFloat())
-    }
+            // Act
+            viewModel.onBudgetChanged("12a34")
+            // Assert
+            assertEquals("", viewModel.monthlyBudget.value)
+        }
 
     @Test
-    fun `finishOnboarding does not save blank user name`() = runTest {
-        // Act
-        viewModel.onNameChanged("  ")
-        viewModel.finishOnboarding()
-        advanceUntilIdle()
+    fun `onHomeCurrencyChanged updates homeCurrency state`() =
+        runTest {
+            // Arrange
+            val newCurrency = CurrencyInfo("Testland", "TSD", "T")
 
+            // Act
+            viewModel.onHomeCurrencyChanged(newCurrency)
 
-        // Assert
-        verify(settingsRepository, never()).saveUserName(anyString())
-    }
-
-    @Test
-    fun `finishOnboarding does not save zero or invalid budget`() = runTest {
-        // Act
-        viewModel.onBudgetChanged("0")
-        viewModel.finishOnboarding()
-        advanceUntilIdle()
-        // Assert
-        verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(anyFloat())
-
-        // Act
-        viewModel.onBudgetChanged("")
-        viewModel.finishOnboarding()
-        advanceUntilIdle()
-        // Assert
-        verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(anyFloat())
-    }
+            // Assert
+            assertEquals(newCurrency, viewModel.homeCurrency.value)
+        }
 
     @Test
-    fun `finishOnboarding schedules default workers via ReminderManager`() = runTest {
-        // Arrange
-        mockkObject(ReminderManager)
-        every { ReminderManager.rescheduleAllWork(any()) } just runs
+    fun `finishOnboarding saves user name, currency, categories, and budget`() =
+        runTest {
+            // Arrange
+            val name = "Test User"
+            val budget = "25000"
+            val currency = CurrencyHelper.getCurrencyInfo("USD")!!
 
-        // Act
-        viewModel.finishOnboarding()
-        advanceUntilIdle() // Ensure the coroutine in finishOnboarding completes
+            // Act
+            viewModel.onNameChanged(name)
+            viewModel.onBudgetChanged(budget)
+            viewModel.onHomeCurrencyChanged(currency)
+            viewModel.finishOnboarding()
+            advanceUntilIdle()
 
-        // Assert
-        verify(exactly = 1) { ReminderManager.rescheduleAllWork(application) }
-    }
+            // Assert
+            verify(settingsRepository).saveUserName(name)
+            verify(settingsRepository).saveHomeCurrency(currency.currencyCode)
+            verify(categoryRepository).insertAll(CategoryIconHelper.predefinedCategories)
+            verify(settingsRepository).saveOverallBudgetForCurrentMonth(budget.toFloat())
+        }
+
+    @Test
+    fun `finishOnboarding does not save blank user name`() =
+        runTest {
+            // Act
+            viewModel.onNameChanged("  ")
+            viewModel.finishOnboarding()
+            advanceUntilIdle()
+
+            // Assert
+            verify(settingsRepository, never()).saveUserName(anyString())
+        }
+
+    @Test
+    fun `finishOnboarding does not save zero or invalid budget`() =
+        runTest {
+            // Act
+            viewModel.onBudgetChanged("0")
+            viewModel.finishOnboarding()
+            advanceUntilIdle()
+            // Assert
+            verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(anyFloat())
+
+            // Act
+            viewModel.onBudgetChanged("")
+            viewModel.finishOnboarding()
+            advanceUntilIdle()
+            // Assert
+            verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(anyFloat())
+        }
+
+    @Test
+    fun `finishOnboarding schedules default workers via ReminderManager`() =
+        runTest {
+            // Arrange
+            mockkObject(ReminderManager)
+            every { ReminderManager.rescheduleAllWork(any()) } just runs
+
+            // Act
+            viewModel.finishOnboarding()
+            advanceUntilIdle() // Ensure the coroutine in finishOnboarding completes
+
+            // Assert
+            verify(exactly = 1) { ReminderManager.rescheduleAllWork(application) }
+        }
 }

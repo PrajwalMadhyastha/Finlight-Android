@@ -13,7 +13,6 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
-
 import io.pm.finlight.utils.SystemTimeProvider
 
 /**
@@ -36,7 +35,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                 budgetDao = db.budgetDao(),
                 settingsRepository = settingsRepository,
                 merchantRenameRuleRepository = merchantRenameRuleRepository,
-                timeProvider = SystemTimeProvider()
+                timeProvider = SystemTimeProvider(),
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

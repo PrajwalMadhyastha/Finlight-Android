@@ -33,7 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.ManageSearch
 import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.* 
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +43,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import io.pm.finlight.data.DataExportService
@@ -53,13 +55,11 @@ import io.pm.finlight.ui.components.WeeklyReportTimePicker
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import io.pm.finlight.ui.viewmodel.SettingsViewModel
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
@@ -74,16 +74,18 @@ private fun formatBackupTimestamp(timestamp: Long): String {
     return sdf.format(Date(timestamp))
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppearanceSettingsScreen(navController: NavController, settingsViewModel: SettingsViewModel) {
+fun AppearanceSettingsScreen(
+    navController: NavController,
+    settingsViewModel: SettingsViewModel,
+) {
     val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             GlassPanel {
@@ -91,23 +93,23 @@ fun AppearanceSettingsScreen(navController: NavController, settingsViewModel: Se
                     Text(
                         text = "Theme",
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "Select the app's color palette.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
+                        horizontalArrangement = Arrangement.SpaceAround,
                     ) {
                         AppTheme.entries.forEach { theme ->
                             ThemePickerItem(
                                 theme = theme,
                                 isSelected = selectedTheme == theme,
-                                onClick = { settingsViewModel.saveSelectedTheme(theme) }
+                                onClick = { settingsViewModel.saveSelectedTheme(theme) },
                             )
                         }
                     }
@@ -119,7 +121,10 @@ fun AppearanceSettingsScreen(navController: NavController, settingsViewModel: Se
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AutomationSettingsScreen(navController: NavController, settingsViewModel: SettingsViewModel) {
+fun AutomationSettingsScreen(
+    navController: NavController,
+    settingsViewModel: SettingsViewModel,
+) {
     val context = LocalContext.current
     val isScanning by settingsViewModel.isScanning.collectAsState()
     var showDatePickerDialog by remember { mutableStateOf(false) }
@@ -143,7 +148,7 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             GlassPanel {
@@ -170,7 +175,7 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                                 text = "Start date: ${dateFormatter.format(Date(smsScanStartDate))}",
                                 modifier = Modifier.clickable { showDatePickerDialog = true },
                                 color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
                             )
                         },
                         leadingContent = { Icon(Icons.Default.Event, "Scan from date", tint = MaterialTheme.colorScheme.primary) },
@@ -184,9 +189,9 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                                         }
                                     }
                                 },
-                                enabled = !isScanning
+                                enabled = !isScanning,
                             ) { Text("Scan") }
-                        }
+                        },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsActionItem(
@@ -207,7 +212,7 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                         text = "Debug SMS Parsing",
                         subtitle = "See why recent messages were parsed or ignored",
                         icon = Icons.Default.BugReport,
-                        onClick = { navController.navigate("sms_debug_screen") }
+                        onClick = { navController.navigate("sms_debug_screen") },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsToggleItem(
@@ -222,7 +227,6 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
         }
     }
 
-
     if (showDatePickerDialog) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = smsScanStartDate)
         DatePickerDialog(
@@ -234,17 +238,17 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
                             settingsViewModel.saveSmsScanStartDate(it)
                         }
                         showDatePickerDialog = false
-                    }
+                    },
                 ) { Text("OK") }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePickerDialog = false }) { Text("Cancel") }
             },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
         ) {
             DatePicker(
                 state = datePickerState,
-                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
             )
         }
     }
@@ -259,25 +263,26 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
             text = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Spacer(Modifier.height(16.dp))
                     LinearProgressIndicator(
                         progress = { (processedSms.toFloat() / totalSms.toFloat()).coerceIn(0f, 1f) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(CircleShape)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(CircleShape),
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
                         "Scanning: $processedSms / $totalSms messages",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             },
-            confirmButton = { /* No button, non-dismissible */ }
+            confirmButton = { /* No button, non-dismissible */ },
         )
     } else if (isScanning) {
         // --- Indeterminate Fallback Scrim ---
@@ -299,7 +304,10 @@ fun AutomationSettingsScreen(navController: NavController, settingsViewModel: Se
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationSettingsScreen(navController: NavController, settingsViewModel: SettingsViewModel) {
+fun NotificationSettingsScreen(
+    navController: NavController,
+    settingsViewModel: SettingsViewModel,
+) {
     val isWeeklySummaryEnabled by settingsViewModel.weeklySummaryEnabled.collectAsState()
     val isDailyReportEnabled by settingsViewModel.dailyReportEnabled.collectAsState()
     val isMonthlySummaryEnabled by settingsViewModel.monthlySummaryEnabled.collectAsState()
@@ -325,7 +333,7 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
                     subtitle = "Notify when a transaction is saved from an SMS",
                     icon = Icons.Default.Sms,
                     checked = isAutoCaptureNotificationEnabled,
-                    onCheckedChange = { settingsViewModel.setAutoCaptureNotificationEnabled(it) }
+                    onCheckedChange = { settingsViewModel.setAutoCaptureNotificationEnabled(it) },
                 )
             }
         }
@@ -338,7 +346,7 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
                     icon = Icons.Default.CloudUpload,
                     checked = isAutoBackupNotificationEnabled,
                     onCheckedChange = { settingsViewModel.setAutoBackupNotificationEnabled(it) },
-                    enabled = isAutoBackupEnabled // Keep the dependency on auto-backup being enabled
+                    enabled = isAutoBackupEnabled, // Keep the dependency on auto-backup being enabled
                 )
             }
         }
@@ -358,7 +366,7 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
                         subtitle = "Current: ${String.format("%02d:%02d", dailyReportTime.first, dailyReportTime.second)}",
                         icon = Icons.Default.Schedule,
                         onClick = { showDailyTimePicker = true },
-                        enabled = isDailyReportEnabled
+                        enabled = isDailyReportEnabled,
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsToggleItem(
@@ -371,11 +379,11 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
                     SettingsActionItem(
                         text = "Weekly Report Time",
                         subtitle = "Current: ${SimpleDateFormat("EEEE", Locale.getDefault()).format(
-                            Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, weeklyReportTime.first) }.time
+                            Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, weeklyReportTime.first) }.time,
                         )} at ${String.format("%02d:%02d", weeklyReportTime.second, weeklyReportTime.third)}",
                         icon = Icons.Default.Schedule,
                         onClick = { showWeeklyTimePicker = true },
-                        enabled = isWeeklySummaryEnabled
+                        enabled = isWeeklySummaryEnabled,
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsToggleItem(
@@ -390,13 +398,13 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
         }
     }
 
-
     if (showDailyTimePicker) {
-        val timePickerState = rememberTimePickerState(
-            initialHour = dailyReportTime.first,
-            initialMinute = dailyReportTime.second,
-            is24Hour = false
-        )
+        val timePickerState =
+            rememberTimePickerState(
+                initialHour = dailyReportTime.first,
+                initialMinute = dailyReportTime.second,
+                is24Hour = false,
+            )
         AlertDialog(
             onDismissRequest = { showDailyTimePicker = false },
             title = { Text("Select Daily Report Time") },
@@ -410,13 +418,13 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
                     onClick = {
                         settingsViewModel.saveDailyReportTime(timePickerState.hour, timePickerState.minute)
                         showDailyTimePicker = false
-                    }
+                    },
                 ) { Text("OK") }
             },
             dismissButton = {
                 TextButton(onClick = { showDailyTimePicker = false }) { Text("Cancel") }
             },
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         )
     }
 
@@ -429,14 +437,17 @@ fun NotificationSettingsScreen(navController: NavController, settingsViewModel: 
             onConfirm = { day, hour, minute ->
                 settingsViewModel.saveWeeklyReportTime(day, hour, minute)
                 showWeeklyTimePicker = false
-            }
+            },
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DataSettingsScreen(navController: NavController, settingsViewModel: SettingsViewModel) {
+fun DataSettingsScreen(
+    navController: NavController,
+    settingsViewModel: SettingsViewModel,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val isAppLockEnabled by settingsViewModel.appLockEnabled.collectAsState()
@@ -461,94 +472,99 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
         }
     }
 
-    val jsonFileSaverLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json"),
-        onResult = { uri ->
-            uri?.let {
-                scope.launch {
-                    val jsonString = DataExportService.exportToJsonString(context)
-                    if (jsonString != null) {
+    val jsonFileSaverLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("application/json"),
+            onResult = { uri ->
+                uri?.let {
+                    scope.launch {
+                        val jsonString = DataExportService.exportToJsonString(context)
+                        if (jsonString != null) {
+                            try {
+                                context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                                    outputStream.write(jsonString.toByteArray())
+                                }
+                                Toast.makeText(context, "Data exported successfully!", Toast.LENGTH_LONG).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Error saving file.", Toast.LENGTH_LONG).show()
+                            }
+                        } else {
+                            Toast.makeText(context, "Error exporting data.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            },
+        )
+
+    val csvFileSaverLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("text/csv"),
+            onResult = { uri ->
+                uri?.let {
+                    scope.launch {
+                        val csvString = DataExportService.exportToCsvString(context)
+                        if (csvString != null) {
+                            try {
+                                context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                                    outputStream.write(csvString.toByteArray())
+                                }
+                                Toast.makeText(context, "CSV exported successfully!", Toast.LENGTH_LONG).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Error saving CSV file.", Toast.LENGTH_LONG).show()
+                            }
+                        } else {
+                            Toast.makeText(context, "Error exporting CSV data.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            },
+        )
+
+    val csvTemplateSaverLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("text/csv"),
+            onResult = { uri ->
+                uri?.let {
+                    scope.launch {
                         try {
                             context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                                outputStream.write(jsonString.toByteArray())
+                                outputStream.write(DataExportService.getCsvTemplateString().toByteArray())
                             }
-                            Toast.makeText(context, "Data exported successfully!", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "Template saved!", Toast.LENGTH_SHORT).show()
                         } catch (e: Exception) {
-                            Toast.makeText(context, "Error saving file.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "Error saving template.", Toast.LENGTH_SHORT).show()
                         }
-                    } else {
-                        Toast.makeText(context, "Error exporting data.", Toast.LENGTH_LONG).show()
                     }
                 }
-            }
-        }
-    )
+            },
+        )
 
-    val csvFileSaverLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv"),
-        onResult = { uri ->
-            uri?.let {
-                scope.launch {
-                    val csvString = DataExportService.exportToCsvString(context)
-                    if (csvString != null) {
-                        try {
-                            context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                                outputStream.write(csvString.toByteArray())
-                            }
-                            Toast.makeText(context, "CSV exported successfully!", Toast.LENGTH_LONG).show()
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Error saving CSV file.", Toast.LENGTH_LONG).show()
+    val csvImportLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+            onResult = { uri ->
+                uri?.let {
+                    settingsViewModel.validateCsvFile(it)
+                    navController.navigate("csv_validation_screen")
+                }
+            },
+        )
+
+    val jsonImportLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+            onResult = { uri ->
+                uri?.let {
+                    scope.launch {
+                        if (DataExportService.importDataFromJson(context, it)) {
+                            Toast.makeText(context, "Data imported successfully! Please restart the app.", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(context, "Failed to import data.", Toast.LENGTH_LONG).show()
                         }
-                    } else {
-                        Toast.makeText(context, "Error exporting CSV data.", Toast.LENGTH_LONG).show()
                     }
                 }
-            }
-        }
-    )
-
-    val csvTemplateSaverLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv"),
-        onResult = { uri ->
-            uri?.let {
-                scope.launch {
-                    try {
-                        context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                            outputStream.write(DataExportService.getCsvTemplateString().toByteArray())
-                        }
-                        Toast.makeText(context, "Template saved!", Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Error saving template.", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
-    )
-
-    val csvImportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-        onResult = { uri ->
-            uri?.let {
-                settingsViewModel.validateCsvFile(it)
-                navController.navigate("csv_validation_screen")
-            }
-        }
-    )
-
-    val jsonImportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-        onResult = { uri ->
-            uri?.let {
-                scope.launch {
-                    if (DataExportService.importDataFromJson(context, it)) {
-                        Toast.makeText(context, "Data imported successfully! Please restart the app.", Toast.LENGTH_LONG).show()
-                    } else {
-                        Toast.makeText(context, "Failed to import data.", Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
-        }
-    )
+            },
+        )
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -570,7 +586,7 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                         subtitle = "Hide all amounts and balances",
                         icon = Icons.Default.VisibilityOff,
                         checked = isPrivacyModeEnabled,
-                        onCheckedChange = { settingsViewModel.setPrivacyModeEnabled(it) }
+                        onCheckedChange = { settingsViewModel.setPrivacyModeEnabled(it) },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsToggleItem(
@@ -578,7 +594,7 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                         subtitle = "Backup your data to Google Drive daily",
                         icon = Icons.Default.CloudUpload,
                         checked = isAutoBackupEnabled,
-                        onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) }
+                        onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) },
                     )
                     // --- DELETED: Backup Notification Toggle ---
                     /*
@@ -591,7 +607,7 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                         enabled = isAutoBackupEnabled
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    */
+                     */
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsActionItem(
                         text = "Export Data (JSON)",
@@ -633,8 +649,30 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                         text = "Create Backup Snapshot",
                         subtitle = "Last cloud backup: $lastBackupFormatted",
                         icon = Icons.Default.Save,
-                        onClick = { settingsViewModel.createBackupSnapshot() }
+                        onClick = { settingsViewModel.createBackupSnapshot() },
                     )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    // --- Photo receipts disclaimer ---
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WarningAmber,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text(
+                            text = "Photo receipts attached to transactions are not included in backups.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
@@ -642,10 +680,9 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
 
     if (showBackupSuccessDialog) {
         BackupSnapshotSuccessDialog(
-            onDismiss = { settingsViewModel.dismissBackupSuccessDialog() }
+            onDismiss = { settingsViewModel.dismissBackupSuccessDialog() },
         )
     }
-
 
     if (showCsvInfoDialog) {
         CsvInfoDialog(
@@ -658,7 +695,7 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
             onProceed = {
                 showCsvInfoDialog = false
                 csvImportLauncher.launch(arrayOf("text/csv", "text/comma-separated-values"))
-            }
+            },
         )
     }
 
@@ -673,11 +710,11 @@ fun DataSettingsScreen(navController: NavController, settingsViewModel: Settings
                         showImportJsonDialog = false
                         jsonImportLauncher.launch(arrayOf("application/json"))
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) { Text("Wipe and Import") }
             },
             dismissButton = { TextButton(onClick = { showImportJsonDialog = false }) { Text("Cancel") } },
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         )
     }
 }
@@ -690,13 +727,20 @@ private fun BackupSnapshotSuccessDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = popupContainerColor,
-        icon = { Icon(Icons.Default.CloudDone, contentDescription = "Success", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary) },
+        icon = {
+            Icon(
+                Icons.Default.CloudDone,
+                contentDescription = "Success",
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
         title = { Text("Local Snapshot Created!", color = MaterialTheme.colorScheme.onSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
                     "Your secure local snapshot is ready. We've notified the Android Backup Manager to back this file up to your Google Drive.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     buildString {
@@ -706,7 +750,7 @@ private fun BackupSnapshotSuccessDialog(onDismiss: () -> Unit) {
                         append("3. Find and tap the 'Back up now' button.")
                     },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 22.sp
+                    lineHeight = 22.sp,
                 )
             }
         },
@@ -714,15 +758,14 @@ private fun BackupSnapshotSuccessDialog(onDismiss: () -> Unit) {
             Button(onClick = onDismiss) {
                 Text("Got It")
             }
-        }
+        },
     )
 }
-
 
 @Composable
 private fun SettingsSection(
     title: String,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -743,7 +786,7 @@ private fun SettingsSection(
 private fun ThemePickerItem(
     theme: AppTheme,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
     val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
@@ -751,41 +794,45 @@ private fun ThemePickerItem(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier.clickable(onClick = onClick),
     ) {
         Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .border(2.dp, borderColor, CircleShape)
-                .padding(4.dp)
+            modifier =
+                Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, borderColor, CircleShape)
+                    .padding(4.dp),
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                if (isDark) theme.darkColor else theme.lightColor,
-                                if (isDark) theme.darkColor.copy(alpha = 0.7f) else theme.lightColor.copy(alpha = 0.7f)
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(
+                            brush =
+                                Brush.horizontalGradient(
+                                    colors =
+                                        listOf(
+                                            if (isDark) theme.darkColor else theme.lightColor,
+                                            if (isDark) theme.darkColor.copy(alpha = 0.7f) else theme.lightColor.copy(alpha = 0.7f),
+                                        ),
+                                ),
+                        ),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = theme.icon,
                     contentDescription = theme.displayName,
                     tint = if (isDark) Color.White.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.8f),
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(28.dp),
                 )
             }
         }
         Text(
             text = theme.displayName,
             style = MaterialTheme.typography.labelMedium,
-            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -794,7 +841,7 @@ private fun ThemePickerItem(
 private fun CsvInfoDialog(
     onDismiss: () -> Unit,
     onExportTemplate: () -> Unit,
-    onProceed: () -> Unit
+    onProceed: () -> Unit,
 ) {
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -810,7 +857,7 @@ private fun CsvInfoDialog(
                     text = "Id,ParentId,Date,Description,Amount,Type,Category,Account,Notes,IsExcluded,Tags",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
                 )
                 Text("• Date format must be: yyyy-MM-dd HH:mm:ss")
                 Text("• Type must be 'income' or 'expense'.")
@@ -831,6 +878,6 @@ private fun CsvInfoDialog(
             TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }

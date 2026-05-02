@@ -32,15 +32,23 @@ import kotlinx.coroutines.flow.*
 import java.util.*
 
 enum class AnalysisDimension {
-    CATEGORY, TAG, MERCHANT
+    CATEGORY,
+    TAG,
+    MERCHANT,
 }
 
 enum class AnalysisTimePeriod {
-    WEEK, MONTH, YEAR, ALL_TIME, CUSTOM
+    WEEK,
+    MONTH,
+    YEAR,
+    ALL_TIME,
+    CUSTOM,
 }
 
 enum class AnalysisTransactionType {
-    EXPENSE, INCOME, ALL
+    EXPENSE,
+    INCOME,
+    ALL,
 }
 
 data class AnalysisUiState(
@@ -63,7 +71,7 @@ data class AnalysisUiState(
     val searchQuery: String = "",
     // --- NEW: State for "Include Excluded" toggle ---
     val includeExcluded: Boolean = false,
-    val selectedTransactionType: AnalysisTransactionType = AnalysisTransactionType.EXPENSE
+    val selectedTransactionType: AnalysisTransactionType = AnalysisTransactionType.EXPENSE,
 )
 
 // --- NEW: Helper data class for combining flows ---
@@ -77,16 +85,15 @@ private data class AnalysisInputs(
     val searchQuery: String?,
     // --- NEW: Add includeExcluded field ---
     val includeExcluded: Boolean,
-    val transactionType: AnalysisTransactionType
+    val transactionType: AnalysisTransactionType,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AnalysisViewModel(
     private val transactionDao: TransactionDao,
     private val categoryDao: CategoryDao,
-    private val tagDao: TagDao
+    private val tagDao: TagDao,
 ) : ViewModel() {
-
     // --- INPUTS: StateFlows to hold user selections ---
     private val _selectedDimension = MutableStateFlow(AnalysisDimension.CATEGORY)
     private val _selectedTimePeriod = MutableStateFlow(AnalysisTimePeriod.MONTH)
@@ -106,7 +113,6 @@ class AnalysisViewModel(
 
     private val _selectedTransactionType = MutableStateFlow(AnalysisTransactionType.EXPENSE)
 
-
     // --- DATA: Flows for filter dropdowns ---
     private val allCategories = categoryDao.getAllCategories()
     private val allTags = tagDao.getAllTags()
@@ -115,93 +121,132 @@ class AnalysisViewModel(
     // --- REFACTORED LOGIC ---
 
     // 1. Combine all user inputs into a single flow of a data class.
-    private val analysisInputsFlow = combine(
-        _selectedDimension, _selectedTimePeriod, _customDateRange,
-        _selectedFilterCategory, _selectedFilterTag, _selectedFilterMerchant,
-        _searchQuery,
-        _includeExcluded, // --- ADDED ---
-        _selectedTransactionType
-    ) { args ->
-        @Suppress("UNCHECKED_CAST")
-        AnalysisInputs(
-            dimension = args[0] as AnalysisDimension,
-            period = args[1] as AnalysisTimePeriod,
-            dateRange = args[2] as Pair<Long?, Long?>,
-            filterCat = args[3] as? Category,
-            filterTag = args[4] as? Tag,
-            filterMerchant = args[5] as? String,
-            searchQuery = (args[6] as? String)?.takeIf { it.isNotBlank() },
-            includeExcluded = args[7] as Boolean, // --- ADDED ---
-            transactionType = args[8] as AnalysisTransactionType
-        )
-    }
+    private val analysisInputsFlow =
+        combine(
+            _selectedDimension, _selectedTimePeriod, _customDateRange,
+            _selectedFilterCategory, _selectedFilterTag, _selectedFilterMerchant,
+            _searchQuery,
+            _includeExcluded, // --- ADDED ---
+            _selectedTransactionType,
+        ) { args ->
+            @Suppress("UNCHECKED_CAST")
+            AnalysisInputs(
+                dimension = args[0] as AnalysisDimension,
+                period = args[1] as AnalysisTimePeriod,
+                dateRange = args[2] as Pair<Long?, Long?>,
+                filterCat = args[3] as? Category,
+                filterTag = args[4] as? Tag,
+                filterMerchant = args[5] as? String,
+                searchQuery = (args[6] as? String)?.takeIf { it.isNotBlank() },
+                includeExcluded = args[7] as Boolean, // --- ADDED ---
+                transactionType = args[8] as AnalysisTransactionType,
+            )
+        }
 
     // 2. Use that single input flow to trigger the database query.
     @OptIn(FlowPreview::class)
-    private val analysisResultFlow = analysisInputsFlow
-        .debounce(300) // Debounce search input
-        .flatMapLatest { inputs ->
-            val (start, end) = calculateDateRange(inputs.period, inputs.dateRange.first, inputs.dateRange.second)
-            val typeStr = when (inputs.transactionType) {
-                AnalysisTransactionType.EXPENSE -> "expense"
-                AnalysisTransactionType.INCOME -> "income"
-                AnalysisTransactionType.ALL -> null
+    private val analysisResultFlow =
+        analysisInputsFlow
+            .debounce(300) // Debounce search input
+            .flatMapLatest { inputs ->
+                val (start, end) = calculateDateRange(inputs.period, inputs.dateRange.first, inputs.dateRange.second)
+                val typeStr =
+                    when (inputs.transactionType) {
+                        AnalysisTransactionType.EXPENSE -> "expense"
+                        AnalysisTransactionType.INCOME -> "income"
+                        AnalysisTransactionType.ALL -> null
+                    }
+                when (inputs.dimension) {
+                    // --- UPDATED: Pass includeExcluded to DAO methods ---
+                    AnalysisDimension.CATEGORY ->
+                        transactionDao.getSpendingAnalysisByCategory(
+                            start,
+                            end,
+                            inputs.filterTag?.id,
+                            inputs.filterMerchant,
+                            inputs.filterCat?.id,
+                            inputs.searchQuery,
+                            inputs.includeExcluded,
+                            typeStr,
+                        )
+                    AnalysisDimension.TAG ->
+                        transactionDao.getSpendingAnalysisByTag(
+                            start,
+                            end,
+                            inputs.filterCat?.id,
+                            inputs.filterMerchant,
+                            inputs.filterTag?.id,
+                            inputs.searchQuery,
+                            inputs.includeExcluded,
+                            typeStr,
+                        )
+                    AnalysisDimension.MERCHANT ->
+                        transactionDao.getSpendingAnalysisByMerchant(
+                            start,
+                            end,
+                            inputs.filterCat?.id,
+                            inputs.filterTag?.id,
+                            inputs.filterMerchant,
+                            inputs.searchQuery,
+                            inputs.includeExcluded,
+                            typeStr,
+                        )
+                }
             }
-            when (inputs.dimension) {
-                // --- UPDATED: Pass includeExcluded to DAO methods ---
-                AnalysisDimension.CATEGORY -> transactionDao.getSpendingAnalysisByCategory(start, end, inputs.filterTag?.id, inputs.filterMerchant, inputs.filterCat?.id, inputs.searchQuery, inputs.includeExcluded, typeStr)
-                AnalysisDimension.TAG -> transactionDao.getSpendingAnalysisByTag(start, end, inputs.filterCat?.id, inputs.filterMerchant, inputs.filterTag?.id, inputs.searchQuery, inputs.includeExcluded, typeStr)
-                AnalysisDimension.MERCHANT -> transactionDao.getSpendingAnalysisByMerchant(start, end, inputs.filterCat?.id, inputs.filterTag?.id, inputs.filterMerchant, inputs.searchQuery, inputs.includeExcluded, typeStr)
-            }
-        }
 
     // 3. Combine the input flow, data flows, and result flow into the final UI state.
-    val uiState: StateFlow<AnalysisUiState> = combine(
-        analysisInputsFlow,
-        _showFilterSheet,
-        allCategories,
-        allTags,
-        allMerchants,
-        analysisResultFlow
-    ) { args ->
-        @Suppress("UNCHECKED_CAST")
-        val inputs = args[0] as AnalysisInputs
-        @Suppress("UNCHECKED_CAST")
-        val showSheet = args[1] as Boolean
-        @Suppress("UNCHECKED_CAST")
-        val cats = args[2] as List<Category>
-        @Suppress("UNCHECKED_CAST")
-        val tags = args[3] as List<Tag>
-        @Suppress("UNCHECKED_CAST")
-        val merchants = args[4] as List<String>
-        @Suppress("UNCHECKED_CAST")
-        val items = args[5] as List<SpendingAnalysisItem>
+    val uiState: StateFlow<AnalysisUiState> =
+        combine(
+            analysisInputsFlow,
+            _showFilterSheet,
+            allCategories,
+            allTags,
+            allMerchants,
+            analysisResultFlow,
+        ) { args ->
+            @Suppress("UNCHECKED_CAST")
+            val inputs = args[0] as AnalysisInputs
 
-        val total = items.sumOf { it.totalAmount }
-        AnalysisUiState(
-            selectedDimension = inputs.dimension,
-            selectedTimePeriod = inputs.period,
-            customStartDate = inputs.dateRange.first,
-            customEndDate = inputs.dateRange.second,
-            analysisItems = items,
-            totalSpending = total,
-            isLoading = false,
-            showFilterSheet = showSheet,
-            selectedFilterCategory = inputs.filterCat,
-            selectedFilterTag = inputs.filterTag,
-            selectedFilterMerchant = inputs.filterMerchant,
-            allCategories = cats,
-            allTags = tags,
-            allMerchants = merchants,
-            searchQuery = inputs.searchQuery ?: "",
-            includeExcluded = inputs.includeExcluded, // --- ADDED ---
-            selectedTransactionType = inputs.transactionType
+            @Suppress("UNCHECKED_CAST")
+            val showSheet = args[1] as Boolean
+
+            @Suppress("UNCHECKED_CAST")
+            val cats = args[2] as List<Category>
+
+            @Suppress("UNCHECKED_CAST")
+            val tags = args[3] as List<Tag>
+
+            @Suppress("UNCHECKED_CAST")
+            val merchants = args[4] as List<String>
+
+            @Suppress("UNCHECKED_CAST")
+            val items = args[5] as List<SpendingAnalysisItem>
+
+            val total = items.sumOf { it.totalAmount }
+            AnalysisUiState(
+                selectedDimension = inputs.dimension,
+                selectedTimePeriod = inputs.period,
+                customStartDate = inputs.dateRange.first,
+                customEndDate = inputs.dateRange.second,
+                analysisItems = items,
+                totalSpending = total,
+                isLoading = false,
+                showFilterSheet = showSheet,
+                selectedFilterCategory = inputs.filterCat,
+                selectedFilterTag = inputs.filterTag,
+                selectedFilterMerchant = inputs.filterMerchant,
+                allCategories = cats,
+                allTags = tags,
+                allMerchants = merchants,
+                searchQuery = inputs.searchQuery ?: "",
+                includeExcluded = inputs.includeExcluded, // --- ADDED ---
+                selectedTransactionType = inputs.transactionType,
+            )
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = AnalysisUiState(isLoading = true),
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = AnalysisUiState(isLoading = true)
-    )
 
     fun selectDimension(dimension: AnalysisDimension) {
         _selectedDimension.value = dimension
@@ -215,7 +260,10 @@ class AnalysisViewModel(
         }
     }
 
-    fun setCustomDateRange(start: Long?, end: Long?) {
+    fun setCustomDateRange(
+        start: Long?,
+        end: Long?,
+    ) {
         _selectedTimePeriod.value = AnalysisTimePeriod.CUSTOM
         _customDateRange.value = Pair(start, end)
     }
@@ -258,20 +306,25 @@ class AnalysisViewModel(
         _searchQuery.value = query
     }
 
-    private fun calculateDateRange(period: AnalysisTimePeriod, customStart: Long?, customEnd: Long?): Pair<Long, Long> {
+    private fun calculateDateRange(
+        period: AnalysisTimePeriod,
+        customStart: Long?,
+        customEnd: Long?,
+    ): Pair<Long, Long> {
         val calendar = Calendar.getInstance()
         calendar.set(Calendar.HOUR_OF_DAY, 23)
         calendar.set(Calendar.MINUTE, 59)
         calendar.set(Calendar.SECOND, 59)
         val endDate = calendar.timeInMillis
 
-        val startDate = when (period) {
-            AnalysisTimePeriod.WEEK -> (calendar.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -7) }.timeInMillis
-            AnalysisTimePeriod.MONTH -> (calendar.clone() as Calendar).apply { add(Calendar.MONTH, -1) }.timeInMillis
-            AnalysisTimePeriod.YEAR -> (calendar.clone() as Calendar).apply { add(Calendar.YEAR, -1) }.timeInMillis
-            AnalysisTimePeriod.ALL_TIME -> 0L
-            AnalysisTimePeriod.CUSTOM -> customStart ?: 0L
-        }
+        val startDate =
+            when (period) {
+                AnalysisTimePeriod.WEEK -> (calendar.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -7) }.timeInMillis
+                AnalysisTimePeriod.MONTH -> (calendar.clone() as Calendar).apply { add(Calendar.MONTH, -1) }.timeInMillis
+                AnalysisTimePeriod.YEAR -> (calendar.clone() as Calendar).apply { add(Calendar.YEAR, -1) }.timeInMillis
+                AnalysisTimePeriod.ALL_TIME -> 0L
+                AnalysisTimePeriod.CUSTOM -> customStart ?: 0L
+            }
         val finalEndDate = if (period == AnalysisTimePeriod.CUSTOM) customEnd ?: endDate else endDate
         return Pair(startDate, finalEndDate)
     }

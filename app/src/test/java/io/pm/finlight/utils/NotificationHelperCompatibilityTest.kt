@@ -1,6 +1,5 @@
 package io.pm.finlight.utils
 
-import android.Manifest
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationChannel
@@ -27,7 +26,6 @@ import org.robolectric.shadows.ShadowNotificationManager
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.S], application = TestApplication::class) // Android 12 (API 31)
 class NotificationHelperCompatibilityTest : BaseViewModelTest() {
-
     private lateinit var context: Application
     private lateinit var shadowNotificationManager: ShadowNotificationManager
 
@@ -39,7 +37,7 @@ class NotificationHelperCompatibilityTest : BaseViewModelTest() {
         shadowNotificationManager = shadowOf(notificationManager)
 
         // IMPORTANTE: Do NOT grant Manifest.permission.POST_NOTIFICATIONS here.
-        // On API 31, this permission doesn't exist/isn't required, so the helper 
+        // On API 31, this permission doesn't exist/isn't required, so the helper
         // should skip the check and still post the notification.
 
         // Create the backup channel for testing
@@ -59,7 +57,7 @@ class NotificationHelperCompatibilityTest : BaseViewModelTest() {
         NotificationHelper.showAutoBackupNotification(context, backupTime)
 
         // Assert
-        // On API 31, the permission check in NotificationHelper should assume 'true' 
+        // On API 31, the permission check in NotificationHelper should assume 'true'
         // because it's guarded by SDK >= 33.
         val postedNotification = shadowNotificationManager.getNotification(notificationId)
         assertNotNull("Notification should have been posted on API 31", postedNotification)

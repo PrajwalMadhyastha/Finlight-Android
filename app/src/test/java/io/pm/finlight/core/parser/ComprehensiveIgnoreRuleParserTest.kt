@@ -29,9 +29,8 @@ import org.mockito.MockitoAnnotations
  */
 @RunWith(Parameterized::class)
 class ComprehensiveIgnoreRuleParserTest(
-    private val ruleToTest: IgnoreRule
+    private val ruleToTest: IgnoreRule,
 ) : BaseSmsParserTest() {
-
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{index}: Rule({0})")
@@ -52,41 +51,53 @@ class ComprehensiveIgnoreRuleParserTest(
     }
 
     @Test
-    fun `test_defaultIgnoreRule_isCorrectlyApplied`() = runBlocking {
-        // ARRANGE
-        // Set up the parser with only the specific rule we want to test.
-        setupTest(ignoreRules = listOf(ruleToTest))
+    fun `test_defaultIgnoreRule_isCorrectlyApplied`() =
+        runBlocking {
+            // ARRANGE
+            // Set up the parser with only the specific rule we want to test.
+            setupTest(ignoreRules = listOf(ruleToTest))
 
-        val mockSms: SmsMessage = when (ruleToTest.type) {
-            RuleType.SENDER -> {
-                // For sender rules, create a sender that matches the wildcard pattern
-                // and a body that looks like a transaction to ensure the sender rule is what's causing the ignore.
-                val mockSender = ruleToTest.pattern.replace("*", "TEST")
-                SmsMessage(
-                    id = 1L,
-                    sender = mockSender,
-                    body = "You spent Rs. 100 on something that should be ignored.",
-                    date = System.currentTimeMillis()
+            val mockSms: SmsMessage =
+                when (ruleToTest.type) {
+                    RuleType.SENDER -> {
+                        // For sender rules, create a sender that matches the wildcard pattern
+                        // and a body that looks like a transaction to ensure the sender rule is what's causing the ignore.
+                        val mockSender = ruleToTest.pattern.replace("*", "TEST")
+                        SmsMessage(
+                            id = 1L,
+                            sender = mockSender,
+                            body = "You spent Rs. 100 on something that should be ignored.",
+                            date = System.currentTimeMillis(),
+                        )
+                    }
+                    RuleType.BODY_PHRASE -> {
+                        // For body rules, use a generic sender and embed the ignore phrase in the body.
+                        SmsMessage(
+                            id = 1L,
+                            sender = "VM-GENERIC",
+                            body = "This is a test message about ${ruleToTest.pattern} for Rs. 500.",
+                            date = System.currentTimeMillis(),
+                        )
+                    }
+                }
+
+            // ACT
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
                 )
-            }
-            RuleType.BODY_PHRASE -> {
-                // For body rules, use a generic sender and embed the ignore phrase in the body.
-                SmsMessage(
-                    id = 1L,
-                    sender = "VM-GENERIC",
-                    body = "This is a test message about ${ruleToTest.pattern} for Rs. 500.",
-                    date = System.currentTimeMillis()
-                )
-            }
+
+            // ASSERT
+            assertNull(
+                "Parser should have ignored the message based on the rule: '${ruleToTest.pattern}' (Type: ${ruleToTest.type})",
+                result,
+            )
         }
-
-        // ACT
-        val result = SmsParser.parse(mockSms, emptyMappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider)
-
-        // ASSERT
-        assertNull(
-            "Parser should have ignored the message based on the rule: '${ruleToTest.pattern}' (Type: ${ruleToTest.type})",
-            result
-        )
-    }
 }

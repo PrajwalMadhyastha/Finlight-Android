@@ -35,18 +35,19 @@ fun FilterBottomSheet(
     onCategoryChange: (Category?) -> Unit,
     showTransactionTypeFilter: Boolean = true,
     onTransactionTypeChange: (io.pm.finlight.ui.viewmodel.AnalysisTransactionType) -> Unit = {},
-    onClearFilters: () -> Unit
+    onClearFilters: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .padding(16.dp)
-            .navigationBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .padding(16.dp)
+                .navigationBarsPadding(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             "Filter Transactions",
             style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
 
         OutlinedTextField(
@@ -55,7 +56,7 @@ fun FilterBottomSheet(
             label = { Text("Search by keyword") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         )
 
         if (showTransactionTypeFilter) {
@@ -63,14 +64,14 @@ fun FilterBottomSheet(
                 Text(
                     "Transaction Type",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     io.pm.finlight.ui.viewmodel.AnalysisTransactionType.values().forEach { type ->
                         FilterChip(
                             selected = filterState.transactionType == type,
                             onClick = { onTransactionTypeChange(type) },
-                            label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                            label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
                         )
                     }
                 }
@@ -82,7 +83,7 @@ fun FilterBottomSheet(
             options = accounts,
             selectedOption = filterState.account,
             onOptionSelected = onAccountChange,
-            getDisplayName = { it.name }
+            getDisplayName = { it.name },
         )
 
         SearchableDropdown(
@@ -90,18 +91,17 @@ fun FilterBottomSheet(
             options = categories,
             selectedOption = filterState.category,
             onOptionSelected = onCategoryChange,
-            getDisplayName = { it.name }
+            getDisplayName = { it.name },
         )
 
         Button(
             onClick = onClearFilters,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Clear All Filters")
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,9 +141,10 @@ private fun <T> SearchableDropdown(
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(
-                if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight
-            )
+            modifier =
+                Modifier.background(
+                    if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight,
+                ),
         ) {
             options.forEach { option ->
                 DropdownMenuItem(

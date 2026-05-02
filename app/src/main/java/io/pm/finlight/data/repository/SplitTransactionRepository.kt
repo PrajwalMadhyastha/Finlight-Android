@@ -9,7 +9,6 @@ package io.pm.finlight
 import kotlinx.coroutines.flow.Flow
 
 class SplitTransactionRepository(private val splitTransactionDao: SplitTransactionDao) {
-
     fun getSplitsForParent(parentTransactionId: Int): Flow<List<SplitTransactionDetails>> {
         return splitTransactionDao.getSplitsForParent(parentTransactionId)
     }

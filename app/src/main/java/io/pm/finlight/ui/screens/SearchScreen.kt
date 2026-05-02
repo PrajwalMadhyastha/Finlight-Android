@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.FilterList
@@ -43,15 +42,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.*
+import io.pm.finlight.FinancialSummary
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.TransactionItem
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToLong
-import java.text.NumberFormat
-import io.pm.finlight.FinancialSummary
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
@@ -63,7 +62,7 @@ fun SearchScreen(
     transactionViewModel: TransactionViewModel,
     focusSearch: Boolean,
     expandFilters: Boolean,
-    safeToSpend: Long?
+    safeToSpend: Long?,
 ) {
     val searchUiState by searchViewModel.uiState.collectAsState()
     val searchResults by searchViewModel.searchResults.collectAsState()
@@ -76,10 +75,11 @@ fun SearchScreen(
     val focusRequester = remember { FocusRequester() }
     val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
-    val currencyFormat = remember {
-        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            .apply { maximumFractionDigits = 0 }
-    }
+    val currencyFormat =
+        remember {
+            NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+                .apply { maximumFractionDigits = 0 }
+        }
 
     LaunchedEffect(searchUiState.selectedCategory, expandFilters) {
         if (searchUiState.selectedCategory != null && expandFilters && !filtersAlreadyExpanded) {
@@ -96,10 +96,11 @@ fun SearchScreen(
                     value = searchUiState.keyword,
                     onValueChange = { searchViewModel.onKeywordChange(it) },
                     label = { Text("Keyword (description, notes)") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester),
-                    singleLine = true
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                    singleLine = true,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -107,48 +108,51 @@ fun SearchScreen(
                 GlassPanel {
                     Column {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showFilters = !showFilters }
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showFilters = !showFilters }
+                                    .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
                                 Icons.Default.FilterList,
                                 contentDescription = "Filters",
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 "Filters",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             )
                             Icon(
                                 imageVector = if (showFilters) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                 contentDescription = if (showFilters) "Collapse Filters" else "Expand Filters",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
 
                         AnimatedVisibility(
                             visible = showFilters,
                             enter = expandVertically(animationSpec = tween(200)),
-                            exit = shrinkVertically(animationSpec = tween(200))
+                            exit = shrinkVertically(animationSpec = tween(200)),
                         ) {
                             Column(
-                                modifier = Modifier.padding(
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                    bottom = 16.dp
-                                ),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                                modifier =
+                                    Modifier.padding(
+                                        start = 16.dp,
+                                        end = 16.dp,
+                                        bottom = 16.dp,
+                                    ),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 HorizontalDivider(
-                                    color = MaterialTheme.colorScheme.onSurface.copy(
-                                        alpha = 0.12f
-                                    )
+                                    color =
+                                        MaterialTheme.colorScheme.onSurface.copy(
+                                            alpha = 0.12f,
+                                        ),
                                 )
                                 SearchableDropdown(
                                     label = "Account",
@@ -214,31 +218,33 @@ fun SearchScreen(
         AnimatedVisibility(
             visible = searchUiState.displayDate != null,
             enter = expandVertically(),
-            exit = shrinkVertically()
+            exit = shrinkVertically(),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 GlassPanel {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp, horizontal = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp, horizontal = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
                             text = "Showing results for",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
                             text = searchUiState.displayDate ?: "",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
 
                         // UI REFINEMENT: Safe to Spend moved here
@@ -246,19 +252,19 @@ fun SearchScreen(
                             Spacer(Modifier.height(8.dp))
                             HorizontalDivider(
                                 modifier = Modifier.width(40.dp),
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
                                 text = "Safe to Spend",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
                                 text = currencyFormat.format(safeToSpend),
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
                             )
                         }
                     }
@@ -277,7 +283,7 @@ fun SearchScreen(
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 // --- NEW: Header for Drilldown Mode ---
                 if (searchUiState.isDrilldown) {
@@ -286,7 +292,7 @@ fun SearchScreen(
                         DrilldownHeader(
                             title = searchUiState.keyword,
                             totalAmount = totalAmount,
-                            count = searchResults.size
+                            count = searchResults.size,
                         )
                     }
                 } else {
@@ -304,22 +310,22 @@ fun SearchScreen(
                     TransactionItem(
                         transactionDetails = transactionDetails,
                         onClick = { navController.navigate("transaction_detail/${transactionDetails.transaction.id}") },
-                        onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
+                        onCategoryClick = { transactionViewModel.requestCategoryChange(it) },
                     )
                 }
             }
         } else if (searchUiState.hasSearched) {
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                contentAlignment = Alignment.Center,
             ) {
                 Text("No transactions match your criteria.")
             }
         }
     }
-
 
     LaunchedEffect(Unit) {
         if (focusSearch && !focusAlreadyRequested && !searchUiState.isDrilldown) { // Update focus logic
@@ -344,11 +350,11 @@ fun SearchScreen(
             dismissButton = {
                 TextButton(onClick = { searchViewModel.onShowStartDatePicker(false) }) { Text("Cancel") }
             },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
         ) {
             DatePicker(
                 state = datePickerState,
-                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
             )
         }
     }
@@ -366,11 +372,11 @@ fun SearchScreen(
             dismissButton = {
                 TextButton(onClick = { searchViewModel.onShowEndDatePicker(false) }) { Text("Cancel") }
             },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
         ) {
             DatePicker(
                 state = datePickerState,
-                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
             )
         }
     }
@@ -414,9 +420,10 @@ fun <T> SearchableDropdown(
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(
-                if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight
-            )
+            modifier =
+                Modifier.background(
+                    if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight,
+                ),
         ) {
             options.forEach { option ->
                 DropdownMenuItem(
@@ -456,59 +463,62 @@ fun DateTextField(
                     Icon(Icons.Default.DateRange, "Select Date")
                 }
             },
-            colors = OutlinedTextFieldDefaults.colors(
-                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                disabledContainerColor = Color.Transparent,
-                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            colors =
+                OutlinedTextFieldDefaults.colors(
+                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                    disabledContainerColor = Color.Transparent,
+                    disabledBorderColor = MaterialTheme.colorScheme.outline,
+                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
         )
     }
 }
 
 @Composable
 private fun DaySummaryCard(summary: FinancialSummary) {
-    val currencyFormat = remember {
-        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            .apply { maximumFractionDigits = 0 }
-    }
+    val currencyFormat =
+        remember {
+            NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+                .apply { maximumFractionDigits = 0 }
+        }
 
     val incomeColor = MaterialTheme.colorScheme.primary
     val expenseColor = MaterialTheme.colorScheme.error
 
     GlassPanel {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 20.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "Total Income",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = currencyFormat.format(summary.totalIncome.roundToLong()),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
-                    color = incomeColor
+                    color = incomeColor,
                 )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "Total Expense",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = currencyFormat.format(summary.totalExpenses.roundToLong()),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
-                    color = expenseColor
+                    color = expenseColor,
                 )
             }
         }
@@ -520,22 +530,23 @@ private fun DaySummaryCard(summary: FinancialSummary) {
 private fun DrilldownHeader(
     title: String,
     totalAmount: Double,
-    count: Int
+    count: Int,
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 
     GlassPanel {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 "Transactions for",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 title,
@@ -543,39 +554,39 @@ private fun DrilldownHeader(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(8.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceAround
+                horizontalArrangement = Arrangement.SpaceAround,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         "Total Value",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         currencyFormat.format(totalAmount),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         "Visits",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         "$count",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }

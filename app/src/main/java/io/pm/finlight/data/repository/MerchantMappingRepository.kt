@@ -17,6 +17,4 @@ class MerchantMappingRepository(private val merchantMappingDao: MerchantMappingD
     suspend fun insert(mapping: MerchantMapping) {
         merchantMappingDao.insert(mapping)
     }
-
-
 }

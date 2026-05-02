@@ -44,18 +44,21 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.OnboardingViewModel
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.CurrencyHelper
 import kotlinx.coroutines.launch
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun OnboardingScreen(viewModel: OnboardingViewModel, onOnboardingFinished: () -> Unit) {
+fun OnboardingScreen(
+    viewModel: OnboardingViewModel,
+    onOnboardingFinished: () -> Unit,
+) {
     // --- UPDATED: Page count reduced from 7 to 6 (Currency page removed) ---
     val pagerState = rememberPagerState { 6 }
     val scope = rememberCoroutineScope()
@@ -76,16 +79,17 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, onOnboardingFinished: () ->
                 onFinishClicked = {
                     viewModel.finishOnboarding()
                     onOnboardingFinished()
-                }
+                },
             )
-        }
+        },
     ) { innerPadding ->
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            userScrollEnabled = false
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            userScrollEnabled = false,
         ) { page ->
             when (page) {
                 0 -> WelcomePage()
@@ -107,36 +111,39 @@ fun OnboardingBottomBar(
     pagerState: PagerState,
     viewModel: OnboardingViewModel,
     onNextClicked: () -> Unit,
-    onFinishClicked: () -> Unit
+    onFinishClicked: () -> Unit,
 ) {
     val userName by viewModel.userName.collectAsState()
 
     Surface(shadowElevation = 8.dp) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             PageIndicator(pageCount = pagerState.pageCount, currentPage = pagerState.currentPage)
 
             // --- UPDATED: Logic adjusted for removed currency page. Indices shifted down by 1. ---
-            val isNextButtonVisible = pagerState.currentPage < pagerState.pageCount - 1 &&
+            val isNextButtonVisible =
+                pagerState.currentPage < pagerState.pageCount - 1 &&
                     pagerState.currentPage != 3 // Hide on SMS Permission Page (Force choice or click "Enable")
-                    // Removed: pagerState.currentPage != 4 (Allow "Next" as a Skip for Notifications)
+            // Removed: pagerState.currentPage != 4 (Allow "Next" as a Skip for Notifications)
 
-            val isNextEnabled = if (pagerState.currentPage == 1) {
-                userName.isNotBlank()
-            } else {
-                true
-            }
+            val isNextEnabled =
+                if (pagerState.currentPage == 1) {
+                    userName.isNotBlank()
+                } else {
+                    true
+                }
 
             if (isNextButtonVisible) {
                 Button(
                     onClick = onNextClicked,
-                    enabled = isNextEnabled
+                    enabled = isNextEnabled,
                 ) {
                     Text("Next")
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Page")
@@ -153,18 +160,29 @@ fun OnboardingBottomBar(
 }
 
 @Composable
-fun PageIndicator(pageCount: Int, currentPage: Int) {
+fun PageIndicator(
+    pageCount: Int,
+    currentPage: Int,
+) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         repeat(pageCount) { iteration ->
-            val color = if (currentPage == iteration) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+            val color =
+                if (currentPage == iteration) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(
+                        alpha = 0.3f,
+                    )
+                }
             Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(color)
+                modifier =
+                    Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(color),
             )
         }
     }
@@ -175,22 +193,23 @@ fun WelcomePage() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(32.dp),
     ) {
         Icon(
             imageVector = Icons.Default.PrivacyTip,
             contentDescription = "Privacy Icon",
             modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary
+            tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = "Welcome to Finlight",
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
@@ -216,42 +235,53 @@ fun WelcomePage() {
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) {
                         append("NO LOGIN")
                     }
-                    append(" needed. We will never ask for your phone number or email.\n\nTo keep your data safe, automatic backups to your personal Google Drive are enabled by default. This backup is encrypted and you can disable this at any time in the settings. Let's get you set up.")
+                    append(
+                        " needed. We will never ask for your phone number or email.\n\nTo keep your data safe, automatic backups to your personal Google Drive are enabled by default. This backup is encrypted and you can disable this at any time in the settings. Let's get you set up.",
+                    )
                 }
             },
             style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun UserNamePage(viewModel: OnboardingViewModel, pagerState: PagerState) {
+fun UserNamePage(
+    viewModel: OnboardingViewModel,
+    pagerState: PagerState,
+) {
     val name by viewModel.userName.collectAsState()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(32.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         Icon(
             imageVector = Icons.Default.AccountCircle,
             contentDescription = "User Icon",
             modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary
+            tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(24.dp))
-        Text("What should we call you?", style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            "What should we call you?",
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
         Text(
             "This will be used to personalize your experience.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
         GlassPanel {
@@ -259,25 +289,28 @@ fun UserNamePage(viewModel: OnboardingViewModel, pagerState: PagerState) {
                 value = name,
                 onValueChange = { viewModel.onNameChanged(it) },
                 label = { Text("Your Name") },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    capitalization = KeyboardCapitalization.Words
-                ),
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        capitalization = KeyboardCapitalization.Words,
+                    ),
                 singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                )
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                    ),
             )
         }
     }
@@ -285,36 +318,45 @@ fun UserNamePage(viewModel: OnboardingViewModel, pagerState: PagerState) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun BudgetSetupPage(viewModel: OnboardingViewModel, pagerState: PagerState) {
+fun BudgetSetupPage(
+    viewModel: OnboardingViewModel,
+    pagerState: PagerState,
+) {
     val budget by viewModel.monthlyBudget.collectAsState()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(32.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         Icon(
             imageVector = Icons.Default.Savings,
             contentDescription = "Budget Icon",
             modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary
+            tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(24.dp))
-        Text("Set a Monthly Budget", style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            "Set a Monthly Budget",
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
         Text(
             "Give yourself a spending target for the month.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             "This can be changed any time in Settings.",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
         GlassPanel {
@@ -324,20 +366,22 @@ fun BudgetSetupPage(viewModel: OnboardingViewModel, pagerState: PagerState) {
                 label = { Text("Total Monthly Budget") },
                 leadingIcon = { Text("₹", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                )
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                    ),
             )
         }
     }
@@ -350,49 +394,56 @@ fun CurrencySetupPage(viewModel: OnboardingViewModel) {
     var showCurrencyPicker by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(32.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         Icon(
             imageVector = Icons.Default.Public,
             contentDescription = "Currency Icon",
             modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary
+            tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(24.dp))
-        Text("Confirm Your Currency", style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            "Confirm Your Currency",
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
         Text(
             "We've set your home currency based on your device's region. This will be used for all reports and budgets.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
 
         detectedCurrency?.let {
             GlassPanel {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 24.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 24.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Column {
                         Text(
                             text = "${it.countryName} (${it.currencyCode})",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
                             text = "Symbol: ${it.currencySymbol}",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     TextButton(onClick = { showCurrencyPicker = true }) {
@@ -418,10 +469,11 @@ fun CurrencySetupPage(viewModel: OnboardingViewModel) {
                             ListItem(
                                 headlineContent = { Text("${currency.countryName} (${currency.currencyCode})") },
                                 trailingContent = { Text(currency.currencySymbol) },
-                                modifier = Modifier.clickable {
-                                    viewModel.onHomeCurrencyChanged(currency)
-                                    showCurrencyPicker = false
-                                }
+                                modifier =
+                                    Modifier.clickable {
+                                        viewModel.onHomeCurrencyChanged(currency)
+                                        showCurrencyPicker = false
+                                    },
                             )
                         }
                     }
@@ -432,7 +484,7 @@ fun CurrencySetupPage(viewModel: OnboardingViewModel) {
                     Text("Cancel")
                 }
             },
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         )
     }
 }
@@ -440,34 +492,46 @@ fun CurrencySetupPage(viewModel: OnboardingViewModel) {
 @Composable
 fun SmsPermissionPage(onPermissionResult: () -> Unit) {
     val context = LocalContext.current
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { perms ->
-        if (perms.values.any { !it }) {
-            Toast.makeText(context, "Permissions denied. You can enable them later in settings.", Toast.LENGTH_LONG).show()
-        } else {
-            Toast.makeText(context, "SMS Scanning Enabled!", Toast.LENGTH_SHORT).show()
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestMultiplePermissions(),
+        ) { perms ->
+            if (perms.values.any { !it }) {
+                Toast.makeText(context, "Permissions denied. You can enable them later in settings.", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(context, "SMS Scanning Enabled!", Toast.LENGTH_SHORT).show()
+            }
+            onPermissionResult()
         }
-        onPermissionResult()
-    }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(32.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
-        Icon(Icons.AutoMirrored.Filled.Message, contentDescription = "SMS Icon", modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
+        Icon(
+            Icons.AutoMirrored.Filled.Message,
+            contentDescription = "SMS Icon",
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.primary,
+        )
         Spacer(Modifier.height(24.dp))
-        Text("Automate Your Tracking", style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            "Automate Your Tracking",
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
         Spacer(Modifier.height(16.dp))
         Text(
             "Consider allowing Finlight to read your SMS inbox to automatically detect and import new transactions. This is a huge time-saver!",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
         Button(onClick = {
@@ -481,26 +545,33 @@ fun SmsPermissionPage(onPermissionResult: () -> Unit) {
 @Composable
 fun NotificationPermissionPage(onPermissionResult: () -> Unit) {
     val context = LocalContext.current
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            Toast.makeText(context, "Notifications enabled!", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "You can enable notifications later in settings.", Toast.LENGTH_LONG).show()
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) { isGranted ->
+            if (isGranted) {
+                Toast.makeText(context, "Notifications enabled!", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "You can enable notifications later in settings.", Toast.LENGTH_LONG).show()
+            }
+            onPermissionResult()
         }
-        onPermissionResult()
-    }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(32.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
-        Icon(Icons.Default.NotificationsActive, contentDescription = "Notification Icon", modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
+        Icon(
+            Icons.Default.NotificationsActive,
+            contentDescription = "Notification Icon",
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.primary,
+        )
         Spacer(Modifier.height(24.dp))
         Text("Stay Updated", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(16.dp))
@@ -508,7 +579,7 @@ fun NotificationPermissionPage(onPermissionResult: () -> Unit) {
             "Get notified about new transactions and receive daily, weekly and monthly summaries by enabling notifications.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(24.dp))
 
@@ -519,11 +590,12 @@ fun NotificationPermissionPage(onPermissionResult: () -> Unit) {
                 onPermissionResult()
             }
         }) {
-            val buttonText = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                "Enable Notifications"
-            } else {
-                "Continue"
-            }
+            val buttonText =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    "Enable Notifications"
+                } else {
+                    "Continue"
+                }
             Text(buttonText)
         }
         Spacer(Modifier.height(16.dp))
@@ -533,31 +605,32 @@ fun NotificationPermissionPage(onPermissionResult: () -> Unit) {
 @Composable
 fun CompletionPage() {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         Icon(
             imageVector = Icons.Default.CheckCircle,
             contentDescription = "Success Icon",
             modifier = Modifier.size(100.dp),
-            tint = MaterialTheme.colorScheme.primary
+            tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = "You're All Set!",
             style = MaterialTheme.typography.headlineMedium,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "Your accounts and preferences have been saved. You can now start tracking your finances.",
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

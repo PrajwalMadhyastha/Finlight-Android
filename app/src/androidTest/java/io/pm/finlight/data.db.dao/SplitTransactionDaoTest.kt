@@ -6,7 +6,6 @@ import io.pm.finlight.Category
 import io.pm.finlight.CategoryDao
 import io.pm.finlight.SplitTransaction
 import io.pm.finlight.SplitTransactionDao
-import io.pm.finlight.SplitTransactionDetails
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDao
 import kotlinx.coroutines.flow.first
@@ -18,7 +17,6 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SplitTransactionDaoTest : BaseDaoTest() {
-
     private lateinit var splitDao: SplitTransactionDao
     private lateinit var transactionDao: TransactionDao
     private lateinit var accountDao: AccountDao
@@ -42,13 +40,24 @@ class SplitTransactionDaoTest : BaseDaoTest() {
     @Test
     fun updateSplitTransaction() {
         runBlocking {
-            val parentId = transactionDao.insert(
-                Transaction(description = "Parent", amount = 100.0, date = 0L, accountId = 1, categoryId = null, notes = null, isSplit = true)
-            ).toInt()
+            val parentId =
+                transactionDao.insert(
+                    Transaction(
+                        description = "Parent",
+                        amount = 100.0,
+                        date = 0L,
+                        accountId = 1,
+                        categoryId = null,
+                        notes = null,
+                        isSplit = true,
+                    ),
+                ).toInt()
 
-            splitDao.insertAll(listOf(
-                SplitTransaction(parentTransactionId = parentId, amount = 50.0, categoryId = 1, notes = "Old Note")
-            ))
+            splitDao.insertAll(
+                listOf(
+                    SplitTransaction(parentTransactionId = parentId, amount = 50.0, categoryId = 1, notes = "Old Note"),
+                ),
+            )
 
             val splits = splitDao.getSplitsForParent(parentId).first()
             val originalSplit = splits.first().splitTransaction
@@ -68,23 +77,26 @@ class SplitTransactionDaoTest : BaseDaoTest() {
     fun testCascadingDelete() {
         runBlocking {
             // 1. Create Parent Transaction
-            val parentId = transactionDao.insert(
-                Transaction(
-                    description = "Supermarket",
-                    amount = 100.0,
-                    date = System.currentTimeMillis(),
-                    accountId = 1,
-                    categoryId = null,
-                    notes = null,
-                    isSplit = true
-                )
-            ).toInt()
+            val parentId =
+                transactionDao.insert(
+                    Transaction(
+                        description = "Supermarket",
+                        amount = 100.0,
+                        date = System.currentTimeMillis(),
+                        accountId = 1,
+                        categoryId = null,
+                        notes = null,
+                        isSplit = true,
+                    ),
+                ).toInt()
 
             // 2. Create Child Splits
-            splitDao.insertAll(listOf(
-                SplitTransaction(parentTransactionId = parentId, amount = 60.0, categoryId = 1, notes = "Groceries"),
-                SplitTransaction(parentTransactionId = parentId, amount = 40.0, categoryId = 2, notes = "Magazines")
-            ))
+            splitDao.insertAll(
+                listOf(
+                    SplitTransaction(parentTransactionId = parentId, amount = 60.0, categoryId = 1, notes = "Groceries"),
+                    SplitTransaction(parentTransactionId = parentId, amount = 40.0, categoryId = 2, notes = "Magazines"),
+                ),
+            )
 
             // Verify splits exist
             var splits = splitDao.getSplitsForParent(parentId).first()

@@ -16,5 +16,5 @@ import kotlinx.serialization.Serializable
 data class MerchantCategoryMapping(
     @PrimaryKey
     val parsedName: String,
-    val categoryId: Int
+    val categoryId: Int,
 )

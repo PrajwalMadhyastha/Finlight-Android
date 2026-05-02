@@ -17,15 +17,11 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.data.DataExportService
-import io.pm.finlight.utils.NotificationHelper
-import io.pm.finlight.utils.ReminderManager
-import kotlinx.coroutines.flow.first
 
 class BackupWorker(
     private val context: Context,
-    workerParams: WorkerParameters
+    workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
-
     override suspend fun doWork(): Result {
         return try {
             Log.d("BackupWorker", "Starting periodic database snapshot...")
@@ -42,7 +38,6 @@ class BackupWorker(
                 Log.e("BackupWorker", "Failed to create database snapshot.")
             }
             // --- End of moved logic ---
-
 
             // --- DELETED: Notification logic was removed from this worker ---
 

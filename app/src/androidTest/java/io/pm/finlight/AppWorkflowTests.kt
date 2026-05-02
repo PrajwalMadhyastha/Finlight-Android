@@ -16,7 +16,6 @@ import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import java.util.UUID
 
-
 /**
  * Instrumented UI test for common user workflows in the application.
  *

@@ -7,30 +7,19 @@
 package io.pm.finlight.ui.screens
 
 import android.app.Application
-import android.graphics.Typeface
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.github.mikephil.charting.charts.BarChart
-import com.github.mikephil.charting.components.XAxis
-import com.github.mikephil.charting.data.BarData
-import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import io.pm.finlight.DrilldownType
 import io.pm.finlight.DrilldownViewModel
 import io.pm.finlight.DrilldownViewModelFactory
@@ -47,7 +36,7 @@ fun DrilldownScreen(
     entityName: String,
     month: Int,
     year: Int,
-    transactionViewModel: TransactionViewModel // --- FIX: Inject ViewModel ---
+    transactionViewModel: TransactionViewModel, // --- FIX: Inject ViewModel ---
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = DrilldownViewModelFactory(application, drilldownType, entityName, month, year)
@@ -58,38 +47,40 @@ fun DrilldownScreen(
     val chartData by viewModel.monthlyTrendChartData.collectAsState()
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier =
+            Modifier
+                .fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             GlassPanel {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
                         "6-Month Spending Trend",
                         style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.height(16.dp))
                     if (chartData != null) {
                         ModernTrendChart(
                             chartData = chartData!!,
-                            onBarClick = null
+                            onBarClick = null,
                         )
                     } else {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp),
-                            contentAlignment = Alignment.Center
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 "Not enough data for a trend chart.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -102,14 +93,14 @@ fun DrilldownScreen(
                 Text(
                     "Transactions this month",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             items(transactions, key = { it.transaction.id }) { transaction ->
                 TransactionItem(
                     transactionDetails = transaction,
                     onClick = { navController.navigate("transaction_detail/${transaction.transaction.id}") },
-                    onCategoryClick = { transactionViewModel.requestCategoryChange(it) }
+                    onCategoryClick = { transactionViewModel.requestCategoryChange(it) },
                 )
             }
         }

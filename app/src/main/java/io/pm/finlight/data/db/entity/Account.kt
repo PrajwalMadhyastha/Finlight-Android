@@ -16,7 +16,7 @@ import kotlinx.serialization.Serializable
 @Entity(
     tableName = "accounts",
     // --- NEW: Add a unique, case-insensitive index to the name column ---
-    indices = [Index(value = ["name"], unique = true, name = "index_accounts_name_nocase")]
+    indices = [Index(value = ["name"], unique = true, name = "index_accounts_name_nocase")],
 )
 data class Account(
     @PrimaryKey(autoGenerate = true)

@@ -16,5 +16,5 @@ internal data class AnimatedCircle(
     val color: Color,
     val baseRadiusMultiplier: Float,
     val baseCenter: Offset,
-    val speedMultiplier: Float
+    val speedMultiplier: Float,
 )

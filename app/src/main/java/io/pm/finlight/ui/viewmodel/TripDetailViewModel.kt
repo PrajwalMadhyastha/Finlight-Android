@@ -21,25 +21,26 @@ class TripDetailViewModel(
     tripRepository: TripRepository,
     transactionRepository: TransactionRepository,
     tripId: Int,
-    tagId: Int
+    tagId: Int,
 ) : ViewModel() {
-
     val tripDetails: StateFlow<TripWithStats?>
     val transactions: StateFlow<List<TransactionDetails>>
 
     init {
-        tripDetails = tripRepository.getTripWithStatsById(tripId)
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = null
-            )
+        tripDetails =
+            tripRepository.getTripWithStatsById(tripId)
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5000),
+                    initialValue = null,
+                )
 
-        transactions = transactionRepository.getTransactionsByTagId(tagId)
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
+        transactions =
+            transactionRepository.getTransactionsByTagId(tagId)
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5000),
+                    initialValue = emptyList(),
+                )
     }
 }

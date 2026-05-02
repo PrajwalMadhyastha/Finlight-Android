@@ -6,5 +6,5 @@ package io.pm.finlight
 data class DailyTrend(
     val date: String, // Format: "YYYY-MM-DD"
     val totalIncome: Double,
-    val totalExpenses: Double
+    val totalExpenses: Double,
 )

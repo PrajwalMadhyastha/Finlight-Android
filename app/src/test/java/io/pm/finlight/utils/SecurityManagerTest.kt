@@ -23,7 +23,6 @@ import javax.crypto.SecretKey
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.P], application = TestApplication::class)
 class SecurityManagerTest : BaseViewModelTest() {
-
     private lateinit var context: Application
     private lateinit var securityManager: SecurityManager
     private lateinit var testKeyStore: KeyStore
@@ -41,32 +40,34 @@ class SecurityManagerTest : BaseViewModelTest() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
 
-        testKeyStore = KeyStore.getInstance("BKS", "BC").apply {
-            load(null, "test_password".toCharArray())
-        }
-
-        securityManager = object : SecurityManager(context) {
-            override val keyStoreProvider: String = "BC"
-
-            override val protectionParameter: KeyStore.ProtectionParameter =
-                KeyStore.PasswordProtection("test_password".toCharArray())
-
-            override fun getKeyStore(): KeyStore {
-                return testKeyStore
+        testKeyStore =
+            KeyStore.getInstance("BKS", "BC").apply {
+                load(null, "test_password".toCharArray())
             }
 
-            override fun generateSecretKey(): SecretKey {
-                val keyGenerator = KeyGenerator.getInstance("AES", "BC")
-                keyGenerator.init(256)
-                val secretKey = keyGenerator.generateKey()
-                testKeyStore.setEntry(
-                    KEY_ALIAS,
-                    KeyStore.SecretKeyEntry(secretKey),
-                    protectionParameter
-                )
-                return secretKey
+        securityManager =
+            object : SecurityManager(context) {
+                override val keyStoreProvider: String = "BC"
+
+                override val protectionParameter: KeyStore.ProtectionParameter =
+                    KeyStore.PasswordProtection("test_password".toCharArray())
+
+                override fun getKeyStore(): KeyStore {
+                    return testKeyStore
+                }
+
+                override fun generateSecretKey(): SecretKey {
+                    val keyGenerator = KeyGenerator.getInstance("AES", "BC")
+                    keyGenerator.init(256)
+                    val secretKey = keyGenerator.generateKey()
+                    testKeyStore.setEntry(
+                        KEY_ALIAS,
+                        KeyStore.SecretKeyEntry(secretKey),
+                        protectionParameter,
+                    )
+                    return secretKey
+                }
             }
-        }
     }
 
     @Test
@@ -95,26 +96,26 @@ class SecurityManagerTest : BaseViewModelTest() {
         val passphrase1 = securityManager.getPassphrase()
 
         // Act
-        val newSecurityManager = object : SecurityManager(context) {
-            override val keyStoreProvider: String = "BC"
+        val newSecurityManager =
+            object : SecurityManager(context) {
+                override val keyStoreProvider: String = "BC"
 
-            override fun getKeyStore(): KeyStore {
-                return testKeyStore
+                override fun getKeyStore(): KeyStore {
+                    return testKeyStore
+                }
+
+                override val protectionParameter: KeyStore.ProtectionParameter =
+                    KeyStore.PasswordProtection("test_password".toCharArray())
+
+                override fun generateSecretKey(): SecretKey {
+                    // This override is only needed if a key doesn't exist yet.
+                    // In this test, it will already exist from the first call.
+                    // We provide it for completeness.
+                    val keyGenerator = KeyGenerator.getInstance("AES", "BC")
+                    keyGenerator.init(256)
+                    return keyGenerator.generateKey()
+                }
             }
-
-            override val protectionParameter: KeyStore.ProtectionParameter =
-                KeyStore.PasswordProtection("test_password".toCharArray())
-
-
-            override fun generateSecretKey(): SecretKey {
-                // This override is only needed if a key doesn't exist yet.
-                // In this test, it will already exist from the first call.
-                // We provide it for completeness.
-                val keyGenerator = KeyGenerator.getInstance("AES", "BC")
-                keyGenerator.init(256)
-                return keyGenerator.generateKey()
-            }
-        }
         val passphrase2 = newSecurityManager.getPassphrase()
 
         // Assert

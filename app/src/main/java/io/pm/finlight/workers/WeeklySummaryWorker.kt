@@ -32,35 +32,39 @@ class WeeklySummaryWorker(
                 val transactionDao = AppDatabase.getInstance(context).transactionDao()
 
                 // Date range for LAST 7 DAYS
-                val thisWeekEnd = Calendar.getInstance().apply {
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59)
-                    set(Calendar.MILLISECOND, 999)
-                }.timeInMillis
-                val thisWeekStart = Calendar.getInstance().apply {
-                    add(Calendar.DAY_OF_YEAR, -7)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
+                val thisWeekEnd =
+                    Calendar.getInstance().apply {
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59)
+                        set(Calendar.MILLISECOND, 999)
+                    }.timeInMillis
+                val thisWeekStart =
+                    Calendar.getInstance().apply {
+                        add(Calendar.DAY_OF_YEAR, -7)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }.timeInMillis
 
                 // Date range for PREVIOUS 7 DAYS (8-14 days ago)
-                val lastWeekEnd = Calendar.getInstance().apply {
-                    add(Calendar.DAY_OF_YEAR, -8)
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59)
-                    set(Calendar.MILLISECOND, 999)
-                }.timeInMillis
-                val lastWeekStart = Calendar.getInstance().apply {
-                    add(Calendar.DAY_OF_YEAR, -14)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
+                val lastWeekEnd =
+                    Calendar.getInstance().apply {
+                        add(Calendar.DAY_OF_YEAR, -8)
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59)
+                        set(Calendar.MILLISECOND, 999)
+                    }.timeInMillis
+                val lastWeekStart =
+                    Calendar.getInstance().apply {
+                        add(Calendar.DAY_OF_YEAR, -14)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }.timeInMillis
 
                 val thisWeekSummary = transactionDao.getFinancialSummaryForRange(thisWeekStart, thisWeekEnd)
                 val thisWeekExpenses = thisWeekSummary?.totalExpenses ?: 0.0
@@ -70,9 +74,12 @@ class WeeklySummaryWorker(
 
                 val topCategories = transactionDao.getTopSpendingCategoriesForRange(thisWeekStart, thisWeekEnd)
 
-                val percentageChange = if (lastWeekExpenses > 0) {
-                    ((thisWeekExpenses - lastWeekExpenses) / lastWeekExpenses * 100).roundToInt()
-                } else null
+                val percentageChange =
+                    if (lastWeekExpenses > 0) {
+                        ((thisWeekExpenses - lastWeekExpenses) / lastWeekExpenses * 100).roundToInt()
+                    } else {
+                        null
+                    }
 
                 NotificationHelper.showWeeklySummaryNotification(context, thisWeekExpenses, percentageChange, topCategories)
 

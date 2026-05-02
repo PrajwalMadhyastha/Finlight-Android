@@ -13,5 +13,5 @@ data class SplitTransactionDetails(
     val splitTransaction: SplitTransaction,
     val categoryName: String?,
     val categoryIconKey: String?,
-    val categoryColorKey: String?
+    val categoryColorKey: String?,
 )

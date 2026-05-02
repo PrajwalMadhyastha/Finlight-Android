@@ -33,11 +33,11 @@ import androidx.work.ListenableWorker
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
+import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
-import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -53,7 +53,6 @@ import kotlin.test.assertTrue
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class DailyReportWorkerTest : BaseViewModelTest() {
-
     private lateinit var context: Context
 
     // --- FIX: Remove @Mock annotations ---
@@ -76,10 +75,11 @@ class DailyReportWorkerTest : BaseViewModelTest() {
         every { db.transactionDao() } returns transactionDao
 
         // Initialize WorkManager for testing. This is required for TestListenableWorkerBuilder.
-        val config = Configuration.Builder()
-            .setMinimumLoggingLevel(Log.DEBUG)
-            .setExecutor(SynchronousExecutor())
-            .build()
+        val config =
+            Configuration.Builder()
+                .setMinimumLoggingLevel(Log.DEBUG)
+                .setExecutor(SynchronousExecutor())
+                .build()
         WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
 
         // Mock static helpers
@@ -99,157 +99,167 @@ class DailyReportWorkerTest : BaseViewModelTest() {
     // --- REMOVED: racy getExpectedTimeRanges() function ---
 
     @Test
-    fun `doWork with higher spending generates 'higher than usual' title and uses correct rolling 24h time-bounds`() = runTest {
-        // Arrange
-        // --- USE GENERIC MATCHERS ---
-        coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 200.0)
-        coEvery { transactionDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
-        coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+    fun `doWork with higher spending generates 'higher than usual' title and uses correct rolling 24h time-bounds`() =
+        runTest {
+            // Arrange
+            // --- USE GENERIC MATCHERS ---
+            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 200.0)
+            coEvery { transactionDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
+            coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
-        val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
-        val titleCaptor = slot<String>()
+            val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
+            val titleCaptor = slot<String>()
 
-        // --- SLOTS FOR VERIFICATION ---
-        val reportStartSlot = slot<Long>()
-        val reportEndSlot = slot<Long>()
-        val avgStartSlot = slot<Long>()
-        val avgEndSlot = slot<Long>()
+            // --- SLOTS FOR VERIFICATION ---
+            val reportStartSlot = slot<Long>()
+            val reportEndSlot = slot<Long>()
+            val avgStartSlot = slot<Long>()
+            val avgEndSlot = slot<Long>()
 
-        // --- CAPTURE "NOW" IN THE TEST ---
-        val testNow = Calendar.getInstance()
+            // --- CAPTURE "NOW" IN THE TEST ---
+            val testNow = Calendar.getInstance()
 
-        // Act
-        val result = worker.doWork()
+            // Act
+            val result = worker.doWork()
 
-        // Assert
-        assertEquals(ListenableWorker.Result.success(), result)
+            // Assert
+            assertEquals(ListenableWorker.Result.success(), result)
 
-        // --- VERIFY DAO CALLS WITH CAPTORS ---
-        coVerify {
-            transactionDao.getFinancialSummaryForRange(capture(reportStartSlot), capture(reportEndSlot))
-            transactionDao.getAverageDailySpendingForRange(capture(avgStartSlot), capture(avgEndSlot))
-            transactionDao.getTopSpendingCategoriesForRange(capture(reportStartSlot), capture(reportEndSlot))
-        }
+            // --- VERIFY DAO CALLS WITH CAPTORS ---
+            coVerify {
+                transactionDao.getFinancialSummaryForRange(capture(reportStartSlot), capture(reportEndSlot))
+                transactionDao.getAverageDailySpendingForRange(capture(avgStartSlot), capture(avgEndSlot))
+                transactionDao.getTopSpendingCategoriesForRange(capture(reportStartSlot), capture(reportEndSlot))
+            }
 
-        // --- VERIFY TIME BOUNDS ---
-        // 1. Report Window (Rolling 24h)
-        val expectedReportEnd = testNow.timeInMillis
-        val expectedReportStart = (testNow.clone() as Calendar).apply { add(Calendar.HOUR_OF_DAY, -24) }.timeInMillis
+            // --- VERIFY TIME BOUNDS ---
+            // 1. Report Window (Rolling 24h)
+            val expectedReportEnd = testNow.timeInMillis
+            val expectedReportStart = (testNow.clone() as Calendar).apply { add(Calendar.HOUR_OF_DAY, -24) }.timeInMillis
 
-        // Allow a small delta (e.g., 100ms) for execution time difference between test and SUT
-        val timeDelta = 100L
-        // --- FIX: Correct argument order for assertTrue ---
-        assertTrue(
-            kotlin.math.abs(expectedReportEnd - reportEndSlot.captured) < timeDelta,
-            "Report end time (${reportEndSlot.captured}) should be close to expected ($expectedReportEnd)"
-        )
-        assertTrue(
-            kotlin.math.abs(expectedReportStart - reportStartSlot.captured) < timeDelta,
-            "Report start time (${reportStartSlot.captured}) should be close to expected ($expectedReportStart)"
-        )
-
-        // 2. Average Window (7 days prior, full days)
-        val expectedAvgStart = (testNow.clone() as Calendar).apply {
-            add(Calendar.DAY_OF_YEAR, -8)
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-        val expectedAvgEnd = (testNow.clone() as Calendar).apply {
-            add(Calendar.DAY_OF_YEAR, -2)
-            set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59); set(Calendar.MILLISECOND, 999)
-        }.timeInMillis
-
-        // These should be exact, as their calculation is deterministic relative to 'now'
-        // --- FIX: Correct argument order for assertTrue ---
-        assertTrue(
-            kotlin.math.abs(expectedAvgStart - avgStartSlot.captured) < timeDelta,
-            "Average start time (${avgStartSlot.captured}) should be close to expected ($expectedAvgStart)"
-        )
-        assertTrue(
-            kotlin.math.abs(expectedAvgEnd - avgEndSlot.captured) < timeDelta,
-            "Average end time (${avgEndSlot.captured}) should be close to expected ($expectedAvgEnd)"
-        )
-
-
-        // Verify the notification logic is correct
-        verify {
-            NotificationHelper.showDailyReportNotification(
-                context = any(),
-                title = capture(titleCaptor),
-                totalExpenses = any(),
-                topCategories = any(),
-                dateMillis = any()
+            // Allow a small delta (e.g., 100ms) for execution time difference between test and SUT
+            val timeDelta = 100L
+            // --- FIX: Correct argument order for assertTrue ---
+            assertTrue(
+                kotlin.math.abs(expectedReportEnd - reportEndSlot.captured) < timeDelta,
+                "Report end time (${reportEndSlot.captured}) should be close to expected ($expectedReportEnd)",
             )
+            assertTrue(
+                kotlin.math.abs(expectedReportStart - reportStartSlot.captured) < timeDelta,
+                "Report start time (${reportStartSlot.captured}) should be close to expected ($expectedReportStart)",
+            )
+
+            // 2. Average Window (7 days prior, full days)
+            val expectedAvgStart =
+                (testNow.clone() as Calendar).apply {
+                    add(Calendar.DAY_OF_YEAR, -8)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+            val expectedAvgEnd =
+                (testNow.clone() as Calendar).apply {
+                    add(Calendar.DAY_OF_YEAR, -2)
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }.timeInMillis
+
+            // These should be exact, as their calculation is deterministic relative to 'now'
+            // --- FIX: Correct argument order for assertTrue ---
+            assertTrue(
+                kotlin.math.abs(expectedAvgStart - avgStartSlot.captured) < timeDelta,
+                "Average start time (${avgStartSlot.captured}) should be close to expected ($expectedAvgStart)",
+            )
+            assertTrue(
+                kotlin.math.abs(expectedAvgEnd - avgEndSlot.captured) < timeDelta,
+                "Average end time (${avgEndSlot.captured}) should be close to expected ($expectedAvgEnd)",
+            )
+
+            // Verify the notification logic is correct
+            verify {
+                NotificationHelper.showDailyReportNotification(
+                    context = any(),
+                    title = capture(titleCaptor),
+                    totalExpenses = any(),
+                    topCategories = any(),
+                    dateMillis = any(),
+                )
+            }
+            assertEquals("Heads up: Spending was higher than usual yesterday.", titleCaptor.captured)
+            coVerify { ReminderManager.scheduleDailyReport(context) }
         }
-        assertEquals("Heads up: Spending was higher than usual yesterday.", titleCaptor.captured)
-        coVerify { ReminderManager.scheduleDailyReport(context) }
-    }
 
     @Test
-    fun `doWork with lower spending generates 'well below average' title`() = runTest {
-        // Arrange
-        coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 10.0)
-        coEvery { transactionDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
-        coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+    fun `doWork with lower spending generates 'well below average' title`() =
+        runTest {
+            // Arrange
+            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 10.0)
+            coEvery { transactionDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
+            coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
-        val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
-        val titleCaptor = slot<String>()
+            val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
+            val titleCaptor = slot<String>()
 
-        // Act
-        val result = worker.doWork()
+            // Act
+            val result = worker.doWork()
 
-        // Assert
-        assertEquals(ListenableWorker.Result.success(), result)
-        verify {
-            NotificationHelper.showDailyReportNotification(
-                context = any(),
-                title = capture(titleCaptor),
-                totalExpenses = any(),
-                topCategories = any(),
-                dateMillis = any()
-            )
+            // Assert
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify {
+                NotificationHelper.showDailyReportNotification(
+                    context = any(),
+                    title = capture(titleCaptor),
+                    totalExpenses = any(),
+                    topCategories = any(),
+                    dateMillis = any(),
+                )
+            }
+            assertEquals("Great job! Spending was well below average yesterday.", titleCaptor.captured)
         }
-        assertEquals("Great job! Spending was well below average yesterday.", titleCaptor.captured)
-    }
 
     @Test
-    fun `doWork with no spending generates 'no spending' title`() = runTest {
-        // Arrange
-        coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
-        coEvery { transactionDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
-        coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+    fun `doWork with no spending generates 'no spending' title`() =
+        runTest {
+            // Arrange
+            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
+            coEvery { transactionDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
+            coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
-        val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
-        val titleCaptor = slot<String>()
+            val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
+            val titleCaptor = slot<String>()
 
-        // Act
-        val result = worker.doWork()
+            // Act
+            val result = worker.doWork()
 
-        // Assert
-        assertEquals(ListenableWorker.Result.success(), result)
-        verify {
-            NotificationHelper.showDailyReportNotification(
-                context = any(),
-                title = capture(titleCaptor),
-                totalExpenses = any(),
-                topCategories = any(),
-                dateMillis = any()
-            )
+            // Assert
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify {
+                NotificationHelper.showDailyReportNotification(
+                    context = any(),
+                    title = capture(titleCaptor),
+                    totalExpenses = any(),
+                    topCategories = any(),
+                    dateMillis = any(),
+                )
+            }
+            assertEquals("No spending recorded yesterday. Keep it up!", titleCaptor.captured)
         }
-        assertEquals("No spending recorded yesterday. Keep it up!", titleCaptor.captured)
-    }
 
     @Test
-    fun `doWork returns retry on failure`() = runTest {
-        // Arrange
-        coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
-        val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
+    fun `doWork returns retry on failure`() =
+        runTest {
+            // Arrange
+            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
+            val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
 
-        // Act
-        val result = worker.doWork()
+            // Act
+            val result = worker.doWork()
 
-        // Assert
-        assertEquals(ListenableWorker.Result.retry(), result)
-        coVerify(exactly = 0) { ReminderManager.scheduleDailyReport(any()) }
-    }
+            // Assert
+            assertEquals(ListenableWorker.Result.retry(), result)
+            coVerify(exactly = 0) { ReminderManager.scheduleDailyReport(any()) }
+        }
 }
-

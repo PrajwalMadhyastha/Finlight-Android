@@ -19,7 +19,7 @@ data class SplitItem(
     val id: Int, // Can be a temporary ID for new items, or the real ID for existing ones
     val amount: String,
     val category: Category?,
-    val notes: String?
+    val notes: String?,
 )
 
 data class SplitTransactionUiState(
@@ -27,16 +27,15 @@ data class SplitTransactionUiState(
     val splitItems: List<SplitItem> = emptyList(),
     val remainingAmount: Double = 0.0,
     val isSaving: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
 )
 
 class SplitTransactionViewModel(
     private val transactionRepository: TransactionRepository,
     val categoryRepository: CategoryRepository,
     private val splitTransactionRepository: SplitTransactionRepository,
-    private val transactionId: Int
+    private val transactionId: Int,
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(SplitTransactionUiState())
     val uiState = _uiState.asStateFlow()
 
@@ -49,21 +48,23 @@ class SplitTransactionViewModel(
                 if (parentTxn.isSplit) {
                     val existingSplits = splitTransactionRepository.getSplitsForParent(transactionId).firstOrNull()
                     if (!existingSplits.isNullOrEmpty()) {
-                        val splitItems = existingSplits.map { details ->
-                            // --- UPDATED: Use originalAmount if available, otherwise fallback to home currency amount ---
-                            val displayAmount = details.splitTransaction.originalAmount ?: details.splitTransaction.amount
-                            SplitItem(
-                                id = details.splitTransaction.id,
-                                amount = displayAmount.toString(),
-                                category = categoryRepository.getCategoryById(details.splitTransaction.categoryId ?: -1),
-                                notes = details.splitTransaction.notes
+                        val splitItems =
+                            existingSplits.map { details ->
+                                // --- UPDATED: Use originalAmount if available, otherwise fallback to home currency amount ---
+                                val displayAmount = details.splitTransaction.originalAmount ?: details.splitTransaction.amount
+                                SplitItem(
+                                    id = details.splitTransaction.id,
+                                    amount = displayAmount.toString(),
+                                    category = categoryRepository.getCategoryById(details.splitTransaction.categoryId ?: -1),
+                                    notes = details.splitTransaction.notes,
+                                )
+                            }
+                        _uiState.value =
+                            SplitTransactionUiState(
+                                parentTransaction = parentTxn,
+                                splitItems = splitItems,
+                                remainingAmount = 0.0,
                             )
-                        }
-                        _uiState.value = SplitTransactionUiState(
-                            parentTransaction = parentTxn,
-                            splitItems = splitItems,
-                            remainingAmount = 0.0
-                        )
                     } else {
                         initializeForCreation(parentTxn)
                     }
@@ -79,17 +80,19 @@ class SplitTransactionViewModel(
     private fun initializeForCreation(parentTxn: Transaction) {
         // --- UPDATED: Use originalAmount for splitting if it exists ---
         val amountToSplit = parentTxn.originalAmount ?: parentTxn.amount
-        val initialSplit = SplitItem(
-            id = nextTempId--,
-            amount = amountToSplit.toString(),
-            category = null,
-            notes = parentTxn.notes
-        )
-        _uiState.value = SplitTransactionUiState(
-            parentTransaction = parentTxn,
-            splitItems = listOf(initialSplit),
-            remainingAmount = 0.0
-        )
+        val initialSplit =
+            SplitItem(
+                id = nextTempId--,
+                amount = amountToSplit.toString(),
+                category = null,
+                notes = parentTxn.notes,
+            )
+        _uiState.value =
+            SplitTransactionUiState(
+                parentTransaction = parentTxn,
+                splitItems = listOf(initialSplit),
+                remainingAmount = 0.0,
+            )
     }
 
     fun addSplitItem() {
@@ -107,21 +110,29 @@ class SplitTransactionViewModel(
         recalculateRemainingAmount()
     }
 
-    fun updateSplitAmount(itemToUpdate: SplitItem, newAmount: String) {
+    fun updateSplitAmount(
+        itemToUpdate: SplitItem,
+        newAmount: String,
+    ) {
         _uiState.update { currentState ->
-            val updatedList = currentState.splitItems.map {
-                if (it.id == itemToUpdate.id) it.copy(amount = newAmount) else it
-            }
+            val updatedList =
+                currentState.splitItems.map {
+                    if (it.id == itemToUpdate.id) it.copy(amount = newAmount) else it
+                }
             currentState.copy(splitItems = updatedList)
         }
         recalculateRemainingAmount()
     }
 
-    fun updateSplitCategory(itemToUpdate: SplitItem, newCategory: Category?) {
+    fun updateSplitCategory(
+        itemToUpdate: SplitItem,
+        newCategory: Category?,
+    ) {
         _uiState.update { currentState ->
-            val updatedList = currentState.splitItems.map {
-                if (it.id == itemToUpdate.id) it.copy(category = newCategory) else it
-            }
+            val updatedList =
+                currentState.splitItems.map {
+                    if (it.id == itemToUpdate.id) it.copy(category = newCategory) else it
+                }
             currentState.copy(splitItems = updatedList)
         }
     }

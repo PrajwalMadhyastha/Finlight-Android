@@ -20,10 +20,10 @@ import kotlinx.serialization.Serializable
             entity = Account::class,
             parentColumns = ["id"],
             childColumns = ["accountId"],
-            onDelete = ForeignKey.CASCADE
-        )
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
-    indices = [Index(value = ["accountId"])]
+    indices = [Index(value = ["accountId"])],
 )
 data class Goal(
     @PrimaryKey(autoGenerate = true)
@@ -32,5 +32,5 @@ data class Goal(
     val targetAmount: Double,
     var savedAmount: Double,
     val targetDate: Long?,
-    val accountId: Int
+    val accountId: Int,
 )

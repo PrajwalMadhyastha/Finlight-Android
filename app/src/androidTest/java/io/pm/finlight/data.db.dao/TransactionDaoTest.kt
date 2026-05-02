@@ -4,8 +4,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.Account
 import io.pm.finlight.Category
 import io.pm.finlight.CategoryDao
-import io.pm.finlight.CategorySpending
-import io.pm.finlight.FinancialSummary
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDao
 import kotlinx.coroutines.flow.first
@@ -18,7 +16,6 @@ import java.util.Calendar
 
 @RunWith(AndroidJUnit4::class)
 class TransactionDaoTest : BaseDaoTest() {
-
     private lateinit var transactionDao: TransactionDao
     private lateinit var accountDao: AccountDao
     private lateinit var categoryDao: CategoryDao
@@ -39,14 +36,15 @@ class TransactionDaoTest : BaseDaoTest() {
     @Test
     fun insertAndReadTransaction() {
         runBlocking {
-            val transaction = Transaction(
-                description = "Coffee",
-                amount = 50.0,
-                date = System.currentTimeMillis(),
-                accountId = 1,
-                categoryId = 1,
-                notes = "Yummy"
-            )
+            val transaction =
+                Transaction(
+                    description = "Coffee",
+                    amount = 50.0,
+                    date = System.currentTimeMillis(),
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = "Yummy",
+                )
             val id = transactionDao.insert(transaction)
 
             // Read back using Flow
@@ -61,14 +59,17 @@ class TransactionDaoTest : BaseDaoTest() {
     @Test
     fun updateTransaction() {
         runBlocking {
-            val id = transactionDao.insert(Transaction(
-                description = "Old Desc",
-                amount = 100.0,
-                date = System.currentTimeMillis(),
-                accountId = 1,
-                categoryId = 1,
-                notes = null
-            )).toInt()
+            val id =
+                transactionDao.insert(
+                    Transaction(
+                        description = "Old Desc",
+                        amount = 100.0,
+                        date = System.currentTimeMillis(),
+                        accountId = 1,
+                        categoryId = 1,
+                        notes = null,
+                    ),
+                ).toInt()
 
             val original = transactionDao.getTransactionById(id).first()!!
             val updated = original.copy(description = "New Desc", amount = 150.0)
@@ -84,14 +85,17 @@ class TransactionDaoTest : BaseDaoTest() {
     @Test
     fun deleteTransaction() {
         runBlocking {
-            val id = transactionDao.insert(Transaction(
-                description = "To Delete",
-                amount = 100.0,
-                date = System.currentTimeMillis(),
-                accountId = 1,
-                categoryId = 1,
-                notes = null
-            )).toInt()
+            val id =
+                transactionDao.insert(
+                    Transaction(
+                        description = "To Delete",
+                        amount = 100.0,
+                        date = System.currentTimeMillis(),
+                        accountId = 1,
+                        categoryId = 1,
+                        notes = null,
+                    ),
+                ).toInt()
 
             val txn = transactionDao.getTransactionById(id).first()!!
             transactionDao.delete(txn)
@@ -107,29 +111,57 @@ class TransactionDaoTest : BaseDaoTest() {
             val today = System.currentTimeMillis()
 
             // Expense 1: -100
-            transactionDao.insert(Transaction(
-                description = "Lunch", amount = 100.0, transactionType = "expense",
-                date = today, accountId = 1, categoryId = 1, notes = null
-            ))
+            transactionDao.insert(
+                Transaction(
+                    description = "Lunch",
+                    amount = 100.0,
+                    transactionType = "expense",
+                    date = today,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                ),
+            )
 
             // Expense 2: -50
-            transactionDao.insert(Transaction(
-                description = "Bus", amount = 50.0, transactionType = "expense",
-                date = today, accountId = 1, categoryId = 2, notes = null
-            ))
+            transactionDao.insert(
+                Transaction(
+                    description = "Bus",
+                    amount = 50.0,
+                    transactionType = "expense",
+                    date = today,
+                    accountId = 1,
+                    categoryId = 2,
+                    notes = null,
+                ),
+            )
 
             // Income: +500
-            transactionDao.insert(Transaction(
-                description = "Refund", amount = 500.0, transactionType = "income",
-                date = today, accountId = 1, categoryId = null, notes = null
-            ))
+            transactionDao.insert(
+                Transaction(
+                    description = "Refund",
+                    amount = 500.0,
+                    transactionType = "income",
+                    date = today,
+                    accountId = 1,
+                    categoryId = null,
+                    notes = null,
+                ),
+            )
 
             // Expense 3 (Outside range): -1000
             val lastMonth = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }.timeInMillis
-            transactionDao.insert(Transaction(
-                description = "Old", amount = 1000.0, transactionType = "expense",
-                date = lastMonth, accountId = 1, categoryId = 1, notes = null
-            ))
+            transactionDao.insert(
+                Transaction(
+                    description = "Old",
+                    amount = 1000.0,
+                    transactionType = "expense",
+                    date = lastMonth,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                ),
+            )
 
             // Act: Query for today
             val start = today - 1000
@@ -149,9 +181,39 @@ class TransactionDaoTest : BaseDaoTest() {
             val today = System.currentTimeMillis()
 
             // 2 Food transactions, 1 Transport
-            transactionDao.insert(Transaction(description = "Food 1", amount = 10.0, transactionType = "expense", date = today, accountId = 1, categoryId = 1, notes = null))
-            transactionDao.insert(Transaction(description = "Food 2", amount = 20.0, transactionType = "expense", date = today, accountId = 1, categoryId = 1, notes = null))
-            transactionDao.insert(Transaction(description = "Taxi", amount = 50.0, transactionType = "expense", date = today, accountId = 1, categoryId = 2, notes = null))
+            transactionDao.insert(
+                Transaction(
+                    description = "Food 1",
+                    amount = 10.0,
+                    transactionType = "expense",
+                    date = today,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                ),
+            )
+            transactionDao.insert(
+                Transaction(
+                    description = "Food 2",
+                    amount = 20.0,
+                    transactionType = "expense",
+                    date = today,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                ),
+            )
+            transactionDao.insert(
+                Transaction(
+                    description = "Taxi",
+                    amount = 50.0,
+                    transactionType = "expense",
+                    date = today,
+                    accountId = 1,
+                    categoryId = 2,
+                    notes = null,
+                ),
+            )
 
             // Act
             val start = today - 1000

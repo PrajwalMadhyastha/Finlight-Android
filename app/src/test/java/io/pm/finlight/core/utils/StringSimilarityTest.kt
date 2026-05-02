@@ -4,7 +4,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class StringSimilarityTest {
-
     @Test
     fun `test exact match`() {
         val score = StringSimilarity.calculateTokenOverlapScore("amazon", "amazon")
@@ -35,7 +34,7 @@ class StringSimilarityTest {
         // Tokens legacy: [hdfc, bank, card]
         // Tokens ner: [hdfc, credit, card]
         // Intersection: [hdfc, card] (2). minSize: 3
-        assertEquals(2.0/3.0, score, 0.001)
+        assertEquals(2.0 / 3.0, score, 0.001)
     }
 
     @Test

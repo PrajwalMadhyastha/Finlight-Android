@@ -23,11 +23,11 @@ import kotlinx.serialization.Serializable
             entity = Tag::class,
             parentColumns = ["id"],
             childColumns = ["tagId"],
-            onDelete = ForeignKey.CASCADE
-        )
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
     // --- FIX: Mark the index as unique to match the DB schema ---
-    indices = [Index(value = ["tagId"], unique = true)]
+    indices = [Index(value = ["tagId"], unique = true)],
 )
 data class Trip(
     @PrimaryKey(autoGenerate = true)
@@ -40,5 +40,5 @@ data class Trip(
     @ColumnInfo(defaultValue = "DOMESTIC")
     val tripType: TripType,
     val currencyCode: String?,
-    val conversionRate: Float?
+    val conversionRate: Float?,
 )

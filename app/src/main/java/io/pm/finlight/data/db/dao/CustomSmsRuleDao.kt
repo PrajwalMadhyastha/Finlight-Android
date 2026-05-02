@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface CustomSmsRuleDao {
-
     /**
      * Inserts a new custom SMS rule into the database. If a rule with the same primary key
      * already exists, it will be replaced.

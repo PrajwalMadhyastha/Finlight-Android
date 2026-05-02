@@ -46,5 +46,5 @@ data class RecurringTransaction(
     val accountId: Int,
     val categoryId: Int?,
     // --- NEW: Track the last execution date of this rule ---
-    val lastRunDate: Long? = null
+    val lastRunDate: Long? = null,
 )

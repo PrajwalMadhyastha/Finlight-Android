@@ -1,6 +1,6 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/FinlightBackupAgent.kt
-//=================================================================
+// =================================================================
 package io.pm.finlight
 
 import android.app.backup.BackupAgentHelper
@@ -13,7 +13,6 @@ import android.util.Log
 import io.pm.finlight.utils.NotificationHelper
 
 class FinlightBackupAgent : BackupAgentHelper() {
-
     companion object {
         // A unique tag for Logcat filtering
         private const val TAG = "FinlightBackup"
@@ -44,7 +43,11 @@ class FinlightBackupAgent : BackupAgentHelper() {
         }
     }
 
-    override fun onBackup(oldState: ParcelFileDescriptor?, data: BackupDataOutput?, newState: ParcelFileDescriptor?) {
+    override fun onBackup(
+        oldState: ParcelFileDescriptor?,
+        data: BackupDataOutput?,
+        newState: ParcelFileDescriptor?,
+    ) {
         Log.d(TAG, "onBackup: Starting backup process...")
         val settingsRepository = SettingsRepository(applicationContext)
 
@@ -72,10 +75,13 @@ class FinlightBackupAgent : BackupAgentHelper() {
         Log.d(TAG, "onBackup: Backup process finished.")
     }
 
-    override fun onRestore(data: BackupDataInput?, appVersionCode: Int, newState: ParcelFileDescriptor?) {
+    override fun onRestore(
+        data: BackupDataInput?,
+        appVersionCode: Int,
+        newState: ParcelFileDescriptor?,
+    ) {
         Log.d(TAG, "onRestore: Starting restore process...")
         super.onRestore(data, appVersionCode, newState)
         Log.d(TAG, "onRestore: Restore process finished.")
     }
 }
-

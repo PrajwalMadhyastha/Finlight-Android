@@ -84,7 +84,7 @@ fun ChartLegend(pieData: PieData?) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "${entry.label} - ₹${"%.2f".format(entry.value)}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -94,7 +94,7 @@ fun ChartLegend(pieData: PieData?) {
 @Composable
 fun GroupedBarChart(
     chartData: Pair<BarData, List<String>>,
-    onBarClick: ((Entry) -> Unit)? = null
+    onBarClick: ((Entry) -> Unit)? = null,
 ) {
     val (barData, labels) = chartData
     val textColor = MaterialTheme.colorScheme.onSurface.toArgb()
@@ -127,20 +127,21 @@ fun GroupedBarChart(
                     textSize = 11f
                     setDrawAxisLine(false)
                     // Use custom formatter for Y-axis labels
-                    valueFormatter = object : com.github.mikephil.charting.formatter.ValueFormatter() {
-                        override fun getFormattedValue(value: Float): String {
-                            return when {
-                                value >= 10000000 -> String.format("%.1fCr", value / 10000000)
-                                value >= 100000 -> String.format("%.1fL", value / 100000)
-                                value >= 1000 -> String.format("%.1fK", value / 1000)
-                                else -> value.toInt().toString()
+                    valueFormatter =
+                        object : com.github.mikephil.charting.formatter.ValueFormatter() {
+                            override fun getFormattedValue(value: Float): String {
+                                return when {
+                                    value >= 10000000 -> String.format("%.1fCr", value / 10000000)
+                                    value >= 100000 -> String.format("%.1fL", value / 100000)
+                                    value >= 1000 -> String.format("%.1fK", value / 1000)
+                                    else -> value.toInt().toString()
+                                }
                             }
                         }
-                    }
                 }
 
                 axisRight.isEnabled = false
-                
+
                 // Enable dragging/scrolling
                 isDragEnabled = true
                 setScaleEnabled(false)
@@ -148,12 +149,18 @@ fun GroupedBarChart(
 
                 // Add click listener
                 if (onBarClick != null) {
-                    setOnChartValueSelectedListener(object : OnChartValueSelectedListener {
-                        override fun onValueSelected(e: Entry?, h: Highlight?) {
-                            e?.let { onBarClick(it) }
-                        }
-                        override fun onNothingSelected() {}
-                    })
+                    setOnChartValueSelectedListener(
+                        object : OnChartValueSelectedListener {
+                            override fun onValueSelected(
+                                e: Entry?,
+                                h: Highlight?,
+                            ) {
+                                e?.let { onBarClick(it) }
+                            }
+
+                            override fun onNothingSelected() {}
+                        },
+                    )
                 }
             }
         },
@@ -179,15 +186,16 @@ fun GroupedBarChart(
             chart.axisLeft.textColor = textColor
 
             chart.groupBars(0f, groupSpace, barSpace)
-            
+
             // Limit visible range to 5 groups and scroll to end
             chart.setVisibleXRangeMaximum(5f)
             chart.moveViewToX(labels.size.toFloat())
-            
+
             chart.invalidate()
         },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(300.dp) // Increased from 250dp for better spacing
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(300.dp), // Increased from 250dp for better spacing
     )
 }

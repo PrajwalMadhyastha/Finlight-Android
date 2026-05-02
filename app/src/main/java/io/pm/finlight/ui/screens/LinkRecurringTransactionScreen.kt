@@ -48,11 +48,12 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun LinkRecurringTransactionScreen(
     navController: NavController,
-    potentialTransactionJson: String
+    potentialTransactionJson: String,
 ) {
-    val potentialTxn = remember(potentialTransactionJson) {
-        Gson().fromJson(URLDecoder.decode(potentialTransactionJson, "UTF-8"), PotentialTransaction::class.java)
-    }
+    val potentialTxn =
+        remember(potentialTransactionJson) {
+            Gson().fromJson(URLDecoder.decode(potentialTransactionJson, "UTF-8"), PotentialTransaction::class.java)
+        }
 
     val application = LocalContext.current.applicationContext as Application
     val factory = LinkTransactionViewModelFactory(application, potentialTxn)
@@ -71,17 +72,18 @@ fun LinkRecurringTransactionScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
-        containerColor = Color.Transparent
+        containerColor = Color.Transparent,
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
                 DuePaymentDetailsCard(viewModel.potentialTransaction)
@@ -90,7 +92,7 @@ fun LinkRecurringTransactionScreen(
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     OutlinedButton(
                         onClick = {
@@ -100,13 +102,13 @@ fun LinkRecurringTransactionScreen(
                             }
                             navController.popBackStack()
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     ) {
                         Text("Remind Tomorrow")
                     }
                     Button(
                         onClick = { navController.navigate("recurring_transactions") },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     ) {
                         Text("Manage Rules")
                     }
@@ -117,7 +119,7 @@ fun LinkRecurringTransactionScreen(
                 Text(
                     "Or, link to a recent transaction:",
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -126,11 +128,11 @@ fun LinkRecurringTransactionScreen(
                     GlassPanel {
                         Box(
                             modifier = Modifier.fillMaxWidth().padding(32.dp),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 "No recent matching transactions found.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -139,7 +141,7 @@ fun LinkRecurringTransactionScreen(
                 items(candidates, key = { it.id }) { transaction ->
                     LinkCandidateItem(
                         transaction = transaction,
-                        onClick = { showConfirmationDialog = transaction }
+                        onClick = { showConfirmationDialog = transaction },
                     )
                 }
             }
@@ -177,7 +179,7 @@ fun LinkRecurringTransactionScreen(
                     Text("Cancel")
                 }
             },
-            containerColor = popupContainerColor
+            containerColor = popupContainerColor,
         )
     }
 }
@@ -185,39 +187,40 @@ fun LinkRecurringTransactionScreen(
 @Composable
 private fun DuePaymentDetailsCard(pt: PotentialTransaction) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
-    val amountColor = if (pt.transactionType == "expense") {
-        MaterialTheme.colorScheme.error
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
+    val amountColor =
+        if (pt.transactionType == "expense") {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.primary
+        }
 
     GlassPanel(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 "Payment Due Today",
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     pt.merchantName ?: "Unknown",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     currencyFormat.format(pt.amount),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = amountColor
+                    color = amountColor,
                 )
             }
         }
@@ -225,7 +228,10 @@ private fun DuePaymentDetailsCard(pt: PotentialTransaction) {
 }
 
 @Composable
-private fun LinkCandidateItem(transaction: Transaction, onClick: () -> Unit) {
+private fun LinkCandidateItem(
+    transaction: Transaction,
+    onClick: () -> Unit,
+) {
     val dateFormatter = remember { SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()) }
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 
@@ -233,26 +239,26 @@ private fun LinkCandidateItem(transaction: Transaction, onClick: () -> Unit) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     transaction.description,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     dateFormatter.format(Date(transaction.date)),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Text(
                 currencyFormat.format(transaction.amount),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }

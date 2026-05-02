@@ -9,14 +9,20 @@ import androidx.room.withTransaction
  * without needing to mock static Room/Coroutines extension functions.
  */
 interface TransactionRunner {
-    suspend fun <R> run(db: RoomDatabase, block: suspend () -> R): R
+    suspend fun <R> run(
+        db: RoomDatabase,
+        block: suspend () -> R,
+    ): R
 }
 
 /**
  * Default implementation that delegates to Room's withTransaction extension function.
  */
 class RoomTransactionRunner : TransactionRunner {
-    override suspend fun <R> run(db: RoomDatabase, block: suspend () -> R): R {
+    override suspend fun <R> run(
+        db: RoomDatabase,
+        block: suspend () -> R,
+    ): R {
         return db.withTransaction(block)
     }
 }

@@ -29,5 +29,5 @@ data class Category(
     val iconKey: String = "category", // Default icon
     // A key to identify the icon's background color
     @ColumnInfo(name = "colorKey")
-    val colorKey: String = "gray" // Default color
+    val colorKey: String = "gray", // Default color
 )

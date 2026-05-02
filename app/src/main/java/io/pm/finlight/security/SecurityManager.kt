@@ -24,7 +24,6 @@ import javax.crypto.spec.GCMParameterSpec
  * making the encryption process transparent to the user.
  */
 open class SecurityManager(private val context: Context) {
-
     companion object {
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         internal const val KEY_ALIAS = "finlight_db_key" // Made internal for test access
@@ -73,18 +72,19 @@ open class SecurityManager(private val context: Context) {
      */
     internal open fun generateSecretKey(): SecretKey {
         val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, keyStoreProvider)
-        val parameterSpec = KeyGenParameterSpec.Builder(
-            KEY_ALIAS,
-            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-        ).apply {
-            setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-            setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-            setKeySize(256)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                setUnlockedDeviceRequired(false)
-                setIsStrongBoxBacked(false)
-            }
-        }.build()
+        val parameterSpec =
+            KeyGenParameterSpec.Builder(
+                KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+            ).apply {
+                setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                setKeySize(256)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    setUnlockedDeviceRequired(false)
+                    setIsStrongBoxBacked(false)
+                }
+            }.build()
         keyGenerator.init(parameterSpec)
         return keyGenerator.generateKey()
     }

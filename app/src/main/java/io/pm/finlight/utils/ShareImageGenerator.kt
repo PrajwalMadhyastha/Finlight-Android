@@ -49,13 +49,12 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 object ShareImageGenerator {
-
     /**
      * A data class to bundle a transaction with its associated tags for rendering.
      */
     data class TransactionSnapshotData(
         val details: TransactionDetails,
-        val tags: List<Tag>
+        val tags: List<Tag>,
     )
 
     /**
@@ -64,34 +63,38 @@ object ShareImageGenerator {
     private fun createBitmapFromComposable(
         context: Context,
         transactionsWithData: List<TransactionSnapshotData>,
-        fields: Set<ShareableField>
+        fields: Set<ShareableField>,
     ): Bitmap {
-        val activity = context as? Activity
-            ?: throw IllegalArgumentException("A valid Activity context is required to generate an image.")
+        val activity =
+            context as? Activity
+                ?: throw IllegalArgumentException("A valid Activity context is required to generate an image.")
 
         val root = activity.window.decorView.findViewById<ViewGroup>(android.R.id.content)
 
-        val composeView = ComposeView(context).apply {
-            setContent {
-                PersonalFinanceAppTheme {
-                    TransactionSnapshotContent(transactionsWithData = transactionsWithData, fields = fields)
+        val composeView =
+            ComposeView(context).apply {
+                setContent {
+                    PersonalFinanceAppTheme {
+                        TransactionSnapshotContent(transactionsWithData = transactionsWithData, fields = fields)
+                    }
                 }
             }
-        }
 
-        val container = LinearLayout(context).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            addView(composeView)
-        }
+        val container =
+            LinearLayout(context).apply {
+                layoutParams =
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    )
+                addView(composeView)
+            }
 
         try {
             root.addView(container)
             container.measure(
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
             )
             container.layout(0, 0, container.measuredWidth, container.measuredHeight)
 
@@ -110,7 +113,7 @@ object ShareImageGenerator {
     fun shareTransactionsAsImage(
         context: Context,
         transactionsWithData: List<TransactionSnapshotData>,
-        fields: Set<ShareableField>
+        fields: Set<ShareableField>,
     ) {
         val bitmap = createBitmapFromComposable(context, transactionsWithData, fields)
 
@@ -124,11 +127,12 @@ object ShareImageGenerator {
         val contentUri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.provider", file)
 
         // --- FIX: Use Kotlin property access syntax for 'type' ---
-        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "image/png"
-            putExtra(Intent.EXTRA_STREAM, contentUri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
+        val shareIntent =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(Intent.EXTRA_STREAM, contentUri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
         context.startActivity(Intent.createChooser(shareIntent, "Share Transactions"))
     }
 }
@@ -152,41 +156,44 @@ private fun getFieldWeight(field: ShareableField): Float {
 @Composable
 private fun TransactionSnapshotContent(
     transactionsWithData: List<ShareImageGenerator.TransactionSnapshotData>,
-    fields: Set<ShareableField>
+    fields: Set<ShareableField>,
 ) {
-    val totalAmount = transactionsWithData.sumOf {
-        if (it.details.transaction.transactionType == "income") it.details.transaction.amount else -it.details.transaction.amount
-    }
+    val totalAmount =
+        transactionsWithData.sumOf {
+            if (it.details.transaction.transactionType == "income") it.details.transaction.amount else -it.details.transaction.amount
+        }
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     val dateFormat = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
 
     // --- FIX: Create an ordered list of fields to display ---
-    val orderedFields = remember(fields) {
-        ShareableField.entries.filter { it in fields }
-    }
+    val orderedFields =
+        remember(fields) {
+            ShareableField.entries.filter { it in fields }
+        }
 
     Column(
-        modifier = Modifier
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(16.dp)
-            .width(IntrinsicSize.Max)
+        modifier =
+            Modifier
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(16.dp)
+                .width(IntrinsicSize.Max),
     ) {
         Text(
             "Transaction Summary",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             "Generated by Finlight",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(16.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // --- UPDATED: Iterate over the ordered list ---
             orderedFields.forEach { field ->
@@ -196,7 +203,7 @@ private fun TransactionSnapshotContent(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(getFieldWeight(field)),
-                    textAlign = if (field == ShareableField.Amount) TextAlign.End else TextAlign.Start
+                    textAlign = if (field == ShareableField.Amount) TextAlign.End else TextAlign.Start,
                 )
             }
         }
@@ -206,27 +213,29 @@ private fun TransactionSnapshotContent(
             val details = data.details
             val tags = data.tags
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 // --- UPDATED: Iterate over the ordered list ---
                 orderedFields.forEach { field ->
-                    val text = when (field) {
-                        ShareableField.Date -> dateFormat.format(Date(details.transaction.date))
-                        ShareableField.Description -> details.transaction.description
-                        ShareableField.Amount -> currencyFormat.format(details.transaction.amount)
-                        ShareableField.Category -> details.categoryName ?: "N/A"
-                        ShareableField.Tags -> tags.joinToString(", ") { it.name }.ifEmpty { "-" }
-                    }
+                    val text =
+                        when (field) {
+                            ShareableField.Date -> dateFormat.format(Date(details.transaction.date))
+                            ShareableField.Description -> details.transaction.description
+                            ShareableField.Amount -> currencyFormat.format(details.transaction.amount)
+                            ShareableField.Category -> details.categoryName ?: "N/A"
+                            ShareableField.Tags -> tags.joinToString(", ") { it.name }.ifEmpty { "-" }
+                        }
                     Text(
                         text = text,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(getFieldWeight(field)),
                         textAlign = if (field == ShareableField.Amount) TextAlign.End else TextAlign.Start,
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
                     )
                 }
             }
@@ -234,24 +243,25 @@ private fun TransactionSnapshotContent(
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.End
+            horizontalArrangement = Arrangement.End,
         ) {
             Text(
                 "Total:",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(end = 16.dp)
+                modifier = Modifier.padding(end = 16.dp),
             )
             Text(
                 currencyFormat.format(totalAmount),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }

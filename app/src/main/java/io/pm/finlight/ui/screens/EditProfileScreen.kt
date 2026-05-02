@@ -65,7 +65,7 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun EditProfileScreen(
     navController: NavController,
-    viewModel: ProfileViewModel = viewModel()
+    viewModel: ProfileViewModel = viewModel(),
 ) {
     val currentName by viewModel.userName.collectAsState()
     val savedProfilePictureUri by viewModel.profilePictureUri.collectAsState()
@@ -84,56 +84,62 @@ fun EditProfileScreen(
     val toolbarTintColor = MaterialTheme.colorScheme.onPrimary.toArgb()
     val activityBackgroundColor = MaterialTheme.colorScheme.background.toArgb()
 
-    val imageCropper = rememberLauncherForActivityResult(CropImageContract()) { result ->
-        if (result.isSuccessful) {
-            croppedImageUri = result.uriContent
-        } else {
-            val exception = result.error
-            Toast.makeText(context, "Image cropping failed: ${exception?.message}", Toast.LENGTH_SHORT).show()
+    val imageCropper =
+        rememberLauncherForActivityResult(CropImageContract()) { result ->
+            if (result.isSuccessful) {
+                croppedImageUri = result.uriContent
+            } else {
+                val exception = result.error
+                Toast.makeText(context, "Image cropping failed: ${exception?.message}", Toast.LENGTH_SHORT).show()
+            }
         }
-    }
 
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-        if (success) {
-            tempCameraImageUri?.let { uri ->
-                val cropOptions = CropImageContractOptions(
-                    uri = uri,
-                    cropImageOptions = createCropOptions(toolbarColor, toolbarTintColor, activityBackgroundColor)
-                )
+    val cameraLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            if (success) {
+                tempCameraImageUri?.let { uri ->
+                    val cropOptions =
+                        CropImageContractOptions(
+                            uri = uri,
+                            cropImageOptions = createCropOptions(toolbarColor, toolbarTintColor, activityBackgroundColor),
+                        )
+                    imageCropper.launch(cropOptions)
+                }
+            }
+        }
+
+    val galleryLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let {
+                val cropOptions =
+                    CropImageContractOptions(
+                        uri = it,
+                        cropImageOptions = createCropOptions(toolbarColor, toolbarTintColor, activityBackgroundColor),
+                    )
                 imageCropper.launch(cropOptions)
             }
         }
-    }
-
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let {
-            val cropOptions = CropImageContractOptions(
-                uri = it,
-                cropImageOptions = createCropOptions(toolbarColor, toolbarTintColor, activityBackgroundColor)
-            )
-            imageCropper.launch(cropOptions)
-        }
-    }
 
     // --- NEW: Launcher for the camera permission request ---
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            // Permission is granted, now launch the camera.
-            val tempFile = createTempImageFile(context)
-            val newTempUri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.provider",
-                tempFile
-            )
-            tempCameraImageUri = newTempUri
-            cameraLauncher.launch(newTempUri)
-        } else {
-            Toast.makeText(context, "Camera permission is required to take a photo.", Toast.LENGTH_SHORT).show()
+    val cameraPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) { isGranted: Boolean ->
+            if (isGranted) {
+                // Permission is granted, now launch the camera.
+                val tempFile = createTempImageFile(context)
+                val newTempUri =
+                    FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.provider",
+                        tempFile,
+                    )
+                tempCameraImageUri = newTempUri
+                cameraLauncher.launch(newTempUri)
+            } else {
+                Toast.makeText(context, "Camera permission is required to take a photo.", Toast.LENGTH_SHORT).show()
+            }
         }
-    }
-
 
     if (showImageSourceDialog) {
         val isThemeDark = MaterialTheme.colorScheme.background.isDark()
@@ -153,11 +159,12 @@ fun EditProfileScreen(
                             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) -> {
                                 // Permission is already granted
                                 val tempFile = createTempImageFile(context)
-                                val newTempUri = FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.provider",
-                                    tempFile
-                                )
+                                val newTempUri =
+                                    FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.provider",
+                                        tempFile,
+                                    )
                                 tempCameraImageUri = newTempUri
                                 cameraLauncher.launch(newTempUri)
                             }
@@ -166,7 +173,7 @@ fun EditProfileScreen(
                                 cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                             }
                         }
-                    }
+                    },
                 ) {
                     Icon(Icons.Default.CameraAlt, contentDescription = "Camera")
                     Spacer(Modifier.width(8.dp))
@@ -178,22 +185,23 @@ fun EditProfileScreen(
                     onClick = {
                         showImageSourceDialog = false
                         galleryLauncher.launch("image/*")
-                    }
+                    },
                 ) {
                     Icon(Icons.Default.PhotoLibrary, contentDescription = "Gallery")
                     Spacer(Modifier.width(8.dp))
                     Text("Gallery")
                 }
-            }
+            },
         )
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         AsyncImage(
             model = displayUri,
@@ -201,14 +209,15 @@ fun EditProfileScreen(
             placeholder = painterResource(id = R.drawable.ic_launcher_foreground),
             error = painterResource(id = R.drawable.ic_launcher_foreground),
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(128.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                .clickable {
-                    showImageSourceDialog = true
-                }
+            modifier =
+                Modifier
+                    .size(128.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    .clickable {
+                        showImageSourceDialog = true
+                    },
         )
 
         OutlinedTextField(
@@ -217,18 +226,18 @@ fun EditProfileScreen(
             label = { Text("Your Name") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
         )
 
         Spacer(modifier = Modifier.weight(1f))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             OutlinedButton(
                 onClick = { navController.popBackStack() },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 Text("Cancel")
             }
@@ -240,7 +249,7 @@ fun EditProfileScreen(
                     navController.popBackStack()
                 },
                 modifier = Modifier.weight(1f),
-                enabled = editedName.text.isNotBlank()
+                enabled = editedName.text.isNotBlank(),
             ) {
                 Text("Save")
             }
@@ -251,7 +260,11 @@ fun EditProfileScreen(
 /**
  * Helper function to create the crop options for the image cropper.
  */
-private fun createCropOptions(toolbarColor: Int, toolbarTintColor: Int, activityBackgroundColor: Int): CropImageOptions {
+private fun createCropOptions(
+    toolbarColor: Int,
+    toolbarTintColor: Int,
+    activityBackgroundColor: Int,
+): CropImageOptions {
     return CropImageOptions(
         cropShape = CropImageView.CropShape.OVAL,
         aspectRatioX = 1,
@@ -264,7 +277,7 @@ private fun createCropOptions(toolbarColor: Int, toolbarTintColor: Int, activity
         activityMenuIconColor = toolbarTintColor,
         toolbarColor = toolbarColor,
         toolbarBackButtonColor = toolbarTintColor,
-        activityBackgroundColor = activityBackgroundColor
+        activityBackgroundColor = activityBackgroundColor,
     )
 }
 
@@ -277,6 +290,6 @@ private fun createTempImageFile(context: Context): File {
     return File.createTempFile(
         "JPEG_${timeStamp}_",
         ".jpg",
-        storageDir
+        storageDir,
     )
 }

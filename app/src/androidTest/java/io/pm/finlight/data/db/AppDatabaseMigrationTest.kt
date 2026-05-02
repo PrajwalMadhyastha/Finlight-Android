@@ -15,28 +15,28 @@ import org.junit.runner.RunWith
 
 /**
  * Database migration tests for AppDatabase.
- * 
+ *
  * These tests use Room's MigrationTestHelper to verify database migrations work correctly.
  * They create temporary test databases and DO NOT affect the actual app database.
- * 
+ *
  * Tested Migrations:
  * - 39→40: Add index on transactions.date
  * - 40→41: Deduplicate sms_parse_templates and add UNIQUE index
  * - 41→42: Recreate sms_parse_templates table with new schema
  * - 42→43: Add transactionType column to custom_sms_rules
- * 
+ *
  * NOTE: These are instrumented tests and must run on a device/emulator.
  */
 @RunWith(AndroidJUnit4::class)
 class AppDatabaseMigrationTest {
-
     private val TEST_DB_NAME = "migration-test"
 
     @get:Rule
-    val helper: MigrationTestHelper = MigrationTestHelper(
-        InstrumentationRegistry.getInstrumentation(),
-        AppDatabase::class.java
-    )
+    val helper: MigrationTestHelper =
+        MigrationTestHelper(
+            InstrumentationRegistry.getInstrumentation(),
+            AppDatabase::class.java,
+        )
 
     /**
      * Test MIGRATION_39_40: Adds index on transactions.date column
@@ -45,10 +45,12 @@ class AppDatabaseMigrationTest {
     fun migrate39To40_addsDateIndexOnTransactions() {
         helper.createDatabase(TEST_DB_NAME, 39).apply {
             execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank')")
-            execSQL("""
+            execSQL(
+                """
                 INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit) 
                 VALUES (1, 'Test Transaction', 100.0, 1234567890000, 1, 'expense', 'Manual Entry', 0, 0)
-            """)
+            """,
+            )
             close()
         }
 
@@ -62,7 +64,7 @@ class AppDatabaseMigrationTest {
 
     /**
      * Test MIGRATION_40_41: Deduplicates sms_parse_templates and adds UNIQUE index
-     * 
+     *
      * Verifies that:
      * 1. Duplicate records are removed (keeping the one with MIN id)
      * 2. A UNIQUE index is created on templateSignature
@@ -74,19 +76,25 @@ class AppDatabaseMigrationTest {
         helper.createDatabase(TEST_DB_NAME, 40).apply {
             // Insert duplicates
             // Signature "SIG_A" -> Repeated twice
-            execSQL("""
+            execSQL(
+                """
                 INSERT INTO sms_parse_templates (id, templateSignature, originalSmsBody, originalMerchantStartIndex, originalMerchantEndIndex, originalAmountStartIndex, originalAmountEndIndex)
                 VALUES (1, 'SIG_A', 'Body 1', 0, 1, 2, 3)
-            """)
-            execSQL("""
+            """,
+            )
+            execSQL(
+                """
                 INSERT INTO sms_parse_templates (id, templateSignature, originalSmsBody, originalMerchantStartIndex, originalMerchantEndIndex, originalAmountStartIndex, originalAmountEndIndex)
                 VALUES (2, 'SIG_A', 'Body 1 - Duplicate', 0, 1, 2, 3)
-            """)
+            """,
+            )
             // Signature "SIG_B" -> Unique
-            execSQL("""
+            execSQL(
+                """
                 INSERT INTO sms_parse_templates (id, templateSignature, originalSmsBody, originalMerchantStartIndex, originalMerchantEndIndex, originalAmountStartIndex, originalAmountEndIndex)
                 VALUES (3, 'SIG_B', 'Body B', 0, 1, 2, 3)
-            """)
+            """,
+            )
             close()
         }
 
@@ -106,10 +114,12 @@ class AppDatabaseMigrationTest {
 
             // Verify Unique Constraint works now
             try {
-                execSQL("""
+                execSQL(
+                    """
                     INSERT INTO sms_parse_templates (id, templateSignature, originalSmsBody, originalMerchantStartIndex, originalMerchantEndIndex, originalAmountStartIndex, originalAmountEndIndex)
                     VALUES (4, 'SIG_B', 'Body B Duplicate', 0, 1, 2, 3)
-                """)
+                """,
+                )
                 fail("Should fail to insert duplicate templateSignature due to UNIQUE constraint")
             } catch (e: SQLiteConstraintException) {
                 // Expected failure
@@ -121,7 +131,7 @@ class AppDatabaseMigrationTest {
 
     /**
      * Test MIGRATION_41_42: Recreates sms_parse_templates table with new schema
-     * 
+     *
      * Verifies that the table structure changes (e.g., new columns, new primary key).
      * Note: This migration is destructive (drops old table).
      */
@@ -129,10 +139,12 @@ class AppDatabaseMigrationTest {
     fun migrate41To42_recreatesTable() {
         helper.createDatabase(TEST_DB_NAME, 41).apply {
             // Insert old schema data
-            execSQL("""
+            execSQL(
+                """
                 INSERT INTO sms_parse_templates (id, templateSignature, originalSmsBody, originalMerchantStartIndex, originalMerchantEndIndex, originalAmountStartIndex, originalAmountEndIndex)
                 VALUES (1, 'SIG_OLD', 'Body Old', 0, 1, 2, 3)
-            """)
+            """,
+            )
             close()
         }
 
@@ -150,11 +162,13 @@ class AppDatabaseMigrationTest {
 
             // Verify we can insert using NEW schema
             // New schema PK: (templateSignature, correctedMerchantName)
-            execSQL("""
+            execSQL(
+                """
                 INSERT INTO sms_parse_templates (templateSignature, correctedMerchantName, originalSmsBody, originalAmountStartIndex, originalAmountEndIndex, originalMerchantStartIndex, originalMerchantEndIndex)
                 VALUES ('SIG_NEW', 'Merchant', 'Body', 0, 0, 0, 0)
-            """)
-            
+            """,
+            )
+
             // Verify data count
             val countCursor = query("SELECT COUNT(*) FROM sms_parse_templates")
             assertTrue(countCursor.moveToFirst())

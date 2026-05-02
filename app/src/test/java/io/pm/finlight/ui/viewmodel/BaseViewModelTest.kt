@@ -55,7 +55,6 @@ fun <T> capture(argumentCaptor: ArgumentCaptor<T>): T {
     return null as T
 }
 
-
 /**
  * An abstract base class for all ViewModel unit tests in the Finlight project.
  *
@@ -71,7 +70,6 @@ fun <T> capture(argumentCaptor: ArgumentCaptor<T>): T {
  */
 @ExperimentalCoroutinesApi
 abstract class BaseViewModelTest {
-
     /**
      * JUnit rule to execute LiveData and other background tasks from Architecture Components
      * synchronously. This is essential for testing LiveData emissions.

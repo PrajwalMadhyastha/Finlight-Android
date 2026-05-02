@@ -34,7 +34,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class TagViewModelTest : BaseViewModelTest() {
-
     private val application: Application = ApplicationProvider.getApplicationContext()
 
     @Mock
@@ -56,117 +55,124 @@ class TagViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `allTags flow emits tags from repository`() = runTest {
-        // Arrange
-        val tags = listOf(Tag(1, "Work"), Tag(2, "Vacation"))
-        initializeViewModel(tags)
+    fun `allTags flow emits tags from repository`() =
+        runTest {
+            // Arrange
+            val tags = listOf(Tag(1, "Work"), Tag(2, "Vacation"))
+            initializeViewModel(tags)
 
-        // Assert
-        viewModel.allTags.test {
-            assertEquals(tags, awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.allTags.test {
+                assertEquals(tags, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `addTag with new name calls repository insert`() = runTest {
-        // Arrange
-        val newTagName = "New Tag"
-        initializeViewModel()
-        `when`(tagRepository.findByName(newTagName)).thenReturn(null)
+    fun `addTag with new name calls repository insert`() =
+        runTest {
+            // Arrange
+            val newTagName = "New Tag"
+            initializeViewModel()
+            `when`(tagRepository.findByName(newTagName)).thenReturn(null)
 
-        // Act
-        viewModel.addTag(newTagName)
+            // Act
+            viewModel.addTag(newTagName)
 
-        // Assert
-        verify(tagRepository).insert(Tag(name = newTagName))
-        viewModel.uiEvent.test {
-            assertEquals("Tag '$newTagName' created.", awaitItem())
+            // Assert
+            verify(tagRepository).insert(Tag(name = newTagName))
+            viewModel.uiEvent.test {
+                assertEquals("Tag '$newTagName' created.", awaitItem())
+            }
         }
-    }
 
     @Test
-    fun `addTag with existing name sends error event and does not insert`() = runTest {
-        // Arrange
-        val existingTagName = "Existing Tag"
-        val existingTag = Tag(1, existingTagName)
-        initializeViewModel(listOf(existingTag))
-        `when`(tagRepository.findByName(existingTagName)).thenReturn(existingTag)
+    fun `addTag with existing name sends error event and does not insert`() =
+        runTest {
+            // Arrange
+            val existingTagName = "Existing Tag"
+            val existingTag = Tag(1, existingTagName)
+            initializeViewModel(listOf(existingTag))
+            `when`(tagRepository.findByName(existingTagName)).thenReturn(existingTag)
 
-        // Act
-        viewModel.addTag(existingTagName)
+            // Act
+            viewModel.addTag(existingTagName)
 
-        // Assert
-        verify(tagRepository, never()).insert(Tag(name = existingTagName))
-        viewModel.uiEvent.test {
-            assertEquals("A tag named '$existingTagName' already exists.", awaitItem())
+            // Assert
+            verify(tagRepository, never()).insert(Tag(name = existingTagName))
+            viewModel.uiEvent.test {
+                assertEquals("A tag named '$existingTagName' already exists.", awaitItem())
+            }
         }
-    }
 
     @Test
-    fun `updateTag calls repository update`() = runTest {
-        // Arrange
-        initializeViewModel()
-        val tagToUpdate = Tag(1, "Updated Name")
+    fun `updateTag calls repository update`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val tagToUpdate = Tag(1, "Updated Name")
 
-        // Act
-        viewModel.updateTag(tagToUpdate)
+            // Act
+            viewModel.updateTag(tagToUpdate)
 
-        // Assert
-        verify(tagRepository).update(tagToUpdate)
-    }
+            // Assert
+            verify(tagRepository).update(tagToUpdate)
+        }
 
     @Test
-    fun `deleteTag when not in use calls repository delete`() = runTest {
-        // Arrange
-        val tagToDelete = Tag(1, "Unused Tag")
-        initializeViewModel()
-        `when`(tagRepository.isTagInUse(tagToDelete.id)).thenReturn(false)
-        `when`(tripRepository.isTagUsedByTrip(tagToDelete.id)).thenReturn(false)
+    fun `deleteTag when not in use calls repository delete`() =
+        runTest {
+            // Arrange
+            val tagToDelete = Tag(1, "Unused Tag")
+            initializeViewModel()
+            `when`(tagRepository.isTagInUse(tagToDelete.id)).thenReturn(false)
+            `when`(tripRepository.isTagUsedByTrip(tagToDelete.id)).thenReturn(false)
 
-        // Act
-        viewModel.deleteTag(tagToDelete)
+            // Act
+            viewModel.deleteTag(tagToDelete)
 
-        // Assert
-        verify(tagRepository).delete(tagToDelete)
-        viewModel.uiEvent.test {
-            assertEquals("Tag '${tagToDelete.name}' deleted.", awaitItem())
+            // Assert
+            verify(tagRepository).delete(tagToDelete)
+            viewModel.uiEvent.test {
+                assertEquals("Tag '${tagToDelete.name}' deleted.", awaitItem())
+            }
         }
-    }
 
     @Test
-    fun `deleteTag when used by transaction sends error event`() = runTest {
-        // Arrange
-        val tagInUse = Tag(1, "Transaction Tag")
-        initializeViewModel()
-        `when`(tagRepository.isTagInUse(tagInUse.id)).thenReturn(true)
-        `when`(tripRepository.isTagUsedByTrip(tagInUse.id)).thenReturn(false)
+    fun `deleteTag when used by transaction sends error event`() =
+        runTest {
+            // Arrange
+            val tagInUse = Tag(1, "Transaction Tag")
+            initializeViewModel()
+            `when`(tagRepository.isTagInUse(tagInUse.id)).thenReturn(true)
+            `when`(tripRepository.isTagUsedByTrip(tagInUse.id)).thenReturn(false)
 
-        // Act
-        viewModel.deleteTag(tagInUse)
+            // Act
+            viewModel.deleteTag(tagInUse)
 
-        // Assert
-        verify(tagRepository, never()).delete(tagInUse)
-        viewModel.uiEvent.test {
-            assertEquals("Cannot delete '${tagInUse.name}'. It is attached to one or more transactions.", awaitItem())
+            // Assert
+            verify(tagRepository, never()).delete(tagInUse)
+            viewModel.uiEvent.test {
+                assertEquals("Cannot delete '${tagInUse.name}'. It is attached to one or more transactions.", awaitItem())
+            }
         }
-    }
 
     @Test
-    fun `deleteTag when used by trip sends error event`() = runTest {
-        // Arrange
-        val tagInUse = Tag(1, "Trip Tag")
-        initializeViewModel()
-        `when`(tagRepository.isTagInUse(tagInUse.id)).thenReturn(false)
-        `when`(tripRepository.isTagUsedByTrip(tagInUse.id)).thenReturn(true)
+    fun `deleteTag when used by trip sends error event`() =
+        runTest {
+            // Arrange
+            val tagInUse = Tag(1, "Trip Tag")
+            initializeViewModel()
+            `when`(tagRepository.isTagInUse(tagInUse.id)).thenReturn(false)
+            `when`(tripRepository.isTagUsedByTrip(tagInUse.id)).thenReturn(true)
 
-        // Act
-        viewModel.deleteTag(tagInUse)
+            // Act
+            viewModel.deleteTag(tagInUse)
 
-        // Assert
-        verify(tagRepository, never()).delete(tagInUse)
-        viewModel.uiEvent.test {
-            assertEquals("Cannot delete '${tagInUse.name}'. It is linked to a trip in your travel history.", awaitItem())
+            // Assert
+            verify(tagRepository, never()).delete(tagInUse)
+            viewModel.uiEvent.test {
+                assertEquals("Cannot delete '${tagInUse.name}'. It is linked to a trip in your travel history.", awaitItem())
+            }
         }
-    }
 }

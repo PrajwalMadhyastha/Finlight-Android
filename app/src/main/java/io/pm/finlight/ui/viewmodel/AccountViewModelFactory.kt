@@ -30,7 +30,7 @@ class AccountViewModelFactory(private val application: Application) : ViewModelP
                 application,
                 accountRepository,
                 transactionRepository,
-                settingsRepository
+                settingsRepository,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

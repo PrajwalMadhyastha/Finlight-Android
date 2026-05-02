@@ -12,15 +12,15 @@ import androidx.room.PrimaryKey
             entity = Transaction::class,
             parentColumns = ["id"],
             childColumns = ["transactionId"],
-            onDelete = ForeignKey.CASCADE
-        )
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
     // --- FIX: Explicitly declare the index that Room creates for the foreign key ---
-    indices = [Index(value = ["transactionId"])]
+    indices = [Index(value = ["transactionId"])],
 )
 data class TransactionImage(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val transactionId: Int,
-    val imageUri: String // Stores the URI of the image in the app's internal storage
+    val imageUri: String, // Stores the URI of the image in the app's internal storage
 )

@@ -29,9 +29,8 @@ import java.util.Locale
 class OnboardingViewModel(
     private val application: Application,
     private val categoryRepository: CategoryRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
-
     private val _userName = MutableStateFlow("")
     val userName = _userName.asStateFlow()
 
@@ -65,47 +64,49 @@ class OnboardingViewModel(
                 if (!networkCountryIso.isNullOrBlank()) {
                     val locale = Locale("", networkCountryIso)
                     val currency = Currency.getInstance(locale)
-                    _homeCurrency.value = CurrencyInfo(
-                        countryName = locale.displayCountry,
-                        currencyCode = currency.currencyCode,
-                        currencySymbol = currency.getSymbol(locale)
-                    )
+                    _homeCurrency.value =
+                        CurrencyInfo(
+                            countryName = locale.displayCountry,
+                            currencyCode = currency.currencyCode,
+                            currencySymbol = currency.getSymbol(locale),
+                        )
                     return@launch
                 }
 
                 // 2. Fallback to Configuration Locale
-                val configLocale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    application.resources.configuration.locales.get(0)
-                } else {
-                    @Suppress("DEPRECATION")
-                    application.resources.configuration.locale
-                }
+                val configLocale =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        application.resources.configuration.locales.get(0)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        application.resources.configuration.locale
+                    }
                 if (configLocale != null && configLocale.country.isNotBlank()) {
                     val currency = Currency.getInstance(configLocale)
-                    _homeCurrency.value = CurrencyInfo(
-                        countryName = configLocale.displayCountry,
-                        currencyCode = currency.currencyCode,
-                        currencySymbol = currency.getSymbol(configLocale)
-                    )
+                    _homeCurrency.value =
+                        CurrencyInfo(
+                            countryName = configLocale.displayCountry,
+                            currencyCode = currency.currencyCode,
+                            currencySymbol = currency.getSymbol(configLocale),
+                        )
                     return@launch
                 }
 
                 // 3. Last resort: Default Locale (language preference)
                 val defaultLocale = Locale.getDefault()
                 val currency = Currency.getInstance(defaultLocale)
-                _homeCurrency.value = CurrencyInfo(
-                    countryName = defaultLocale.displayCountry,
-                    currencyCode = currency.currencyCode,
-                    currencySymbol = currency.getSymbol(defaultLocale)
-                )
-
+                _homeCurrency.value =
+                    CurrencyInfo(
+                        countryName = defaultLocale.displayCountry,
+                        currencyCode = currency.currencyCode,
+                        currencySymbol = currency.getSymbol(defaultLocale),
+                    )
             } catch (e: Exception) {
                 // Final fallback to INR if everything fails
                 _homeCurrency.value = CurrencyHelper.getCurrencyInfo("INR")
             }
         }
     }
-
 
     fun onHomeCurrencyChanged(currencyInfo: CurrencyInfo) {
         _homeCurrency.value = currencyInfo

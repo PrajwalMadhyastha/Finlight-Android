@@ -24,7 +24,6 @@ import kotlin.test.assertTrue
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class TagDaoTest {
-
     @get:Rule
     val dbRule = DatabaseTestRule()
 
@@ -36,105 +35,112 @@ class TagDaoTest {
     }
 
     @Test
-    fun `inserting duplicate tag name with different case is ignored`() = runTest {
-        // Arrange
-        tagDao.insert(Tag(name = "Work"))
+    fun `inserting duplicate tag name with different case is ignored`() =
+        runTest {
+            // Arrange
+            tagDao.insert(Tag(name = "Work"))
 
-        // Act
-        // This insert should be ignored because of the unique, case-insensitive index.
-        try {
-            tagDao.insert(Tag(name = "work"))
-        } catch (e: SQLiteConstraintException) {
-            // This is the expected outcome for a unique constraint violation.
-            // The test passes if this exception is caught.
+            // Act
+            // This insert should be ignored because of the unique, case-insensitive index.
+            try {
+                tagDao.insert(Tag(name = "work"))
+            } catch (e: SQLiteConstraintException) {
+                // This is the expected outcome for a unique constraint violation.
+                // The test passes if this exception is caught.
+            }
+
+            // Assert
+            tagDao.getAllTags().test {
+                val tags = awaitItem()
+                // There should still be only one tag in the database.
+                assertEquals(1, tags.size)
+                assertEquals("Work", tags.first().name)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 
-        // Assert
-        tagDao.getAllTags().test {
-            val tags = awaitItem()
-            // There should still be only one tag in the database.
-            assertEquals(1, tags.size)
-            assertEquals("Work", tags.first().name)
-            cancelAndIgnoreRemainingEvents()
+    @Test
+    fun `findByName is case insensitive`() =
+        runTest {
+            // Arrange
+            tagDao.insert(Tag(name = "Travel"))
+
+            // Act
+            val foundTag = tagDao.findByName("travel")
+
+            // Assert
+            assertNotNull(foundTag)
+            assertEquals("Travel", foundTag?.name)
         }
-    }
 
     @Test
-    fun `findByName is case insensitive`() = runTest {
-        // Arrange
-        tagDao.insert(Tag(name = "Travel"))
+    fun `getAllTagsList returns all tags`() =
+        runTest {
+            // Arrange
+            tagDao.insertAll(listOf(Tag(name = "Tag1"), Tag(name = "Tag2")))
 
-        // Act
-        val foundTag = tagDao.findByName("travel")
+            // Act
+            val tags = tagDao.getAllTagsList()
 
-        // Assert
-        assertNotNull(foundTag)
-        assertEquals("Travel", foundTag?.name)
-    }
-
-    @Test
-    fun `getAllTagsList returns all tags`() = runTest {
-        // Arrange
-        tagDao.insertAll(listOf(Tag(name = "Tag1"), Tag(name = "Tag2")))
-
-        // Act
-        val tags = tagDao.getAllTagsList()
-
-        // Assert
-        assertEquals(2, tags.size)
-    }
+            // Assert
+            assertEquals(2, tags.size)
+        }
 
     @Test
-    fun `getTagById returns correct tag`() = runTest {
-        // Arrange
-        val id = tagDao.insert(Tag(name = "Test")).toInt()
+    fun `getTagById returns correct tag`() =
+        runTest {
+            // Arrange
+            val id = tagDao.insert(Tag(name = "Test")).toInt()
 
-        // Act
-        val tag = tagDao.getTagById(id)
+            // Act
+            val tag = tagDao.getTagById(id)
 
-        // Assert
-        assertNotNull(tag)
-        assertEquals("Test", tag?.name)
-    }
-
-    @Test
-    fun `update modifies a tag`() = runTest {
-        // Arrange
-        val id = tagDao.insert(Tag(name = "Old")).toInt()
-        val updatedTag = Tag(id = id, name = "New")
-
-        // Act
-        tagDao.update(updatedTag)
-
-        // Assert
-        val fromDb = tagDao.getTagById(id)
-        assertEquals("New", fromDb?.name)
-    }
+            // Assert
+            assertNotNull(tag)
+            assertEquals("Test", tag?.name)
+        }
 
     @Test
-    fun `delete removes a tag`() = runTest {
-        // Arrange
-        val id = tagDao.insert(Tag(name = "ToDelete")).toInt()
-        val toDelete = Tag(id = id, name = "ToDelete")
+    fun `update modifies a tag`() =
+        runTest {
+            // Arrange
+            val id = tagDao.insert(Tag(name = "Old")).toInt()
+            val updatedTag = Tag(id = id, name = "New")
 
-        // Act
-        tagDao.delete(toDelete)
+            // Act
+            tagDao.update(updatedTag)
 
-        // Assert
-        val fromDb = tagDao.getTagById(id)
-        assertNull(fromDb)
-    }
+            // Assert
+            val fromDb = tagDao.getTagById(id)
+            assertEquals("New", fromDb?.name)
+        }
 
     @Test
-    fun `deleteAll removes all tags`() = runTest {
-        // Arrange
-        tagDao.insertAll(listOf(Tag(name = "Tag1"), Tag(name = "Tag2")))
+    fun `delete removes a tag`() =
+        runTest {
+            // Arrange
+            val id = tagDao.insert(Tag(name = "ToDelete")).toInt()
+            val toDelete = Tag(id = id, name = "ToDelete")
 
-        // Act
-        tagDao.deleteAll()
+            // Act
+            tagDao.delete(toDelete)
 
-        // Assert
-        val tags = tagDao.getAllTagsList()
-        assertTrue(tags.isEmpty())
-    }
+            // Assert
+            val fromDb = tagDao.getTagById(id)
+            assertNull(fromDb)
+        }
+
+    @Test
+    fun `deleteAll removes all tags`() =
+        runTest {
+            // Arrange
+            tagDao.insertAll(listOf(Tag(name = "Tag1"), Tag(name = "Tag2")))
+
+            // Act
+            tagDao.deleteAll()
+
+            // Assert
+            val tags = tagDao.getAllTagsList()
+            assertTrue(tags.isEmpty())
+        }
 }

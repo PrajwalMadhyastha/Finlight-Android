@@ -12,7 +12,6 @@ import android.app.Application
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -57,7 +56,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -89,28 +87,17 @@ import kotlinx.coroutines.withContext
 import java.net.URLDecoder
 import java.util.concurrent.Executor
 
-import com.google.android.gms.common.GoogleApiAvailability
-import com.google.android.gms.common.ConnectionResult
-
-private const val PLAY_SERVICES_RESOLUTION_REQUEST = 9000
-
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 class MainActivity : AppCompatActivity() {
-    
     companion object {
         const val ACTION_ADD_EXPENSE = "io.pm.finlight.ACTION_ADD_EXPENSE"
         const val ACTION_ADD_INCOME = "io.pm.finlight.ACTION_ADD_INCOME"
         const val ACTION_SEARCH = "io.pm.finlight.ACTION_SEARCH"
     }
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Add this check at the very beginning of onCreate
-        if (!checkGooglePlayServices()) {
-            return
-        }
 
         enableEdgeToEdge()
         // Temporarily disable FLAG_SECURE
@@ -119,16 +106,16 @@ class MainActivity : AppCompatActivity() {
 //            WindowManager.LayoutParams.FLAG_SECURE
 //        )
 
-
         val settingsRepository = SettingsRepository(this)
         val hasSeenOnboarding = settingsRepository.hasSeenOnboarding()
 
         setContent {
             val application = LocalContext.current.applicationContext as Application
             val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(application))
-            val settingsViewModel: SettingsViewModel = viewModel(
-                factory = SettingsViewModelFactory(application, transactionViewModel)
-            )
+            val settingsViewModel: SettingsViewModel =
+                viewModel(
+                    factory = SettingsViewModelFactory(application, transactionViewModel),
+                )
             val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
 
             // UPDATED: Using ForceAppScaling to handle both Text and Display scaling
@@ -143,66 +130,58 @@ class MainActivity : AppCompatActivity() {
                             onOnboardingFinished = {
                                 settingsRepository.setHasSeenOnboarding(true)
                                 showOnboarding = false
-                            }
+                            },
                         )
                     } else {
                         FinanceAppWithLockScreen(
                             isInitiallyLocked = settingsRepository.isAppLockEnabledBlocking(),
-                            shortcutAction = intent?.action
+                            shortcutAction = intent?.action,
                         )
                     }
                 }
             }
         }
     }
-
-    private fun checkGooglePlayServices(): Boolean {
-        val googleApiAvailability = GoogleApiAvailability.getInstance()
-        val resultCode = googleApiAvailability.isGooglePlayServicesAvailable(this)
-        if (resultCode != ConnectionResult.SUCCESS) {
-            if (googleApiAvailability.isUserResolvableError(resultCode)) {
-                googleApiAvailability.getErrorDialog(this, resultCode, PLAY_SERVICES_RESOLUTION_REQUEST)?.show()
-            } else {
-                Toast.makeText(this, "This device does not support Google Play Services. If the problem persists, try restarting the app.", Toast.LENGTH_LONG).show()
-                finish() // Close the app if Play Services is not supported
-            }
-            return false
-        }
-        return true
-    }
 }
 
 @Composable
-fun FinanceAppWithLockScreen(isInitiallyLocked: Boolean, shortcutAction: String? = null) {
+fun FinanceAppWithLockScreen(
+    isInitiallyLocked: Boolean,
+    shortcutAction: String? = null,
+) {
     val context = LocalContext.current
     val settingsRepository = remember { SettingsRepository(context) }
 
     var isLocked by remember { mutableStateOf(isInitiallyLocked) }
     val appLockEnabled by settingsRepository.getAppLockEnabled().collectAsState(initial = isInitiallyLocked)
 
-    val permissionsToRequest = remember {
-        val list = mutableListOf(
-            Manifest.permission.READ_SMS,
-            Manifest.permission.RECEIVE_SMS
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            list.add(Manifest.permission.POST_NOTIFICATIONS)
+    val permissionsToRequest =
+        remember {
+            val list =
+                mutableListOf(
+                    Manifest.permission.READ_SMS,
+                    Manifest.permission.RECEIVE_SMS,
+                )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                list.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            list.toTypedArray()
         }
-        list.toTypedArray()
-    }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { perms ->
-        val allPermissionsGranted = perms.all { it.value }
-        if (!allPermissionsGranted) {
-            Toast.makeText(context, "Some permissions were denied. The app may not function fully.", Toast.LENGTH_LONG).show()
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestMultiplePermissions(),
+        ) { perms ->
+            val allPermissionsGranted = perms.all { it.value }
+            if (!allPermissionsGranted) {
+                Toast.makeText(context, "Some permissions were denied. The app may not function fully.", Toast.LENGTH_LONG).show()
+            }
         }
-    }
 
     LaunchedEffect(key1 = true) {
-        val areAllPermissionsGranted = permissionsToRequest.all {
-            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-        }
+        val areAllPermissionsGranted =
+            permissionsToRequest.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
         if (!areAllPermissionsGranted) {
             permissionLauncher.launch(permissionsToRequest)
         }
@@ -221,42 +200,49 @@ fun FinanceAppWithLockScreen(isInitiallyLocked: Boolean, shortcutAction: String?
     }
 }
 
-
 @Composable
 fun LockScreen(onUnlock: () -> Unit) {
     val context = LocalContext.current
     val activity = LocalContext.current as FragmentActivity
     val executor: Executor = remember { ContextCompat.getMainExecutor(context) }
 
-    val promptInfo = remember {
-        BiometricPrompt.PromptInfo.Builder()
-            .setTitle("App Locked")
-            .setSubtitle("Authenticate to access your finances")
-            .setNegativeButtonText("Cancel")
-            .build()
-    }
+    val promptInfo =
+        remember {
+            BiometricPrompt.PromptInfo.Builder()
+                .setTitle("App Locked")
+                .setSubtitle("Authenticate to access your finances")
+                .setNegativeButtonText("Cancel")
+                .build()
+        }
 
-    val biometricPrompt = remember {
-        BiometricPrompt(activity, executor,
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    super.onAuthenticationSucceeded(result)
-                    onUnlock()
-                }
-
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    super.onAuthenticationError(errorCode, errString)
-                    if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON && errorCode != BiometricPrompt.ERROR_USER_CANCELED) {
-                        Toast.makeText(context, "Authentication error: $errString", Toast.LENGTH_SHORT).show()
+    val biometricPrompt =
+        remember {
+            BiometricPrompt(
+                activity,
+                executor,
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        super.onAuthenticationSucceeded(result)
+                        onUnlock()
                     }
-                }
 
-                override fun onAuthenticationFailed() {
-                    super.onAuthenticationFailed()
-                    Toast.makeText(context, "Authentication failed", Toast.LENGTH_SHORT).show()
-                }
-            })
-    }
+                    override fun onAuthenticationError(
+                        errorCode: Int,
+                        errString: CharSequence,
+                    ) {
+                        super.onAuthenticationError(errorCode, errString)
+                        if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON && errorCode != BiometricPrompt.ERROR_USER_CANCELED) {
+                            Toast.makeText(context, "Authentication error: $errString", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
+                    override fun onAuthenticationFailed() {
+                        super.onAuthenticationFailed()
+                        Toast.makeText(context, "Authentication failed", Toast.LENGTH_SHORT).show()
+                    }
+                },
+            )
+        }
 
     LaunchedEffect(Unit) {
         biometricPrompt.authenticate(promptInfo)
@@ -264,7 +250,7 @@ fun LockScreen(onUnlock: () -> Unit) {
 
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Button(onClick = { biometricPrompt.authenticate(promptInfo) }) {
             Icon(Icons.Default.Fingerprint, contentDescription = null, modifier = Modifier.size(24.dp))
@@ -295,7 +281,6 @@ fun MainAppScreen(shortcutAction: String? = null) {
     val manageParseRulesViewModel: ManageParseRulesViewModel = viewModel(factory = ManageParseRulesViewModelFactory(context))
     val tagViewModel: TagViewModel = viewModel(factory = TagViewModelFactory(context))
 
-
     val userName by dashboardViewModel.userName.collectAsState()
     val profilePictureUri by dashboardViewModel.profilePictureUri.collectAsState()
     val filterState by transactionViewModel.filterState.collectAsState()
@@ -309,13 +294,14 @@ fun MainAppScreen(shortcutAction: String? = null) {
     val selectedIdsCount by transactionViewModel.selectedTransactionIds.map { it.size }.collectAsState(initial = 0)
     val showDeleteConfirmation by transactionViewModel.showDeleteConfirmation.collectAsState()
 
-    val bottomNavItems = listOf(
-        BottomNavItem.Dashboard,
-        BottomNavItem.Transactions,
-        BottomNavItem.Reports,
-        BottomNavItem.Profile
-    )
-    
+    val bottomNavItems =
+        listOf(
+            BottomNavItem.Dashboard,
+            BottomNavItem.Transactions,
+            BottomNavItem.Reports,
+            BottomNavItem.Profile,
+        )
+
     // Handle shortcut navigation
     LaunchedEffect(shortcutAction) {
         when (shortcutAction) {
@@ -338,30 +324,33 @@ fun MainAppScreen(shortcutAction: String? = null) {
 
     val showBottomBar = bottomNavItems.any { it.route == baseCurrentRoute }
 
-    val screensWithCustomTopBars = setOf(
-        "splash_screen",
-        "add_transaction",
-        "transaction_detail",
-        "split_transaction",
-        "rule_creation_screen",
-        "csv_validation_screen",
-        "link_transaction_screen",
-        "link_recurring_transaction",
-        "add_edit_goal",
-        "approve_transaction_screen"
-    )
+    val screensWithCustomTopBars =
+        setOf(
+            "splash_screen",
+            "add_transaction",
+            "transaction_detail",
+            "split_transaction",
+            "rule_creation_screen",
+            "csv_validation_screen",
+            "link_transaction_screen",
+            "link_recurring_transaction",
+            "add_edit_goal",
+            "approve_transaction_screen",
+        )
 
     val showMainTopBar = baseCurrentRoute !in screensWithCustomTopBars
 
-    val currentTitle = when {
-        baseCurrentRoute == BottomNavItem.Profile.route -> "Profile"
-        showBottomBar -> "Hi, $userName!"
-        else -> screenTitles[currentRoute] ?: screenTitles[baseCurrentRoute] ?: "Finance App"
-    }
+    val currentTitle =
+        when {
+            baseCurrentRoute == BottomNavItem.Profile.route -> "Profile"
+            showBottomBar -> "Hi, $userName!"
+            else -> screenTitles[currentRoute] ?: screenTitles[baseCurrentRoute] ?: "Finance App"
+        }
 
-    val fabRoutes = setOf(
-        "account_list"
-    )
+    val fabRoutes =
+        setOf(
+            "account_list",
+        )
     val showFab = baseCurrentRoute in fabRoutes && !isAccountSelectionMode
 
     val activity = LocalContext.current as AppCompatActivity
@@ -379,7 +368,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
             else -> {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colorScheme.background,
                 ) {}
             }
         }
@@ -402,10 +391,11 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                 Icon(Icons.Default.Share, contentDescription = "Share")
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
-                            titleContentColor = MaterialTheme.colorScheme.onSurface
-                        )
+                        colors =
+                            TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
+                                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
                     )
                 } else if (showMainTopBar) {
                     TopAppBar(
@@ -423,19 +413,20 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                     model = profilePictureUri ?: R.mipmap.ic_launcher,
                                     contentDescription = "User Profile Picture",
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .padding(end = 16.dp)
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .clickable {
-                                            navController.navigate(BottomNavItem.Profile.route) {
-                                                popUpTo(BottomNavItem.Dashboard.route) {
-                                                    saveState = true
+                                    modifier =
+                                        Modifier
+                                            .padding(end = 16.dp)
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .clickable {
+                                                navController.navigate(BottomNavItem.Profile.route) {
+                                                    popUpTo(BottomNavItem.Dashboard.route) {
+                                                        saveState = true
+                                                    }
+                                                    launchSingleTop = true
+                                                    restoreState = true
                                                 }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        }
+                                            },
                                 )
                             }
                             when (baseCurrentRoute) {
@@ -443,7 +434,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                     IconButton(onClick = { settingsViewModel.setPrivacyModeEnabled(!isPrivacyModeEnabled) }) {
                                         Icon(
                                             imageVector = if (isPrivacyModeEnabled) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                            contentDescription = "Toggle Privacy Mode"
+                                            contentDescription = "Toggle Privacy Mode",
                                         )
                                     }
                                     IconButton(onClick = { navController.navigate("customize_dashboard") }) {
@@ -467,13 +458,14 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                         badge = {
                                             if (areFiltersActive) {
                                                 Box(
-                                                    modifier = Modifier
-                                                        .size(8.dp)
-                                                        .clip(CircleShape)
-                                                        .background(MaterialTheme.colorScheme.primary)
+                                                    modifier =
+                                                        Modifier
+                                                            .size(8.dp)
+                                                            .clip(CircleShape)
+                                                            .background(MaterialTheme.colorScheme.primary),
                                                 )
                                             }
-                                        }
+                                        },
                                     ) {
                                         IconButton(onClick = { transactionViewModel.onFilterClick() }) {
                                             Icon(Icons.Default.FilterList, contentDescription = "Filter Transactions")
@@ -506,14 +498,14 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                 "manage_ignore_rules" -> HelpActionIcon(helpKey = "manage_ignore_rules")
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                     )
                 }
             },
             bottomBar = {
                 if (showBottomBar) {
                     NavigationBar(
-                        containerColor = Color.Transparent
+                        containerColor = Color.Transparent,
                     ) {
                         bottomNavItems.forEach { screen ->
                             val isSelected = baseCurrentRoute == screen.route
@@ -529,7 +521,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                         launchSingleTop = true
                                         restoreState = true
                                     }
-                                }
+                                },
                             )
                         }
                     }
@@ -546,7 +538,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                     }
                 }
             },
-            containerColor = Color.Transparent
+            containerColor = Color.Transparent,
         ) { innerPadding ->
             AppNavHost(
                 navController = navController,
@@ -564,7 +556,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                 reportsViewModel = reportsViewModel,
                 manageIgnoreRulesViewModel = manageIgnoreRulesViewModel,
                 manageParseRulesViewModel = manageParseRulesViewModel,
-                tagViewModel = tagViewModel
+                tagViewModel = tagViewModel,
             )
         }
 
@@ -578,7 +570,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
             ModalBottomSheet(
                 onDismissRequest = onDismiss,
                 sheetState = sheetState,
-                containerColor = popupContainerColor
+                containerColor = popupContainerColor,
             ) {
                 CategoryPickerSheet(
                     title = "Change Category",
@@ -588,7 +580,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                         transactionViewModel.cancelCategoryChange()
                     },
                     onDismiss = onDismiss,
-                    onAddNew = null
+                    onAddNew = null,
                 )
             }
         }
@@ -600,22 +592,25 @@ fun MainAppScreen(shortcutAction: String? = null) {
             AlertDialog(
                 onDismissRequest = { transactionViewModel.onCancelDeleteSelection() },
                 title = { Text("Delete Transactions?") },
-                text = { Text("Are you sure you want to permanently delete the selected $selectedIdsCount transaction(s)? This action cannot be undone.") },
+                text = {
+                    Text(
+                        "Are you sure you want to permanently delete the selected $selectedIdsCount transaction(s)? This action cannot be undone.",
+                    )
+                },
                 confirmButton = {
                     Button(
                         onClick = { transactionViewModel.onConfirmDeleteSelection() },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     ) { Text("Delete") }
                 },
                 dismissButton = {
                     TextButton(onClick = { transactionViewModel.onCancelDeleteSelection() }) { Text("Cancel") }
                 },
-                containerColor = popupContainerColor
+                containerColor = popupContainerColor,
             )
         }
     }
 }
-
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -636,12 +631,12 @@ fun AppNavHost(
     reportsViewModel: ReportsViewModel,
     manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel,
     manageParseRulesViewModel: ManageParseRulesViewModel,
-    tagViewModel: TagViewModel
+    tagViewModel: TagViewModel,
 ) {
     NavHost(
         navController = navController,
         startDestination = "splash_screen",
-        modifier = modifier
+        modifier = modifier,
     ) {
         // --- NEW: Route for Spending Analysis Screen ---
         composable(
@@ -649,36 +644,38 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             AnalysisScreen(navController = navController)
         }
         if (io.pm.finlight.BuildConfig.ENABLE_DEV_TOOLS) {
             composable("batch_analysis") {
-                 BatchAnalysisScreen(navController = navController)
+                BatchAnalysisScreen(navController = navController)
             }
         }
         // --- NEW: Route for Spending Analysis Detail Screen ---
         composable(
             "analysis_detail_screen/{dimension}/{dimensionId}/{startDate}/{endDate}?title={title}",
-            arguments = listOf(
-                navArgument("dimension") { type = NavType.EnumType(AnalysisDimension::class.java) },
-                navArgument("dimensionId") { type = NavType.StringType },
-                navArgument("startDate") { type = NavType.LongType },
-                navArgument("endDate") { type = NavType.LongType },
-                navArgument("title") { type = NavType.StringType }
-            ),
+            arguments =
+                listOf(
+                    navArgument("dimension") { type = NavType.EnumType(AnalysisDimension::class.java) },
+                    navArgument("dimensionId") { type = NavType.StringType },
+                    navArgument("startDate") { type = NavType.LongType },
+                    navArgument("endDate") { type = NavType.LongType },
+                    navArgument("title") { type = NavType.StringType },
+                ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
-            val dimension = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                backStackEntry.arguments?.getSerializable("dimension", AnalysisDimension::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                backStackEntry.arguments?.getSerializable("dimension") as? AnalysisDimension
-            }
+            val dimension =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    backStackEntry.arguments?.getSerializable("dimension", AnalysisDimension::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    backStackEntry.arguments?.getSerializable("dimension") as? AnalysisDimension
+                }
             val dimensionId = backStackEntry.arguments?.getString("dimensionId")
             val title = URLDecoder.decode(backStackEntry.arguments?.getString("title"), "UTF-8")
             val startDate = backStackEntry.arguments?.getLong("startDate")
@@ -692,7 +689,7 @@ fun AppNavHost(
                     title = title,
                     startDate = startDate,
                     endDate = endDate,
-                    transactionViewModel = transactionViewModel
+                    transactionViewModel = transactionViewModel,
                 )
             }
         }
@@ -701,11 +698,11 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             SmsDebugScreen(
                 navController = navController,
-                transactionViewModel = transactionViewModel
+                transactionViewModel = transactionViewModel,
             )
         }
         // --- DELETED: "account_mapping_screen" route ---
@@ -714,7 +711,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             CustomizeDashboardScreen(navController = navController, viewModel = dashboardViewModel)
         }
@@ -729,13 +726,13 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             val transactionId = backStackEntry.arguments!!.getInt("transactionId")
             SplitTransactionScreen(
                 navController = navController,
                 transactionId = transactionId,
-                transactionViewModel = transactionViewModel
+                transactionViewModel = transactionViewModel,
             )
         }
 
@@ -744,14 +741,14 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { ManageParseRulesScreen(navController, manageParseRulesViewModel) }
         composable(
             "manage_ignore_rules",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             ManageIgnoreRulesScreen(navController = navController, viewModel = manageIgnoreRulesViewModel)
         }
@@ -760,25 +757,28 @@ fun AppNavHost(
             DashboardScreen(
                 navController = navController,
                 dashboardViewModel = dashboardViewModel,
-                transactionViewModel = transactionViewModel
+                transactionViewModel = transactionViewModel,
             )
         }
         composable(
             route = "transaction_list?initialTab={initialTab}",
-            arguments = listOf(navArgument("initialTab") {
-                type = NavType.IntType
-                defaultValue = 0
-            }),
+            arguments =
+                listOf(
+                    navArgument("initialTab") {
+                        type = NavType.IntType
+                        defaultValue = 0
+                    },
+                ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             val initialTab = backStackEntry.arguments?.getInt("initialTab") ?: 0
             TransactionListScreen(
                 navController = navController,
                 viewModel = transactionViewModel,
-                initialTab = initialTab
+                initialTab = initialTab,
             )
         }
         composable(
@@ -787,7 +787,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { ReportsScreen(navController, reportsViewModel) }
 
         composable(
@@ -795,11 +795,11 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             ProfileScreen(
                 navController = navController,
-                profileViewModel = profileViewModel
+                profileViewModel = profileViewModel,
             )
         }
         composable(
@@ -807,29 +807,49 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { EditProfileScreen(navController, profileViewModel) }
         composable(
             "csv_validation_screen",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { CsvValidationScreen(navController, settingsViewModel) }
         composable(
             route = "search_screen?categoryId={categoryId}&date={date}&safeToSpend={safeToSpend}&focusSearch={focusSearch}&expandFilters={expandFilters}&query={query}",
-            arguments = listOf(
-                navArgument("categoryId") { type = NavType.IntType; defaultValue = -1 },
-                navArgument("date") { type = NavType.LongType; defaultValue = -1L },
-                navArgument("safeToSpend") { type = NavType.LongType; defaultValue = -1L },
-                navArgument("focusSearch") { type = NavType.BoolType; defaultValue = true },
-                navArgument("expandFilters") { type = NavType.BoolType; defaultValue = true },
-                navArgument("query") { type = NavType.StringType; nullable = true; defaultValue = null }
-            ),
+            arguments =
+                listOf(
+                    navArgument("categoryId") {
+                        type = NavType.IntType
+                        defaultValue = -1
+                    },
+                    navArgument("date") {
+                        type = NavType.LongType
+                        defaultValue = -1L
+                    },
+                    navArgument("safeToSpend") {
+                        type = NavType.LongType
+                        defaultValue = -1L
+                    },
+                    navArgument("focusSearch") {
+                        type = NavType.BoolType
+                        defaultValue = true
+                    },
+                    navArgument("expandFilters") {
+                        type = NavType.BoolType
+                        defaultValue = true
+                    },
+                    navArgument("query") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             val categoryId = backStackEntry.arguments?.getInt("categoryId") ?: -1
             val date = backStackEntry.arguments?.getLong("date") ?: -1L
@@ -838,14 +858,22 @@ fun AppNavHost(
             val expandFilters = backStackEntry.arguments?.getBoolean("expandFilters") ?: true
             val query = backStackEntry.arguments?.getString("query")
 
-            val factory = SearchViewModelFactory(
-                activity.application,
-                if (categoryId != -1) categoryId else null,
-                if (date != -1L) date else null,
-                query
-            )
+            val factory =
+                SearchViewModelFactory(
+                    activity.application,
+                    if (categoryId != -1) categoryId else null,
+                    if (date != -1L) date else null,
+                    query,
+                )
             val searchViewModel: SearchViewModel = viewModel(factory = factory)
-            SearchScreen(navController, searchViewModel, transactionViewModel, focusSearch, expandFilters, if (safeToSpend != -1L) safeToSpend else null)
+            SearchScreen(
+                navController,
+                searchViewModel,
+                transactionViewModel,
+                focusSearch,
+                expandFilters,
+                if (safeToSpend != -1L) safeToSpend else null,
+            )
         }
         composable(
             route = "review_sms_screen",
@@ -853,7 +881,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { ReviewSmsScreen(navController, settingsViewModel) }
 
         composable(
@@ -861,21 +889,25 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             IncomeScreen(navController, incomeViewModel, transactionViewModel)
         }
 
         composable(
             route = "approve_transaction_screen?potentialTxnJson={potentialTxnJson}",
-            arguments = listOf(
-                navArgument("potentialTxnJson") { type = NavType.StringType }
-            ),
-            deepLinks = listOf(navDeepLink { uriPattern = "app://finlight.pm.io/approve_transaction_screen?potentialTxnJson={potentialTxnJson}" }),
+            arguments =
+                listOf(
+                    navArgument("potentialTxnJson") { type = NavType.StringType },
+                ),
+            deepLinks =
+                listOf(
+                    navDeepLink { uriPattern = "app://finlight.pm.io/approve_transaction_screen?potentialTxnJson={potentialTxnJson}" },
+                ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             val json = backStackEntry.arguments?.getString("potentialTxnJson")
             val potentialTxn = Gson().fromJson(URLDecoder.decode(json, "UTF-8"), PotentialTransaction::class.java)
@@ -884,22 +916,37 @@ fun AppNavHost(
                 navController = navController,
                 transactionViewModel = transactionViewModel,
                 settingsViewModel = settingsViewModel,
-                potentialTxn = potentialTxn
+                potentialTxn = potentialTxn,
             )
         }
 
         composable(
             "add_transaction?isCsvEdit={isCsvEdit}&csvLineNumber={csvLineNumber}&initialDataJson={initialDataJson}&transactionType={transactionType}",
-            arguments = listOf(
-                navArgument("isCsvEdit") { type = NavType.BoolType; defaultValue = false },
-                navArgument("csvLineNumber") { type = NavType.IntType; defaultValue = -1 },
-                navArgument("initialDataJson") { type = NavType.StringType; nullable = true; defaultValue = null },
-                navArgument("transactionType") { type = NavType.StringType; nullable = true; defaultValue = null }
-            ),
+            arguments =
+                listOf(
+                    navArgument("isCsvEdit") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
+                    navArgument("csvLineNumber") {
+                        type = NavType.IntType
+                        defaultValue = -1
+                    },
+                    navArgument("initialDataJson") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("transactionType") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             val arguments = requireNotNull(backStackEntry.arguments)
             AddTransactionScreen(
@@ -907,7 +954,7 @@ fun AppNavHost(
                 viewModel = transactionViewModel,
                 isCsvEdit = arguments.getBoolean("isCsvEdit"),
                 initialDataJson = arguments.getString("initialDataJson")?.let { URLDecoder.decode(it, "UTF-8") },
-                initialTransactionType = arguments.getString("transactionType")
+                initialTransactionType = arguments.getString("transactionType"),
             )
         }
 
@@ -918,7 +965,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             val transactionId = backStackEntry.arguments!!.getInt("transactionId")
             TransactionDetailScreen(
@@ -926,7 +973,7 @@ fun AppNavHost(
                 transactionId = transactionId,
                 viewModel = transactionViewModel,
                 accountViewModel = accountViewModel,
-                onSaveRenameRule = { original, new -> settingsViewModel.saveMerchantRenameRule(original, new) }
+                onSaveRenameRule = { original, new -> settingsViewModel.saveMerchantRenameRule(original, new) },
             )
         }
 
@@ -935,7 +982,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { AccountListScreen(navController, accountViewModel) }
 
         composable(
@@ -943,7 +990,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             AddEditAccountScreen(navController, accountViewModel, null)
         }
@@ -953,7 +1000,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             AddEditAccountScreen(navController, accountViewModel, backStackEntry.arguments!!.getInt("accountId"))
         }
@@ -964,7 +1011,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             AccountDetailScreen(navController, accountViewModel, backStackEntry.arguments!!.getInt("accountId"))
         }
@@ -973,14 +1020,14 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { BudgetScreen(navController, budgetViewModel) }
         composable(
             "add_budget",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { AddEditBudgetScreen(navController, budgetViewModel, null) }
         composable(
             "edit_budget/{budgetId}",
@@ -988,7 +1035,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             AddEditBudgetScreen(navController, budgetViewModel, backStackEntry.arguments?.getInt("budgetId"))
         }
@@ -997,33 +1044,40 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { CategoryListScreen(navController, categoryViewModel) }
         composable(
             "tag_management",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { TagManagementScreen(navController = navController, viewModel = tagViewModel) }
 
         composable(
             "rule_creation_screen?potentialTransactionJson={potentialTransactionJson}&ruleId={ruleId}",
-            arguments = listOf(
-                navArgument("potentialTransactionJson") { type = NavType.StringType; nullable = true },
-                navArgument("ruleId") { type = NavType.IntType; defaultValue = -1 }
-            ),
+            arguments =
+                listOf(
+                    navArgument("potentialTransactionJson") {
+                        type = NavType.StringType
+                        nullable = true
+                    },
+                    navArgument("ruleId") {
+                        type = NavType.IntType
+                        defaultValue = -1
+                    },
+                ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             val json = backStackEntry.arguments?.getString("potentialTransactionJson")
             val ruleId = backStackEntry.arguments?.getInt("ruleId")
             RuleCreationScreen(
                 navController = navController,
                 potentialTransactionJson = json?.let { URLDecoder.decode(it, "UTF-8") },
-                ruleId = if (ruleId == -1) null else ruleId
+                ruleId = if (ruleId == -1) null else ruleId,
             )
         }
 
@@ -1033,7 +1087,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             val json = backStackEntry.arguments?.getString("potentialTransactionJson") ?: ""
             LinkTransactionScreen(navController = navController, potentialTransactionJson = json)
@@ -1046,7 +1100,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             val json = backStackEntry.arguments?.getString("potentialTransactionJson") ?: ""
             LinkRecurringTransactionScreen(navController = navController, potentialTransactionJson = json)
@@ -1054,23 +1108,36 @@ fun AppNavHost(
 
         composable(
             "time_period_report_screen/{timePeriod}?date={date}&showPreviousMonth={showPreviousMonth}",
-            arguments = listOf(
-                navArgument("timePeriod") { type = NavType.EnumType(TimePeriod::class.java) },
-                navArgument("date") { type = NavType.LongType; defaultValue = -1L },
-                navArgument("showPreviousMonth") { type = NavType.BoolType; defaultValue = false }
-            ),
-            deepLinks = listOf(navDeepLink { uriPattern = "app://finlight.pm.io/report/{timePeriod}?date={date}&showPreviousMonth={showPreviousMonth}" }),
+            arguments =
+                listOf(
+                    navArgument("timePeriod") { type = NavType.EnumType(TimePeriod::class.java) },
+                    navArgument("date") {
+                        type = NavType.LongType
+                        defaultValue = -1L
+                    },
+                    navArgument("showPreviousMonth") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
+                ),
+            deepLinks =
+                listOf(
+                    navDeepLink {
+                        uriPattern = "app://finlight.pm.io/report/{timePeriod}?date={date}&showPreviousMonth={showPreviousMonth}"
+                    },
+                ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
-            val timePeriod = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                backStackEntry.arguments?.getSerializable("timePeriod", TimePeriod::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                backStackEntry.arguments?.getSerializable("timePeriod") as? TimePeriod
-            }
+            val timePeriod =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    backStackEntry.arguments?.getSerializable("timePeriod", TimePeriod::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    backStackEntry.arguments?.getSerializable("timePeriod") as? TimePeriod
+                }
             val date = backStackEntry.arguments?.getLong("date")
             val showPreviousMonth = backStackEntry.arguments?.getBoolean("showPreviousMonth") ?: false
             if (timePeriod != null) {
@@ -1079,7 +1146,7 @@ fun AppNavHost(
                     timePeriod = timePeriod,
                     transactionViewModel = transactionViewModel,
                     initialDateMillis = date,
-                    showPreviousMonth = showPreviousMonth
+                    showPreviousMonth = showPreviousMonth,
                 )
             }
         }
@@ -1089,7 +1156,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             AppearanceSettingsScreen(navController, settingsViewModel)
         }
@@ -1098,7 +1165,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             AutomationSettingsScreen(navController, settingsViewModel)
         }
@@ -1107,7 +1174,7 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             NotificationSettingsScreen(navController, settingsViewModel)
         }
@@ -1116,20 +1183,23 @@ fun AppNavHost(
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             DataSettingsScreen(navController, settingsViewModel)
         }
         composable(
             "currency_travel_settings?tripId={tripId}",
-            arguments = listOf(navArgument("tripId") {
-                type = NavType.IntType
-                defaultValue = -1
-            }),
+            arguments =
+                listOf(
+                    navArgument("tripId") {
+                        type = NavType.IntType
+                        defaultValue = -1
+                    },
+                ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             val context = LocalContext.current.applicationContext as Application
             val tripId = backStackEntry.arguments?.getInt("tripId")
@@ -1138,11 +1208,12 @@ fun AppNavHost(
         }
         composable(
             "category_detail/{categoryName}/{month}/{year}",
-            arguments = listOf(
-                navArgument("categoryName") { type = NavType.StringType },
-                navArgument("month") { type = NavType.IntType },
-                navArgument("year") { type = NavType.IntType }
-            )
+            arguments =
+                listOf(
+                    navArgument("categoryName") { type = NavType.StringType },
+                    navArgument("month") { type = NavType.IntType },
+                    navArgument("year") { type = NavType.IntType },
+                ),
         ) { backStackEntry ->
             val categoryName = URLDecoder.decode(backStackEntry.arguments?.getString("categoryName"), "UTF-8")
             val month = backStackEntry.arguments?.getInt("month") ?: 0
@@ -1153,16 +1224,17 @@ fun AppNavHost(
                 entityName = categoryName,
                 month = month,
                 year = year,
-                transactionViewModel = transactionViewModel
+                transactionViewModel = transactionViewModel,
             )
         }
         composable(
             "merchant_detail/{merchantName}/{month}/{year}",
-            arguments = listOf(
-                navArgument("merchantName") { type = NavType.StringType },
-                navArgument("month") { type = NavType.IntType },
-                navArgument("year") { type = NavType.IntType }
-            )
+            arguments =
+                listOf(
+                    navArgument("merchantName") { type = NavType.StringType },
+                    navArgument("month") { type = NavType.IntType },
+                    navArgument("year") { type = NavType.IntType },
+                ),
         ) { backStackEntry ->
             val merchantName = URLDecoder.decode(backStackEntry.arguments?.getString("merchantName"), "UTF-8")
             val month = backStackEntry.arguments?.getInt("month") ?: 0
@@ -1173,26 +1245,27 @@ fun AppNavHost(
                 entityName = merchantName,
                 month = month,
                 year = year,
-                transactionViewModel = transactionViewModel
+                transactionViewModel = transactionViewModel,
             )
         }
         composable(
             "trip_detail/{tripId}/{tagId}",
-            arguments = listOf(
-                navArgument("tripId") { type = NavType.IntType },
-                navArgument("tagId") { type = NavType.IntType }
-            ),
+            arguments =
+                listOf(
+                    navArgument("tripId") { type = NavType.IntType },
+                    navArgument("tagId") { type = NavType.IntType },
+                ),
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
-            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) }
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getInt("tripId") ?: 0
             val tagId = backStackEntry.arguments?.getInt("tagId") ?: 0
             TripDetailScreen(
                 navController = navController,
                 tripId = tripId,
-                tagId = tagId
+                tagId = tagId,
             )
         }
     }
@@ -1209,9 +1282,10 @@ fun SplashScreen(navController: NavHostController) {
 
         if (isFirstLaunch) {
             statusText = "Checking for restored data..."
-            val restored = withContext(Dispatchers.IO) {
-                DataExportService.restoreFromBackupSnapshot(context)
-            }
+            val restored =
+                withContext(Dispatchers.IO) {
+                    DataExportService.restoreFromBackupSnapshot(context)
+                }
             if (restored) {
                 statusText = "Data restored successfully!"
                 delay(1500) // Give user time to see the message
@@ -1229,7 +1303,7 @@ fun SplashScreen(navController: NavHostController) {
 
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
@@ -1245,62 +1319,64 @@ private fun CategoryPickerSheet(
     items: List<Category>,
     onItemSelected: (Category) -> Unit,
     onDismiss: () -> Unit,
-    onAddNew: (() -> Unit)? = null
+    onAddNew: (() -> Unit)? = null,
 ) {
     Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {
         Text(
             title,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 100.dp),
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             items(items) { category ->
                 Column(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            onItemSelected(category)
-                        }
-                        .padding(vertical = 12.dp),
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                onItemSelected(category)
+                            }
+                            .padding(vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     CategoryIconDisplay(category)
                     Text(
                         category.name,
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
             if (onAddNew != null) {
                 item {
                     Column(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable(onClick = onAddNew)
-                            .padding(vertical = 12.dp)
-                            .height(80.dp),
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(onClick = onAddNew)
+                                .padding(vertical = 12.dp)
+                                .height(80.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        verticalArrangement = Arrangement.Center,
                     ) {
                         Icon(
                             Icons.Default.AddCircleOutline,
                             contentDescription = "Create New",
                             modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
                             "New",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 }
@@ -1313,32 +1389,33 @@ private fun CategoryPickerSheet(
 @Composable
 private fun CategoryIconDisplay(category: Category) {
     Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-        contentAlignment = Alignment.Center
+        modifier =
+            Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
+        contentAlignment = Alignment.Center,
     ) {
         if (category.name == "Uncategorized") {
             Icon(
                 imageVector = CategoryIconHelper.getIcon("help_outline"),
                 contentDescription = category.name,
                 tint = Color.Black,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             )
         } else if (category.iconKey == "letter_default") {
             Text(
                 text = category.name.firstOrNull()?.uppercase() ?: "?",
                 color = Color.Black,
                 fontWeight = FontWeight.Bold,
-                fontSize = 22.sp
+                fontSize = 22.sp,
             )
         } else {
             Icon(
                 imageVector = CategoryIconHelper.getIcon(category.iconKey),
                 contentDescription = category.name,
                 tint = Color.Black,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             )
         }
     }
@@ -1372,19 +1449,21 @@ fun ForceAppScaling(content: @Composable () -> Unit) {
     // TargetDensity = CurrentDensity * (CurrentWidth / TargetWidth)
     // Example: 320 / 375 = 0.85. New Density = 3.0 * 0.85 = 2.55.
     // New Width = (320 * 3.0) / 2.55 = 376.
-    val densityMultiplier = if (screenWidthDp < minWidthDp && screenWidthDp > 0) {
-        screenWidthDp / minWidthDp
-    } else {
-        1f
-    }
+    val densityMultiplier =
+        if (screenWidthDp < minWidthDp && screenWidthDp > 0) {
+            screenWidthDp / minWidthDp
+        } else {
+            1f
+        }
 
-    val customDensity = Density(
-        density = density.density * densityMultiplier,
-        fontScale = 1f // Always enforce 1.0 font scale
-    )
+    val customDensity =
+        Density(
+            density = density.density * densityMultiplier,
+            fontScale = 1f, // Always enforce 1.0 font scale
+        )
 
     CompositionLocalProvider(
         LocalDensity provides customDensity,
-        content = content
+        content = content,
     )
 }

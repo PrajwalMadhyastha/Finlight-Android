@@ -22,9 +22,8 @@ import kotlin.math.roundToInt
 
 class MonthlySummaryWorker(
     private val context: Context,
-    workerParams: WorkerParameters
+    workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
-
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
@@ -32,42 +31,45 @@ class MonthlySummaryWorker(
 
                 // --- Date range for LAST MONTH ---
                 val lastMonthCalendar = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
-                val lastMonthEnd = Calendar.getInstance().apply {
-                    set(Calendar.DAY_OF_MONTH, 1)
-                    add(Calendar.DAY_OF_MONTH, -1)
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59) // --- FIX
-                    set(Calendar.MILLISECOND, 999) // --- FIX
-                }.timeInMillis
-                val lastMonthStart = Calendar.getInstance().apply {
-                    add(Calendar.MONTH, -1)
-                    set(Calendar.DAY_OF_MONTH, 1)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0) // --- FIX
-                    set(Calendar.MILLISECOND, 0) // --- FIX
-                }.timeInMillis
+                val lastMonthEnd =
+                    Calendar.getInstance().apply {
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.DAY_OF_MONTH, -1)
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59) // --- FIX
+                        set(Calendar.MILLISECOND, 999) // --- FIX
+                    }.timeInMillis
+                val lastMonthStart =
+                    Calendar.getInstance().apply {
+                        add(Calendar.MONTH, -1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0) // --- FIX
+                        set(Calendar.MILLISECOND, 0) // --- FIX
+                    }.timeInMillis
 
                 // --- Date range for PREVIOUS-TO-LAST MONTH ---
-                val prevMonthEnd = Calendar.getInstance().apply {
-                    add(Calendar.MONTH, -1)
-                    set(Calendar.DAY_OF_MONTH, 1)
-                    add(Calendar.DAY_OF_MONTH, -1)
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59) // --- FIX
-                    set(Calendar.MILLISECOND, 999) // --- FIX
-                }.timeInMillis
-                val prevMonthStart = Calendar.getInstance().apply {
-                    add(Calendar.MONTH, -2)
-                    set(Calendar.DAY_OF_MONTH, 1)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0) // --- FIX
-                    set(Calendar.MILLISECOND, 0) // --- FIX
-                }.timeInMillis
-
+                val prevMonthEnd =
+                    Calendar.getInstance().apply {
+                        add(Calendar.MONTH, -1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.DAY_OF_MONTH, -1)
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59) // --- FIX
+                        set(Calendar.MILLISECOND, 999) // --- FIX
+                    }.timeInMillis
+                val prevMonthStart =
+                    Calendar.getInstance().apply {
+                        add(Calendar.MONTH, -2)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0) // --- FIX
+                        set(Calendar.MILLISECOND, 0) // --- FIX
+                    }.timeInMillis
 
                 val lastMonthSummary = transactionDao.getFinancialSummaryForRange(lastMonthStart, lastMonthEnd)
                 val lastMonthExpenses = lastMonthSummary?.totalExpenses ?: 0.0
@@ -77,11 +79,20 @@ class MonthlySummaryWorker(
 
                 val topCategories = transactionDao.getTopSpendingCategoriesForRange(lastMonthStart, lastMonthEnd)
 
-                val percentageChange = if (prevMonthExpenses > 0) {
-                    ((lastMonthExpenses - prevMonthExpenses) / prevMonthExpenses * 100).roundToInt()
-                } else null
+                val percentageChange =
+                    if (prevMonthExpenses > 0) {
+                        ((lastMonthExpenses - prevMonthExpenses) / prevMonthExpenses * 100).roundToInt()
+                    } else {
+                        null
+                    }
 
-                NotificationHelper.showMonthlySummaryNotification(context, lastMonthCalendar, lastMonthExpenses, percentageChange, topCategories)
+                NotificationHelper.showMonthlySummaryNotification(
+                    context,
+                    lastMonthCalendar,
+                    lastMonthExpenses,
+                    percentageChange,
+                    topCategories,
+                )
 
                 ReminderManager.scheduleMonthlySummary(context)
                 Result.success()

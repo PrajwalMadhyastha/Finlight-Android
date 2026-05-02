@@ -11,12 +11,15 @@ import android.os.Build
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -25,14 +28,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import io.pm.finlight.utils.CurrencyHelper
-import io.pm.finlight.utils.CurrencyInfo
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TripType
 import io.pm.finlight.data.db.dao.TripWithStats
@@ -40,6 +43,8 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.CurrencyViewModel
+import io.pm.finlight.utils.CurrencyHelper
+import io.pm.finlight.utils.CurrencyInfo
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.time.Instant
@@ -54,13 +59,14 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 fun CurrencyTravelScreen(
     navController: NavController,
     tripId: Int?,
-    viewModel: CurrencyViewModel
+    viewModel: CurrencyViewModel,
 ) {
     val isEditMode = tripId != null
     val homeCurrencyCode by viewModel.homeCurrency.collectAsState()
     val activeTravelSettings by viewModel.travelModeSettings.collectAsState()
     val tripToEdit by viewModel.tripToEdit.collectAsState()
     val historicTrips by viewModel.historicTrips.collectAsState()
+    val allTags by viewModel.allTags.collectAsState()
     val context = LocalContext.current
 
     DisposableEffect(Unit) {
@@ -68,7 +74,6 @@ fun CurrencyTravelScreen(
             viewModel.clearTripToEdit()
         }
     }
-
 
     // Load trip data if in edit mode
     LaunchedEffect(tripId) {
@@ -85,20 +90,24 @@ fun CurrencyTravelScreen(
     var endDate by remember { mutableStateOf<Long?>(null) }
     var tripToDelete by remember { mutableStateOf<TripWithStats?>(null) }
 
-
     // Effect to populate the UI state when the relevant data source changes
     LaunchedEffect(tripToEdit, activeTravelSettings, isEditMode) {
-        val source = if (isEditMode) {
-            tripToEdit?.let {
-                TravelModeSettings(
-                    isEnabled = true, tripName = it.tripName, tripType = it.tripType,
-                    startDate = it.startDate, endDate = it.endDate,
-                    currencyCode = it.currencyCode, conversionRate = it.conversionRate
-                )
+        val source =
+            if (isEditMode) {
+                tripToEdit?.let {
+                    TravelModeSettings(
+                        isEnabled = true,
+                        tripName = it.tripName,
+                        tripType = it.tripType,
+                        startDate = it.startDate,
+                        endDate = it.endDate,
+                        currencyCode = it.currencyCode,
+                        conversionRate = it.conversionRate,
+                    )
+                }
+            } else {
+                activeTravelSettings
             }
-        } else {
-            activeTravelSettings
-        }
 
         tripName = TextFieldValue(source?.tripName ?: "", TextRange((source?.tripName ?: "").length))
         tripType = source?.tripType ?: TripType.DOMESTIC
@@ -116,7 +125,8 @@ fun CurrencyTravelScreen(
     var showEndDatePicker by remember { mutableStateOf(false) }
     var showCancelConfirmation by remember { mutableStateOf(false) }
 
-    val isSaveEnabled = tripName.text.isNotBlank() &&
+    val isSaveEnabled =
+        tripName.text.isNotBlank() &&
             startDate != null &&
             endDate != null &&
             (tripType == TripType.DOMESTIC || (selectedCurrency != null && (conversionRate.text.toFloatOrNull() ?: 0f) > 0f))
@@ -125,10 +135,11 @@ fun CurrencyTravelScreen(
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier =
+            Modifier
+                .fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
             SettingsSection(title = "Home Currency") {
@@ -137,41 +148,46 @@ fun CurrencyTravelScreen(
                     supportingContent = { Text("Used for all reports and budgets") },
                     trailingContent = {
                         TextButton(onClick = { showHomeCurrencyPicker = true }) {
-                            Text("${CurrencyHelper.getCurrencyInfo(homeCurrencyCode)?.currencyCode ?: homeCurrencyCode} (${CurrencyHelper.getCurrencySymbol(homeCurrencyCode)})")
+                            Text(
+                                "${CurrencyHelper.getCurrencyInfo(homeCurrencyCode)?.currencyCode ?: homeCurrencyCode} (${CurrencyHelper.getCurrencySymbol(
+                                    homeCurrencyCode,
+                                )})",
+                            )
                         }
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
             }
         }
 
-
         item {
-            val sectionTitle = when {
-                isEditMode -> "Edit Trip Plan"
-                activeTravelSettings != null -> "Active Trip Plan"
-                else -> "Create New Trip Plan"
-            }
+            val sectionTitle =
+                when {
+                    isEditMode -> "Edit Trip Plan"
+                    activeTravelSettings != null -> "Active Trip Plan"
+                    else -> "Create New Trip Plan"
+                }
             SettingsSection(title = sectionTitle) {
                 TripSettingsForm(
                     tripName = tripName.text, onTripNameChange = { str ->
                         tripName = TextFieldValue(str, TextRange(str.length))
                     },
+                    allTags = allTags,
                     tripType = tripType, onTripTypeChange = { tripType = it },
                     selectedCurrency = selectedCurrency, onSelectCurrencyClick = { showTravelCurrencyPicker = true },
                     conversionRate = conversionRate.text, onConversionRateChange = { str ->
-                        conversionRate = TextFieldValue(
-                            str.filter { c -> c.isDigit() || c == '.' },
-                            TextRange(str.filter { c -> c.isDigit() || c == '.' }.length)
-                        )
+                        conversionRate =
+                            TextFieldValue(
+                                str.filter { c -> c.isDigit() || c == '.' },
+                                TextRange(str.filter { c -> c.isDigit() || c == '.' }.length),
+                            )
                     },
                     homeCurrencyCode = homeCurrencyCode,
                     startDate = startDate, onStartDateClick = { showStartDatePicker = true },
-                    endDate = endDate, onEndDateClick = { showEndDatePicker = true }
+                    endDate = endDate, onEndDateClick = { showEndDatePicker = true },
                 )
             }
         }
-
 
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -182,7 +198,7 @@ fun CurrencyTravelScreen(
                             Toast.makeText(context, "Trip Completed! Future transactions will not be tagged.", Toast.LENGTH_LONG).show()
                             navController.popBackStack()
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text("Mark Trip as Completed")
                     }
@@ -190,12 +206,16 @@ fun CurrencyTravelScreen(
 
                 Button(
                     onClick = {
-                        val settings = TravelModeSettings(
-                            isEnabled = true, tripName = tripName.text, tripType = tripType,
-                            startDate = startDate!!, endDate = endDate!!,
-                            currencyCode = if (tripType == TripType.INTERNATIONAL) selectedCurrency?.currencyCode else null,
-                            conversionRate = if (tripType == TripType.INTERNATIONAL) conversionRate.text.toFloatOrNull() else null
-                        )
+                        val settings =
+                            TravelModeSettings(
+                                isEnabled = true,
+                                tripName = tripName.text,
+                                tripType = tripType,
+                                startDate = startDate!!,
+                                endDate = endDate!!,
+                                currencyCode = if (tripType == TripType.INTERNATIONAL) selectedCurrency?.currencyCode else null,
+                                conversionRate = if (tripType == TripType.INTERNATIONAL) conversionRate.text.toFloatOrNull() else null,
+                            )
                         if (isEditMode) {
                             viewModel.updateHistoricTrip(settings)
                         } else {
@@ -208,20 +228,21 @@ fun CurrencyTravelScreen(
                     },
                     enabled = isSaveEnabled,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = if (activeTravelSettings == null && !isEditMode) ButtonDefaults.buttonColors() else ButtonDefaults.outlinedButtonColors()
+                    colors = if (activeTravelSettings == null && !isEditMode) ButtonDefaults.buttonColors() else ButtonDefaults.outlinedButtonColors(),
                 ) {
-                    val buttonText = when {
-                        isEditMode -> "Update Trip Details"
-                        activeTravelSettings == null -> "Save and Activate Plan"
-                        else -> "Save Changes to Active Plan"
-                    }
+                    val buttonText =
+                        when {
+                            isEditMode -> "Update Trip Details"
+                            activeTravelSettings == null -> "Save and Activate Plan"
+                            else -> "Save Changes to Active Plan"
+                        }
                     Text(buttonText)
                 }
 
                 if (activeTravelSettings != null && !isEditMode) {
                     TextButton(
                         onClick = { showCancelConfirmation = true },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text("Cancel Active Trip", color = MaterialTheme.colorScheme.error)
                     }
@@ -238,7 +259,7 @@ fun CurrencyTravelScreen(
                                 trip = trip,
                                 onClick = { navController.navigate("trip_detail/${trip.tripId}/${trip.tagId}") },
                                 onEditClick = { navController.navigate("currency_travel_settings?tripId=${trip.tripId}") },
-                                onDeleteClick = { tripToDelete = trip }
+                                onDeleteClick = { tripToDelete = trip },
                             )
                         }
                     }
@@ -247,13 +268,16 @@ fun CurrencyTravelScreen(
         }
     }
 
-
     if (showCancelConfirmation) {
         AlertDialog(
             onDismissRequest = { showCancelConfirmation = false },
             containerColor = popupContainerColor,
             title = { Text("Cancel Trip?") },
-            text = { Text("This will untag all transactions for this specific trip instance. The trip will be removed from your history. This cannot be undone.") },
+            text = {
+                Text(
+                    "This will untag all transactions for this specific trip instance. The trip will be removed from your history. This cannot be undone.",
+                )
+            },
             confirmButton = {
                 Button(
                     onClick = {
@@ -262,12 +286,12 @@ fun CurrencyTravelScreen(
                         Toast.makeText(context, "Trip cancelled and data removed.", Toast.LENGTH_LONG).show()
                         navController.popBackStack()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) { Text("Confirm Cancellation") }
             },
             dismissButton = {
                 TextButton(onClick = { showCancelConfirmation = false }) { Text("Nevermind") }
-            }
+            },
         )
     }
 
@@ -276,19 +300,23 @@ fun CurrencyTravelScreen(
             onDismissRequest = { tripToDelete = null },
             containerColor = popupContainerColor,
             title = { Text("Delete Trip?") },
-            text = { Text("Are you sure you want to delete '${tripToDelete?.tripName}'? This will untag ${tripToDelete?.transactionCount} transaction(s). This action cannot be undone.") },
+            text = {
+                Text(
+                    "Are you sure you want to delete '${tripToDelete?.tripName}'? This will untag ${tripToDelete?.transactionCount} transaction(s). This action cannot be undone.",
+                )
+            },
             confirmButton = {
                 Button(
                     onClick = {
                         viewModel.deleteTrip(tripToDelete!!.tripId, tripToDelete!!.tagId)
                         tripToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) { Text("Delete") }
             },
             dismissButton = {
                 TextButton(onClick = { tripToDelete = null }) { Text("Cancel") }
-            }
+            },
         )
     }
 
@@ -299,7 +327,7 @@ fun CurrencyTravelScreen(
             onCurrencySelected = {
                 viewModel.saveHomeCurrency(it.currencyCode)
                 showHomeCurrencyPicker = false
-            }
+            },
         )
     }
     if (showTravelCurrencyPicker) {
@@ -309,7 +337,7 @@ fun CurrencyTravelScreen(
             onCurrencySelected = {
                 selectedCurrency = it
                 showTravelCurrencyPicker = false
-            }
+            },
         )
     }
     if (showStartDatePicker) {
@@ -319,9 +347,10 @@ fun CurrencyTravelScreen(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { selectedMillis ->
-                        val localDate = Instant.ofEpochMilli(selectedMillis)
-                            .atZone(ZoneId.systemDefault())
-                            .toLocalDate()
+                        val localDate =
+                            Instant.ofEpochMilli(selectedMillis)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
                         val startOfDayInLocalZone = localDate.atStartOfDay(ZoneId.systemDefault())
                         startDate = startOfDayInLocalZone.toInstant().toEpochMilli()
                     }
@@ -329,11 +358,11 @@ fun CurrencyTravelScreen(
                 }) { Text("OK") }
             },
             dismissButton = { TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") } },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
         ) {
             DatePicker(
                 state = datePickerState,
-                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
             )
         }
     }
@@ -344,51 +373,107 @@ fun CurrencyTravelScreen(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { selectedMillis ->
-                        val localDate = Instant.ofEpochMilli(selectedMillis)
-                            .atZone(ZoneId.systemDefault())
-                            .toLocalDate()
-                        val endOfDayInLocalZone = localDate.atTime(23, 59, 59, 999_999_999)
-                            .atZone(ZoneId.systemDefault())
+                        val localDate =
+                            Instant.ofEpochMilli(selectedMillis)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+                        val endOfDayInLocalZone =
+                            localDate.atTime(23, 59, 59, 999_999_999)
+                                .atZone(ZoneId.systemDefault())
                         endDate = endOfDayInLocalZone.toInstant().toEpochMilli()
                     }
                     showEndDatePicker = false
                 }) { Text("OK") }
             },
             dismissButton = { TextButton(onClick = { showEndDatePicker = false }) { Text("Cancel") } },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
         ) {
             DatePicker(
                 state = datePickerState,
-                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f))
+                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
             )
         }
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TripSettingsForm(
-    tripName: String, onTripNameChange: (String) -> Unit,
-    tripType: TripType, onTripTypeChange: (TripType) -> Unit,
-    selectedCurrency: CurrencyInfo?, onSelectCurrencyClick: () -> Unit,
-    conversionRate: String, onConversionRateChange: (String) -> Unit,
+    tripName: String,
+    onTripNameChange: (String) -> Unit,
+    allTags: List<io.pm.finlight.Tag>,
+    tripType: TripType,
+    onTripTypeChange: (TripType) -> Unit,
+    selectedCurrency: CurrencyInfo?,
+    onSelectCurrencyClick: () -> Unit,
+    conversionRate: String,
+    onConversionRateChange: (String) -> Unit,
     homeCurrencyCode: String,
-    startDate: Long?, onStartDateClick: () -> Unit,
-    endDate: Long?, onEndDateClick: () -> Unit
+    startDate: Long?,
+    onStartDateClick: () -> Unit,
+    endDate: Long?,
+    onEndDateClick: () -> Unit,
 ) {
+    var expanded by remember { mutableStateOf(false) }
+    var textFieldWidth by remember { mutableStateOf(0) }
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+    val popupContainerColor = if (isThemeDark) io.pm.finlight.ui.theme.PopupSurfaceDark else io.pm.finlight.ui.theme.PopupSurfaceLight
+
     Column {
         ListItem(
             headlineContent = {
-                OutlinedTextField(
-                    value = tripName,
-                    onValueChange = onTripNameChange,
-                    label = { Text("Trip Name / Tag*") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = tripName,
+                        onValueChange = { 
+                            onTripNameChange(it)
+                            expanded = true // Show suggestions when typing
+                        },
+                        label = { Text("Trip Name / Tag*") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onGloballyPositioned { coordinates ->
+                                textFieldWidth = coordinates.size.width
+                            },
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { expanded = !expanded }) {
+                                Icon(
+                                    imageVector = if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown,
+                                    contentDescription = "Toggle Dropdown"
+                                )
+                            }
+                        }
+                    )
+                    
+                    // Filter tags based on current input, or show all if empty
+                    val filteredTags = if (tripName.isBlank()) {
+                        allTags
+                    } else {
+                        allTags.filter { it.name.contains(tripName, ignoreCase = true) }
+                    }
+                    
+                    DropdownMenu(
+                        expanded = expanded && filteredTags.isNotEmpty(),
+                        onDismissRequest = { expanded = false },
+                        properties = androidx.compose.ui.window.PopupProperties(focusable = false),
+                        modifier = Modifier
+                            .width(with(LocalDensity.current) { textFieldWidth.toDp() })
+                            .background(popupContainerColor)
+                    ) {
+                        filteredTags.forEach { tag ->
+                            DropdownMenuItem(
+                                text = { Text(tag.name, color = MaterialTheme.colorScheme.onSurface) },
+                                onClick = {
+                                    onTripNameChange(tag.name)
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
             },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
         ListItem(
@@ -398,16 +483,16 @@ private fun TripSettingsForm(
                     SegmentedButton(
                         selected = tripType == TripType.DOMESTIC,
                         onClick = { onTripTypeChange(TripType.DOMESTIC) },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                     ) { Text("Domestic") }
                     SegmentedButton(
                         selected = tripType == TripType.INTERNATIONAL,
                         onClick = { onTripTypeChange(TripType.INTERNATIONAL) },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                     ) { Text("International") }
                 }
             },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
         AnimatedVisibility(visible = tripType == TripType.INTERNATIONAL) {
             Column {
@@ -419,7 +504,7 @@ private fun TripSettingsForm(
                             Text(selectedCurrency?.currencyCode ?: "Select")
                         }
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                 ListItem(
@@ -429,7 +514,7 @@ private fun TripSettingsForm(
                             Text(
                                 "1 ${selectedCurrency?.currencyCode ?: "Foreign"} = ? $homeCurrencyCode",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     },
@@ -440,10 +525,10 @@ private fun TripSettingsForm(
                             modifier = Modifier.width(100.dp),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
-                            label = { Text(homeCurrencyCode) }
+                            label = { Text(homeCurrencyCode) },
                         )
                     },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
             }
         }
@@ -456,7 +541,7 @@ private fun TripSettingsForm(
                     Text(startDate?.let { formatter.format(Date(it)) } ?: "Select")
                 }
             },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
         ListItem(
@@ -467,16 +552,15 @@ private fun TripSettingsForm(
                     Text(endDate?.let { formatter.format(Date(it)) } ?: "Select")
                 }
             },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
     }
 }
 
-
 @Composable
 private fun SettingsSection(
     title: String,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -497,7 +581,7 @@ private fun SettingsSection(
 private fun CurrencyPickerDialog(
     title: String,
     onDismiss: () -> Unit,
-    onCurrencySelected: (CurrencyInfo) -> Unit
+    onCurrencySelected: (CurrencyInfo) -> Unit,
 ) {
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -513,7 +597,7 @@ private fun CurrencyPickerDialog(
                         ListItem(
                             headlineContent = { Text("${currency.countryName} (${currency.currencyCode})") },
                             trailingContent = { Text(currency.currencySymbol) },
-                            modifier = Modifier.clickable { onCurrencySelected(currency) }
+                            modifier = Modifier.clickable { onCurrencySelected(currency) },
                         )
                     }
                 }
@@ -524,7 +608,7 @@ private fun CurrencyPickerDialog(
                 Text("Cancel")
             }
         },
-        containerColor = popupContainerColor.copy(alpha = 1f)
+        containerColor = popupContainerColor.copy(alpha = 1f),
     )
 }
 
@@ -534,7 +618,7 @@ private fun HistoricTripItem(
     trip: TripWithStats,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     val dateFormat = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
@@ -547,12 +631,12 @@ private fun HistoricTripItem(
                         text = trip.tripName,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "${dateFormat.format(Date(trip.startDate))} - ${dateFormat.format(Date(trip.endDate))}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 IconButton(onClick = onEditClick) {
@@ -562,10 +646,13 @@ private fun HistoricTripItem(
                     Icon(Icons.Default.Delete, "Delete Trip", tint = MaterialTheme.colorScheme.error)
                 }
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column {
                     Text("Total Spend", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -573,7 +660,7 @@ private fun HistoricTripItem(
                         currencyFormat.format(trip.totalSpend),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
@@ -582,7 +669,7 @@ private fun HistoricTripItem(
                         "${trip.transactionCount}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }

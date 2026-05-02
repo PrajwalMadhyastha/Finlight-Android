@@ -18,7 +18,11 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.unit.Dp
 import kotlin.math.absoluteValue
 
-private fun lerp(start: Dp, stop: Dp, fraction: Float): Dp {
+private fun lerp(
+    start: Dp,
+    stop: Dp,
+    fraction: Float,
+): Dp {
     return Dp(start.value + (stop.value - start.value) * fraction)
 }
 
@@ -26,31 +30,34 @@ private fun lerp(start: Dp, stop: Dp, fraction: Float): Dp {
 fun Modifier.pagerTabIndicatorOffset(
     pagerState: PagerState,
     tabPositions: List<TabPosition>,
-): Modifier = composed {
-    if (tabPositions.isEmpty()) {
-        this
-    } else {
-        val currentPage = pagerState.currentPage
-        val fraction = pagerState.currentPageOffsetFraction.absoluteValue
-
-        val currentTab = tabPositions[currentPage]
-        val nextTab = tabPositions.getOrNull(currentPage + 1)
-
-        val targetIndicatorOffset = if (nextTab != null) {
-            lerp(currentTab.left, nextTab.left, fraction)
+): Modifier =
+    composed {
+        if (tabPositions.isEmpty()) {
+            this
         } else {
-            currentTab.left
-        }
+            val currentPage = pagerState.currentPage
+            val fraction = pagerState.currentPageOffsetFraction.absoluteValue
 
-        val indicatorWidth = if (nextTab != null) {
-            lerp(currentTab.width, nextTab.width, fraction)
-        } else {
-            currentTab.width
-        }
+            val currentTab = tabPositions[currentPage]
+            val nextTab = tabPositions.getOrNull(currentPage + 1)
 
-        this.fillMaxWidth()
-            .wrapContentSize(Alignment.BottomStart)
-            .offset(x = targetIndicatorOffset)
-            .width(indicatorWidth)
+            val targetIndicatorOffset =
+                if (nextTab != null) {
+                    lerp(currentTab.left, nextTab.left, fraction)
+                } else {
+                    currentTab.left
+                }
+
+            val indicatorWidth =
+                if (nextTab != null) {
+                    lerp(currentTab.width, nextTab.width, fraction)
+                } else {
+                    currentTab.width
+                }
+
+            this.fillMaxWidth()
+                .wrapContentSize(Alignment.BottomStart)
+                .offset(x = targetIndicatorOffset)
+                .width(indicatorWidth)
+        }
     }
-}

@@ -17,7 +17,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -25,7 +24,6 @@ import kotlin.test.assertTrue
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class GoalDaoTest {
-
     @get:Rule
     val dbRule = DatabaseTestRule()
 
@@ -35,117 +33,127 @@ class GoalDaoTest {
     private var accountId: Int = 0
 
     @Before
-    fun setup() = runTest {
-        goalDao = dbRule.db.goalDao()
-        accountDao = dbRule.db.accountDao()
-        accountId = accountDao.insert(Account(name = "Savings", type = "Bank")).toInt()
-    }
-
-    @Test
-    fun `getAllGoalsWithAccountName returns goal with correct account name`() = runTest {
-        // Arrange
-        val goal = Goal(name = "Trip to Japan", targetAmount = 200000.0, savedAmount = 25000.0, targetDate = null, accountId = accountId)
-        goalDao.insert(goal)
-
-        // Act & Assert
-        goalDao.getAllGoalsWithAccountName().test {
-            val goalsWithAccount = awaitItem()
-            assertEquals(1, goalsWithAccount.size)
-            val result = goalsWithAccount.first()
-
-            assertEquals("Trip to Japan", result.name)
-            assertEquals("Savings", result.accountName)
-            assertEquals(accountId, result.accountId)
-
-            cancelAndIgnoreRemainingEvents()
+    fun setup() =
+        runTest {
+            goalDao = dbRule.db.goalDao()
+            accountDao = dbRule.db.accountDao()
+            accountId = accountDao.insert(Account(name = "Savings", type = "Bank")).toInt()
         }
-    }
 
     @Test
-    fun `reassignGoals updates accountId for specified goals`() = runTest {
-        // Arrange
-        val sourceAccountId = accountDao.insert(Account(name = "Source", type = "Bank")).toInt()
-        val destAccountId = accountDao.insert(Account(name = "Destination", type = "Bank")).toInt()
-        goalDao.insert(Goal(name = "Goal 1", targetAmount = 100.0, savedAmount = 0.0, targetDate = null, accountId = sourceAccountId))
-        goalDao.insert(Goal(name = "Goal 2", targetAmount = 200.0, savedAmount = 0.0, targetDate = null, accountId = sourceAccountId))
+    fun `getAllGoalsWithAccountName returns goal with correct account name`() =
+        runTest {
+            // Arrange
+            val goal =
+                Goal(name = "Trip to Japan", targetAmount = 200000.0, savedAmount = 25000.0, targetDate = null, accountId = accountId)
+            goalDao.insert(goal)
 
-        // Act
-        goalDao.reassignGoals(listOf(sourceAccountId), destAccountId)
+            // Act & Assert
+            goalDao.getAllGoalsWithAccountName().test {
+                val goalsWithAccount = awaitItem()
+                assertEquals(1, goalsWithAccount.size)
+                val result = goalsWithAccount.first()
 
-        // Assert
-        goalDao.getAllGoalsWithAccountName().test {
-            val updatedGoals = awaitItem()
-            assertEquals(2, updatedGoals.size)
-            assertTrue(updatedGoals.all { it.accountId == destAccountId })
-            cancelAndIgnoreRemainingEvents()
+                assertEquals("Trip to Japan", result.name)
+                assertEquals("Savings", result.accountName)
+                assertEquals(accountId, result.accountId)
+
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `update modifies goal correctly`() = runTest {
-        // Arrange
-        val goal = Goal(name = "Old Name", targetAmount = 100.0, savedAmount = 0.0, targetDate = null, accountId = accountId)
-        goalDao.insert(goal)
-        val insertedGoal = goalDao.getAll().first()
-        val updatedGoal = insertedGoal.copy(name = "New Name", savedAmount = 50.0)
+    fun `reassignGoals updates accountId for specified goals`() =
+        runTest {
+            // Arrange
+            val sourceAccountId = accountDao.insert(Account(name = "Source", type = "Bank")).toInt()
+            val destAccountId = accountDao.insert(Account(name = "Destination", type = "Bank")).toInt()
+            goalDao.insert(Goal(name = "Goal 1", targetAmount = 100.0, savedAmount = 0.0, targetDate = null, accountId = sourceAccountId))
+            goalDao.insert(Goal(name = "Goal 2", targetAmount = 200.0, savedAmount = 0.0, targetDate = null, accountId = sourceAccountId))
 
-        // Act
-        goalDao.update(updatedGoal)
+            // Act
+            goalDao.reassignGoals(listOf(sourceAccountId), destAccountId)
 
-        // Assert
-        goalDao.getGoalById(insertedGoal.id).test {
-            val fromDb = awaitItem()
-            assertEquals("New Name", fromDb?.name)
-            assertEquals(50.0, fromDb?.savedAmount)
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            goalDao.getAllGoalsWithAccountName().test {
+                val updatedGoals = awaitItem()
+                assertEquals(2, updatedGoals.size)
+                assertTrue(updatedGoals.all { it.accountId == destAccountId })
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `delete removes goal`() = runTest {
-        // Arrange
-        val goal = Goal(name = "To Delete", targetAmount = 100.0, savedAmount = 0.0, targetDate = null, accountId = accountId)
-        goalDao.insert(goal)
-        val insertedGoal = goalDao.getAll().first()
+    fun `update modifies goal correctly`() =
+        runTest {
+            // Arrange
+            val goal = Goal(name = "Old Name", targetAmount = 100.0, savedAmount = 0.0, targetDate = null, accountId = accountId)
+            goalDao.insert(goal)
+            val insertedGoal = goalDao.getAll().first()
+            val updatedGoal = insertedGoal.copy(name = "New Name", savedAmount = 50.0)
 
-        // Act
-        goalDao.delete(insertedGoal)
+            // Act
+            goalDao.update(updatedGoal)
 
-        // Assert
-        goalDao.getGoalById(insertedGoal.id).test {
-            assertNull(awaitItem())
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            goalDao.getGoalById(insertedGoal.id).test {
+                val fromDb = awaitItem()
+                assertEquals("New Name", fromDb?.name)
+                assertEquals(50.0, fromDb?.savedAmount)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `deleteAll removes all goals`() = runTest {
-        // Arrange
-        goalDao.insertAll(listOf(
-            Goal(name = "Goal 1", targetAmount = 100.0, savedAmount = 0.0, targetDate = null, accountId = accountId),
-            Goal(name = "Goal 2", targetAmount = 200.0, savedAmount = 0.0, targetDate = null, accountId = accountId)
-        ))
+    fun `delete removes goal`() =
+        runTest {
+            // Arrange
+            val goal = Goal(name = "To Delete", targetAmount = 100.0, savedAmount = 0.0, targetDate = null, accountId = accountId)
+            goalDao.insert(goal)
+            val insertedGoal = goalDao.getAll().first()
 
-        // Act
-        goalDao.deleteAll()
+            // Act
+            goalDao.delete(insertedGoal)
 
-        // Assert
-        assertTrue(goalDao.getAll().isEmpty())
-    }
-
-    @Test
-    fun `getGoalsForAccount returns only goals for that account`() = runTest {
-        // Arrange
-        val otherAccountId = accountDao.insert(Account(name = "Other", type = "Bank")).toInt()
-        goalDao.insert(Goal(name = "Goal 1", targetAmount = 100.0, savedAmount = 0.0, targetDate = null, accountId = accountId))
-        goalDao.insert(Goal(name = "Goal 2", targetAmount = 200.0, savedAmount = 0.0, targetDate = null, accountId = otherAccountId))
-
-        // Act & Assert
-        goalDao.getGoalsForAccount(accountId).test {
-            val goals = awaitItem()
-            assertEquals(1, goals.size)
-            assertEquals("Goal 1", goals.first().name)
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            goalDao.getGoalById(insertedGoal.id).test {
+                assertNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
+
+    @Test
+    fun `deleteAll removes all goals`() =
+        runTest {
+            // Arrange
+            goalDao.insertAll(
+                listOf(
+                    Goal(name = "Goal 1", targetAmount = 100.0, savedAmount = 0.0, targetDate = null, accountId = accountId),
+                    Goal(name = "Goal 2", targetAmount = 200.0, savedAmount = 0.0, targetDate = null, accountId = accountId),
+                ),
+            )
+
+            // Act
+            goalDao.deleteAll()
+
+            // Assert
+            assertTrue(goalDao.getAll().isEmpty())
+        }
+
+    @Test
+    fun `getGoalsForAccount returns only goals for that account`() =
+        runTest {
+            // Arrange
+            val otherAccountId = accountDao.insert(Account(name = "Other", type = "Bank")).toInt()
+            goalDao.insert(Goal(name = "Goal 1", targetAmount = 100.0, savedAmount = 0.0, targetDate = null, accountId = accountId))
+            goalDao.insert(Goal(name = "Goal 2", targetAmount = 200.0, savedAmount = 0.0, targetDate = null, accountId = otherAccountId))
+
+            // Act & Assert
+            goalDao.getGoalsForAccount(accountId).test {
+                val goals = awaitItem()
+                assertEquals(1, goals.size)
+                assertEquals("Goal 1", goals.first().name)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

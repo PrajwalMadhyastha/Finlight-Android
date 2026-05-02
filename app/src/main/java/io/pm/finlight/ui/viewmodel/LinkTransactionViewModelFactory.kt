@@ -15,7 +15,7 @@ import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
 
 class LinkTransactionViewModelFactory(
     private val application: Application,
-    private val potentialTransaction: PotentialTransaction
+    private val potentialTransaction: PotentialTransaction,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LinkTransactionViewModel::class.java)) {
@@ -28,7 +28,7 @@ class LinkTransactionViewModelFactory(
             return LinkTransactionViewModel(
                 transactionRepository,
                 recurringTransactionDao,
-                potentialTransaction
+                potentialTransaction,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

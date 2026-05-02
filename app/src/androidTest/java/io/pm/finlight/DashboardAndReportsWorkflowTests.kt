@@ -51,14 +51,15 @@ class DashboardAndReportsWorkflowTests {
         // --- FIX: Create a list of expected content and scroll to each one individually ---
         // This is more robust than a single swipe, as it ensures each item is found
         // before the test proceeds.
-        val expectedCardContent = listOf(
-            "Monthly Budget",
-            "View Trends", // Content from Quick Actions card
-            "Net Worth",
-            "Recent Transactions",
-            "Accounts",
-            "Budget Watch"
-        )
+        val expectedCardContent =
+            listOf(
+                "Monthly Budget",
+                "View Trends", // Content from Quick Actions card
+                "Net Worth",
+                "Recent Transactions",
+                "Accounts",
+                "Budget Watch",
+            )
 
         // Find the scrollable container using its test tag.
         val lazyColumn = composeTestRule.onNodeWithTag("dashboard_lazy_column")
@@ -114,7 +115,6 @@ class DashboardAndReportsWorkflowTests {
         val nextSubtitleNode = composeTestRule.onNodeWithText("Since", substring = true)
         val nextSubtitleText = nextSubtitleNode.fetchSemanticsNode().config[SemanticsProperties.Text].first().text
         assert(initialSubtitleText != nextSubtitleText) { "Date should have changed after swiping left." }
-
 
         // 5. Perform a swipe right gesture to move back to the previous day.
         composeTestRule.onRoot().performTouchInput { swipeRight() }

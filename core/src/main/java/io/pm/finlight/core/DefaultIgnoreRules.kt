@@ -32,7 +32,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "is approved", "congratulations", "eligible for", "SIP Purchase", "towards your SIP",
     "EMI Alert", "due by", "has requested money from you", "order.*has been delivered",
     "shipped", "Arriving today", "out for delivery", "from Paytm Balance", "using OlaMoney Postpaid",
-    "is declined", "Request Failure", "AutoPay (E-mandate) Active", "mandate is successfully revoked",
+    "declined", "Request Failure", "AutoPay (E-mandate) Active", "mandate is successfully revoked",
     "mandate has been successfully created", "has been dispatched", "is now active",
     "successfully registered for UPI", "Unit Allotment", "E-statement of", // --- FIX: "Mutual Fund" removed from this line
     "order is received",

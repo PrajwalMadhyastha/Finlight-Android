@@ -21,13 +21,13 @@ import kotlinx.serialization.Serializable
             entity = Account::class,
             parentColumns = ["id"],
             childColumns = ["destinationAccountId"],
-            onDelete = ForeignKey.CASCADE
-        )
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
-    indices = [Index(value = ["destinationAccountId"])]
+    indices = [Index(value = ["destinationAccountId"])],
 )
 data class AccountAlias(
     @PrimaryKey
     val aliasName: String, // e.g., "ICICI - xx1234"
-    val destinationAccountId: Int // e.g., The ID of the "ICICI Bank" account
+    val destinationAccountId: Int, // e.g., The ID of the "ICICI Bank" account
 )

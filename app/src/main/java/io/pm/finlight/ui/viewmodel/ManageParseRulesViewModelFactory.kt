@@ -8,7 +8,6 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.CustomSmsRuleDao
 import io.pm.finlight.ManageParseRulesViewModel
 import io.pm.finlight.data.db.AppDatabase
 

@@ -15,9 +15,8 @@ import kotlinx.coroutines.flow.Flow
  */
 class TagRepository(
     private val tagDao: TagDao,
-    private val transactionDao: TransactionDao
+    private val transactionDao: TransactionDao,
 ) {
-
     val allTags: Flow<List<Tag>> = tagDao.getAllTags()
 
     suspend fun insert(tag: Tag): Long {

@@ -42,25 +42,28 @@ class DailyReportWorker(
                 // 1. "Last 24 Hours" period (The Fix)
                 // This now matches the logic in TimePeriodReportScreen.kt for TimePeriod.DAILY
                 val reportEndTime = now.timeInMillis
-                val reportStartTime = (now.clone() as Calendar).apply {
-                    add(Calendar.HOUR_OF_DAY, -24)
-                }.timeInMillis
+                val reportStartTime =
+                    (now.clone() as Calendar).apply {
+                        add(Calendar.HOUR_OF_DAY, -24)
+                    }.timeInMillis
 
                 // 2. "Previous 7 Days" period (for calculating the average)
-                val sevenDaysAgoEnd = (now.clone() as Calendar).apply {
-                    add(Calendar.DAY_OF_YEAR, -2)
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59) // --- FIX
-                    set(Calendar.MILLISECOND, 999) // --- FIX
-                }.timeInMillis
-                val sevenDaysAgoStart = (now.clone() as Calendar).apply {
-                    add(Calendar.DAY_OF_YEAR, -8)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0) // --- FIX
-                    set(Calendar.MILLISECOND, 0) // --- FIX
-                }.timeInMillis
+                val sevenDaysAgoEnd =
+                    (now.clone() as Calendar).apply {
+                        add(Calendar.DAY_OF_YEAR, -2)
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59) // --- FIX
+                        set(Calendar.MILLISECOND, 999) // --- FIX
+                    }.timeInMillis
+                val sevenDaysAgoStart =
+                    (now.clone() as Calendar).apply {
+                        add(Calendar.DAY_OF_YEAR, -8)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0) // --- FIX
+                        set(Calendar.MILLISECOND, 0) // --- FIX
+                    }.timeInMillis
 
                 // --- Fetch Data ---
                 // --- UPDATED: Use the new rolling 24-hour window ---
@@ -73,25 +76,26 @@ class DailyReportWorker(
                 val topCategories = transactionDao.getTopSpendingCategoriesForRange(reportStartTime, reportEndTime)
 
                 // --- Apply Contextual Logic ---
-                val title = when {
-                    // Scenario D: No Spending
-                    yesterdayExpenses == 0.0 -> "No spending recorded yesterday. Keep it up!"
+                val title =
+                    when {
+                        // Scenario D: No Spending
+                        yesterdayExpenses == 0.0 -> "No spending recorded yesterday. Keep it up!"
 
-                    // Scenario C: Significant Drop
-                    weeklyAverage > 0 && (yesterdayExpenses / weeklyAverage) < 0.20 ->
-                        "Great job! Spending was well below average yesterday."
+                        // Scenario C: Significant Drop
+                        weeklyAverage > 0 && (yesterdayExpenses / weeklyAverage) < 0.20 ->
+                            "Great job! Spending was well below average yesterday."
 
-                    // Scenario B: Normal Fluctuation
-                    weeklyAverage > 0 && (yesterdayExpenses / weeklyAverage) in 0.90..1.10 ->
-                        "Your spending is on track with your weekly average."
+                        // Scenario B: Normal Fluctuation
+                        weeklyAverage > 0 && (yesterdayExpenses / weeklyAverage) in 0.90..1.10 ->
+                            "Your spending is on track with your weekly average."
 
-                    // Scenario A: Major Spike
-                    weeklyAverage > 0 && (yesterdayExpenses / weeklyAverage) > 1.50 ->
-                        "Heads up: Spending was higher than usual yesterday."
+                        // Scenario A: Major Spike
+                        weeklyAverage > 0 && (yesterdayExpenses / weeklyAverage) > 1.50 ->
+                            "Heads up: Spending was higher than usual yesterday."
 
-                    // Default Case (Catch-All)
-                    else -> "Here's your daily summary."
-                }
+                        // Default Case (Catch-All)
+                        else -> "Here's your daily summary."
+                    }
 
                 NotificationHelper.showDailyReportNotification(context, title, yesterdayExpenses, topCategories, now.timeInMillis)
 

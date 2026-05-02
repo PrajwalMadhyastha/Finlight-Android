@@ -83,7 +83,6 @@ class MainApplication : Application() {
         }
     }
 
-
     private fun createDailyReportNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Daily Reports"

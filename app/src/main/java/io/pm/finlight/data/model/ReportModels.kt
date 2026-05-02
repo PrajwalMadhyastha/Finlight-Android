@@ -10,7 +10,7 @@ enum class ReportPeriod(val displayName: String) {
     WEEK("This Week"),
     MONTH("This Month"),
     QUARTER("3 Months"),
-    ALL_TIME("All Time")
+    ALL_TIME("All Time"),
 }
 
 /**
@@ -18,7 +18,7 @@ enum class ReportPeriod(val displayName: String) {
  */
 data class ReportInsights(
     val percentageChange: Int?,
-    val topCategory: CategorySpending?
+    val topCategory: CategorySpending?,
 )
 
 /**
@@ -28,5 +28,5 @@ data class ReportScreenData(
     val pieData: PieData?,
     val trendData: Pair<BarData, List<String>>?,
     val periodTitle: String,
-    val insights: ReportInsights?
+    val insights: ReportInsights?,
 )

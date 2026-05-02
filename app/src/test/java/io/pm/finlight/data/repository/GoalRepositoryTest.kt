@@ -20,7 +20,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class GoalRepositoryTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var goalDao: GoalDao
 
@@ -51,33 +50,35 @@ class GoalRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `insert calls DAO`() = runTest {
-        // Arrange
-        val goal = Goal(name = "Test", targetAmount = 100.0, savedAmount = 10.0, targetDate = null, accountId = 1)
-        // Act
-        repository.insert(goal)
-        // Assert
-        verify(goalDao).insert(goal)
-    }
+    fun `insert calls DAO`() =
+        runTest {
+            // Arrange
+            val goal = Goal(name = "Test", targetAmount = 100.0, savedAmount = 10.0, targetDate = null, accountId = 1)
+            // Act
+            repository.insert(goal)
+            // Assert
+            verify(goalDao).insert(goal)
+        }
 
     @Test
-    fun `update calls DAO`() = runTest {
-        // Arrange
-        val goal = Goal(id = 1, name = "Test", targetAmount = 100.0, savedAmount = 10.0, targetDate = null, accountId = 1)
-        // Act
-        repository.update(goal)
-        // Assert
-        verify(goalDao).update(goal)
-    }
+    fun `update calls DAO`() =
+        runTest {
+            // Arrange
+            val goal = Goal(id = 1, name = "Test", targetAmount = 100.0, savedAmount = 10.0, targetDate = null, accountId = 1)
+            // Act
+            repository.update(goal)
+            // Assert
+            verify(goalDao).update(goal)
+        }
 
     @Test
-    fun `delete calls DAO`() = runTest {
-        // Arrange
-        val goal = Goal(id = 1, name = "Test", targetAmount = 100.0, savedAmount = 10.0, targetDate = null, accountId = 1)
-        // Act
-        repository.delete(goal)
-        // Assert
-        verify(goalDao).delete(goal)
-    }
+    fun `delete calls DAO`() =
+        runTest {
+            // Arrange
+            val goal = Goal(id = 1, name = "Test", targetAmount = 100.0, savedAmount = 10.0, targetDate = null, accountId = 1)
+            // Act
+            repository.delete(goal)
+            // Assert
+            verify(goalDao).delete(goal)
+        }
 }
-

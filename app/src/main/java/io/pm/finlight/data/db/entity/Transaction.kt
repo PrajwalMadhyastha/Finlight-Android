@@ -22,7 +22,7 @@ import kotlinx.serialization.Serializable
         Index(value = ["categoryId"]),
         Index(value = ["accountId"]),
         Index(value = ["smsSignature"]),
-        Index(value = ["date"]) // --- NEW: Add index for date-based queries ---
+        Index(value = ["date"]), // --- NEW: Add index for date-based queries ---
     ],
     foreignKeys = [
         ForeignKey(
@@ -59,5 +59,5 @@ data class Transaction(
     val currencyCode: String? = null,
     val conversionRate: Double? = null,
     // --- NEW: Flag to indicate this is a parent transaction ---
-    val isSplit: Boolean = false
+    val isSplit: Boolean = false,
 )

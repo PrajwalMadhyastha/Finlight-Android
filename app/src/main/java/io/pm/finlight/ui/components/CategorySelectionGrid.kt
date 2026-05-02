@@ -39,22 +39,27 @@ import androidx.compose.ui.unit.sp
 import io.pm.finlight.Category
 import io.pm.finlight.utils.CategoryIconHelper
 
+private fun Modifier.categoryGridItem(onClick: () -> Unit) = this
+    .clip(RoundedCornerShape(12.dp))
+    .clickable(onClick = onClick)
+    .padding(vertical = 12.dp)
+
 @Composable
 fun CategorySelectionGrid(
     categories: List<Category>,
     onCategorySelected: (Category) -> Unit,
-    onAddNew: (() -> Unit)? = null
+    onAddNew: (() -> Unit)? = null,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 85.dp),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(categories) { category ->
             CategoryGridItem(
                 category = category,
-                onSelected = { onCategorySelected(category) }
+                onSelected = { onCategorySelected(category) },
             )
         }
         if (onAddNew != null) {
@@ -68,15 +73,12 @@ fun CategorySelectionGrid(
 @Composable
 private fun CategoryGridItem(
     category: Category,
-    onSelected: () -> Unit
+    onSelected: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onSelected)
-            .padding(vertical = 12.dp),
+        modifier = Modifier.categoryGridItem(onClick = onSelected),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         CategoryIconDisplay(category)
         Text(
@@ -85,7 +87,7 @@ private fun CategoryGridItem(
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -93,24 +95,21 @@ private fun CategoryGridItem(
 @Composable
 private fun AddNewCategoryGridItem(onAddNew: () -> Unit) {
     Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onAddNew)
-            .padding(vertical = 12.dp)
-            .height(80.dp), // Match the approximate height of other items
+        modifier = Modifier.categoryGridItem(onClick = onAddNew).height(80.dp),
+        // Match the approximate height of other items
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         Icon(
             Icons.Default.AddCircleOutline,
             contentDescription = "Create New",
             modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             "New",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -118,32 +117,33 @@ private fun AddNewCategoryGridItem(onAddNew: () -> Unit) {
 @Composable
 private fun CategoryIconDisplay(category: Category) {
     Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-        contentAlignment = Alignment.Center
+        modifier =
+            Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
+        contentAlignment = Alignment.Center,
     ) {
         if (category.name == "Uncategorized") {
             Icon(
                 imageVector = CategoryIconHelper.getIcon("help_outline"),
                 contentDescription = category.name,
                 tint = Color.Black,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             )
         } else if (category.iconKey == "letter_default") {
             Text(
                 text = category.name.firstOrNull()?.uppercase() ?: "?",
                 color = Color.Black,
                 fontWeight = FontWeight.Bold,
-                fontSize = 22.sp
+                fontSize = 22.sp,
             )
         } else {
             Icon(
                 imageVector = CategoryIconHelper.getIcon(category.iconKey),
                 contentDescription = category.name,
                 tint = Color.Black,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             )
         }
     }

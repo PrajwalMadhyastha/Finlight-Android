@@ -23,5 +23,5 @@ enum class SpendingStatus {
     /**
      * The day is in the future or before the user started tracking, so no data is available.
      */
-    NO_DATA
+    NO_DATA,
 }

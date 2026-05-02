@@ -63,10 +63,13 @@ interface BudgetDao {
             TxSums ON B.categoryName = TxSums.categoryName
         LEFT JOIN
             categories AS Cat ON B.categoryName = Cat.name
-    """
+    """,
     )
-    fun getBudgetsWithSpendingForMonth(yearMonth: String, month: Int, year: Int): Flow<List<BudgetWithSpending>>
-
+    fun getBudgetsWithSpendingForMonth(
+        yearMonth: String,
+        month: Int,
+        year: Int,
+    ): Flow<List<BudgetWithSpending>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(budgets: List<Budget>)
@@ -90,7 +93,7 @@ interface BudgetDao {
         SELECT SUM(AE.amount) FROM AtomicExpenses AS AE
         JOIN categories AS C ON AE.categoryId = C.id
         WHERE C.name = :categoryName AND AE.categoryId IS NOT NULL
-    """
+    """,
     )
     fun getActualSpendingForCategory(
         categoryName: String,

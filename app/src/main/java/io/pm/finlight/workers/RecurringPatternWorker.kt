@@ -21,9 +21,8 @@ import kotlin.math.abs
 
 class RecurringPatternWorker(
     private val context: Context,
-    workerParams: WorkerParameters
+    workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
-
     private val transactionDao = AppDatabase.getInstance(context).transactionDao()
     private val patternDao = AppDatabase.getInstance(context).recurringPatternDao()
     private val recurringTransactionDao = AppDatabase.getInstance(context).recurringTransactionDao()
@@ -31,8 +30,10 @@ class RecurringPatternWorker(
     companion object {
         // The time window to look back for transactions to analyze. 90 days is a good balance.
         private val ANALYSIS_WINDOW_DAYS = 90L
+
         // The minimum number of times a transaction must occur to be considered a pattern.
         private const val MIN_OCCURRENCES_FOR_PATTERN = 3
+
         // The tolerance for interval matching (in days).
         private const val WEEKLY_TOLERANCE_DAYS = 1
         private const val MONTHLY_TOLERANCE_DAYS = 3
@@ -54,9 +55,10 @@ class RecurringPatternWorker(
                 }
 
                 // 1. Fetch recent transactions that have an SMS signature.
-                val recentTransactions = transactionDao.getTransactionsWithSignatureSince(
-                    System.currentTimeMillis() - TimeUnit.DAYS.toMillis(ANALYSIS_WINDOW_DAYS)
-                )
+                val recentTransactions =
+                    transactionDao.getTransactionsWithSignatureSince(
+                        System.currentTimeMillis() - TimeUnit.DAYS.toMillis(ANALYSIS_WINDOW_DAYS),
+                    )
 
                 // 2. Update the pattern database with these transactions.
                 for (transaction in recentTransactions) {
@@ -75,8 +77,8 @@ class RecurringPatternWorker(
                                 categoryId = transaction.categoryId,
                                 occurrences = 1,
                                 firstSeen = transaction.date,
-                                lastSeen = transaction.date
-                            )
+                                lastSeen = transaction.date,
+                            ),
                         )
                     } else {
                         // We've seen this before, update the existing pattern.
@@ -126,18 +128,22 @@ class RecurringPatternWorker(
         }
     }
 
-    private suspend fun createRuleAndNotify(pattern: RecurringPattern, interval: String) {
+    private suspend fun createRuleAndNotify(
+        pattern: RecurringPattern,
+        interval: String,
+    ) {
         // Create the recurring transaction rule
-        val newRule = RecurringTransaction(
-            description = pattern.description,
-            amount = pattern.amount,
-            transactionType = pattern.transactionType,
-            recurrenceInterval = interval,
-            startDate = pattern.lastSeen,
-            accountId = pattern.accountId,
-            categoryId = pattern.categoryId,
-            lastRunDate = pattern.lastSeen
-        )
+        val newRule =
+            RecurringTransaction(
+                description = pattern.description,
+                amount = pattern.amount,
+                transactionType = pattern.transactionType,
+                recurrenceInterval = interval,
+                startDate = pattern.lastSeen,
+                accountId = pattern.accountId,
+                categoryId = pattern.categoryId,
+                lastRunDate = pattern.lastSeen,
+            )
         val newRuleId = recurringTransactionDao.insert(newRule).toInt()
 
         // Notify the user

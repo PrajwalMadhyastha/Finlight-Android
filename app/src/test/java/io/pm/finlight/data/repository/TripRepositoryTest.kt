@@ -23,7 +23,6 @@ import org.robolectric.annotation.Config
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class TripRepositoryTest : BaseViewModelTest() {
-
     @Mock
     private lateinit var tripDao: TripDao
 
@@ -36,11 +35,21 @@ class TripRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `insert calls DAO`() = runTest {
-        val trip = Trip(name = "Test", startDate = 0L, endDate = 1L, tagId = 1, tripType = TripType.DOMESTIC, currencyCode = null, conversionRate = null)
-        repository.insert(trip)
-        verify(tripDao).insert(trip)
-    }
+    fun `insert calls DAO`() =
+        runTest {
+            val trip =
+                Trip(
+                    name = "Test",
+                    startDate = 0L,
+                    endDate = 1L,
+                    tagId = 1,
+                    tripType = TripType.DOMESTIC,
+                    currencyCode = null,
+                    conversionRate = null,
+                )
+            repository.insert(trip)
+            verify(tripDao).insert(trip)
+        }
 
     @Test
     fun `getAllTripsWithStats calls DAO`() {
@@ -55,28 +64,32 @@ class TripRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `getTripByTagId calls DAO`() = runTest {
-        repository.getTripByTagId(1)
-        verify(tripDao).getTripByTagId(1)
-    }
+    fun `getTripByTagId calls DAO`() =
+        runTest {
+            repository.getTripByTagId(1)
+            verify(tripDao).getTripByTagId(1)
+        }
 
     @Test
-    fun `deleteTripById calls DAO`() = runTest {
-        repository.deleteTripById(1)
-        verify(tripDao).deleteTripById(1)
-    }
+    fun `deleteTripById calls DAO`() =
+        runTest {
+            repository.deleteTripById(1)
+            verify(tripDao).deleteTripById(1)
+        }
 
     @Test
-    fun `isTagUsedByTrip returns true when count is greater than zero`() = runTest {
-        `when`(tripDao.isTagUsedByTrip(1)).thenReturn(1)
-        val result = repository.isTagUsedByTrip(1)
-        assertTrue(result)
-    }
+    fun `isTagUsedByTrip returns true when count is greater than zero`() =
+        runTest {
+            `when`(tripDao.isTagUsedByTrip(1)).thenReturn(1)
+            val result = repository.isTagUsedByTrip(1)
+            assertTrue(result)
+        }
 
     @Test
-    fun `isTagUsedByTrip returns false when count is zero`() = runTest {
-        `when`(tripDao.isTagUsedByTrip(1)).thenReturn(0)
-        val result = repository.isTagUsedByTrip(1)
-        assertFalse(result)
-    }
+    fun `isTagUsedByTrip returns false when count is zero`() =
+        runTest {
+            `when`(tripDao.isTagUsedByTrip(1)).thenReturn(0)
+            val result = repository.isTagUsedByTrip(1)
+            assertFalse(result)
+        }
 }

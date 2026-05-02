@@ -51,56 +51,59 @@ fun TransactionItem(
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     onEnterSelectionMode: () -> Unit = {},
-    onToggleSelection: () -> Unit = {}
+    onToggleSelection: () -> Unit = {},
 ) {
     val contentAlpha = if (transactionDetails.transaction.isExcluded) 0.5f else 1f
     val isSplit = transactionDetails.transaction.isSplit
     val isUncategorized = transactionDetails.categoryName == null || transactionDetails.categoryName == "Uncategorized"
 
-    val clickModifier = if (isSelectionMode) {
-        Modifier.clickable { onToggleSelection() }
-    } else {
-        Modifier.combinedClickable(
-            onClick = onClick,
-            onLongClick = onEnterSelectionMode
-        )
-    }
+    val clickModifier =
+        if (isSelectionMode) {
+            Modifier.clickable { onToggleSelection() }
+        } else {
+            Modifier.combinedClickable(
+                onClick = onClick,
+                onLongClick = onEnterSelectionMode,
+            )
+        }
 
     GlassPanel(
-        modifier = modifier
-            .fillMaxWidth()
-            // FIX: Use heightIn to allow the card to grow vertically if text wraps
-            .heightIn(min = 72.dp)
-            .then(clickModifier)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                // FIX: Use heightIn to allow the card to grow vertically if text wraps
+                .heightIn(min = 72.dp)
+                .then(clickModifier),
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             if (isSelectionMode) {
                 Checkbox(
                     checked = isSelected,
                     onCheckedChange = { onToggleSelection() },
-                    modifier = Modifier.padding(end = 16.dp)
+                    modifier = Modifier.padding(end = 16.dp),
                 )
             }
 
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .clickable(enabled = !isSplit && !isSelectionMode) { onCategoryClick(transactionDetails) }
-                    .background(
-                        CategoryIconHelper.getIconBackgroundColor(
-                            when {
-                                isSplit -> "gray_light"
-                                isUncategorized -> "red_light"
-                                else -> transactionDetails.categoryColorKey ?: "gray_light"
-                            }
-                        )
-                            .copy(alpha = contentAlpha)
-                    ),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .clickable(enabled = !isSplit && !isSelectionMode) { onCategoryClick(transactionDetails) }
+                        .background(
+                            CategoryIconHelper.getIconBackgroundColor(
+                                when {
+                                    isSplit -> "gray_light"
+                                    isUncategorized -> "red_light"
+                                    else -> transactionDetails.categoryColorKey ?: "gray_light"
+                                },
+                            )
+                                .copy(alpha = contentAlpha),
+                        ),
+                contentAlignment = Alignment.Center,
             ) {
                 when {
                     isSplit -> {
@@ -108,7 +111,7 @@ fun TransactionItem(
                             imageVector = Icons.AutoMirrored.Filled.CallSplit,
                             contentDescription = "Split Transaction",
                             tint = Color.Black.copy(alpha = contentAlpha),
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(22.dp),
                         )
                     }
                     isUncategorized -> {
@@ -116,7 +119,7 @@ fun TransactionItem(
                             imageVector = CategoryIconHelper.getIcon("help_outline"),
                             contentDescription = "Uncategorized",
                             tint = Color.Black.copy(alpha = contentAlpha),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                     transactionDetails.categoryIconKey == "letter_default" -> {
@@ -124,7 +127,7 @@ fun TransactionItem(
                             text = transactionDetails.categoryName?.firstOrNull()?.uppercase() ?: "?",
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
-                            color = Color.Black.copy(alpha = contentAlpha)
+                            color = Color.Black.copy(alpha = contentAlpha),
                         )
                     }
                     else -> {
@@ -132,7 +135,7 @@ fun TransactionItem(
                             imageVector = CategoryIconHelper.getIcon(transactionDetails.categoryIconKey ?: "category"),
                             contentDescription = transactionDetails.categoryName,
                             tint = Color.Black.copy(alpha = contentAlpha),
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(22.dp),
                         )
                     }
                 }
@@ -146,24 +149,28 @@ fun TransactionItem(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
                     // FIX: Allow up to 2 lines for merchant name
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
 
                 val hasTags = !transactionDetails.tagNames.isNullOrEmpty()
-                val subtitleText = if (hasTags) {
-                    transactionDetails.tagNames
-                } else if (isSplit) {
-                    "Multiple Categories"
-                } else {
-                    transactionDetails.categoryName ?: "Uncategorized"
-                }
+                val subtitleText =
+                    if (hasTags) {
+                        transactionDetails.tagNames
+                    } else if (isSplit) {
+                        "Multiple Categories"
+                    } else {
+                        transactionDetails.categoryName ?: "Uncategorized"
+                    }
 
                 Text(
                     text = subtitleText!!,
                     style = MaterialTheme.typography.bodyMedium,
                     fontStyle = FontStyle.Italic,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
-                    modifier = Modifier.clickable(enabled = !isSplit && !isSelectionMode && !hasTags) { onCategoryClick(transactionDetails) },
+                    modifier =
+                        Modifier.clickable(
+                            enabled = !isSplit && !isSelectionMode && !hasTags,
+                        ) { onCategoryClick(transactionDetails) },
                     // FIX: Allow subtitle to wrap naturally
                     // maxLines = 1,
                     // overflow = TextOverflow.Ellipsis
@@ -172,16 +179,17 @@ fun TransactionItem(
                 Text(
                     text = SimpleDateFormat("dd MMM yy, h:mm a", Locale.getDefault()).format(Date(transactionDetails.transaction.date)),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
                 )
             }
 
             val isIncome = transactionDetails.transaction.transactionType == "income"
-            val amountColor = if (isSystemInDarkTheme()) {
-                if (isIncome) IncomeGreenDark else ExpenseRedDark
-            } else {
-                if (isIncome) IncomeGreenLight else ExpenseRedLight
-            }.copy(alpha = contentAlpha)
+            val amountColor =
+                if (isSystemInDarkTheme()) {
+                    if (isIncome) IncomeGreenDark else ExpenseRedDark
+                } else {
+                    if (isIncome) IncomeGreenLight else ExpenseRedLight
+                }.copy(alpha = contentAlpha)
             val icon = if (isIncome) Icons.Default.SouthWest else Icons.Default.NorthEast
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -189,14 +197,14 @@ fun TransactionItem(
                     text = "₹${"%.2f".format(transactionDetails.transaction.amount)}",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = amountColor
+                    color = amountColor,
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Icon(
                     imageVector = icon,
                     contentDescription = transactionDetails.transaction.transactionType,
                     tint = amountColor,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }
@@ -213,13 +221,14 @@ fun TransactionList(
     isSelectionMode: Boolean = false,
     selectedIds: Set<Int> = emptySet(),
     onEnterSelectionMode: (Int) -> Unit = {},
-    onToggleSelection: (Int) -> Unit = {}
+    onToggleSelection: (Int) -> Unit = {},
 ) {
     if (transactions.isEmpty()) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text("No transactions yet. Add one!")
@@ -228,7 +237,7 @@ fun TransactionList(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             items(transactions, key = { it.transaction.id }) { details ->
                 TransactionItem(
@@ -245,7 +254,7 @@ fun TransactionList(
                     isSelectionMode = isSelectionMode,
                     isSelected = details.transaction.id in selectedIds,
                     onEnterSelectionMode = { onEnterSelectionMode(details.transaction.id) },
-                    onToggleSelection = { onToggleSelection(details.transaction.id) }
+                    onToggleSelection = { onToggleSelection(details.transaction.id) },
                 )
             }
         }

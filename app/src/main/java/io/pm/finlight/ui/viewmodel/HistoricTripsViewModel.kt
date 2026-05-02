@@ -17,20 +17,22 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-
 class HistoricTripsViewModel(
     private val tripRepository: TripRepository,
-    private val transactionRepository: TransactionRepository
+    private val transactionRepository: TransactionRepository,
 ) : ViewModel() {
+    val historicTrips: StateFlow<List<TripWithStats>> =
+        tripRepository.getAllTripsWithStats()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
-    val historicTrips: StateFlow<List<TripWithStats>> = tripRepository.getAllTripsWithStats()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    fun deleteTrip(tripId: Int, tagId: Int) {
+    fun deleteTrip(
+        tripId: Int,
+        tagId: Int,
+    ) {
         viewModelScope.launch {
             // First, remove all associations from the cross-reference table for that tag
             transactionRepository.removeAllTransactionsForTag(tagId)

@@ -18,7 +18,6 @@ import io.pm.finlight.utils.NotificationHelper
 import io.mockk.*
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
-import androidx.work.WorkRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -40,10 +39,9 @@ import kotlin.test.assertNull
 @Config(
     sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE],
     application = TestApplication::class,
-    shadows = [SmsReceiverTest.ShadowTelephonyIntents::class]
+    shadows = [SmsReceiverTest.ShadowTelephonyIntents::class],
 )
 class SmsReceiverTest : BaseViewModelTest() {
-
     private lateinit var context: Context
     private lateinit var receiver: SmsReceiver
     private lateinit var mockPendingResult: BroadcastReceiver.PendingResult
@@ -64,7 +62,6 @@ class SmsReceiverTest : BaseViewModelTest() {
     private lateinit var tagDao: TagDao
     private lateinit var nerExtractor: SmsEntityExtractor
 
-
     @Implements(Telephony.Sms.Intents::class)
     object ShadowTelephonyIntents {
         var mockSmsMessages: Array<AndroidSmsMessage> = emptyArray()
@@ -76,16 +73,16 @@ class SmsReceiverTest : BaseViewModelTest() {
         }
     }
 
-
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
 
         db = mockk()
-        transactionDao = mockk(relaxed = true) {
-            coEvery { insert(any()) } returns 1L // Ensure insert returns a value
-        }
+        transactionDao =
+            mockk(relaxed = true) {
+                coEvery { insert(any()) } returns 1L // Ensure insert returns a value
+            }
         merchantMappingDao = mockk(relaxed = true)
         customSmsRuleDao = mockk(relaxed = true)
         ignoreRuleDao = mockk(relaxed = true)
@@ -120,7 +117,6 @@ class SmsReceiverTest : BaseViewModelTest() {
         every { db.accountAliasDao() } returns accountAliasDao
         every { db.tagDao() } returns tagDao
 
-
         every { smsClassifier.classify(any()) } returns 0.9f
         every { nerExtractor.extract(any()) } returns emptyMap()
         every { anyConstructed<SettingsRepository>().isAutoCaptureNotificationEnabledBlocking() } returns true
@@ -154,7 +150,10 @@ class SmsReceiverTest : BaseViewModelTest() {
         super.tearDown()
     }
 
-    private fun createSmsIntent(sender: String, body: String): Intent {
+    private fun createSmsIntent(
+        sender: String,
+        body: String,
+    ): Intent {
         val mockMessage = mockk<AndroidSmsMessage>()
         every { mockMessage.originatingAddress } returns sender
         every { mockMessage.messageBody } returns body
@@ -165,315 +164,330 @@ class SmsReceiverTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `valid new SMS is parsed and saved`() = runTest {
-        // Arrange
-        val sender = "AM-HDFCBK"
-        val body = "Spent Rs.100 at Starbucks"
-        val intent = createSmsIntent(sender, body)
-        receiver.coroutineScope = this // Inject TestScope
+    fun `valid new SMS is parsed and saved`() =
+        runTest {
+            // Arrange
+            val sender = "AM-HDFCBK"
+            val body = "Spent Rs.100 at Starbucks"
+            val intent = createSmsIntent(sender, body)
+            receiver.coroutineScope = this // Inject TestScope
 
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle() // Ensure the launched coroutine completes
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle() // Ensure the launched coroutine completes
 
-        // Assert
-        coVerify(exactly = 1) { transactionDao.insert(any()) }
-        verify(exactly = 1) { mockPendingResult.finish() }
-    }
-
-    @Test
-    fun `message matching ignore rule is ignored`() = runTest {
-        // Arrange
-        val sender = "AM-PROMO"
-        val body = "Your OTP is 1234"
-        val intent = createSmsIntent(sender, body)
-        coEvery { ignoreRuleDao.getEnabledRules() } returns listOf(IgnoreRule(pattern = "OTP", type = RuleType.BODY_PHRASE, isDefault = true))
-        receiver.coroutineScope = this
-
-
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
-
-        // Assert
-        coVerify(exactly = 0) { transactionDao.insert(any()) }
-        verify(exactly = 1) { mockPendingResult.finish() }
-    }
+            // Assert
+            coVerify(exactly = 1) { transactionDao.insert(any()) }
+            verify(exactly = 1) { mockPendingResult.finish() }
+        }
 
     @Test
-    fun `ML model filters out non-transactional message`() = runTest {
-        // Arrange
-        val sender = "AM-JUNK"
-        val body = "This is not a transaction"
-        val intent = createSmsIntent(sender, body)
-        every { smsClassifier.classify("This is not a transaction") } returns 0.05f
-        receiver.coroutineScope = this
+    fun `message matching ignore rule is ignored`() =
+        runTest {
+            // Arrange
+            val sender = "AM-PROMO"
+            val body = "Your OTP is 1234"
+            val intent = createSmsIntent(sender, body)
+            coEvery { ignoreRuleDao.getEnabledRules() } returns listOf(IgnoreRule(pattern = "OTP", type = RuleType.BODY_PHRASE, isDefault = true))
+            receiver.coroutineScope = this
 
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
 
-        // Assert
-        coVerify(exactly = 0) { transactionDao.insert(any()) }
-        verify(exactly = 1) { mockPendingResult.finish() }
-    }
-
-    @Test
-    fun `already processed SMS hash is ignored`() = runTest {
-        // Arrange
-        val sender = "AM-HDFCBK"
-        val body = "Spent Rs.100 at Starbucks"
-        val intent = createSmsIntent(sender, body)
-        val normalizedBody = body.replace(Regex("\\s+"), " ").trim()
-        val hash = (sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
-        coEvery { transactionDao.getAllSmsHashes() } returns flowOf(listOf(hash))
-        receiver.coroutineScope = this
-
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
-
-        // Assert
-        coVerify(exactly = 0) { transactionDao.insert(any()) }
-        verify(exactly = 1) { mockPendingResult.finish() }
-    }
+            // Assert
+            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            verify(exactly = 1) { mockPendingResult.finish() }
+        }
 
     @Test
-    fun `international travel mode with ambiguous currency defaults to home currency`() = runTest {
-        // Arrange
-        val sender = "AM-HDFCBK"
-        val body = "Spent 50 at Starbucks" // No currency
-        val intent = createSmsIntent(sender, body)
+    fun `ML model filters out non-transactional message`() =
+        runTest {
+            // Arrange
+            val sender = "AM-JUNK"
+            val body = "This is not a transaction"
+            val intent = createSmsIntent(sender, body)
+            every { smsClassifier.classify("This is not a transaction") } returns 0.05f
+            receiver.coroutineScope = this
 
-        val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 83.5f)
-        every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
-        // The parser will default to INR, which is our mocked home currency.
-        every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
-        receiver.coroutineScope = this
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
 
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
-
-        // Assert
-        // Verify that the notification is NOT called, and instead the transaction is saved directly as a home currency transaction.
-        verify(exactly = 0) { NotificationHelper.showTravelModeSmsNotification(any(), any(), any()) }
-        coVerify(exactly = 1) { transactionDao.insert(any()) }
-        verify(exactly = 1) { mockPendingResult.finish() }
-    }
+            // Assert
+            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            verify(exactly = 1) { mockPendingResult.finish() }
+        }
 
     @Test
-    fun `travel mode international SMS is saved with currency conversion`() = runTest {
-        // Arrange
-        val sender = "AM-CITI"
-        val body = "Spent USD 10.00 at Starbucks"
-        val intent = createSmsIntent(sender, body)
-        val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 80.0f)
-        val transactionCaptor = slot<Transaction>()
+    fun `already processed SMS hash is ignored`() =
+        runTest {
+            // Arrange
+            val sender = "AM-HDFCBK"
+            val body = "Spent Rs.100 at Starbucks"
+            val intent = createSmsIntent(sender, body)
+            val normalizedBody = body.replace(Regex("\\s+"), " ").trim()
+            val hash = (sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
+            coEvery { transactionDao.getAllSmsHashes() } returns flowOf(listOf(hash))
+            receiver.coroutineScope = this
 
-        every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
-        every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
-        coEvery { transactionDao.insert(capture(transactionCaptor)) } returns 1L
-        receiver.coroutineScope = this
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
 
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
-
-        // Assert
-        coVerify(exactly = 1) { transactionDao.insert(any()) }
-        val savedTx = transactionCaptor.captured
-        assertEquals(800.0, savedTx.amount, 0.0) // 10.0 * 80.0
-        // --- FIX: Assert non-null first, then use !! for the type-safe assertEquals ---
-        assertNotNull(savedTx.originalAmount)
-        assertEquals(10.0, savedTx.originalAmount!!, 0.0)
-        assertEquals("USD", savedTx.currencyCode)
-        // --- FIX: Assert non-null first, then use !! for the type-safe assertEquals ---
-        assertNotNull(savedTx.conversionRate)
-        assertEquals(80.0, savedTx.conversionRate!!, 0.0)
-        coVerify(exactly = 1) { transactionDao.addTagsToTransaction(any()) } // Travel tag was added
-    }
+            // Assert
+            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            verify(exactly = 1) { mockPendingResult.finish() }
+        }
 
     @Test
-    fun `travel mode SMS matching home currency is saved without conversion`() = runTest {
-        // Arrange
-        val sender = "AM-HDFCBK"
-        val body = "Spent Rs. 500 at Airport Lounge"
-        val intent = createSmsIntent(sender, body)
-        val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 80.0f)
-        val transactionCaptor = slot<Transaction>()
+    fun `international travel mode with ambiguous currency defaults to home currency`() =
+        runTest {
+            // Arrange
+            val sender = "AM-HDFCBK"
+            val body = "Spent 50 at Starbucks" // No currency
+            val intent = createSmsIntent(sender, body)
 
-        every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
-        every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
-        coEvery { transactionDao.insert(capture(transactionCaptor)) } returns 1L
-        receiver.coroutineScope = this
+            val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 83.5f)
+            every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
+            // The parser will default to INR, which is our mocked home currency.
+            every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
+            receiver.coroutineScope = this
 
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
 
-        // Assert
-        coVerify(exactly = 1) { transactionDao.insert(any()) }
-        val savedTx = transactionCaptor.captured
-        assertEquals(500.0, savedTx.amount, 0.0) // Amount is the original INR amount
-        assertNull(savedTx.originalAmount) // No conversion
-        assertNull(savedTx.currencyCode)
-        assertNull(savedTx.conversionRate)
-        coVerify(exactly = 1) { transactionDao.addTagsToTransaction(any()) } // Travel tag was added
-    }
+            // Assert
+            // Verify that the notification is NOT called, and instead the transaction is saved directly as a home currency transaction.
+            verify(exactly = 0) { NotificationHelper.showTravelModeSmsNotification(any(), any(), any()) }
+            coVerify(exactly = 1) { transactionDao.insert(any()) }
+            verify(exactly = 1) { mockPendingResult.finish() }
+        }
 
     @Test
-    fun `ignore intent with different action`() = runTest {
-        // Arrange
-        val intent = Intent("INVALID_ACTION")
-        receiver.coroutineScope = this
+    fun `travel mode international SMS is saved with currency conversion`() =
+        runTest {
+            // Arrange
+            val sender = "AM-CITI"
+            val body = "Spent USD 10.00 at Starbucks"
+            val intent = createSmsIntent(sender, body)
+            val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 80.0f)
+            val transactionCaptor = slot<Transaction>()
 
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
+            every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
+            every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
+            coEvery { transactionDao.insert(capture(transactionCaptor)) } returns 1L
+            receiver.coroutineScope = this
 
-        // Assert
-        coVerify(exactly = 0) { transactionDao.insert(any()) }
-        verify(exactly = 1) { receiver.onReceive(any(), any()) } // Just to verify it was called
-    }
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
 
-    @Test
-    fun `ignore SMS with null sender`() = runTest {
-        // Arrange
-        val intent = Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION)
-        val mockMessage = mockk<AndroidSmsMessage>()
-        every { mockMessage.originatingAddress } returns null
-        every { mockMessage.messageBody } returns "Body"
-        every { mockMessage.timestampMillis } returns 1L
-        ShadowTelephonyIntents.mockSmsMessages = arrayOf(mockMessage)
-        
-        receiver.coroutineScope = this
-
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
-
-        // Assert
-        coVerify(exactly = 0) { transactionDao.insert(any()) }
-        verify(exactly = 1) { mockPendingResult.finish() }
-    }
+            // Assert
+            coVerify(exactly = 1) { transactionDao.insert(any()) }
+            val savedTx = transactionCaptor.captured
+            assertEquals(800.0, savedTx.amount, 0.0) // 10.0 * 80.0
+            // --- FIX: Assert non-null first, then use !! for the type-safe assertEquals ---
+            assertNotNull(savedTx.originalAmount)
+            assertEquals(10.0, savedTx.originalAmount!!, 0.0)
+            assertEquals("USD", savedTx.currencyCode)
+            // --- FIX: Assert non-null first, then use !! for the type-safe assertEquals ---
+            assertNotNull(savedTx.conversionRate)
+            assertEquals(80.0, savedTx.conversionRate!!, 0.0)
+            coVerify(exactly = 1) { transactionDao.addTagsToTransaction(any()) } // Travel tag was added
+        }
 
     @Test
-    fun `travel mode with unknown currency shows notification`() = runTest {
-        // Arrange
-        val sender = "AM-CITI"
-        val body = "Spent GBP 10.00 at Starbucks" // Different from USD
-        val intent = createSmsIntent(sender, body)
-        val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 80.0f)
+    fun `travel mode SMS matching home currency is saved without conversion`() =
+        runTest {
+            // Arrange
+            val sender = "AM-HDFCBK"
+            val body = "Spent Rs. 500 at Airport Lounge"
+            val intent = createSmsIntent(sender, body)
+            val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 80.0f)
+            val transactionCaptor = slot<Transaction>()
 
-        every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
-        every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
-        receiver.coroutineScope = this
+            every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
+            every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
+            coEvery { transactionDao.insert(capture(transactionCaptor)) } returns 1L
+            receiver.coroutineScope = this
 
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
 
-        // Assert
-        verify(exactly = 1) { NotificationHelper.showTravelModeSmsNotification(any(), any(), any()) }
-        coVerify(exactly = 0) { transactionDao.insert(any()) }
-        verify(exactly = 1) { mockPendingResult.finish() }
-    }
-
-    @Test
-    fun `handle exception during processing gracefully`() = runTest {
-        // Arrange
-        val intent = createSmsIntent("Sender", "Body")
-        coEvery { transactionDao.getAllSmsHashes() } throws RuntimeException("DB Error")
-        receiver.coroutineScope = this
-
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
-
-        // Assert
-        verify(exactly = 1) { mockPendingResult.finish() }
-    }
+            // Assert
+            coVerify(exactly = 1) { transactionDao.insert(any()) }
+            val savedTx = transactionCaptor.captured
+            assertEquals(500.0, savedTx.amount, 0.0) // Amount is the original INR amount
+            assertNull(savedTx.originalAmount) // No conversion
+            assertNull(savedTx.currencyCode)
+            assertNull(savedTx.conversionRate)
+            coVerify(exactly = 1) { transactionDao.addTagsToTransaction(any()) } // Travel tag was added
+        }
 
     @Test
-    fun `auto-healing rules are saved on success`() = runTest {
-        // Arrange
-        val intent = createSmsIntent("AM-HDFCBK", "Spent Rs.100 at Starbucks")
-        val potentialTxn = PotentialTransaction(
-            sourceSmsId = 1L,
-            smsSender = "AM-HDFCBK",
-            amount = 100.0,
-            transactionType = "expense",
-            merchantName = "Starbucks",
-            originalMessage = "Spent Rs.100 at Starbucks",
-            sourceSmsHash = "hash1"
-        )
-        val success = ParseResult.Success(
-            transaction = potentialTxn,
-            newlyDiscoveredRenameAlias = "Starbucks" to "Starbucks Coffee",
-            newlyDiscoveredCategoryAlias = "Starbucks" to 4
-        )
-        mockkObject(SmsParser)
-        coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
-        coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns success
-        receiver.coroutineScope = this
+    fun `ignore intent with different action`() =
+        runTest {
+            // Arrange
+            val intent = Intent("INVALID_ACTION")
+            receiver.coroutineScope = this
 
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
 
-        // Assert
-        coVerify { merchantRenameRuleDao.insert(any()) }
-        coVerify { merchantCategoryMappingDao.insert(any()) }
-        unmockkObject(SmsParser)
-    }
+            // Assert
+            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            verify(exactly = 1) { receiver.onReceive(any(), any()) } // Just to verify it was called
+        }
 
     @Test
-    fun `transaction is saved using account alias`() = runTest {
-        val intent = createSmsIntent("AM-HDFCBK", "Spent Rs.100 at Starbucks")
-        coEvery { accountAliasDao.findByAlias(any()) } returns AccountAlias("HDFCBK", 2)
-        receiver.coroutineScope = this
-        
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
+    fun `ignore SMS with null sender`() =
+        runTest {
+            // Arrange
+            val intent = Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION)
+            val mockMessage = mockk<AndroidSmsMessage>()
+            every { mockMessage.originatingAddress } returns null
+            every { mockMessage.messageBody } returns "Body"
+            every { mockMessage.timestampMillis } returns 1L
+            ShadowTelephonyIntents.mockSmsMessages = arrayOf(mockMessage)
 
-        coVerify { transactionDao.insert(any()) }
-    }
+            receiver.coroutineScope = this
+
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            verify(exactly = 1) { mockPendingResult.finish() }
+        }
 
     @Test
-    fun `new account is created if it does not exist`() = runTest {
-        val intent = createSmsIntent("Sender", "Spent Rs.100 at Starbucks")
-        coEvery { accountDao.findByName(any()) } returns null
-        coEvery { accountDao.insert(any()) } returns 10L
-        coEvery { accountDao.getAccountByIdBlocking(10) } returns Account(10, "Sender", "General")
-        receiver.coroutineScope = this
-        
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
+    fun `travel mode with unknown currency shows notification`() =
+        runTest {
+            // Arrange
+            val sender = "AM-CITI"
+            val body = "Spent GBP 10.00 at Starbucks" // Different from USD
+            val intent = createSmsIntent(sender, body)
+            val travelSettings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 0L, Long.MAX_VALUE, "USD", 80.0f)
 
-        coVerify { accountDao.insert(any()) }
-        coVerify { transactionDao.insert(match { it.accountId == 10 }) }
-    }
+            every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
+            every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
+            receiver.coroutineScope = this
+
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
+
+            // Assert
+            verify(exactly = 1) { NotificationHelper.showTravelModeSmsNotification(any(), any(), any()) }
+            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            verify(exactly = 1) { mockPendingResult.finish() }
+        }
+
+    @Test
+    fun `handle exception during processing gracefully`() =
+        runTest {
+            // Arrange
+            val intent = createSmsIntent("Sender", "Body")
+            coEvery { transactionDao.getAllSmsHashes() } throws RuntimeException("DB Error")
+            receiver.coroutineScope = this
+
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
+
+            // Assert
+            verify(exactly = 1) { mockPendingResult.finish() }
+        }
+
+    @Test
+    fun `auto-healing rules are saved on success`() =
+        runTest {
+            // Arrange
+            val intent = createSmsIntent("AM-HDFCBK", "Spent Rs.100 at Starbucks")
+            val potentialTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 100.0,
+                    transactionType = "expense",
+                    merchantName = "Starbucks",
+                    originalMessage = "Spent Rs.100 at Starbucks",
+                    sourceSmsHash = "hash1",
+                )
+            val success =
+                ParseResult.Success(
+                    transaction = potentialTxn,
+                    newlyDiscoveredRenameAlias = "Starbucks" to "Starbucks Coffee",
+                    newlyDiscoveredCategoryAlias = "Starbucks" to 4,
+                )
+            mockkObject(SmsParser)
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns success
+            receiver.coroutineScope = this
+
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify { merchantRenameRuleDao.insert(any()) }
+            coVerify { merchantCategoryMappingDao.insert(any()) }
+            unmockkObject(SmsParser)
+        }
+
+    @Test
+    fun `transaction is saved using account alias`() =
+        runTest {
+            val intent = createSmsIntent("AM-HDFCBK", "Spent Rs.100 at Starbucks")
+            coEvery { accountAliasDao.findByAlias(any()) } returns AccountAlias("HDFCBK", 2)
+            receiver.coroutineScope = this
+
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
+
+            coVerify { transactionDao.insert(any()) }
+        }
+
+    @Test
+    fun `new account is created if it does not exist`() =
+        runTest {
+            val intent = createSmsIntent("Sender", "Spent Rs.100 at Starbucks")
+            coEvery { accountDao.findByName(any()) } returns null
+            coEvery { accountDao.insert(any()) } returns 10L
+            coEvery { accountDao.getAccountByIdBlocking(10) } returns Account(10, "Sender", "General")
+            receiver.coroutineScope = this
+
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
+
+            coVerify { accountDao.insert(any()) }
+            coVerify { transactionDao.insert(match { it.accountId == 10 }) }
+        }
 
     @Test
     @Config(sdk = [Build.VERSION_CODES.S]) // API 31
-    fun `valid SMS on API 31 enqueues notification worker despite no explicit permission granted`() = runTest {
-        // Arrange
-        val intent = createSmsIntent("AM-HDFCBK", "Spent Rs.100 at Starbucks")
-        receiver.coroutineScope = this
-        mockkObject(WorkManager)
-        val mockWorkManager = mockk<WorkManager>(relaxed = true)
-        every { WorkManager.getInstance(any()) } returns mockWorkManager
-        
-        // Act
-        receiver.onReceive(context, intent)
-        advanceUntilIdle()
+    fun `valid SMS on API 31 enqueues notification worker despite no explicit permission granted`() =
+        runTest {
+            // Arrange
+            val intent = createSmsIntent("AM-HDFCBK", "Spent Rs.100 at Starbucks")
+            receiver.coroutineScope = this
+            mockkObject(WorkManager)
+            val mockWorkManager = mockk<WorkManager>(relaxed = true)
+            every { WorkManager.getInstance(any()) } returns mockWorkManager
 
-        // Assert
-        // On API 31, the permission check should return 'true' 
-        // because it's guarded by SDK >= 33.
-        verify(exactly = 1) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
-        unmockkObject(WorkManager)
-    }
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
+
+            // Assert
+            // On API 31, the permission check should return 'true'
+            // because it's guarded by SDK >= 33.
+            verify(exactly = 1) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+            unmockkObject(WorkManager)
+        }
 }
-

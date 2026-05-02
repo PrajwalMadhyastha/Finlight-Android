@@ -47,7 +47,7 @@ class TransactionCrudTests {
      */
     private fun addTransactionForTest(
         customDescription: String? = null,
-        customAmount: String = "100.0"
+        customAmount: String = "100.0",
     ): String {
         val uniqueDescription = customDescription ?: "Test Txn ${UUID.randomUUID().toString().take(5)}"
 
@@ -58,11 +58,12 @@ class TransactionCrudTests {
 
         // FIX: Check collection size instead of .exists()
         val addTransactionNodes = composeTestRule.onAllNodesWithContentDescription("Add Transaction")
-        val fabNode = if (addTransactionNodes.fetchSemanticsNodes().isNotEmpty()) {
-            addTransactionNodes.onFirst()
-        } else {
-            composeTestRule.onNodeWithContentDescription("Add")
-        }
+        val fabNode =
+            if (addTransactionNodes.fetchSemanticsNodes().isNotEmpty()) {
+                addTransactionNodes.onFirst()
+            } else {
+                composeTestRule.onNodeWithContentDescription("Add")
+            }
 
         fabNode.performClick()
 
@@ -81,8 +82,8 @@ class TransactionCrudTests {
         // Wait for Sheet
         composeTestRule.waitUntil(timeoutMillis = 5000) {
             // "Search or enter" is the likely hint or title in the Merchant sheet
-            composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty()
-                    || composeTestRule.onAllNodesWithText("Merchant").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty() ||
+                composeTestRule.onAllNodesWithText("Merchant").fetchSemanticsNodes().isNotEmpty()
         }
 
         // Input the description into the search field of the sheet
@@ -155,8 +156,8 @@ class TransactionCrudTests {
         // 4. Input new description in the sheet
         // Look for the text field pre-filled with original description
         composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithText("Rename Transaction").fetchSemanticsNodes().isNotEmpty()
-                    || composeTestRule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Rename Transaction").fetchSemanticsNodes().isNotEmpty() ||
+                composeTestRule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()
         }
 
         // Clear and enter new text
@@ -167,11 +168,12 @@ class TransactionCrudTests {
         // 5. Click Save/Update
         // FIX: Check collection size for fallback logic instead of .exists()
         val updateButtons = composeTestRule.onAllNodesWithText("Update")
-        val saveButton = if (updateButtons.fetchSemanticsNodes().isNotEmpty()) {
-            updateButtons.onFirst()
-        } else {
-            composeTestRule.onNodeWithText("Save")
-        }
+        val saveButton =
+            if (updateButtons.fetchSemanticsNodes().isNotEmpty()) {
+                updateButtons.onFirst()
+            } else {
+                composeTestRule.onNodeWithText("Save")
+            }
         saveButton.performClick()
 
         // 6. Verify update on detail screen
@@ -235,11 +237,12 @@ class TransactionCrudTests {
         // 2. Open Add Transaction screen again
         // FIX: Check collection size instead of .exists()
         val addTransactionNodes = composeTestRule.onAllNodesWithContentDescription("Add Transaction")
-        val fabNode = if (addTransactionNodes.fetchSemanticsNodes().isNotEmpty()) {
-            addTransactionNodes.onFirst()
-        } else {
-            composeTestRule.onNodeWithContentDescription("Add")
-        }
+        val fabNode =
+            if (addTransactionNodes.fetchSemanticsNodes().isNotEmpty()) {
+                addTransactionNodes.onFirst()
+            } else {
+                composeTestRule.onNodeWithContentDescription("Add")
+            }
         fabNode.performClick()
 
         // 3. Verify "Quick Fill from Recent" carousel is visible
