@@ -24,6 +24,7 @@ package io.pm.finlight
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.utils.DateUtils
+import io.pm.finlight.utils.MerchantAliasHelper
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -111,8 +112,7 @@ class DashboardViewModel(
                 )
 
         merchantAliases =
-            merchantRenameRuleRepository.getAliasesAsMap()
-                .map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
+            merchantRenameRuleRepository.getLowercaseAliasesAsMap()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
         viewModelScope.launch {
@@ -141,24 +141,7 @@ class DashboardViewModel(
 
         checkForLastMonthSummary()
 
-        val monthStart =
-            (calendar.clone() as Calendar).apply {
-                set(Calendar.DAY_OF_MONTH, 1)
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
-        val monthEnd =
-            (calendar.clone() as Calendar).apply {
-                add(Calendar.MONTH, 1)
-                set(Calendar.DAY_OF_MONTH, 1)
-                add(Calendar.DAY_OF_MONTH, -1)
-                set(Calendar.HOUR_OF_DAY, 23)
-                set(Calendar.MINUTE, 59)
-                set(Calendar.SECOND, 59)
-                set(Calendar.MILLISECOND, 999)
-            }.timeInMillis
+        val (monthStart, monthEnd) = DateUtils.getMonthDateRange(calendar)
 
         val financialSummaryFlow =
             transactionRepository.getFinancialSummaryForRangeFlow(monthStart, monthEnd)
@@ -305,8 +288,8 @@ class DashboardViewModel(
 
         recentTransactions =
             transactionRepository.recentTransactions
-                .combine(merchantAliases) { transactions, aliases -> // NEW
-                    applyAliases(transactions, aliases) // NEW
+                .combine(merchantAliases) { transactions, aliases ->
+                    MerchantAliasHelper.applyAliases(transactions, aliases)
                 }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -353,29 +336,6 @@ class DashboardViewModel(
                     started = SharingStarted.WhileSubscribed(5000),
                     initialValue = emptyList(),
                 )
-    }
-
-    private fun applyAliases(
-        transactions: List<TransactionDetails>,
-        aliases: Map<String, String>,
-    ): List<TransactionDetails> {
-        return transactions.map { details ->
-            val original = details.transaction.originalDescription
-            val currentDesc = details.transaction.description
-            val key = (original ?: currentDesc).lowercase(Locale.getDefault())
-            val alias = aliases[key]
-
-            val newDescription = if (alias != null) {
-                if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
-                    alias
-                } else {
-                    currentDesc
-                }
-            } else {
-                currentDesc
-            }
-            details.copy(transaction = details.transaction.copy(description = newDescription))
-        }
     }
 
     fun dismissLastMonthSummaryCard() {

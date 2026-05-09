@@ -8,6 +8,7 @@ package io.pm.finlight
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.util.Locale
 
 /**
  * Repository that abstracts access to the MerchantRenameRule data source.
@@ -22,6 +23,15 @@ class MerchantRenameRuleRepository(private val dao: MerchantRenameRuleDao) {
         return dao.getAllRules().map { rules ->
             rules.associate { it.originalName to it.newName }
         }
+    }
+
+    /**
+     * Retrieves all rename rules and transforms them into a key-value map
+     * with lowercase keys for case-insensitive efficient lookups.
+     * @return A Flow emitting a Map where the key is the lowercase original name and the value is the new name.
+     */
+    fun getLowercaseAliasesAsMap(): Flow<Map<String, String>> {
+        return getAliasesAsMap().map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
     }
 
     /**
