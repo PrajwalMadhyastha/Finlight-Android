@@ -265,14 +265,38 @@ object SmsParser {
                     }
                     // --- MODIFICATION END ---
 
+                    var finalCustomMerchant = customMerchant
+                    if (finalCustomMerchant == null) {
+                        for (pattern in MERCHANT_REGEX_PATTERNS) {
+                            val match = pattern.find(normalizedBody)
+                            if (match != null) {
+                                val potentialName = match.groups[1]?.value?.replace("_", " ")?.replace(Regex("\\s+"), " ")?.trim()?.trimEnd('.')
+                                if (!potentialName.isNullOrBlank() && !potentialName.contains("call", ignoreCase = true)) {
+                                    val containsLetters = potentialName.any { it.isLetter() }
+                                    val containsDigits = potentialName.any { it.isDigit() }
+                                    val isLikelyRefNumber = potentialName.length >= 8 && containsDigits && !containsLetters && !potentialName.startsWith("NEFT", ignoreCase = true)
+                                    if (!isLikelyRefNumber) {
+                                        finalCustomMerchant = potentialName
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    var finalAccount = customAccountStr?.let { PotentialAccount(it, "Unknown") }
+                    if (finalAccount == null) {
+                        finalAccount = parseAccount(normalizedBody, sms.sender)
+                    }
+
                     val potentialTxn = PotentialTransaction(
                         sourceSmsId = sms.id,
                         smsSender = sms.sender,
                         amount = customAmount,
                         transactionType = transactionType, // <-- Use the new logic
-                        merchantName = customMerchant,
+                        merchantName = finalCustomMerchant,
                         originalMessage = sms.body,
-                        potentialAccount = customAccountStr?.let { PotentialAccount(it, "Unknown") },
+                        potentialAccount = finalAccount,
                         date = sms.date
                     )
                     // Enrich and return immediately if a custom rule matches
