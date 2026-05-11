@@ -21,16 +21,8 @@ object DateUtils {
             }
         // Move calendar to the previous month
         calendar.add(Calendar.MONTH, -1)
-        return getMonthDateRange(calendar)
-    }
 
-    /**
-     * Calculates the start and end timestamps for the month represented by the given [Calendar] instance.
-     * @param calendar The calendar instance to calculate the month range for.
-     * @return A Pair containing the start (inclusive) and end (inclusive) milliseconds.
-     */
-    fun getMonthDateRange(calendar: Calendar): Pair<Long, Long> {
-        // Calculate the start of the month
+        // Calculate the start of that month
         val start =
             (calendar.clone() as Calendar).apply {
                 set(Calendar.DAY_OF_MONTH, 1)
@@ -40,7 +32,7 @@ object DateUtils {
                 set(Calendar.MILLISECOND, 0)
             }.timeInMillis
 
-        // Calculate the end of the month
+        // Calculate the end of that month
         val end =
             (calendar.clone() as Calendar).apply {
                 set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))

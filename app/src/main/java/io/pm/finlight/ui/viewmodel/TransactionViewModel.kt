@@ -18,9 +18,7 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
-import io.pm.finlight.utils.DateUtils
 import io.pm.finlight.utils.CategoryIconHelper
-import io.pm.finlight.utils.MerchantAliasHelper
 import io.pm.finlight.utils.HeuristicCategorizer
 import io.pm.finlight.utils.ShareImageGenerator
 import kotlinx.coroutines.Dispatchers
@@ -258,7 +256,22 @@ class TransactionViewModel(
 
         transactionsForSelectedMonth =
             combinedState.flatMapLatest { (calendar, filters) ->
-                val (monthStart, monthEnd) = DateUtils.getMonthDateRange(calendar)
+                val monthStart =
+                    (calendar.clone() as Calendar).apply {
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                    }.timeInMillis
+                val monthEnd =
+                    (calendar.clone() as Calendar).apply {
+                        add(Calendar.MONTH, 1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.DAY_OF_MONTH, -1)
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59)
+                    }.timeInMillis
                 transactionRepository.getTransactionDetailsForRange(
                     monthStart, monthEnd,
                     filters.keyword.takeIf {
@@ -272,12 +285,27 @@ class TransactionViewModel(
                         emit(emptyList())
                     }
             }.combine(merchantAliases) { transactions, aliases ->
-                MerchantAliasHelper.applyAliases(transactions, aliases)
+                applyAliases(transactions, aliases)
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         val financialSummaryFlow =
             _selectedMonth.flatMapLatest { calendar ->
-                val (monthStart, monthEnd) = DateUtils.getMonthDateRange(calendar)
+                val monthStart =
+                    (calendar.clone() as Calendar).apply {
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                    }.timeInMillis
+                val monthEnd =
+                    (calendar.clone() as Calendar).apply {
+                        add(Calendar.MONTH, 1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.DAY_OF_MONTH, -1)
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59)
+                    }.timeInMillis
                 transactionRepository.getFinancialSummaryForRangeFlow(monthStart, monthEnd)
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
@@ -320,7 +348,22 @@ class TransactionViewModel(
                     },
                     filters.account?.id, filters.category?.id, typeStr,
                 )
-                val (monthStart, monthEnd) = DateUtils.getMonthDateRange(calendar)
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        merchantSpendingForSelectedMonth =
+            combinedState.flatMapLatest { (calendar, filters) ->
+                val monthStart =
+                    (calendar.clone() as Calendar).apply {
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                    }.timeInMillis
+                val monthEnd =
+                    (calendar.clone() as Calendar).apply {
+                        add(Calendar.MONTH, 1)
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.DAY_OF_MONTH, -1)
                         set(Calendar.HOUR_OF_DAY, 23)
                         set(Calendar.MINUTE, 59)
                         set(Calendar.SECOND, 59)
@@ -338,7 +381,22 @@ class TransactionViewModel(
                     },
                     filters.account?.id, filters.category?.id, typeStr,
                 )
-                val (monthStart, monthEnd) = DateUtils.getMonthDateRange(calendar)
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        allAccounts =
+            accountRepository.allAccounts.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
+        allCategories = categoryRepository.allCategories
+        allTags =
+            tagRepository.allTags.onEach {
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
 
         monthlySummaries =
             transactionRepository.getFirstTransactionDate().flatMapLatest { firstTransactionDate ->
@@ -581,10 +639,36 @@ class TransactionViewModel(
         }
     }
 
+    private fun applyAliases(
+        transactions: List<TransactionDetails>,
+        aliases: Map<String, String>,
+    ): List<TransactionDetails> {
+        return transactions.map { details ->
+            val original = details.transaction.originalDescription
+            val currentDesc = details.transaction.description
+            val key = (original ?: currentDesc).lowercase(Locale.getDefault())
+            val alias = aliases[key]
+
+            val newDescription = if (alias != null) {
+                // If it matches original, apply alias.
+                // If it was already matching the alias, applying it changes nothing.
+                // If it matches neither, it's a manual exception, so preserve currentDesc.
+                if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
+                    alias
+                } else {
+                    currentDesc
+                }
+            } else {
+                currentDesc
+            }
+            details.copy(transaction = details.transaction.copy(description = newDescription))
+        }
+    }
+
     fun findTransactionDetailsById(id: Int): Flow<TransactionDetails?> {
         return transactionRepository.getTransactionDetailsById(id)
             .combine(merchantAliases) { details, aliases ->
-                details?.let { MerchantAliasHelper.applyAliases(listOf(it), aliases).firstOrNull() }
+                details?.let { applyAliases(listOf(it), aliases).firstOrNull() }
             }
     }
 
