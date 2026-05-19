@@ -65,4 +65,56 @@ class StringSimilarityTest {
         assertEquals(0.5, score1, 0.001)
         assertEquals(0.5, score2, 0.001)
     }
+
+    // =========================================================================
+    // --- isCanonicalSubset Tests ---
+    // =========================================================================
+
+    @Test
+    fun `isCanonicalSubset returns true when canonical tokens are a subset of incoming tokens`() {
+        // "Swiggy" (1 token) is present inside "SWIGGY INDIA PVT LTD" after cleaning
+        assert(StringSimilarity.isCanonicalSubset("Swiggy", "SWIGGY INDIA"))
+    }
+
+    @Test
+    fun `isCanonicalSubset returns true for multi-token canonical match`() {
+        // "Amazon Pay" (2 tokens) should match "AMAZON PAY MERCHANT"
+        assert(StringSimilarity.isCanonicalSubset("Amazon Pay", "AMAZON PAY MERCHANT"))
+    }
+
+    @Test
+    fun `isCanonicalSubset returns false when canonical token is missing from incoming`() {
+        // "Swiggy" is NOT in "ZOMATO INDIA"
+        assert(!StringSimilarity.isCanonicalSubset("Swiggy", "ZOMATO INDIA"))
+    }
+
+    @Test
+    fun `isCanonicalSubset returns false when canonical name is shorter than 5 chars`() {
+        // "Pay" (3 chars) must not match anything — too short, too risky
+        assert(!StringSimilarity.isCanonicalSubset("Pay", "PAYTM INDIA"))
+        // "SBI" (3 chars) must not match
+        assert(!StringSimilarity.isCanonicalSubset("SBI", "SBI BANK CARD"))
+    }
+
+    @Test
+    fun `isCanonicalSubset returns false for null or blank inputs`() {
+        assert(!StringSimilarity.isCanonicalSubset(null, "SWIGGY INDIA"))
+        assert(!StringSimilarity.isCanonicalSubset("Swiggy", null))
+        assert(!StringSimilarity.isCanonicalSubset("", "SWIGGY INDIA"))
+        assert(!StringSimilarity.isCanonicalSubset("Swiggy", ""))
+    }
+
+    @Test
+    fun `isCanonicalSubset is case-insensitive`() {
+        assert(StringSimilarity.isCanonicalSubset("swiggy", "SWIGGY INFOTECH"))
+        assert(StringSimilarity.isCanonicalSubset("SWIGGY", "swiggy india"))
+    }
+
+    @Test
+    fun `isCanonicalSubset returns false when only partial canonical tokens match`() {
+        // "Amazon Pay" has tokens [amazon, pay]. "AMAZON MERCHANT" only has [amazon, merchant].
+        // "pay" is missing, so should NOT match.
+        assert(!StringSimilarity.isCanonicalSubset("Amazon Pay", "AMAZON MERCHANT"))
+    }
 }
+

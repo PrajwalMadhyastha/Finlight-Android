@@ -1090,6 +1090,21 @@ interface TransactionDao {
         excludeId: Int,
     ): List<Transaction>
 
+    /**
+     * Returns all distinct, non-null originalDescription values across all non-excluded
+     * transactions. Used by the cross-account canonical nudge to find unmatched variants.
+     */
+    @Query("SELECT DISTINCT originalDescription FROM transactions WHERE originalDescription IS NOT NULL AND isExcluded = 0")
+    suspend fun getDistinctOriginalDescriptions(): List<String>
+
+    /**
+     * Returns the IDs of all non-excluded transactions whose [originalDescription] matches
+     * the given value (case-insensitive). Used to bulk-update transactions for a confirmed
+     * canonical nudge selection.
+     */
+    @Query("SELECT id FROM transactions WHERE LOWER(originalDescription) = LOWER(:originalDesc) AND isExcluded = 0")
+    suspend fun getTransactionIdsByOriginalDescription(originalDesc: String): List<Int>
+
     @Query("UPDATE transactions SET categoryId = :categoryId WHERE id IN (:ids)")
     suspend fun updateCategoryForIds(
         ids: List<Int>,
