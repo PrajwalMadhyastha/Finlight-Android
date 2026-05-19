@@ -265,14 +265,38 @@ object SmsParser {
                     }
                     // --- MODIFICATION END ---
 
+                    var finalCustomMerchant = customMerchant
+                    if (finalCustomMerchant == null) {
+                        for (pattern in MERCHANT_REGEX_PATTERNS) {
+                            val match = pattern.find(normalizedBody)
+                            if (match != null) {
+                                val potentialName = match.groups[1]?.value?.replace("_", " ")?.replace(Regex("\\s+"), " ")?.trim()?.trimEnd('.')
+                                if (!potentialName.isNullOrBlank() && !potentialName.contains("call", ignoreCase = true)) {
+                                    val containsLetters = potentialName.any { it.isLetter() }
+                                    val containsDigits = potentialName.any { it.isDigit() }
+                                    val isLikelyRefNumber = potentialName.length >= 8 && containsDigits && !containsLetters && !potentialName.startsWith("NEFT", ignoreCase = true)
+                                    if (!isLikelyRefNumber) {
+                                        finalCustomMerchant = potentialName
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    var finalAccount = customAccountStr?.let { PotentialAccount(it, "Unknown") }
+                    if (finalAccount == null) {
+                        finalAccount = parseAccount(normalizedBody, sms.sender)
+                    }
+
                     val potentialTxn = PotentialTransaction(
                         sourceSmsId = sms.id,
                         smsSender = sms.sender,
                         amount = customAmount,
                         transactionType = transactionType, // <-- Use the new logic
-                        merchantName = customMerchant,
+                        merchantName = finalCustomMerchant,
                         originalMessage = sms.body,
-                        potentialAccount = customAccountStr?.let { PotentialAccount(it, "Unknown") },
+                        potentialAccount = finalAccount,
                         date = sms.date
                     )
                     // Enrich and return immediately if a custom rule matches
@@ -513,6 +537,38 @@ object SmsParser {
             if (bestNewName != null) {
                 finalMerchantName = bestNewName
                 newRenameAlias = Pair(originalMerchant, bestNewName)
+            }
+        }
+
+        // --- Step 2b: Reverse Canonical Subset Fallback ---
+        // If still no match, check whether the user's chosen canonical name (rule.newName)
+        // is a token-subset of the incoming raw merchant. This catches cross-account
+        // variants where different banks extract slightly different merchant strings
+        // (e.g. "SWIGGY INFOTECH" vs "SWIGGY INDIA PVT LTD") but the user's canonical
+        // "Swiggy" is present as a token in both.
+        if (finalMerchantName == null && originalMerchant != null) {
+            var bestCandidate: String? = null
+            var bestTokenCount = 0
+
+            for (rule in renameRules) {
+                if (StringSimilarity.isCanonicalSubset(rule.newName, originalMerchant)) {
+                    // Prefer the most specific (most tokens) canonical name to avoid
+                    // shorter rules shadowing more precise ones.
+                    val tokenCount = rule.newName
+                        .lowercase()
+                        .split(Regex("[^a-z0-9]+"))
+                        .count { it.isNotBlank() }
+                    if (tokenCount > bestTokenCount) {
+                        bestTokenCount = tokenCount
+                        bestCandidate = rule.newName
+                    }
+                }
+            }
+
+            if (bestCandidate != null) {
+                finalMerchantName = bestCandidate
+                // Record alias so the auto-heal path persists a direct rule for this variant.
+                newRenameAlias = Pair(originalMerchant, bestCandidate)
             }
         }
 

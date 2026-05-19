@@ -330,6 +330,14 @@ class TransactionRepository(
         return transactionDao.findSimilarTransactions(description, excludeId)
     }
 
+    /** Returns all distinct [Transaction.originalDescription] values for cross-account nudge scanning. */
+    suspend fun getDistinctOriginalDescriptions(): List<String> =
+        transactionDao.getDistinctOriginalDescriptions()
+
+    /** Returns IDs of all transactions sharing the given [originalDesc] (case-insensitive). */
+    suspend fun getTransactionIdsByOriginalDescription(originalDesc: String): List<Int> =
+        transactionDao.getTransactionIdsByOriginalDescription(originalDesc)
+
     suspend fun updateCategoryForIds(
         ids: List<Int>,
         categoryId: Int,
