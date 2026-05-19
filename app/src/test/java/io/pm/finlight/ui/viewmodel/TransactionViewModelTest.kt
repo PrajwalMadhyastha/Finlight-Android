@@ -674,6 +674,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
             assertEquals(null, sheetState?.newCategoryId) // Category didn't change
             assertEquals(1, sheetState?.similarTransactions?.size)
             assertEquals(2, sheetState?.selectedIds?.first()) // The ID of the similar transaction
+            // FIX: totalMatchingCount must include the current transaction (1 similar + 1 current = 2)
+            assertEquals(2, sheetState?.totalMatchingCount)
         }
 
     // --- NEW: Simple Update Function Tests (Success Path) ---
@@ -2498,4 +2500,388 @@ class TransactionViewModelTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    // =========================================================================
+    // --- NEW TESTS: Silent Rule Persistence (Bug Fix 1) ---
+    // Covers the onAttemptToLeaveScreen else-branch that was previously a no-op.
+    // =========================================================================
+
+    /**
+     * Helper to set up a transaction whose description has been changed and has no
+     * similar transactions in the database, so the "else" branch in
+     * onAttemptToLeaveScreen is exercised.
+     */
+    private fun setupUniqueRenameScenario(
+        initialDesc: String,
+        currentDesc: String,
+        originalDescription: String = initialDesc,
+    ) = runTest {
+        val initialTxn = Transaction(
+            id = 1,
+            description = initialDesc,
+            categoryId = 1,
+            amount = 10.0,
+            date = 0L,
+            accountId = 1,
+            notes = null,
+            originalDescription = originalDescription,
+        )
+        val currentTxn = initialTxn.copy(description = currentDesc)
+
+        whenever(transactionRepository.getTransactionById(1))
+            .thenReturn(flowOf(initialTxn), flowOf(currentTxn))
+        // No similar transactions exist for this merchant
+        whenever(transactionRepository.findSimilarTransactions(originalDescription, 1))
+            .thenReturn(emptyList())
+        whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+        whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+        whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+        whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+        viewModel.loadTransactionForDetailScreen(1)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `onAttemptToLeaveScreen silently saves rename rule when no similar transactions exist`() =
+        runTest {
+            // ARRANGE: "Annual Maintenance" renamed from "Water charges", no similar txns
+            setupUniqueRenameScenario(
+                initialDesc = "Water charges",
+                currentDesc = "Annual Maintenance",
+                originalDescription = "Water charges",
+            )
+
+            var hasNavigated = false
+
+            // ACT
+            viewModel.onAttemptToLeaveScreen { hasNavigated = true }
+            advanceUntilIdle()
+
+            // ASSERT: Navigation should be allowed immediately (no sheet shown)
+            assertTrue("Should navigate when no similar transactions", hasNavigated)
+            assertNull("Sheet state should remain null", viewModel.retroUpdateSheetState.value)
+            // ASSERT: The rename rule must have been saved silently
+            verify(merchantRenameRuleRepository).insert(
+                MerchantRenameRule(originalName = "Water charges", newName = "Annual Maintenance")
+            )
+            verify(merchantRenameRuleRepository, never()).deleteByOriginalName(anyString())
+        }
+
+    @Test
+    fun `onAttemptToLeaveScreen silently deletes rule when reverting name with no similar transactions`() =
+        runTest {
+            // ARRANGE: User is reverting "Gateway" back to "Gateway" (same as originalDescription)
+            setupUniqueRenameScenario(
+                initialDesc = "Annual Maintenance",
+                currentDesc = "Water charges",  // Reverting back to original name
+                originalDescription = "Water charges",
+            )
+
+            var hasNavigated = false
+
+            // ACT
+            viewModel.onAttemptToLeaveScreen { hasNavigated = true }
+            advanceUntilIdle()
+
+            // ASSERT: Navigation allowed, sheet not shown
+            assertTrue("Should navigate when no similar transactions", hasNavigated)
+            assertNull("Sheet state should remain null", viewModel.retroUpdateSheetState.value)
+            // ASSERT: Existing rule for this original name should be removed
+            verify(merchantRenameRuleRepository).deleteByOriginalName("Water charges")
+            verify(merchantRenameRuleRepository, never()).insert(any())
+        }
+
+    @Test
+    fun `onAttemptToLeaveScreen allows navigation and saves no rule when description unchanged`() =
+        runTest {
+            // ARRANGE: No description change at all
+            val txn = Transaction(
+                id = 1, description = "Starbucks", categoryId = 1,
+                amount = 10.0, date = 0L, accountId = 1, notes = null,
+                originalDescription = "Starbucks",
+            )
+            whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(txn))
+            whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+            whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+            viewModel.loadTransactionForDetailScreen(1)
+            advanceUntilIdle()
+
+            var hasNavigated = false
+
+            // ACT
+            viewModel.onAttemptToLeaveScreen { hasNavigated = true }
+            advanceUntilIdle()
+
+            // ASSERT
+            assertTrue("Should navigate when nothing changed", hasNavigated)
+            assertNull(viewModel.retroUpdateSheetState.value)
+            verify(merchantRenameRuleRepository, never()).insert(any())
+            verify(merchantRenameRuleRepository, never()).deleteByOriginalName(anyString())
+        }
+
+    // =========================================================================
+    // --- NEW TESTS: isAllSelected Fix (Bug Fix 2) ---
+    // The new formula is (idsToUpdate.size + 1) == totalMatchingCount.
+    // setupRetroSheet with numSimilar=N sets totalMatchingCount = N+1.
+    // =========================================================================
+
+    @Test
+    fun `performBatchUpdate saves rule only when idsToUpdate plus current equals totalMatchingCount`() =
+        runTest {
+            // ARRANGE: 1 similar transaction + 1 current = totalMatchingCount 2
+            // User keeps the 1 similar selected → (1+1)==2 → isAllSelected=true → rule saved
+            setupRetroSheet(newDesc = "Annual Maintenance", numSimilar = 1)
+
+            val state = viewModel.retroUpdateSheetState.value
+            assertNotNull(state)
+            assertEquals(2, state?.totalMatchingCount)
+            assertEquals(setOf(2), state?.selectedIds) // Only similar txn #2 selected
+
+            // ACT & ASSERT
+            viewModel.uiEvent.test {
+                viewModel.performBatchUpdate()
+                advanceUntilIdle()
+
+                // isAllSelected: (1+1)==2 → TRUE → rule must be saved
+                verify(merchantRenameRuleRepository).insert(
+                    MerchantRenameRule("Starbucks", "Annual Maintenance")
+                )
+                verify(transactionRepository).updateDescriptionForIds(listOf(2), "Annual Maintenance")
+
+                assertEquals("Updated 1 transaction(s).", awaitItem())
+                assertNull(viewModel.retroUpdateSheetState.value)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `performBatchUpdate skips rule when partial selection even if similar count matches old logic`() =
+        runTest {
+            // ARRANGE: 3 similar transactions → totalMatchingCount=4
+            // Old (buggy) logic: idsToUpdate.size==similarTransactions.size → 2==3 → false → no rule (OK)
+            // Partial deselect: user deselects 1 → selectedIds={2,3} (2 out of 3)
+            // New logic: (2+1)==4 → false → no rule saved
+            setupRetroSheet(newDesc = "Annual Maintenance", numSimilar = 3)
+
+            // Deselect txn 4 → selectedIds = {2, 3}
+            viewModel.toggleRetroUpdateSelection(4)
+            advanceUntilIdle()
+
+            val state = viewModel.retroUpdateSheetState.value
+            assertEquals(setOf(2, 3), state?.selectedIds)
+            assertEquals(4, state?.totalMatchingCount) // 3 similar + 1 current
+
+            // ACT & ASSERT
+            viewModel.uiEvent.test {
+                viewModel.performBatchUpdate()
+                advanceUntilIdle()
+
+                // (2+1)==4 → FALSE → no rule should be saved
+                verify(merchantRenameRuleRepository, never()).insert(any())
+                verify(transactionRepository).updateDescriptionForIds(listOf(2, 3), "Annual Maintenance")
+
+                assertEquals("Updated 2 transaction(s).", awaitItem())
+                assertNull(viewModel.retroUpdateSheetState.value)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `onAttemptToLeaveScreen sets totalMatchingCount to similar size plus one`() =
+        runTest {
+            // ARRANGE: 3 similar transactions
+            val initialTxn = Transaction(
+                id = 1, description = "Merchant", categoryId = 1,
+                amount = 10.0, date = 0L, accountId = 1, notes = null,
+                originalDescription = "Merchant",
+            )
+            val currentTxn = initialTxn.copy(description = "Renamed Merchant")
+            val similarTxns = (2..4).map {
+                Transaction(id = it, description = "Merchant", categoryId = 1, amount = 5.0, date = 0L, accountId = 1, notes = null)
+            }
+
+            whenever(transactionRepository.getTransactionById(1))
+                .thenReturn(flowOf(initialTxn), flowOf(currentTxn))
+            whenever(transactionRepository.findSimilarTransactions("Merchant", 1))
+                .thenReturn(similarTxns)
+            whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+            whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+            viewModel.loadTransactionForDetailScreen(1)
+            viewModel.onAttemptToLeaveScreen { }
+            advanceUntilIdle()
+
+            // ASSERT
+            val sheetState = viewModel.retroUpdateSheetState.value
+            assertNotNull(sheetState)
+            // 3 similar + 1 currently edited = 4
+            assertEquals(4, sheetState?.totalMatchingCount)
+            assertEquals(3, sheetState?.similarTransactions?.size)
+        }
+
+    // =========================================================================
+    // --- NEW TESTS: Cross-Account Canonical Nudge (Layer B) ---
+    // =========================================================================
+
+    /**
+     * Helper that wires up a performBatchUpdate scenario that will trigger
+     * findCrossAccountVariants (isAllSelected=true, rule saved).
+     */
+    private fun setupBatchUpdateAllSelected(
+        originalDesc: String = "SWIGGY INFOTECH",
+        canonicalName: String = "Swiggy",
+    ) = runTest {
+        setupRetroSheet(newDesc = canonicalName, numSimilar = 1)
+        // After setupRetroSheet: selectedIds={2}, totalMatchingCount=2 → (1+1)==2 → isAllSelected=true
+        whenever(transactionRepository.getDistinctOriginalDescriptions())
+            .thenReturn(emptyList()) // default: no variants
+        whenever(transactionRepository.getTransactionIdsByOriginalDescription(anyString()))
+            .thenReturn(emptyList())
+        whenever(merchantRenameRuleRepository.getAliasesAsMap())
+            .thenReturn(flowOf(mapOf(originalDesc.lowercase() to canonicalName)))
+    }
+
+    @Test
+    fun `performBatchUpdate emits navigateBackEvent when no cross-account variants found`() =
+        runTest {
+            setupBatchUpdateAllSelected()
+
+            viewModel.navigateBackEvent.test {
+                viewModel.performBatchUpdate()
+                advanceUntilIdle()
+
+                // Should receive navigation event because no variants were found
+                awaitItem()
+                cancelAndIgnoreRemainingEvents()
+            }
+            assertNull("Canonical nudge should remain null", viewModel.canonicalNudgeState.value)
+        }
+
+    @Test
+    fun `performBatchUpdate populates canonicalNudgeState when cross-account variants exist`() =
+        runTest {
+            setupBatchUpdateAllSelected(originalDesc = "SWIGGY INFOTECH", canonicalName = "Swiggy")
+
+            // Override: one cross-account variant exists that hasn't been renamed yet
+            whenever(transactionRepository.getDistinctOriginalDescriptions())
+                .thenReturn(listOf("SWIGGY INFOTECH", "SWIGGY INDIA"))
+            whenever(merchantRenameRuleRepository.getAliasesAsMap())
+                .thenReturn(flowOf(mapOf("swiggy infotech" to "Swiggy")))
+            whenever(transactionRepository.getTransactionIdsByOriginalDescription("SWIGGY INDIA"))
+                .thenReturn(listOf(10, 11, 12))
+
+            viewModel.performBatchUpdate()
+            advanceUntilIdle()
+
+            // Should show the nudge, NOT navigate immediately
+            val nudge = viewModel.canonicalNudgeState.value
+            assertNotNull("Canonical nudge should be shown", nudge)
+            assertEquals("Swiggy", nudge?.canonicalName)
+            assertEquals(1, nudge?.variants?.size)
+            assertEquals("SWIGGY INDIA", nudge?.variants?.first()?.rawName)
+            assertEquals(3, nudge?.variants?.first()?.transactionCount)
+            // All variants pre-selected by default
+            assertEquals(setOf("SWIGGY INDIA"), nudge?.selectedRawNames)
+        }
+
+    @Test
+    fun `toggleCanonicalVariant adds and removes variant from selection`() =
+        runTest {
+            setupBatchUpdateAllSelected()
+            whenever(transactionRepository.getDistinctOriginalDescriptions())
+                .thenReturn(listOf("SWIGGY INFOTECH", "SWIGGY INDIA"))
+            whenever(merchantRenameRuleRepository.getAliasesAsMap())
+                .thenReturn(flowOf(mapOf("swiggy infotech" to "Swiggy")))
+            whenever(transactionRepository.getTransactionIdsByOriginalDescription("SWIGGY INDIA"))
+                .thenReturn(listOf(10))
+
+            viewModel.performBatchUpdate()
+            advanceUntilIdle()
+
+            // Pre-condition: SWIGGY INDIA is selected
+            assertEquals(setOf("SWIGGY INDIA"), viewModel.canonicalNudgeState.value?.selectedRawNames)
+
+            // Deselect
+            viewModel.toggleCanonicalVariant("SWIGGY INDIA")
+            advanceUntilIdle()
+            assertEquals(emptySet<String>(), viewModel.canonicalNudgeState.value?.selectedRawNames)
+
+            // Re-select
+            viewModel.toggleCanonicalVariant("SWIGGY INDIA")
+            advanceUntilIdle()
+            assertEquals(setOf("SWIGGY INDIA"), viewModel.canonicalNudgeState.value?.selectedRawNames)
+        }
+
+    @Test
+    fun `confirmCanonicalNudge saves rules and updates DB for selected variants`() =
+        runTest {
+            setupBatchUpdateAllSelected()
+            whenever(transactionRepository.getDistinctOriginalDescriptions())
+                .thenReturn(listOf("SWIGGY INFOTECH", "SWIGGY INDIA"))
+            whenever(merchantRenameRuleRepository.getAliasesAsMap())
+                .thenReturn(flowOf(mapOf("swiggy infotech" to "Swiggy")))
+            whenever(transactionRepository.getTransactionIdsByOriginalDescription("SWIGGY INDIA"))
+                .thenReturn(listOf(10, 11))
+
+            viewModel.performBatchUpdate()
+            advanceUntilIdle()
+            assertNotNull(viewModel.canonicalNudgeState.value)
+
+            viewModel.uiEvent.test {
+                viewModel.navigateBackEvent.test {
+                    viewModel.confirmCanonicalNudge()
+                    advanceUntilIdle()
+
+                    // Rule saved for cross-account variant
+                    verify(merchantRenameRuleRepository).insert(
+                        MerchantRenameRule(originalName = "SWIGGY INDIA", newName = "Swiggy"),
+                    )
+                    // Transactions updated
+                    verify(transactionRepository).updateDescriptionForIds(listOf(10, 11), "Swiggy")
+
+                    // State cleared
+                    assertNull(viewModel.canonicalNudgeState.value)
+
+                    // Navigation triggered
+                    awaitItem()
+                    cancelAndIgnoreRemainingEvents()
+                }
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `dismissCanonicalNudge clears state and emits navigateBackEvent`() =
+        runTest {
+            setupBatchUpdateAllSelected()
+            whenever(transactionRepository.getDistinctOriginalDescriptions())
+                .thenReturn(listOf("SWIGGY INFOTECH", "SWIGGY INDIA"))
+            whenever(merchantRenameRuleRepository.getAliasesAsMap())
+                .thenReturn(flowOf(mapOf("swiggy infotech" to "Swiggy")))
+            whenever(transactionRepository.getTransactionIdsByOriginalDescription("SWIGGY INDIA"))
+                .thenReturn(listOf(10))
+
+            viewModel.performBatchUpdate()
+            advanceUntilIdle()
+            assertNotNull(viewModel.canonicalNudgeState.value)
+
+            viewModel.navigateBackEvent.test {
+                viewModel.dismissCanonicalNudge()
+                advanceUntilIdle()
+
+                assertNull("Nudge should be dismissed", viewModel.canonicalNudgeState.value)
+                verify(merchantRenameRuleRepository, never()).insert(
+                    MerchantRenameRule(originalName = "SWIGGY INDIA", newName = "Swiggy"),
+                )
+                awaitItem() // navigateBackEvent emitted
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }
+

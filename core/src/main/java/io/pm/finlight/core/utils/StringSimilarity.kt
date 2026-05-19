@@ -42,4 +42,23 @@ object StringSimilarity {
 
         return intersectionSize.toDouble() / unionSize
     }
+
+    /**
+     * Returns `true` if all tokens of [canonicalName] are present in [incomingName].
+     * This is the "reverse canonical" check used for cross-account merchant matching:
+     * the user's concise chosen name (e.g. "Swiggy") is checked as a token-subset of
+     * a raw extracted name from a different bank (e.g. "SWIGGY INDIA PVT LTD").
+     *
+     * A minimum length of 5 characters is enforced on [canonicalName] to prevent
+     * short labels like "Pay" or "SBI" from generating false positive matches.
+     */
+    fun isCanonicalSubset(canonicalName: String?, incomingName: String?): Boolean {
+        if (canonicalName.isNullOrBlank() || incomingName.isNullOrBlank()) return false
+        if (canonicalName.trim().length < 5) return false
+
+        val canonicalTokens = canonicalName.lowercase().split(Regex("[^a-z0-9]+")).filter { it.isNotBlank() }.toSet()
+        val incomingTokens = incomingName.lowercase().split(Regex("[^a-z0-9]+")).filter { it.isNotBlank() }.toSet()
+
+        return canonicalTokens.isNotEmpty() && canonicalTokens.all { it in incomingTokens }
+    }
 }

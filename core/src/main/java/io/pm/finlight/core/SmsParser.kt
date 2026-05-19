@@ -540,6 +540,38 @@ object SmsParser {
             }
         }
 
+        // --- Step 2b: Reverse Canonical Subset Fallback ---
+        // If still no match, check whether the user's chosen canonical name (rule.newName)
+        // is a token-subset of the incoming raw merchant. This catches cross-account
+        // variants where different banks extract slightly different merchant strings
+        // (e.g. "SWIGGY INFOTECH" vs "SWIGGY INDIA PVT LTD") but the user's canonical
+        // "Swiggy" is present as a token in both.
+        if (finalMerchantName == null && originalMerchant != null) {
+            var bestCandidate: String? = null
+            var bestTokenCount = 0
+
+            for (rule in renameRules) {
+                if (StringSimilarity.isCanonicalSubset(rule.newName, originalMerchant)) {
+                    // Prefer the most specific (most tokens) canonical name to avoid
+                    // shorter rules shadowing more precise ones.
+                    val tokenCount = rule.newName
+                        .lowercase()
+                        .split(Regex("[^a-z0-9]+"))
+                        .count { it.isNotBlank() }
+                    if (tokenCount > bestTokenCount) {
+                        bestTokenCount = tokenCount
+                        bestCandidate = rule.newName
+                    }
+                }
+            }
+
+            if (bestCandidate != null) {
+                finalMerchantName = bestCandidate
+                // Record alias so the auto-heal path persists a direct rule for this variant.
+                newRenameAlias = Pair(originalMerchant, bestCandidate)
+            }
+        }
+
         finalMerchantName = finalMerchantName ?: originalMerchant
 
         // --- Step 3: If we still haven't found a category, try again with the RENAMED merchant name ---

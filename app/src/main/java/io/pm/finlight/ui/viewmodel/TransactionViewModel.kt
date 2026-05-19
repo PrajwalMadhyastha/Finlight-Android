@@ -15,6 +15,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.core.utils.StringSimilarity
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
@@ -51,6 +52,11 @@ data class RetroUpdateSheetState(
     val similarTransactions: List<Transaction> = emptyList(),
     val selectedIds: Set<Int> = emptySet(),
     val isLoading: Boolean = true,
+    /** Total number of transactions sharing this originalDescription, INCLUDING the one
+     *  currently being edited (which is excluded from [similarTransactions]). Used to
+     *  correctly determine whether the user selected ALL affected transactions so a global
+     *  rename rule can be saved or deleted. */
+    val totalMatchingCount: Int = 0,
 )
 
 data class ManualTransactionData(
@@ -62,6 +68,31 @@ data class ManualTransactionData(
     val transactionType: String,
     val imageUris: List<Uri>,
     val tags: Set<Tag>,
+)
+
+/**
+ * Represents a single cross-account variant of a merchant: a raw extracted name that
+ * maps to the same canonical merchant but came from a different bank's SMS format.
+ */
+data class CanonicalVariant(
+    val rawName: String,
+    val transactionCount: Int,
+    val transactionIds: List<Int>,
+)
+
+/**
+ * State for the canonical nudge sheet shown after a rename rule is saved.
+ * Surfaces historical transactions from other accounts whose raw merchant name
+ * is canonically equivalent but was not yet renamed.
+ *
+ * @param canonicalName The user-chosen display name (e.g. "Swiggy").
+ * @param variants Unmatched raw merchant names that token-contain the canonical name.
+ * @param selectedRawNames The set of raw names the user has checked for bulk-rename.
+ */
+data class CanonicalNudgeSheetState(
+    val canonicalName: String,
+    val variants: List<CanonicalVariant>,
+    val selectedRawNames: Set<String> = variants.map { it.rawName }.toSet(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
@@ -153,6 +184,18 @@ class TransactionViewModel(
 
     private val _retroUpdateSheetState = MutableStateFlow<RetroUpdateSheetState?>(null)
     val retroUpdateSheetState = _retroUpdateSheetState.asStateFlow()
+
+    /** State for the cross-account canonical nudge sheet. Non-null means the sheet is visible. */
+    private val _canonicalNudgeState = MutableStateFlow<CanonicalNudgeSheetState?>(null)
+    val canonicalNudgeState = _canonicalNudgeState.asStateFlow()
+
+    /**
+     * Emits [Unit] whenever the ViewModel determines that navigation back is safe.
+     * Replaces direct [navigateBack] calls from the UI so the two-sheet flow
+     * (retro sheet → canonical nudge) can be sequenced by the ViewModel.
+     */
+    private val _navigateBackEvent = Channel<Unit>(Channel.CONFLATED)
+    val navigateBackEvent = _navigateBackEvent.receiveAsFlow()
 
     val travelModeSettings: StateFlow<TravelModeSettings?>
 
@@ -478,6 +521,8 @@ class TransactionViewModel(
             val similar = transactionRepository.findSimilarTransactions(originalDescriptionForSearch, initial.id)
 
             if (similar.isNotEmpty()) {
+                // Pass totalMatchingCount = similar.size + 1 (the current transaction itself)
+                // so performBatchUpdate can correctly evaluate "did the user select ALL?"
                 _retroUpdateSheetState.value =
                     RetroUpdateSheetState(
                         originalDescription = originalDescriptionForSearch,
@@ -486,9 +531,42 @@ class TransactionViewModel(
                         similarTransactions = similar,
                         selectedIds = similar.map { it.id }.toSet(),
                         isLoading = false,
+                        totalMatchingCount = similar.size + 1,
                     )
             } else {
-                onNavigationAllowed()
+                // --- FIX 1: No similar transactions found, but a rename still happened.
+                // Silently persist the global rule so the parser remembers this rename
+                // for future incoming transactions, then check for cross-account variants.
+                if (descriptionChanged) {
+                    val newDesc = current.description
+                    val originalDesc = originalDescriptionForSearch
+                    if (originalDesc.isNotBlank() && !originalDesc.equals(newDesc, ignoreCase = true)) {
+                        try {
+                            val rule = MerchantRenameRule(originalName = originalDesc, newName = newDesc)
+                            merchantRenameRuleRepository.insert(rule)
+                            Log.d(TAG, "Silently saved rename rule: '$originalDesc' -> '$newDesc' (no similar transactions).")
+                            // Layer B: scan for cross-account variants. If found, the nudge
+                            // will emit navigateBackEvent after the user responds.
+                            val foundVariants = findCrossAccountVariants(newDesc, originalDesc)
+                            if (!foundVariants) onNavigationAllowed()
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to save rename rule silently", e)
+                            onNavigationAllowed()
+                        }
+                    } else if (originalDesc.isNotBlank() && originalDesc.equals(newDesc, ignoreCase = true)) {
+                        // User reverted the name — remove any existing rule for this name.
+                        try {
+                            merchantRenameRuleRepository.deleteByOriginalName(originalDesc)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to delete rename rule on revert", e)
+                        }
+                        onNavigationAllowed()
+                    } else {
+                        onNavigationAllowed()
+                    }
+                } else {
+                    onNavigationAllowed()
+                }
             }
         }
     }
@@ -1571,21 +1649,32 @@ class TransactionViewModel(
             val state = _retroUpdateSheetState.value ?: return@launch
             val idsToUpdate = state.selectedIds.toList()
             if (idsToUpdate.isEmpty()) {
-                dismissRetroUpdateSheet()
+                _retroUpdateSheetState.value = null
+                _navigateBackEvent.send(Unit)
                 return@launch
             }
 
             try {
+                var ruleSaved = false
+                var savedCanonical: String? = null
+                var savedOriginal: String? = null
+
                 state.newDescription?.let { newDesc ->
                     val originalDesc = state.originalDescription
-                    val isAllSelected = idsToUpdate.size == state.similarTransactions.size
+                    val isAllSelected = (idsToUpdate.size + 1) == state.totalMatchingCount
                     if (isAllSelected) {
                         if (originalDesc.isNotBlank() && !originalDesc.equals(newDesc, ignoreCase = true)) {
                             val rule = MerchantRenameRule(originalName = originalDesc, newName = newDesc)
                             merchantRenameRuleRepository.insert(rule)
+                            Log.d(TAG, "Batch: saved global rename rule '$originalDesc' -> '$newDesc' (all ${state.totalMatchingCount} selected).")
+                            ruleSaved = true
+                            savedCanonical = newDesc
+                            savedOriginal = originalDesc
                         } else if (originalDesc.isNotBlank() && originalDesc.equals(newDesc, ignoreCase = true)) {
                             merchantRenameRuleRepository.deleteByOriginalName(originalDesc)
                         }
+                    } else {
+                        Log.d(TAG, "Batch: partial selection (${idsToUpdate.size + 1}/${state.totalMatchingCount}) — skipping global rule change.")
                     }
                 }
 
@@ -1596,12 +1685,146 @@ class TransactionViewModel(
                     transactionRepository.updateCategoryForIds(idsToUpdate, it)
                 }
                 _uiEvent.send("Updated ${idsToUpdate.size} transaction(s).")
+
+                // Layer B: if a global rule was saved, scan for cross-account variants.
+                // The canonical nudge (if shown) will emit navigateBackEvent when resolved.
+                if (ruleSaved && savedCanonical != null && savedOriginal != null) {
+                    val foundVariants = findCrossAccountVariants(savedCanonical!!, savedOriginal!!)
+                    if (!foundVariants) _navigateBackEvent.send(Unit)
+                } else {
+                    _navigateBackEvent.send(Unit)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to perform batch update", e)
                 _uiEvent.send("Batch update failed. Please try again.")
+                _navigateBackEvent.send(Unit)
             } finally {
-                dismissRetroUpdateSheet()
+                _retroUpdateSheetState.value = null
             }
+        }
+    }
+
+    /**
+     * Called when the user explicitly skips the retro update sheet (dismiss or cancel).
+     * Clears the sheet and triggers navigation since no global rule was saved.
+     */
+    fun onRetroSheetSkipped() {
+        viewModelScope.launch {
+            _retroUpdateSheetState.value = null
+            _navigateBackEvent.send(Unit)
+        }
+    }
+
+    // =========================================================================
+    // --- Cross-Account Canonical Nudge (Layer B) ---
+    // =========================================================================
+
+    /**
+     * Scans all distinct [Transaction.originalDescription] values in the database and
+     * surfaces any that pass the canonical-subset check but do not already have a rename
+     * rule. If variants are found, [_canonicalNudgeState] is populated and the function
+     * returns `true` (navigation deferred). Returns `false` if no variants are found.
+     *
+     * @param canonicalName The user-chosen display name just saved (e.g. "Swiggy").
+     * @param savedOriginalName The raw name the rule was saved for (e.g. "SWIGGY INFOTECH").
+     */
+    private suspend fun findCrossAccountVariants(
+        canonicalName: String,
+        savedOriginalName: String,
+    ): Boolean {
+        if (canonicalName.trim().length < 5) return false
+        return try {
+            val existingRules = merchantRenameRuleRepository
+                .getAliasesAsMap()
+                .first()
+                .keys
+                .map { it.lowercase() }
+                .toSet()
+
+            val allOriginalDescs = transactionRepository.getDistinctOriginalDescriptions()
+            val variants = mutableListOf<CanonicalVariant>()
+
+            for (rawDesc in allOriginalDescs) {
+                // Skip the original we already have a rule for.
+                if (rawDesc.equals(savedOriginalName, ignoreCase = true)) continue
+                // Skip any that already have a rename rule.
+                if (rawDesc.lowercase() in existingRules) continue
+                // Skip if it IS the canonical name.
+                if (rawDesc.equals(canonicalName, ignoreCase = true)) continue
+
+                if (StringSimilarity.isCanonicalSubset(canonicalName, rawDesc)) {
+                    val ids = transactionRepository.getTransactionIdsByOriginalDescription(rawDesc)
+                    if (ids.isNotEmpty()) {
+                        variants.add(CanonicalVariant(rawDesc, ids.size, ids))
+                    }
+                }
+            }
+
+            if (variants.isNotEmpty()) {
+                _canonicalNudgeState.value = CanonicalNudgeSheetState(canonicalName, variants)
+                Log.d(TAG, "Canonical nudge: found ${variants.size} cross-account variant(s) for '$canonicalName'.")
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scanning for cross-account variants", e)
+            false
+        }
+    }
+
+    /** Toggles the selection of a cross-account variant in the canonical nudge sheet. */
+    fun toggleCanonicalVariant(rawName: String) {
+        _canonicalNudgeState.update { state ->
+            state?.copy(
+                selectedRawNames = state.selectedRawNames.toMutableSet().apply {
+                    if (rawName in this) remove(rawName) else add(rawName)
+                },
+            )
+        }
+    }
+
+    /**
+     * Applies the canonical rename to all selected variants: saves a new
+     * [MerchantRenameRule] and bulk-updates the [Transaction.description] for each.
+     * Emits [navigateBackEvent] when done.
+     */
+    fun confirmCanonicalNudge() {
+        viewModelScope.launch {
+            val state = _canonicalNudgeState.value ?: run {
+                _navigateBackEvent.send(Unit)
+                return@launch
+            }
+            try {
+                val selected = state.variants.filter { it.rawName in state.selectedRawNames }
+                for (variant in selected) {
+                    merchantRenameRuleRepository.insert(
+                        MerchantRenameRule(
+                            originalName = variant.rawName,
+                            newName = state.canonicalName,
+                        ),
+                    )
+                    transactionRepository.updateDescriptionForIds(variant.transactionIds, state.canonicalName)
+                    Log.d(TAG, "Canonical nudge: applied '${state.canonicalName}' to ${variant.transactionIds.size} txn(s) with raw name '${variant.rawName}'.")
+                }
+                if (selected.isNotEmpty()) {
+                    _uiEvent.send("Applied '${state.canonicalName}' to ${selected.sumOf { it.transactionCount }} more transaction(s).")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to apply canonical nudge", e)
+                _uiEvent.send("Failed to apply rename to similar transactions.")
+            } finally {
+                _canonicalNudgeState.value = null
+                _navigateBackEvent.send(Unit)
+            }
+        }
+    }
+
+    /** Dismisses the canonical nudge without applying any changes and triggers navigation. */
+    fun dismissCanonicalNudge() {
+        viewModelScope.launch {
+            _canonicalNudgeState.value = null
+            _navigateBackEvent.send(Unit)
         }
     }
 }

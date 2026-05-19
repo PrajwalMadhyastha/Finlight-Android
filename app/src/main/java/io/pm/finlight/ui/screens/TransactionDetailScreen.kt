@@ -177,6 +177,12 @@ fun TransactionDetailScreen(
     val visitCount by viewModel.visitCount.collectAsState()
     val scope = rememberCoroutineScope()
     val retroUpdateSheetState by viewModel.retroUpdateSheetState.collectAsState()
+    val canonicalNudgeState by viewModel.canonicalNudgeState.collectAsState()
+
+    // Observe ViewModel-driven navigation events (e.g. after canonical nudge resolves).
+    LaunchedEffect(Unit) {
+        viewModel.navigateBackEvent.collect { navigateBack() }
+    }
 
     var showMenu by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -233,10 +239,7 @@ fun TransactionDetailScreen(
         if (retroUpdateSheetState != null) {
             val retroSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             ModalBottomSheet(
-                onDismissRequest = {
-                    viewModel.dismissRetroUpdateSheet()
-                    navigateBack()
-                },
+                onDismissRequest = { viewModel.onRetroSheetSkipped() },
                 sheetState = retroSheetState,
                 windowInsets = WindowInsets(0),
                 containerColor = popupContainerColor,
@@ -247,13 +250,29 @@ fun TransactionDetailScreen(
                     onToggleSelection = viewModel::toggleRetroUpdateSelection,
                     onToggleSelectAll = viewModel::toggleRetroUpdateSelectAll,
                     onConfirm = {
+                        // Navigation is now driven by the ViewModel via navigateBackEvent.
                         viewModel.performBatchUpdate()
-                        navigateBack()
                     },
-                    onDismiss = {
-                        viewModel.dismissRetroUpdateSheet()
-                        navigateBack()
-                    },
+                    onDismiss = { viewModel.onRetroSheetSkipped() },
+                )
+            }
+        }
+
+        // --- Cross-Account Canonical Nudge Sheet (Layer B) ---
+        if (canonicalNudgeState != null) {
+            val nudgeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = { viewModel.dismissCanonicalNudge() },
+                sheetState = nudgeSheetState,
+                windowInsets = WindowInsets(0),
+                containerColor = popupContainerColor,
+                dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            ) {
+                CanonicalNudgeSheetContent(
+                    state = canonicalNudgeState!!,
+                    onToggleVariant = viewModel::toggleCanonicalVariant,
+                    onConfirm = { viewModel.confirmCanonicalNudge() },
+                    onDismiss = { viewModel.dismissCanonicalNudge() },
                 )
             }
         }
@@ -2029,3 +2048,97 @@ private fun SelectableTransactionItem(
         }
     }
 }
+
+/**
+ * Bottom sheet displayed after a rename rule is saved, surfacing historical transactions
+ * from other accounts whose raw merchant name is canonically equivalent to the newly
+ * saved canonical name. The user can tick each variant and apply the rename in bulk.
+ */
+@Composable
+private fun CanonicalNudgeSheetContent(
+    state: CanonicalNudgeSheetState,
+    onToggleVariant: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val selectedCount = state.selectedRawNames.size
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 32.dp),
+    ) {
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Similar merchants found",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "These merchant names from other accounts look like \"${state.canonicalName}\". Apply the rename to them too?",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        state.variants.forEach { variant ->
+            val isSelected = variant.rawName in state.selectedRawNames
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggleVariant(variant.rawName) }
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleVariant(variant.rawName) },
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = variant.rawName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "${variant.transactionCount} transaction${if (variant.transactionCount != 1) "s" else ""}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("Skip")
+            }
+            Button(
+                onClick = onConfirm,
+                enabled = selectedCount > 0,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(
+                    text = if (selectedCount > 0) "Apply to $selectedCount variant${if (selectedCount != 1) "s" else ""}" else "Apply",
+                )
+            }
+        }
+    }
+}
+
