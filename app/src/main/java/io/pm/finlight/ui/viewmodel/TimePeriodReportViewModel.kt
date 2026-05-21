@@ -199,8 +199,17 @@ class TimePeriodReportViewModel(
         _selectedDate.flatMapLatest { calendar ->
             when (timePeriod) {
                 TimePeriod.DAILY -> {
-                    val endCal = (calendar.clone() as Calendar)
-                    val startCal = (calendar.clone() as Calendar).apply { add(Calendar.HOUR_OF_DAY, -24) }
+                    val endCal = (calendar.clone() as Calendar).apply {
+                        set(Calendar.HOUR_OF_DAY, 23)
+                        set(Calendar.MINUTE, 59)
+                        set(Calendar.SECOND, 59)
+                    }
+                    val startCal = (calendar.clone() as Calendar).apply {
+                        add(Calendar.DAY_OF_YEAR, -2) // 3 days total
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                    }
 
                     transactionDao.getDailyTrends(startCal.timeInMillis, endCal.timeInMillis).map { dailyTrends ->
                         if (dailyTrends.isEmpty()) return@map null
@@ -210,12 +219,16 @@ class TimePeriodReportViewModel(
                         val labels = mutableListOf<String>()
                         val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
                         val fullDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        val trendsMap = dailyTrends.associateBy { it.date }
 
-                        dailyTrends.forEachIndexed { index, dailyTrend ->
-                            incomeEntries.add(BarEntry(index.toFloat(), dailyTrend.totalIncome.toFloat()))
-                            expenseEntries.add(BarEntry(index.toFloat(), dailyTrend.totalExpenses.toFloat()))
-                            val date = fullDateFormat.parse(dailyTrend.date)
-                            labels.add(dayFormat.format(date!!))
+                        for (i in 0..2) {
+                            val dayCal = (startCal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, i) }
+                            val dateStr = fullDateFormat.format(dayCal.time)
+
+                            val trend = trendsMap[dateStr]
+                            incomeEntries.add(BarEntry(i.toFloat(), trend?.totalIncome?.toFloat() ?: 0f))
+                            expenseEntries.add(BarEntry(i.toFloat(), trend?.totalExpenses?.toFloat() ?: 0f))
+                            labels.add(dayFormat.format(dayCal.time))
                         }
 
                         val incomeDataSet =
@@ -238,7 +251,7 @@ class TimePeriodReportViewModel(
                         }
                     val startCal =
                         (calendar.clone() as Calendar).apply {
-                            add(Calendar.WEEK_OF_YEAR, -7) // 8 weeks total
+                            add(Calendar.WEEK_OF_YEAR, -2) // 3 weeks total
                             set(Calendar.DAY_OF_WEEK, firstDayOfWeek)
                         }
 
@@ -250,7 +263,7 @@ class TimePeriodReportViewModel(
                         val labels = mutableListOf<String>()
                         val trendsMap = weeklyTrends.associateBy { it.period }
 
-                        for (i in 0..7) {
+                        for (i in 0..2) {
                             val weekCal = (startCal.clone() as Calendar).apply { add(Calendar.WEEK_OF_YEAR, i) }
                             val yearWeek = "${weekCal.get(Calendar.YEAR)}-${weekCal.get(Calendar.WEEK_OF_YEAR).toString().padStart(2, '0')}"
 
@@ -278,7 +291,7 @@ class TimePeriodReportViewModel(
                         }
                     val startCal =
                         (calendar.clone() as Calendar).apply {
-                            add(Calendar.MONTH, -5) // 6 months total
+                            add(Calendar.MONTH, -2) // 3 months total
                             set(Calendar.DAY_OF_MONTH, 1)
                         }
 
@@ -292,7 +305,7 @@ class TimePeriodReportViewModel(
                         val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
                         val trendsMap = monthlyTrends.associateBy { it.monthYear }
 
-                        for (i in 0..5) {
+                        for (i in 0..2) {
                             val monthCal = (startCal.clone() as Calendar).apply { add(Calendar.MONTH, i) }
                             val yearMonth = yearMonthFormat.format(monthCal.time)
 

@@ -302,8 +302,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             viewModel.chartData.test {
                 val chartPair = awaitItem()
                 assertNotNull(chartPair)
-                assertEquals(16, chartPair!!.first.entryCount) // 8 weeks x 2 datasets (income + expense)
-                assertEquals(8, chartPair.second.size) // 8 labels
+                assertEquals(6, chartPair!!.first.entryCount) // 3 weeks x 2 datasets (income + expense)
+                assertEquals(3, chartPair.second.size) // 3 labels
                 cancelAndIgnoreRemainingEvents()
             }
         }
