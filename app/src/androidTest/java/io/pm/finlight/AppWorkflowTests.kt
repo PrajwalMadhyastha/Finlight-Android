@@ -1,7 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/androidTest/java/io/pm/finlight/AppWorkflowTests.kt
-// REASON: FIX - Removed several unused import directives to resolve lint warnings
-// and clean up the file.
+// REASON: PHASE 1 — Harden existing tests by replacing hardcoded device-data
+// references ("SBI", "Food") with deterministic seeded data via SeedDatabaseRule.
 // =================================================================================
 package io.pm.finlight
 
@@ -19,8 +19,10 @@ import java.util.UUID
 /**
  * Instrumented UI test for common user workflows in the application.
  *
- * NOTE: This file has been updated to include a custom TestRule to bypass the
- * onboarding screen, ensuring tests start in a consistent state.
+ * Phase 1 changes:
+ * - Added [SeedDatabaseRule] to rule chain — guarantees "Test Bank" and
+ *   "Food & Drinks" exist, replacing brittle references to live-device data
+ *   ("SBI", "Food") that caused intermittent failures.
  */
 @RunWith(AndroidJUnit4::class)
 class AppWorkflowTests {
@@ -29,9 +31,11 @@ class AppWorkflowTests {
     @get:Rule
     val ruleChain: RuleChain =
         RuleChain
-            // --- NEW: This rule runs first to bypass the onboarding screen ---
             .outerRule(DisableOnboardingRule())
             .around(DisableAppLockRule())
+            // Seed known data BEFORE the activity is launched so account/category
+            // dropdowns have deterministic entries.
+            .around(SeedDatabaseRule())
             .around(
                 GrantPermissionRule.grant(
                     Manifest.permission.READ_SMS,
@@ -51,33 +55,48 @@ class AppWorkflowTests {
 
         // 1. Wait until the dashboard is fully loaded by checking for a stable element.
         composeTestRule.waitUntil(timeoutMillis = 10000) {
-            composeTestRule.onAllNodesWithText("Monthly Budget").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // 2. Click the main FAB to add a new item.
-        composeTestRule.onNodeWithContentDescription("Add").performClick()
+        // 2. Scroll to "Recent Transactions" and click the Add button.
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasText("Recent Transactions"))
+        composeTestRule.onNodeWithContentDescription("Add Transaction").performClick()
 
-        // 3. Verify we are on the "Add Transaction" screen and fill out the form.
-        composeTestRule.onNodeWithText("Add Transaction").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Description").performTextInput(uniqueDescription)
-        composeTestRule.onNodeWithText("Amount").performTextInput("150.0")
-        composeTestRule.onNodeWithText("Select Account").performClick()
-        composeTestRule.onNodeWithText("SBI").performClick()
-        composeTestRule.onNodeWithText("Select Category").performClick()
-        composeTestRule.onNodeWithText("Food").performClick()
+        // 3. Verify we are on the "Compose Transaction" screen and fill out the form.
+        composeTestRule.onNodeWithText("Compose Transaction").assertIsDisplayed()
+
+        // Click search icon to open Merchant BottomSheet
+        composeTestRule.onNodeWithContentDescription("Search Predictions").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty()
+        }
+        val searchInput = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()
+        searchInput.performTextInput(uniqueDescription)
+        composeTestRule.onAllNodesWithText(uniqueDescription).onFirst().performClick()
+
+        // Enter amount
+        composeTestRule.onNodeWithTag("amount_text_field").performTextInput("150.0")
+
+        // Select Account and Category names using robust testTags and onLast
+        composeTestRule.onNodeWithTag("account_select_chip").performClick()
+        composeTestRule.onAllNodesWithText(TestDataSeeder.ACCOUNT_BANK_NAME).onLast().performClick()
+
+        composeTestRule.onNodeWithTag("category_select_chip").performClick()
+        composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_FOOD_NAME).onLast().performClick()
 
         // 4. Save the transaction.
-        composeTestRule.onNodeWithText("Save Transaction").performClick()
+        composeTestRule.onNodeWithText("Save Transaction").performScrollTo().performClick()
 
         // --- Wait for navigation back to the dashboard to complete ---
         composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithText("Monthly Budget").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
 
         // 5. Verify the new transaction appears in the "Recent Transactions" list.
-        val newNode = composeTestRule.onNodeWithText(uniqueDescription, useUnmergedTree = true)
-        newNode.performScrollTo()
-        newNode.assertIsDisplayed()
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasText(uniqueDescription))
+        composeTestRule.onNodeWithText(uniqueDescription).assertExists()
     }
 
     /**
@@ -88,25 +107,40 @@ class AppWorkflowTests {
     fun test_addTransaction_failsWithInvalidAmount_showsValidationError() {
         // 1. Wait for the dashboard and navigate to the Add Transaction Screen.
         composeTestRule.waitUntil(timeoutMillis = 10000) {
-            composeTestRule.onAllNodesWithText("Monthly Budget").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onNodeWithContentDescription("Add").performClick()
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasText("Recent Transactions"))
+        composeTestRule.onNodeWithContentDescription("Add Transaction").performClick()
 
         // 2. Fill out the form, but with an invalid (non-numeric) amount.
-        composeTestRule.onNodeWithText("Add Transaction").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Description").performTextInput("Test Invalid Amount")
-        composeTestRule.onNodeWithText("Amount").performTextInput("not-a-number")
-        composeTestRule.onNodeWithText("Select Account").performClick()
-        composeTestRule.onNodeWithText("SBI").performClick()
-        composeTestRule.onNodeWithText("Select Category").performClick()
-        composeTestRule.onNodeWithText("Food").performClick()
+        composeTestRule.onNodeWithText("Compose Transaction").assertIsDisplayed()
+
+        // Click search icon to open Merchant BottomSheet
+        composeTestRule.onNodeWithContentDescription("Search Predictions").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty()
+        }
+        val searchInput = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()
+        searchInput.performTextInput("Test Invalid Amount")
+        composeTestRule.onAllNodesWithText("Test Invalid Amount").onFirst().performClick()
+
+        // Enter amount
+        composeTestRule.onNodeWithTag("amount_text_field").performTextInput("not-a-number")
+
+        // Select Account and Category names using robust testTags and onLast
+        composeTestRule.onNodeWithTag("account_select_chip").performClick()
+        composeTestRule.onAllNodesWithText(TestDataSeeder.ACCOUNT_BANK_NAME).onLast().performClick()
+
+        composeTestRule.onNodeWithTag("category_select_chip").performClick()
+        composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_FOOD_NAME).onLast().performClick()
 
         // 3. Attempt to save the invalid transaction.
-        composeTestRule.onNodeWithText("Save Transaction").performClick()
+        composeTestRule.onNodeWithText("Save Transaction").performScrollTo().performClick()
 
-        // 4. Verify the validation error.
-        composeTestRule.onNodeWithText("Add Transaction").assertIsDisplayed()
-        val expectedError = "Please enter a valid, positive amount."
-        composeTestRule.onNodeWithText(expectedError).assertIsDisplayed()
+        // 4. Verify that the save button is disabled (amount is invalid) and we remain on the same screen.
+        composeTestRule.onNodeWithText("Compose Transaction").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Save Transaction").assertIsNotEnabled()
     }
 }
+

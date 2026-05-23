@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -914,7 +915,8 @@ private fun AmountComposer(
                 Modifier
                     .clip(RoundedCornerShape(12.dp))
                     .border(2.dp, animatedBorderColor, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .testTag("description_text_field"),
             textStyle =
                 MaterialTheme.typography.titleLarge.copy(
                     color = MaterialTheme.colorScheme.onSurface,
@@ -966,7 +968,8 @@ private fun AmountComposer(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester)
+                    .testTag("amount_text_field"),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             textStyle = textStyle,
             singleLine = true,
@@ -1027,11 +1030,13 @@ private fun OrbitalChips(
             icon = selectedCategory?.let { CategoryIconHelper.getIcon(it.iconKey) } ?: Icons.Default.Category,
             text = selectedCategory?.name ?: "Category",
             onClick = onCategoryClick,
+            modifier = Modifier.testTag("category_select_chip"),
         )
         DetailChip(
             icon = Icons.Default.AccountBalanceWallet,
             text = selectedAccount?.name ?: "Account",
             onClick = onAccountClick,
+            modifier = Modifier.testTag("account_select_chip"),
         )
         DetailChip(
             icon = Icons.Default.CalendarToday,
@@ -1046,10 +1051,11 @@ private fun DetailChip(
     icon: ImageVector,
     text: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     GlassPanel(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth(0.8f)
                 .clickable(onClick = onClick),
     ) {

@@ -101,14 +101,25 @@ class ClearDatabaseRule : TestRule {
                 val context = InstrumentationRegistry.getInstrumentation().targetContext
                 val db = AppDatabase.getInstance(context)
                 runBlocking {
-                    // Order matters: clear transactions first (they reference accounts/categories),
-                    // then clear accounts (which cascade-deletes any remaining orphans),
-                    // then budgets, tags, goals independently.
-                    db.transactionDao().deleteAll()
-                    db.accountDao().deleteAll()
-                    db.budgetDao().deleteAll()
-                    db.tagDao().deleteAll()
-                    db.goalDao().deleteAll()
+                    // Use a raw transaction to clear all tables in correct dependency order,
+                    // guaranteeing no foreign key constraint failures or orphan rows.
+                    val writableDb = db.openHelper.writableDatabase
+                    writableDb.beginTransaction()
+                    try {
+                        writableDb.execSQL("DELETE FROM transaction_images")
+                        writableDb.execSQL("DELETE FROM transaction_tag_cross_ref")
+                        writableDb.execSQL("DELETE FROM split_transactions")
+                        writableDb.execSQL("DELETE FROM transactions")
+                        writableDb.execSQL("DELETE FROM trips")
+                        writableDb.execSQL("DELETE FROM tags")
+                        writableDb.execSQL("DELETE FROM goals")
+                        writableDb.execSQL("DELETE FROM recurring_transactions")
+                        writableDb.execSQL("DELETE FROM accounts")
+                        writableDb.execSQL("DELETE FROM budgets")
+                        writableDb.setTransactionSuccessful()
+                    } finally {
+                        writableDb.endTransaction()
+                    }
                 }
                 base.evaluate()
             }
