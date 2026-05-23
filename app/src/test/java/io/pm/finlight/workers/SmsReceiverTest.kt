@@ -490,4 +490,80 @@ class SmsReceiverTest : BaseViewModelTest() {
             verify(exactly = 1) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
             unmockkObject(WorkManager)
         }
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.S])
+    fun `suspicious transaction triggers showSuspiciousAmountNotification`() =
+        runTest {
+            // Arrange
+            val intent = createSmsIntent("AM-HDFCBK", "Spent Rs.150000 at Starbucks")
+            val potentialTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 150000.0,
+                    transactionType = "expense",
+                    merchantName = "Starbucks",
+                    originalMessage = "Spent Rs.150000 at Starbucks",
+                    sourceSmsHash = "hash1",
+                    needsReview = true,
+                    suspicionReason = "Amount exceeds threshold"
+                )
+            val success = ParseResult.Success(transaction = potentialTxn)
+
+            mockkObject(SmsParser)
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns success
+            receiver.coroutineScope = this
+
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 1) { transactionDao.insert(any()) }
+            verify(exactly = 1) { NotificationHelper.showSuspiciousAmountNotification(any(), any(), "Amount exceeds threshold") }
+            
+            unmockkObject(SmsParser)
+        }
+
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.S])
+    fun `normal transaction enqueues regular notification worker`() =
+        runTest {
+            // Arrange
+            val intent = createSmsIntent("AM-HDFCBK", "Spent Rs.100 at Starbucks")
+            val potentialTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 100.0,
+                    transactionType = "expense",
+                    merchantName = "Starbucks",
+                    originalMessage = "Spent Rs.100 at Starbucks",
+                    sourceSmsHash = "hash1",
+                    needsReview = false
+                )
+            val success = ParseResult.Success(transaction = potentialTxn)
+
+            mockkObject(SmsParser)
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns success
+            
+            mockkObject(WorkManager)
+            val mockWorkManager = mockk<WorkManager>(relaxed = true)
+            every { WorkManager.getInstance(any()) } returns mockWorkManager
+            receiver.coroutineScope = this
+
+            // Act
+            receiver.onReceive(context, intent)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 1) { transactionDao.insert(any()) }
+            verify(exactly = 0) { NotificationHelper.showSuspiciousAmountNotification(any(), any(), any()) }
+            verify(exactly = 1) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+            
+            unmockkObject(SmsParser)
+            unmockkObject(WorkManager)
+        }
 }

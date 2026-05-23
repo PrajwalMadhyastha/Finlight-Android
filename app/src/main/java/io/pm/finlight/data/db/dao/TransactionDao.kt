@@ -399,7 +399,7 @@ interface TransactionDao {
             UNION ALL
             SELECT
                 P.id, P.description, S.categoryId, S.amount, P.date, P.accountId, S.notes, P.transactionType, P.sourceSmsId, P.sourceSmsHash, P.source,
-                P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit
+                P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit, P.needsReview
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'income' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
               AND (:accountId IS NULL OR P.accountId = :accountId)

@@ -60,4 +60,6 @@ data class Transaction(
     val conversionRate: Double? = null,
     // --- NEW: Flag to indicate this is a parent transaction ---
     val isSplit: Boolean = false,
+    // --- NEW: Flag for amounts that failed sanity checks and need user review ---
+    val needsReview: Boolean = false,
 )

@@ -87,8 +87,38 @@ class NerExtractorTest {
 
         val result = extractor.extractEntities(predictions, tokenResult)
 
-        assertEquals("100", result["AMOUNT"]) // rs. 100 -> rs.100 -> cleanup -> 100 (after post-processing)
-        assertEquals("amazon", result["MERCHANT"])
+        assertEquals("100", result["AMOUNT"]?.value) // rs. 100 -> rs.100 -> cleanup -> 100 (after post-processing)
+        assertEquals("amazon", result["MERCHANT"]?.value)
+    }
+
+    @Test
+    fun `extractEntities calculates confidence correctly`() {
+        val tokens = listOf("[CLS]", "spent", "100", "[SEP]")
+        val wordIds = intArrayOf(-1, 0, 1, -1)
+        val tokenResult =
+            WordPieceTokenizer.TokenizationResult(
+                inputIds = IntArray(128),
+                attentionMask = IntArray(128),
+                wordIds = wordIds + IntArray(124) { -1 },
+                tokens = tokens + List(124) { "[PAD]" },
+            )
+
+        val predictions = IntArray(128) { 0 }
+        predictions[2] = 3 // B-AMOUNT (100)
+
+        // Mock logits: 8 classes. For index 2, class 3 has logit 2.0, class 0 has 1.0, others 0.0.
+        // exp(2) = 7.389, exp(1) = 2.718, 6 * exp(0) = 6. Sum = 16.107
+        // confidence = 7.389 / 16.107 ≈ 0.458
+        val logits = Array(128) { FloatArray(8) { 0.0f } }
+        logits[2][3] = 2.0f
+        logits[2][0] = 1.0f
+
+        val result = extractor.extractEntities(predictions, tokenResult, logits)
+
+        val amountEntity = result["AMOUNT"]
+        assertNotNull(amountEntity)
+        assertEquals("100", amountEntity!!.value)
+        assertEquals(0.458f, amountEntity.confidence, 0.01f)
     }
 
     @Test
@@ -127,8 +157,8 @@ class NerExtractorTest {
 
         assertTrue(result.containsKey("MERCHANT"))
         assertTrue(result.containsKey("AMOUNT"))
-        assertEquals("B1 I1, B1", result["MERCHANT"])
-        assertEquals("I1, B2 I2", result["AMOUNT"])
+        assertEquals("B1 I1, B1", result["MERCHANT"]?.value)
+        assertEquals("I1, B2 I2", result["AMOUNT"]?.value)
     }
 
     @Test
@@ -151,7 +181,7 @@ class NerExtractorTest {
 
         // [SEP] has wordId -1, so it closes the span.
         // The I1 afterward is an orphan because currentSpan was nullified.
-        assertEquals("B1", result["MERCHANT"])
+        assertEquals("B1", result["MERCHANT"]?.value)
     }
 
     @Test
@@ -218,7 +248,7 @@ class NerExtractorTest {
         predictions[4] = 4 // I-AMOUNT
 
         var result = extractor.extractEntities(predictions.copyOf(), tokenResult)
-        assertEquals("1000", result["AMOUNT"])
+        assertEquals("1000", result["AMOUNT"]?.value)
 
         // Test INR and ₹
         val tokenResult2 =
@@ -231,7 +261,7 @@ class NerExtractorTest {
         predictions2[1] = 4
         predictions2[2] = 4
         result = extractor.extractEntities(predictions2, tokenResult2)
-        assertEquals("500", result["AMOUNT"])
+        assertEquals("500", result["AMOUNT"]?.value)
 
         val tokenResult3 =
             tokenResult.copy(
@@ -243,7 +273,7 @@ class NerExtractorTest {
         predictions3[1] = 4
         predictions3[2] = 4
         result = extractor.extractEntities(predictions3, tokenResult3)
-        assertEquals("99", result["AMOUNT"])
+        assertEquals("99", result["AMOUNT"]?.value)
 
         // Test mixed case and Indian-style commas
         val tokenResult4 =
@@ -254,7 +284,7 @@ class NerExtractorTest {
         val predictions4 = IntArray(128) { 4 } // All I-AMOUNT (orphan I- start)
         predictions4[0] = 3 // B-AMOUNT at "inR"
         result = extractor.extractEntities(predictions4, tokenResult4)
-        assertEquals("123456", result["AMOUNT"])
+        assertEquals("123456", result["AMOUNT"]?.value)
     }
 
     @Test
@@ -302,12 +332,12 @@ class NerExtractorTest {
         p2[2] = 4 // I-AMOUNT (flipkart)
 
         var result = extractor.extractEntities(predictions, tokenResult)
-        assertEquals("amazon, and, flipkart", result["MERCHANT"])
-        assertEquals("swiggy", result["PAYEE"])
+        assertEquals("amazon, and, flipkart", result["MERCHANT"]?.value)
+        assertEquals("swiggy", result["PAYEE"]?.value)
 
         result = extractor.extractEntities(p2, tokenResult)
-        assertEquals("amazon", result["MERCHANT"])
-        assertEquals("and flipkart", result["AMOUNT"])
+        assertEquals("amazon", result["MERCHANT"]?.value)
+        assertEquals("and flipkart", result["AMOUNT"]?.value)
     }
 
     @Test

@@ -26,6 +26,7 @@
 package io.pm.finlight
 
 import io.pm.finlight.core.CATEGORY_KEYWORD_MAP
+import io.pm.finlight.core.NerEntity
 import io.pm.finlight.core.utils.MerchantCleaner
 import io.pm.finlight.core.utils.StringSimilarity
 import java.util.regex.Pattern
@@ -45,7 +46,19 @@ sealed class ParseResult {
 }
 
 object SmsParser {
-    private const val TAG = "SmsParser"
+
+
+    /**
+     * Amounts above this threshold (in home currency) are considered suspicious
+     * and require explicit user review before being silently auto-saved. (Option A)
+     */
+    private const val SUSPICIOUS_AMOUNT_THRESHOLD = 100_000.0
+
+    /**
+     * Minimum NER model confidence required to trust the extracted AMOUNT entity.
+     * Below this value the amount tag is treated as uncertain. (Option D)
+     */
+    private const val NER_CONFIDENCE_THRESHOLD = 0.70f
 
     private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
@@ -206,7 +219,7 @@ object SmsParser {
         merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
         categoryFinderProvider: CategoryFinderProvider,
         smsParseTemplateProvider: SmsParseTemplateProvider,
-        nerEntities: Map<String, String>? = null,
+        nerEntities: Map<String, NerEntity>? = null,
     ): PotentialTransaction? {
         return when (val result = parseWithReason(sms, mappings, customSmsRuleProvider, merchantRenameRuleProvider, ignoreRuleProvider, merchantCategoryMappingProvider, categoryFinderProvider, smsParseTemplateProvider, nerEntities = nerEntities)) {
             is ParseResult.Success -> result.transaction
@@ -321,7 +334,7 @@ object SmsParser {
         merchantCategoryMappingProvider: MerchantCategoryMappingProvider,
         categoryFinderProvider: CategoryFinderProvider,
         smsParseTemplateProvider: SmsParseTemplateProvider,
-        nerEntities: Map<String, String>? = null,
+        nerEntities: Map<String, NerEntity>? = null,
     ): ParseResult {
         val normalizedBody = sms.body.replace(Regex("\\s+"), " ").trim()
 
@@ -368,7 +381,8 @@ object SmsParser {
             // --- NER AMOUNT OVERRIDE ---
             // If the NER model found an AMOUNT entity, parse it directly.
             // Otherwise, use the existing regex pipeline.
-            val nerAmountStr = nerEntities?.get("AMOUNT")
+            val nerAmountEntity = nerEntities?.get("AMOUNT")
+            val nerAmountStr = nerAmountEntity?.value
             if (nerAmountStr != null) {
                 // Strip currency prefixes (rs, inr, etc.) and normalize.
                 // The [.:\\s]* also handles "Rs:147.5" colon-notation used by some banks.
@@ -406,7 +420,7 @@ object SmsParser {
                     // Check sender mappings first (highest trust). Then prefer NER over regex.
                     var merchantName = mappings[sms.sender]
                     if (merchantName == null) {
-                        val nerMerchant = nerEntities?.get("MERCHANT")
+                        val nerMerchant = nerEntities?.get("MERCHANT")?.value
                         if (nerMerchant != null) {
                             // Use NER merchant, but capitalize it properly
                             merchantName = nerMerchant.split(" ").joinToString(" ") { word ->
@@ -432,6 +446,45 @@ object SmsParser {
                         }
                     }
 
+                    // -------------------------------------------------------------------
+                    // AMOUNT SANITY CHECKS: Options D, C, A (applied in priority order)
+                    // -------------------------------------------------------------------
+                    var needsReview = false
+                    var suspicionReason: String? = null
+
+                    // Option D: Low NER model confidence for the AMOUNT tag
+                    val nerAmountConf = nerAmountEntity?.confidence
+                    if (nerAmountConf != null && nerAmountConf < NER_CONFIDENCE_THRESHOLD) {
+                        needsReview = true
+                        suspicionReason = "NER model uncertainty: AMOUNT confidence was ${"%.0f".format(nerAmountConf * 100)}% (threshold ${"%.0f".format(NER_CONFIDENCE_THRESHOLD * 100)}%)."
+                        System.err.println("[SmsParser][Suspicious] Low NER confidence for AMOUNT ($nerAmountConf). SMS: ${sms.body.take(80)}")
+                    }
+
+                    // Option C: AMOUNT > BALANCE extracted from the same SMS
+                    if (!needsReview) {
+                        val nerBalanceStr = nerEntities?.get("BALANCE")?.value
+                        if (nerBalanceStr != null) {
+                            val balanceNumeric = nerBalanceStr
+                                .replace(Regex("^(rs|inr|₹)[.:\\s]*", RegexOption.IGNORE_CASE), "")
+                                .replace(",", "")
+                                .trim()
+                                .toDoubleOrNull()
+                            if (balanceNumeric != null && amount > balanceNumeric) {
+                                needsReview = true
+                                suspicionReason = "Amount (₹$amount) exceeds available balance (₹$balanceNumeric) reported in the same SMS."
+                                System.err.println("[SmsParser][Suspicious] Amount $amount > balance $balanceNumeric. SMS: ${sms.body.take(80)}")
+                            }
+                        }
+                    }
+
+                    // Option A: Hard upper-bound threshold (₹1,00,000 by default)
+                    if (!needsReview && amount > SUSPICIOUS_AMOUNT_THRESHOLD) {
+                        needsReview = true
+                        suspicionReason = "Amount (₹${"%.2f".format(amount)}) exceeds the auto-save threshold of ₹${"%.0f".format(SUSPICIOUS_AMOUNT_THRESHOLD)}."
+                        System.err.println("[SmsParser][Suspicious] Large amount $amount exceeds threshold. SMS: ${sms.body.take(80)}")
+                    }
+                    // -------------------------------------------------------------------
+
                     potentialTxn = PotentialTransaction(
                         sourceSmsId = sms.id,
                         smsSender = sms.sender,
@@ -440,7 +493,9 @@ object SmsParser {
                         merchantName = merchantName,
                         originalMessage = sms.body,
                         detectedCurrencyCode = detectedCurrency,
-                        date = sms.date
+                        date = sms.date,
+                        needsReview = needsReview,
+                        suspicionReason = suspicionReason,
                     )
                 }
             }
@@ -465,7 +520,7 @@ object SmsParser {
         categoryFinderProvider: CategoryFinderProvider,
         normalizedBody: String,
         sender: String,
-        nerEntities: Map<String, String>? = null
+        nerEntities: Map<String, NerEntity>? = null
     ): Triple<PotentialTransaction, Pair<String, Int>?, Pair<String, String>?> {
         val renameRules = merchantRenameRuleProvider.getAllRules()
 
@@ -580,7 +635,7 @@ object SmsParser {
         }
 
         // --- Step 4: Construct the final transaction object with all enrichments ---
-        val finalAccount = txn.potentialAccount ?: nerEntities?.get("ACCOUNT")?.let { accountStr ->
+        val finalAccount = txn.potentialAccount ?: nerEntities?.get("ACCOUNT")?.value?.let { accountStr ->
             val cleaned = accountStr.split(" ").joinToString(" ") { word ->
                 word.replaceFirstChar { it.uppercaseChar() }
             }
@@ -807,7 +862,7 @@ object SmsParser {
                 date = originalSms.date
             )
         } catch (e: Exception) {
-            println("$TAG: Error applying heuristic template: ${e.message}")
+            System.err.println("[SmsParser]: Error applying heuristic template: ${e.message}")
             return null
         }
     }

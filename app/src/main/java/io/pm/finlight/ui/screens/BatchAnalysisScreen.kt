@@ -191,7 +191,7 @@ class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
         val isTransaction = !isIgnored && score > 0.5f
 
         // Run NER extraction for transactional-looking messages (score > 0.1 to catch borderline cases)
-        val nerEntities: Map<String, String> =
+        val nerEntities =
             if (!isIgnored && score > 0.1f) {
                 try {
                     nerExtractor.extract(body)
@@ -214,10 +214,11 @@ class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
         }
         // Write NER entities as individual fields for easy analysis
         if (nerEntities.isNotEmpty()) {
-            writer.name("ner_amount").value(nerEntities["AMOUNT"])
-            writer.name("ner_merchant").value(nerEntities["MERCHANT"])
-            writer.name("ner_account").value(nerEntities["ACCOUNT"])
-            nerEntities["BALANCE"]?.let { writer.name("ner_balance").value(it) }
+            writer.name("ner_amount").value(nerEntities["AMOUNT"]?.value)
+            writer.name("ner_amount_conf").value(nerEntities["AMOUNT"]?.confidence?.toDouble())
+            writer.name("ner_merchant").value(nerEntities["MERCHANT"]?.value)
+            writer.name("ner_account").value(nerEntities["ACCOUNT"]?.value)
+            nerEntities["BALANCE"]?.let { writer.name("ner_balance").value(it.value) }
         }
         writer.endObject()
     }

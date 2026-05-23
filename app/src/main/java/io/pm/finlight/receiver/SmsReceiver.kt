@@ -260,6 +260,7 @@ class SmsReceiver : BroadcastReceiver() {
                         sourceSmsHash = potentialTxn.sourceSmsHash,
                         source = "Auto-Captured",
                         smsSignature = potentialTxn.smsSignature,
+                        needsReview = potentialTxn.needsReview,
                     )
                 } else {
                     Transaction(
@@ -275,6 +276,7 @@ class SmsReceiver : BroadcastReceiver() {
                         sourceSmsHash = potentialTxn.sourceSmsHash,
                         source = "Auto-Captured",
                         smsSignature = potentialTxn.smsSignature,
+                        needsReview = potentialTxn.needsReview,
                     )
                 }
 
@@ -288,12 +290,22 @@ class SmsReceiver : BroadcastReceiver() {
                     true
                 }
 
-            if (canShowNotification && settingsRepository.isAutoCaptureNotificationEnabledBlocking()) {
-                val workRequest =
-                    OneTimeWorkRequestBuilder<TransactionNotificationWorker>()
-                        .setInputData(workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to newTransactionId.toInt()))
-                        .build()
-                WorkManager.getInstance(context).enqueue(workRequest)
+            if (canShowNotification) {
+                if (potentialTxn.needsReview) {
+                    // Suspicious amount — show a high-priority review notification regardless of user pref
+                    val savedTxn = transactionToSave.copy(id = newTransactionId.toInt())
+                    NotificationHelper.showSuspiciousAmountNotification(
+                        context,
+                        savedTxn,
+                        potentialTxn.suspicionReason ?: "Amount flagged for review.",
+                    )
+                } else if (settingsRepository.isAutoCaptureNotificationEnabledBlocking()) {
+                    val workRequest =
+                        OneTimeWorkRequestBuilder<TransactionNotificationWorker>()
+                            .setInputData(workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to newTransactionId.toInt()))
+                            .build()
+                    WorkManager.getInstance(context).enqueue(workRequest)
+                }
             }
         } else {
             Log.e(tag, "Failed to find or create an account for the transaction.")
