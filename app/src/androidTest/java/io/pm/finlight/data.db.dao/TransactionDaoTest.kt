@@ -220,7 +220,7 @@ class TransactionDaoTest : BaseDaoTest() {
             val end = today + 1000
 
             // collect the flow
-            val spendingListFlow = transactionDao.getSpendingByCategoryForMonth(start, end, null, null, null)
+            val spendingListFlow = transactionDao.getSpendingByCategoryForMonth(start, end, null, null, null, null)
             val spendingList = spendingListFlow.first()
 
             // Assert
