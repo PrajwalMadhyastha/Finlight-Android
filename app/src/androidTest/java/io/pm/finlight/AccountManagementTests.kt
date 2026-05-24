@@ -206,7 +206,7 @@ class AccountManagementTests {
         }
 
         // Wallet transactions: -150 (coffee), -50 (bus), -250 (taxi) = -450 total balance.
-        // Assert that the balance contains "450" inside the Current Balance header.
-        composeTestRule.onNodeWithText("450", substring = true).assertExists()
+        val expectedBalance = java.text.NumberFormat.getCurrencyInstance(java.util.Locale("en", "IN")).format(-450.0)
+        composeTestRule.onNodeWithText(expectedBalance).assertExists()
     }
 }

@@ -33,6 +33,8 @@ class AppWorkflowTests {
         RuleChain
             .outerRule(DisableOnboardingRule())
             .around(DisableAppLockRule())
+            // Clear prior data to ensure tests are hermetic and deterministic
+            .around(ClearDatabaseRule())
             // Seed known data BEFORE the activity is launched so account/category
             // dropdowns have deterministic entries.
             .around(SeedDatabaseRule())
