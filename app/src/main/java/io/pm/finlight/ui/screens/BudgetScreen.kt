@@ -51,6 +51,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.testTag
+
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -106,7 +108,7 @@ fun BudgetScreen(
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().testTag("budget_lazy_column"),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -489,10 +491,16 @@ private fun CategoryBudgetItem(
                     )
                 }
                 Row {
-                    IconButton(onClick = onEdit) {
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.testTag("edit_budget_${budgetWithSpending.budget.categoryName}")
+                    ) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit Budget", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    IconButton(onClick = onDelete) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.testTag("delete_budget_${budgetWithSpending.budget.categoryName}")
+                    ) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete Budget", tint = MaterialTheme.colorScheme.error)
                     }
                 }

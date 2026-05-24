@@ -178,16 +178,19 @@ class TransactionCrudTests {
         val updatedDescription = "Updated Dinner ${UUID.randomUUID().toString().take(5)}"
 
         // 1. Open Detail Screen
-        composeTestRule.onNodeWithTag("dashboard_lazy_column")
-            .performScrollToNode(hasText(originalDescription))
-        composeTestRule.onNode(
-            hasClickAction() and hasAnyDescendant(hasText(originalDescription)),
-            useUnmergedTree = true
-        ).performClick()
+        // Navigate to Transactions tab to avoid nested scroll issues on dashboard
+        composeTestRule.onNodeWithText("Transactions").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText(originalDescription).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNode(hasText(originalDescription), useUnmergedTree = true)
+            .onAncestors()
+            .filterToOne(hasClickAction())
+            .performClick()
 
         // 2. Wait for detail screen
         composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithContentDescription("More options").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
         }
 
         // 3. Click the description to edit (opens the MerchantPredictionSheet)
@@ -211,13 +214,11 @@ class TransactionCrudTests {
         // 7. Back to Dashboard
         composeTestRule.onNodeWithContentDescription("Back").performClick()
 
-        // 8. Verify on Dashboard
+        // 8. Verify on Transactions List
         composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText(originalDescription).assertDoesNotExist()
-        composeTestRule.onNodeWithTag("dashboard_lazy_column")
-            .performScrollToNode(hasText(updatedDescription))
         composeTestRule.onNodeWithText(updatedDescription).assertExists()
     }
 
@@ -229,18 +230,20 @@ class TransactionCrudTests {
         val description = addTransactionForTest()
 
         // 1. Open Detail Screen
-        composeTestRule.onNodeWithTag("dashboard_lazy_column")
-            .performScrollToNode(hasText(description))
-        composeTestRule.onNode(
-            hasClickAction() and hasAnyDescendant(hasText(description)),
-            useUnmergedTree = true
-        ).performClick()
+        composeTestRule.onNodeWithText("Transactions").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNode(hasText(description), useUnmergedTree = true)
+            .onAncestors()
+            .filterToOne(hasClickAction())
+            .performClick()
 
         // 2. Click 'More' menu
         composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithContentDescription("More options").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onNodeWithContentDescription("More options").performClick()
+        composeTestRule.onNodeWithContentDescription("More options", useUnmergedTree = true).performClick()
 
         // 3. Click 'Delete'
         composeTestRule.onNodeWithText("Delete").performClick()
@@ -251,7 +254,7 @@ class TransactionCrudTests {
 
         // 5. Verify removal
         composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText(description).assertDoesNotExist()
     }
