@@ -51,6 +51,8 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.CurrencyHelper
 import kotlinx.coroutines.launch
 
+import androidx.activity.compose.BackHandler
+
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -62,6 +64,12 @@ fun OnboardingScreen(
     // --- UPDATED: Page count reduced from 7 to 6 (Currency page removed) ---
     val pagerState = rememberPagerState { 6 }
     val scope = rememberCoroutineScope()
+
+    BackHandler(enabled = pagerState.currentPage > 0) {
+        scope.launch {
+            pagerState.animateScrollToPage(pagerState.currentPage - 1)
+        }
+    }
 
     val onNextClicked: (Int) -> Unit = { fromPage ->
         scope.launch {
