@@ -16,7 +16,7 @@ on:
   workflow_call:
 
 jobs:
-  fast-checks:
+  build-and-test:
     name: Unit Tests & Build Check
     runs-on: ubuntu-latest
 
