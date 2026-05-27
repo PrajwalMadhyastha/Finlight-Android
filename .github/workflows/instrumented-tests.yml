@@ -1,10 +1,11 @@
 name: Instrumented Tests
 
-# Run on PRs targeting main, nightly, and manual dispatch.
+# Run on PRs targeting main (and develop for pipeline validation), nightly, and manual dispatch.
 # Kept separate from android-ci.yml to avoid slowing down day-to-day PR feedback.
+# TODO: Remove "develop" from the branches list below once the pipeline is validated.
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
   schedule:
     # Runs at 02:00 UTC every day (07:30 IST)
     - cron: '0 2 * * *'
