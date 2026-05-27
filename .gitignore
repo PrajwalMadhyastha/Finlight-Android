@@ -39,6 +39,8 @@ ner_eval_summary*.txt
 .antigravityignore
 # Exception: NER model label map is a static app asset, not a generated file
 !app/src/main/assets/ner_label_map.json
+# Exception: Room database schema exports for migration testing
+!app/schemas/**/*.json
 
 # ML Training (Phase 4)
 ml_training/venv/
