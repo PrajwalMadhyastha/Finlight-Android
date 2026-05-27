@@ -17,7 +17,6 @@ on:
 
 jobs:
   build-and-test:
-    name: Unit Tests & Build Check
     runs-on: ubuntu-latest
 
     steps:
