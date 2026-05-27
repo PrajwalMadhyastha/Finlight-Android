@@ -91,8 +91,9 @@ class TransactionCrudTests {
             }
         }
 
-        // 4. Enter Amount
-        composeTestRule.onNodeWithTag("amount_text_field").performTextInput(customAmount)
+        val amountInput = composeTestRule.onNodeWithTag("amount_text_field")
+        amountInput.performTextInput(customAmount)
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
 
         // 5. Enter Description — opens Merchant BottomSheet
         composeTestRule.onNodeWithContentDescription("Search Predictions").performClick()
@@ -104,6 +105,7 @@ class TransactionCrudTests {
 
         val searchInput = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()
         searchInput.performTextInput(uniqueDescription)
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
 
         // Select the manually-entered description from the suggestion list
         composeTestRule.onAllNodesWithText(uniqueDescription).onFirst().performClick()
@@ -116,7 +118,7 @@ class TransactionCrudTests {
         // 7. Select Category (expenses only — income may not require one)
         if (!isIncome) {
             composeTestRule.onNodeWithTag("category_select_chip").performClick()
-            composeTestRule.onNodeWithText(TestDataSeeder.CATEGORY_FOOD_NAME).performClick()
+            composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_FOOD_NAME).onLast().performClick()
         }
 
         // 8. Save
@@ -204,6 +206,7 @@ class TransactionCrudTests {
         val inputNode = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()
         inputNode.performTextClearance()
         inputNode.performTextInput(updatedDescription)
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
 
         // 5. Click Save
         composeTestRule.onNodeWithText("Save").performClick()

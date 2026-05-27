@@ -744,7 +744,7 @@ abstract class AppDatabase : RoomDatabase() {
                     val categoryCount = categoryDao.getAllCategories().first().size
                     if (categoryCount == 0) {
                         Log.w("DatabaseCallback", "Categories table is empty. Repopulating default categories.")
-                        categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
+                        categoryDao.insertAllIgnore(CategoryIconHelper.predefinedCategories)
                     }
 
                     val ignoreRuleDao = database.ignoreRuleDao()

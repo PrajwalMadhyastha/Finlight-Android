@@ -76,8 +76,9 @@ class BudgetManagementTests {
         }
         composeTestRule.onNodeWithText("Transport").performClick()
         
-        // Fill Budget Amount
-        composeTestRule.onNodeWithText("Budget Amount").performTextInput("2000")
+        val amountInput = composeTestRule.onNodeWithText("Budget Amount")
+        amountInput.performTextInput("2000")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
 
         // Click Save Budget
         composeTestRule.onNodeWithText("Save Budget").performClick()
@@ -112,6 +113,7 @@ class BudgetManagementTests {
         val amountInput = composeTestRule.onNodeWithText("Budget Amount")
         amountInput.performTextClearance()
         amountInput.performTextInput("6000")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
 
         // Save
         composeTestRule.onNodeWithText("Update Budget").performClick()
