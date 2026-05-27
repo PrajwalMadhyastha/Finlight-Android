@@ -71,7 +71,6 @@ class SearchWorkflowTests {
         composeTestRule.onNodeWithText("No transactions match your criteria.").assertExists()
     }
 
-    @org.junit.Ignore("Flaky in UI tests due to Compose navigation/keyboard issues dropping performClick")
     @Test
     fun test_search_result_tapNavigatesToDetail() {
         navigateToSearch()
@@ -92,12 +91,17 @@ class SearchWorkflowTests {
         composeTestRule.onNodeWithTag("transaction_item_${TestDataSeeder.TXN_SALARY_DESC}").performScrollTo().performClick()
         composeTestRule.waitForIdle()
 
-        // Verify we are on the transaction detail screen
+        // Verify we are on the transaction detail screen.
+        // Income transactions show "Credit transaction" as the TopAppBar title
+        // (see TransactionDetailScreen.kt: when (transactionType) { "income" -> "Credit transaction" })
+        // We verify via the detail screen's unique lazy column tag + the transaction description.
         composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithText("Income Details").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onNodeWithText("Income Details").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").assertExists()
         composeTestRule.onNodeWithText(TestDataSeeder.TXN_SALARY_DESC).assertIsDisplayed()
+        // Confirm title: income = "Credit transaction"
+        composeTestRule.onNodeWithText("Credit transaction").assertIsDisplayed()
     }
 
     @Test

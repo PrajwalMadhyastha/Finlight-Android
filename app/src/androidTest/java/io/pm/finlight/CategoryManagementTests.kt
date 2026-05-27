@@ -134,40 +134,56 @@ class CategoryManagementTests {
         composeTestRule.onNodeWithText(tempCategoryName).assertDoesNotExist()
     }
 
-    @org.junit.Ignore("Flaky in UI tests due to Compose navigation/keyboard issues dropping performClick")
     @Test
     fun test_categoryDetail_showsSpendingBreakdown() {
-        // Navigate to Reports -> Analysis
+        // Navigate to Reports -> Spending Analysis screen.
+        // The Reports screen card is labeled "Spending Analysis" (not just "Analysis").
         composeTestRule.waitUntil(timeoutMillis = 10000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("nav_item_Reports").performClick()
-        composeTestRule.waitForIdle()
-        
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithText("Weekly Report").fetchSemanticsNodes().isNotEmpty()
+
+        // Wait for the reports list to appear (same anchor used by ReportsNavigationTests)
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText("Spending Consistency").fetchSemanticsNodes().isNotEmpty()
         }
-        
-        composeTestRule.onNodeWithText("Analysis").performClick()
-        composeTestRule.waitForIdle()
 
-        // Switch to "All Time" to ensure the items are not filtered out by the default current-month filter
-        // "All Time" is in a scrollable tab row, so we need to scroll to it
-        composeTestRule.onNodeWithText("All Time").performScrollTo().performClick()
-        composeTestRule.waitForIdle()
+        // Scroll down to the "Spending Analysis" card and tap it
+        composeTestRule.onNodeWithTag("reports_lazy_column")
+            .performScrollToNode(hasText("Spending Analysis"))
+        composeTestRule.onNodeWithText("Spending Analysis").performClick()
 
-        // Scroll to "Food & Drinks" because it might be off-screen
-        composeTestRule.onNodeWithTag("analysis_item_${TestDataSeeder.CATEGORY_FOOD_ID}").performScrollTo().assertIsDisplayed()
-        
-        // Tap "Food & Drinks"
+        // Wait for the AnalysisScreen to fully load (search field is a reliable anchor)
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithTag("analysis_item_${TestDataSeeder.CATEGORY_FOOD_ID}").fetchSemanticsNodes().isNotEmpty() ||
+                composeTestRule.onAllNodesWithText("No spending data for this selection.").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // The default period is MONTH. Seeded transactions are in the current month so they
+        // should appear without switching to ALL TIME. Only switch if not visible yet.
+        if (composeTestRule.onAllNodesWithTag("analysis_item_${TestDataSeeder.CATEGORY_FOOD_ID}").fetchSemanticsNodes().isEmpty()) {
+            // Switch to "ALL TIME" period chip.
+            // Chip label: period.name.replaceFirstChar { it.titlecase() }.replace("_", " ")
+            // ALL_TIME -> 'A' is already uppercase -> "ALL_TIME" -> replace _ -> "ALL TIME"
+            composeTestRule.onNodeWithText("ALL TIME").performScrollTo().performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.waitUntil(timeoutMillis = 5000) {
+                composeTestRule.onAllNodesWithTag("analysis_item_${TestDataSeeder.CATEGORY_FOOD_ID}").fetchSemanticsNodes().isNotEmpty()
+            }
+        }
+
+        // Scroll to the Food & Drinks analysis item and tap it
+        composeTestRule.onNodeWithTag("analysis_item_${TestDataSeeder.CATEGORY_FOOD_ID}")
+            .performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("analysis_item_${TestDataSeeder.CATEGORY_FOOD_ID}").performClick()
         composeTestRule.waitForIdle()
 
-        // Verify spending breakdown appears (AnalysisDetailScreen shows list of transactions)
+        // Verify the AnalysisDetailScreen shows the seeded grocery transaction
         composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule.onAllNodesWithTag("transaction_item_${TestDataSeeder.TXN_GROCERY_DESC}").fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onNodeWithTag("transaction_item_${TestDataSeeder.TXN_GROCERY_DESC}").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("transaction_item_${TestDataSeeder.TXN_GROCERY_DESC}")
+            .performScrollTo().assertIsDisplayed()
     }
 }
