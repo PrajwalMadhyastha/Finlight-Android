@@ -100,14 +100,12 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            # Disable system animations to prevent timing-related test flakiness
-            adb shell settings put global window_animation_scale 0.0
-            adb shell settings put global transition_animation_scale 0.0
-            adb shell settings put global animator_duration_scale 0.0
-            # Run the full instrumented test suite
-            ./gradlew connectedDebugAndroidTest --no-daemon --max-workers 2 \
-              -Pandroid.testInstrumentationRunnerArguments.notPackage=io.pm.finlight.data.db.dao \
-              2>&1
+            # Run the full instrumented test suite.
+            # NOTE: Keep this as a single line — the emulator-runner action invokes
+            # the script via /usr/bin/sh -c, which does not support backslash
+            # line continuations. Splitting the command caused Gradle to interpret
+            # the literal '\' as a task name (now fixed).
+            ./gradlew connectedDebugAndroidTest --no-daemon --max-workers 2 -Pandroid.testInstrumentationRunnerArguments.notPackage=io.pm.finlight.data.db.dao
 
       # ── 9. Upload raw test results ───────────────────────────────────────────
       # Always upload so failures can be inspected even when the job fails.
