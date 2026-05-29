@@ -27,9 +27,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -45,11 +45,11 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.CurrencyViewModel
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.CurrencyInfo
+import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.util.*
-import io.pm.finlight.utils.FormatUtils
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
@@ -425,41 +425,45 @@ private fun TripSettingsForm(
                 Box(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = tripName,
-                        onValueChange = { 
+                        onValueChange = {
                             onTripNameChange(it)
-                            expanded = true // Show suggestions when typing
+                            // Show suggestions when typing
+                            expanded = true
                         },
                         label = { Text("Trip Name / Tag*") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onGloballyPositioned { coordinates ->
-                                textFieldWidth = coordinates.size.width
-                            },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .onGloballyPositioned { coordinates ->
+                                    textFieldWidth = coordinates.size.width
+                                },
                         singleLine = true,
                         trailingIcon = {
                             IconButton(onClick = { expanded = !expanded }) {
                                 Icon(
                                     imageVector = if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown,
-                                    contentDescription = "Toggle Dropdown"
+                                    contentDescription = "Toggle Dropdown",
                                 )
                             }
-                        }
+                        },
                     )
-                    
+
                     // Filter tags based on current input, or show all if empty
-                    val filteredTags = if (tripName.isBlank()) {
-                        allTags
-                    } else {
-                        allTags.filter { it.name.contains(tripName, ignoreCase = true) }
-                    }
-                    
+                    val filteredTags =
+                        if (tripName.isBlank()) {
+                            allTags
+                        } else {
+                            allTags.filter { it.name.contains(tripName, ignoreCase = true) }
+                        }
+
                     DropdownMenu(
                         expanded = expanded && filteredTags.isNotEmpty(),
                         onDismissRequest = { expanded = false },
                         properties = androidx.compose.ui.window.PopupProperties(focusable = false),
-                        modifier = Modifier
-                            .width(with(LocalDensity.current) { textFieldWidth.toDp() })
-                            .background(popupContainerColor)
+                        modifier =
+                            Modifier
+                                .width(with(LocalDensity.current) { textFieldWidth.toDp() })
+                                .background(popupContainerColor),
                     ) {
                         filteredTags.forEach { tag ->
                             DropdownMenuItem(
@@ -467,7 +471,7 @@ private fun TripSettingsForm(
                                 onClick = {
                                     onTripNameChange(tag.name)
                                     expanded = false
-                                }
+                                },
                             )
                         }
                     }

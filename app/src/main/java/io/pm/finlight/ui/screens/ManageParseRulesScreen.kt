@@ -39,8 +39,6 @@ import io.pm.finlight.ManageParseRulesViewModel
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.theme.PopupSurfaceDark
-import io.pm.finlight.ui.theme.PopupSurfaceLight
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -58,7 +56,7 @@ fun ManageParseRulesScreen(
         EmptyStateMessage(
             message = "No custom parsing rules have been created yet.",
             icon = Icons.Default.Info,
-            modifier = Modifier.fillMaxSize().padding(16.dp)
+            modifier = Modifier.fillMaxSize().padding(16.dp),
         )
     } else {
         LazyColumn(
@@ -88,7 +86,7 @@ fun ManageParseRulesScreen(
             onConfirm = {
                 viewModel.deleteRule(ruleToDelete!!)
                 ruleToDelete = null
-            }
+            },
         )
     }
 }

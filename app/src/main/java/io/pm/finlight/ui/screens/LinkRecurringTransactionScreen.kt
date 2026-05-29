@@ -36,10 +36,10 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
+import io.pm.finlight.utils.FormatUtils
 import java.net.URLDecoder
 import java.text.NumberFormat
 import java.util.*
-import io.pm.finlight.utils.FormatUtils
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5

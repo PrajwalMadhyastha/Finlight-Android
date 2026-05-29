@@ -24,6 +24,7 @@ package io.pm.finlight
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.utils.DateUtils
+import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,7 +33,6 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToLong
-import io.pm.finlight.utils.FormatUtils
 
 data class ConsistencyStats(val goodDays: Int, val badDays: Int, val noSpendDays: Int, val noDataDays: Int)
 
@@ -48,7 +48,8 @@ class DashboardViewModel(
     private val budgetDao: BudgetDao,
     private val settingsRepository: SettingsRepository,
     private val merchantRenameRuleRepository: MerchantRenameRuleRepository,
-    private val timeProvider: TimeProvider, // Added dependency
+    // Added dependency
+    private val timeProvider: TimeProvider,
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
@@ -365,15 +366,16 @@ class DashboardViewModel(
             val key = (original ?: currentDesc).lowercase(Locale.getDefault())
             val alias = aliases[key]
 
-            val newDescription = if (alias != null) {
-                if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
-                    alias
+            val newDescription =
+                if (alias != null) {
+                    if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
+                        alias
+                    } else {
+                        currentDesc
+                    }
                 } else {
                     currentDesc
                 }
-            } else {
-                currentDesc
-            }
             details.copy(transaction = details.transaction.copy(description = newDescription))
         }
     }

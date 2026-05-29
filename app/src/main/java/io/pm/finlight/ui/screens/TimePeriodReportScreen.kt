@@ -179,7 +179,8 @@ fun TimePeriodReportScreen(
                             } else {
                                 ConsistencyCalendar(
                                     data = yearlyConsistencyData,
-                                    year = selectedDate.get(Calendar.YEAR), // FIX: Pass the year here
+                                    // FIX: Pass the year here
+                                    year = selectedDate.get(Calendar.YEAR),
                                     onDayClick = { date ->
                                         val dayData =
                                             yearlyConsistencyData.find {
@@ -212,7 +213,8 @@ fun TimePeriodReportScreen(
                         if (chartDataPair != null) {
                             ModernTrendChart(
                                 chartData = chartDataPair!!,
-                                onBarClick = null, // No navigation needed in detail view
+                                // No navigation needed in detail view
+                                onBarClick = null,
                                 initialScrollIndex =
                                     if (timePeriod == TimePeriod.YEARLY) {
                                         // Scroll to current month (0-indexed)

@@ -13,13 +13,13 @@ package io.pm.finlight.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToLong
-import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class IncomeViewModel(

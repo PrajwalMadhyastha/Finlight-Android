@@ -29,6 +29,7 @@ import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
+import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -37,7 +38,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
-import io.pm.finlight.utils.FormatUtils
 
 sealed class ScanResult {
     data class Success(val count: Int) : ScanResult()
@@ -170,7 +170,8 @@ class SettingsViewModel(
         settingsRepository.getAutoBackupNotificationEnabled().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = false, // Changed default value to false
+            // Changed default value to false
+            initialValue = false,
         )
 
     val privacyModeEnabled: StateFlow<Boolean> =

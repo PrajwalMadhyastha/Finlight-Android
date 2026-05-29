@@ -11,7 +11,6 @@ import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,7 +27,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -36,11 +34,7 @@ import io.pm.finlight.*
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.theme.PopupSurfaceDark
-import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.FormatUtils
-import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
 
@@ -62,7 +56,7 @@ fun GoalScreen(
             EmptyStateMessage(
                 message = "No savings goals yet. Tap '+' to add one!",
                 icon = Icons.Default.Info,
-                modifier = Modifier.fillMaxSize().padding(innerPadding)
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
             )
         } else {
             LazyColumn(
@@ -102,7 +96,7 @@ fun GoalScreen(
             onConfirm = {
                 goalViewModel.deleteGoal(goal)
                 goalToDelete = null
-            }
+            },
         )
     }
 }
@@ -185,4 +179,3 @@ private fun GoalItem(
         }
     }
 }
-

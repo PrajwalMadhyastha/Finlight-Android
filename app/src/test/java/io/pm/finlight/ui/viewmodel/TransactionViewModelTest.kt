@@ -469,7 +469,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
             // ACT
             viewModel.onSaveTapped(
-                description = "", // No description
+                // No description
+                description = "",
                 amountStr = "100.0",
                 accountId = accountId,
                 categoryId = null,
@@ -495,10 +496,12 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
             // ACT
             viewModel.onSaveTapped(
-                description = "Coffee", // Description is present
+                // Description is present
+                description = "Coffee",
                 amountStr = "100.0",
                 accountId = accountId,
-                categoryId = null, // No category selected yet
+                // No category selected yet
+                categoryId = null,
                 notes = null,
                 date = 0L,
                 transactionType = "expense",
@@ -582,11 +585,14 @@ class TransactionViewModelTest : BaseViewModelTest() {
             // ACT
             viewModel.onSaveTapped(
                 description = "Starbucks",
-                amountStr = "5.0", // 5 USD
+                // 5 USD
+                amountStr = "5.0",
                 accountId = 1,
-                categoryId = 1, // Category provided, so no nudge
+                // Category provided, so no nudge
+                categoryId = 1,
                 notes = null,
-                date = 1000L, // Within trip date range
+                // Within trip date range
+                date = 1000L,
                 transactionType = "expense",
                 imageUris = emptyList(),
             ) {}
@@ -1549,11 +1555,11 @@ class TransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // ARRANGE
             setupRetroSheet(newDesc = "Starbucks Coffee", newCatId = 5, numSimilar = 2)
-            
+
             // ACT: Deselect one to make it not 'all selected'
             viewModel.toggleRetroUpdateSelection(3) // Now only 2 is selected out of {2, 3}
             advanceUntilIdle()
-            
+
             val state = viewModel.retroUpdateSheetState.value
             assertEquals(setOf(2), state?.selectedIds) // Only 1 selected
             val expectedIdsToUpdate = listOf(2)
@@ -1564,7 +1570,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
                 // Verify it DOES NOT insert rule
                 verify(merchantRenameRuleRepository, never()).insert(any())
-                
+
                 // Verify it still updates DB for the selected ID
                 verify(transactionRepository).updateDescriptionForIds(expectedIdsToUpdate, "Starbucks Coffee")
                 verify(transactionRepository).updateCategoryForIds(expectedIdsToUpdate, 5)
@@ -1598,7 +1604,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
                 // Verify repo calls
                 verify(merchantRenameRuleRepository, never()).insert(any())
                 verify(merchantRenameRuleRepository).deleteByOriginalName("Starbucks")
-                
+
                 verify(transactionRepository).updateDescriptionForIds(expectedIdsToUpdate, "Starbucks")
                 verify(transactionRepository).updateCategoryForIds(expectedIdsToUpdate, 5)
 
@@ -2062,10 +2068,13 @@ class TransactionViewModelTest : BaseViewModelTest() {
                 Transaction(
                     id = 100,
                     description = "Quick Lunch",
-                    amount = 120.50, // Has decimals
+                    // Has decimals
+                    amount = 120.50,
                     date = System.currentTimeMillis(),
-                    accountId = 1, // "Cash"
-                    categoryId = 10, // "Food"
+                    // "Cash"
+                    accountId = 1,
+                    // "Food"
+                    categoryId = 10,
                     source = "Manual Entry",
                     transactionType = "expense",
                     notes = null,
@@ -2363,7 +2372,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
                 Transaction(
                     id = 200,
                     description = "ATM Withdrawal",
-                    amount = 500.0, // Integer amount
+                    // Integer amount
+                    amount = 500.0,
                     date = System.currentTimeMillis(),
                     accountId = 1,
                     categoryId = 10,
@@ -2432,18 +2442,28 @@ class TransactionViewModelTest : BaseViewModelTest() {
         }
 
     // --- NEW: applyAliases Tests via findTransactionDetailsById ---
-    
+
     @Test
     fun `applyAliases applies alias when description equals originalDescription`() =
         runTest {
             // Arrange
             val aliases = mapOf("gateway" to "Water Charges")
             whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
-            
-            val transaction = Transaction(id = 1, description = "Gateway", originalDescription = "Gateway", amount = 1.0, date = 0L, accountId = 1, categoryId = 1, notes = null)
+
+            val transaction =
+                Transaction(
+                    id = 1,
+                    description = "Gateway",
+                    originalDescription = "Gateway",
+                    amount = 1.0,
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                )
             val details = TransactionDetails(transaction, emptyList(), "Account", "Category", "icon", "color", null)
             whenever(transactionRepository.getTransactionDetailsById(1)).thenReturn(flowOf(details))
-            
+
             initializeViewModel()
             advanceUntilIdle()
 
@@ -2461,12 +2481,22 @@ class TransactionViewModelTest : BaseViewModelTest() {
             // Arrange
             val aliases = mapOf("gateway" to "Water Charges")
             whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
-            
+
             // Description is already the alias, meaning it was applied by SmsParser
-            val transaction = Transaction(id = 1, description = "Water Charges", originalDescription = "Gateway", amount = 1.0, date = 0L, accountId = 1, categoryId = 1, notes = null)
+            val transaction =
+                Transaction(
+                    id = 1,
+                    description = "Water Charges",
+                    originalDescription = "Gateway",
+                    amount = 1.0,
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                )
             val details = TransactionDetails(transaction, emptyList(), "Account", "Category", "icon", "color", null)
             whenever(transactionRepository.getTransactionDetailsById(1)).thenReturn(flowOf(details))
-            
+
             initializeViewModel()
             advanceUntilIdle()
 
@@ -2484,12 +2514,22 @@ class TransactionViewModelTest : BaseViewModelTest() {
             // Arrange
             val aliases = mapOf("gateway" to "Water Charges")
             whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
-            
+
             // Description is DIFFERENT from original ("Gateway") AND alias ("Water Charges")
-            val transaction = Transaction(id = 1, description = "Gas Bill", originalDescription = "Gateway", amount = 1.0, date = 0L, accountId = 1, categoryId = 1, notes = null)
+            val transaction =
+                Transaction(
+                    id = 1,
+                    description = "Gas Bill",
+                    originalDescription = "Gateway",
+                    amount = 1.0,
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                )
             val details = TransactionDetails(transaction, emptyList(), "Account", "Category", "icon", "color", null)
             whenever(transactionRepository.getTransactionDetailsById(1)).thenReturn(flowOf(details))
-            
+
             initializeViewModel()
             advanceUntilIdle()
 
@@ -2516,16 +2556,17 @@ class TransactionViewModelTest : BaseViewModelTest() {
         currentDesc: String,
         originalDescription: String = initialDesc,
     ) = runTest {
-        val initialTxn = Transaction(
-            id = 1,
-            description = initialDesc,
-            categoryId = 1,
-            amount = 10.0,
-            date = 0L,
-            accountId = 1,
-            notes = null,
-            originalDescription = originalDescription,
-        )
+        val initialTxn =
+            Transaction(
+                id = 1,
+                description = initialDesc,
+                categoryId = 1,
+                amount = 10.0,
+                date = 0L,
+                accountId = 1,
+                notes = null,
+                originalDescription = originalDescription,
+            )
         val currentTxn = initialTxn.copy(description = currentDesc)
 
         whenever(transactionRepository.getTransactionById(1))
@@ -2563,7 +2604,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
             assertNull("Sheet state should remain null", viewModel.retroUpdateSheetState.value)
             // ASSERT: The rename rule must have been saved silently
             verify(merchantRenameRuleRepository).insert(
-                MerchantRenameRule(originalName = "Water charges", newName = "Annual Maintenance")
+                MerchantRenameRule(originalName = "Water charges", newName = "Annual Maintenance"),
             )
             verify(merchantRenameRuleRepository, never()).deleteByOriginalName(anyString())
         }
@@ -2574,7 +2615,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
             // ARRANGE: User is reverting "Gateway" back to "Gateway" (same as originalDescription)
             setupUniqueRenameScenario(
                 initialDesc = "Annual Maintenance",
-                currentDesc = "Water charges",  // Reverting back to original name
+                // Reverting back to original name
+                currentDesc = "Water charges",
                 originalDescription = "Water charges",
             )
 
@@ -2596,11 +2638,17 @@ class TransactionViewModelTest : BaseViewModelTest() {
     fun `onAttemptToLeaveScreen allows navigation and saves no rule when description unchanged`() =
         runTest {
             // ARRANGE: No description change at all
-            val txn = Transaction(
-                id = 1, description = "Starbucks", categoryId = 1,
-                amount = 10.0, date = 0L, accountId = 1, notes = null,
-                originalDescription = "Starbucks",
-            )
+            val txn =
+                Transaction(
+                    id = 1,
+                    description = "Starbucks",
+                    categoryId = 1,
+                    amount = 10.0,
+                    date = 0L,
+                    accountId = 1,
+                    notes = null,
+                    originalDescription = "Starbucks",
+                )
             whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(txn))
             whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
@@ -2648,7 +2696,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
                 // isAllSelected: (1+1)==2 → TRUE → rule must be saved
                 verify(merchantRenameRuleRepository).insert(
-                    MerchantRenameRule("Starbucks", "Annual Maintenance")
+                    MerchantRenameRule("Starbucks", "Annual Maintenance"),
                 )
                 verify(transactionRepository).updateDescriptionForIds(listOf(2), "Annual Maintenance")
 
@@ -2694,15 +2742,22 @@ class TransactionViewModelTest : BaseViewModelTest() {
     fun `onAttemptToLeaveScreen sets totalMatchingCount to similar size plus one`() =
         runTest {
             // ARRANGE: 3 similar transactions
-            val initialTxn = Transaction(
-                id = 1, description = "Merchant", categoryId = 1,
-                amount = 10.0, date = 0L, accountId = 1, notes = null,
-                originalDescription = "Merchant",
-            )
+            val initialTxn =
+                Transaction(
+                    id = 1,
+                    description = "Merchant",
+                    categoryId = 1,
+                    amount = 10.0,
+                    date = 0L,
+                    accountId = 1,
+                    notes = null,
+                    originalDescription = "Merchant",
+                )
             val currentTxn = initialTxn.copy(description = "Renamed Merchant")
-            val similarTxns = (2..4).map {
-                Transaction(id = it, description = "Merchant", categoryId = 1, amount = 5.0, date = 0L, accountId = 1, notes = null)
-            }
+            val similarTxns =
+                (2..4).map {
+                    Transaction(id = it, description = "Merchant", categoryId = 1, amount = 5.0, date = 0L, accountId = 1, notes = null)
+                }
 
             whenever(transactionRepository.getTransactionById(1))
                 .thenReturn(flowOf(initialTxn), flowOf(currentTxn))
@@ -2884,4 +2939,3 @@ class TransactionViewModelTest : BaseViewModelTest() {
             }
         }
 }
-

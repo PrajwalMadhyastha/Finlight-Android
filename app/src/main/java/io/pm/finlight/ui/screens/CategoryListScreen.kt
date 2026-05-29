@@ -25,9 +25,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -128,7 +128,7 @@ fun CategoryListScreen(
                                         selectedCategory = category
                                         showEditDialog = true
                                     },
-                                    modifier = Modifier.testTag("edit_category_${category.name}")
+                                    modifier = Modifier.testTag("edit_category_${category.name}"),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Edit,
@@ -141,7 +141,7 @@ fun CategoryListScreen(
                                         selectedCategory = category
                                         showDeleteDialog = true
                                     },
-                                    modifier = Modifier.testTag("delete_category_${category.name}")
+                                    modifier = Modifier.testTag("delete_category_${category.name}"),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
@@ -182,7 +182,7 @@ fun CategoryListScreen(
             onConfirm = {
                 viewModel.deleteCategory(selectedCategory!!)
                 showDeleteDialog = false
-            }
+            },
         )
     }
 }
@@ -280,4 +280,3 @@ fun EditCategoryDialog(
         containerColor = popupContainerColor,
     )
 }
-

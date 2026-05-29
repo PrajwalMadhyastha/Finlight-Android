@@ -490,6 +490,7 @@ class SmsReceiverTest : BaseViewModelTest() {
             verify(exactly = 1) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
             unmockkObject(WorkManager)
         }
+
     @Test
     @Config(sdk = [Build.VERSION_CODES.S])
     fun `suspicious transaction triggers showSuspiciousAmountNotification`() =
@@ -506,7 +507,7 @@ class SmsReceiverTest : BaseViewModelTest() {
                     originalMessage = "Spent Rs.150000 at Starbucks",
                     sourceSmsHash = "hash1",
                     needsReview = true,
-                    suspicionReason = "Amount exceeds threshold"
+                    suspicionReason = "Amount exceeds threshold",
                 )
             val success = ParseResult.Success(transaction = potentialTxn)
 
@@ -522,7 +523,7 @@ class SmsReceiverTest : BaseViewModelTest() {
             // Assert
             coVerify(exactly = 1) { transactionDao.insert(any()) }
             verify(exactly = 1) { NotificationHelper.showSuspiciousAmountNotification(any(), any(), "Amount exceeds threshold") }
-            
+
             unmockkObject(SmsParser)
         }
 
@@ -541,14 +542,14 @@ class SmsReceiverTest : BaseViewModelTest() {
                     merchantName = "Starbucks",
                     originalMessage = "Spent Rs.100 at Starbucks",
                     sourceSmsHash = "hash1",
-                    needsReview = false
+                    needsReview = false,
                 )
             val success = ParseResult.Success(transaction = potentialTxn)
 
             mockkObject(SmsParser)
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns success
-            
+
             mockkObject(WorkManager)
             val mockWorkManager = mockk<WorkManager>(relaxed = true)
             every { WorkManager.getInstance(any()) } returns mockWorkManager
@@ -562,7 +563,7 @@ class SmsReceiverTest : BaseViewModelTest() {
             coVerify(exactly = 1) { transactionDao.insert(any()) }
             verify(exactly = 0) { NotificationHelper.showSuspiciousAmountNotification(any(), any(), any()) }
             verify(exactly = 1) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
-            
+
             unmockkObject(SmsParser)
             unmockkObject(WorkManager)
         }

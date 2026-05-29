@@ -612,8 +612,10 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(transactionDao.getFirstTransactionDate()).thenReturn(flowOf(firstTxDate))
             val dailyTotals =
                 listOf(
-                    DailyTotal(getDateKey(year, month, 2), 100.0), // Day 2: Spent 100
-                    DailyTotal(getDateKey(year, month, 3), 0.0), // Day 3: Spent 0
+                    // Day 2: Spent 100
+                    DailyTotal(getDateKey(year, month, 2), 100.0),
+                    // Day 3: Spent 0
+                    DailyTotal(getDateKey(year, month, 3), 0.0),
                 )
             `when`(transactionDao.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(dailyTotals))
 
@@ -656,9 +658,12 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(transactionDao.getFirstTransactionDate()).thenReturn(flowOf(firstTxDate))
             val dailyTotals =
                 listOf(
-                    DailyTotal(getDateKey(year, month, 2), 0.0), // No spend
-                    DailyTotal(getDateKey(year, month, 3), 50.0), // Within limit
-                    DailyTotal(getDateKey(year, month, 4), 150.0), // Over limit
+                    // No spend
+                    DailyTotal(getDateKey(year, month, 2), 0.0),
+                    // Within limit
+                    DailyTotal(getDateKey(year, month, 3), 50.0),
+                    // Over limit
+                    DailyTotal(getDateKey(year, month, 4), 150.0),
                 )
             `when`(transactionDao.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(dailyTotals))
 
@@ -706,7 +711,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             val dailyTotals =
                 listOf(
-                    DailyTotal(getDateKey(year, month, 11), 50.0), // Day 11: WITHIN_LIMIT
+                    // Day 11: WITHIN_LIMIT
+                    DailyTotal(getDateKey(year, month, 11), 50.0),
                 )
 
             // Mock all DAO/Repo calls

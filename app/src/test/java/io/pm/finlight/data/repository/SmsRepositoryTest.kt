@@ -65,7 +65,8 @@ class SmsRepositoryTest : BaseViewModelTest() {
         verify(contentResolver).query(
             eq(Telephony.Sms.Inbox.CONTENT_URI),
             any(),
-            eq(null), // No date selection
+            // No date selection
+            eq(null),
             eq(null),
             eq("date DESC"),
         )

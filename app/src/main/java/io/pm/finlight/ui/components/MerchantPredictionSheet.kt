@@ -132,7 +132,10 @@ fun MerchantPredictionSheet(
                             .fillMaxWidth(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("No past transactions found matching '${currentDescription.text}'", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "No past transactions found matching '${currentDescription.text}'",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             } else {
                 Spacer(modifier = Modifier.weight(1f))

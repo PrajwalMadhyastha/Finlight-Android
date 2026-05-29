@@ -26,7 +26,6 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SmsWorkflowTests {
-
     @get:Rule
     val composeTestRule = createComposeRule()
 
@@ -38,7 +37,7 @@ class SmsWorkflowTests {
     fun setup() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as Application
         db = AppDatabase.getInstance(context)
-        
+
         runBlocking {
             db.transactionDao().deleteAll()
             db.categoryDao().deleteAll()
@@ -51,81 +50,85 @@ class SmsWorkflowTests {
     }
 
     @Test
-    fun test_approveSmsTransaction_createsTransaction() = runBlocking {
-        // 1. Create a PotentialTransaction (in-memory)
-        val pt = PotentialTransaction(
-            sourceSmsId = 998L,
-            smsSender = "AD-HDFCBK",
-            amount = 450.0,
-            transactionType = "expense",
-            merchantName = "Swiggy",
-            originalMessage = "Spent Rs.450.00 at Swiggy on HDFC Bank Card.",
-            date = System.currentTimeMillis()
-        )
+    fun test_approveSmsTransaction_createsTransaction() =
+        runBlocking {
+            // 1. Create a PotentialTransaction (in-memory)
+            val pt =
+                PotentialTransaction(
+                    sourceSmsId = 998L,
+                    smsSender = "AD-HDFCBK",
+                    amount = 450.0,
+                    transactionType = "expense",
+                    merchantName = "Swiggy",
+                    originalMessage = "Spent Rs.450.00 at Swiggy on HDFC Bank Card.",
+                    date = System.currentTimeMillis(),
+                )
 
-        // 2. Set the content directly to the ApproveTransactionScreen
-        composeTestRule.setContent {
-            ApproveTransactionScreen(
-                potentialTxn = pt,
-                navController = rememberNavController(),
-                transactionViewModel = transactionViewModel,
-                settingsViewModel = settingsViewModel
-            )
+            // 2. Set the content directly to the ApproveTransactionScreen
+            composeTestRule.setContent {
+                ApproveTransactionScreen(
+                    potentialTxn = pt,
+                    navController = rememberNavController(),
+                    transactionViewModel = transactionViewModel,
+                    settingsViewModel = settingsViewModel,
+                )
+            }
+
+            // Verify the UI loads the transaction data
+            composeTestRule.onNodeWithText("Swiggy").assertExists()
+            composeTestRule.onNodeWithText("₹450.00").assertExists() // Assuming default currency format
+
+            // 3. In Approve Screen, select category
+            composeTestRule.onNodeWithText("Select category").performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithText("Food").performClick()
+            composeTestRule.waitForIdle()
+
+            // 4. Save the transaction
+            composeTestRule.onNodeWithText("Save Transaction").performClick()
+            composeTestRule.waitForIdle()
+
+            // 5. Verify it was added to transactions in the database
+            val txns = db.transactionDao().getAllTransactionsSimple().first()
+            assert(txns.size == 1) { "One transaction should have been created" }
+            assert(txns[0].description == "Swiggy")
+            assert(txns[0].amount == 450.0)
+            assert(txns[0].sourceSmsId == 998L)
         }
-
-        // Verify the UI loads the transaction data
-        composeTestRule.onNodeWithText("Swiggy").assertExists()
-        composeTestRule.onNodeWithText("₹450.00").assertExists() // Assuming default currency format
-
-        // 3. In Approve Screen, select category
-        composeTestRule.onNodeWithText("Select category").performClick()
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Food").performClick()
-        composeTestRule.waitForIdle()
-
-        // 4. Save the transaction
-        composeTestRule.onNodeWithText("Save Transaction").performClick()
-        composeTestRule.waitForIdle()
-
-        // 5. Verify it was added to transactions in the database
-        val txns = db.transactionDao().getAllTransactionsSimple().first()
-        assert(txns.size == 1) { "One transaction should have been created" }
-        assert(txns[0].description == "Swiggy")
-        assert(txns[0].amount == 450.0)
-        assert(txns[0].sourceSmsId == 998L)
-    }
 
     @Test
-    fun test_cancelSmsTransaction_doesNotCreateTransaction() = runBlocking {
-        // 1. Create a PotentialTransaction
-        val pt = PotentialTransaction(
-            sourceSmsId = 997L,
-            smsSender = "TM-ZOMATO",
-            amount = 250.0,
-            transactionType = "expense",
-            merchantName = "Zomato",
-            originalMessage = "Spent Rs.250.00 at Zomato.",
-            date = System.currentTimeMillis()
-        )
+    fun test_cancelSmsTransaction_doesNotCreateTransaction() =
+        runBlocking {
+            // 1. Create a PotentialTransaction
+            val pt =
+                PotentialTransaction(
+                    sourceSmsId = 997L,
+                    smsSender = "TM-ZOMATO",
+                    amount = 250.0,
+                    transactionType = "expense",
+                    merchantName = "Zomato",
+                    originalMessage = "Spent Rs.250.00 at Zomato.",
+                    date = System.currentTimeMillis(),
+                )
 
-        // 2. Set the content directly
-        composeTestRule.setContent {
-            ApproveTransactionScreen(
-                potentialTxn = pt,
-                navController = rememberNavController(),
-                transactionViewModel = transactionViewModel,
-                settingsViewModel = settingsViewModel
-            )
+            // 2. Set the content directly
+            composeTestRule.setContent {
+                ApproveTransactionScreen(
+                    potentialTxn = pt,
+                    navController = rememberNavController(),
+                    transactionViewModel = transactionViewModel,
+                    settingsViewModel = settingsViewModel,
+                )
+            }
+
+            composeTestRule.onNodeWithText("Zomato").assertExists()
+
+            // 3. Cancel the flow
+            composeTestRule.onNodeWithText("Cancel").performClick()
+            composeTestRule.waitForIdle()
+
+            // 4. Verify it was not added to DB
+            val txns = db.transactionDao().getAllTransactionsSimple().first()
+            assert(txns.isEmpty()) { "No transaction should have been created on cancel" }
         }
-
-        composeTestRule.onNodeWithText("Zomato").assertExists()
-
-        // 3. Cancel the flow
-        composeTestRule.onNodeWithText("Cancel").performClick()
-        composeTestRule.waitForIdle()
-
-        // 4. Verify it was not added to DB
-        val txns = db.transactionDao().getAllTransactionsSimple().first()
-        assert(txns.isEmpty()) { "No transaction should have been created on cancel" }
-    }
 }

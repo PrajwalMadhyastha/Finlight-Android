@@ -117,4 +117,3 @@ class StringSimilarityTest {
         assert(!StringSimilarity.isCanonicalSubset("Amazon Pay", "AMAZON MERCHANT"))
     }
 }
-

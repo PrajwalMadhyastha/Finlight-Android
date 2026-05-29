@@ -22,7 +22,7 @@ fun ConfirmationDialog(
     dismissButtonText: String = "Cancel",
     isDestructive: Boolean = false,
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
 ) {
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -34,11 +34,12 @@ fun ConfirmationDialog(
         confirmButton = {
             Button(
                 onClick = onConfirm,
-                colors = if (isDestructive) {
-                    ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                } else {
-                    ButtonDefaults.buttonColors()
-                },
+                colors =
+                    if (isDestructive) {
+                        ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    } else {
+                        ButtonDefaults.buttonColors()
+                    },
             ) {
                 Text(confirmButtonText)
             }

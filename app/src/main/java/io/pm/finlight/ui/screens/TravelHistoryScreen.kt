@@ -33,9 +33,9 @@ import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
 import io.pm.finlight.ui.viewmodel.HistoricTripsViewModelFactory
+import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
 import java.util.*
-import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable

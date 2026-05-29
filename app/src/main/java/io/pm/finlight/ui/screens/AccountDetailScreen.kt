@@ -35,9 +35,9 @@ import io.pm.finlight.ui.theme.IncomeGreenDark
 import io.pm.finlight.ui.theme.IncomeGreenLight
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.utils.BankLogoHelper
+import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
 import java.util.*
-import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -156,7 +156,8 @@ private fun AccountDetailHeader(
 @Composable
 private fun AccountDetailTransactionItem(
     transactionDetails: TransactionDetails,
-    onClick: () -> Unit, // --- NEW: Accept an onClick lambda ---
+    // --- NEW: Accept an onClick lambda ---
+    onClick: () -> Unit,
 ) {
     val contentAlpha = if (transactionDetails.transaction.isExcluded) 0.5f else 1f
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }

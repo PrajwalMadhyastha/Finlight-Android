@@ -30,8 +30,8 @@ import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
-import java.text.NumberFormat
 import io.pm.finlight.utils.FormatUtils
+import java.text.NumberFormat
 import java.util.*
 
 // Helper to detect perceived luminance.

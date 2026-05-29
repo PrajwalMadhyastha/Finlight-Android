@@ -41,13 +41,13 @@ class BudgetManagementTests {
         composeTestRule.waitUntil(timeoutMillis = 10000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
-        
-        // Scroll to Budget Watch card and click it. 
+
+        // Scroll to Budget Watch card and click it.
         composeTestRule.onNodeWithTag("dashboard_lazy_column")
             .performScrollToNode(hasText("Budget Watch"))
-        
+
         composeTestRule.onNodeWithText("Budget Watch").performClick()
-        
+
         // Wait for BudgetScreen to open
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Category Budgets").fetchSemanticsNodes().isNotEmpty()
@@ -75,7 +75,7 @@ class BudgetManagementTests {
             composeTestRule.onAllNodesWithText("Transport").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Transport").performClick()
-        
+
         val amountInput = composeTestRule.onNodeWithText("Budget Amount")
         amountInput.performTextInput("2000")
         androidx.test.espresso.Espresso.closeSoftKeyboard()
@@ -162,7 +162,7 @@ class BudgetManagementTests {
         navigateToBudgetScreen()
 
         composeTestRule.onNodeWithText("Food & Drinks").assertIsDisplayed()
-        
+
         // Progress indicator should be non-zero. The TestDataSeeder has a budget of ₹5000 for Food & Drinks.
         composeTestRule.onNodeWithText("of ₹5,000", substring = true).assertExists()
     }

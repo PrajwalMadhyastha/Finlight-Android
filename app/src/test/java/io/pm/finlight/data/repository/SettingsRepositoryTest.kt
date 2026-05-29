@@ -137,7 +137,7 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         runTest {
             val pastEndDate = 0L
             val expiredSettings = TravelModeSettings(true, "Old Trip", TripType.DOMESTIC, 1L, pastEndDate, null, null)
-            
+
             // Bypass saveTravelModeSettings to directly inject an "expired" state
             prefs.edit().putString("travel_mode_settings", gson.toJson(expiredSettings)).commit()
 
@@ -146,7 +146,7 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(null, item, "Item was $item")
                 cancelAndIgnoreRemainingEvents()
             }
-            
+
             // Verify it was actually removed from prefs
             assertNull(prefs.getString("travel_mode_settings", null))
         }

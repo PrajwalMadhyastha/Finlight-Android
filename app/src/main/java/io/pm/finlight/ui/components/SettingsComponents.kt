@@ -40,16 +40,24 @@ import java.util.*
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @Composable
-private fun transparentListItemColors(enabled: Boolean) = ListItemDefaults.colors(
-    containerColor = Color.Transparent, // Make transparent to show GlassPanel behind
-    headlineColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-    supportingColor = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-    leadingIconColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.38f),
-)
+private fun transparentListItemColors(enabled: Boolean) =
+    ListItemDefaults.colors(
+        // Make transparent to show GlassPanel behind
+        containerColor = Color.Transparent,
+        headlineColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+        supportingColor =
+            if (enabled) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                    alpha = 0.38f,
+                )
+            },
+        leadingIconColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.38f),
+    )
 
 @Composable
-private fun getPopupContainerColor() =
-    if (MaterialTheme.colorScheme.background.isDark()) PopupSurfaceDark else PopupSurfaceLight
+private fun getPopupContainerColor() = if (MaterialTheme.colorScheme.background.isDark()) PopupSurfaceDark else PopupSurfaceLight
 
 @Composable
 fun SettingsToggleItem(

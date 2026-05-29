@@ -47,11 +47,11 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.TransactionItem
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToLong
-import io.pm.finlight.utils.FormatUtils
-import java.text.SimpleDateFormat
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 

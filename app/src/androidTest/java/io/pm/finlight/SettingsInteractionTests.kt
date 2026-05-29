@@ -15,19 +15,20 @@ class SettingsInteractionTests {
     private val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @get:Rule
-    val ruleChain: RuleChain = RuleChain
-        .outerRule(DisableOnboardingRule())
-        .around(DisableAppLockRule())
-        .around(ClearDatabaseRule())
-        .around(SeedDatabaseRule())
-        .around(
-            GrantPermissionRule.grant(
-                Manifest.permission.READ_SMS,
-                Manifest.permission.RECEIVE_SMS,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ),
-        )
-        .around(composeTestRule)
+    val ruleChain: RuleChain =
+        RuleChain
+            .outerRule(DisableOnboardingRule())
+            .around(DisableAppLockRule())
+            .around(ClearDatabaseRule())
+            .around(SeedDatabaseRule())
+            .around(
+                GrantPermissionRule.grant(
+                    Manifest.permission.READ_SMS,
+                    Manifest.permission.RECEIVE_SMS,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ),
+            )
+            .around(composeTestRule)
 
     private fun navigateToProfile() {
         composeTestRule.waitUntil(timeoutMillis = 10000) {
@@ -41,14 +42,14 @@ class SettingsInteractionTests {
         navigateToProfile()
         composeTestRule.onNodeWithTag("profile_lazy_column").performScrollToNode(hasText("Theme & Appearance"))
         composeTestRule.onNodeWithText("Theme & Appearance").performClick()
-        
+
         // Tap "Midnight"
         composeTestRule.onNodeWithText("Midnight").performScrollTo().performClick()
-        
+
         // Restart the activity
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
-        
+
         // Verify we are still in appearance settings after recreate
         composeTestRule.onNodeWithText("Theme").assertIsDisplayed()
     }
@@ -58,7 +59,7 @@ class SettingsInteractionTests {
         navigateToProfile()
         composeTestRule.onNodeWithTag("profile_lazy_column").performScrollToNode(hasText("Security & Data"))
         composeTestRule.onNodeWithText("Security & Data").performClick()
-        
+
         composeTestRule.onNodeWithText("Export Transactions (CSV)").performScrollTo().assertIsDisplayed()
     }
 
@@ -68,7 +69,7 @@ class SettingsInteractionTests {
         composeTestRule.onNodeWithTag("profile_lazy_column").performScrollToNode(hasText("Automation"))
         composeTestRule.onNodeWithText("Automation").performClick()
         composeTestRule.onNodeWithText("Manage Custom Parse Rules").performScrollTo().performClick()
-        
+
         composeTestRule.onNodeWithText("No custom parsing rules have been created yet.").assertIsDisplayed()
     }
 
@@ -78,27 +79,27 @@ class SettingsInteractionTests {
         composeTestRule.onNodeWithTag("profile_lazy_column").performScrollToNode(hasText("Automation"))
         composeTestRule.onNodeWithText("Automation").performClick()
         composeTestRule.onNodeWithText("Manage Parser Ignore List").performScrollTo().performClick()
-        
+
         // Switch to "Sender" rule
         composeTestRule.onNodeWithText("Sender").performClick()
-        
+
         // Enter a rule
         val textInput = composeTestRule.onNodeWithText("Sender pattern to ignore")
         textInput.performTextInput("TEST_SENDER")
-        
+
         // Click Add Rule button
         composeTestRule.onNodeWithContentDescription("Add Rule").performClick()
-        
+
         // Verify it was added
         composeTestRule.onNodeWithText("TEST_SENDER").assertIsDisplayed()
-        
+
         // Click Delete rule button
         // In case there are multiple, click the first one
         composeTestRule.onAllNodesWithContentDescription("Delete rule", ignoreCase = true)[0].performClick()
-        
+
         // Confirm deletion
         composeTestRule.onNodeWithText("Delete").performClick()
-        
+
         // Verify it was deleted
         composeTestRule.onNodeWithText("TEST_SENDER").assertDoesNotExist()
     }

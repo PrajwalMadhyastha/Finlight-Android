@@ -18,7 +18,8 @@ class TimePeriodReportViewModelFactory(
     private val application: Application,
     private val timePeriod: TimePeriod,
     private val initialDateMillis: Long?,
-    private val showPreviousMonth: Boolean, // --- NEW: Add parameter
+    // --- NEW: Add parameter
+    private val showPreviousMonth: Boolean,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TimePeriodReportViewModel::class.java)) {
@@ -31,9 +32,11 @@ class TimePeriodReportViewModelFactory(
             @Suppress("UNCHECKED_CAST")
             return TimePeriodReportViewModel(
                 // --- UPDATED: Pass repositories instead of DAOs ---
-                transactionDao = db.transactionDao(), // Still needed for charts/insights
+                // Still needed for charts/insights
+                transactionDao = db.transactionDao(),
                 transactionRepository = transactionRepository,
-                settingsRepository = settingsRepository, // --- NEW: Added ---
+                // --- NEW: Added ---
+                settingsRepository = settingsRepository,
                 timePeriod = timePeriod,
                 initialDateMillis = initialDateMillis,
                 showPreviousMonth = showPreviousMonth,

@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -36,7 +37,6 @@ import coil.compose.AsyncImage
 import io.pm.finlight.*
 import io.pm.finlight.R
 import io.pm.finlight.ui.components.*
-import androidx.compose.ui.platform.testTag
 
 @Composable
 fun ProfileScreen(

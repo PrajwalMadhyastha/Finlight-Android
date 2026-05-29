@@ -14,7 +14,8 @@ class SearchViewModelFactory(
     private val application: Application,
     private val initialCategoryId: Int?,
     private val initialDateMillis: Long?,
-    private val initialQuery: String?, // --- NEW: Add parameter
+    // --- NEW: Add parameter
+    private val initialQuery: String?,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SearchViewModel::class.java)) {
@@ -27,7 +28,8 @@ class SearchViewModelFactory(
                 tagDao = database.tagDao(),
                 initialCategoryId = initialCategoryId,
                 initialDateMillis = initialDateMillis,
-                initialQuery = initialQuery, // --- NEW: Pass to VM
+                // --- NEW: Pass to VM
+                initialQuery = initialQuery,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

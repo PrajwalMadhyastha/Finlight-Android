@@ -18,6 +18,7 @@ import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
 import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -25,7 +26,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
-import io.pm.finlight.utils.FormatUtils
 
 /**
  * Enum to manage the state of the view toggle on the reports screen.

@@ -88,12 +88,12 @@ import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URLEncoder
 import java.text.NumberFormat
-import io.pm.finlight.utils.FormatUtils
 import java.util.*
 
 private const val TAG = "DetailScreenDebug"
@@ -608,7 +608,7 @@ fun TransactionDetailScreen(
                             viewModel.deleteTransaction(details.transaction)
                             showDeleteDialog = false
                             navigateBack()
-                        }
+                        },
                     )
                 }
 
@@ -635,7 +635,7 @@ fun TransactionDetailScreen(
                         onConfirm = {
                             viewModel.deleteTransactionImage(showImageDeleteDialog!!)
                             showImageDeleteDialog = null
-                        }
+                        },
                     )
                 }
             }
@@ -1155,10 +1155,9 @@ private fun TagsRow(
         Column(modifier = Modifier.weight(1f)) {
             Text("Tags", color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(8.dp))
-            if (selectedTags.isEmpty())
-                {
-                    Text("Tap to add", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
+            if (selectedTags.isEmpty()) {
+                Text("Tap to add", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -2040,10 +2039,11 @@ private fun CanonicalNudgeSheetContent(
     val selectedCount = state.selectedRawNames.size
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 32.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -2065,10 +2065,11 @@ private fun CanonicalNudgeSheetContent(
         state.variants.forEach { variant ->
             val isSelected = variant.rawName in state.selectedRawNames
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onToggleVariant(variant.rawName) }
-                    .padding(vertical = 10.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onToggleVariant(variant.rawName) }
+                        .padding(vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Checkbox(
@@ -2117,4 +2118,3 @@ private fun CanonicalNudgeSheetContent(
         }
     }
 }
-

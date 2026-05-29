@@ -7,6 +7,8 @@
 // eliminating any visual 'jerk' or jumping and providing a smooth, animated
 // reordering experience.
 // =================================================================================
+@file:Suppress("ktlint:standard:filename")
+
 package io.pm.finlight.ui.components
 
 import androidx.compose.foundation.lazy.LazyListItemInfo

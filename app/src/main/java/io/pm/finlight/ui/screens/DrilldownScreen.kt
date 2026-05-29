@@ -36,7 +36,8 @@ fun DrilldownScreen(
     entityName: String,
     month: Int,
     year: Int,
-    transactionViewModel: TransactionViewModel, // --- FIX: Inject ViewModel ---
+    // --- FIX: Inject ViewModel ---
+    transactionViewModel: TransactionViewModel,
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = DrilldownViewModelFactory(application, drilldownType, entityName, month, year)

@@ -84,7 +84,8 @@ object ReminderManager {
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             AUTO_BACKUP_WORK_TAG,
-            ExistingPeriodicWorkPolicy.KEEP, // Keep the existing work if it's already scheduled
+            // Keep the existing work if it's already scheduled
+            ExistingPeriodicWorkPolicy.KEEP,
             backupRequest,
         )
         Log.d("ReminderManager", "Auto backup (WorkManager) scheduled to run periodically every 8 hours.")

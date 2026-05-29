@@ -31,13 +31,13 @@ package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.*
 import kotlin.math.roundToLong
-import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class BudgetViewModel(

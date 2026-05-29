@@ -150,4 +150,3 @@ class AppWorkflowTests {
         composeTestRule.onNodeWithText("Save Transaction").assertIsNotEnabled()
     }
 }
-

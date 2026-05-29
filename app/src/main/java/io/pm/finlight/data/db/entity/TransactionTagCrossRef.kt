@@ -19,19 +19,22 @@ import kotlinx.serialization.Serializable
 @Entity(
     tableName = "transaction_tag_cross_ref",
     primaryKeys = ["transactionId", "tagId"],
-    indices = [Index(value = ["tagId"])], // --- FIX: Added the missing index ---
+    // --- FIX: Added the missing index ---
+    indices = [Index(value = ["tagId"])],
     foreignKeys = [
         ForeignKey(
             entity = Transaction::class,
             parentColumns = ["id"],
             childColumns = ["transactionId"],
-            onDelete = ForeignKey.CASCADE, // If a transaction is deleted, remove its tag links
+            // If a transaction is deleted, remove its tag links
+            onDelete = ForeignKey.CASCADE,
         ),
         ForeignKey(
             entity = Tag::class,
             parentColumns = ["id"],
             childColumns = ["tagId"],
-            onDelete = ForeignKey.CASCADE, // If a tag is deleted, remove its links from transactions
+            // If a tag is deleted, remove its links from transactions
+            onDelete = ForeignKey.CASCADE,
         ),
     ],
 )

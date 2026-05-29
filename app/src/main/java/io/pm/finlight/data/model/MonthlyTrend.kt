@@ -1,7 +1,8 @@
 package io.pm.finlight
 
 data class MonthlyTrend(
-    val monthYear: String, // Format: "YYYY-MM"
+    // Format: "YYYY-MM"
+    val monthYear: String,
     val totalIncome: Double,
     val totalExpenses: Double,
 )

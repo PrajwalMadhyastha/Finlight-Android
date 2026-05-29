@@ -16,18 +16,19 @@ class NavigationSmokeTests {
     private val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @get:Rule
-    val ruleChain: RuleChain = RuleChain
-        .outerRule(DisableOnboardingRule())
-        .around(DisableAppLockRule())
-        .around(SeedDatabaseRule())
-        .around(
-            GrantPermissionRule.grant(
-                Manifest.permission.READ_SMS,
-                Manifest.permission.RECEIVE_SMS,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ),
-        )
-        .around(composeTestRule)
+    val ruleChain: RuleChain =
+        RuleChain
+            .outerRule(DisableOnboardingRule())
+            .around(DisableAppLockRule())
+            .around(SeedDatabaseRule())
+            .around(
+                GrantPermissionRule.grant(
+                    Manifest.permission.READ_SMS,
+                    Manifest.permission.RECEIVE_SMS,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ),
+            )
+            .around(composeTestRule)
 
     @Test
     fun test_bottomNav_allFourTabsLoad() {
@@ -35,7 +36,7 @@ class NavigationSmokeTests {
         composeTestRule.waitUntil(timeoutMillis = 10000) {
             composeTestRule.onAllNodesWithTag("nav_item_Dashboard").fetchSemanticsNodes().isNotEmpty()
         }
-        
+
         // Tap Transactions
         composeTestRule.onNodeWithTag("nav_item_Transactions").performClick()
         composeTestRule.onAllNodesWithText("Transactions").onFirst().assertIsDisplayed()
@@ -60,10 +61,13 @@ class NavigationSmokeTests {
             composeTestRule.onAllNodesWithTag("nav_item_Transactions").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithTag("nav_item_Transactions").performClick()
-        
+
         // Find any seeded transaction visible on screen
         composeTestRule.waitUntil(timeoutMillis = 8000) {
-            composeTestRule.onAllNodes(hasText("Test", substring = true, ignoreCase = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodes(
+                hasText("Test", substring = true, ignoreCase = true),
+                useUnmergedTree = true,
+            ).fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onAllNodes(hasText("Test", substring = true, ignoreCase = true), useUnmergedTree = true).onFirst()
             .onAncestors()
@@ -137,7 +141,7 @@ class NavigationSmokeTests {
 
         // Verify dashboard is still displayed (meaning no crash)
         composeTestRule.onAllNodesWithText("Dashboard").onFirst().assertIsDisplayed()
-        
+
         // Navigate to another screen (Transactions)
         composeTestRule.onNodeWithTag("nav_item_Transactions").performClick()
         composeTestRule.waitForIdle()
@@ -147,9 +151,9 @@ class NavigationSmokeTests {
         composeTestRule.activityRule.scenario.onActivity { activity ->
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
-        
+
         composeTestRule.waitForIdle()
-        
+
         // Still on Transactions
         composeTestRule.onAllNodesWithText("Transactions").onFirst().assertIsDisplayed()
     }

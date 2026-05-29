@@ -39,7 +39,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
-import io.pm.finlight.utils.FormatUtils
 
 object NotificationHelper {
     private const val DEEP_LINK_URI_EDIT = "app://finlight.pm.io/transaction_detail"
@@ -502,7 +501,8 @@ object NotificationHelper {
 
     fun showDailyReportNotification(
         context: Context,
-        title: String, // --- UPDATED: Receive the intelligent title directly
+        // --- UPDATED: Receive the intelligent title directly
+        title: String,
         totalExpenses: Double,
         topCategories: List<CategorySpending>,
         dateMillis: Long,

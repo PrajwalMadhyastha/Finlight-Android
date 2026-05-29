@@ -23,7 +23,6 @@ import java.util.Calendar
  * (categories, accounts) which the DatabaseCallback seeds on first launch.
  */
 object TestDataSeeder {
-
     // --- Public constants so tests can reference these without magic strings ---
     const val ACCOUNT_WALLET_NAME = "Test Wallet"
     const val ACCOUNT_WALLET_ID = 9001
@@ -58,13 +57,14 @@ object TestDataSeeder {
      * It is safe to call multiple times — all inserts use IGNORE/REPLACE
      * conflict strategies so re-seeding is idempotent.
      */
-    fun seed(db: AppDatabase) = runBlocking {
-        seedAccounts(db)
-        seedCategories(db)
-        seedTransactions(db)
-        seedBudget(db)
-        seedTag(db)
-    }
+    fun seed(db: AppDatabase) =
+        runBlocking {
+            seedAccounts(db)
+            seedCategories(db)
+            seedTransactions(db)
+            seedBudget(db)
+            seedTag(db)
+        }
 
     // -------------------------------------------------------------------------
     // Private seed helpers

@@ -14,12 +14,13 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.core.utils.StringSimilarity
+import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
 import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.HeuristicCategorizer
 import io.pm.finlight.utils.ShareImageGenerator
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +35,6 @@ import java.io.FileOutputStream
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import io.pm.finlight.utils.FormatUtils
 
 private const val TAG = "TransactionViewModel"
 
@@ -727,18 +727,19 @@ class TransactionViewModel(
             val key = (original ?: currentDesc).lowercase(Locale.getDefault())
             val alias = aliases[key]
 
-            val newDescription = if (alias != null) {
-                // If it matches original, apply alias.
-                // If it was already matching the alias, applying it changes nothing.
-                // If it matches neither, it's a manual exception, so preserve currentDesc.
-                if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
-                    alias
+            val newDescription =
+                if (alias != null) {
+                    // If it matches original, apply alias.
+                    // If it was already matching the alias, applying it changes nothing.
+                    // If it matches neither, it's a manual exception, so preserve currentDesc.
+                    if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
+                        alias
+                    } else {
+                        currentDesc
+                    }
                 } else {
                     currentDesc
                 }
-            } else {
-                currentDesc
-            }
             details.copy(transaction = details.transaction.copy(description = newDescription))
         }
     }
@@ -1666,7 +1667,10 @@ class TransactionViewModel(
                         if (originalDesc.isNotBlank() && !originalDesc.equals(newDesc, ignoreCase = true)) {
                             val rule = MerchantRenameRule(originalName = originalDesc, newName = newDesc)
                             merchantRenameRuleRepository.insert(rule)
-                            Log.d(TAG, "Batch: saved global rename rule '$originalDesc' -> '$newDesc' (all ${state.totalMatchingCount} selected).")
+                            Log.d(
+                                TAG,
+                                "Batch: saved global rename rule '$originalDesc' -> '$newDesc' (all ${state.totalMatchingCount} selected).",
+                            )
                             ruleSaved = true
                             savedCanonical = newDesc
                             savedOriginal = originalDesc
@@ -1674,7 +1678,10 @@ class TransactionViewModel(
                             merchantRenameRuleRepository.deleteByOriginalName(originalDesc)
                         }
                     } else {
-                        Log.d(TAG, "Batch: partial selection (${idsToUpdate.size + 1}/${state.totalMatchingCount}) — skipping global rule change.")
+                        Log.d(
+                            TAG,
+                            "Batch: partial selection (${idsToUpdate.size + 1}/${state.totalMatchingCount}) — skipping global rule change.",
+                        )
                     }
                 }
 
@@ -1734,12 +1741,13 @@ class TransactionViewModel(
     ): Boolean {
         if (canonicalName.trim().length < 5) return false
         return try {
-            val existingRules = merchantRenameRuleRepository
-                .getAliasesAsMap()
-                .first()
-                .keys
-                .map { it.lowercase() }
-                .toSet()
+            val existingRules =
+                merchantRenameRuleRepository
+                    .getAliasesAsMap()
+                    .first()
+                    .keys
+                    .map { it.lowercase() }
+                    .toSet()
 
             val allOriginalDescs = transactionRepository.getDistinctOriginalDescriptions()
             val variants = mutableListOf<CanonicalVariant>()
@@ -1777,9 +1785,10 @@ class TransactionViewModel(
     fun toggleCanonicalVariant(rawName: String) {
         _canonicalNudgeState.update { state ->
             state?.copy(
-                selectedRawNames = state.selectedRawNames.toMutableSet().apply {
-                    if (rawName in this) remove(rawName) else add(rawName)
-                },
+                selectedRawNames =
+                    state.selectedRawNames.toMutableSet().apply {
+                        if (rawName in this) remove(rawName) else add(rawName)
+                    },
             )
         }
     }
@@ -1791,10 +1800,11 @@ class TransactionViewModel(
      */
     fun confirmCanonicalNudge() {
         viewModelScope.launch {
-            val state = _canonicalNudgeState.value ?: run {
-                _navigateBackEvent.send(Unit)
-                return@launch
-            }
+            val state =
+                _canonicalNudgeState.value ?: run {
+                    _navigateBackEvent.send(Unit)
+                    return@launch
+                }
             try {
                 val selected = state.variants.filter { it.rawName in state.selectedRawNames }
                 for (variant in selected) {
@@ -1805,7 +1815,10 @@ class TransactionViewModel(
                         ),
                     )
                     transactionRepository.updateDescriptionForIds(variant.transactionIds, state.canonicalName)
-                    Log.d(TAG, "Canonical nudge: applied '${state.canonicalName}' to ${variant.transactionIds.size} txn(s) with raw name '${variant.rawName}'.")
+                    Log.d(
+                        TAG,
+                        "Canonical nudge: applied '${state.canonicalName}' to ${variant.transactionIds.size} txn(s) with raw name '${variant.rawName}'.",
+                    )
                 }
                 if (selected.isNotEmpty()) {
                     _uiEvent.send("Applied '${state.canonicalName}' to ${selected.sumOf { it.transactionCount }} more transaction(s).")

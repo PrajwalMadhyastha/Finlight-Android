@@ -16,7 +16,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class SplitItem(
-    val id: Int, // Can be a temporary ID for new items, or the real ID for existing ones
+    // Can be a temporary ID for new items, or the real ID for existing ones
+    val id: Int,
     val amount: String,
     val category: Category?,
     val notes: String?,

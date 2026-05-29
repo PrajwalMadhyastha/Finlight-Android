@@ -7,6 +7,7 @@
 // =================================================================================
 package io.pm.finlight
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
@@ -145,6 +146,7 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+@SuppressLint("NewApi")
 @Composable
 fun FinanceAppWithLockScreen(
     isInitiallyLocked: Boolean,
@@ -1461,7 +1463,8 @@ fun ForceAppScaling(content: @Composable () -> Unit) {
     val customDensity =
         Density(
             density = density.density * densityMultiplier,
-            fontScale = 1f, // Always enforce 1.0 font scale
+            // Always enforce 1.0 font scale
+            fontScale = 1f,
         )
 
     CompositionLocalProvider(

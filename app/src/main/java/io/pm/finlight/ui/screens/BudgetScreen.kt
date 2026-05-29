@@ -53,12 +53,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
-
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -72,7 +70,6 @@ import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.FormatUtils
-import java.text.NumberFormat
 import java.util.*
 import kotlin.math.min
 import kotlin.math.roundToLong
@@ -158,7 +155,7 @@ fun BudgetScreen(
                 EmptyStateMessage(
                     message = "No category budgets set. Tap the '+' icon to add one.",
                     icon = Icons.Default.Info,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
                 )
             }
         } else {
@@ -185,7 +182,7 @@ fun BudgetScreen(
             onConfirm = {
                 budgetToDelete?.let { viewModel.deleteBudget(it) }
                 showDeleteDialog = false
-            }
+            },
         )
     }
 
@@ -403,7 +400,8 @@ private fun OverallBudgetGauge(progress: Float) {
         val center = Offset(size.width / 2, size.height / 2)
 
         drawCircle(
-            color = trackColor, // Use the variable here
+            // Use the variable here
+            color = trackColor,
             style = Stroke(width = strokeWidth),
             radius = radius,
             center = center,
@@ -481,13 +479,13 @@ private fun CategoryBudgetItem(
                 Row {
                     IconButton(
                         onClick = onEdit,
-                        modifier = Modifier.testTag("edit_budget_${budgetWithSpending.budget.categoryName}")
+                        modifier = Modifier.testTag("edit_budget_${budgetWithSpending.budget.categoryName}"),
                     ) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit Budget", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(
                         onClick = onDelete,
-                        modifier = Modifier.testTag("delete_budget_${budgetWithSpending.budget.categoryName}")
+                        modifier = Modifier.testTag("delete_budget_${budgetWithSpending.budget.categoryName}"),
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete Budget", tint = MaterialTheme.colorScheme.error)
                     }

@@ -12,7 +12,6 @@
 package io.pm.finlight
 
 import android.Manifest
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -66,7 +65,8 @@ class DashboardAndReportsWorkflowTests {
 
         val expectedCardContent =
             listOf(
-                "View Trends", // Content from Quick Actions card
+                // Content from Quick Actions card
+                "View Trends",
                 "Recent Transactions",
                 "Accounts",
                 "Budget Watch",

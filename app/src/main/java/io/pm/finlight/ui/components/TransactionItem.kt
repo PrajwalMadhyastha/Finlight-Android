@@ -24,9 +24,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,8 +39,8 @@ import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
 import io.pm.finlight.ui.theme.IncomeGreenLight
 import io.pm.finlight.utils.CategoryIconHelper
-import java.util.*
 import io.pm.finlight.utils.FormatUtils
+import java.util.*
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -179,7 +179,11 @@ fun TransactionItem(
                 )
 
                 Text(
-                    text = FormatUtils.getFormatter("dd MMM yy, h:mm a", Locale.getDefault()).format(Date(transactionDetails.transaction.date)),
+                    text =
+                        FormatUtils.getFormatter(
+                            "dd MMM yy, h:mm a",
+                            Locale.getDefault(),
+                        ).format(Date(transactionDetails.transaction.date)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
                 )

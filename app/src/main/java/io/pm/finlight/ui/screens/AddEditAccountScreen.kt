@@ -154,7 +154,7 @@ fun AddEditAccountScreen(
                 viewModel.deleteAccount(accountToEdit!!)
                 showDeleteDialog = false
                 navController.popBackStack()
-            }
+            },
         )
     }
 }

@@ -22,7 +22,8 @@ class RecurringTransactionViewModel(
     fun getRuleById(id: Int): Flow<RecurringTransaction?> = repository.getById(id)
 
     fun saveRule(
-        ruleId: Int?, // Null for new rules
+        // Null for new rules
+        ruleId: Int?,
         description: String,
         amount: Double,
         transactionType: String,
@@ -30,7 +31,8 @@ class RecurringTransactionViewModel(
         startDate: Long,
         accountId: Int,
         categoryId: Int?,
-        lastRunDate: Long?, // Preserve last run date on edit
+        // Preserve last run date on edit
+        lastRunDate: Long?,
     ) = viewModelScope.launch {
         val rule =
             RecurringTransaction(

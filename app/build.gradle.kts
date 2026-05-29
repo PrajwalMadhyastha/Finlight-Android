@@ -102,8 +102,10 @@ sonar {
                 "**/MainActivity.kt," +
                 "**/MainApplication.kt," +
                 "**/utils/ShareImageGenerator.kt," +
-                "**/data/db/**," + // Exclude DB package
-                "**/*_Impl*", // Exclude generated implementations
+                // Exclude DB package
+                "**/data/db/**," +
+                // Exclude generated implementations
+                "**/*_Impl*",
         )
         property("sonar.exclusions", "**/*ViewModelFactory*.kt")
         property("sonar.cpd.exclusions", "**/ui/screens/**")
@@ -130,7 +132,8 @@ kover {
                     "io.pm.finlight.ui.screens",
                     "io.pm.finlight.ui.components",
                     "io.pm.finlight.ui.theme",
-                    "io.pm.finlight.data.db", // Exclude DB package from unit tests
+                    // Exclude DB package from unit tests
+                    "io.pm.finlight.data.db",
                     "io.pm.finlight.data.db.dao",
                     "io.pm.finlight.data.db.entity",
                 )
@@ -353,6 +356,7 @@ dependencies {
     implementation("com.google.ai.edge.litert:litert-metadata:1.4.0")
     // Flex Delegate removed — MobileBERT NER model uses only TFLITE_BUILTINS,
     // confirmed via flatbuffer inspection (0 Flex ops) and full F1 regression check.
+
     testImplementation(kotlin("test"))
     testImplementation("org.bouncycastle:bcprov-jdk15on:1.70")
 }

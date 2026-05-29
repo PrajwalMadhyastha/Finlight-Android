@@ -48,12 +48,12 @@ import io.pm.finlight.ui.components.TransactionList
 import io.pm.finlight.ui.components.pagerTabIndicatorOffset
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
 import java.text.NumberFormat
 import java.util.*
 import kotlin.math.roundToLong
-import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -107,7 +107,8 @@ fun TransactionListScreen(
             totalIncome = totalIncome.roundToLong(),
             budget = budget,
             onMonthSelected = { viewModel.setSelectedMonth(it) },
-            isPrivacyModeEnabled = isPrivacyModeEnabled, // --- NEW: Pass state
+            // --- NEW: Pass state
+            isPrivacyModeEnabled = isPrivacyModeEnabled,
         )
         TabRow(
             selectedTabIndex = pagerState.currentPage,
@@ -344,7 +345,8 @@ fun MonthlySummaryHeader(
                 spent = totalSpent,
                 budget = budget.roundToLong(),
                 modifier = Modifier.padding(horizontal = 16.dp),
-                isPrivacyModeEnabled = isPrivacyModeEnabled, // --- NEW: Pass state
+                // --- NEW: Pass state
+                isPrivacyModeEnabled = isPrivacyModeEnabled,
             )
         } else {
             Text(

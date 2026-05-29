@@ -46,7 +46,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.NumberFormat
 import java.util.*
-import io.pm.finlight.utils.FormatUtils
 
 object ShareImageGenerator {
     /**

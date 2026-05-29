@@ -84,7 +84,7 @@ class ReportsNavigationTests {
         navigateToReports()
         composeTestRule.onNodeWithTag("reports_lazy_column").performScrollToNode(hasText("Daily Report"))
         composeTestRule.onNodeWithText("Daily Report").performClick()
-        
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Total Spent").fetchSemanticsNodes().isNotEmpty()
         }
@@ -93,10 +93,13 @@ class ReportsNavigationTests {
         val initialTitleText = initialTitleNode.fetchSemanticsNode().config[SemanticsProperties.Text].first().text
 
         composeTestRule.onRoot().performTouchInput { swipeLeft() }
-        
+
         // Wait for change
         composeTestRule.waitUntil(timeoutMillis = 8000) {
-            val currentText = composeTestRule.onNodeWithTag("report_period_title").fetchSemanticsNode().config[SemanticsProperties.Text].first().text
+            val currentText =
+                composeTestRule.onNodeWithTag(
+                    "report_period_title",
+                ).fetchSemanticsNode().config[SemanticsProperties.Text].first().text
             currentText != initialTitleText
         }
 
@@ -110,7 +113,7 @@ class ReportsNavigationTests {
         navigateToReports()
         composeTestRule.onNodeWithTag("reports_lazy_column").performScrollToNode(hasText("Daily Report"))
         composeTestRule.onNodeWithText("Daily Report").performClick()
-        
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Total Spent").fetchSemanticsNodes().isNotEmpty()
         }
@@ -121,10 +124,13 @@ class ReportsNavigationTests {
         composeTestRule.onRoot().performTouchInput { swipeRight() }
 
         composeTestRule.waitUntil(timeoutMillis = 8000) {
-            val currentText = composeTestRule.onNodeWithTag("report_period_title").fetchSemanticsNode().config[SemanticsProperties.Text].first().text
+            val currentText =
+                composeTestRule.onNodeWithTag(
+                    "report_period_title",
+                ).fetchSemanticsNode().config[SemanticsProperties.Text].first().text
             currentText != initialTitleText
         }
-        
+
         val nextTitleNode = composeTestRule.onNodeWithTag("report_period_title")
         val nextTitleText = nextTitleNode.fetchSemanticsNode().config[SemanticsProperties.Text].first().text
         assert(initialTitleText != nextTitleText) { "Date should have changed after swiping right." }
@@ -135,7 +141,7 @@ class ReportsNavigationTests {
         navigateToReports()
         composeTestRule.onNodeWithTag("reports_lazy_column").performScrollToNode(hasText("Daily Report"))
         composeTestRule.onNodeWithText("Daily Report").performClick()
-        
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Total Spent").fetchSemanticsNodes().isNotEmpty()
         }
@@ -145,16 +151,22 @@ class ReportsNavigationTests {
 
         composeTestRule.onRoot().performTouchInput { swipeLeft() }
         composeTestRule.waitUntil(timeoutMillis = 8000) {
-            val currentText = composeTestRule.onNodeWithTag("report_period_title").fetchSemanticsNode().config[SemanticsProperties.Text].first().text
+            val currentText =
+                composeTestRule.onNodeWithTag(
+                    "report_period_title",
+                ).fetchSemanticsNode().config[SemanticsProperties.Text].first().text
             currentText != initialTitleText
         }
 
         composeTestRule.onRoot().performTouchInput { swipeRight() }
         composeTestRule.waitUntil(timeoutMillis = 8000) {
-            val currentText = composeTestRule.onNodeWithTag("report_period_title").fetchSemanticsNode().config[SemanticsProperties.Text].first().text
+            val currentText =
+                composeTestRule.onNodeWithTag(
+                    "report_period_title",
+                ).fetchSemanticsNode().config[SemanticsProperties.Text].first().text
             currentText == initialTitleText
         }
-        
+
         val finalTitleNode = composeTestRule.onNodeWithTag("report_period_title")
         val finalTitleText = finalTitleNode.fetchSemanticsNode().config[SemanticsProperties.Text].first().text
         assert(initialTitleText == finalTitleText) { "Date should have returned to original after swiping right." }
@@ -166,11 +178,11 @@ class ReportsNavigationTests {
         // Wait for reports to load
         composeTestRule.onNodeWithTag("reports_lazy_column").performScrollToNode(hasText("Monthly Report"))
         composeTestRule.onNodeWithText("Monthly Report").performClick()
-        
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Total Spent").fetchSemanticsNodes().isNotEmpty()
         }
-        
+
         composeTestRule.onNodeWithTag("time_period_report_lazy_column").performScrollToNode(hasText("Top Spend"))
         composeTestRule.onNodeWithText("Top Spend").assertExists()
     }
@@ -180,11 +192,11 @@ class ReportsNavigationTests {
         navigateToReports()
         composeTestRule.onNodeWithTag("reports_lazy_column").performScrollToNode(hasText("Monthly Report"))
         composeTestRule.onNodeWithText("Monthly Report").performClick()
-        
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Total Spent").fetchSemanticsNodes().isNotEmpty()
         }
-        
+
         composeTestRule.onNodeWithTag("time_period_report_lazy_column").performScrollToNode(hasText("Transactions in this Period"))
         composeTestRule.onNodeWithText("Transactions in this Period").assertIsDisplayed()
     }
@@ -194,14 +206,16 @@ class ReportsNavigationTests {
         navigateToReports()
         composeTestRule.onNodeWithTag("reports_lazy_column").performScrollToNode(hasText("Daily Report"))
         composeTestRule.onNodeWithText("Daily Report").performClick()
-        
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Total Spent").fetchSemanticsNodes().isNotEmpty()
         }
-        
+
         // Use a date far in the future by swiping a few times if necessary
         // Or simply wait, since the current day likely has no transactions.
-        composeTestRule.onNodeWithTag("time_period_report_lazy_column").performScrollToNode(hasText("No transactions recorded for this period."))
+        composeTestRule.onNodeWithTag(
+            "time_period_report_lazy_column",
+        ).performScrollToNode(hasText("No transactions recorded for this period."))
         composeTestRule.onNodeWithText("No transactions recorded for this period.").assertIsDisplayed()
     }
 }

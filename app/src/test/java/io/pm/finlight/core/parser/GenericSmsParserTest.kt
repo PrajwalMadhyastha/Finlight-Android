@@ -742,35 +742,39 @@ class GenericSmsParserTest : BaseSmsParserTest() {
     @Test
     fun `test custom rule without merchant regex falls back to default merchant extraction`() =
         runBlocking {
-            val customRule = CustomSmsRule(
-                id = 1,
-                triggerPhrase = "RAZ*Swiggy",
-                amountRegex = "Spent Rs\\.?([\\d,]+\\.?\\d*)",
-                merchantRegex = null, // Missing merchant regex
-                accountRegex = null,
-                merchantNameExample = null,
-                amountExample = null,
-                accountNameExample = null,
-                priority = 1,
-                sourceSmsBody = "Spent Rs.1234 On HDFC Bank Card 1234 At RAZ*Swiggy On 1234-12-12:12:12:12"
-            )
+            val customRule =
+                CustomSmsRule(
+                    id = 1,
+                    triggerPhrase = "RAZ*Swiggy",
+                    amountRegex = "Spent Rs\\.?([\\d,]+\\.?\\d*)",
+                    // Missing merchant regex
+                    merchantRegex = null,
+                    accountRegex = null,
+                    merchantNameExample = null,
+                    amountExample = null,
+                    accountNameExample = null,
+                    priority = 1,
+                    sourceSmsBody = "Spent Rs.1234 On HDFC Bank Card 1234 At RAZ*Swiggy On 1234-12-12:12:12:12",
+                )
             setupTest(customRules = listOf(customRule))
-            
-            val smsBody = "Spent Rs.1234 On HDFC Bank Card 1234 At RAZ*Swiggy On 1234-12-12:12:12:12"
-            val mockSms = SmsMessage(
-                id = 100L,
-                sender = "AM-HDFCBK",
-                body = smsBody,
-                date = System.currentTimeMillis()
-            )
 
-            val result = SmsParser.parseWithOnlyCustomRules(
-                sms = mockSms,
-                customSmsRuleProvider = customSmsRuleProvider,
-                merchantRenameRuleProvider = merchantRenameRuleProvider,
-                merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                categoryFinderProvider = categoryFinderProvider
-            ) as? ParseResult.Success
+            val smsBody = "Spent Rs.1234 On HDFC Bank Card 1234 At RAZ*Swiggy On 1234-12-12:12:12:12"
+            val mockSms =
+                SmsMessage(
+                    id = 100L,
+                    sender = "AM-HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+
+            val result =
+                SmsParser.parseWithOnlyCustomRules(
+                    sms = mockSms,
+                    customSmsRuleProvider = customSmsRuleProvider,
+                    merchantRenameRuleProvider = merchantRenameRuleProvider,
+                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                    categoryFinderProvider = categoryFinderProvider,
+                ) as? ParseResult.Success
 
             assertNotNull("Parser should return a successful ParseResult", result)
             assertEquals(1234.0, result?.transaction?.amount)

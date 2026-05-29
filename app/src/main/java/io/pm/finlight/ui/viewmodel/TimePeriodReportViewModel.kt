@@ -13,16 +13,17 @@ import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import java.util.*
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
-import io.pm.finlight.utils.FormatUtils
 
 data class MonthlyBreakdown(
-    val monthKey: String, // yyyy-MM
+    // yyyy-MM
+    val monthKey: String,
     val monthName: String,
     val income: Double,
     val expenses: Double,
@@ -199,17 +200,19 @@ class TimePeriodReportViewModel(
         _selectedDate.flatMapLatest { calendar ->
             when (timePeriod) {
                 TimePeriod.DAILY -> {
-                    val endCal = (calendar.clone() as Calendar).apply {
-                        set(Calendar.HOUR_OF_DAY, 23)
-                        set(Calendar.MINUTE, 59)
-                        set(Calendar.SECOND, 59)
-                    }
-                    val startCal = (calendar.clone() as Calendar).apply {
-                        add(Calendar.DAY_OF_YEAR, -2) // 3 days total
-                        set(Calendar.HOUR_OF_DAY, 0)
-                        set(Calendar.MINUTE, 0)
-                        set(Calendar.SECOND, 0)
-                    }
+                    val endCal =
+                        (calendar.clone() as Calendar).apply {
+                            set(Calendar.HOUR_OF_DAY, 23)
+                            set(Calendar.MINUTE, 59)
+                            set(Calendar.SECOND, 59)
+                        }
+                    val startCal =
+                        (calendar.clone() as Calendar).apply {
+                            add(Calendar.DAY_OF_YEAR, -2) // 3 days total
+                            set(Calendar.HOUR_OF_DAY, 0)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                        }
 
                     transactionDao.getDailyTrends(startCal.timeInMillis, endCal.timeInMillis).map { dailyTrends ->
                         if (dailyTrends.isEmpty()) return@map null

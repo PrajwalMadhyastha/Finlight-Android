@@ -40,11 +40,11 @@ import io.pm.finlight.ui.components.PrivacyAwareText
 import io.pm.finlight.ui.components.TransactionList
 import io.pm.finlight.ui.components.pagerTabIndicatorOffset
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.*
 import kotlin.math.roundToLong
-import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -81,7 +81,8 @@ fun IncomeScreen(
             selectedMonth = selectedMonth,
             monthlySummaries = monthlySummaries,
             onMonthSelected = { incomeViewModel.setSelectedMonth(it) },
-            isPrivacyModeEnabled = isPrivacyModeEnabled, // --- NEW: Pass state
+            // --- NEW: Pass state
+            isPrivacyModeEnabled = isPrivacyModeEnabled,
         )
 
         TabRow(

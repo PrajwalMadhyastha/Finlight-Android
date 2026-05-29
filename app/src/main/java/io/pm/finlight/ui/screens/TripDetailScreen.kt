@@ -33,9 +33,9 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.TransactionItem
 import io.pm.finlight.ui.viewmodel.TripDetailViewModel
 import io.pm.finlight.ui.viewmodel.TripDetailViewModelFactory
+import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
 import java.util.*
-import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

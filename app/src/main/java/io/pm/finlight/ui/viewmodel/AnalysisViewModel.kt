@@ -126,7 +126,8 @@ class AnalysisViewModel(
             _selectedDimension, _selectedTimePeriod, _customDateRange,
             _selectedFilterCategory, _selectedFilterTag, _selectedFilterMerchant,
             _searchQuery,
-            _includeExcluded, // --- ADDED ---
+            // --- ADDED ---
+            _includeExcluded,
             _selectedTransactionType,
         ) { args ->
             @Suppress("UNCHECKED_CAST")
@@ -138,7 +139,8 @@ class AnalysisViewModel(
                 filterTag = args[4] as? Tag,
                 filterMerchant = args[5] as? String,
                 searchQuery = (args[6] as? String)?.takeIf { it.isNotBlank() },
-                includeExcluded = args[7] as Boolean, // --- ADDED ---
+                // --- ADDED ---
+                includeExcluded = args[7] as Boolean,
                 transactionType = args[8] as AnalysisTransactionType,
             )
         }
@@ -239,7 +241,8 @@ class AnalysisViewModel(
                 allTags = tags,
                 allMerchants = merchants,
                 searchQuery = inputs.searchQuery ?: "",
-                includeExcluded = inputs.includeExcluded, // --- ADDED ---
+                // --- ADDED ---
+                includeExcluded = inputs.includeExcluded,
                 selectedTransactionType = inputs.transactionType,
             )
         }.stateIn(

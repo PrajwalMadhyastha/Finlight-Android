@@ -196,6 +196,7 @@ fun GroupedBarChart(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(300.dp), // Increased from 250dp for better spacing
+                // Increased from 250dp for better spacing
+                .height(300.dp),
     )
 }

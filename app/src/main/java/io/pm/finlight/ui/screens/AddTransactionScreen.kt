@@ -75,12 +75,12 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.text.NumberFormat
 import java.util.*
-import io.pm.finlight.utils.FormatUtils
 
 private sealed class ComposerSheet {
     object Category : ComposerSheet()

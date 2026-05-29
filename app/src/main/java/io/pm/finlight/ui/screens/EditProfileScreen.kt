@@ -55,9 +55,9 @@ import io.pm.finlight.ProfileViewModel
 import io.pm.finlight.R
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.FormatUtils
 import java.io.File
 import java.util.*
-import io.pm.finlight.utils.FormatUtils
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -271,8 +271,10 @@ private fun createCropOptions(
         aspectRatioY = 1,
         fixAspectRatio = true,
         outputCompressQuality = 70,
-        imageSourceIncludeGallery = false, // We handle this ourselves now
-        imageSourceIncludeCamera = false, // We handle this ourselves now
+        // We handle this ourselves now
+        imageSourceIncludeGallery = false,
+        // We handle this ourselves now
+        imageSourceIncludeCamera = false,
         activityTitle = "Crop Profile Picture",
         activityMenuIconColor = toolbarTintColor,
         toolbarColor = toolbarColor,

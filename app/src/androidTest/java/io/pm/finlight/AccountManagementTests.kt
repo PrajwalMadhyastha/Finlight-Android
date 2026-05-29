@@ -101,7 +101,7 @@ class AccountManagementTests {
         // the parent GlassPanel merges the child text node's text "Test Bank",
         // so the IconButton matches hasAnyAncestor(hasText("Test Bank")).
         composeTestRule.onNode(
-            hasContentDescription("Edit Account") and hasAnyAncestor(hasText(TestDataSeeder.ACCOUNT_BANK_NAME))
+            hasContentDescription("Edit Account") and hasAnyAncestor(hasText(TestDataSeeder.ACCOUNT_BANK_NAME)),
         ).performClick()
 
         // Wait for AddEditAccountScreen to load in edit mode
@@ -136,7 +136,7 @@ class AccountManagementTests {
 
         // Click Edit Account button for the seeded "Test Wallet" account
         composeTestRule.onNode(
-            hasContentDescription("Edit Account") and hasAnyAncestor(hasText(TestDataSeeder.ACCOUNT_WALLET_NAME))
+            hasContentDescription("Edit Account") and hasAnyAncestor(hasText(TestDataSeeder.ACCOUNT_WALLET_NAME)),
         ).performClick()
 
         // Wait for AddEditAccountScreen to load
@@ -172,7 +172,7 @@ class AccountManagementTests {
         // Click on the "Test Bank" card item to open detail screen
         composeTestRule.onNode(
             hasClickAction() and hasAnyDescendant(hasText(TestDataSeeder.ACCOUNT_BANK_NAME)),
-            useUnmergedTree = true
+            useUnmergedTree = true,
         ).performClick()
 
         // Wait for AccountDetailScreen to load
@@ -197,7 +197,7 @@ class AccountManagementTests {
         // Click on the "Test Wallet" card item to open detail screen
         composeTestRule.onNode(
             hasClickAction() and hasAnyDescendant(hasText(TestDataSeeder.ACCOUNT_WALLET_NAME)),
-            useUnmergedTree = true
+            useUnmergedTree = true,
         ).performClick()
 
         // Wait for AccountDetailScreen to load
@@ -206,9 +206,10 @@ class AccountManagementTests {
         }
 
         // Wallet transactions: -150 (coffee), -50 (bus), -250 (taxi) = -450 total balance.
-        val expectedBalance = java.text.NumberFormat.getCurrencyInstance(java.util.Locale("en", "IN"))
-            .apply { maximumFractionDigits = 0 }
-            .format(-450.0)
+        val expectedBalance =
+            java.text.NumberFormat.getCurrencyInstance(java.util.Locale("en", "IN"))
+                .apply { maximumFractionDigits = 0 }
+                .format(-450.0)
         composeTestRule.onNodeWithText(expectedBalance).assertExists()
     }
 }

@@ -346,7 +346,8 @@ fun NotificationSettingsScreen(
                     icon = Icons.Default.CloudUpload,
                     checked = isAutoBackupNotificationEnabled,
                     onCheckedChange = { settingsViewModel.setAutoBackupNotificationEnabled(it) },
-                    enabled = isAutoBackupEnabled, // Keep the dependency on auto-backup being enabled
+                    // Keep the dependency on auto-backup being enabled
+                    enabled = isAutoBackupEnabled,
                 )
             }
         }
@@ -597,6 +598,7 @@ fun DataSettingsScreen(
                         onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) },
                     )
                     // --- DELETED: Backup Notification Toggle ---
+
                     /*
                     SettingsToggleItem(
                         title = "Backup Notification",
@@ -706,7 +708,7 @@ fun DataSettingsScreen(
             onConfirm = {
                 showImportJsonDialog = false
                 jsonImportLauncher.launch(arrayOf("application/json"))
-            }
+            },
         )
     }
 }

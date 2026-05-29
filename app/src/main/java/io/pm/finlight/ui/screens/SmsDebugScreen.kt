@@ -259,8 +259,10 @@ private fun CreateRuleButton(
                 PotentialTransaction(
                     sourceSmsId = sms.id,
                     smsSender = sms.sender,
-                    amount = 0.0, // Amount is not relevant here, rule screen will re-parse
-                    transactionType = "expense", // Default, can be changed in rule screen
+                    // Amount is not relevant here, rule screen will re-parse
+                    amount = 0.0,
+                    // Default, can be changed in rule screen
+                    transactionType = "expense",
                     merchantName = null,
                     originalMessage = sms.body,
                     date = sms.date,

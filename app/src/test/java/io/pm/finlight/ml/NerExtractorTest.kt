@@ -199,7 +199,8 @@ class NerExtractorTest {
         val testCases =
             mapOf(
                 listOf("rs", ".", "100") to "rs.100",
-                listOf("a", "/", "c") to "A/C", // Note: wait, NerExtractor doesn't uppercase A/C in cleanup?
+                // Note: wait, NerExtractor doesn't uppercase A/C in cleanup?
+                listOf("a", "/", "c") to "A/C",
                 listOf("1", ",", "41", ",", "453") to "1,41,453",
             )
 

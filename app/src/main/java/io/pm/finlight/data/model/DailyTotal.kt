@@ -5,6 +5,7 @@ package io.pm.finlight
  * containing a date string and the total amount spent on that day.
  */
 data class DailyTotal(
-    val date: String, // Format: "YYYY-MM-DD"
+    // Format: "YYYY-MM-DD"
+    val date: String,
     val totalAmount: Double,
 )

@@ -62,8 +62,10 @@ data class HelpInfo(
  */
 object HelpContentRegistry {
     /** Convenience builder so each entry doesn't repeat `HelpInfo` + `.trimIndent()`. */
-    private fun helpEntry(title: String, content: String) =
-        HelpInfo(title = title, content = content.trimIndent())
+    private fun helpEntry(
+        title: String,
+        content: String,
+    ) = HelpInfo(title = title, content = content.trimIndent())
 
     val content =
         mapOf(
@@ -424,7 +426,8 @@ fun HelpBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
-        windowInsets = WindowInsets(0), // Edge-to-edge
+        // Edge-to-edge
+        windowInsets = WindowInsets(0),
     ) {
         GlassPanel {
             Column(
@@ -454,6 +457,7 @@ fun HelpBottomSheet(
                     MarkdownText(markdown = info.content)
 
                     // Temporarily commented out the visual/GIF display logic as requested.
+
                     /*
                     AnimatedVisibility(visible = info.visual != null) {
                         Box(

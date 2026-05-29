@@ -15,9 +15,9 @@ import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.flow.*
 import java.util.*
-import io.pm.finlight.utils.FormatUtils
 
 enum class DrilldownType {
     CATEGORY,

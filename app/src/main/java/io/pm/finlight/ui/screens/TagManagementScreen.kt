@@ -74,7 +74,7 @@ fun TagManagementScreen(
                 EmptyStateMessage(
                     message = "No tags created yet. Add one above!",
                     icon = Icons.Default.Info,
-                    modifier = Modifier.fillMaxSize().padding(16.dp)
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
                 )
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -136,7 +136,7 @@ fun TagManagementScreen(
             onConfirm = {
                 viewModel.deleteTag(selectedTag!!)
                 showDeleteDialog = false
-            }
+            },
         )
     }
 }
@@ -221,4 +221,3 @@ private fun EditTagDialog(
         containerColor = popupContainerColor,
     )
 }
-

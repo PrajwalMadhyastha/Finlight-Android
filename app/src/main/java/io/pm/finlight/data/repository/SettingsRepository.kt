@@ -11,13 +11,13 @@ import androidx.core.content.edit
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import io.pm.finlight.ui.theme.AppTheme
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import io.pm.finlight.utils.FormatUtils
 
 /**
  * An enum to distinguish between domestic and international travel modes.
@@ -329,7 +329,7 @@ class SettingsRepository(context: Context) {
                     if (key == KEY_TRAVEL_MODE_SETTINGS) {
                         val json = sp.getString(key, null)
                         var settings = if (json == null) null else gson.fromJson(json, TravelModeSettings::class.java)
-                        
+
                         if (settings != null && System.currentTimeMillis() > settings.endDate) {
                             saveTravelModeSettings(null)
                             settings = null
@@ -340,7 +340,7 @@ class SettingsRepository(context: Context) {
             prefs.registerOnSharedPreferenceChangeListener(listener)
             val initialJson = prefs.getString(KEY_TRAVEL_MODE_SETTINGS, null)
             var initialSettings = if (initialJson == null) null else gson.fromJson(initialJson, TravelModeSettings::class.java)
-            
+
             if (initialSettings != null && System.currentTimeMillis() > initialSettings.endDate) {
                 saveTravelModeSettings(null)
                 initialSettings = null

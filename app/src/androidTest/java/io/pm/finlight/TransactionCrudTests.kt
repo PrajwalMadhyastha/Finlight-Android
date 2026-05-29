@@ -165,11 +165,12 @@ class TransactionCrudTests {
      */
     @Test
     fun test_createIncomeTransaction_appearsOnDashboard() {
-        val description = addTransactionForTest(
-            customDescription = "Test Salary Income ${UUID.randomUUID().toString().take(5)}",
-            customAmount = "5000.0",
-            isIncome = true,
-        )
+        val description =
+            addTransactionForTest(
+                customDescription = "Test Salary Income ${UUID.randomUUID().toString().take(5)}",
+                customAmount = "5000.0",
+                isIncome = true,
+            )
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
         }

@@ -39,11 +39,11 @@ import androidx.compose.ui.unit.dp
 import io.pm.finlight.CalendarDayStatus
 import io.pm.finlight.ConsistencyStats
 import io.pm.finlight.SpendingStatus
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.launch
 import java.util.*
 import kotlin.math.floor
 import kotlin.math.min
-import io.pm.finlight.utils.FormatUtils
 
 private val DAY_SIZE = 16.dp
 private val DAY_SPACING = 4.dp
@@ -132,7 +132,8 @@ private fun StatItem(
 @Composable
 fun ConsistencyCalendar(
     data: List<CalendarDayStatus>,
-    year: Int, // Added year parameter to support navigation
+    // Added year parameter to support navigation
+    year: Int,
     modifier: Modifier = Modifier,
     onDayClick: (Date) -> Unit,
 ) {

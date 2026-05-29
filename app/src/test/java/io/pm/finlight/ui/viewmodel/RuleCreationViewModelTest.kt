@@ -277,7 +277,8 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
                 CustomSmsRule(
                     id = ruleId,
                     triggerPhrase = "test",
-                    transactionType = "income", // <-- Test this
+                    // <-- Test this
+                    transactionType = "income",
                     priority = 10,
                     sourceSmsBody = "some body",
                     merchantRegex = "regex1",
@@ -347,7 +348,8 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
                     accountNameExample = "xx1234",
                     priority = 10,
                     sourceSmsBody = smsBody,
-                    transactionType = null, // Start as "Auto-Detect"
+                    // Start as "Auto-Detect"
+                    transactionType = null,
                 )
             `when`(customSmsRuleDao.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
 

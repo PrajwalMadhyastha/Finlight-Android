@@ -35,7 +35,8 @@ class CustomRuleParserTest : BaseSmsParserTest() {
                     triggerPhrase = "spent Rs",
                     amountRegex = "Rs. ([\\d,.]+)",
                     merchantRegex = "at (.*)\\.",
-                    transactionType = "income", // Explicitly set to INCOME
+                    // Explicitly set to INCOME
+                    transactionType = "income",
                     priority = 10,
                     sourceSmsBody = smsBody,
                     accountRegex = null,
@@ -76,7 +77,8 @@ class CustomRuleParserTest : BaseSmsParserTest() {
                     triggerPhrase = "credited Rs",
                     amountRegex = "Rs. ([\\d,.]+)",
                     merchantRegex = "by (.*)\\.",
-                    transactionType = "expense", // Explicitly set to EXPENSE
+                    // Explicitly set to EXPENSE
+                    transactionType = "expense",
                     priority = 10,
                     sourceSmsBody = smsBody,
                     accountRegex = null,
@@ -117,7 +119,8 @@ class CustomRuleParserTest : BaseSmsParserTest() {
                     triggerPhrase = "spent Rs",
                     amountRegex = "Rs. ([\\d,.]+)",
                     merchantRegex = "at (.*)\\.",
-                    transactionType = null, // "Auto-Detect"
+                    // "Auto-Detect"
+                    transactionType = null,
                     priority = 10,
                     sourceSmsBody = smsBody,
                     accountRegex = null,
@@ -156,7 +159,8 @@ class CustomRuleParserTest : BaseSmsParserTest() {
                     triggerPhrase = "credited Rs",
                     amountRegex = "Rs. ([\\d,.]+)",
                     merchantRegex = "by (.*)\\.",
-                    transactionType = null, // "Auto-Detect"
+                    // "Auto-Detect"
+                    transactionType = null,
                     priority = 10,
                     sourceSmsBody = smsBody,
                     accountRegex = null,
