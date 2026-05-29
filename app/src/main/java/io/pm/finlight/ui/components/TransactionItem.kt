@@ -39,8 +39,8 @@ import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
 import io.pm.finlight.ui.theme.IncomeGreenLight
 import io.pm.finlight.utils.CategoryIconHelper
-import java.text.SimpleDateFormat
 import java.util.*
+import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -179,7 +179,7 @@ fun TransactionItem(
                 )
 
                 Text(
-                    text = SimpleDateFormat("dd MMM yy, h:mm a", Locale.getDefault()).format(Date(transactionDetails.transaction.date)),
+                    text = FormatUtils.getFormatter("dd MMM yy, h:mm a", Locale.getDefault()).format(Date(transactionDetails.transaction.date)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
                 )

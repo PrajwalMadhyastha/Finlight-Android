@@ -22,12 +22,12 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 import kotlin.collections.forEach
+import io.pm.finlight.utils.FormatUtils
 
 object DataExportService {
     private val json =
@@ -224,7 +224,7 @@ object DataExportService {
 
                 csvBuilder.append(getCsvTemplateString())
 
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                val dateFormat = FormatUtils.getFormatter("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
                 transactions.forEach { details: TransactionDetails ->
                     val transaction = details.transaction

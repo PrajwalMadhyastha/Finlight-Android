@@ -31,10 +31,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import io.pm.finlight.utils.FormatUtils
 
 private const val TAG = "TransactionViewModel"
 
@@ -447,7 +447,7 @@ class TransactionViewModel(
 
                 transactionRepository.getMonthlyTrends(startDate)
                     .map { trends ->
-                        val dateFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                        val dateFormat = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault())
                         val monthMap =
                             trends.associate {
                                 val cal = Calendar.getInstance().apply { time = dateFormat.parse(it.monthYear) ?: Date() }

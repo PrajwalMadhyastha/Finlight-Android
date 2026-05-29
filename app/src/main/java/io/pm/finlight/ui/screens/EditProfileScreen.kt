@@ -56,8 +56,8 @@ import io.pm.finlight.R
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import java.io.File
-import java.text.SimpleDateFormat
 import java.util.*
+import io.pm.finlight.utils.FormatUtils
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -285,7 +285,7 @@ private fun createCropOptions(
  * Helper function to create a temporary image file in the app's external files directory.
  */
 private fun createTempImageFile(context: Context): File {
-    val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+    val timeStamp: String = FormatUtils.getFormatter("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
     val storageDir: File? = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
     return File.createTempFile(
         "JPEG_${timeStamp}_",

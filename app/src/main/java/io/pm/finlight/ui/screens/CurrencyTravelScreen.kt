@@ -46,10 +46,10 @@ import io.pm.finlight.ui.viewmodel.CurrencyViewModel
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.CurrencyInfo
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.util.*
+import io.pm.finlight.utils.FormatUtils
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
@@ -536,7 +536,7 @@ private fun TripSettingsForm(
         ListItem(
             headlineContent = { Text("Trip Start Date") },
             trailingContent = {
-                val formatter = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
+                val formatter = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }
                 TextButton(onClick = onStartDateClick) {
                     Text(startDate?.let { formatter.format(Date(it)) } ?: "Select")
                 }
@@ -547,7 +547,7 @@ private fun TripSettingsForm(
         ListItem(
             headlineContent = { Text("Trip End Date") },
             trailingContent = {
-                val formatter = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
+                val formatter = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }
                 TextButton(onClick = onEndDateClick) {
                     Text(endDate?.let { formatter.format(Date(it)) } ?: "Select")
                 }
@@ -621,7 +621,7 @@ private fun HistoricTripItem(
     onDeleteClick: () -> Unit,
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
-    val dateFormat = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
+    val dateFormat = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }
 
     GlassPanel(modifier = modifier.clickable(onClick = onClick)) {
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {

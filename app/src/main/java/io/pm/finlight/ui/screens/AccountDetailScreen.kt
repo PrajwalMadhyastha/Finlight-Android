@@ -36,8 +36,8 @@ import io.pm.finlight.ui.theme.IncomeGreenLight
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.utils.BankLogoHelper
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
+import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -160,7 +160,7 @@ private fun AccountDetailTransactionItem(
 ) {
     val contentAlpha = if (transactionDetails.transaction.isExcluded) 0.5f else 1f
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
-    val dateFormatter = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
+    val dateFormatter = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }
 
     // --- UPDATED: Apply the clickable modifier to the GlassPanel ---
     GlassPanel(

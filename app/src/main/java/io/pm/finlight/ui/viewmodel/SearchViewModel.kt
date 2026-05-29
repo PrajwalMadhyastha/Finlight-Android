@@ -15,9 +15,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import io.pm.finlight.utils.FormatUtils
 
 data class SearchUiState(
     val keyword: String = "",
@@ -142,7 +142,7 @@ class SearchViewModel(
             cal.set(Calendar.SECOND, 59)
             val end = cal.timeInMillis
 
-            val dateFormatter = SimpleDateFormat("MMMM d, yyyy", Locale.getDefault())
+            val dateFormatter = FormatUtils.getFormatter("MMMM d, yyyy", Locale.getDefault())
             val formattedDate = dateFormatter.format(cal.time)
 
             _uiState.update {

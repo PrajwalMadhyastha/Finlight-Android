@@ -93,7 +93,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URLEncoder
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
+import io.pm.finlight.utils.FormatUtils
 import java.util.*
 
 private const val TAG = "DetailScreenDebug"
@@ -598,28 +598,17 @@ fun TransactionDetailScreen(
                 }
 
                 if (showDeleteDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showDeleteDialog = false },
-                        containerColor = popupContainerColor.copy(alpha = 1f),
-                        title = { Text("Delete Transaction?", color = MaterialTheme.colorScheme.onSurface) },
-                        text = {
-                            Text(
-                                "Are you sure you want to permanently delete this transaction? This action cannot be undone.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    viewModel.deleteTransaction(details.transaction)
-                                    showDeleteDialog = false
-                                    navigateBack()
-                                },
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                            ) { Text("Delete") }
-                        },
-                        dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } },
+                    ConfirmationDialog(
+                        title = "Delete Transaction?",
+                        text = "Are you sure you want to permanently delete this transaction? This action cannot be undone.",
+                        confirmButtonText = "Delete",
+                        isDestructive = true,
+                        onDismiss = { showDeleteDialog = false },
+                        onConfirm = {
+                            viewModel.deleteTransaction(details.transaction)
+                            showDeleteDialog = false
+                            navigateBack()
+                        }
                     )
                 }
 
@@ -637,29 +626,16 @@ fun TransactionDetailScreen(
                 }
 
                 if (showImageDeleteDialog != null) {
-                    AlertDialog(
-                        onDismissRequest = { showImageDeleteDialog = null },
-                        containerColor = popupContainerColor.copy(alpha = 1f),
-                        title = { Text("Delete Attachment?", color = MaterialTheme.colorScheme.onSurface) },
-                        text = {
-                            Text(
-                                "Are you sure you want to delete this attachment? This action cannot be undone.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    viewModel.deleteTransactionImage(showImageDeleteDialog!!)
-                                    showImageDeleteDialog = null
-                                },
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                            ) { Text("Delete") }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showImageDeleteDialog = null }) { Text("Cancel") }
-                        },
+                    ConfirmationDialog(
+                        title = "Delete Attachment?",
+                        text = "Are you sure you want to delete this attachment? This action cannot be undone.",
+                        confirmButtonText = "Delete",
+                        isDestructive = true,
+                        onDismiss = { showImageDeleteDialog = null },
+                        onConfirm = {
+                            viewModel.deleteTransactionImage(showImageDeleteDialog!!)
+                            showImageDeleteDialog = null
+                        }
                     )
                 }
             }
@@ -901,7 +877,7 @@ private fun TransactionSpotlightHeader(
     val headerDescription = if (isSplit) "Split Transaction" else details.transaction.description
 
     val categoryColor = CategoryIconHelper.getIconBackgroundColor(displayCategory.colorKey)
-    val dateFormatter = remember { SimpleDateFormat("EEE, dd MMMM yy, h:mm a", Locale.getDefault()) }
+    val dateFormatter = remember { FormatUtils.fullDateTimeFormatter }
 
     val animatedAmount by animateFloatAsState(
         targetValue = details.transaction.amount.toFloat(),
@@ -2001,7 +1977,7 @@ private fun SelectableTransactionItem(
     isSelected: Boolean,
     onToggle: () -> Unit,
 ) {
-    val dateFormatter = remember { SimpleDateFormat("dd MMM, yy", Locale.getDefault()) }
+    val dateFormatter = remember { FormatUtils.shortYearDateFormatter }
 
     GlassPanel(
         modifier =

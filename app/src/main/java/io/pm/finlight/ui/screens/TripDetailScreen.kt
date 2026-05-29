@@ -34,8 +34,8 @@ import io.pm.finlight.ui.components.TransactionItem
 import io.pm.finlight.ui.viewmodel.TripDetailViewModel
 import io.pm.finlight.ui.viewmodel.TripDetailViewModelFactory
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
+import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,7 +87,7 @@ fun TripDetailScreen(
 @Composable
 private fun TripDetailHeader(trip: TripWithStats) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
-    val dateFormat = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
+    val dateFormat = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }
 
     GlassPanel {
         Column(

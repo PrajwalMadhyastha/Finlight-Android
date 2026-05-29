@@ -42,9 +42,9 @@ import io.pm.finlight.ui.components.pagerTabIndicatorOffset
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToLong
+import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -154,8 +154,8 @@ fun IncomeHeader(
     // --- NEW: Accept privacy mode state ---
     isPrivacyModeEnabled: Boolean,
 ) {
-    val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
-    val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
+    val monthFormat = FormatUtils.getFormatter("LLL", Locale.getDefault())
+    val monthYearFormat = FormatUtils.getFormatter("LLLL yyyy", Locale.getDefault())
     var showMonthScroller by remember { mutableStateOf(false) }
 
     val currencyFormat =

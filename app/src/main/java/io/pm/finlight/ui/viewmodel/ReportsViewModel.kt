@@ -21,11 +21,11 @@ import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import io.pm.finlight.utils.FormatUtils
 
 /**
  * Enum to manage the state of the view toggle on the reports screen.
@@ -118,8 +118,8 @@ class ReportsViewModel(
                     trends.forEachIndexed { index, trend ->
                         incomeEntries.add(BarEntry(index.toFloat(), trend.totalIncome.toFloat()))
                         expenseEntries.add(BarEntry(index.toFloat(), trend.totalExpenses.toFloat()))
-                        val date = SimpleDateFormat("yyyy-MM", Locale.getDefault()).parse(trend.monthYear)
-                        labels.add(SimpleDateFormat("MMM", Locale.getDefault()).format(date ?: Date()))
+                        val date = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).parse(trend.monthYear)
+                        labels.add(FormatUtils.getFormatter("MMM", Locale.getDefault()).format(date ?: Date()))
                     }
                     val incomeDataSet = BarDataSet(incomeEntries, "Income").apply { color = android.graphics.Color.rgb(102, 187, 106) }
                     val expenseDataSet = BarDataSet(expenseEntries, "Expense").apply { color = android.graphics.Color.rgb(239, 83, 80) }

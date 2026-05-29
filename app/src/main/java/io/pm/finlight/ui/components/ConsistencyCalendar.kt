@@ -40,10 +40,10 @@ import io.pm.finlight.CalendarDayStatus
 import io.pm.finlight.ConsistencyStats
 import io.pm.finlight.SpendingStatus
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.floor
 import kotlin.math.min
+import io.pm.finlight.utils.FormatUtils
 
 private val DAY_SIZE = 16.dp
 private val DAY_SPACING = 4.dp
@@ -209,8 +209,8 @@ fun DetailedMonthlyCalendar(
 ) {
     val monthData = MonthData.fromCalendar(selectedMonth)
     val dataMap = data.associateByDate()
-    val monthYearFormat = remember { SimpleDateFormat("MMMM yyyy", Locale.getDefault()) }
-    val dayOfWeekFormat = remember { SimpleDateFormat("EE", Locale.getDefault()) }
+    val monthYearFormat = remember { FormatUtils.getFormatter("MMMM yyyy", Locale.getDefault()) }
+    val dayOfWeekFormat = remember { FormatUtils.getFormatter("EE", Locale.getDefault()) }
     val weekDays =
         (Calendar.SUNDAY..Calendar.SATURDAY).map {
             dayOfWeekFormat.format(Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, it) }.time)

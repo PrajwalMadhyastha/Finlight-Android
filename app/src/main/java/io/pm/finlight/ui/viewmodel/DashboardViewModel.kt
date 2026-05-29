@@ -29,10 +29,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToLong
+import io.pm.finlight.utils.FormatUtils
 
 data class ConsistencyStats(val goodDays: Int, val badDays: Int, val noSpendDays: Int, val noDataDays: Int)
 
@@ -137,7 +137,7 @@ class DashboardViewModel(
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         val calendar = timeProvider.now()
-        monthYear = SimpleDateFormat("MMMM", Locale.getDefault()).format(calendar.time)
+        monthYear = FormatUtils.getFormatter("MMMM", Locale.getDefault()).format(calendar.time)
 
         checkForLastMonthSummary()
 
@@ -310,7 +310,7 @@ class DashboardViewModel(
                 }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-        val yearMonthString = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
+        val yearMonthString = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(calendar.time)
         budgetStatus =
             budgetDao.getBudgetsWithSpendingForMonth(yearMonthString, currentMonth, currentYear)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

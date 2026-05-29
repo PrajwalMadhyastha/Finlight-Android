@@ -35,11 +35,11 @@ import io.pm.finlight.*
 import io.pm.finlight.data.model.TimePeriod
 import java.net.URLEncoder
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+import io.pm.finlight.utils.FormatUtils
 
 object NotificationHelper {
     private const val DEEP_LINK_URI_EDIT = "app://finlight.pm.io/transaction_detail"
@@ -65,7 +65,7 @@ object NotificationHelper {
         }
 
         // --- NEW: Format the timestamp ---
-        val sdf = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+        val sdf = FormatUtils.getFormatter("dd MMM, hh:mm a", Locale.getDefault())
         val formattedTime = sdf.format(Date(backupTimestamp))
         val contentText = "Your Finlight data was successfully backed up at $formattedTime."
 

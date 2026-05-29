@@ -36,8 +36,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
 import java.util.*
+import io.pm.finlight.utils.FormatUtils
 
 sealed class ScanResult {
     data class Success(val count: Int) : ScanResult()
@@ -653,7 +653,7 @@ class SettingsViewModel(
             )
         }
 
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+        val dateFormat = FormatUtils.getFormatter("yyyy-MM-dd HH:mm:ss", Locale.US)
         try {
             dateFormat.parse(tokens[2])
         } catch (
@@ -804,7 +804,7 @@ class SettingsViewModel(
         usedColorKeys: MutableList<String>,
     ): Transaction {
         val h = header.associateWith { header.indexOf(it) }.withDefault { -1 }
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+        val dateFormat = FormatUtils.getFormatter("yyyy-MM-dd HH:mm:ss", Locale.US)
 
         val date = dateFormat.parse(row[h.getValue("Date")])?.time ?: Date().time
         val description = row[h.getValue("Description")]

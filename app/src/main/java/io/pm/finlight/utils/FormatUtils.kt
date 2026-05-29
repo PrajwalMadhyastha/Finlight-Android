@@ -2,8 +2,21 @@ package io.pm.finlight.utils
 
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 object FormatUtils {
+    
+    private val formatters = ConcurrentHashMap<Pair<String, Locale>, ThreadLocal<SimpleDateFormat>>()
+
+    fun getFormatter(pattern: String, locale: Locale = Locale.getDefault()): SimpleDateFormat {
+        return formatters.getOrPut(pattern to locale) {
+            object : ThreadLocal<SimpleDateFormat>() {
+                override fun initialValue(): SimpleDateFormat {
+                    return SimpleDateFormat(pattern, locale)
+                }
+            }
+        }.get()!!
+    }
     
     private val _defaultDateFormatter = object : ThreadLocal<SimpleDateFormat>() {
         override fun initialValue(): SimpleDateFormat {
@@ -26,6 +39,18 @@ object FormatUtils {
     private val _monthYearDisplayFormatter = object : ThreadLocal<SimpleDateFormat>() {
         override fun initialValue(): SimpleDateFormat {
             return SimpleDateFormat("LLLL yyyy", Locale.getDefault())
+        }
+    }
+
+    private val _fullDateTimeFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat {
+            return SimpleDateFormat("EEE, dd MMMM yy, h:mm a", Locale.getDefault())
+        }
+    }
+
+    private val _shortYearDateFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat {
+            return SimpleDateFormat("dd MMM, yy", Locale.getDefault())
         }
     }
 
@@ -82,6 +107,12 @@ object FormatUtils {
 
     val monthYearDisplayFormatter: SimpleDateFormat
         get() = _monthYearDisplayFormatter.get()!!
+
+    val fullDateTimeFormatter: SimpleDateFormat
+        get() = _fullDateTimeFormatter.get()!!
+
+    val shortYearDateFormatter: SimpleDateFormat
+        get() = _shortYearDateFormatter.get()!!
 
     val isoDateFormatter: SimpleDateFormat
         get() = _isoDateFormatter.get()!!

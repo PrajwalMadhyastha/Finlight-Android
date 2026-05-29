@@ -34,8 +34,8 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
 import io.pm.finlight.ui.viewmodel.HistoricTripsViewModelFactory
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
+import io.pm.finlight.utils.FormatUtils
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -115,7 +115,7 @@ private fun HistoricTripItem(
     onDeleteClick: () -> Unit,
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
-    val dateFormat = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
+    val dateFormat = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }
 
     GlassPanel(modifier = modifier.clickable(onClick = onClick)) {
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {

@@ -19,13 +19,9 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.theme.PopupSurfaceDark
-import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.AccountViewModel
-
-// Helper function to determine if a color is 'dark' based on luminance.
-private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @Composable
 fun AddEditAccountScreen(
@@ -148,27 +144,17 @@ fun AddEditAccountScreen(
     }
 
     if (showDeleteDialog && accountToEdit != null) {
-        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-        val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Confirm Deletion") },
-            text = { Text("Are you sure you want to delete this account? This will also delete all associated transactions.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.deleteAccount(accountToEdit!!)
-                        showDeleteDialog = false
-                        navController.popBackStack()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) { Text("Delete") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
-            },
-            containerColor = popupContainerColor,
+        ConfirmationDialog(
+            title = "Confirm Deletion",
+            text = "Are you sure you want to delete this account? This will also delete all associated transactions.",
+            confirmButtonText = "Delete",
+            isDestructive = true,
+            onDismiss = { showDeleteDialog = false },
+            onConfirm = {
+                viewModel.deleteAccount(accountToEdit!!)
+                showDeleteDialog = false
+                navController.popBackStack()
+            }
         )
     }
 }

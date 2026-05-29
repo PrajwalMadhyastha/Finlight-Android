@@ -14,10 +14,10 @@ import io.pm.finlight.ui.theme.AppTheme
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import io.pm.finlight.utils.FormatUtils
 
 /**
  * An enum to distinguish between domestic and international travel modes.
@@ -217,14 +217,14 @@ class SettingsRepository(context: Context) {
     }
 
     fun setLastMonthSummaryDismissed() {
-        val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
+        val monthKey = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(Date())
         prefs.edit {
             putBoolean(KEY_LAST_MONTH_SUMMARY_DISMISSED + monthKey, true)
         }
     }
 
     fun hasLastMonthSummaryBeenDismissed(): Boolean {
-        val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
+        val monthKey = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(Date())
         return prefs.getBoolean(KEY_LAST_MONTH_SUMMARY_DISMISSED + monthKey, false)
     }
 

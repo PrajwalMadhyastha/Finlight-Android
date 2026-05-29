@@ -16,10 +16,10 @@ import io.pm.finlight.data.model.TimePeriod
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import io.pm.finlight.utils.FormatUtils
 
 data class MonthlyBreakdown(
     val monthKey: String, // yyyy-MM
@@ -73,8 +73,8 @@ class TimePeriodReportViewModel(
         ) { transactions, excludedIncome, excludedExpense, date ->
             if (timePeriod != TimePeriod.YEARLY) return@combine emptyList()
 
-            val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-            val nameSdf = SimpleDateFormat("MMM", Locale.getDefault())
+            val sdf = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault())
+            val nameSdf = FormatUtils.getFormatter("MMM", Locale.getDefault())
             val breakdownMap = mutableMapOf<String, Pair<Double, Double>>()
 
             val cal = (date.clone() as Calendar).apply { set(Calendar.MONTH, Calendar.JANUARY) }
@@ -217,8 +217,8 @@ class TimePeriodReportViewModel(
                         val incomeEntries = mutableListOf<BarEntry>()
                         val expenseEntries = mutableListOf<BarEntry>()
                         val labels = mutableListOf<String>()
-                        val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
-                        val fullDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        val dayFormat = FormatUtils.getFormatter("EEE", Locale.getDefault())
+                        val fullDateFormat = FormatUtils.getFormatter("yyyy-MM-dd", Locale.getDefault())
                         val trendsMap = dailyTrends.associateBy { it.date }
 
                         for (i in 0..2) {
@@ -301,8 +301,8 @@ class TimePeriodReportViewModel(
                         val incomeEntries = mutableListOf<BarEntry>()
                         val expenseEntries = mutableListOf<BarEntry>()
                         val labels = mutableListOf<String>()
-                        val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
-                        val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                        val monthFormat = FormatUtils.getFormatter("MMM", Locale.getDefault())
+                        val yearMonthFormat = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault())
                         val trendsMap = monthlyTrends.associateBy { it.monthYear }
 
                         for (i in 0..2) {
@@ -349,8 +349,8 @@ class TimePeriodReportViewModel(
                         val incomeEntries = mutableListOf<BarEntry>()
                         val expenseEntries = mutableListOf<BarEntry>()
                         val labels = mutableListOf<String>()
-                        val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
-                        val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                        val monthFormat = FormatUtils.getFormatter("MMM", Locale.getDefault())
+                        val yearMonthFormat = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault())
 
                         // Filter trends to only include current year
                         val currentYear = calendar.get(Calendar.YEAR).toString()
