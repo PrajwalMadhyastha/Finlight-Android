@@ -317,47 +317,49 @@ class ReportsViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `reportData returns null percentageChange when previous summary expenses is zero`() = runTest {
-        // Arrange
-        val currentSummary = FinancialSummary(0.0, 150.0)
-        val previousSummary = FinancialSummary(0.0, 0.0)
-        
-        `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
-            .thenReturn(flowOf(currentSummary))
-            .thenReturn(flowOf(previousSummary))
+    fun `reportData returns null percentageChange when previous summary expenses is zero`() =
+        runTest {
+            // Arrange
+            val currentSummary = FinancialSummary(0.0, 150.0)
+            val previousSummary = FinancialSummary(0.0, 0.0)
 
-        // Act
-        val viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository)
-        viewModel.selectPeriod(ReportPeriod.MONTH)
-        advanceUntilIdle()
+            `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
+                .thenReturn(flowOf(currentSummary))
+                .thenReturn(flowOf(previousSummary))
 
-        // Assert
-        viewModel.reportData.test {
-            val data = awaitItem()
-            assertNull(data.insights?.percentageChange)
-            cancelAndIgnoreRemainingEvents()
+            // Act
+            val viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository)
+            viewModel.selectPeriod(ReportPeriod.MONTH)
+            advanceUntilIdle()
+
+            // Assert
+            viewModel.reportData.test {
+                val data = awaitItem()
+                assertNull(data.insights?.percentageChange)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 
     @Test
-    fun `reportData returns null percentageChange when previous summary is null`() = runTest {
-        // Arrange
-        val currentSummary = FinancialSummary(0.0, 150.0)
-        
-        `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
-            .thenReturn(flowOf(currentSummary))
-            .thenReturn(flowOf(null))
+    fun `reportData returns null percentageChange when previous summary is null`() =
+        runTest {
+            // Arrange
+            val currentSummary = FinancialSummary(0.0, 150.0)
 
-        // Act
-        val viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository)
-        viewModel.selectPeriod(ReportPeriod.MONTH)
-        advanceUntilIdle()
+            `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
+                .thenReturn(flowOf(currentSummary))
+                .thenReturn(flowOf(null))
 
-        // Assert
-        viewModel.reportData.test {
-            val data = awaitItem()
-            assertNull(data.insights?.percentageChange)
-            cancelAndIgnoreRemainingEvents()
+            // Act
+            val viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository)
+            viewModel.selectPeriod(ReportPeriod.MONTH)
+            advanceUntilIdle()
+
+            // Assert
+            viewModel.reportData.test {
+                val data = awaitItem()
+                assertNull(data.insights?.percentageChange)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-    }
 }

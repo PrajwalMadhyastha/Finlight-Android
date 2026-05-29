@@ -804,129 +804,137 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `yearlyMonthlyBreakdown handles income and expense exclusions correctly`() = runTest {
-        // Arrange
-        val testDate = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }
-        `when`(settingsRepository.getExcludedIncomeMonths()).thenReturn(flowOf(setOf("2025-01")))
-        `when`(settingsRepository.getExcludedExpenseMonths()).thenReturn(flowOf(setOf("2025-02")))
+    fun `yearlyMonthlyBreakdown handles income and expense exclusions correctly`() =
+        runTest {
+            // Arrange
+            val testDate = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }
+            `when`(settingsRepository.getExcludedIncomeMonths()).thenReturn(flowOf(setOf("2025-01")))
+            `when`(settingsRepository.getExcludedExpenseMonths()).thenReturn(flowOf(setOf("2025-02")))
 
-        val transactions = listOf(
-            TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-            TransactionDetails(Transaction(id = 2, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
-        )
-        `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
+            val transactions =
+                listOf(
+                TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                TransactionDetails(Transaction(id = 2, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
+            )
+            `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
-        // Act
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false)
-        advanceUntilIdle()
+            // Act
+            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false)
+            advanceUntilIdle()
 
-        // Assert
-        viewModel.yearlyMonthlyBreakdown.test {
-            val breakdown = awaitItem()
-            if (breakdown.isNotEmpty()) {
-                val jan = breakdown.find { it.monthKey == "2025-01" }
-                val feb = breakdown.find { it.monthKey == "2025-02" }
-                assertEquals(true, jan?.isIncomeExcluded)
-                assertEquals(false, jan?.isExpenseExcluded)
-                assertEquals(false, feb?.isIncomeExcluded)
-                assertEquals(true, feb?.isExpenseExcluded)
-                assertEquals(100.0, jan?.income ?: 0.0, 0.0)
-                assertEquals(50.0, feb?.expenses ?: 0.0, 0.0)
+            // Assert
+            viewModel.yearlyMonthlyBreakdown.test {
+                val breakdown = awaitItem()
+                if (breakdown.isNotEmpty()) {
+                    val jan = breakdown.find { it.monthKey == "2025-01" }
+                    val feb = breakdown.find { it.monthKey == "2025-02" }
+                    assertEquals(true, jan?.isIncomeExcluded)
+                    assertEquals(false, jan?.isExpenseExcluded)
+                    assertEquals(false, feb?.isIncomeExcluded)
+                    assertEquals(true, feb?.isExpenseExcluded)
+                    assertEquals(100.0, jan?.income ?: 0.0, 0.0)
+                    assertEquals(50.0, feb?.expenses ?: 0.0, 0.0)
+                }
+                cancelAndIgnoreRemainingEvents()
             }
-            cancelAndIgnoreRemainingEvents()
         }
-    }
 
     @Test
-    fun `totalIncome and totalExpenses respect exclusions in YEARLY time period`() = runTest {
-        // Arrange
-        val testDate = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }
-        `when`(settingsRepository.getExcludedIncomeMonths()).thenReturn(flowOf(setOf("2025-01")))
-        `when`(settingsRepository.getExcludedExpenseMonths()).thenReturn(flowOf(setOf("2025-02")))
+    fun `totalIncome and totalExpenses respect exclusions in YEARLY time period`() =
+        runTest {
+            // Arrange
+            val testDate = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }
+            `when`(settingsRepository.getExcludedIncomeMonths()).thenReturn(flowOf(setOf("2025-01")))
+            `when`(settingsRepository.getExcludedExpenseMonths()).thenReturn(flowOf(setOf("2025-02")))
 
-        val transactions = listOf(
-            TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-            TransactionDetails(Transaction(id = 2, amount = 200.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-            TransactionDetails(Transaction(id = 3, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-            TransactionDetails(Transaction(id = 4, amount = 75.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
-        )
-        `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
+            val transactions =
+                listOf(
+                TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                TransactionDetails(Transaction(id = 2, amount = 200.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                TransactionDetails(Transaction(id = 3, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                TransactionDetails(Transaction(id = 4, amount = 75.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
+            )
+            `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
-        // Act
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false)
-        advanceUntilIdle()
+            // Act
+            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false)
+            advanceUntilIdle()
 
-        // Assert
-        viewModel.totalIncome.test {
-            var item = awaitItem()
-            if (item == 0L) item = awaitItem()
-            assertEquals(200L, item) // 100 is excluded
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.totalIncome.test {
+                var item = awaitItem()
+                if (item == 0L) item = awaitItem()
+                assertEquals(200L, item) // 100 is excluded
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            viewModel.totalExpenses.test {
+                var item = awaitItem()
+                if (item == 0L) item = awaitItem()
+                assertEquals(50L, item) // 75 is excluded
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-        
-        viewModel.totalExpenses.test {
-            var item = awaitItem()
-            if (item == 0L) item = awaitItem()
-            assertEquals(50L, item) // 75 is excluded
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
 
     @Test
-    fun `monthlyAverageIncome and monthlyAverageExpenses omit excluded months`() = runTest {
-        // Arrange
-        val testDate = Calendar.getInstance().apply { set(2025, Calendar.MARCH, 15) }
-        `when`(settingsRepository.getExcludedIncomeMonths()).thenReturn(flowOf(setOf("2025-01")))
-        `when`(settingsRepository.getExcludedExpenseMonths()).thenReturn(flowOf(setOf("2025-02")))
+    fun `monthlyAverageIncome and monthlyAverageExpenses omit excluded months`() =
+        runTest {
+            // Arrange
+            val testDate = Calendar.getInstance().apply { set(2025, Calendar.MARCH, 15) }
+            `when`(settingsRepository.getExcludedIncomeMonths()).thenReturn(flowOf(setOf("2025-01")))
+            `when`(settingsRepository.getExcludedExpenseMonths()).thenReturn(flowOf(setOf("2025-02")))
 
-        val transactions = listOf(
-            TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-            TransactionDetails(Transaction(id = 2, amount = 200.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-            TransactionDetails(Transaction(id = 3, amount = 300.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-            TransactionDetails(Transaction(id = 4, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-            TransactionDetails(Transaction(id = 5, amount = 75.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-            TransactionDetails(Transaction(id = 6, amount = 150.0, transactionType = "expense", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
-        )
-        `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
+            val transactions =
+                listOf(
+                TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                TransactionDetails(Transaction(id = 2, amount = 200.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                TransactionDetails(Transaction(id = 3, amount = 300.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                TransactionDetails(Transaction(id = 4, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                TransactionDetails(Transaction(id = 5, amount = 75.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                TransactionDetails(Transaction(id = 6, amount = 150.0, transactionType = "expense", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
+            )
+            `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
-        // Act
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false)
-        advanceUntilIdle()
+            // Act
+            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false)
+            advanceUntilIdle()
 
-        // Assert
-        viewModel.monthlyAverageIncome.test {
-            val item = awaitItem()
-            assertNotNull(item)
-            cancelAndIgnoreRemainingEvents()
+            // Assert
+            viewModel.monthlyAverageIncome.test {
+                val item = awaitItem()
+                assertNotNull(item)
+                cancelAndIgnoreRemainingEvents()
+            }
+            viewModel.monthlyAverageExpenses.test {
+                val item = awaitItem()
+                assertNotNull(item)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
-        viewModel.monthlyAverageExpenses.test {
-            val item = awaitItem()
-            assertNotNull(item)
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
 
     @Test
-    fun `toggleIncomeExclusion calls repository toggle`() = runTest {
-        // Arrange
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false)
-        
-        // Act
-        viewModel.toggleIncomeExclusion("2025-05")
-        
-        // Assert
-        verify(settingsRepository).toggleIncomeMonthExclusion("2025-05")
-    }
+    fun `toggleIncomeExclusion calls repository toggle`() =
+        runTest {
+            // Arrange
+            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false)
+
+            // Act
+            viewModel.toggleIncomeExclusion("2025-05")
+
+            // Assert
+            verify(settingsRepository).toggleIncomeMonthExclusion("2025-05")
+        }
 
     @Test
-    fun `toggleExpenseExclusion calls repository toggle`() = runTest {
-        // Arrange
-        val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false)
-        
-        // Act
-        viewModel.toggleExpenseExclusion("2025-05")
-        
-        // Assert
-        verify(settingsRepository).toggleExpenseMonthExclusion("2025-05")
-    }
+    fun `toggleExpenseExclusion calls repository toggle`() =
+        runTest {
+            // Arrange
+            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false)
+
+            // Act
+            viewModel.toggleExpenseExclusion("2025-05")
+
+            // Assert
+            verify(settingsRepository).toggleExpenseMonthExclusion("2025-05")
+        }
 }
