@@ -813,9 +813,9 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
             val transactions =
                 listOf(
-                TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-                TransactionDetails(Transaction(id = 2, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
-            )
+                    TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                    TransactionDetails(Transaction(id = 2, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
+                )
             `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
             // Act
@@ -849,11 +849,11 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
             val transactions =
                 listOf(
-                TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-                TransactionDetails(Transaction(id = 2, amount = 200.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-                TransactionDetails(Transaction(id = 3, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-                TransactionDetails(Transaction(id = 4, amount = 75.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
-            )
+                    TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                    TransactionDetails(Transaction(id = 2, amount = 200.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                    TransactionDetails(Transaction(id = 3, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                    TransactionDetails(Transaction(id = 4, amount = 75.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
+                )
             `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
             // Act
@@ -886,13 +886,13 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
             val transactions =
                 listOf(
-                TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-                TransactionDetails(Transaction(id = 2, amount = 200.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-                TransactionDetails(Transaction(id = 3, amount = 300.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-                TransactionDetails(Transaction(id = 4, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-                TransactionDetails(Transaction(id = 5, amount = 75.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
-                TransactionDetails(Transaction(id = 6, amount = 150.0, transactionType = "expense", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
-            )
+                    TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                    TransactionDetails(Transaction(id = 2, amount = 200.0, transactionType = "income", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                    TransactionDetails(Transaction(id = 3, amount = 300.0, transactionType = "income", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                    TransactionDetails(Transaction(id = 4, amount = 50.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.JANUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                    TransactionDetails(Transaction(id = 5, amount = 75.0, transactionType = "expense", description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
+                    TransactionDetails(Transaction(id = 6, amount = 150.0, transactionType = "expense", description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
+                )
             `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
             // Act
