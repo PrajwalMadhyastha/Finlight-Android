@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,9 +33,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.*
+import io.pm.finlight.ui.components.ConfirmationDialog
+import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -55,19 +59,11 @@ fun GoalScreen(
         containerColor = Color.Transparent,
     ) { innerPadding ->
         if (goals.isEmpty()) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "No savings goals yet. Tap '+' to add one!",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            }
+            EmptyStateMessage(
+                message = "No savings goals yet. Tap '+' to add one!",
+                icon = Icons.Default.Info,
+                modifier = Modifier.fillMaxSize().padding(innerPadding)
+            )
         } else {
             LazyColumn(
                 modifier = Modifier.padding(innerPadding),
@@ -97,13 +93,16 @@ fun GoalScreen(
     }
 
     goalToDelete?.let { goal ->
-        DeleteGoalDialog(
-            goalName = goal.name,
+        ConfirmationDialog(
+            title = "Delete Goal?",
+            text = "Are you sure you want to delete the goal '${goal.name}'?",
+            confirmButtonText = "Delete",
+            isDestructive = true,
             onDismiss = { goalToDelete = null },
             onConfirm = {
                 goalViewModel.deleteGoal(goal)
                 goalToDelete = null
-            },
+            }
         )
     }
 }
@@ -121,8 +120,8 @@ private fun GoalItem(
         animationSpec = tween(durationMillis = 400, easing = EaseOutCubic),
         label = "GoalProgress",
     )
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
-    val dateFormat = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
+    val currencyFormat = remember { FormatUtils.currencyFormatter }
+    val dateFormat = remember { FormatUtils.displayDateFormatter }
 
     GlassPanel(modifier = modifier) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -187,26 +186,3 @@ private fun GoalItem(
     }
 }
 
-@Composable
-private fun DeleteGoalDialog(
-    goalName: String,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = popupContainerColor,
-        title = { Text("Delete Goal?") },
-        text = { Text("Are you sure you want to delete the goal '$goalName'?") },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-            ) { Text("Delete") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}

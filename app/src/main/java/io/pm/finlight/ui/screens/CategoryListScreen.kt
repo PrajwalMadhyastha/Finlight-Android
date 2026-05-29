@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import io.pm.finlight.Category
 import io.pm.finlight.CategoryViewModel
+import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
@@ -172,17 +173,16 @@ fun CategoryListScreen(
     }
 
     if (showDeleteDialog && selectedCategory != null) {
-        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-        val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-
-        DeleteCategoryDialog(
-            category = selectedCategory!!,
+        ConfirmationDialog(
+            title = "Delete Category",
+            text = "Are you sure you want to delete the category '${selectedCategory!!.name}'? This cannot be undone.",
+            confirmButtonText = "Delete",
+            isDestructive = true,
             onDismiss = { showDeleteDialog = false },
             onConfirm = {
                 viewModel.deleteCategory(selectedCategory!!)
                 showDeleteDialog = false
-            },
-            containerColor = popupContainerColor,
+            }
         )
     }
 }
@@ -281,30 +281,3 @@ fun EditCategoryDialog(
     )
 }
 
-@Composable
-fun DeleteCategoryDialog(
-    category: Category,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-    containerColor: Color,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Delete Category") },
-        text = { Text("Are you sure you want to delete the category '${category.name}'? This cannot be undone.") },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-            ) {
-                Text("Delete")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-        containerColor = containerColor,
-    )
-}
