@@ -29,6 +29,30 @@ object FormatUtils {
         }
     }
 
+    private val _isoDateFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat {
+            return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        }
+    }
+
+    private val _dateTimeFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat {
+            return SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+        }
+    }
+
+    private val _longDateFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat {
+            return SimpleDateFormat("dd MMMM, yyyy", Locale.getDefault())
+        }
+    }
+
+    private val _dayOfWeekFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat {
+            return SimpleDateFormat("EEEE", Locale.getDefault())
+        }
+    }
+
     private val _displayDateFormatter = object : ThreadLocal<SimpleDateFormat>() {
         override fun initialValue(): SimpleDateFormat {
             return SimpleDateFormat("dd MMM, yyyy", Locale.getDefault())
@@ -58,6 +82,18 @@ object FormatUtils {
 
     val monthYearDisplayFormatter: SimpleDateFormat
         get() = _monthYearDisplayFormatter.get()!!
+
+    val isoDateFormatter: SimpleDateFormat
+        get() = _isoDateFormatter.get()!!
+
+    val dateTimeFormatter: SimpleDateFormat
+        get() = _dateTimeFormatter.get()!!
+
+    val longDateFormatter: SimpleDateFormat
+        get() = _longDateFormatter.get()!!
+
+    val dayOfWeekFormatter: SimpleDateFormat
+        get() = _dayOfWeekFormatter.get()!!
 
     val displayDateFormatter: SimpleDateFormat
         get() = _displayDateFormatter.get()!!

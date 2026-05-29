@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +36,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.CustomSmsRule
 import io.pm.finlight.ManageParseRulesViewModel
+import io.pm.finlight.ui.components.ConfirmationDialog
+import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
@@ -52,18 +55,11 @@ fun ManageParseRulesScreen(
     var ruleToDelete by remember { mutableStateOf<CustomSmsRule?>(null) }
 
     if (rules.isEmpty()) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                "No custom parsing rules have been created yet.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        EmptyStateMessage(
+            message = "No custom parsing rules have been created yet.",
+            icon = Icons.Default.Info,
+            modifier = Modifier.fillMaxSize().padding(16.dp)
+        )
     } else {
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
@@ -83,30 +79,16 @@ fun ManageParseRulesScreen(
     }
 
     if (ruleToDelete != null) {
-        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-        val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-
-        AlertDialog(
-            onDismissRequest = { ruleToDelete = null },
-            title = { Text("Delete Rule?") },
-            text = { Text("Are you sure you want to delete this parsing rule? This action cannot be undone.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.deleteRule(ruleToDelete!!)
-                        ruleToDelete = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { ruleToDelete = null }) {
-                    Text("Cancel")
-                }
-            },
-            containerColor = popupContainerColor,
+        ConfirmationDialog(
+            title = "Delete Rule?",
+            text = "Are you sure you want to delete this parsing rule? This action cannot be undone.",
+            confirmButtonText = "Delete",
+            isDestructive = true,
+            onDismiss = { ruleToDelete = null },
+            onConfirm = {
+                viewModel.deleteRule(ruleToDelete!!)
+                ruleToDelete = null
+            }
         )
     }
 }
