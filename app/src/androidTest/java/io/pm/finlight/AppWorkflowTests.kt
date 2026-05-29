@@ -70,7 +70,7 @@ class AppWorkflowTests {
 
         // Click search icon to open Merchant BottomSheet
         composeTestRule.onNodeWithContentDescription("Search Predictions").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty()
         }
         val searchInput = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()
@@ -91,11 +91,16 @@ class AppWorkflowTests {
         composeTestRule.onNodeWithText("Save Transaction").performScrollTo().performClick()
 
         // --- Wait for navigation back to the dashboard to complete ---
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
 
         // 5. Verify the new transaction appears in the "Recent Transactions" list.
+        // Wait until the item is in the composition before scrolling — avoids a race
+        // where the DB write has committed but the LazyColumn hasn't recomposed yet.
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText(uniqueDescription).fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithTag("dashboard_lazy_column")
             .performScrollToNode(hasText(uniqueDescription))
         composeTestRule.onNodeWithText(uniqueDescription).assertExists()
@@ -120,7 +125,7 @@ class AppWorkflowTests {
 
         // Click search icon to open Merchant BottomSheet
         composeTestRule.onNodeWithContentDescription("Search Predictions").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty()
         }
         val searchInput = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()

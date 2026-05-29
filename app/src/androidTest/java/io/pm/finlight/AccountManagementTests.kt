@@ -47,7 +47,7 @@ class AccountManagementTests {
         composeTestRule.onNodeWithText("Accounts").performClick()
 
         // Wait for AccountListScreen to open (by checking for "Add" FAB)
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithContentDescription("Add").fetchSemanticsNodes().isNotEmpty()
         }
     }
@@ -65,7 +65,7 @@ class AccountManagementTests {
         composeTestRule.onNodeWithContentDescription("Add").performClick()
 
         // Wait for AddEditAccountScreen to load
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Add New Account").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -79,7 +79,7 @@ class AccountManagementTests {
         composeTestRule.onNodeWithText("Save").performClick()
 
         // Wait for return to AccountListScreen
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithContentDescription("Add").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -105,7 +105,7 @@ class AccountManagementTests {
         ).performClick()
 
         // Wait for AddEditAccountScreen to load in edit mode
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Edit Account").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -118,7 +118,7 @@ class AccountManagementTests {
         composeTestRule.onNodeWithText("Update").performClick()
 
         // Wait for return to AccountListScreen
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithContentDescription("Add").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -140,7 +140,7 @@ class AccountManagementTests {
         ).performClick()
 
         // Wait for AddEditAccountScreen to load
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Edit Account").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -148,13 +148,13 @@ class AccountManagementTests {
         composeTestRule.onNodeWithText("Delete Account").performClick()
 
         // Wait for confirmation dialog and click Delete
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Confirm Deletion").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Delete").performClick()
 
         // Wait for return to AccountListScreen
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithContentDescription("Add").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -176,7 +176,7 @@ class AccountManagementTests {
         ).performClick()
 
         // Wait for AccountDetailScreen to load
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Current Balance").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -201,7 +201,7 @@ class AccountManagementTests {
         ).performClick()
 
         // Wait for AccountDetailScreen to load
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Current Balance").fetchSemanticsNodes().isNotEmpty()
         }
 

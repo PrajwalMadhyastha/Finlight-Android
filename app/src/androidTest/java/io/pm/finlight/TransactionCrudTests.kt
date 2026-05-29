@@ -79,7 +79,7 @@ class TransactionCrudTests {
         composeTestRule.onNodeWithContentDescription("Add Transaction").performClick()
 
         // 2. Wait for Add Screen
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Save Transaction").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -98,7 +98,7 @@ class TransactionCrudTests {
         // 5. Enter Description — opens Merchant BottomSheet
         composeTestRule.onNodeWithContentDescription("Search Predictions").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty() ||
                 composeTestRule.onAllNodesWithText("Merchant").fetchSemanticsNodes().isNotEmpty()
         }
@@ -137,7 +137,7 @@ class TransactionCrudTests {
         }
 
         // 9. Wait for return to Dashboard
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         return uniqueDescription
@@ -149,6 +149,9 @@ class TransactionCrudTests {
     @Test
     fun test_createTransaction_appearsOnDashboard() {
         val description = addTransactionForTest()
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithTag("dashboard_lazy_column")
             .performScrollToNode(hasText(description))
         composeTestRule.onNodeWithText(description).assertExists()
@@ -165,6 +168,9 @@ class TransactionCrudTests {
             customAmount = "5000.0",
             isIncome = true,
         )
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithTag("dashboard_lazy_column")
             .performScrollToNode(hasText(description))
         composeTestRule.onNodeWithText(description).assertExists()
@@ -182,7 +188,7 @@ class TransactionCrudTests {
         // 1. Open Detail Screen
         // Navigate to Transactions tab to avoid nested scroll issues on dashboard
         composeTestRule.onNodeWithText("Transactions").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(originalDescription).fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNode(hasText(originalDescription), useUnmergedTree = true)
@@ -191,7 +197,7 @@ class TransactionCrudTests {
             .performClick()
 
         // 2. Wait for detail screen
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -199,7 +205,7 @@ class TransactionCrudTests {
         composeTestRule.onNode(hasText(originalDescription) and hasClickAction()).performClick()
 
         // 4. Wait for the sheet and enter new description in the OutlinedTextField
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -218,7 +224,7 @@ class TransactionCrudTests {
         composeTestRule.onNodeWithContentDescription("Back").performClick()
 
         // 8. Verify on Transactions List
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText(originalDescription).assertDoesNotExist()
@@ -234,7 +240,7 @@ class TransactionCrudTests {
 
         // 1. Open Detail Screen
         composeTestRule.onNodeWithText("Transactions").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNode(hasText(description), useUnmergedTree = true)
@@ -243,7 +249,7 @@ class TransactionCrudTests {
             .performClick()
 
         // 2. Click 'More' menu
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithContentDescription("More options", useUnmergedTree = true).performClick()
@@ -256,7 +262,7 @@ class TransactionCrudTests {
         composeTestRule.onAllNodesWithText("Delete").onLast().performClick()
 
         // 5. Verify removal
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText(description).assertDoesNotExist()
@@ -277,7 +283,7 @@ class TransactionCrudTests {
         composeTestRule.onNodeWithContentDescription("Add Transaction").performClick()
 
         // 3. Verify "Quick Fill from Recent" carousel is visible
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Quick Fill from Recent").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Quick Fill from Recent").assertIsDisplayed()

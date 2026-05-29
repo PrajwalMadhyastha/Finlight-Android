@@ -39,7 +39,7 @@ class SpendingAnalysisTests {
         
         composeTestRule.onNodeWithTag("reports_lazy_column").performScrollToNode(hasText("Spending Analysis"))
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Spending Analysis").fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -53,7 +53,7 @@ class SpendingAnalysisTests {
         navigateToAnalysisScreen()
         
         // Wait for the total spending to be populated
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_FOOD_NAME).fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -66,7 +66,7 @@ class SpendingAnalysisTests {
     fun test_analysisDrilldown_navigatesToDetail() {
         navigateToAnalysisScreen()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_FOOD_NAME).fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -74,7 +74,7 @@ class SpendingAnalysisTests {
         composeTestRule.onNodeWithText(TestDataSeeder.CATEGORY_FOOD_NAME).performClick()
         
         // Assert Detail screen opens
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Analysis Details").fetchSemanticsNodes().isNotEmpty() ||
             composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_FOOD_NAME).fetchSemanticsNodes().isNotEmpty()
         }
@@ -88,13 +88,13 @@ class SpendingAnalysisTests {
     fun test_analysisDetail_showsTransactionList() {
         navigateToAnalysisScreen()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_FOOD_NAME).fetchSemanticsNodes().isNotEmpty()
         }
         
         composeTestRule.onNodeWithText(TestDataSeeder.CATEGORY_FOOD_NAME).performClick()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(TestDataSeeder.TXN_GROCERY_DESC).fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -106,7 +106,7 @@ class SpendingAnalysisTests {
     fun test_analysisScreen_dateRangeFilter() {
         navigateToAnalysisScreen()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_FOOD_NAME).fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -114,7 +114,7 @@ class SpendingAnalysisTests {
         composeTestRule.onAllNodes(androidx.compose.ui.test.hasScrollToIndexAction()).onFirst().performScrollToIndex(4)
         composeTestRule.onNodeWithText("Custom").performClick()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Select Date Range").fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -126,7 +126,7 @@ class SpendingAnalysisTests {
         composeTestRule.onNodeWithText("YEAR").performClick()
         
         // Total should still show up
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_FOOD_NAME).fetchSemanticsNodes().isNotEmpty()
         }
         

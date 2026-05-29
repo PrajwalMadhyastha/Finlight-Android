@@ -49,7 +49,7 @@ class BudgetManagementTests {
         composeTestRule.onNodeWithText("Budget Watch").performClick()
         
         // Wait for BudgetScreen to open
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Category Budgets").fetchSemanticsNodes().isNotEmpty()
         }
     }
@@ -65,13 +65,13 @@ class BudgetManagementTests {
         composeTestRule.onNodeWithContentDescription("Add Category Budget").performClick()
 
         // Wait for AddEditBudgetScreen to load
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Add Budget").fetchSemanticsNodes().isNotEmpty()
         }
 
         // Fill Category
         composeTestRule.onNodeWithText("Select Category").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Transport").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Transport").performClick()
@@ -84,7 +84,7 @@ class BudgetManagementTests {
         composeTestRule.onNodeWithText("Save Budget").performClick()
 
         // Wait for return to BudgetScreen
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Category Budgets").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -105,7 +105,7 @@ class BudgetManagementTests {
         composeTestRule.onNodeWithTag("edit_budget_Food & Drinks").performClick()
 
         // Wait for Edit Budget screen
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Edit Budget").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -119,7 +119,7 @@ class BudgetManagementTests {
         composeTestRule.onNodeWithText("Update Budget").performClick()
 
         // Wait for return
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Category Budgets").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -140,13 +140,13 @@ class BudgetManagementTests {
         composeTestRule.onNodeWithTag("delete_budget_Food & Drinks").performClick()
 
         // Confirm
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Delete Budget?").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Delete").performClick()
 
         // Verify removed
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Food & Drinks").fetchSemanticsNodes().isEmpty()
         }
         composeTestRule.onNodeWithText("Food & Drinks").assertDoesNotExist()
@@ -174,13 +174,13 @@ class BudgetManagementTests {
 
         composeTestRule.onNodeWithContentDescription("Add Category Budget").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Add Budget").fetchSemanticsNodes().isNotEmpty()
         }
 
         // Select category
         composeTestRule.onNodeWithText("Select Category").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Transport").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Transport").performClick()

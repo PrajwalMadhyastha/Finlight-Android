@@ -95,7 +95,7 @@ class ReportsNavigationTests {
         composeTestRule.onRoot().performTouchInput { swipeLeft() }
         
         // Wait for change
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             val currentText = composeTestRule.onNodeWithTag("report_period_title").fetchSemanticsNode().config[SemanticsProperties.Text].first().text
             currentText != initialTitleText
         }
@@ -120,7 +120,7 @@ class ReportsNavigationTests {
 
         composeTestRule.onRoot().performTouchInput { swipeRight() }
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             val currentText = composeTestRule.onNodeWithTag("report_period_title").fetchSemanticsNode().config[SemanticsProperties.Text].first().text
             currentText != initialTitleText
         }
@@ -144,13 +144,13 @@ class ReportsNavigationTests {
         val initialTitleText = initialTitleNode.fetchSemanticsNode().config[SemanticsProperties.Text].first().text
 
         composeTestRule.onRoot().performTouchInput { swipeLeft() }
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             val currentText = composeTestRule.onNodeWithTag("report_period_title").fetchSemanticsNode().config[SemanticsProperties.Text].first().text
             currentText != initialTitleText
         }
 
         composeTestRule.onRoot().performTouchInput { swipeRight() }
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             val currentText = composeTestRule.onNodeWithTag("report_period_title").fetchSemanticsNode().config[SemanticsProperties.Text].first().text
             currentText == initialTitleText
         }

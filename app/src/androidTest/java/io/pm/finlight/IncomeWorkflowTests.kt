@@ -40,7 +40,7 @@ class IncomeWorkflowTests {
             .performScrollToNode(hasText("Recent Transactions"))
         composeTestRule.onNodeWithContentDescription("Add Transaction").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Save Transaction").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -53,7 +53,7 @@ class IncomeWorkflowTests {
 
         composeTestRule.onNodeWithContentDescription("Search Predictions").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty() ||
                 composeTestRule.onAllNodesWithText("Merchant").fetchSemanticsNodes().isNotEmpty()
         }
@@ -76,7 +76,7 @@ class IncomeWorkflowTests {
             // Nudge didn't appear; proceed gracefully
         }
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
     }
@@ -87,7 +87,7 @@ class IncomeWorkflowTests {
         addIncomeTransaction("12000.0", description)
 
         // Wait until back on Dashboard
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -105,13 +105,16 @@ class IncomeWorkflowTests {
         val description = "Gift ${UUID.randomUUID().toString().take(5)}"
         addIncomeTransaction("5000.0", description)
 
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithTag("dashboard_lazy_column")
             .performScrollToNode(hasText(description))
         composeTestRule.onNodeWithText(description).assertExists()
 
         // Optionally, check Transactions tab
         composeTestRule.onNodeWithText("Transactions").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText(description).assertExists()

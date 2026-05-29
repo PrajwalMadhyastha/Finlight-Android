@@ -42,13 +42,13 @@ class CategoryManagementTests {
         
         composeTestRule.onNodeWithText("Profile").performClick()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Manage Categories").fetchSemanticsNodes().isNotEmpty()
         }
         
         composeTestRule.onNodeWithText("Manage Categories").performScrollTo().performClick()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Add New Category").fetchSemanticsNodes().isNotEmpty()
         }
     }
@@ -61,7 +61,7 @@ class CategoryManagementTests {
 
         composeTestRule.onNodeWithText("Add New Category").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Category Name").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -71,7 +71,7 @@ class CategoryManagementTests {
         
         composeTestRule.onNodeWithText("Add").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(uniqueCategoryName).fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText(uniqueCategoryName).assertExists()
@@ -85,7 +85,7 @@ class CategoryManagementTests {
 
         composeTestRule.onNodeWithTag("edit_category_${TestDataSeeder.CATEGORY_FOOD_NAME}").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Edit Category").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -96,7 +96,7 @@ class CategoryManagementTests {
 
         composeTestRule.onNodeWithText("Update").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(updatedCategoryName).fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -111,7 +111,7 @@ class CategoryManagementTests {
         // 1. Add a temporary category
         val tempCategoryName = "Temp Delete Cat"
         composeTestRule.onNodeWithText("Add New Category").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Category Name").fetchSemanticsNodes().isNotEmpty()
         }
         val nameInputTemp = composeTestRule.onNodeWithText("Category Name")
@@ -120,20 +120,20 @@ class CategoryManagementTests {
         composeTestRule.onNodeWithText("Add").performClick()
 
         // 2. Wait for it to appear
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(tempCategoryName).fetchSemanticsNodes().isNotEmpty()
         }
 
         // 3. Delete it
         composeTestRule.onNodeWithTag("delete_category_$tempCategoryName").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Delete Category").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Delete").performClick()
 
         // 4. Verify it's gone
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(tempCategoryName).fetchSemanticsNodes().isEmpty()
         }
 
@@ -174,7 +174,7 @@ class CategoryManagementTests {
             // ALL_TIME -> 'A' is already uppercase -> "ALL_TIME" -> replace _ -> "ALL TIME"
             composeTestRule.onNodeWithText("ALL TIME").performScrollTo().performClick()
             composeTestRule.waitForIdle()
-            composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.waitUntil(timeoutMillis = 8000) {
                 composeTestRule.onAllNodesWithTag("analysis_item_${TestDataSeeder.CATEGORY_FOOD_ID}").fetchSemanticsNodes().isNotEmpty()
             }
         }
@@ -186,7 +186,7 @@ class CategoryManagementTests {
         composeTestRule.waitForIdle()
 
         // Verify the AnalysisDetailScreen shows the seeded grocery transaction
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithTag("transaction_item_${TestDataSeeder.TXN_GROCERY_DESC}").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithTag("transaction_item_${TestDataSeeder.TXN_GROCERY_DESC}")

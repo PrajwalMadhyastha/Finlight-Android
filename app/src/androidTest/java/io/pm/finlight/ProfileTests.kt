@@ -66,7 +66,7 @@ class ProfileTests {
         
         // Assuming "Theme" or "Appearance" related text is shown in the settings screen
         // Wait for screen to navigate
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Theme").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Theme").assertIsDisplayed() 

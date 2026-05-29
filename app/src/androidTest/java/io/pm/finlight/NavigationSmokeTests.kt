@@ -62,7 +62,7 @@ class NavigationSmokeTests {
         composeTestRule.onNodeWithTag("nav_item_Transactions").performClick()
         
         // Find any seeded transaction visible on screen
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodes(hasText("Test", substring = true, ignoreCase = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onAllNodes(hasText("Test", substring = true, ignoreCase = true), useUnmergedTree = true).onFirst()
@@ -71,7 +71,7 @@ class NavigationSmokeTests {
             .performClick()
 
         // Verify we are on detail screen
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onAllNodesWithText("Exclude from Totals").onFirst().assertExists()

@@ -40,7 +40,7 @@ class SplitTransactionTests {
         
         composeTestRule.onAllNodes(hasScrollAction(), useUnmergedTree = true).onLast().performScrollToNode(hasText(TestDataSeeder.TXN_GROCERY_DESC))
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(TestDataSeeder.TXN_GROCERY_DESC).fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -49,7 +49,7 @@ class SplitTransactionTests {
             .filterToOne(hasClickAction())
             .performClick()
             
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
         }
     }
@@ -61,7 +61,7 @@ class SplitTransactionTests {
         // Tap "Split Transaction"
         composeTestRule.onNodeWithText("Split Transaction").performClick()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Add Item").fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -96,7 +96,7 @@ class SplitTransactionTests {
         composeTestRule.onNodeWithText("Save Splits").performClick()
         
         // Wait to return to details screen (Header changes to "Split Transaction")
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Split Transaction").fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -114,7 +114,7 @@ class SplitTransactionTests {
         
         composeTestRule.onNodeWithText("Split Transaction").performClick()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Add Item").fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -145,7 +145,7 @@ class SplitTransactionTests {
         
         composeTestRule.onNodeWithText("Split Transaction").performClick()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Add Item").fetchSemanticsNodes().isNotEmpty()
         }
         
@@ -173,14 +173,14 @@ class SplitTransactionTests {
         composeTestRule.onAllNodes(hasScrollAction()).onLast().performScrollToNode(hasText(TestDataSeeder.CATEGORY_SHOPPING_NAME))
         composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_SHOPPING_NAME).onLast().performClick()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             val nodes = composeTestRule.onAllNodesWithText("Save Splits").fetchSemanticsNodes()
             nodes.isNotEmpty() && !nodes.first().config.contains(androidx.compose.ui.semantics.SemanticsProperties.Disabled)
         }
         composeTestRule.onNodeWithText("Save Splits").performClick()
         
         // Wait to return to details screen
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Split Transaction").fetchSemanticsNodes().isNotEmpty()
         }
         

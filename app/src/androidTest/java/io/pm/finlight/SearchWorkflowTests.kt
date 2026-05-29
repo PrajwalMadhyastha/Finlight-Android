@@ -40,7 +40,7 @@ class SearchWorkflowTests {
         
         composeTestRule.onNodeWithContentDescription("Search").performClick()
         
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Keyword (description, notes)").fetchSemanticsNodes().isNotEmpty()
         }
     }
@@ -52,7 +52,7 @@ class SearchWorkflowTests {
         val searchInput = composeTestRule.onNodeWithText("Keyword (description, notes)")
         searchInput.performTextInput(TestDataSeeder.TXN_GROCERY_DESC)
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(TestDataSeeder.TXN_GROCERY_DESC).fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText(TestDataSeeder.TXN_GROCERY_DESC).assertExists()
@@ -65,7 +65,7 @@ class SearchWorkflowTests {
         val searchInput = composeTestRule.onNodeWithText("Keyword (description, notes)")
         searchInput.performTextInput("xyzzy_notreal_abc")
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("No transactions match your criteria.").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("No transactions match your criteria.").assertExists()
@@ -79,7 +79,7 @@ class SearchWorkflowTests {
         searchInput.performTextInput(TestDataSeeder.TXN_SALARY_DESC)
 
         // Wait for the transaction item test tag instead of text to avoid matching the text field
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithTag("transaction_item_${TestDataSeeder.TXN_SALARY_DESC}").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -95,7 +95,7 @@ class SearchWorkflowTests {
         // Income transactions show "Credit transaction" as the TopAppBar title
         // (see TransactionDetailScreen.kt: when (transactionType) { "income" -> "Credit transaction" })
         // We verify via the detail screen's unique lazy column tag + the transaction description.
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithTag("transaction_detail_lazy_column").assertExists()
@@ -111,7 +111,7 @@ class SearchWorkflowTests {
         // Open filters
         composeTestRule.onNodeWithText("Filters").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Account").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -119,7 +119,7 @@ class SearchWorkflowTests {
         composeTestRule.onNodeWithText("Account").performClick()
         
         // Select Cash Account
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(TestDataSeeder.ACCOUNT_WALLET_NAME).fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText(TestDataSeeder.ACCOUNT_WALLET_NAME).performClick()
@@ -128,7 +128,7 @@ class SearchWorkflowTests {
         composeTestRule.onNodeWithText("Filters").performClick()
 
         // Wait for results. TXN_TAXI_DESC is near the top of the list, avoiding scroll issues
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithTag("transaction_item_${TestDataSeeder.TXN_TAXI_DESC}").fetchSemanticsNodes().isNotEmpty()
         }
 

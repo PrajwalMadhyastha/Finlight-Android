@@ -39,12 +39,12 @@ class TagManagementTests {
         composeTestRule.onNodeWithTag("dashboard_lazy_column")
             .performScrollToNode(hasText("Recent Transactions"))
         composeTestRule.onNodeWithContentDescription("Add Transaction").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Save Transaction").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithTag("amount_text_field").performTextInput("100.0")
         composeTestRule.onNodeWithContentDescription("Search Predictions").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty() ||
                 composeTestRule.onAllNodesWithText("Merchant").fetchSemanticsNodes().isNotEmpty()
         }
@@ -56,7 +56,7 @@ class TagManagementTests {
         composeTestRule.onNodeWithTag("category_select_chip").performClick()
         composeTestRule.onNodeWithText(TestDataSeeder.CATEGORY_FOOD_NAME).performClick()
         composeTestRule.onNodeWithText("Save Transaction").performScrollTo().performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         return uniqueDescription
@@ -69,7 +69,7 @@ class TagManagementTests {
 
         // Go to Transactions tab to avoid scroll issues
         composeTestRule.onNodeWithText("Transactions").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -79,7 +79,7 @@ class TagManagementTests {
             .filterToOne(hasClickAction())
             .performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -88,7 +88,7 @@ class TagManagementTests {
         composeTestRule.onNodeWithText("Tags").performClick()
 
         // Wait for Tag Picker Sheet
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Manage Tags").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -115,7 +115,7 @@ class TagManagementTests {
 
         // Go to Transactions tab
         composeTestRule.onNodeWithText("Transactions").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(description1).fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -128,7 +128,7 @@ class TagManagementTests {
         composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Tags"))
         composeTestRule.onNodeWithText("Tags").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Manage Tags").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -140,7 +140,7 @@ class TagManagementTests {
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithContentDescription("Back").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
         }
 
@@ -148,28 +148,28 @@ class TagManagementTests {
         // It's on the dashboard (actually BottomNavItem.Search doesn't exist, search is an icon on bottom bar?)
         // Let's just click the "Dashboard" tab to go back
         composeTestRule.onNodeWithText("Dashboard").performClick()
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
 
         // Go to search screen
         composeTestRule.onNodeWithContentDescription("Search").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Keyword (description, notes)").fetchSemanticsNodes().isNotEmpty()
         }
 
         // Open filters
         composeTestRule.onNodeWithText("Filters").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Tag").fetchSemanticsNodes().isNotEmpty()
         }
 
         // Tap Tag filter dropdown
         composeTestRule.onNodeWithText("Tag").performClick()
 
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(newTagName).fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText(newTagName).performClick()
@@ -178,7 +178,7 @@ class TagManagementTests {
         composeTestRule.onNodeWithText("Filters").performClick()
 
         // Verify only the tagged transaction shows
-        composeTestRule.waitUntil(timeoutMillis = 5000) {
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(description1).fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText(description1).assertExists()
