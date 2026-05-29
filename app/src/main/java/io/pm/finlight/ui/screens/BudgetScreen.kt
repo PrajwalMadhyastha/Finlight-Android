@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -64,12 +65,14 @@ import androidx.navigation.NavController
 import io.pm.finlight.Budget
 import io.pm.finlight.BudgetViewModel
 import io.pm.finlight.BudgetWithSpending
+import io.pm.finlight.ui.components.ConfirmationDialog
+import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.min
 import kotlin.math.roundToLong
@@ -79,12 +82,10 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 // --- NEW: Copied from TransactionListScreen for the header ---
 private fun formatAmountInLakhs(amount: Long): String {
-    val currencyFormat =
-        NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            .apply { maximumFractionDigits = 0 }
+    val currencyFormat = FormatUtils.currencyFormatter.apply { maximumFractionDigits = 0 }
     if (amount < 1000) return currencyFormat.format(amount)
     if (amount < 100000) return "${currencyFormat.format(amount / 1000)}K"
-    return "${NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 2 }.format(amount / 100000.0)}L"
+    return "${FormatUtils.currencyFormatter.apply { maximumFractionDigits = 2 }.format(amount / 100000.0)}L"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -154,19 +155,11 @@ fun BudgetScreen(
         // --- REFACTORED: Use dynamic state ---
         if (budgetsForSelectedMonth.isEmpty()) {
             item {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 48.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "No category budgets set. Tap the '+' icon to add one.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
+                EmptyStateMessage(
+                    message = "No category budgets set. Tap the '+' icon to add one.",
+                    icon = Icons.Default.Info,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)
+                )
             }
         } else {
             items(budgetsForSelectedMonth, key = { it.budget.id }) { budgetWithSpending ->
@@ -183,21 +176,16 @@ fun BudgetScreen(
     }
 
     if (showDeleteDialog && budgetToDelete != null) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Budget?") },
-            text = { Text("Are you sure you want to delete the budget for '${budgetToDelete?.categoryName}'?") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        budgetToDelete?.let { viewModel.deleteBudget(it) }
-                        showDeleteDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) { Text("Delete") }
-            },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } },
-            containerColor = popupContainerColor,
+        ConfirmationDialog(
+            title = "Delete Budget?",
+            text = "Are you sure you want to delete the budget for '${budgetToDelete?.categoryName}'?",
+            confirmButtonText = "Delete",
+            isDestructive = true,
+            onDismiss = { showDeleteDialog = false },
+            onConfirm = {
+                budgetToDelete?.let { viewModel.deleteBudget(it) }
+                showDeleteDialog = false
+            }
         )
     }
 
@@ -222,8 +210,8 @@ private fun MonthlySummaryHeader(
     monthlySummaries: List<Pair<Calendar, Float?>>,
     onMonthSelected: (Calendar) -> Unit,
 ) {
-    val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
-    val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
+    val monthFormat = FormatUtils.shortMonthFormatter
+    val monthYearFormat = FormatUtils.monthYearDisplayFormatter
     var showMonthScroller by remember { mutableStateOf(false) }
 
     val selectedTabIndex =
@@ -329,7 +317,7 @@ private fun OverallBudgetHub(
         animationSpec = tween(durationMillis = 1500),
         label = "OverallBudgetProgress",
     )
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 0 } }
+    val currencyFormat = remember { FormatUtils.currencyFormatter.apply { maximumFractionDigits = 0 } }
 
     GlassPanel(modifier = Modifier.clickable(onClick = onEditClick)) {
         Column(
@@ -451,7 +439,7 @@ private fun CategoryBudgetItem(
             progress > 0.8f -> MaterialTheme.colorScheme.secondary
             else -> MaterialTheme.colorScheme.primary
         }
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply { maximumFractionDigits = 0 } }
+    val currencyFormat = remember { FormatUtils.currencyFormatter.apply { maximumFractionDigits = 0 } }
 
     GlassPanel {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {

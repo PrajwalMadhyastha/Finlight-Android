@@ -17,6 +17,18 @@ object FormatUtils {
         }
     }
 
+    private val _shortMonthFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat {
+            return SimpleDateFormat("LLL", Locale.getDefault())
+        }
+    }
+
+    private val _monthYearDisplayFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat {
+            return SimpleDateFormat("LLLL yyyy", Locale.getDefault())
+        }
+    }
+
     private val _displayDateFormatter = object : ThreadLocal<SimpleDateFormat>() {
         override fun initialValue(): SimpleDateFormat {
             return SimpleDateFormat("dd MMM, yyyy", Locale.getDefault())
@@ -40,6 +52,12 @@ object FormatUtils {
         
     val monthYearFormatter: SimpleDateFormat
         get() = _monthYearFormatter.get()!!
+
+    val shortMonthFormatter: SimpleDateFormat
+        get() = _shortMonthFormatter.get()!!
+
+    val monthYearDisplayFormatter: SimpleDateFormat
+        get() = _monthYearDisplayFormatter.get()!!
 
     val displayDateFormatter: SimpleDateFormat
         get() = _displayDateFormatter.get()!!
