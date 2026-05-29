@@ -330,7 +330,7 @@ class NerModelEvaluationTest {
         // ---- Run evaluation ----
         data class EvalResult(
             val case: EvalCase,
-            val nerEntities: Map<String, String>,
+            val nerEntities: Map<String, io.pm.finlight.core.NerEntity>,
             val nerAmount: String?,
             val nerMerchant: String?,
             val nerAccount: String?,
@@ -351,9 +351,9 @@ class NerModelEvaluationTest {
                     emptyMap()
                 }
 
-            val nerAmount = entities["AMOUNT"]
-            val nerMerchant = entities["MERCHANT"]
-            val nerAccount = entities["ACCOUNT"]
+            val nerAmount = entities["AMOUNT"]?.value
+            val nerMerchant = entities["MERCHANT"]?.value
+            val nerAccount = entities["ACCOUNT"]?.value
 
             // Amount comparison: normalize to double
             val amountMatch =

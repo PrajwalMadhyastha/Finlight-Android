@@ -323,7 +323,7 @@ fun TransactionDetailScreen(
                 containerColor = Color.Transparent,
             ) { innerPadding ->
                 LazyColumn(
-                    modifier = Modifier.padding(innerPadding),
+                    modifier = Modifier.padding(innerPadding).testTag("transaction_detail_lazy_column"),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 16.dp),
                 ) {

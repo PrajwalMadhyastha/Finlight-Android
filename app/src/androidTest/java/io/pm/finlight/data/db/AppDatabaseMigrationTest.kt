@@ -180,25 +180,32 @@ class AppDatabaseMigrationTest {
     }
 
     /**
-     * Test MIGRATION_42_43: Adds transactionType column to custom_sms_rules
+     * Test MIGRATION_43_44: Adds needsReview column to transactions
      */
     @Test
-    fun migrate42To43_addsTransactionTypeColumnToCustomSmsRules() {
-        helper.createDatabase(TEST_DB_NAME, 42).apply {
-            execSQL("INSERT INTO custom_sms_rules (id, triggerPhrase, priority, sourceSmsBody) VALUES (1, 'debited', 1, 'Test SMS body')")
+    fun migrate43To44_addsNeedsReviewColumnToTransactions() {
+        helper.createDatabase(TEST_DB_NAME, 43).apply {
+            execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank')")
+            execSQL(
+                """
+                INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit) 
+                VALUES (1, 'Test Transaction', 100.0, 1234567890000, 1, 'expense', 'Manual Entry', 0, 0)
+            """
+            )
             close()
         }
 
-        helper.runMigrationsAndValidate(TEST_DB_NAME, 43, true, MIGRATION_42_43).apply {
-            val cursor = query("PRAGMA table_info(custom_sms_rules)")
+        helper.runMigrationsAndValidate(TEST_DB_NAME, 44, true, io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_43_44).apply {
+            val cursor = query("PRAGMA table_info(transactions)")
             var found = false
             while (cursor.moveToNext()) {
-                if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "transactionType") {
+                if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "needsReview") {
                     found = true
-                    assertEquals(0, cursor.getInt(cursor.getColumnIndexOrThrow("notnull")))
+                    assertEquals("needsReview should default to 0 (false) and not null", 1, cursor.getInt(cursor.getColumnIndexOrThrow("notnull")))
+                    assertEquals("0", cursor.getString(cursor.getColumnIndexOrThrow("dflt_value")))
                 }
             }
-            assertTrue("Column 'transactionType' should exist", found)
+            assertTrue("Column 'needsReview' should exist in transactions table", found)
             cursor.close()
             close()
         }

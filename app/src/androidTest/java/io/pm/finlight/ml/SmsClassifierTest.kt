@@ -74,11 +74,7 @@ class SmsClassifierTest {
 
         transactionalMessages.forEach { message ->
             val score = classifier.classify(message)
-            // Use reflection to access the private tokenize method for debugging
-            val tokenizeMethod = classifier.javaClass.getDeclaredMethod("tokenize", String::class.java)
-            tokenizeMethod.isAccessible = true
-            val tokens = tokenizeMethod.invoke(classifier, message) as LongArray
-            Log.d("SmsClassifierTest", "Kotlin Tokens for '${message.take(20)}...': ${tokens.take(30).joinToString(", ")}...")
+            // Tokens logged directly from SmsClassifier if needed, but removed reflection here to avoid NoSuchMethodException.
 
             assertTrue(
                 "Expected high confidence for transactional message, but got $score. Message: '$message'",

@@ -1,5 +1,6 @@
 package io.pm.finlight.ml
 
+import io.pm.finlight.core.NerEntity
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -49,7 +50,7 @@ class DesktopNerExtractor(
         idToLabel = map
     }
 
-    override fun extract(text: String): Map<String, String> {
+    override fun extract(text: String): Map<String, NerEntity> {
         // Step 1: Tokenize (pure Kotlin, identical to Android)
         val result = tokenizer.tokenize(text)
 
@@ -108,7 +109,7 @@ class DesktopNerExtractor(
     private fun extractEntities(
         predictions: IntArray,
         tokenResult: WordPieceTokenizer.TokenizationResult,
-    ): Map<String, String> {
+    ): Map<String, NerEntity> {
         data class EntitySpan(val type: String, val tokens: MutableList<String>)
 
         val spans = mutableListOf<EntitySpan>()
@@ -165,7 +166,8 @@ class DesktopNerExtractor(
                     joined.replace(Regex("(?i)^(?:rs\\.?|inr\\.?|₹)\\s*"), "")
                         .replace(Regex(",(?=\\d{2,3})"), "")
             }
-            joined
+            // Confidence is set to 1.0f; DesktopNerExtractor doesn't compute logits
+            NerEntity(joined, 1.0f)
         }
     }
 

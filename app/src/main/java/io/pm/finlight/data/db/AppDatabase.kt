@@ -48,7 +48,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         Trip::class,
         AccountAlias::class,
     ],
-    version = 43,
+    version = 44,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -683,6 +683,14 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- NEW: Migration for version 44 --- Adds needsReview flag to transactions
+        val MIGRATION_43_44 =
+            object : Migration(43, 44) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `transactions` ADD COLUMN `needsReview` INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val securityManager = SecurityManager(context)
@@ -707,6 +715,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_40_42,
                             MIGRATION_41_42,
                             MIGRATION_42_43, // --- ADDED ---
+                            MIGRATION_43_44, // --- ADDED: needsReview column ---
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))
@@ -735,7 +744,7 @@ abstract class AppDatabase : RoomDatabase() {
                     val categoryCount = categoryDao.getAllCategories().first().size
                     if (categoryCount == 0) {
                         Log.w("DatabaseCallback", "Categories table is empty. Repopulating default categories.")
-                        categoryDao.insertAll(CategoryIconHelper.predefinedCategories)
+                        categoryDao.insertAllIgnore(CategoryIconHelper.predefinedCategories)
                     }
 
                     val ignoreRuleDao = database.ignoreRuleDao()
