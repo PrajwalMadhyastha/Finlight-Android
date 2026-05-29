@@ -1,93 +1,65 @@
-Finlight
-==========
+# Finlight
 
-**Finlight** is a privacy-focused, on-device personal finance management app for Android (7.0+). Built entirely with Jetpack Compose, it features a sophisticated, multi-layered SMS parsing engine, on-device machine learning, and a bespoke glassmorphism design language called **"Project Aurora"**.
+Finlight is a privacy-focused, on-device personal finance management application for Android (API Level 24+). Built entirely with Jetpack Compose, the application incorporates a sophisticated, multi-layered SMS parsing engine, on-device machine learning, and a custom design system termed "Project Aurora".
 
-> **Our Mission:** To provide a powerful, beautiful, and completely private financial tool. Your data is yours. Period. It never leaves your device.
+> **Mission Statement:** To provide a secure, efficient, and private financial management tool. User data remains strictly on the device, ensuring complete privacy.
 
-Project Aurora: A Glimpse into Finlight
----------------------------------------
+## Project Aurora Design System
 
-Finlight's UI is built on a custom design language that emphasizes depth, light, and motion. We use theme-aware animated backgrounds and frosted glass effects to create an experience that is both functional and beautiful.
+Finlight utilizes a custom UI design language that prioritizes depth, lighting, and fluid motion. The application implements theme-aware animated backgrounds and frosted glass effects to deliver a highly functional and cohesive user interface.
 
 | Dashboard & Privacy Mode                    | Spending Analysis Hub                       |
 |---------------------------------------------|---------------------------------------------|
 | ![Privacy Mode](docs/gifs/Privacy_mode.gif) | ![Analysis Hub](docs/gifs/Analysis_hub.gif) |
 
-Core Philosophy
----------------
+## Core Architecture and Philosophy
 
-Finlight is built on three core principles:
+Finlight is developed around three foundational principles:
 
-1.  **Privacy First:** All financial data is stored in a locally encrypted SQLCipher database. There are no servers and no user accounts. Secure, automatic backups can be made to your personal Google Drive.
+1.  **Privacy:** All financial data is stored locally within an encrypted SQLCipher database. The application operates without remote servers or user accounts. Secure, automated backups can be configured using Google Drive.
 
-2.  **Intelligent Automation:** At its heart is a multi-stage SMS parser called the **"Finlight Genie"**. It uses a hierarchy of trust to accurately capture transactions:
+2.  **Intelligent Automation:** The application utilizes a multi-stage SMS parsing engine to accurately extract and categorize transaction data. This system employs:
+    *   **User-Defined Rules:** Customizable rules for high-priority transaction matching.
+    *   **On-Device Machine Learning:** A TensorFlow Lite model that pre-filters messages to minimize noise and enhance parsing accuracy.
+    *   **Heuristic & Generic Parsers:** An adaptive engine utilizing extensive regular expression patterns, capable of learning from manual corrections.
 
-    *   **User-Defined Rules:** High-priority custom rules give you full control.
+3.  **Design System:** The "Project Aurora" design system ensures a consistent and high-quality user experience across all components, adhering to modern UI/UX standards.
 
-    *   **On-Device ML:** A custom TensorFlow Lite model pre-filters messages, reducing noise and improving accuracy.
+## Feature Overview
 
-    *   **Heuristic & Generic Parsers:** A powerful engine that learns from your corrections and uses dozens of regex patterns to catch everything else.
+*   **Spending Analysis Hub:** An analytical tool for visualizing expenditure. Users can aggregate data by category, tag, or merchant, and apply complex, cross-dimensional filters.
+*   **Intelligent Budget Summary:** The dashboard delivers context-aware financial forecasting by analyzing spending velocity and projecting month-end totals.
+*   **Automated Travel Mode:** Automatically identifies and tags transactions within a specified trip duration and processes foreign currency conversions.
+*   **Smart Account Merging:** Proactively identifies and suggests the merging of duplicate accounts (e.g., "ICICI Bank" and "ICICI - xx1234") utilizing Levenshtein distance algorithms.
+*   **Transaction Splitting:** Enables the division of a single transaction (e.g., a consolidated grocery receipt) into multiple, individually categorized entries.
+*   **Tagging System:** Facilitates the organization of transactions via custom tags, enhancing search and filtering capabilities.
+*   **Customizable Dashboard:** Offers a modular interface allowing users to arrange dashboard components according to their preferences.
+*   **Privacy Mode:** Obscures sensitive financial figures across the dashboard with a single interaction.
 
-3.  **Bespoke Design:** "Project Aurora" isn't just a theme; it's a commitment to a high-quality user experience. Every component, from buttons to dialogs, is designed to be cohesive, theme-aware, and aesthetically pleasing.
+## Technology Stack
 
-
-Feature Spotlight
------------------
-
-*   **Spending Analysis Hub:** A powerful tool to visualize and drill down into your spending. Group data by category, tag, or merchant, and apply advanced, cross-dimensional filters.
-
-*   **Intelligent Budget Summary:** The dashboard provides smart, context-aware advice by analyzing your "spending velocity" and forecasting your month-end total.
-
-*   **Automated Travel Mode:** Automatically tags transactions within a trip's date range and handles foreign currency conversions.
-
-*   **Smart Account Merging:** Proactively suggests and merges duplicate accounts (e.g., "ICICI Bank" and "ICICI - xx1234") using a Levenshtein distance check.
-
-*   **Transaction Splitting:** Split a single expense (like a grocery bill) into multiple categorized items.
-
-*   **Tagging System:** Organize transactions with custom tags, then filter by them in the search and analysis screens.
-
-*   **Customizable Dashboard:** Drag and drop cards to create a layout that works for you.
-
-*   **Privacy Mode:** Hide all sensitive amounts on the dashboard with a single tap.
-
-
-Technology Stack
-----------------
-
-*   **Core:** 100% [Kotlin](https://kotlinlang.org/), [Coroutines](https://kotlinlang.org/docs/coroutines-overview.html), [Flow](https://developer.android.com/kotlin/flow)
-
-*   **UI:** [Jetpack Compose](https://developer.android.com/jetpack/compose) with [Material 3](https://m3.material.io/)
-
-*   **Architecture:** MVVM, Repository Pattern, Multi-module (:app, :core, :analyzer)
-
-*   **Database:** [Room](https://developer.android.com/training/data-storage/room) with [SQLCipher](https://www.zetetic.net/sqlcipher/) for full database encryption.
-
-*   **Background Jobs:** [WorkManager](https://developer.android.com/topic/libraries/architecture/workmanager)
-
+*   **Core:** [Kotlin](https://kotlinlang.org/), [Coroutines](https://kotlinlang.org/docs/coroutines-overview.html), [Flow](https://developer.android.com/kotlin/flow)
+*   **UI:** [Jetpack Compose](https://developer.android.com/jetpack/compose) with [Material Design 3](https://m3.material.io/)
+*   **Architecture:** Model-View-ViewModel (MVVM), Repository Pattern, Multi-module architecture (`:app`, `:core`, `:analyzer`)
+*   **Database:** [Room](https://developer.android.com/training/data-storage/room) integrated with [SQLCipher](https://www.zetetic.net/sqlcipher/) for robust database encryption
+*   **Background Processing:** [WorkManager](https://developer.android.com/topic/libraries/architecture/workmanager)
 *   **On-Device ML:** [TensorFlow Lite](https://www.tensorflow.org/lite)
+*   **Testing:** JUnit, Mockito, Robolectric, Espresso
 
-*   **Testing:** JUnit, Mockito, Robolectric, Espresso UI Tests
+## Installation and Setup
 
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/PrajwalMadhyastha/Finlight-Android.git
+    ```
+2.  Navigate to the project root and create a `local.properties` file. You may use `local.properties.template` as a starting point. This is necessary for configuring release signing credentials.
+3.  Open the project using the latest stable release of Android Studio.
+4.  Build and deploy the application to an emulator or a physical device running Android 7.0 (API level 24) or higher.
 
-Getting Started
----------------
+## Contributing
 
-1.  git clone [**https://github.com/PrajwalMadhyastha/Finlight-Android.git**](https://github.com/PrajwalMadhyastha/Finlight-Android.git)
+Contributions are welcome. Please refer to the [**CONTRIBUTING.md**](CONTRIBUTING.md) file for guidelines on how to participate in the development of this project.
 
-2.  Create a local.properties file in the root of the project. You can copy the local.properties.template file to get started. This is required for release signing configs.
+## License
 
-3.  Open the project in the latest stable version of Android Studio.
-
-4.  Build and run the app configuration on an emulator or a physical device (API 24+).
-
-
-How to Contribute
------------------
-
-We welcome all contributions! Please read our [**CONTRIBUTING.md**](CONTRIBUTING.md) to get started.
-
-License
--------
-
-This project is licensed under the MIT License - see the [**LICENSE**](https://www.google.com/search?q=LICENSE) file for details.
+This project is licensed under the MIT License. Please see the [**LICENSE**](LICENSE) file for further details.

@@ -94,6 +94,7 @@ class TransactionCrudTests {
         val amountInput = composeTestRule.onNodeWithTag("amount_text_field")
         amountInput.performTextInput(customAmount)
         androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
 
         // 5. Enter Description — opens Merchant BottomSheet
         composeTestRule.onNodeWithContentDescription("Search Predictions").performClick()
@@ -106,6 +107,7 @@ class TransactionCrudTests {
         val searchInput = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()
         searchInput.performTextInput(uniqueDescription)
         androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
 
         // Select the manually-entered description from the suggestion list
         composeTestRule.onAllNodesWithText(uniqueDescription).onFirst().performClick()
@@ -213,6 +215,7 @@ class TransactionCrudTests {
         inputNode.performTextClearance()
         inputNode.performTextInput(updatedDescription)
         androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
 
         // 5. Click Save
         composeTestRule.onNodeWithText("Save").performClick()

@@ -68,6 +68,7 @@ class CategoryManagementTests {
         val nameInput = composeTestRule.onNodeWithText("Category Name")
         nameInput.performTextInput(uniqueCategoryName)
         androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
         
         composeTestRule.onNodeWithText("Add").performClick()
 
@@ -93,6 +94,7 @@ class CategoryManagementTests {
         nameInput.performTextClearance()
         nameInput.performTextInput(updatedCategoryName)
         androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithText("Update").performClick()
 
@@ -117,6 +119,7 @@ class CategoryManagementTests {
         val nameInputTemp = composeTestRule.onNodeWithText("Category Name")
         nameInputTemp.performTextInput(tempCategoryName)
         androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Add").performClick()
 
         // 2. Wait for it to appear
