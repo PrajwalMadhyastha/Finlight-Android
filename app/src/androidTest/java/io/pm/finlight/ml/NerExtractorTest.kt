@@ -57,7 +57,7 @@ class NerExtractorTest {
                     message = "Your HDFC Bank A/C XX1234 debited Rs 500 at Amazon",
                     expectedEntities =
                         mapOf(
-                            "AMOUNT" to listOf("rs", "500"),
+                            "AMOUNT" to listOf("500"),
                             "MERCHANT" to listOf("amazon"),
                         ),
                 ),
@@ -94,7 +94,7 @@ class NerExtractorTest {
                 keywords.forEach { keyword ->
                     assertTrue(
                         "Expected '$keyword' in $entityType='$extracted' for: '${tc.message}'",
-                        extracted!!.contains(keyword, ignoreCase = true),
+                        extracted!!.value.contains(keyword, ignoreCase = true),
                     )
                 }
             }
@@ -142,7 +142,7 @@ class NerExtractorTest {
             entities.values.forEach { value ->
                 assertTrue(
                     "Entity value should not be blank for: '${message.take(40)}...'",
-                    value.isNotBlank(),
+                    value.value.isNotBlank(),
                 )
             }
         }

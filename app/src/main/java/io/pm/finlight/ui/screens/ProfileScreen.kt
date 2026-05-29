@@ -36,6 +36,7 @@ import coil.compose.AsyncImage
 import io.pm.finlight.*
 import io.pm.finlight.R
 import io.pm.finlight.ui.components.*
+import androidx.compose.ui.platform.testTag
 
 @Composable
 fun ProfileScreen(
@@ -46,7 +47,7 @@ fun ProfileScreen(
     val savedProfilePictureUri by profileViewModel.profilePictureUri.collectAsState()
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().testTag("profile_lazy_column"),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

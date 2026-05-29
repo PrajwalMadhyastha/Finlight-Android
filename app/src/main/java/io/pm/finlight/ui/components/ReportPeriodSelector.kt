@@ -22,6 +22,8 @@ import io.pm.finlight.data.model.TimePeriod
 import java.text.SimpleDateFormat
 import java.util.*
 
+import androidx.compose.ui.platform.testTag
+
 @Composable
 fun ReportPeriodSelector(
     timePeriod: TimePeriod,
@@ -56,11 +58,13 @@ fun ReportPeriodSelector(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.testTag("report_period_title"),
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("report_period_subtitle"),
                 )
             }
 

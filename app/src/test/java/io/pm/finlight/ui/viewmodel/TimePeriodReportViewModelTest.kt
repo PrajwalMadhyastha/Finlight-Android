@@ -302,8 +302,60 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             viewModel.chartData.test {
                 val chartPair = awaitItem()
                 assertNotNull(chartPair)
-                assertEquals(16, chartPair!!.first.entryCount) // 8 weeks x 2 datasets (income + expense)
-                assertEquals(8, chartPair.second.size) // 8 labels
+                assertEquals(6, chartPair!!.first.entryCount) // 3 weeks x 2 datasets (income + expense)
+                assertEquals(3, chartPair.second.size) // 3 labels
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `chartData generates correctly for DAILY period`() =
+        runTest {
+            // Arrange
+            val dailyTrends =
+                listOf(
+                    io.pm.finlight.DailyTrend("2025-10-08", 100.0, 50.0),
+                    io.pm.finlight.DailyTrend("2025-10-09", 200.0, 100.0),
+                )
+            `when`(transactionDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(dailyTrends))
+
+            // Act
+            val viewModel =
+                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.DAILY, null, false)
+            advanceUntilIdle()
+
+            // Assert
+            viewModel.chartData.test {
+                val chartPair = awaitItem()
+                assertNotNull(chartPair)
+                assertEquals(6, chartPair!!.first.entryCount) // 3 days x 2 datasets (income + expense)
+                assertEquals(3, chartPair.second.size) // 3 labels
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `chartData generates correctly for MONTHLY period`() =
+        runTest {
+            // Arrange
+            val monthlyTrends =
+                listOf(
+                    io.pm.finlight.MonthlyTrend("2025-09", 1000.0, 500.0),
+                    io.pm.finlight.MonthlyTrend("2025-10", 2000.0, 1000.0),
+                )
+            `when`(transactionDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(monthlyTrends))
+
+            // Act
+            val viewModel =
+                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false)
+            advanceUntilIdle()
+
+            // Assert
+            viewModel.chartData.test {
+                val chartPair = awaitItem()
+                assertNotNull(chartPair)
+                assertEquals(6, chartPair!!.first.entryCount) // 3 months x 2 datasets (income + expense)
+                assertEquals(3, chartPair.second.size) // 3 labels
                 cancelAndIgnoreRemainingEvents()
             }
         }

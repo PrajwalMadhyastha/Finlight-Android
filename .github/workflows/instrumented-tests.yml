@@ -1,0 +1,128 @@
+name: Instrumented Tests
+
+# Run on all PRs, nightly, and manual dispatch.
+# Kept separate from android-ci.yml to keep jobs organized.
+on:
+  pull_request:
+  schedule:
+    # Runs at 02:00 UTC every day (07:30 IST)
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+# Explicitly limit permissions (principle of least privilege)
+permissions:
+  contents: read
+  checks: write   # Required by dorny/test-reporter to post PR check annotations
+
+jobs:
+  instrumented-tests:
+    name: Run Instrumented UI Tests (API 34)
+    # ubuntu-latest supports KVM hardware acceleration since early 2024.
+    # 1x minute multiplier vs 10x for macOS — far more cost-effective.
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Java ──────────────────────────────────────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      # ── 3. Enable KVM (hardware acceleration on Linux) ────────────────────
+      - name: Enable KVM group permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # ── 4. Gradle cache ──────────────────────────────────────────────────────
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # ── 5. AVD cache ─────────────────────────────────────────────────────────
+      # Caching the AVD snapshot saves ~3-5 min on cache hits.
+      # Key includes API level and system image to invalidate on changes.
+      - name: Cache AVD snapshot
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api34-atd-${{ runner.os }}-v1
+
+      # ── 6. Create AVD (only on cache miss) ──────────────────────────────────
+      - name: Create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2.37.0
+        with:
+          api-level: 34
+          # aosp_atd = Android Test Delivery image: no Google Play, leaner, boots faster
+          target: aosp_atd
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          # Run a no-op script just to create and cache the snapshot
+          script: echo "AVD created and snapshot cached."
+
+      # ── 7. Make gradlew executable ──────────────────────────────────────────
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # ── 8. Run instrumented tests ─────────────────────────────────────────
+      # --max-workers 2 prevents OOM (ubuntu runners have 7GB RAM; emulator + Gradle
+      # can hit limits without this).
+      - name: Run Instrumented Tests
+        uses: reactivecircus/android-emulator-runner@v2.37.0
+        with:
+          api-level: 34
+          target: aosp_atd
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            # Run the full instrumented test suite.
+            # NOTE: Keep this as a single line — the emulator-runner action invokes
+            # the script via /usr/bin/sh -c, which does not support backslash
+            # line continuations. Splitting the command caused Gradle to interpret
+            # the literal '\' as a task name (now fixed).
+            ./gradlew connectedDebugAndroidTest --no-daemon --max-workers 2 -Pandroid.testInstrumentationRunnerArguments.notPackage=io.pm.finlight.data.db.dao
+
+      # ── 9. Upload raw test results ───────────────────────────────────────────
+      # Always upload so failures can be inspected even when the job fails.
+      - name: Upload raw test results (XML)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-results-api34
+          path: app/build/outputs/androidTest-results/
+          retention-days: 14
+
+      # ── 10. Publish test report (inline PR annotations) ──────────────────────
+      # Posts pass/fail per test directly in the PR "Checks" tab.
+      # check_name must be unique per workflow run.
+      - name: Publish test report
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Instrumented Tests (API 34)
+          path: app/build/outputs/androidTest-results/**/*.xml
+          reporter: java-junit
+          fail-on-error: true

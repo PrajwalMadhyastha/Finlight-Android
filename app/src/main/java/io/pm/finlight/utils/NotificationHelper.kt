@@ -673,4 +673,65 @@ object NotificationHelper {
             notify(transaction.id, builder.build())
         }
     }
+
+    /**
+     * Shows a high-priority notification when the amount parser flagged a transaction as suspicious.
+     *
+     * The transaction has already been saved (with [Transaction.needsReview] = true) so no data
+     * is lost. The notification invites the user to tap and verify the amount on the edit screen.
+     *
+     * Triggered by Options A (large amount), C (amount > balance), or D (low NER confidence).
+     */
+    fun showSuspiciousAmountNotification(
+        context: Context,
+        transaction: Transaction,
+        reason: String,
+    ) {
+        val canShowNotification =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+
+        if (!canShowNotification) return
+
+        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+        val amountStr = currencyFormat.format(transaction.amount)
+
+        val detailIntent =
+            Intent(
+                Intent.ACTION_VIEW,
+                "$DEEP_LINK_URI_EDIT/${transaction.id}".toUri(),
+            ).apply {
+                `package` = context.packageName
+            }
+
+        val pendingIntent: PendingIntent? =
+            TaskStackBuilder.create(context).run {
+                addNextIntentWithParentStack(detailIntent)
+                getPendingIntent(
+                    transaction.id,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+            }
+
+        val bigText =
+            "⚠️ Suspicious amount $amountStr captured for ${transaction.description}.\n\n$reason\n\nPlease tap to verify — the transaction has been saved but marked for review."
+
+        val builder =
+            NotificationCompat.Builder(context, MainApplication.TRANSACTION_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_logo)
+                .setContentTitle("⚠️ Suspicious Amount Detected")
+                .setContentText("$amountStr at ${transaction.description} — tap to verify")
+                .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .addAction(android.R.drawable.ic_menu_edit, "Review Now", pendingIntent)
+
+        with(NotificationManagerCompat.from(context)) {
+            notify(transaction.id, builder.build())
+        }
+    }
 }

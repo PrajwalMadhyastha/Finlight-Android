@@ -42,6 +42,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -510,6 +511,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                         bottomNavItems.forEach { screen ->
                             val isSelected = baseCurrentRoute == screen.route
                             NavigationBarItem(
+                                modifier = Modifier.testTag("nav_item_${screen.label}"),
                                 icon = { Icon(screen.icon, contentDescription = screen.label) },
                                 label = { Text(screen.label) },
                                 selected = isSelected,

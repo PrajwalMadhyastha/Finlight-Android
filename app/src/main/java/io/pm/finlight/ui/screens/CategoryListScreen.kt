@@ -25,6 +25,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -121,20 +122,26 @@ fun CategoryListScreen(
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             Row {
-                                IconButton(onClick = {
-                                    selectedCategory = category
-                                    showEditDialog = true
-                                }) {
+                                IconButton(
+                                    onClick = {
+                                        selectedCategory = category
+                                        showEditDialog = true
+                                    },
+                                    modifier = Modifier.testTag("edit_category_${category.name}")
+                                ) {
                                     Icon(
                                         imageVector = Icons.Default.Edit,
                                         contentDescription = "Edit Category",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                IconButton(onClick = {
-                                    selectedCategory = category
-                                    showDeleteDialog = true
-                                }) {
+                                IconButton(
+                                    onClick = {
+                                        selectedCategory = category
+                                        showDeleteDialog = true
+                                    },
+                                    modifier = Modifier.testTag("delete_category_${category.name}")
+                                ) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Delete Category",

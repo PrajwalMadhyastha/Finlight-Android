@@ -8,7 +8,7 @@ class SmsEntityExtractorTest {
         // Create an anonymous implementation that uses the default close()
         val extractor =
             object : SmsEntityExtractor {
-                override fun extract(text: String): Map<String, String> {
+                override fun extract(text: String): Map<String, io.pm.finlight.core.NerEntity> {
                     return emptyMap()
                 }
             }

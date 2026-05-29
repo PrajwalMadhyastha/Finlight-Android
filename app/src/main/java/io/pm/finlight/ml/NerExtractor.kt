@@ -2,6 +2,7 @@ package io.pm.finlight.ml
 
 import android.content.Context
 import androidx.annotation.VisibleForTesting
+import io.pm.finlight.core.NerEntity
 import org.json.JSONObject
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
@@ -123,7 +124,7 @@ class NerExtractor private constructor(
      * @return Map of entity type to extracted text, e.g. {"MERCHANT": "Amazon", "AMOUNT": "Rs 500"}.
      *         Only entities found in the text are included.
      */
-    override fun extract(text: String): Map<String, String> {
+    override fun extract(text: String): Map<String, NerEntity> {
         val interp = interpreter ?: return emptyMap()
         val tok = tokenizer ?: return emptyMap()
 
@@ -197,7 +198,7 @@ class NerExtractor private constructor(
             }
 
         // Step 6: Post-process BIO tags into entity spans
-        return extractEntities(predictions, result)
+        return extractEntities(predictions, result, logits)
     }
 
     /**
@@ -213,8 +214,9 @@ class NerExtractor private constructor(
     internal fun extractEntities(
         predictions: IntArray,
         tokenResult: WordPieceTokenizer.TokenizationResult,
-    ): Map<String, String> {
-        data class EntitySpan(val type: String, val tokens: MutableList<String>)
+        logits: Array<FloatArray> = emptyArray(),
+    ): Map<String, NerEntity> {
+        data class EntitySpan(val type: String, val tokens: MutableList<String>, val confidences: MutableList<Float>)
 
         val spans = mutableListOf<EntitySpan>()
         var currentSpan: EntitySpan? = null
@@ -236,17 +238,21 @@ class NerExtractor private constructor(
                     // Start a new entity
                     if (currentSpan != null) spans.add(currentSpan)
                     val entityType = label.removePrefix("B-")
-                    currentSpan = EntitySpan(entityType, mutableListOf(tokenResult.tokens[i]))
+                    // Softmax confidence for this token: exp(maxLogit) / sum(exp(all logits))
+                    val tokenConf = if (logits.isNotEmpty()) softmaxConfidence(logits[i], predictions[i]) else 1f
+                    currentSpan = EntitySpan(entityType, mutableListOf(tokenResult.tokens[i]), mutableListOf(tokenConf))
                 }
                 label.startsWith("I-") && currentSpan != null -> {
                     val entityType = label.removePrefix("I-")
+                    val tokenConf = if (logits.isNotEmpty()) softmaxConfidence(logits[i], predictions[i]) else 1f
                     if (entityType == currentSpan.type) {
                         // Continue the current entity
                         currentSpan.tokens.add(tokenResult.tokens[i])
+                        currentSpan.confidences.add(tokenConf)
                     } else {
                         // Type mismatch — close current and start new
                         spans.add(currentSpan)
-                        currentSpan = EntitySpan(entityType, mutableListOf(tokenResult.tokens[i]))
+                        currentSpan = EntitySpan(entityType, mutableListOf(tokenResult.tokens[i]), mutableListOf(tokenConf))
                     }
                 }
                 else -> {
@@ -261,25 +267,30 @@ class NerExtractor private constructor(
         if (currentSpan != null) spans.add(currentSpan)
 
         // Merge tokens into text, handling WordPiece "##" subword joining
-        val entityMap = mutableMapOf<String, MutableList<String>>()
+        val entityMap = mutableMapOf<String, MutableList<Pair<String, Float>>>()
         for (span in spans) {
             val text = mergeSubwordTokens(span.tokens)
+            val avgConf = if (span.confidences.isNotEmpty()) span.confidences.average().toFloat() else 1f
             if (text.isNotBlank()) {
-                entityMap.getOrPut(span.type) { mutableListOf() }.add(text)
+                entityMap.getOrPut(span.type) { mutableListOf() }.add(Pair(text, avgConf))
             }
         }
 
-        return entityMap.mapValues { (type, values) ->
-            val uniqueValues = values.distinct()
-            var joined = uniqueValues.joinToString(", ")
+        return entityMap.mapValues { (type, pairs) ->
+            val uniquePairs = pairs.distinctBy { it.first }
+            val joined = uniquePairs.joinToString(", ") { it.first }
+            // Average confidence across all unique occurrences of this entity type
+            val avgConf = uniquePairs.map { it.second }.average().toFloat()
 
             // Post-process AMOUNT to remove currency prefixes and commas
-            if (type == "AMOUNT") {
-                joined =
-                    joined.replace(Regex("(?i)^(?:rs\\.?|inr\\.?|₹)\\s*"), "")
-                        .replace(Regex(",(?=\\d{2,3})"), "") // Remove Indian-style commas
+            val processedValue = if (type == "AMOUNT") {
+                joined
+                    .replace(Regex("""(?i)^(?:rs\.?|inr\.?|₹)\s*"""), "")
+                    .replace(Regex(""",(?=\d{2,3})"""), "") // Remove Indian-style commas
+            } else {
+                joined
             }
-            joined
+            NerEntity(processedValue, avgConf)
         }
     }
 
@@ -325,6 +336,19 @@ class NerExtractor private constructor(
             .replace(Regex("""([.,/:*\-@;])\s+(?=\w)"""), "$1")
             // Strip trailing punctuation from sentence boundaries
             .trimEnd('.', ',', ':', ';', '-', '@')
+    }
+
+    /**
+     * Compute the softmax probability for a single predicted class index from a logit vector.
+     *
+     * Uses the numerically-stable max-subtraction trick to prevent float overflow.
+     */
+    private fun softmaxConfidence(logits: FloatArray, predictedIndex: Int): Float {
+        if (logits.isEmpty()) return 1f
+        val max = logits.max()
+        val expValues = logits.map { Math.exp((it - max).toDouble()).toFloat() }
+        val sumExp = expValues.sum()
+        return if (sumExp == 0f) 0f else expValues[predictedIndex] / sumExp
     }
 
     override fun close() {
