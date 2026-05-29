@@ -127,7 +127,7 @@ class ReportsViewModel(
 
                     // Calculate insights
                     val percentageChange =
-                        if (previousSummary?.totalExpenses != null && previousSummary.totalExpenses > 0) {
+                        if (previousSummary != null && previousSummary.totalExpenses > 0) {
                             val currentExpenses = currentSummary?.totalExpenses ?: 0.0
                             ((currentExpenses - previousSummary.totalExpenses) / previousSummary.totalExpenses * 100).roundToInt()
                         } else {

@@ -512,6 +512,16 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `getRecentManualTransactions calls DAO`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository)
+            `when`(transactionDao.getRecentManualTransactions(5)).thenReturn(flowOf(emptyList()))
+            repository.getRecentManualTransactions(5)
+            verify(transactionDao).getRecentManualTransactions(5)
+        }
+
+    @Test
     fun `addTagForDateRange calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()

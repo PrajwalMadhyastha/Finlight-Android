@@ -7,109 +7,36 @@ import java.util.concurrent.ConcurrentHashMap
 object FormatUtils {
     private val formatters = ConcurrentHashMap<Pair<String, Locale>, ThreadLocal<SimpleDateFormat>>()
 
+    private class ThreadLocalFormatter(private val pattern: String, private val locale: Locale) : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue() = SimpleDateFormat(pattern, locale)
+    }
+
+    private class ThreadLocalCurrencyFormatter(private val locale: Locale) : ThreadLocal<java.text.NumberFormat>() {
+        override fun initialValue() = java.text.NumberFormat.getCurrencyInstance(locale)
+    }
+
     fun getFormatter(
         pattern: String,
         locale: Locale = Locale.getDefault(),
     ): SimpleDateFormat {
         return formatters.getOrPut(pattern to locale) {
-            object : ThreadLocal<SimpleDateFormat>() {
-                override fun initialValue(): SimpleDateFormat {
-                    return SimpleDateFormat(pattern, locale)
-                }
-            }
+            ThreadLocalFormatter(pattern, locale)
         }.get()!!
     }
 
-    private val _defaultDateFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            }
-        }
-
-    private val _monthYearFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("yyyy-MM", Locale.getDefault())
-            }
-        }
-
-    private val _shortMonthFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("LLL", Locale.getDefault())
-            }
-        }
-
-    private val _monthYearDisplayFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("LLLL yyyy", Locale.getDefault())
-            }
-        }
-
-    private val _fullDateTimeFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("EEE, dd MMMM yy, h:mm a", Locale.getDefault())
-            }
-        }
-
-    private val _shortYearDateFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("dd MMM, yy", Locale.getDefault())
-            }
-        }
-
-    private val _isoDateFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            }
-        }
-
-    private val _dateTimeFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
-            }
-        }
-
-    private val _longDateFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("dd MMMM, yyyy", Locale.getDefault())
-            }
-        }
-
-    private val _dayOfWeekFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("EEEE", Locale.getDefault())
-            }
-        }
-
-    private val _displayDateFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("dd MMM, yyyy", Locale.getDefault())
-            }
-        }
-
-    private val _timestampFormatter =
-        object : ThreadLocal<SimpleDateFormat>() {
-            override fun initialValue(): SimpleDateFormat {
-                return SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-            }
-        }
-
-    private val _currencyFormatter =
-        object : ThreadLocal<java.text.NumberFormat>() {
-            override fun initialValue(): java.text.NumberFormat {
-                return java.text.NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            }
-        }
+    private val _defaultDateFormatter = ThreadLocalFormatter("yyyy-MM-dd", Locale.getDefault())
+    private val _monthYearFormatter = ThreadLocalFormatter("yyyy-MM", Locale.getDefault())
+    private val _shortMonthFormatter = ThreadLocalFormatter("LLL", Locale.getDefault())
+    private val _monthYearDisplayFormatter = ThreadLocalFormatter("LLLL yyyy", Locale.getDefault())
+    private val _fullDateTimeFormatter = ThreadLocalFormatter("EEE, dd MMMM yy, h:mm a", Locale.getDefault())
+    private val _shortYearDateFormatter = ThreadLocalFormatter("dd MMM, yy", Locale.getDefault())
+    private val _isoDateFormatter = ThreadLocalFormatter("yyyy-MM-dd", Locale.getDefault())
+    private val _dateTimeFormatter = ThreadLocalFormatter("dd MMM yyyy, hh:mm a", Locale.getDefault())
+    private val _longDateFormatter = ThreadLocalFormatter("dd MMMM, yyyy", Locale.getDefault())
+    private val _dayOfWeekFormatter = ThreadLocalFormatter("EEEE", Locale.getDefault())
+    private val _displayDateFormatter = ThreadLocalFormatter("dd MMM, yyyy", Locale.getDefault())
+    private val _timestampFormatter = ThreadLocalFormatter("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+    private val _currencyFormatter = ThreadLocalCurrencyFormatter(Locale("en", "IN"))
 
     val defaultDateFormatter: SimpleDateFormat
         get() = _defaultDateFormatter.get()!!

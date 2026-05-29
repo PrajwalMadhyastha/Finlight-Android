@@ -2444,6 +2444,39 @@ class TransactionViewModelTest : BaseViewModelTest() {
     // --- NEW: applyAliases Tests via findTransactionDetailsById ---
 
     @Test
+    fun `applyAliases does nothing when alias is null`() =
+        runTest {
+            // Arrange
+            val aliases = emptyMap<String, String>()
+            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
+
+            val transaction =
+                Transaction(
+                    id = 1,
+                    description = "Gateway",
+                    originalDescription = "Gateway",
+                    amount = 1.0,
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                )
+            val details = TransactionDetails(transaction, emptyList(), "Account", "Category", "icon", "color", null)
+            whenever(transactionRepository.getTransactionDetailsById(1)).thenReturn(flowOf(details))
+
+            initializeViewModel()
+            advanceUntilIdle()
+
+            // Act & Assert
+            viewModel.findTransactionDetailsById(1).test {
+                val result = awaitItem()
+                assertNotNull(result)
+                assertEquals("Gateway", result!!.transaction.description)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `applyAliases applies alias when description equals originalDescription`() =
         runTest {
             // Arrange
