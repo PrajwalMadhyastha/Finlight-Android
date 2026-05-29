@@ -79,6 +79,7 @@ class BudgetManagementTests {
         val amountInput = composeTestRule.onNodeWithText("Budget Amount")
         amountInput.performTextInput("2000")
         androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
 
         // Click Save Budget
         composeTestRule.onNodeWithText("Save Budget").performClick()
@@ -114,6 +115,7 @@ class BudgetManagementTests {
         amountInput.performTextClearance()
         amountInput.performTextInput("6000")
         androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
 
         // Save
         composeTestRule.onNodeWithText("Update Budget").performClick()
