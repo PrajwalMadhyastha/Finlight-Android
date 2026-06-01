@@ -12,7 +12,6 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class TravelModeTests {
-
     private val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @get:Rule
@@ -38,7 +37,7 @@ class TravelModeTests {
             composeTestRule.onAllNodesWithText("Profile").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Profile").performClick()
-        
+
         composeTestRule.waitUntil(timeoutMillis = 10000) {
             composeTestRule.onAllNodesWithText("Currency & Travel").fetchSemanticsNodes().isNotEmpty()
         }

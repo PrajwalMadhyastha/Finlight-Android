@@ -30,6 +30,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -108,6 +109,7 @@ fun MerchantPredictionSheet(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .testTag("description_text_field")
                         .focusRequester(focusRequester),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
@@ -150,6 +152,7 @@ fun MerchantPredictionSheet(
                 Button(
                     onClick = { onManualSave(currentDescription.text) },
                     enabled = currentDescription.text.isNotBlank(),
+                    modifier = Modifier.testTag("merchant_save_button")
                 ) {
                     Text("Save")
                 }

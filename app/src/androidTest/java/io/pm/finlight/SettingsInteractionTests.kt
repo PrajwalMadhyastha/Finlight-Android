@@ -3,6 +3,8 @@ package io.pm.finlight
 import android.Manifest
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import org.junit.Rule
@@ -63,14 +65,57 @@ class SettingsInteractionTests {
         composeTestRule.onNodeWithText("Export Transactions (CSV)").performScrollTo().assertIsDisplayed()
     }
 
+    @OptIn(ExperimentalTestApi::class)
     @Test
-    fun test_manageParseRules_showsEmptyState() {
+    fun test_manageParseRules_addsAndDeletesRule() {
         navigateToProfile()
         composeTestRule.onNodeWithTag("profile_lazy_column").performScrollToNode(hasText("Automation"))
         composeTestRule.onNodeWithText("Automation").performClick()
         composeTestRule.onNodeWithText("Manage Custom Parse Rules").performScrollTo().performClick()
 
-        composeTestRule.onNodeWithText("No custom parsing rules have been created yet.").assertIsDisplayed()
+        // Wait for empty state or Add button
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Add New Rule").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Click Add New Rule
+        composeTestRule.onNodeWithText("Add New Rule").performClick()
+
+        // In RuleCreationScreen, paste a mock SMS
+        val mockSms = "Paid ZOMATO FOOD 500 Rs"
+        composeTestRule.onNodeWithTag("sms_input_field")
+            .performTextInput(mockSms)
+
+        // Select trigger phrase "Paid"
+        composeTestRule.onNodeWithTag("sms_input_field")
+            .performTextInputSelection(TextRange(0, 4))
+        composeTestRule.onNodeWithTag("mark_trigger_btn").performClick()
+
+        // Select merchant "ZOMATO FOOD"
+        composeTestRule.onNodeWithTag("sms_input_field")
+            .performTextInputSelection(TextRange(5, 16))
+        composeTestRule.onNodeWithTag("mark_merchant_btn").performClick()
+
+        // Select amount "500"
+        composeTestRule.onNodeWithTag("sms_input_field")
+            .performTextInputSelection(TextRange(17, 20))
+        composeTestRule.onNodeWithTag("mark_amount_btn").performClick()
+
+        // Save Rule
+        composeTestRule.onNodeWithTag("save_rule_btn").performScrollTo().performClick()
+
+        // Verify it appears in ManageParseRulesScreen
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Paid").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Paid").assertIsDisplayed()
+
+        // Delete Rule
+        composeTestRule.onNodeWithContentDescription("Delete Rule").performClick()
+        composeTestRule.onNodeWithText("Delete").performClick()
+
+        // Verify deletion
+        composeTestRule.onNodeWithText("Paid").assertDoesNotExist()
     }
 
     @Test
@@ -103,6 +148,7 @@ class SettingsInteractionTests {
         // Verify it was deleted
         composeTestRule.onNodeWithText("TEST_SENDER").assertDoesNotExist()
     }
+
     @Test
     fun test_toggleAppLock_persists() {
         navigateToProfile()
@@ -112,15 +158,15 @@ class SettingsInteractionTests {
         // Toggle App Lock on
         val appLockToggle = composeTestRule.onNodeWithText("Enable App Lock")
         appLockToggle.performScrollTo().assertIsDisplayed()
-        
+
         // Find the toggle (Switch) next to it, or just click the row if it handles it
         // The help text says "Use biometrics to secure the app" so we can check that too
         composeTestRule.onNodeWithText("Use biometrics to secure the app").assertIsDisplayed()
-        
-        // Since we cannot interact with the system BiometricPrompt in Compose tests, 
+
+        // Since we cannot interact with the system BiometricPrompt in Compose tests,
         // we'll just check that the setting is present and interactable.
         appLockToggle.performClick()
-        
+
         // Wait for idle
         composeTestRule.waitForIdle()
 

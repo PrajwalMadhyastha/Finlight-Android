@@ -53,11 +53,21 @@ fun ManageParseRulesScreen(
     var ruleToDelete by remember { mutableStateOf<CustomSmsRule?>(null) }
 
     if (rules.isEmpty()) {
-        EmptyStateMessage(
-            message = "No custom parsing rules have been created yet.",
-            icon = Icons.Default.Info,
+        Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
-        )
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            EmptyStateMessage(
+                message = "No custom parsing rules have been created yet.",
+                icon = Icons.Default.Info,
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = { navController.navigate("rule_creation_screen") }) {
+                Text("Add New Rule")
+            }
+        }
     } else {
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
@@ -72,6 +82,15 @@ fun ManageParseRulesScreen(
                     },
                     onDeleteClick = { ruleToDelete = rule },
                 )
+            }
+            item {
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = { navController.navigate("rule_creation_screen") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Add New Rule")
+                }
             }
         }
     }

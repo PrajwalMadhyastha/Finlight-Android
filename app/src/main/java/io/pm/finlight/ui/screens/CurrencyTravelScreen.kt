@@ -348,12 +348,14 @@ fun CurrencyTravelScreen(
         )
     }
     if (showStartDatePicker) {
-        val todayMidnightUtc = remember {
-            java.time.LocalDate.now().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
-        }
-        val initialStart = remember(startDate) {
-            startDate?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() } ?: todayMidnightUtc
-        }
+        val todayMidnightUtc =
+            remember {
+                java.time.LocalDate.now().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+            }
+        val initialStart =
+            remember(startDate) {
+                startDate?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() } ?: todayMidnightUtc
+            }
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialStart)
         DatePickerDialog(
             onDismissRequest = { showStartDatePicker = false },
@@ -380,13 +382,15 @@ fun CurrencyTravelScreen(
         }
     }
     if (showEndDatePicker) {
-        val todayMidnightUtc = remember {
-            java.time.LocalDate.now().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
-        }
-        val initialEnd = remember(endDate, startDate) {
-            val baseMillis = endDate ?: startDate
-            baseMillis?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() } ?: todayMidnightUtc
-        }
+        val todayMidnightUtc =
+            remember {
+                java.time.LocalDate.now().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+            }
+        val initialEnd =
+            remember(endDate, startDate) {
+                val baseMillis = endDate ?: startDate
+                baseMillis?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() } ?: todayMidnightUtc
+            }
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialEnd)
         DatePickerDialog(
             onDismissRequest = { showEndDatePicker = false },
