@@ -98,6 +98,16 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_SEARCH = "io.pm.finlight.ACTION_SEARCH"
     }
 
+    /**
+     * Public wrapper around the protected [onNewIntent] for use in instrumented tests.
+     * This allows tests to simulate an incoming deep link intent while the activity
+     * is already running (i.e., the same way a notification PendingIntent works).
+     */
+    @androidx.annotation.VisibleForTesting
+    fun handleIntentForTesting(intent: android.content.Intent) {
+        onNewIntent(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
