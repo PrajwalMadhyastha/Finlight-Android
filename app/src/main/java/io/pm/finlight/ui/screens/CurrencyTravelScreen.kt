@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -44,6 +45,7 @@ import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.CurrencyViewModel
 import io.pm.finlight.utils.CurrencyHelper
+import kotlinx.coroutines.launch
 import io.pm.finlight.utils.CurrencyInfo
 import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
@@ -124,6 +126,7 @@ fun CurrencyTravelScreen(
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showEndDatePicker by remember { mutableStateOf(false) }
     var showCancelConfirmation by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     val isSaveEnabled =
         tripName.text.isNotBlank() &&
@@ -204,6 +207,7 @@ fun CurrencyTravelScreen(
                     }
                 }
 
+                android.util.Log.d("TravelModeTests", "isSaveEnabled=$isSaveEnabled, startDate=$startDate, endDate=$endDate, tripType=$tripType, selectedCurrency=${selectedCurrency?.currencyCode}, conversionRate=${conversionRate.text}, tripName=${tripName.text}")
                 Button(
                     onClick = {
                         val settings =
@@ -223,8 +227,11 @@ fun CurrencyTravelScreen(
                         }
 
                         val toastMessage = if (activeTravelSettings == null && !isEditMode) "New travel plan saved!" else "Trip details updated!"
-                        Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
-                        navController.popBackStack()
+                        android.widget.Toast.makeText(context, toastMessage, android.widget.Toast.LENGTH_SHORT).show()
+                        coroutineScope.launch {
+                            kotlinx.coroutines.delay(500)
+                            navController.popBackStack()
+                        }
                     },
                     enabled = isSaveEnabled,
                     modifier = Modifier.fillMaxWidth(),
@@ -341,7 +348,13 @@ fun CurrencyTravelScreen(
         )
     }
     if (showStartDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = startDate ?: System.currentTimeMillis())
+        val todayMidnightUtc = remember {
+            java.time.LocalDate.now().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+        }
+        val initialStart = remember(startDate) {
+            startDate?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() } ?: todayMidnightUtc
+        }
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialStart)
         DatePickerDialog(
             onDismissRequest = { showStartDatePicker = false },
             confirmButton = {
@@ -367,7 +380,14 @@ fun CurrencyTravelScreen(
         }
     }
     if (showEndDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = endDate ?: startDate ?: System.currentTimeMillis())
+        val todayMidnightUtc = remember {
+            java.time.LocalDate.now().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+        }
+        val initialEnd = remember(endDate, startDate) {
+            val baseMillis = endDate ?: startDate
+            baseMillis?.let { java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() } ?: todayMidnightUtc
+        }
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialEnd)
         DatePickerDialog(
             onDismissRequest = { showEndDatePicker = false },
             confirmButton = {
@@ -434,6 +454,7 @@ private fun TripSettingsForm(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
+                                .testTag("trip_name_input")
                                 .onGloballyPositioned { coordinates ->
                                     textFieldWidth = coordinates.size.width
                                 },
@@ -488,11 +509,13 @@ private fun TripSettingsForm(
                         selected = tripType == TripType.DOMESTIC,
                         onClick = { onTripTypeChange(TripType.DOMESTIC) },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        modifier = Modifier.testTag("domestic_trip_button")
                     ) { Text("Domestic") }
                     SegmentedButton(
                         selected = tripType == TripType.INTERNATIONAL,
                         onClick = { onTripTypeChange(TripType.INTERNATIONAL) },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        modifier = Modifier.testTag("international_trip_button")
                     ) { Text("International") }
                 }
             },
@@ -504,7 +527,7 @@ private fun TripSettingsForm(
                 ListItem(
                     headlineContent = { Text("Foreign Currency") },
                     trailingContent = {
-                        TextButton(onClick = onSelectCurrencyClick) {
+                        TextButton(onClick = onSelectCurrencyClick, modifier = Modifier.testTag("foreign_currency_button")) {
                             Text(selectedCurrency?.currencyCode ?: "Select")
                         }
                     },
@@ -526,7 +549,7 @@ private fun TripSettingsForm(
                         OutlinedTextField(
                             value = conversionRate,
                             onValueChange = onConversionRateChange,
-                            modifier = Modifier.width(100.dp),
+                            modifier = Modifier.width(100.dp).testTag("conversion_rate_input"),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             label = { Text(homeCurrencyCode) },
@@ -541,7 +564,7 @@ private fun TripSettingsForm(
             headlineContent = { Text("Trip Start Date") },
             trailingContent = {
                 val formatter = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }
-                TextButton(onClick = onStartDateClick) {
+                TextButton(onClick = onStartDateClick, modifier = Modifier.testTag("start_date_button")) {
                     Text(startDate?.let { formatter.format(Date(it)) } ?: "Select")
                 }
             },
@@ -552,7 +575,7 @@ private fun TripSettingsForm(
             headlineContent = { Text("Trip End Date") },
             trailingContent = {
                 val formatter = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }
-                TextButton(onClick = onEndDateClick) {
+                TextButton(onClick = onEndDateClick, modifier = Modifier.testTag("end_date_button")) {
                     Text(endDate?.let { formatter.format(Date(it)) } ?: "Select")
                 }
             },
