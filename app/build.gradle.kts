@@ -187,7 +187,7 @@ android {
         targetSdk = 35
         versionCode = generateVersionCode()
         versionName = "${versionProperties["VERSION_MAJOR"]}.${versionProperties["VERSION_MINOR"]}.${versionProperties["VERSION_PATCH"]}"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "io.pm.finlight.FinlightTestRunner"
         vectorDrawables {
             useSupportLibrary = true
         }

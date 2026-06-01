@@ -109,8 +109,9 @@ class TransactionCrudTests {
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         composeTestRule.waitForIdle()
 
-        // Select the manually-entered description from the suggestion list
-        composeTestRule.onAllNodesWithText(uniqueDescription).onFirst().performClick()
+        // Explicitly click the Save button in the MerchantPredictionSheet to close it
+        composeTestRule.onNodeWithText("Save").performClick()
+        composeTestRule.waitForIdle()
 
         // 6. Select Account — use the seeded "Test Wallet" so it never depends on
         //    live device data like "Cash Spends"
@@ -151,6 +152,10 @@ class TransactionCrudTests {
     @Test
     fun test_createTransaction_appearsOnDashboard() {
         val description = addTransactionForTest()
+        // First, scroll to the Recent Transactions card so its contents are composed.
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasText("Recent Transactions"))
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
         }

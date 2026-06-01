@@ -211,8 +211,19 @@ class ReportsNavigationTests {
             composeTestRule.onAllNodesWithText("Total Spent").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Use a date far in the future by swiping a few times if necessary
-        // Or simply wait, since the current day likely has no transactions.
+        // Since TestDataSeeder now seeds transactions for today, swipe left to go to tomorrow
+        val initialTitleNode = composeTestRule.onNodeWithTag("report_period_title")
+        val initialTitleText = initialTitleNode.fetchSemanticsNode().config[SemanticsProperties.Text].first().text
+
+        composeTestRule.onRoot().performTouchInput { swipeLeft() }
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            val currentText =
+                composeTestRule.onNodeWithTag(
+                    "report_period_title",
+                ).fetchSemanticsNode().config[SemanticsProperties.Text].first().text
+            currentText != initialTitleText
+        }
+
         composeTestRule.onNodeWithTag(
             "time_period_report_lazy_column",
         ).performScrollToNode(hasText("No transactions recorded for this period."))

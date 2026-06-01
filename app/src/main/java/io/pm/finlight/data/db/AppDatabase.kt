@@ -691,6 +691,11 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        @androidx.annotation.VisibleForTesting
+        fun setTestInstance(database: AppDatabase) {
+            INSTANCE = database
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val securityManager = SecurityManager(context)

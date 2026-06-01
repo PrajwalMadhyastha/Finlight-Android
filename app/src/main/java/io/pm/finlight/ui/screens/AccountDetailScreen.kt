@@ -15,6 +15,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -63,6 +64,7 @@ fun AccountDetailScreen(
             AccountDetailHeader(
                 account = currentAccount,
                 balance = balance,
+                transactionCount = transactions.size,
             )
         }
 
@@ -109,6 +111,7 @@ fun AccountDetailScreen(
 private fun AccountDetailHeader(
     account: Account,
     balance: Long,
+    transactionCount: Int,
 ) {
     val currencyFormat =
         remember {
@@ -123,6 +126,23 @@ private fun AccountDetailHeader(
         }
 
     GlassPanel {
+        // Transaction count badge — anchored to the top-right of the GlassPanel
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp),
+        ) {
+            Text(
+                text = if (transactionCount == 1) "1 Txn" else "$transactionCount Txns",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
+
         Column(
             modifier =
                 Modifier
