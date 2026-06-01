@@ -226,6 +226,11 @@ class TransactionCrudTests {
         // 5. Click Save
         composeTestRule.onNodeWithText("Save").performClick()
 
+        // Wait for the sheet to close and the detail screen to update
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText(updatedDescription).fetchSemanticsNodes().isNotEmpty()
+        }
+
         // 6. Verify update on detail screen
         composeTestRule.onNodeWithText(updatedDescription).assertIsDisplayed()
 
