@@ -1042,6 +1042,7 @@ private fun OrbitalChips(
             icon = Icons.Default.CalendarToday,
             text = FormatUtils.getFormatter("dd MMM", Locale.getDefault()).format(selectedDateTime),
             onClick = onDateClick,
+            modifier = Modifier.testTag("date_select_chip")
         )
     }
 }

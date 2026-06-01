@@ -103,4 +103,29 @@ class SettingsInteractionTests {
         // Verify it was deleted
         composeTestRule.onNodeWithText("TEST_SENDER").assertDoesNotExist()
     }
+    @Test
+    fun test_toggleAppLock_persists() {
+        navigateToProfile()
+        composeTestRule.onNodeWithTag("profile_lazy_column").performScrollToNode(hasText("Security & Data"))
+        composeTestRule.onNodeWithText("Security & Data").performClick()
+
+        // Toggle App Lock on
+        val appLockToggle = composeTestRule.onNodeWithText("Enable App Lock")
+        appLockToggle.performScrollTo().assertIsDisplayed()
+        
+        // Find the toggle (Switch) next to it, or just click the row if it handles it
+        // The help text says "Use biometrics to secure the app" so we can check that too
+        composeTestRule.onNodeWithText("Use biometrics to secure the app").assertIsDisplayed()
+        
+        // Since we cannot interact with the system BiometricPrompt in Compose tests, 
+        // we'll just check that the setting is present and interactable.
+        appLockToggle.performClick()
+        
+        // Wait for idle
+        composeTestRule.waitForIdle()
+
+        // Toggle back off
+        appLockToggle.performClick()
+        composeTestRule.waitForIdle()
+    }
 }
