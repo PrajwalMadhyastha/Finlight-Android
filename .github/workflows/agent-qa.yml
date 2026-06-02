@@ -81,9 +81,7 @@ jobs:
             ./gradlew installDebug --no-daemon
             
             echo "Running AI Agent..."
-            GOAL="${{ github.event.inputs.goal }}"
-            GOAL="${GOAL:-random}"
-            python -m agent.main --goal "$GOAL"
+            python -m agent.main --goal "${{ github.event.inputs.goal || 'random' }}"
 
       - name: Upload QA Report
         if: always()
