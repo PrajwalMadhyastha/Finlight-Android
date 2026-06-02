@@ -54,8 +54,8 @@ def get_next_action(model, goal: str, ui_state: str, history: list) -> dict:
             response = model.generate_content(prompt)
             break
         except google_exceptions.ResourceExhausted:
-            print(f"Rate limit exceeded (5 RPM). Waiting 15 seconds before retrying (Attempt {attempt+1}/5)...")
-            time.sleep(15)
+            print(f"Rate limit exceeded (5 RPM). Waiting 60 seconds before retrying (Attempt {attempt+1}/5)...")
+            time.sleep(60)
             
     if not response:
         return {"action": "error", "reasoning": "Rate limit exhausted repeatedly", "args": {}}
