@@ -13,7 +13,7 @@ on:
       goal:
         description: 'The high-level goal for the QA Agent'
         required: true
-        default: 'Perform a thorough exploratory test of the application to find any crashes or unexpected behavior.'
+        default: 'random'
 
 permissions:
   contents: read
@@ -82,7 +82,7 @@ jobs:
             
             echo "Running AI Agent..."
             GOAL="${{ github.event.inputs.goal }}"
-            GOAL="${GOAL:-Perform a thorough exploratory test of the application to find any crashes or unexpected behavior.}"
+            GOAL="${GOAL:-random}"
             python -m agent.main --goal "$GOAL"
 
       - name: Upload QA Report
