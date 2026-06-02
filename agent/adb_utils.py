@@ -41,3 +41,32 @@ def launch_app(package_name="io.pm.finlight", activity=".MainActivity"):
     # Note: Using monkey is often easier than specifying exact activity, but am start is cleaner.
     run_adb(f"am start -n {package_name}/{package_name}{activity}")
     time.sleep(2) # Wait for launch
+
+import random
+
+def get_screen_size():
+    """Gets the screen size from adb"""
+    output = run_adb("wm size")
+    # Output is usually like "Physical size: 1080x2400"
+    match = re.search(r"(\d+)x(\d+)", output)
+    if match:
+        return int(match.group(1)), int(match.group(2))
+    return 1080, 2400 # fallback
+
+def random_monkey_events(count=5):
+    """Executes random tap and swipe events to create chaos."""
+    width, height = get_screen_size()
+    print(f"Executing {count} random monkey events for chaos start...")
+    for _ in range(count):
+        event_type = random.choice(["tap", "swipe"])
+        if event_type == "tap":
+            x = random.randint(0, width)
+            y = random.randint(0, height)
+            tap(x, y)
+        else:
+            x1 = random.randint(0, width)
+            y1 = random.randint(0, height)
+            x2 = random.randint(0, width)
+            y2 = random.randint(0, height)
+            swipe(x1, y1, x2, y2, duration_ms=random.randint(100, 500))
+        time.sleep(0.5)

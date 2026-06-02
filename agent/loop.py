@@ -11,6 +11,9 @@ def run_agent_loop(goal: str, max_steps: int = 30):
     print("Launching app...")
     adb_utils.launch_app()
     
+    # Phase 3: The Chaos Start
+    adb_utils.random_monkey_events(count=5)
+    
     status = "incomplete"
     summary = ""
     
