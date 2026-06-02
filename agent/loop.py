@@ -3,7 +3,7 @@ import agent.adb_utils as adb_utils
 import agent.ui_parser as ui_parser
 import agent.brain as brain
 
-def run_agent_loop(goal: str, max_steps: int = 30):
+def run_agent_loop(goal: str, max_steps: int = 30, memory_text: str = ""):
     model = brain.setup_gemini()
     history = []
     
@@ -28,7 +28,7 @@ def run_agent_loop(goal: str, max_steps: int = 30):
              ui_state_json = ui_parser.get_ui_json()
              
         print("Thinking...")
-        action_obj = brain.get_next_action(model, goal, ui_state_json, history)
+        action_obj = brain.get_next_action(model, goal, ui_state_json, history, memory_text)
         
         reasoning = action_obj.get("reasoning", "No reasoning provided.")
         action = action_obj.get("action", "error")

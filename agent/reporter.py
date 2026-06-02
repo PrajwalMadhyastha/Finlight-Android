@@ -41,4 +41,26 @@ def generate_report(goal: str, result: dict):
         f.write(content)
         
     print(f"\nReport successfully generated at: {filepath}")
+    
+    # Update Memory File
+    memory_file = os.path.join(os.getcwd(), "agent_memory.txt")
+    delimiter = "\n=== RUN SUMMARY ===\n"
+    summaries = []
+    
+    if os.path.exists(memory_file):
+        with open(memory_file, "r", encoding="utf-8") as f:
+            mem_content = f.read()
+            if mem_content.strip():
+                summaries = [s.strip() for s in mem_content.split(delimiter) if s.strip()]
+                
+    summaries.append(f"Goal: {goal}\nStatus: {status}\nSummary: {summary}".strip())
+    
+    # Keep only the last 5 runs
+    if len(summaries) > 5:
+        summaries = summaries[-5:]
+        
+    with open(memory_file, "w", encoding="utf-8") as f:
+        f.write(delimiter.join(summaries))
+    print(f"Memory successfully updated at: {memory_file}")
+        
     return filepath

@@ -24,8 +24,15 @@ def main():
     else:
         print(f"Goal selected: {goal}")
         
+    import os
+    memory_text = ""
+    if os.path.exists("agent_memory.txt"):
+        with open("agent_memory.txt", "r", encoding="utf-8") as f:
+            memory_text = f.read()
+            print("Loaded previous agent memory.")
+        
     # Run the loop
-    result = loop.run_agent_loop(goal=goal, max_steps=args.max_steps)
+    result = loop.run_agent_loop(goal=goal, max_steps=args.max_steps, memory_text=memory_text)
     
     # Generate the report
     reporter.generate_report(goal, result)

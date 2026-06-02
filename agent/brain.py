@@ -41,8 +41,10 @@ def setup_gemini():
     client = genai.Client(api_key=api_key)
     return client
 
-def get_next_action(client, goal: str, ui_state: str, history: list) -> dict:
+def get_next_action(client, goal: str, ui_state: str, history: list, memory_text: str = "") -> dict:
     prompt = f"HIGH-LEVEL GOAL:\n{goal}\n\n"
+    if memory_text:
+        prompt += f"[AVOID TESTING THESE PREVIOUSLY TESTED FEATURES]\n{memory_text}\n\n"
     prompt += f"ACTION HISTORY:\n{json.dumps(history, indent=2)}\n\n"
     prompt += f"CURRENT UI STATE:\n{ui_state}\n\n"
     prompt += "What is your next action? Respond in JSON format only."
