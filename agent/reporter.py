@@ -55,9 +55,9 @@ def generate_report(goal: str, result: dict):
                 
     summaries.append(f"Goal: {goal}\nStatus: {status}\nSummary: {summary}".strip())
     
-    # Keep only the last 5 runs
-    if len(summaries) > 5:
-        summaries = summaries[-5:]
+    # Keep only the last 10 runs
+    if len(summaries) > 10:
+        summaries = summaries[-10:]
         
     with open(memory_file, "w", encoding="utf-8") as f:
         f.write(delimiter.join(summaries))
