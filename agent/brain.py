@@ -45,7 +45,21 @@ def get_next_action(model, goal: str, ui_state: str, history: list) -> dict:
     prompt += f"CURRENT UI STATE:\n{ui_state}\n\n"
     prompt += "What is your next action? Respond in JSON format only."
     
-    response = model.generate_content(prompt)
+    import time
+    from google.api_core import exceptions as google_exceptions
+    
+    response = None
+    for attempt in range(5):
+        try:
+            response = model.generate_content(prompt)
+            break
+        except google_exceptions.ResourceExhausted:
+            print(f"Rate limit exceeded (5 RPM). Waiting 15 seconds before retrying (Attempt {attempt+1}/5)...")
+            time.sleep(15)
+            
+    if not response:
+        return {"action": "error", "reasoning": "Rate limit exhausted repeatedly", "args": {}}
+        
     text_response = response.text
     
     # Clean up markdown code blocks if present
