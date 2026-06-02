@@ -54,7 +54,8 @@ def get_next_action(client, goal: str, ui_state: str, history: list) -> dict:
                 model='gemini-3.1-flash-lite',
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PROMPT
+                    system_instruction=SYSTEM_PROMPT,
+                    temperature=0.9
                 )
             )
             break

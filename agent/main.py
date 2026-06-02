@@ -5,7 +5,7 @@ import agent.reporter as reporter
 
 def main():
     parser = argparse.ArgumentParser(description="Autonomous QA Agent Runner")
-    parser.add_argument("--goal", type=str, required=True, help="The high level testing goal.")
+    parser.add_argument("--goal", type=str, required=False, default="random", help="The high level testing goal.")
     parser.add_argument("--max-steps", type=int, default=30, help="Maximum number of steps the agent can take.")
     
     args = parser.parse_args()
@@ -14,11 +14,21 @@ def main():
     print("🤖 Autonomous Android QA Agent")
     print("="*50)
     
+    import random
+    import agent.personas as personas
+    
+    goal = args.goal
+    if goal == "random":
+        goal = random.choice(personas.PERSONAS)
+        print(f"Random persona selected: {goal}")
+    else:
+        print(f"Goal selected: {goal}")
+        
     # Run the loop
-    result = loop.run_agent_loop(goal=args.goal, max_steps=args.max_steps)
+    result = loop.run_agent_loop(goal=goal, max_steps=args.max_steps)
     
     # Generate the report
-    reporter.generate_report(args.goal, result)
+    reporter.generate_report(goal, result)
     
     # Exit with code 1 if it explicitly failed, helps CI know it failed
     if result.get("status", "").lower() == "fail":
