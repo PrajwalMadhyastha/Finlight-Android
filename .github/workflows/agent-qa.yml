@@ -101,4 +101,10 @@ jobs:
 
       - name: Display Report in Actions UI
         if: always()
-        run: cat qa-report-*.md >> $GITHUB_STEP_SUMMARY
+        run: |
+          cat qa-report-*.md >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Agent Memory (Last 5 Runs)" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          cat agent_memory.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
