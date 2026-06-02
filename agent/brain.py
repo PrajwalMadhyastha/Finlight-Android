@@ -1,6 +1,9 @@
-import google.generativeai as genai
 import os
 import json
+import time
+from google import genai
+from google.genai import types
+from google.genai.errors import APIError
 
 SYSTEM_PROMPT = """You are an autonomous exploratory Android QA tester.
 Your goal is to explore the app, test features, and find bugs based on a given HIGH-LEVEL GOAL.
@@ -34,28 +37,41 @@ def setup_gemini():
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         print("WARNING: GEMINI_API_KEY environment variable not set.")
-    genai.configure(api_key=api_key)
-    # Use gemini-3.5-flash for cost/speed
-    model = genai.GenerativeModel('gemini-3.5-flash', system_instruction=SYSTEM_PROMPT)
-    return model
+    # Initialize the new genai client
+    client = genai.Client(api_key=api_key)
+    return client
 
-def get_next_action(model, goal: str, ui_state: str, history: list) -> dict:
+def get_next_action(client, goal: str, ui_state: str, history: list) -> dict:
     prompt = f"HIGH-LEVEL GOAL:\n{goal}\n\n"
     prompt += f"ACTION HISTORY:\n{json.dumps(history, indent=2)}\n\n"
     prompt += f"CURRENT UI STATE:\n{ui_state}\n\n"
     prompt += "What is your next action? Respond in JSON format only."
     
-    import time
-    from google.api_core import exceptions as google_exceptions
-    
     response = None
     for attempt in range(5):
         try:
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model='gemini-3.1-flash-lite',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT
+                )
+            )
             break
-        except google_exceptions.ResourceExhausted:
-            print(f"Rate limit exceeded (5 RPM). Waiting 60 seconds before retrying (Attempt {attempt+1}/5)...")
-            time.sleep(60)
+        except APIError as e:
+            if e.code == 429:
+                print(f"Rate limit exceeded (15 RPM). Waiting 15 seconds before retrying (Attempt {attempt+1}/5)...")
+                time.sleep(15)
+            else:
+                print(f"API Error encountered: {e}")
+                time.sleep(10)
+        except Exception as e:
+            if "429" in str(e) or "ResourceExhausted" in str(e):
+                print(f"Rate limit exceeded (15 RPM). Waiting 15 seconds before retrying (Attempt {attempt+1}/5)...")
+                time.sleep(15)
+            else:
+                print(f"Unexpected error: {e}")
+                time.sleep(10)
             
     if not response:
         return {"action": "error", "reasoning": "Rate limit exhausted repeatedly", "args": {}}
