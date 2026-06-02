@@ -35,8 +35,8 @@ def setup_gemini():
     if not api_key:
         print("WARNING: GEMINI_API_KEY environment variable not set.")
     genai.configure(api_key=api_key)
-    # Use gemini-1.5-flash as agreed for cost/speed
-    model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=SYSTEM_PROMPT)
+    # Use gemini-3.5-flash for cost/speed
+    model = genai.GenerativeModel('gemini-3.5-flash', system_instruction=SYSTEM_PROMPT)
     return model
 
 def get_next_action(model, goal: str, ui_state: str, history: list) -> dict:

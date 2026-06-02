@@ -73,7 +73,8 @@ jobs:
             ./gradlew installDebug --no-daemon
             
             echo "Running AI Agent..."
-            GOAL="${{ github.event.inputs.goal || 'Perform a thorough exploratory test of the application to find any crashes or unexpected behavior.' }}"
+            GOAL="${{ github.event.inputs.goal }}"
+            GOAL="${GOAL:-Perform a thorough exploratory test of the application to find any crashes or unexpected behavior.}"
             python -m agent.main --goal "$GOAL"
 
       - name: Upload QA Report
