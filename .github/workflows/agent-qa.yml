@@ -41,7 +41,7 @@ jobs:
         with:
           name: qa-agent-memory
           path: .
-          workflow_conclusion: success
+          workflow_conclusion: completed
         continue-on-error: true
 
       - name: Set up Python
