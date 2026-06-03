@@ -13,16 +13,17 @@ import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 data class MonthlyBreakdown(
-    val monthKey: String, // yyyy-MM
+    // yyyy-MM
+    val monthKey: String,
     val monthName: String,
     val income: Double,
     val expenses: Double,
@@ -73,8 +74,8 @@ class TimePeriodReportViewModel(
         ) { transactions, excludedIncome, excludedExpense, date ->
             if (timePeriod != TimePeriod.YEARLY) return@combine emptyList()
 
-            val sdf = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-            val nameSdf = SimpleDateFormat("MMM", Locale.getDefault())
+            val sdf = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault())
+            val nameSdf = FormatUtils.getFormatter("MMM", Locale.getDefault())
             val breakdownMap = mutableMapOf<String, Pair<Double, Double>>()
 
             val cal = (date.clone() as Calendar).apply { set(Calendar.MONTH, Calendar.JANUARY) }
@@ -184,7 +185,7 @@ class TimePeriodReportViewModel(
                 val topCategories = transactionDao.getTopSpendingCategoriesForRange(currentStart, currentEnd)
 
                 val percentageChange =
-                    if (previousSummary?.totalExpenses != null && previousSummary.totalExpenses > 0) {
+                    if (previousSummary != null && previousSummary.totalExpenses > 0) {
                         val currentExpenses = currentSummary?.totalExpenses ?: 0.0
                         ((currentExpenses - previousSummary.totalExpenses) / previousSummary.totalExpenses * 100).roundToInt()
                     } else {
@@ -199,17 +200,19 @@ class TimePeriodReportViewModel(
         _selectedDate.flatMapLatest { calendar ->
             when (timePeriod) {
                 TimePeriod.DAILY -> {
-                    val endCal = (calendar.clone() as Calendar).apply {
-                        set(Calendar.HOUR_OF_DAY, 23)
-                        set(Calendar.MINUTE, 59)
-                        set(Calendar.SECOND, 59)
-                    }
-                    val startCal = (calendar.clone() as Calendar).apply {
-                        add(Calendar.DAY_OF_YEAR, -2) // 3 days total
-                        set(Calendar.HOUR_OF_DAY, 0)
-                        set(Calendar.MINUTE, 0)
-                        set(Calendar.SECOND, 0)
-                    }
+                    val endCal =
+                        (calendar.clone() as Calendar).apply {
+                            set(Calendar.HOUR_OF_DAY, 23)
+                            set(Calendar.MINUTE, 59)
+                            set(Calendar.SECOND, 59)
+                        }
+                    val startCal =
+                        (calendar.clone() as Calendar).apply {
+                            add(Calendar.DAY_OF_YEAR, -2) // 3 days total
+                            set(Calendar.HOUR_OF_DAY, 0)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                        }
 
                     transactionDao.getDailyTrends(startCal.timeInMillis, endCal.timeInMillis).map { dailyTrends ->
                         if (dailyTrends.isEmpty()) return@map null
@@ -217,8 +220,8 @@ class TimePeriodReportViewModel(
                         val incomeEntries = mutableListOf<BarEntry>()
                         val expenseEntries = mutableListOf<BarEntry>()
                         val labels = mutableListOf<String>()
-                        val dayFormat = SimpleDateFormat("EEE", Locale.getDefault())
-                        val fullDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        val dayFormat = FormatUtils.getFormatter("EEE", Locale.getDefault())
+                        val fullDateFormat = FormatUtils.getFormatter("yyyy-MM-dd", Locale.getDefault())
                         val trendsMap = dailyTrends.associateBy { it.date }
 
                         for (i in 0..2) {
@@ -301,8 +304,8 @@ class TimePeriodReportViewModel(
                         val incomeEntries = mutableListOf<BarEntry>()
                         val expenseEntries = mutableListOf<BarEntry>()
                         val labels = mutableListOf<String>()
-                        val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
-                        val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                        val monthFormat = FormatUtils.getFormatter("MMM", Locale.getDefault())
+                        val yearMonthFormat = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault())
                         val trendsMap = monthlyTrends.associateBy { it.monthYear }
 
                         for (i in 0..2) {
@@ -349,8 +352,8 @@ class TimePeriodReportViewModel(
                         val incomeEntries = mutableListOf<BarEntry>()
                         val expenseEntries = mutableListOf<BarEntry>()
                         val labels = mutableListOf<String>()
-                        val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
-                        val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                        val monthFormat = FormatUtils.getFormatter("MMM", Locale.getDefault())
+                        val yearMonthFormat = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault())
 
                         // Filter trends to only include current year
                         val currentYear = calendar.get(Calendar.YEAR).toString()

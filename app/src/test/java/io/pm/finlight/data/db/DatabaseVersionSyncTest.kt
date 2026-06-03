@@ -65,9 +65,12 @@ class DatabaseVersionSyncTest {
         // Try paths relative to user.dir (which might be project root or module root)
         val possiblePaths =
             listOf(
-                relativePath, // If dir is 'app'
-                "app/$relativePath", // If dir is project root
-                "../app/$relativePath", // If dir is somewhere else
+                // If dir is 'app'
+                relativePath,
+                // If dir is project root
+                "app/$relativePath",
+                // If dir is somewhere else
+                "../app/$relativePath",
             )
 
         for (path in possiblePaths) {

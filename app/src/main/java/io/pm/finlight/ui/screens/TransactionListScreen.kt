@@ -48,10 +48,10 @@ import io.pm.finlight.ui.components.TransactionList
 import io.pm.finlight.ui.components.pagerTabIndicatorOffset
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToLong
 
@@ -107,7 +107,8 @@ fun TransactionListScreen(
             totalIncome = totalIncome.roundToLong(),
             budget = budget,
             onMonthSelected = { viewModel.setSelectedMonth(it) },
-            isPrivacyModeEnabled = isPrivacyModeEnabled, // --- NEW: Pass state
+            // --- NEW: Pass state
+            isPrivacyModeEnabled = isPrivacyModeEnabled,
         )
         TabRow(
             selectedTabIndex = pagerState.currentPage,
@@ -218,8 +219,8 @@ fun MonthlySummaryHeader(
     // --- NEW: Accept privacy mode state ---
     isPrivacyModeEnabled: Boolean,
 ) {
-    val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
-    val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
+    val monthFormat = FormatUtils.getFormatter("LLL", Locale.getDefault())
+    val monthYearFormat = FormatUtils.getFormatter("LLLL yyyy", Locale.getDefault())
     var showMonthScroller by remember { mutableStateOf(false) }
 
     val currencyFormat =
@@ -344,7 +345,8 @@ fun MonthlySummaryHeader(
                 spent = totalSpent,
                 budget = budget.roundToLong(),
                 modifier = Modifier.padding(horizontal = 16.dp),
-                isPrivacyModeEnabled = isPrivacyModeEnabled, // --- NEW: Pass state
+                // --- NEW: Pass state
+                isPrivacyModeEnabled = isPrivacyModeEnabled,
             )
         } else {
             Text(

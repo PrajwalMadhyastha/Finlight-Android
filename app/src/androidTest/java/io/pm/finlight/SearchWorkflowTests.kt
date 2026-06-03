@@ -37,9 +37,9 @@ class SearchWorkflowTests {
         composeTestRule.waitUntil(timeoutMillis = 10000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
-        
+
         composeTestRule.onNodeWithContentDescription("Search").performClick()
-        
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Keyword (description, notes)").fetchSemanticsNodes().isNotEmpty()
         }
@@ -117,7 +117,7 @@ class SearchWorkflowTests {
 
         // Tap Account filter dropdown
         composeTestRule.onNodeWithText("Account").performClick()
-        
+
         // Select Cash Account
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(TestDataSeeder.ACCOUNT_WALLET_NAME).fetchSemanticsNodes().isNotEmpty()

@@ -25,9 +25,11 @@ data class Category(
     @ColumnInfo(name = "name", collate = ColumnInfo.NOCASE)
     val name: String,
     // A key to identify the Material Icon for the category
+    // Default icon
     @ColumnInfo(name = "iconKey")
-    val iconKey: String = "category", // Default icon
+    val iconKey: String = "category",
     // A key to identify the icon's background color
+    // Default color
     @ColumnInfo(name = "colorKey")
-    val colorKey: String = "gray", // Default color
+    val colorKey: String = "gray",
 )

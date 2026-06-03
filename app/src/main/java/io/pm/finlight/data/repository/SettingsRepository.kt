@@ -11,10 +11,10 @@ import androidx.core.content.edit
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import io.pm.finlight.ui.theme.AppTheme
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -217,14 +217,14 @@ class SettingsRepository(context: Context) {
     }
 
     fun setLastMonthSummaryDismissed() {
-        val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
+        val monthKey = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(Date())
         prefs.edit {
             putBoolean(KEY_LAST_MONTH_SUMMARY_DISMISSED + monthKey, true)
         }
     }
 
     fun hasLastMonthSummaryBeenDismissed(): Boolean {
-        val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
+        val monthKey = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(Date())
         return prefs.getBoolean(KEY_LAST_MONTH_SUMMARY_DISMISSED + monthKey, false)
     }
 
@@ -329,7 +329,7 @@ class SettingsRepository(context: Context) {
                     if (key == KEY_TRAVEL_MODE_SETTINGS) {
                         val json = sp.getString(key, null)
                         var settings = if (json == null) null else gson.fromJson(json, TravelModeSettings::class.java)
-                        
+
                         if (settings != null && System.currentTimeMillis() > settings.endDate) {
                             saveTravelModeSettings(null)
                             settings = null
@@ -340,7 +340,7 @@ class SettingsRepository(context: Context) {
             prefs.registerOnSharedPreferenceChangeListener(listener)
             val initialJson = prefs.getString(KEY_TRAVEL_MODE_SETTINGS, null)
             var initialSettings = if (initialJson == null) null else gson.fromJson(initialJson, TravelModeSettings::class.java)
-            
+
             if (initialSettings != null && System.currentTimeMillis() > initialSettings.endDate) {
                 saveTravelModeSettings(null)
                 initialSettings = null

@@ -50,8 +50,7 @@ import io.pm.finlight.utils.CategoryIconHelper
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @Composable
-private fun getPopupContainerColor() =
-    if (MaterialTheme.colorScheme.background.isDark()) PopupSurfaceDark else PopupSurfaceLight
+private fun getPopupContainerColor() = if (MaterialTheme.colorScheme.background.isDark()) PopupSurfaceDark else PopupSurfaceLight
 
 @Composable
 fun CreateAccountDialog(

@@ -7,7 +7,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_39_40
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_40_41
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_41_42
-import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_42_43
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -29,7 +28,7 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class AppDatabaseMigrationTest {
-    private val TEST_DB_NAME = "migration-test"
+    private val testDbName = "migration-test"
 
     @get:Rule
     val helper: MigrationTestHelper =
@@ -43,7 +42,7 @@ class AppDatabaseMigrationTest {
      */
     @Test
     fun migrate39To40_addsDateIndexOnTransactions() {
-        helper.createDatabase(TEST_DB_NAME, 39).apply {
+        helper.createDatabase(testDbName, 39).apply {
             execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank')")
             execSQL(
                 """
@@ -54,7 +53,7 @@ class AppDatabaseMigrationTest {
             close()
         }
 
-        helper.runMigrationsAndValidate(TEST_DB_NAME, 40, true, MIGRATION_39_40).apply {
+        helper.runMigrationsAndValidate(testDbName, 40, true, MIGRATION_39_40).apply {
             val cursor = query("SELECT name FROM sqlite_master WHERE type='index' AND name='index_transactions_date'")
             assertTrue("Index 'index_transactions_date' should exist", cursor.moveToFirst())
             cursor.close()
@@ -73,7 +72,7 @@ class AppDatabaseMigrationTest {
     @Test
     fun migrate40To41_deduplicatesTemplates() {
         // Create DB at version 40 (Schema has NO unique constraint on templateSignature)
-        helper.createDatabase(TEST_DB_NAME, 40).apply {
+        helper.createDatabase(testDbName, 40).apply {
             // Insert duplicates
             // Signature "SIG_A" -> Repeated twice
             execSQL(
@@ -99,7 +98,7 @@ class AppDatabaseMigrationTest {
         }
 
         // Run migration to 41
-        helper.runMigrationsAndValidate(TEST_DB_NAME, 41, true, MIGRATION_40_41).apply {
+        helper.runMigrationsAndValidate(testDbName, 41, true, MIGRATION_40_41).apply {
             // Check count - should be 2 (SIG_A + SIG_B)
             val countCursor = query("SELECT COUNT(*) FROM sms_parse_templates")
             assertTrue(countCursor.moveToFirst())
@@ -137,7 +136,7 @@ class AppDatabaseMigrationTest {
      */
     @Test
     fun migrate41To42_recreatesTable() {
-        helper.createDatabase(TEST_DB_NAME, 41).apply {
+        helper.createDatabase(testDbName, 41).apply {
             // Insert old schema data
             execSQL(
                 """
@@ -148,7 +147,7 @@ class AppDatabaseMigrationTest {
             close()
         }
 
-        helper.runMigrationsAndValidate(TEST_DB_NAME, 42, true, MIGRATION_41_42).apply {
+        helper.runMigrationsAndValidate(testDbName, 42, true, MIGRATION_41_42).apply {
             // Verify new columns exist (e.g. correctedMerchantName) by checking table info
             val cursor = query("PRAGMA table_info(sms_parse_templates)")
             var hasCorrectedMerchantName = false
@@ -184,24 +183,28 @@ class AppDatabaseMigrationTest {
      */
     @Test
     fun migrate43To44_addsNeedsReviewColumnToTransactions() {
-        helper.createDatabase(TEST_DB_NAME, 43).apply {
+        helper.createDatabase(testDbName, 43).apply {
             execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank')")
             execSQL(
                 """
                 INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit) 
                 VALUES (1, 'Test Transaction', 100.0, 1234567890000, 1, 'expense', 'Manual Entry', 0, 0)
-            """
+            """,
             )
             close()
         }
 
-        helper.runMigrationsAndValidate(TEST_DB_NAME, 44, true, io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_43_44).apply {
+        helper.runMigrationsAndValidate(testDbName, 44, true, io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_43_44).apply {
             val cursor = query("PRAGMA table_info(transactions)")
             var found = false
             while (cursor.moveToNext()) {
                 if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "needsReview") {
                     found = true
-                    assertEquals("needsReview should default to 0 (false) and not null", 1, cursor.getInt(cursor.getColumnIndexOrThrow("notnull")))
+                    assertEquals(
+                        "needsReview should default to 0 (false) and not null",
+                        1,
+                        cursor.getInt(cursor.getColumnIndexOrThrow("notnull")),
+                    )
                     assertEquals("0", cursor.getString(cursor.getColumnIndexOrThrow("dflt_value")))
                 }
             }

@@ -40,9 +40,12 @@ data class RecurringTransaction(
     val id: Int = 0,
     val description: String,
     val amount: Double,
-    val transactionType: String, // "income" or "expense"
-    val recurrenceInterval: String, // e.g., "Daily", "Weekly", "Monthly", "Yearly"
-    val startDate: Long, // Timestamp for the first occurrence
+    // "income" or "expense"
+    val transactionType: String,
+    // e.g., "Daily", "Weekly", "Monthly", "Yearly"
+    val recurrenceInterval: String,
+    // Timestamp for the first occurrence
+    val startDate: Long,
     val accountId: Int,
     val categoryId: Int?,
     // --- NEW: Track the last execution date of this rule ---

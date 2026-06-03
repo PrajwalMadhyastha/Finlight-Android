@@ -54,7 +54,8 @@ class RecurringTransactionWorker(
                                 merchantName = rule.description,
                                 originalMessage = "Recurring payment for ${rule.description}",
                                 sourceSmsHash = "recurring_${rule.id}",
-                                date = System.currentTimeMillis(), // Use current time for due transactions
+                                // Use current time for due transactions
+                                date = System.currentTimeMillis(),
                             )
                         NotificationHelper.showRecurringTransactionDueNotification(context, potentialTxn)
                     }

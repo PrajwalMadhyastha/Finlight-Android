@@ -7,7 +7,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 @Entity(tableName = "merchant_mappings")
 data class MerchantMapping(
+    // e.g., "AM-HDFCBK"
     @PrimaryKey
-    val smsSender: String, // e.g., "AM-HDFCBK"
-    val merchantName: String, // e.g., "McDonald's"
+    val smsSender: String,
+    // e.g., "McDonald's"
+    val merchantName: String,
 )

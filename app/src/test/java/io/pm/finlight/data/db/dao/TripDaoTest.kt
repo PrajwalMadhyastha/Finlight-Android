@@ -153,8 +153,10 @@ class TripDaoTest {
             transactionDao.addTagsToTransaction(listOf(TransactionTagCrossRef(transactionId = parentTxId, tagId = tripTagId)))
             dbRule.db.splitTransactionDao().insertAll(
                 listOf(
-                    SplitTransaction(parentTransactionId = parentTxId, amount = 2700.0, categoryId = 1, notes = "Food"), // 30 EUR
-                    SplitTransaction(parentTransactionId = parentTxId, amount = 6300.0, categoryId = 2, notes = "Souvenirs"), // 70 EUR
+                    // 30 EUR
+                    SplitTransaction(parentTransactionId = parentTxId, amount = 2700.0, categoryId = 1, notes = "Food"),
+                    // 70 EUR
+                    SplitTransaction(parentTransactionId = parentTxId, amount = 6300.0, categoryId = 2, notes = "Souvenirs"),
                 ),
             )
 

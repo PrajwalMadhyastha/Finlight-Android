@@ -1143,7 +1143,8 @@ interface TransactionDao {
         transactionType: String?,
         startDate: Long?,
         endDate: Long?,
-        tagId: Int?, // --- NEW: Add tagId parameter
+        // --- NEW: Add tagId parameter
+        tagId: Int?,
     ): Flow<List<TransactionDetails>>
 
     // --- NEW: Reassigns transactions from source accounts to a destination account ---

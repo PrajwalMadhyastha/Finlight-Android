@@ -36,9 +36,9 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 4. Run Ktlint (uncomment when ready)
-      #- name: Run Ktlint
-      #  run: ./gradlew ktlintCheck
+      # 4. Run Ktlint
+      - name: Run Ktlint
+        run: ./gradlew ktlintCheck
 
       # 5. Run unit tests (107 test files, ~2 min on ubuntu-latest)
       - name: Run unit tests

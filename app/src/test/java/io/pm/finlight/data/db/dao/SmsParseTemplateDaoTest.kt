@@ -68,7 +68,8 @@ class SmsParseTemplateDaoTest {
             val template1_duplicate =
                 SmsParseTemplate(
                     templateSignature = "sig1",
-                    correctedMerchantName = "Amazon", // Same composite PK as template1
+                    // Same composite PK as template1
+                    correctedMerchantName = "Amazon",
                     originalSmsBody = "body_duplicate",
                     originalMerchantStartIndex = 10,
                     originalMerchantEndIndex = 11,

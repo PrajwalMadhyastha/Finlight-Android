@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -113,7 +114,7 @@ fun RuleCreationScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = "Long-press text to select it, then tap a 'Mark as...' button below.",
+                        text = if (isEditMode || potentialTransactionJson != null) "Long-press text to select it, then tap a 'Mark as...' button below." else "Paste an SMS message below, long-press to select text, then tap a 'Mark as...' button.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -138,7 +139,8 @@ fun RuleCreationScreen(
                         BasicTextField(
                             value = textFieldValue,
                             onValueChange = { textFieldValue = it },
-                            readOnly = true,
+                            readOnly = isEditMode || potentialTransactionJson != null,
+                            modifier = Modifier.testTag("sms_input_field"),
                             textStyle =
                                 TextStyle(
                                     fontFamily = FontFamily.Monospace,
@@ -164,7 +166,7 @@ fun RuleCreationScreen(
                         viewModel.onMarkAsTrigger(RuleSelection(selectedText, start, end))
                     },
                     enabled = isSelectionActive,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("mark_trigger_btn"),
                 ) {
                     Text("Mark as Trigger Phrase")
                 }
@@ -178,7 +180,7 @@ fun RuleCreationScreen(
                             viewModel.onMarkAsMerchant(RuleSelection(selectedText, start, end))
                         },
                         enabled = isSelectionActive,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).testTag("mark_merchant_btn"),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     ) {
                         Text("Mark as Merchant")
@@ -191,7 +193,7 @@ fun RuleCreationScreen(
                             viewModel.onMarkAsAmount(RuleSelection(selectedText, start, end))
                         },
                         enabled = isSelectionActive,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).testTag("mark_amount_btn"),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     ) {
                         Text("Mark as Amount")
@@ -313,7 +315,7 @@ fun RuleCreationScreen(
                         }
                     },
                     enabled = isSaveEnabled,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).testTag("save_rule_btn"),
                 ) {
                     Text(if (isEditMode) "Update Rule" else "Save Rule")
                 }

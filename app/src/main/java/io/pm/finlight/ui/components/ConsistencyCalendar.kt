@@ -39,8 +39,8 @@ import androidx.compose.ui.unit.dp
 import io.pm.finlight.CalendarDayStatus
 import io.pm.finlight.ConsistencyStats
 import io.pm.finlight.SpendingStatus
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.floor
 import kotlin.math.min
@@ -132,7 +132,8 @@ private fun StatItem(
 @Composable
 fun ConsistencyCalendar(
     data: List<CalendarDayStatus>,
-    year: Int, // Added year parameter to support navigation
+    // Added year parameter to support navigation
+    year: Int,
     modifier: Modifier = Modifier,
     onDayClick: (Date) -> Unit,
 ) {
@@ -209,8 +210,8 @@ fun DetailedMonthlyCalendar(
 ) {
     val monthData = MonthData.fromCalendar(selectedMonth)
     val dataMap = data.associateByDate()
-    val monthYearFormat = remember { SimpleDateFormat("MMMM yyyy", Locale.getDefault()) }
-    val dayOfWeekFormat = remember { SimpleDateFormat("EE", Locale.getDefault()) }
+    val monthYearFormat = remember { FormatUtils.getFormatter("MMMM yyyy", Locale.getDefault()) }
+    val dayOfWeekFormat = remember { FormatUtils.getFormatter("EE", Locale.getDefault()) }
     val weekDays =
         (Calendar.SUNDAY..Calendar.SATURDAY).map {
             dayOfWeekFormat.format(Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, it) }.time)

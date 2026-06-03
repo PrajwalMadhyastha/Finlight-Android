@@ -144,7 +144,8 @@ fun AddRecurringTransactionScreen(
                         ExposedDropdownMenu(
                             expanded = intervalExpanded,
                             onDismissRequest = { intervalExpanded = false },
-                            modifier = Modifier.background(popupContainerColor), // --- UPDATED ---
+                            // --- UPDATED ---
+                            modifier = Modifier.background(popupContainerColor),
                         ) {
                             recurrenceIntervals.forEach { interval ->
                                 DropdownMenuItem(text = { Text(interval) }, onClick = {
@@ -171,7 +172,8 @@ fun AddRecurringTransactionScreen(
                         ExposedDropdownMenu(
                             expanded = accountExpanded,
                             onDismissRequest = { accountExpanded = false },
-                            modifier = Modifier.background(popupContainerColor), // --- UPDATED ---
+                            // --- UPDATED ---
+                            modifier = Modifier.background(popupContainerColor),
                         ) {
                             accounts.forEach { account ->
                                 DropdownMenuItem(text = { Text(account.name) }, onClick = {
@@ -198,7 +200,8 @@ fun AddRecurringTransactionScreen(
                         ExposedDropdownMenu(
                             expanded = categoryExpanded,
                             onDismissRequest = { categoryExpanded = false },
-                            modifier = Modifier.background(popupContainerColor), // --- UPDATED ---
+                            // --- UPDATED ---
+                            modifier = Modifier.background(popupContainerColor),
                         ) {
                             categories.forEach { category ->
                                 DropdownMenuItem(text = { Text(category.name) }, onClick = {

@@ -119,8 +119,10 @@ class SmsRepository(private val context: Context) {
         context.contentResolver.query(
             Telephony.Sms.Inbox.CONTENT_URI,
             projection,
-            null, // Selection is not needed, we use the sort order
-            null, // Selection args are not needed
+            // Selection is not needed, we use the sort order
+            null,
+            // Selection args are not needed
+            null,
             sortOrder,
         )?.use { cursor ->
             if (cursor.moveToFirst()) {

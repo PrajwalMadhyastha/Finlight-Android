@@ -35,7 +35,8 @@ data class TrendMonthData(
 fun ModernTrendChart(
     chartData: Pair<BarData, List<String>>,
     onBarClick: ((Int) -> Unit)? = null,
-    initialScrollIndex: Int? = null, // Optional: specify which month to scroll to initially
+    // Optional: specify which month to scroll to initially
+    initialScrollIndex: Int? = null,
 ) {
     val (barData, labels) = chartData
 

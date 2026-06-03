@@ -36,9 +36,9 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
+import io.pm.finlight.utils.FormatUtils
 import java.net.URLDecoder
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
 
 // Helper function to determine if a color is 'dark' based on luminance.
@@ -232,7 +232,7 @@ private fun LinkCandidateItem(
     transaction: Transaction,
     onClick: () -> Unit,
 ) {
-    val dateFormatter = remember { SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()) }
+    val dateFormatter = remember { FormatUtils.getFormatter("dd MMM, HH:mm", Locale.getDefault()) }
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 
     GlassPanel(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {

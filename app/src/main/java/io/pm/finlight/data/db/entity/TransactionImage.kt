@@ -22,5 +22,6 @@ data class TransactionImage(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val transactionId: Int,
-    val imageUri: String, // Stores the URI of the image in the app's internal storage
+    // Stores the URI of the image in the app's internal storage
+    val imageUri: String,
 )

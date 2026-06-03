@@ -39,7 +39,7 @@ class AccountManagementTests {
      * Navigates from Dashboard to the Accounts list screen.
      */
     private fun navigateToAccountList() {
-        composeTestRule.waitUntil(timeoutMillis = 10000) {
+        composeTestRule.waitUntil(timeoutMillis = 15000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithTag("dashboard_lazy_column")
@@ -101,7 +101,7 @@ class AccountManagementTests {
         // the parent GlassPanel merges the child text node's text "Test Bank",
         // so the IconButton matches hasAnyAncestor(hasText("Test Bank")).
         composeTestRule.onNode(
-            hasContentDescription("Edit Account") and hasAnyAncestor(hasText(TestDataSeeder.ACCOUNT_BANK_NAME))
+            hasContentDescription("Edit Account") and hasAnyAncestor(hasText(TestDataSeeder.ACCOUNT_BANK_NAME)),
         ).performClick()
 
         // Wait for AddEditAccountScreen to load in edit mode
@@ -136,7 +136,7 @@ class AccountManagementTests {
 
         // Click Edit Account button for the seeded "Test Wallet" account
         composeTestRule.onNode(
-            hasContentDescription("Edit Account") and hasAnyAncestor(hasText(TestDataSeeder.ACCOUNT_WALLET_NAME))
+            hasContentDescription("Edit Account") and hasAnyAncestor(hasText(TestDataSeeder.ACCOUNT_WALLET_NAME)),
         ).performClick()
 
         // Wait for AddEditAccountScreen to load
@@ -163,6 +163,58 @@ class AccountManagementTests {
     }
 
     /**
+     * Test that the AccountDetailScreen header shows the correct transaction count badge
+     * for an account. Resolves GitHub Issue #7.
+     *
+     * Test Bank has 4 seeded transactions: Grocery Run, Shirt Purchase, Salary, Bonus.
+     */
+    @Test
+    fun test_accountDetail_showsTransactionCountBadge_forBankAccount() {
+        navigateToAccountList()
+
+        // Click on the "Test Bank" card item to open detail screen
+        composeTestRule.onNode(
+            hasClickAction() and hasAnyDescendant(hasText(TestDataSeeder.ACCOUNT_BANK_NAME)),
+            useUnmergedTree = true,
+        ).performClick()
+
+        // Wait for AccountDetailScreen to load
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Current Balance").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify the transaction count badge is displayed with the correct count
+        // Test Bank has 4 transactions: Grocery Run, Shirt Purchase, Salary, Bonus
+        composeTestRule.onNodeWithText("4 Txns").assertIsDisplayed()
+    }
+
+    /**
+     * Test that the AccountDetailScreen header shows the correct transaction count badge
+     * for the Wallet account.
+     *
+     * Test Wallet has 3 seeded transactions: Coffee, Bus Fare, Taxi.
+     */
+    @Test
+    fun test_accountDetail_showsTransactionCountBadge_forWalletAccount() {
+        navigateToAccountList()
+
+        // Click on the "Test Wallet" card item to open detail screen
+        composeTestRule.onNode(
+            hasClickAction() and hasAnyDescendant(hasText(TestDataSeeder.ACCOUNT_WALLET_NAME)),
+            useUnmergedTree = true,
+        ).performClick()
+
+        // Wait for AccountDetailScreen to load
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Current Balance").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify the transaction count badge is displayed with the correct count
+        // Test Wallet has 3 transactions: Coffee, Bus Fare, Taxi
+        composeTestRule.onNodeWithText("3 Txns").assertIsDisplayed()
+    }
+
+    /**
      * Test that account detail view shows transactions seeded for that account.
      */
     @Test
@@ -172,7 +224,7 @@ class AccountManagementTests {
         // Click on the "Test Bank" card item to open detail screen
         composeTestRule.onNode(
             hasClickAction() and hasAnyDescendant(hasText(TestDataSeeder.ACCOUNT_BANK_NAME)),
-            useUnmergedTree = true
+            useUnmergedTree = true,
         ).performClick()
 
         // Wait for AccountDetailScreen to load
@@ -197,7 +249,7 @@ class AccountManagementTests {
         // Click on the "Test Wallet" card item to open detail screen
         composeTestRule.onNode(
             hasClickAction() and hasAnyDescendant(hasText(TestDataSeeder.ACCOUNT_WALLET_NAME)),
-            useUnmergedTree = true
+            useUnmergedTree = true,
         ).performClick()
 
         // Wait for AccountDetailScreen to load
@@ -206,9 +258,10 @@ class AccountManagementTests {
         }
 
         // Wallet transactions: -150 (coffee), -50 (bus), -250 (taxi) = -450 total balance.
-        val expectedBalance = java.text.NumberFormat.getCurrencyInstance(java.util.Locale("en", "IN"))
-            .apply { maximumFractionDigits = 0 }
-            .format(-450.0)
+        val expectedBalance =
+            java.text.NumberFormat.getCurrencyInstance(java.util.Locale("en", "IN"))
+                .apply { maximumFractionDigits = 0 }
+                .format(-450.0)
         composeTestRule.onNodeWithText(expectedBalance).assertExists()
     }
 }

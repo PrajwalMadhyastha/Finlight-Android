@@ -36,7 +36,8 @@ fun AnalysisDetailScreen(
     title: String,
     startDate: Long,
     endDate: Long,
-    transactionViewModel: TransactionViewModel, // --- FIX: Inject ViewModel ---
+    // --- FIX: Inject ViewModel ---
+    transactionViewModel: TransactionViewModel,
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = AnalysisDetailViewModelFactory(application, dimension, dimensionId, startDate, endDate)

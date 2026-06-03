@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.dp
  * Use via [rememberInlineTextToolbar] and [InlineTextToolbarActionBar].
  */
 class InlineTextToolbar : TextToolbar {
-
     var showCut by mutableStateOf(false)
         private set
     var showCopy by mutableStateOf(false)
@@ -92,7 +91,9 @@ class InlineTextToolbar : TextToolbar {
     }
 
     fun cut() = onCutCallback?.invoke()
+
     fun copy() = onCopyCallback?.invoke()
+
     fun paste() = onPasteCallback?.invoke()
 }
 

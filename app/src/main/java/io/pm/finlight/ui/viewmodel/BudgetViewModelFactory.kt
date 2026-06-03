@@ -38,7 +38,8 @@ class BudgetViewModelFactory(private val application: Application) : ViewModelPr
                 budgetRepository,
                 settingsRepository,
                 categoryRepository,
-                transactionRepository, // --- NEW: Pass repository to ViewModel ---
+                // --- NEW: Pass repository to ViewModel ---
+                transactionRepository,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

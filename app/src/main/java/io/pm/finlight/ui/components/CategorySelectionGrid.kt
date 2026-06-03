@@ -39,10 +39,11 @@ import androidx.compose.ui.unit.sp
 import io.pm.finlight.Category
 import io.pm.finlight.utils.CategoryIconHelper
 
-private fun Modifier.categoryGridItem(onClick: () -> Unit) = this
-    .clip(RoundedCornerShape(12.dp))
-    .clickable(onClick = onClick)
-    .padding(vertical = 12.dp)
+private fun Modifier.categoryGridItem(onClick: () -> Unit) =
+    this
+        .clip(RoundedCornerShape(12.dp))
+        .clickable(onClick = onClick)
+        .padding(vertical = 12.dp)
 
 @Composable
 fun CategorySelectionGrid(

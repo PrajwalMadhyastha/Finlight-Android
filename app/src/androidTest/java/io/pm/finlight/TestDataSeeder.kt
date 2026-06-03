@@ -23,7 +23,6 @@ import java.util.Calendar
  * (categories, accounts) which the DatabaseCallback seeds on first launch.
  */
 object TestDataSeeder {
-
     // --- Public constants so tests can reference these without magic strings ---
     const val ACCOUNT_WALLET_NAME = "Test Wallet"
     const val ACCOUNT_WALLET_ID = 9001
@@ -58,13 +57,14 @@ object TestDataSeeder {
      * It is safe to call multiple times — all inserts use IGNORE/REPLACE
      * conflict strategies so re-seeding is idempotent.
      */
-    fun seed(db: AppDatabase) = runBlocking {
-        seedAccounts(db)
-        seedCategories(db)
-        seedTransactions(db)
-        seedBudget(db)
-        seedTag(db)
-    }
+    fun seed(db: AppDatabase) =
+        runBlocking {
+            seedAccounts(db)
+            seedCategories(db)
+            seedTransactions(db)
+            seedBudget(db)
+            seedTag(db)
+        }
 
     // -------------------------------------------------------------------------
     // Private seed helpers
@@ -106,12 +106,10 @@ object TestDataSeeder {
 
     private suspend fun seedTransactions(db: AppDatabase) {
         val now = System.currentTimeMillis()
-        // Place all transactions in the current calendar month so report
-        // screens display them without having to navigate to a past period.
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.DAY_OF_MONTH, 1)
-        cal.set(Calendar.HOUR_OF_DAY, 10)
-        val monthStart = cal.timeInMillis
+        // Place all transactions strictly in the past relative to 'now' so they
+        // don't overshadow newly created test transactions in "Recent Transactions".
+        // We step back by a few minutes for each transaction.
+        val baseTime = now - 600_000L // Start 10 minutes ago
 
         db.transactionDao().run {
             // ---- Expenses ----
@@ -121,7 +119,7 @@ object TestDataSeeder {
                     amount = 150.0,
                     categoryId = CATEGORY_FOOD_ID,
                     accountId = ACCOUNT_WALLET_ID,
-                    date = monthStart + 1 * 86_400_000L,
+                    date = baseTime - 1 * 60_000L,
                     transactionType = "expense",
                     notes = null,
                 ),
@@ -132,7 +130,7 @@ object TestDataSeeder {
                     amount = 50.0,
                     categoryId = CATEGORY_TRANSPORT_ID,
                     accountId = ACCOUNT_WALLET_ID,
-                    date = monthStart + 2 * 86_400_000L,
+                    date = baseTime - 2 * 60_000L,
                     transactionType = "expense",
                     notes = null,
                 ),
@@ -143,7 +141,7 @@ object TestDataSeeder {
                     amount = 800.0,
                     categoryId = CATEGORY_FOOD_ID,
                     accountId = ACCOUNT_BANK_ID,
-                    date = monthStart + 3 * 86_400_000L,
+                    date = baseTime - 3 * 60_000L,
                     transactionType = "expense",
                     notes = "Weekly groceries",
                 ),
@@ -154,7 +152,7 @@ object TestDataSeeder {
                     amount = 600.0,
                     categoryId = CATEGORY_SHOPPING_ID,
                     accountId = ACCOUNT_BANK_ID,
-                    date = monthStart + 4 * 86_400_000L,
+                    date = baseTime - 4 * 60_000L,
                     transactionType = "expense",
                     notes = null,
                 ),
@@ -165,7 +163,7 @@ object TestDataSeeder {
                     amount = 250.0,
                     categoryId = CATEGORY_TRANSPORT_ID,
                     accountId = ACCOUNT_WALLET_ID,
-                    date = monthStart + 5 * 86_400_000L,
+                    date = baseTime - 5 * 60_000L,
                     transactionType = "expense",
                     notes = null,
                 ),
@@ -177,7 +175,7 @@ object TestDataSeeder {
                     amount = 50000.0,
                     categoryId = null,
                     accountId = ACCOUNT_BANK_ID,
-                    date = monthStart + 1 * 86_400_000L,
+                    date = baseTime - 6 * 60_000L,
                     transactionType = "income",
                     notes = "Monthly salary",
                 ),
@@ -188,7 +186,7 @@ object TestDataSeeder {
                     amount = 10000.0,
                     categoryId = null,
                     accountId = ACCOUNT_BANK_ID,
-                    date = monthStart + 6 * 86_400_000L,
+                    date = baseTime - 7 * 60_000L,
                     transactionType = "income",
                     notes = null,
                 ),

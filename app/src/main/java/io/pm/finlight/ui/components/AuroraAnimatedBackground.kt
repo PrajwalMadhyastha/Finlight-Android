@@ -36,25 +36,29 @@ fun AuroraAnimatedBackground() {
     val circles =
         listOf(
             AnimatedCircle(
-                color = Color(0xFF8A2BE2), // Deep Purple
+                // Deep Purple
+                color = Color(0xFF8A2BE2),
                 baseRadiusMultiplier = 0.8f,
                 baseCenter = Offset(0.2f, 0.2f),
                 speedMultiplier = 0.6f,
             ),
             AnimatedCircle(
-                color = Color(0xFF00008B), // Midnight Blue
+                // Midnight Blue
+                color = Color(0xFF00008B),
                 baseRadiusMultiplier = 0.9f,
                 baseCenter = Offset(0.8f, 0.3f),
                 speedMultiplier = 0.4f,
             ),
             AnimatedCircle(
-                color = Color(0xFF008080), // Dark Teal
+                // Dark Teal
+                color = Color(0xFF008080),
                 baseRadiusMultiplier = 1.0f,
                 baseCenter = Offset(0.4f, 0.8f),
                 speedMultiplier = 0.5f,
             ),
             AnimatedCircle(
-                color = Color(0xFF4B0082), // Indigo
+                // Indigo
+                color = Color(0xFF4B0082),
                 baseRadiusMultiplier = 0.7f,
                 baseCenter = Offset(0.9f, 0.9f),
                 speedMultiplier = 0.7f,

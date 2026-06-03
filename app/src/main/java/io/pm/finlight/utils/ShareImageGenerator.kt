@@ -45,7 +45,6 @@ import io.pm.finlight.ui.theme.PersonalFinanceAppTheme
 import java.io.File
 import java.io.FileOutputStream
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
 
 object ShareImageGenerator {
@@ -163,7 +162,7 @@ private fun TransactionSnapshotContent(
             if (it.details.transaction.transactionType == "income") it.details.transaction.amount else -it.details.transaction.amount
         }
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
-    val dateFormat = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
+    val dateFormat = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }
 
     // --- FIX: Create an ordered list of fields to display ---
     val orderedFields =

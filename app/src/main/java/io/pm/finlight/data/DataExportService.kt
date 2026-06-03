@@ -13,6 +13,7 @@ import android.util.Log
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.AppDataBackup
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -22,7 +23,6 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.zip.GZIPInputStream
@@ -224,7 +224,7 @@ object DataExportService {
 
                 csvBuilder.append(getCsvTemplateString())
 
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                val dateFormat = FormatUtils.getFormatter("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
                 transactions.forEach { details: TransactionDetails ->
                     val transaction = details.transaction
@@ -243,12 +243,14 @@ object DataExportService {
                         val parentRow =
                             listOf(
                                 transaction.id.toString(),
-                                "", // ParentId
+                                // ParentId
+                                "",
                                 date,
                                 description,
                                 amount,
                                 type,
-                                "Split Transaction", // Category for parent
+                                // Category for parent
+                                "Split Transaction",
                                 account,
                                 notes,
                                 isExcluded,
@@ -267,8 +269,10 @@ object DataExportService {
                             // Child rows have no ID of their own in this context, but link to the parent
                             val childRow =
                                 listOf(
-                                    "", // Id
-                                    transaction.id.toString(), // ParentId
+                                    // Id
+                                    "",
+                                    // ParentId
+                                    transaction.id.toString(),
                                     dateFormat.format(Date(transaction.date)),
                                     splitDescription,
                                     splitAmount,
@@ -277,7 +281,8 @@ object DataExportService {
                                     account,
                                     escapeCsvField(split.notes ?: ""),
                                     isExcluded,
-                                    "", // <-- THE FIX: Add an empty string for the missing Tags column
+                                    // <-- THE FIX: Add an empty string for the missing Tags column
+                                    "",
                                 ).joinToString(",")
                             csvBuilder.appendLine(childRow)
                         }
@@ -287,7 +292,8 @@ object DataExportService {
                         val row =
                             listOf(
                                 transaction.id.toString(),
-                                "", // ParentId
+                                // ParentId
+                                "",
                                 date,
                                 description,
                                 amount,

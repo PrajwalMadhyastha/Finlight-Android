@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import io.pm.finlight.data.DataExportService
+import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.SettingsActionItem
 import io.pm.finlight.ui.components.SettingsToggleItem
@@ -56,9 +57,9 @@ import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.*
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -70,8 +71,7 @@ private fun hasSmsPermission(context: Context): Boolean {
 @Composable
 private fun formatBackupTimestamp(timestamp: Long): String {
     if (timestamp == 0L) return "Never"
-    val sdf = remember { SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()) }
-    return sdf.format(Date(timestamp))
+    return FormatUtils.dateTimeFormatter.format(Date(timestamp))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,7 +129,7 @@ fun AutomationSettingsScreen(
     val isScanning by settingsViewModel.isScanning.collectAsState()
     var showDatePickerDialog by remember { mutableStateOf(false) }
     val smsScanStartDate by settingsViewModel.smsScanStartDate.collectAsState()
-    val dateFormatter = remember { SimpleDateFormat("dd MMMM, yyyy", Locale.getDefault()) }
+    val dateFormatter = remember { FormatUtils.longDateFormatter }
     val isUnknownTransactionPopupEnabled by settingsViewModel.unknownTransactionPopupEnabled.collectAsState()
 
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
@@ -346,7 +346,8 @@ fun NotificationSettingsScreen(
                     icon = Icons.Default.CloudUpload,
                     checked = isAutoBackupNotificationEnabled,
                     onCheckedChange = { settingsViewModel.setAutoBackupNotificationEnabled(it) },
-                    enabled = isAutoBackupEnabled, // Keep the dependency on auto-backup being enabled
+                    // Keep the dependency on auto-backup being enabled
+                    enabled = isAutoBackupEnabled,
                 )
             }
         }
@@ -378,7 +379,7 @@ fun NotificationSettingsScreen(
                     )
                     SettingsActionItem(
                         text = "Weekly Report Time",
-                        subtitle = "Current: ${SimpleDateFormat("EEEE", Locale.getDefault()).format(
+                        subtitle = "Current: ${FormatUtils.dayOfWeekFormatter.format(
                             Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, weeklyReportTime.first) }.time,
                         )} at ${String.format("%02d:%02d", weeklyReportTime.second, weeklyReportTime.third)}",
                         icon = Icons.Default.Schedule,
@@ -597,6 +598,7 @@ fun DataSettingsScreen(
                         onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) },
                     )
                     // --- DELETED: Backup Notification Toggle ---
+
                     /*
                     SettingsToggleItem(
                         title = "Backup Notification",
@@ -614,8 +616,7 @@ fun DataSettingsScreen(
                         subtitle = "Create a full backup of all your data",
                         icon = Icons.Default.DataObject,
                         onClick = {
-                            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                            val fileName = "Finlight_Backup_${sdf.format(Date())}.json"
+                            val fileName = "Finlight_Backup_${FormatUtils.isoDateFormatter.format(Date())}.json"
                             jsonFileSaverLauncher.launch(fileName)
                         },
                     )
@@ -625,8 +626,7 @@ fun DataSettingsScreen(
                         subtitle = "Save transactions in a spreadsheet format",
                         icon = Icons.Default.GridOn,
                         onClick = {
-                            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                            val fileName = "Finlight_Transactions_${sdf.format(Date())}.csv"
+                            val fileName = "Finlight_Transactions_${FormatUtils.isoDateFormatter.format(Date())}.csv"
                             csvFileSaverLauncher.launch(fileName)
                         },
                     )
@@ -688,8 +688,7 @@ fun DataSettingsScreen(
         CsvInfoDialog(
             onDismiss = { showCsvInfoDialog = false },
             onExportTemplate = {
-                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                val fileName = "Finlight_Import_Template_${sdf.format(Date())}.csv"
+                val fileName = "Finlight_Import_Template_${FormatUtils.isoDateFormatter.format(Date())}.csv"
                 csvTemplateSaverLauncher.launch(fileName)
             },
             onProceed = {
@@ -700,21 +699,16 @@ fun DataSettingsScreen(
     }
 
     if (showImportJsonDialog) {
-        AlertDialog(
-            onDismissRequest = { showImportJsonDialog = false },
-            title = { Text("Import from JSON?") },
-            text = { Text("WARNING: This will DELETE all current data and replace it. This cannot be undone.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showImportJsonDialog = false
-                        jsonImportLauncher.launch(arrayOf("application/json"))
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) { Text("Wipe and Import") }
+        ConfirmationDialog(
+            title = "Import from JSON?",
+            text = "WARNING: This will DELETE all current data and replace it. This cannot be undone.",
+            confirmButtonText = "Wipe and Import",
+            isDestructive = true,
+            onDismiss = { showImportJsonDialog = false },
+            onConfirm = {
+                showImportJsonDialog = false
+                jsonImportLauncher.launch(arrayOf("application/json"))
             },
-            dismissButton = { TextButton(onClick = { showImportJsonDialog = false }) { Text("Cancel") } },
-            containerColor = popupContainerColor,
         )
     }
 }

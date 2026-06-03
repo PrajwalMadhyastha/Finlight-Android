@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -311,6 +312,53 @@ class ReportsViewModelTest : BaseViewModelTest() {
                 assertEquals(previousYear, previousEndCal.get(Calendar.YEAR))
                 assertEquals(today.get(Calendar.MONTH), previousEndCal.get(Calendar.MONTH))
 
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `reportData returns null percentageChange when previous summary expenses is zero`() =
+        runTest {
+            // Arrange
+            val currentSummary = FinancialSummary(0.0, 150.0)
+            val previousSummary = FinancialSummary(0.0, 0.0)
+
+            `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
+                .thenReturn(flowOf(currentSummary))
+                .thenReturn(flowOf(previousSummary))
+
+            // Act
+            val viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository)
+            viewModel.selectPeriod(ReportPeriod.MONTH)
+            advanceUntilIdle()
+
+            // Assert
+            viewModel.reportData.test {
+                val data = awaitItem()
+                assertNull(data.insights?.percentageChange)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `reportData returns null percentageChange when previous summary is null`() =
+        runTest {
+            // Arrange
+            val currentSummary = FinancialSummary(0.0, 150.0)
+
+            `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
+                .thenReturn(flowOf(currentSummary))
+                .thenReturn(flowOf(null))
+
+            // Act
+            val viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository)
+            viewModel.selectPeriod(ReportPeriod.MONTH)
+            advanceUntilIdle()
+
+            // Assert
+            viewModel.reportData.test {
+                val data = awaitItem()
+                assertNull(data.insights?.percentageChange)
                 cancelAndIgnoreRemainingEvents()
             }
         }

@@ -86,7 +86,8 @@ fun CategorySpendingScreen(
                         DonutChart(
                             modifier = Modifier.weight(1.6f),
                             data = spendingList,
-                            onSliceClick = onCategoryClick, // Pass the click handler down
+                            // Pass the click handler down
+                            onSliceClick = onCategoryClick,
                         )
                         ChartLegend(
                             modifier = Modifier.weight(1.6f),

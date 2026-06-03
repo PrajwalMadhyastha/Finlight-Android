@@ -4,6 +4,8 @@
 // has been moved to the :core module to resolve build errors and improve the
 // project's architecture by making shared models accessible to all modules.
 // =================================================================================
+@file:Suppress("ktlint:standard:no-empty-file")
+
 package io.pm.finlight
 
 // This file is intentionally left empty. The SmsParseTemplate data class

@@ -19,7 +19,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,15 +28,11 @@ import com.google.gson.Gson
 import io.pm.finlight.LinkTransactionViewModelFactory
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.Transaction
-import io.pm.finlight.ui.theme.PopupSurfaceDark
-import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
+import io.pm.finlight.utils.FormatUtils
 import java.net.URLDecoder
-import java.text.SimpleDateFormat
 import java.util.*
-
-// Helper function to determine if a color is 'dark' based on luminance.
-private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @Composable
 fun LinkTransactionScreen(
@@ -88,33 +83,22 @@ fun LinkTransactionScreen(
     }
 
     if (showConfirmationDialog && transactionToLink != null) {
-        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-        val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-
-        AlertDialog(
-            onDismissRequest = { showConfirmationDialog = false },
-            title = { Text("Confirm Link") },
-            text = { Text("Link this SMS to the transaction for '${transactionToLink!!.description}'?") },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.linkTransaction(transactionToLink!!.id) {
-                        // Pass the ID of the linked SMS back to the review screen
-                        navController.previousBackStackEntry
-                            ?.savedStateHandle
-                            ?.set("linked_sms_id", potentialTxn.sourceSmsId)
-                        navController.popBackStack()
-                    }
-                    showConfirmationDialog = false
-                }) {
-                    Text("Confirm")
+        ConfirmationDialog(
+            title = "Confirm Link",
+            text = "Link this SMS to the transaction for '${transactionToLink!!.description}'?",
+            confirmButtonText = "Confirm",
+            isDestructive = false,
+            onDismiss = { showConfirmationDialog = false },
+            onConfirm = {
+                viewModel.linkTransaction(transactionToLink!!.id) {
+                    // Pass the ID of the linked SMS back to the review screen
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("linked_sms_id", potentialTxn.sourceSmsId)
+                    navController.popBackStack()
                 }
+                showConfirmationDialog = false
             },
-            dismissButton = {
-                TextButton(onClick = { showConfirmationDialog = false }) {
-                    Text("Cancel")
-                }
-            },
-            containerColor = popupContainerColor,
         )
     }
 }
@@ -140,7 +124,7 @@ private fun LinkCandidateItem(
     transaction: Transaction,
     onClick: () -> Unit,
 ) {
-    val dateFormatter = remember { SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()) }
+    val dateFormatter = remember { FormatUtils.displayDateFormatter }
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,

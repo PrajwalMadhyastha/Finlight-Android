@@ -30,8 +30,8 @@ import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
 
 // Helper to detect perceived luminance.
@@ -201,7 +201,7 @@ fun AddEditGoalScreen(
                     )
                     val dateDisplay =
                         targetDateMillis?.let {
-                            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(it))
+                            FormatUtils.displayDateFormatter.format(Date(it))
                         } ?: "Select"
                     TextButton(onClick = { showDatePicker = true }) {
                         Text(dateDisplay)

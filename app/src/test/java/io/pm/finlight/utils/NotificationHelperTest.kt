@@ -509,7 +509,8 @@ class NotificationHelperTest : BaseViewModelTest() {
                 images = emptyList(),
                 accountName = "Test Account",
                 categoryName = "Food",
-                categoryIconKey = null, // Will trigger letter icon
+                // Will trigger letter icon
+                categoryIconKey = null,
                 categoryColorKey = "red_light",
                 tagNames = null,
             )

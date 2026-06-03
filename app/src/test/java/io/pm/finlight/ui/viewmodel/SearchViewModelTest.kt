@@ -72,7 +72,8 @@ class SearchViewModelTest : BaseViewModelTest() {
     private fun initializeViewModel(
         initialCategoryId: Int? = null,
         initialDateMillis: Long? = null,
-        initialQuery: String? = null, // --- UPDATED: Added initialQuery parameter
+        // --- UPDATED: Added initialQuery parameter
+        initialQuery: String? = null,
     ) {
         viewModel =
             SearchViewModel(
@@ -82,7 +83,8 @@ class SearchViewModelTest : BaseViewModelTest() {
                 tagDao,
                 initialCategoryId,
                 initialDateMillis,
-                initialQuery, // --- UPDATED: Pass to constructor
+                // --- UPDATED: Pass to constructor
+                initialQuery,
             )
     }
 

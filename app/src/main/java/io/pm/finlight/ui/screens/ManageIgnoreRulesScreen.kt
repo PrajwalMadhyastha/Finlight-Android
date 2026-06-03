@@ -32,9 +32,8 @@ import androidx.navigation.NavController
 import io.pm.finlight.IgnoreRule
 import io.pm.finlight.ManageIgnoreRulesViewModel
 import io.pm.finlight.RuleType
+import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.theme.PopupSurfaceDark
-import io.pm.finlight.ui.theme.PopupSurfaceLight
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -202,26 +201,16 @@ fun ManageIgnoreRulesScreen(
     }
 
     if (ruleToDelete != null) {
-        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-        val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-
-        AlertDialog(
-            onDismissRequest = { ruleToDelete = null },
-            title = { Text("Delete Ignore Rule?") },
-            text = { Text("Are you sure you want to delete the rule for \"${ruleToDelete!!.pattern}\"?") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.deleteIgnoreRule(ruleToDelete!!)
-                        ruleToDelete = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) { Text("Delete") }
+        ConfirmationDialog(
+            title = "Delete Ignore Rule?",
+            text = "Are you sure you want to delete the rule for \"${ruleToDelete!!.pattern}\"?",
+            confirmButtonText = "Delete",
+            isDestructive = true,
+            onDismiss = { ruleToDelete = null },
+            onConfirm = {
+                viewModel.deleteIgnoreRule(ruleToDelete!!)
+                ruleToDelete = null
             },
-            dismissButton = {
-                TextButton(onClick = { ruleToDelete = null }) { Text("Cancel") }
-            },
-            containerColor = popupContainerColor,
         )
     }
 }
