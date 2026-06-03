@@ -37,7 +37,7 @@ jobs:
           cache: gradle
 
       - name: Download Previous Agent Memory
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v6
         with:
           name: qa-agent-memory
           path: .
