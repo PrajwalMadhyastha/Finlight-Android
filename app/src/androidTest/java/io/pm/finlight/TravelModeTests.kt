@@ -69,11 +69,11 @@ class TravelModeTests {
         // 8. Save and Activate Plan
         composeTestRule.onNodeWithText("Save and Activate Plan").performScrollTo().performClick()
 
-        // 9. Navigate back to Dashboard
+        // 9. Navigate to Transactions
         composeTestRule.waitUntil(timeoutMillis = 2000) {
-            composeTestRule.onAllNodesWithTag("nav_item_Dashboard").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithTag("nav_item_Transactions").fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onNodeWithTag("nav_item_Dashboard").performClick()
+        composeTestRule.onNodeWithTag("nav_item_Transactions").performClick()
 
         // 10. Open Add Transaction
         composeTestRule.waitUntil(timeoutMillis = 10000) {

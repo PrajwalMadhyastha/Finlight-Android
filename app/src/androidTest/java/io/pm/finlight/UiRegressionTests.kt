@@ -32,6 +32,12 @@ class UiRegressionTests {
 
     @Test
     fun test_dialogTransparency_dateAndTimePickerRenderSolid() {
+        // Navigate to Transactions tab first
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithTag("nav_item_Transactions").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag("nav_item_Transactions").performClick()
+
         // Navigate to add transaction
         composeTestRule.waitUntil(timeoutMillis = 10000) {
             composeTestRule.onAllNodesWithContentDescription("Add Transaction").fetchSemanticsNodes().isNotEmpty()
