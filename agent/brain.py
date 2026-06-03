@@ -21,6 +21,7 @@ Supported actions:
 - "swipe": Swipes on the screen. Requires "x1", "y1", "x2", "y2" in args.
 - "back": Presses the hardware back button. No args.
 - "home": Presses the hardware home button. No args.
+- "checkpoint": Wipes the detailed action history up to this point and replaces it with a summary. Use this when you complete a major stage (like onboarding). Requires "summary" in args.
 - "finish": Ends the test. Requires "status" ("pass" or "fail") and "summary" (detailed markdown string of what was tested and bugs found) in args.
 
 Always output valid JSON only, matching this schema:
@@ -63,15 +64,15 @@ def get_next_action(client, goal: str, ui_state: str, history: list, memory_text
             break
         except APIError as e:
             if e.code == 429:
-                print(f"Rate limit exceeded (15 RPM). Waiting 15 seconds before retrying (Attempt {attempt+1}/5)...")
-                time.sleep(15)
+                print(f"Rate limit exceeded (15 RPM). Waiting 60 seconds before retrying (Attempt {attempt+1}/5)...")
+                time.sleep(60)
             else:
                 print(f"API Error encountered: {e}")
                 time.sleep(10)
         except Exception as e:
             if "429" in str(e) or "ResourceExhausted" in str(e):
-                print(f"Rate limit exceeded (15 RPM). Waiting 15 seconds before retrying (Attempt {attempt+1}/5)...")
-                time.sleep(15)
+                print(f"Rate limit exceeded (15 RPM). Waiting 60 seconds before retrying (Attempt {attempt+1}/5)...")
+                time.sleep(60)
             else:
                 print(f"Unexpected error: {e}")
                 time.sleep(10)

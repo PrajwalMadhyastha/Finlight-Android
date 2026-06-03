@@ -6,7 +6,7 @@ import agent.reporter as reporter
 def main():
     parser = argparse.ArgumentParser(description="Autonomous QA Agent Runner")
     parser.add_argument("--goal", type=str, required=False, default="random", help="The high level testing goal.")
-    parser.add_argument("--max-steps", type=int, default=30, help="Maximum number of steps the agent can take.")
+    parser.add_argument("--max-steps", type=int, default=50, help="Maximum number of steps the agent can take.")
     
     args = parser.parse_args()
     

@@ -3,7 +3,7 @@ import agent.adb_utils as adb_utils
 import agent.ui_parser as ui_parser
 import agent.brain as brain
 
-def run_agent_loop(goal: str, max_steps: int = 30, memory_text: str = ""):
+def run_agent_loop(goal: str, max_steps: int = 50, memory_text: str = ""):
     model = brain.setup_gemini()
     history = []
     
@@ -57,6 +57,15 @@ def run_agent_loop(goal: str, max_steps: int = 30, memory_text: str = ""):
             adb_utils.press_back()
         elif action == "home":
             adb_utils.press_home()
+        elif action == "checkpoint":
+            checkpoint_summary = args.get("summary", "Reached a checkpoint.")
+            print(f"\n[CHECKPOINT REACHED]: {checkpoint_summary}")
+            # Wipe history and replace with checkpoint summary to compress context
+            history = [{
+                "step": step + 1,
+                "action": "checkpoint",
+                "summary": checkpoint_summary
+            }]
         elif action == "finish":
             status = args.get("status", "unknown")
             summary = args.get("summary", "No summary provided.")
