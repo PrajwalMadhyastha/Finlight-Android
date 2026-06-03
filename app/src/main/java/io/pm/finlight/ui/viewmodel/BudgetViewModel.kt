@@ -274,28 +274,30 @@ class BudgetViewModel(
     private fun refreshAnnualSummaries() {
         viewModelScope.launch {
             val year = _selectedPlanningYear.value
-            
+
             // Overall
             val existingOverall = settingsRepository.getOverallBudgetsForYear(year)
             val totalOverall = existingOverall.values.sum()
-            _annualOverallSummary.value = AnnualOverallSummary(
-                totalBudget = totalOverall,
-                overrideCount = existingOverall.size
-            )
+            _annualOverallSummary.value =
+                AnnualOverallSummary(
+                    totalBudget = totalOverall,
+                    overrideCount = existingOverall.size
+                )
 
             // Categories
             val categories = allCategories.firstOrNull() ?: emptyList()
-            val categorySummaries = categories.map { category ->
-                val existingCatBudgets = budgetRepository.getBudgetsForCategoryAndYear(category.name, year)
-                AnnualCategorySummary(
-                    categoryName = category.name,
-                    totalBudget = existingCatBudgets.sumOf { it.amount },
-                    overrideCount = existingCatBudgets.size,
-                    iconKey = category.iconKey,
-                    colorKey = category.colorKey
-                )
-            }.sortedByDescending { it.totalBudget }
-            
+            val categorySummaries =
+                categories.map { category ->
+                    val existingCatBudgets = budgetRepository.getBudgetsForCategoryAndYear(category.name, year)
+                    AnnualCategorySummary(
+                        categoryName = category.name,
+                        totalBudget = existingCatBudgets.sumOf { it.amount },
+                        overrideCount = existingCatBudgets.size,
+                        iconKey = category.iconKey,
+                        colorKey = category.colorKey
+                    )
+                }.sortedByDescending { it.totalBudget }
+
             _annualCategorySummaries.value = categorySummaries
         }
     }
@@ -305,7 +307,10 @@ class BudgetViewModel(
         refreshAnnualSummaries()
     }
 
-    fun saveAnnualOverallBudget(amountStr: String, isStrict: Boolean) {
+    fun saveAnnualOverallBudget(
+        amountStr: String,
+        isStrict: Boolean
+    ) {
         viewModelScope.launch {
             try {
                 val amount = amountStr.toFloatOrNull()
@@ -315,23 +320,23 @@ class BudgetViewModel(
                 }
                 val year = _selectedPlanningYear.value
                 val existingBudgets = settingsRepository.getOverallBudgetsForYear(year)
-                
+
                 var remainingAmount = amount
                 var remainingMonths = 12
-                
+
                 if (isStrict) {
                     val overridesSum = existingBudgets.values.sum()
                     remainingAmount = amount - overridesSum
                     remainingMonths = 12 - existingBudgets.size
-                    
+
                     if (remainingAmount < 0) {
-                         _uiEvent.send("Overrides exceed annual target.")
-                         return@launch
+                        _uiEvent.send("Overrides exceed annual target.")
+                        return@launch
                     }
                 }
-                
+
                 val baseline = if (remainingMonths > 0) remainingAmount / remainingMonths else 0f
-                
+
                 for (month in 1..12) {
                     if (!existingBudgets.containsKey(month)) {
                         val valToSave = if (isStrict) baseline else (amount / 12)
@@ -346,7 +351,11 @@ class BudgetViewModel(
         }
     }
 
-    fun saveAnnualCategoryBudget(categoryName: String, amountStr: String, isStrict: Boolean) {
+    fun saveAnnualCategoryBudget(
+        categoryName: String,
+        amountStr: String,
+        isStrict: Boolean
+    ) {
         viewModelScope.launch {
             try {
                 val amount = amountStr.toDoubleOrNull()
@@ -356,26 +365,26 @@ class BudgetViewModel(
                 }
                 val year = _selectedPlanningYear.value
                 val existingBudgets = budgetRepository.getBudgetsForCategoryAndYear(categoryName, year)
-                
+
                 var remainingAmount = amount
                 var remainingMonths = 12
-                
+
                 if (isStrict) {
                     val overridesSum = existingBudgets.sumOf { it.amount }
                     remainingAmount = amount - overridesSum
                     remainingMonths = 12 - existingBudgets.size
-                    
+
                     if (remainingAmount < 0) {
-                         _uiEvent.send("Overrides exceed annual target.")
-                         return@launch
+                        _uiEvent.send("Overrides exceed annual target.")
+                        return@launch
                     }
                 }
-                
+
                 val baseline = if (remainingMonths > 0) remainingAmount / remainingMonths else 0.0
-                
+
                 val existingMonths = existingBudgets.map { it.month }.toSet()
                 val budgetsToInsert = mutableListOf<Budget>()
-                
+
                 for (month in 1..12) {
                     if (month !in existingMonths) {
                         val valToSave = if (isStrict) baseline else (amount / 12)

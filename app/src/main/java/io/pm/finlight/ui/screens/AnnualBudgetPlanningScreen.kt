@@ -43,7 +43,7 @@ fun AnnualBudgetPlanningScreen(
 
     var showOverallDialog by remember { mutableStateOf(false) }
     var selectedCategoryForEdit by remember { mutableStateOf<String?>(null) }
-    
+
     LaunchedEffect(Unit) {
         viewModel.setSelectedPlanningYear(selectedYear)
     }
@@ -83,7 +83,7 @@ fun AnnualBudgetPlanningScreen(
                     }
                 }
             }
-            
+
             item {
                 GlassPanel(modifier = Modifier.clickable { showOverallDialog = true }) {
                     Column(modifier = Modifier.padding(24.dp).fillMaxWidth()) {
@@ -106,13 +106,13 @@ fun AnnualBudgetPlanningScreen(
                             Text(
                                 "No manual overrides set",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=0.6f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
                         }
                     }
                 }
             }
-            
+
             item {
                 Text(
                     "Category Annual Budgets",
@@ -120,7 +120,7 @@ fun AnnualBudgetPlanningScreen(
                     modifier = Modifier.padding(top = 16.dp)
                 )
             }
-            
+
             items(categorySummaries, key = { it.categoryName }) { summary ->
                 GlassPanel(modifier = Modifier.clickable { selectedCategoryForEdit = summary.categoryName }) {
                     Row(
@@ -128,10 +128,11 @@ fun AnnualBudgetPlanningScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(CategoryIconHelper.getIconBackgroundColor(summary.colorKey ?: "gray_light")),
+                            modifier =
+                                Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(CategoryIconHelper.getIconBackgroundColor(summary.colorKey ?: "gray_light")),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
@@ -162,7 +163,7 @@ fun AnnualBudgetPlanningScreen(
             }
         }
     }
-    
+
     if (showOverallDialog) {
         AnnualBudgetEditDialog(
             title = "Set Overall Annual Budget",
@@ -175,7 +176,7 @@ fun AnnualBudgetPlanningScreen(
             }
         )
     }
-    
+
     selectedCategoryForEdit?.let { categoryName ->
         val summary = categorySummaries.find { it.categoryName == categoryName }
         AnnualBudgetEditDialog(
@@ -204,7 +205,7 @@ fun AnnualBudgetEditDialog(
         mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
     }
     var isStrict by remember { mutableStateOf(true) }
-    
+
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
@@ -224,7 +225,7 @@ fun AnnualBudgetEditDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                
+
                 if (hasOverrides) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { isStrict = !isStrict },
