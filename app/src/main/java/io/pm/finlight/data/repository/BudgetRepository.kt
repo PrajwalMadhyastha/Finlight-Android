@@ -41,6 +41,17 @@ class BudgetRepository(private val budgetDao: BudgetDao) {
         budgetDao.insert(budget)
     }
 
+    suspend fun insertAll(budgets: List<Budget>) {
+        budgetDao.insertAll(budgets)
+    }
+
+    suspend fun getBudgetsForCategoryAndYear(
+        categoryName: String,
+        year: Int,
+    ): List<Budget> {
+        return budgetDao.getBudgetsForCategoryAndYear(categoryName, year)
+    }
+
     suspend fun delete(budget: Budget) {
         budgetDao.delete(budget)
     }

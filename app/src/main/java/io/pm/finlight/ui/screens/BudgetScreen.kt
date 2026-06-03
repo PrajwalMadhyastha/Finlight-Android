@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -116,6 +117,7 @@ fun BudgetScreen(
                 selectedMonth = selectedMonth,
                 monthlySummaries = monthlySummaries,
                 onMonthSelected = { viewModel.setSelectedMonth(it) },
+                onAnnualPlanClick = { navController.navigate("annual_budget_planning") }
             )
         }
 
@@ -206,6 +208,7 @@ private fun MonthlySummaryHeader(
     selectedMonth: Calendar,
     monthlySummaries: List<Pair<Calendar, Float?>>,
     onMonthSelected: (Calendar) -> Unit,
+    onAnnualPlanClick: () -> Unit,
 ) {
     val monthFormat = FormatUtils.shortMonthFormatter
     val monthYearFormat = FormatUtils.monthYearDisplayFormatter
@@ -227,11 +230,14 @@ private fun MonthlySummaryHeader(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clickable { showMonthScroller = !showMonthScroller }
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.clickable { showMonthScroller = !showMonthScroller },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     text = monthYearFormat.format(selectedMonth.time),
                     style = MaterialTheme.typography.headlineSmall,
@@ -243,6 +249,18 @@ private fun MonthlySummaryHeader(
                     contentDescription = if (showMonthScroller) "Hide month selector" else "Show month selector",
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
+            }
+            OutlinedButton(
+                onClick = onAnnualPlanClick,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Annual Plan")
             }
         }
 

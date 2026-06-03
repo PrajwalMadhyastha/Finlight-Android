@@ -588,6 +588,18 @@ class SettingsRepository(context: Context) {
         }
     }
 
+    // --- NEW: Function to get all explicit overall budgets for a year ---
+    fun getOverallBudgetsForYear(year: Int): Map<Int, Float> {
+        val budgets = mutableMapOf<Int, Float>()
+        for (month in 1..12) {
+            val key = getBudgetKey(year, month)
+            if (prefs.contains(key)) {
+                budgets[month] = prefs.getFloat(key, 0f)
+            }
+        }
+        return budgets
+    }
+
     fun saveSmsScanStartDate(date: Long) {
         prefs.edit {
             putLong(KEY_SMS_SCAN_START_DATE, date)
