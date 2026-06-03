@@ -198,7 +198,7 @@ class TimePeriodReportViewModel(
 
     val chartData: StateFlow<Pair<BarData, List<String>>?> =
         _selectedDate.flatMapLatest { calendar ->
-            when (timePeriod) {
+            return@flatMapLatest when (timePeriod) {
                 TimePeriod.DAILY -> {
                     val endCal =
                         (calendar.clone() as Calendar).apply {
