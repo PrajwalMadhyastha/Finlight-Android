@@ -1,13 +1,13 @@
 name: Autonomous QA Agent
 
-# Run on a weekly schedule, manual dispatch, or pushes to this feature branch
+# Run on a daily schedule, manual dispatch, or pushes to main branch
 on:
   push:
     branches:
-      - feat/fix16
+      - main
   schedule:
-    # Runs at 02:00 UTC every day
-    - cron: '0 2 * * *'
+    # Runs at 02:00 IST every day (20:30 UTC)
+    - cron: '30 20 * * *'
   workflow_dispatch:
     inputs:
       goal:
