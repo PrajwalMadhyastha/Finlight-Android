@@ -1,0 +1,125 @@
+name: Autonomous QA Agent
+
+# Run on a daily schedule, manual dispatch, or pushes to main branch
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # Runs at 02:00 IST every day (20:30 UTC)
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+    inputs:
+      goal:
+        description: 'The high-level goal for the QA Agent'
+        required: true
+        default: 'random'
+
+permissions:
+  contents: read
+  pull-requests: write # Required if we use a PR generation action later
+
+jobs:
+  agent-qa:
+    name: Run AI QA Agent
+    # ubuntu-latest supports KVM hardware acceleration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Download Previous Agent Memory
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          name: qa-agent-memory
+          path: .
+          workflow_conclusion: completed
+        continue-on-error: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r agent/requirements.txt
+
+      - name: Enable KVM group permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build and Install APK, Run QA Agent
+        uses: reactivecircus/android-emulator-runner@v2.37.0
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PYTHONPATH: ${{ github.workspace }}
+        with:
+          api-level: 34
+          target: aosp_atd
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            echo "Installing App..."
+            ./gradlew installDebug --no-daemon
+            
+            echo "Running AI Agent..."
+            python -m agent.main --goal "${{ github.event.inputs.goal || 'random' }}"
+
+      - name: Create GitHub Issue on Bug Found
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPORT_FILE=$(ls qa-report-*.md | head -n 1)
+          if [ -f "$REPORT_FILE" ]; then
+            gh issue create \
+              --title "🤖 AI QA Agent Bug: ${{ github.event.inputs.goal || 'random' }}" \
+              --body-file "$REPORT_FILE" \
+              --label "bug"
+          else
+            echo "No report file found to attach to the issue."
+          fi
+
+      - name: Upload QA Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-report
+          path: qa-report-*.md
+          retention-days: 14
+
+      - name: Upload Agent Memory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-agent-memory
+          path: agent_memory.txt
+          retention-days: 30
+
+      - name: Display Report in Actions UI
+        if: always()
+        run: |
+          cat qa-report-*.md >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Agent Memory (Last 10 Runs)" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          cat agent_memory.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

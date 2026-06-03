@@ -11,11 +11,11 @@ package io.pm.finlight
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.dao.AccountDao
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
@@ -24,7 +24,8 @@ data class SearchUiState(
     val selectedAccount: Account? = null,
     val selectedCategory: Category? = null,
     val selectedTag: Tag? = null,
-    val transactionType: String = "All", // "All", "Income", "Expense"
+    // "All", "Income", "Expense"
+    val transactionType: String = "All",
     val startDate: Long? = null,
     val endDate: Long? = null,
     val accounts: List<Account> = emptyList(),
@@ -34,7 +35,8 @@ data class SearchUiState(
     val showStartDatePicker: Boolean = false,
     val showEndDatePicker: Boolean = false,
     val displayDate: String? = null,
-    val isDrilldown: Boolean = false, // --- NEW: Flag for drilldown mode
+    // --- NEW: Flag for drilldown mode
+    val isDrilldown: Boolean = false,
 )
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -125,7 +127,8 @@ class SearchViewModel(
             _uiState.update {
                 it.copy(
                     keyword = initialQuery,
-                    isDrilldown = true, // Enable drilldown mode
+                    // Enable drilldown mode
+                    isDrilldown = true,
                 )
             }
         }
@@ -142,7 +145,7 @@ class SearchViewModel(
             cal.set(Calendar.SECOND, 59)
             val end = cal.timeInMillis
 
-            val dateFormatter = SimpleDateFormat("MMMM d, yyyy", Locale.getDefault())
+            val dateFormatter = FormatUtils.getFormatter("MMMM d, yyyy", Locale.getDefault())
             val formattedDate = dateFormatter.format(cal.time)
 
             _uiState.update {

@@ -5,8 +5,10 @@ import java.util.Locale
 
 data class CurrencyInfo(
     val countryName: String,
-    val currencyCode: String, // e.g., USD
-    val currencySymbol: String, // e.g., $
+    // e.g., USD
+    val currencyCode: String,
+    // e.g., $
+    val currencySymbol: String,
 )
 
 object CurrencyHelper {

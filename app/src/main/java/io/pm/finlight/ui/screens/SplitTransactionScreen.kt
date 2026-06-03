@@ -62,7 +62,8 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 fun SplitTransactionScreen(
     navController: NavController,
     transactionId: Int,
-    transactionViewModel: TransactionViewModel, // --- FIX: Accept shared ViewModel
+    // --- FIX: Accept shared ViewModel
+    transactionViewModel: TransactionViewModel,
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = SplitTransactionViewModelFactory(application, transactionId)

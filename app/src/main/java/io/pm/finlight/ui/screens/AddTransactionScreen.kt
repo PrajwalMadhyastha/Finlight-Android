@@ -75,11 +75,11 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
 
 private sealed class ComposerSheet {
@@ -173,7 +173,7 @@ fun AddTransactionScreen(
                 val typeToken = object : TypeToken<Map<String, String>>() {}.type
                 val initialDataMap: Map<String, String> = gson.fromJson(URLDecoder.decode(initialDataJson, "UTF-8"), typeToken)
 
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                val dateFormat = FormatUtils.getFormatter("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
                 initialDataMap["Date"]?.let {
                     try {
@@ -1040,8 +1040,9 @@ private fun OrbitalChips(
         )
         DetailChip(
             icon = Icons.Default.CalendarToday,
-            text = SimpleDateFormat("dd MMM", Locale.getDefault()).format(selectedDateTime),
+            text = FormatUtils.getFormatter("dd MMM", Locale.getDefault()).format(selectedDateTime),
             onClick = onDateClick,
+            modifier = Modifier.testTag("date_select_chip")
         )
     }
 }

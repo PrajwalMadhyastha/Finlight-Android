@@ -40,9 +40,9 @@ import io.pm.finlight.ui.components.PrivacyAwareText
 import io.pm.finlight.ui.components.TransactionList
 import io.pm.finlight.ui.components.pagerTabIndicatorOffset
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToLong
 
@@ -81,7 +81,8 @@ fun IncomeScreen(
             selectedMonth = selectedMonth,
             monthlySummaries = monthlySummaries,
             onMonthSelected = { incomeViewModel.setSelectedMonth(it) },
-            isPrivacyModeEnabled = isPrivacyModeEnabled, // --- NEW: Pass state
+            // --- NEW: Pass state
+            isPrivacyModeEnabled = isPrivacyModeEnabled,
         )
 
         TabRow(
@@ -154,8 +155,8 @@ fun IncomeHeader(
     // --- NEW: Accept privacy mode state ---
     isPrivacyModeEnabled: Boolean,
 ) {
-    val monthFormat = SimpleDateFormat("LLL", Locale.getDefault())
-    val monthYearFormat = SimpleDateFormat("LLLL yyyy", Locale.getDefault())
+    val monthFormat = FormatUtils.getFormatter("LLL", Locale.getDefault())
+    val monthYearFormat = FormatUtils.getFormatter("LLLL yyyy", Locale.getDefault())
     var showMonthScroller by remember { mutableStateOf(false) }
 
     val currencyFormat =

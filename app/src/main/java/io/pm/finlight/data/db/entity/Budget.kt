@@ -11,6 +11,8 @@ data class Budget(
     val id: Int = 0,
     val categoryName: String,
     val amount: Double,
-    val month: Int, // e.g., 6 for June
-    val year: Int, // e.g., 2024
+    // e.g., 6 for June
+    val month: Int,
+    // e.g., 2024
+    val year: Int,
 )

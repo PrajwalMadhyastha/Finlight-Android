@@ -44,7 +44,8 @@ data class Transaction(
     val id: Int = 0,
     val description: String,
     val categoryId: Int?,
-    val amount: Double, // ALWAYS in home currency
+    // ALWAYS in home currency
+    val amount: Double,
     val date: Long,
     val accountId: Int,
     val notes: String?,

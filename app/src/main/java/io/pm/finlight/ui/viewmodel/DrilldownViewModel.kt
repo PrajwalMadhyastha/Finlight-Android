@@ -15,8 +15,8 @@ import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.flow.*
-import java.text.SimpleDateFormat
 import java.util.*
 
 enum class DrilldownType {
@@ -106,8 +106,8 @@ class DrilldownViewModel(
                 val incomeEntries = mutableListOf<BarEntry>()
                 val expenseEntries = mutableListOf<BarEntry>()
                 val labels = mutableListOf<String>()
-                val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
-                val yearMonthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                val monthFormat = FormatUtils.getFormatter("MMM", Locale.getDefault())
+                val yearMonthFormat = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault())
                 val trendsMap = monthlyTrends.associateBy { it.monthYear }
 
                 for (i in 0..5) {

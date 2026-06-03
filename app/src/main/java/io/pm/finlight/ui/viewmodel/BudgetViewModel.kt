@@ -31,11 +31,11 @@ package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToLong
 
@@ -106,7 +106,7 @@ class BudgetViewModel(
         // --- REFACTORED: Use flatMapLatest on _selectedMonth ---
         budgetsForSelectedMonth =
             _selectedMonth.flatMapLatest { calendar ->
-                val yearMonthString = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
+                val yearMonthString = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(calendar.time)
                 val month = calendar.get(Calendar.MONTH) + 1
                 val year = calendar.get(Calendar.YEAR)
                 budgetRepository.getBudgetsForMonthWithSpending(yearMonthString, month, year)

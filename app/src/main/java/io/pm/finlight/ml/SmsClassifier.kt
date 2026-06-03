@@ -156,14 +156,10 @@ class SmsClassifier private constructor(
 
     /**
      * Cleans and tokenizes the input text into a sequence of integers.
+     * Uses the shared SmsTokenizer from the core module to ensure consistency.
      *
      * @param text The raw SMS body.
      * @return A padded long array representing the tokenized text.
-     */
-
-    /**
-     * Cleans and tokenizes the input text into a sequence of integers.
-     * Uses the shared SmsTokenizer from the core module to ensure consistency.
      */
     @VisibleForTesting
     internal fun tokenize(text: String): LongArray {

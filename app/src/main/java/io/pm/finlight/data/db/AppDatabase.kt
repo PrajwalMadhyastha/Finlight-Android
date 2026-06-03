@@ -691,6 +691,11 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        @androidx.annotation.VisibleForTesting
+        fun setTestInstance(database: AppDatabase) {
+            INSTANCE = database
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val securityManager = SecurityManager(context)
@@ -714,8 +719,10 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_40_41,
                             MIGRATION_40_42,
                             MIGRATION_41_42,
-                            MIGRATION_42_43, // --- ADDED ---
-                            MIGRATION_43_44, // --- ADDED: needsReview column ---
+                            // --- ADDED ---
+                            MIGRATION_42_43,
+                            // --- ADDED: needsReview column ---
+                            MIGRATION_43_44,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

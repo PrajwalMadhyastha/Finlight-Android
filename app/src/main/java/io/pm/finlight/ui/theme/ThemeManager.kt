@@ -6,6 +6,8 @@
 // UPDATE: Swapped the icon background colors for the Midnight and Paper themes
 // to better reflect their nature (dark vs. light).
 // =================================================================================
+@file:Suppress("ktlint:standard:filename")
+
 package io.pm.finlight.ui.theme
 
 import androidx.compose.material.icons.Icons
@@ -35,7 +37,8 @@ enum class AppTheme(
         key = "aurora",
         displayName = "Aurora",
         icon = Icons.Default.Nightlight,
-        lightColor = AuroraDarkPrimary, // Fallback, dark-only theme
+        // Fallback, dark-only theme
+        lightColor = AuroraDarkPrimary,
         darkColor = AuroraDarkPrimary,
     ),
     DAYBREAK(
@@ -43,7 +46,8 @@ enum class AppTheme(
         displayName = "Daybreak",
         icon = Icons.Default.WbSunny,
         lightColor = DaybreakPrimary,
-        darkColor = DaybreakPrimary, // Fallback, light-only theme
+        // Fallback, light-only theme
+        darkColor = DaybreakPrimary,
     ),
     MIDNIGHT(
         key = "midnight",

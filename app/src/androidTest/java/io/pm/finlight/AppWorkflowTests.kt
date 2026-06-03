@@ -75,7 +75,12 @@ class AppWorkflowTests {
         }
         val searchInput = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()
         searchInput.performTextInput(uniqueDescription)
-        composeTestRule.onAllNodesWithText(uniqueDescription).onFirst().performClick()
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
+
+        // Explicitly click the Save button in the MerchantPredictionSheet to close it
+        composeTestRule.onNodeWithText("Save").performClick()
+        composeTestRule.waitForIdle()
 
         // Enter amount
         composeTestRule.onNodeWithTag("amount_text_field").performTextInput("150.0")
@@ -96,8 +101,11 @@ class AppWorkflowTests {
         }
 
         // 5. Verify the new transaction appears in the "Recent Transactions" list.
-        // Wait until the item is in the composition before scrolling — avoids a race
-        // where the DB write has committed but the LazyColumn hasn't recomposed yet.
+        // First, scroll to the Recent Transactions card so its contents are composed.
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasText("Recent Transactions"))
+
+        // Wait until the item is emitted by the DB flow and appears in the composition.
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(uniqueDescription).fetchSemanticsNodes().isNotEmpty()
         }
@@ -150,4 +158,3 @@ class AppWorkflowTests {
         composeTestRule.onNodeWithText("Save Transaction").assertIsNotEnabled()
     }
 }
-

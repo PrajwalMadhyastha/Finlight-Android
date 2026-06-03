@@ -64,7 +64,8 @@ class IncomeViewModelTest : BaseViewModelTest() {
                 transactionRepository,
                 accountRepository,
                 categoryRepository,
-                settingsRepository, // --- NEW: Pass dependency ---
+                // --- NEW: Pass dependency ---
+                settingsRepository,
             )
     }
 

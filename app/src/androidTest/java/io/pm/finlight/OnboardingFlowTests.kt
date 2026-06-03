@@ -5,6 +5,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.rule.GrantPermissionRule
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
@@ -12,10 +13,12 @@ import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.junit.runners.model.Statement
-import androidx.test.rule.GrantPermissionRule
 
 class EnableOnboardingRule : TestRule {
-    override fun apply(base: Statement, description: Description): Statement {
+    override fun apply(
+        base: Statement,
+        description: Description,
+    ): Statement {
         return object : Statement() {
             override fun evaluate() {
                 val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -32,18 +35,19 @@ class OnboardingFlowTests {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @get:Rule
-    val ruleChain: RuleChain = RuleChain
-        .outerRule(EnableOnboardingRule())
-        .around(DisableAppLockRule())
-        .around(ClearDatabaseRule())
-        .around(
-            GrantPermissionRule.grant(
-                android.Manifest.permission.READ_SMS,
-                android.Manifest.permission.RECEIVE_SMS,
-                android.Manifest.permission.POST_NOTIFICATIONS,
+    val ruleChain: RuleChain =
+        RuleChain
+            .outerRule(EnableOnboardingRule())
+            .around(DisableAppLockRule())
+            .around(ClearDatabaseRule())
+            .around(
+                GrantPermissionRule.grant(
+                    android.Manifest.permission.READ_SMS,
+                    android.Manifest.permission.RECEIVE_SMS,
+                    android.Manifest.permission.POST_NOTIFICATIONS,
+                ),
             )
-        )
-        .around(composeTestRule)
+            .around(composeTestRule)
 
     @Test
     fun test_onboarding_showsOnFreshInstall() {
@@ -60,17 +64,17 @@ class OnboardingFlowTests {
         }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Next").assertIsEnabled().performClick()
-        
+
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("What should we call you?").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("What should we call you?").assertIsDisplayed()
-        
+
         composeTestRule.onNodeWithText("Next").assertIsNotEnabled()
         composeTestRule.onNodeWithText("Your Name").performTextInput("John Doe")
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Next").assertIsEnabled().performClick()
-        
+
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("Set a Monthly Budget").fetchSemanticsNodes().isNotEmpty()
         }
@@ -83,34 +87,34 @@ class OnboardingFlowTests {
             composeTestRule.onAllNodesWithText("Next").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Next").performClick() // to User Name
-        
+
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("Your Name").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Your Name").performTextInput("John Doe")
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Next").performClick() // to Budget
-        
+
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("Set a Monthly Budget").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Next").performClick() // to SMS permission
-        
+
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("Enable SMS Scanning").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Enable SMS Scanning").performClick() // grants permission via rule and advances
-        
+
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("Next").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Next").performClick() // to Completion
-        
+
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("Finish Setup").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Finish Setup").performClick() // Finishes and goes to dashboard
-        
+
         composeTestRule.waitUntil(timeoutMillis = 10000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
@@ -125,16 +129,16 @@ class OnboardingFlowTests {
             composeTestRule.onAllNodesWithText("Next").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("Next").performClick() // to User Name
-        
+
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("What should we call you?").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("What should we call you?").assertIsDisplayed()
-        
+
         composeTestRule.activityRule.scenario.onActivity {
             it.onBackPressedDispatcher.onBackPressed()
         }
-        
+
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("Welcome to Finlight").fetchSemanticsNodes().isNotEmpty()
         }

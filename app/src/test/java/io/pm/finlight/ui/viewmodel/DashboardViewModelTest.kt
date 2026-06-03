@@ -565,7 +565,8 @@ class DashboardViewModelTest : BaseViewModelTest() {
             val transaction =
                 Transaction(
                     id = 1,
-                    description = "Manual Edit", // Different from original and alias
+                    // Different from original and alias
+                    description = "Manual Edit",
                     originalDescription = "amzn",
                     amount = 100.0,
                     date = 1L,
@@ -612,9 +613,12 @@ class DashboardViewModelTest : BaseViewModelTest() {
 
             val dailyTotalsForTest =
                 listOf(
-                    DailyTotal(date = keyFormatter.format(day1), totalAmount = 0.0), // No spend
-                    DailyTotal(date = keyFormatter.format(day2), totalAmount = 50.0), // Good day
-                    DailyTotal(date = keyFormatter.format(day3), totalAmount = 150.0), // Bad day
+                    // No spend
+                    DailyTotal(date = keyFormatter.format(day1), totalAmount = 0.0),
+                    // Good day
+                    DailyTotal(date = keyFormatter.format(day2), totalAmount = 50.0),
+                    // Bad day
+                    DailyTotal(date = keyFormatter.format(day3), totalAmount = 150.0),
                 )
 
             `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(firstTransactionDate))

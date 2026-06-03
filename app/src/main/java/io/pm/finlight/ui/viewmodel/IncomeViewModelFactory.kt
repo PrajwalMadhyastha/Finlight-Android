@@ -29,7 +29,8 @@ class IncomeViewModelFactory(private val application: Application) : ViewModelPr
                 transactionRepository,
                 accountRepository,
                 categoryRepository,
-                settingsRepository, // --- NEW: Pass SettingsRepository
+                // --- NEW: Pass SettingsRepository
+                settingsRepository,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

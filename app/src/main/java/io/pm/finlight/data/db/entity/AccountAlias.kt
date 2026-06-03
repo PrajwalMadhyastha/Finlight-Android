@@ -27,7 +27,9 @@ import kotlinx.serialization.Serializable
     indices = [Index(value = ["destinationAccountId"])],
 )
 data class AccountAlias(
+    // e.g., "ICICI - xx1234"
     @PrimaryKey
-    val aliasName: String, // e.g., "ICICI - xx1234"
-    val destinationAccountId: Int, // e.g., The ID of the "ICICI Bank" account
+    val aliasName: String,
+    // e.g., The ID of the "ICICI Bank" account
+    val destinationAccountId: Int,
 )

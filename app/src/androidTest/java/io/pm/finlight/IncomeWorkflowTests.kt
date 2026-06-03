@@ -31,7 +31,10 @@ class IncomeWorkflowTests {
             )
             .around(composeTestRule)
 
-    private fun addIncomeTransaction(amount: String, description: String) {
+    private fun addIncomeTransaction(
+        amount: String,
+        description: String,
+    ) {
         composeTestRule.waitUntil(timeoutMillis = 10000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
@@ -90,7 +93,7 @@ class IncomeWorkflowTests {
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
-        
+
         // Scroll to Income and check if it exists (Total Income)
         composeTestRule.onNodeWithTag("dashboard_lazy_column").performScrollToNode(hasText("Income"))
         composeTestRule.onNodeWithText("Income").assertIsDisplayed()

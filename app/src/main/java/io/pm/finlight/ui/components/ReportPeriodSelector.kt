@@ -16,13 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.pm.finlight.data.model.TimePeriod
-import java.text.SimpleDateFormat
+import io.pm.finlight.utils.FormatUtils
 import java.util.*
-
-import androidx.compose.ui.platform.testTag
 
 @Composable
 fun ReportPeriodSelector(
@@ -82,23 +81,23 @@ private fun getFormattedDateStrings(
     val cal = Calendar.getInstance().apply { time = date }
     return when (timePeriod) {
         TimePeriod.DAILY -> {
-            val titleFormat = SimpleDateFormat("MMMM d", Locale.getDefault())
-            val subtitleFormat = SimpleDateFormat("EEEE", Locale.getDefault())
+            val titleFormat = FormatUtils.getFormatter("MMMM d", Locale.getDefault())
+            val subtitleFormat = FormatUtils.getFormatter("EEEE", Locale.getDefault())
             titleFormat.format(date) to subtitleFormat.format(date)
         }
         TimePeriod.WEEKLY -> {
             val startOfWeek = (cal.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -7) }
             val endOfWeek = cal
-            val startFormat = SimpleDateFormat("MMM d", Locale.getDefault())
-            val endFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+            val startFormat = FormatUtils.getFormatter("MMM d", Locale.getDefault())
+            val endFormat = FormatUtils.getFormatter("MMM d, yyyy", Locale.getDefault())
             "This Week" to "${startFormat.format(startOfWeek.time)} - ${endFormat.format(endOfWeek.time)}"
         }
         TimePeriod.MONTHLY -> {
-            val format = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+            val format = FormatUtils.getFormatter("MMMM yyyy", Locale.getDefault())
             format.format(date) to "Full month summary"
         }
         TimePeriod.YEARLY -> {
-            val format = SimpleDateFormat("yyyy", Locale.getDefault())
+            val format = FormatUtils.getFormatter("yyyy", Locale.getDefault())
             format.format(date) to "Full year summary"
         }
     }

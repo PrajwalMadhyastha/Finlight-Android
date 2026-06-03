@@ -207,7 +207,8 @@ class TransactionDaoTest {
             val transaction =
                 Transaction(
                     id = 1,
-                    description = "Amazon", // Original-cased merchant name
+                    // Original-cased merchant name
+                    description = "Amazon",
                     amount = 500.0,
                     date = transactionTime,
                     accountId = 1,
@@ -1288,8 +1289,10 @@ class TransactionDaoTest {
             transactionDao.insert(
                 Transaction(
                     description = "Tea",
-                    amount = 15.0, // Different amount
-                    date = baseDate, // Newer
+                    // Different amount
+                    amount = 15.0,
+                    // Newer
+                    date = baseDate,
                     accountId = 1,
                     categoryId = 1,
                     source = "Manual Entry",
@@ -1303,13 +1306,16 @@ class TransactionDaoTest {
                 Transaction(
                     description = "Amazon",
                     amount = 500.0,
-                    date = baseDate + 1000, // Newest
+                    // Newest
+                    date = baseDate + 1000,
                     accountId = 1,
                     categoryId = 1,
-                    source = "Auto-Captured", // <-- Should be filtered out
+                    // <-- Should be filtered out
+                    source = "Auto-Captured",
                     transactionType = "expense",
                     notes = null,
-                    sourceSmsId = 12345L, // Explicitly add an SMS ID so it's ignored
+                    // Explicitly add an SMS ID so it's ignored
+                    sourceSmsId = 12345L,
                 ),
             )
 
@@ -1318,7 +1324,8 @@ class TransactionDaoTest {
                 Transaction(
                     description = "Coffee",
                     amount = 25.0,
-                    date = baseDate - 5000, // Between old Tea and new Tea
+                    // Between old Tea and new Tea
+                    date = baseDate - 5000,
                     accountId = 1,
                     categoryId = 1,
                     source = "Manual Entry",

@@ -21,5 +21,6 @@ data class TransactionDetails(
     val categoryName: String?,
     val categoryIconKey: String?,
     val categoryColorKey: String?,
-    val tagNames: String?, // --- NEW: To hold comma-separated tag names
+    // --- NEW: To hold comma-separated tag names
+    val tagNames: String?,
 )

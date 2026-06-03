@@ -88,12 +88,12 @@ import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URLEncoder
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.*
 
 private const val TAG = "DetailScreenDebug"
@@ -598,28 +598,17 @@ fun TransactionDetailScreen(
                 }
 
                 if (showDeleteDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showDeleteDialog = false },
-                        containerColor = popupContainerColor.copy(alpha = 1f),
-                        title = { Text("Delete Transaction?", color = MaterialTheme.colorScheme.onSurface) },
-                        text = {
-                            Text(
-                                "Are you sure you want to permanently delete this transaction? This action cannot be undone.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                    ConfirmationDialog(
+                        title = "Delete Transaction?",
+                        text = "Are you sure you want to permanently delete this transaction? This action cannot be undone.",
+                        confirmButtonText = "Delete",
+                        isDestructive = true,
+                        onDismiss = { showDeleteDialog = false },
+                        onConfirm = {
+                            viewModel.deleteTransaction(details.transaction)
+                            showDeleteDialog = false
+                            navigateBack()
                         },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    viewModel.deleteTransaction(details.transaction)
-                                    showDeleteDialog = false
-                                    navigateBack()
-                                },
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                            ) { Text("Delete") }
-                        },
-                        dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } },
                     )
                 }
 
@@ -637,28 +626,15 @@ fun TransactionDetailScreen(
                 }
 
                 if (showImageDeleteDialog != null) {
-                    AlertDialog(
-                        onDismissRequest = { showImageDeleteDialog = null },
-                        containerColor = popupContainerColor.copy(alpha = 1f),
-                        title = { Text("Delete Attachment?", color = MaterialTheme.colorScheme.onSurface) },
-                        text = {
-                            Text(
-                                "Are you sure you want to delete this attachment? This action cannot be undone.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    viewModel.deleteTransactionImage(showImageDeleteDialog!!)
-                                    showImageDeleteDialog = null
-                                },
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                            ) { Text("Delete") }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showImageDeleteDialog = null }) { Text("Cancel") }
+                    ConfirmationDialog(
+                        title = "Delete Attachment?",
+                        text = "Are you sure you want to delete this attachment? This action cannot be undone.",
+                        confirmButtonText = "Delete",
+                        isDestructive = true,
+                        onDismiss = { showImageDeleteDialog = null },
+                        onConfirm = {
+                            viewModel.deleteTransactionImage(showImageDeleteDialog!!)
+                            showImageDeleteDialog = null
                         },
                     )
                 }
@@ -901,7 +877,7 @@ private fun TransactionSpotlightHeader(
     val headerDescription = if (isSplit) "Split Transaction" else details.transaction.description
 
     val categoryColor = CategoryIconHelper.getIconBackgroundColor(displayCategory.colorKey)
-    val dateFormatter = remember { SimpleDateFormat("EEE, dd MMMM yy, h:mm a", Locale.getDefault()) }
+    val dateFormatter = remember { FormatUtils.fullDateTimeFormatter }
 
     val animatedAmount by animateFloatAsState(
         targetValue = details.transaction.amount.toFloat(),
@@ -1179,10 +1155,9 @@ private fun TagsRow(
         Column(modifier = Modifier.weight(1f)) {
             Text("Tags", color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(8.dp))
-            if (selectedTags.isEmpty())
-                {
-                    Text("Tap to add", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
+            if (selectedTags.isEmpty()) {
+                Text("Tap to add", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -2001,7 +1976,7 @@ private fun SelectableTransactionItem(
     isSelected: Boolean,
     onToggle: () -> Unit,
 ) {
-    val dateFormatter = remember { SimpleDateFormat("dd MMM, yy", Locale.getDefault()) }
+    val dateFormatter = remember { FormatUtils.shortYearDateFormatter }
 
     GlassPanel(
         modifier =
@@ -2064,10 +2039,11 @@ private fun CanonicalNudgeSheetContent(
     val selectedCount = state.selectedRawNames.size
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 32.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
     ) {
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -2089,10 +2065,11 @@ private fun CanonicalNudgeSheetContent(
         state.variants.forEach { variant ->
             val isSelected = variant.rawName in state.selectedRawNames
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onToggleVariant(variant.rawName) }
-                    .padding(vertical = 10.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onToggleVariant(variant.rawName) }
+                        .padding(vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Checkbox(
@@ -2141,4 +2118,3 @@ private fun CanonicalNudgeSheetContent(
         }
     }
 }
-

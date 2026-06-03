@@ -18,10 +18,10 @@ import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
 import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -118,8 +118,8 @@ class ReportsViewModel(
                     trends.forEachIndexed { index, trend ->
                         incomeEntries.add(BarEntry(index.toFloat(), trend.totalIncome.toFloat()))
                         expenseEntries.add(BarEntry(index.toFloat(), trend.totalExpenses.toFloat()))
-                        val date = SimpleDateFormat("yyyy-MM", Locale.getDefault()).parse(trend.monthYear)
-                        labels.add(SimpleDateFormat("MMM", Locale.getDefault()).format(date ?: Date()))
+                        val date = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).parse(trend.monthYear)
+                        labels.add(FormatUtils.getFormatter("MMM", Locale.getDefault()).format(date ?: Date()))
                     }
                     val incomeDataSet = BarDataSet(incomeEntries, "Income").apply { color = android.graphics.Color.rgb(102, 187, 106) }
                     val expenseDataSet = BarDataSet(expenseEntries, "Expense").apply { color = android.graphics.Color.rgb(239, 83, 80) }
@@ -127,7 +127,7 @@ class ReportsViewModel(
 
                     // Calculate insights
                     val percentageChange =
-                        if (previousSummary?.totalExpenses != null && previousSummary.totalExpenses > 0) {
+                        if (previousSummary != null && previousSummary.totalExpenses > 0) {
                             val currentExpenses = currentSummary?.totalExpenses ?: 0.0
                             ((currentExpenses - previousSummary.totalExpenses) / previousSummary.totalExpenses * 100).roundToInt()
                         } else {

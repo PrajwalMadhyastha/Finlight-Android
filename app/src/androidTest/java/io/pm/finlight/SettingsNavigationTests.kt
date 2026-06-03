@@ -15,18 +15,19 @@ class SettingsNavigationTests {
     private val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @get:Rule
-    val ruleChain: RuleChain = RuleChain
-        .outerRule(DisableOnboardingRule())
-        .around(DisableAppLockRule())
-        .around(SeedDatabaseRule())
-        .around(
-            GrantPermissionRule.grant(
-                Manifest.permission.READ_SMS,
-                Manifest.permission.RECEIVE_SMS,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ),
-        )
-        .around(composeTestRule)
+    val ruleChain: RuleChain =
+        RuleChain
+            .outerRule(DisableOnboardingRule())
+            .around(DisableAppLockRule())
+            .around(SeedDatabaseRule())
+            .around(
+                GrantPermissionRule.grant(
+                    Manifest.permission.READ_SMS,
+                    Manifest.permission.RECEIVE_SMS,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ),
+            )
+            .around(composeTestRule)
 
     private fun navigateToProfile() {
         composeTestRule.waitUntil(timeoutMillis = 10000) {
@@ -40,7 +41,7 @@ class SettingsNavigationTests {
         navigateToProfile()
         composeTestRule.onNodeWithTag("profile_lazy_column").performScrollToNode(hasText("Theme & Appearance"))
         composeTestRule.onNodeWithText("Theme & Appearance").performClick()
-        
+
         composeTestRule.onNodeWithText("Theme").assertIsDisplayed()
     }
 
@@ -49,7 +50,7 @@ class SettingsNavigationTests {
         navigateToProfile()
         composeTestRule.onNodeWithTag("profile_lazy_column").performScrollToNode(hasText("Automation"))
         composeTestRule.onNodeWithText("Automation").performClick()
-        
+
         composeTestRule.onNodeWithText("Scan Full Inbox").assertIsDisplayed()
     }
 
@@ -58,7 +59,7 @@ class SettingsNavigationTests {
         navigateToProfile()
         composeTestRule.onNodeWithTag("profile_lazy_column").performScrollToNode(hasText("Notifications"))
         composeTestRule.onNodeWithText("Notifications").performClick()
-        
+
         composeTestRule.onNodeWithText("Auto-Captured Transactions").assertIsDisplayed()
     }
 
@@ -67,7 +68,7 @@ class SettingsNavigationTests {
         navigateToProfile()
         composeTestRule.onNodeWithTag("profile_lazy_column").performScrollToNode(hasText("Security & Data"))
         composeTestRule.onNodeWithText("Security & Data").performClick()
-        
+
         composeTestRule.onNodeWithText("Enable App Lock").assertIsDisplayed()
     }
 
@@ -76,7 +77,7 @@ class SettingsNavigationTests {
         navigateToProfile()
         composeTestRule.onNodeWithTag("profile_lazy_column").performScrollToNode(hasText("Currency & Travel"))
         composeTestRule.onNodeWithText("Currency & Travel").performClick()
-        
+
         composeTestRule.onNodeWithText("Default Currency").assertIsDisplayed()
     }
 }

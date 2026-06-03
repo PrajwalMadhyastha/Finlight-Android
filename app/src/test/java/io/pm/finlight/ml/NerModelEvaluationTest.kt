@@ -29,7 +29,8 @@ class NerModelEvaluationTest {
         val expectedAmount: Double?,
         val expectedMerchant: String?,
         val expectedAccount: String?,
-        val expectedType: String?, // "expense" or "income"
+        // "expense" or "income"
+        val expectedType: String?,
     )
 
     /** Curated test cases from the existing SmsParser unit tests. */

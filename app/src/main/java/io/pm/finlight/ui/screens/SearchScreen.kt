@@ -47,6 +47,7 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.TransactionItem
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -73,7 +74,7 @@ fun SearchScreen(
     var focusAlreadyRequested by rememberSaveable { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
-    val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val dateFormatter = FormatUtils.getFormatter("dd/MM/yyyy", Locale.getDefault())
 
     val currencyFormat =
         remember {

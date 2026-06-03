@@ -43,12 +43,14 @@ private val DaybreakColorScheme =
         primary = DaybreakPrimary,
         onPrimary = Color.White,
         secondary = DaybreakSecondary,
-        onSecondary = Color(0xFF00363A), // Dark text for contrast on light blue
+        // Dark text for contrast on light blue
+        onSecondary = Color(0xFF00363A),
         background = DaybreakBackground,
         onBackground = DaybreakOnSurface,
         surface = Color.Transparent,
         onSurface = DaybreakOnSurface,
-        surfaceVariant = Color(0xFFE7E0EC), // Adjusted for the new background
+        // Adjusted for the new background
+        surfaceVariant = Color(0xFFE7E0EC),
         onSurfaceVariant = DaybreakOnSurfaceVariant,
         error = Color(0xFFB00020),
         onError = Color.White,

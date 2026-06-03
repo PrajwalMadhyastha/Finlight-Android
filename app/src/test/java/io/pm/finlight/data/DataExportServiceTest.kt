@@ -381,7 +381,8 @@ class DataExportServiceTest : BaseViewModelTest() {
                     accountId = 1,
                     categoryId = 1,
                     notes = "Work expense",
-                    isSplit = false, // This is a regular transaction
+                    // This is a regular transaction
+                    isSplit = false,
                     transactionType = "expense",
                     isExcluded = false,
                 )
@@ -393,7 +394,8 @@ class DataExportServiceTest : BaseViewModelTest() {
                     categoryName = "Food",
                     categoryIconKey = "restaurant",
                     categoryColorKey = "red",
-                    tagNames = null, // This field isn't used by the exporter
+                    // This field isn't used by the exporter
+                    tagNames = null,
                 )
             val tags = listOf(Tag(id = tagId, name = "Work"))
 
@@ -446,10 +448,12 @@ class DataExportServiceTest : BaseViewModelTest() {
                     transaction = parentTransaction,
                     images = emptyList(),
                     accountName = "Savings",
-                    categoryName = null, // Is split
+                    // Is split
+                    categoryName = null,
                     categoryIconKey = null,
                     categoryColorKey = null,
-                    tagNames = "Groceries|Weekend", // This is what the GROUP_CONCAT in the DAO query would produce
+                    // This is what the GROUP_CONCAT in the DAO query would produce
+                    tagNames = "Groceries|Weekend",
                 )
 
             // 2. Split Transaction Details

@@ -109,8 +109,9 @@ class TransactionCrudTests {
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         composeTestRule.waitForIdle()
 
-        // Select the manually-entered description from the suggestion list
-        composeTestRule.onAllNodesWithText(uniqueDescription).onFirst().performClick()
+        // Explicitly click the Save button in the MerchantPredictionSheet to close it
+        composeTestRule.onNodeWithText("Save").performClick()
+        composeTestRule.waitForIdle()
 
         // 6. Select Account — use the seeded "Test Wallet" so it never depends on
         //    live device data like "Cash Spends"
@@ -151,6 +152,10 @@ class TransactionCrudTests {
     @Test
     fun test_createTransaction_appearsOnDashboard() {
         val description = addTransactionForTest()
+        // First, scroll to the Recent Transactions card so its contents are composed.
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasText("Recent Transactions"))
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
         }
@@ -165,11 +170,12 @@ class TransactionCrudTests {
      */
     @Test
     fun test_createIncomeTransaction_appearsOnDashboard() {
-        val description = addTransactionForTest(
-            customDescription = "Test Salary Income ${UUID.randomUUID().toString().take(5)}",
-            customAmount = "5000.0",
-            isIncome = true,
-        )
+        val description =
+            addTransactionForTest(
+                customDescription = "Test Salary Income ${UUID.randomUUID().toString().take(5)}",
+                customAmount = "5000.0",
+                isIncome = true,
+            )
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
         }
@@ -219,6 +225,11 @@ class TransactionCrudTests {
 
         // 5. Click Save
         composeTestRule.onNodeWithText("Save").performClick()
+
+        // Wait for the sheet to close and the detail screen to update
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText(updatedDescription).fetchSemanticsNodes().isNotEmpty()
+        }
 
         // 6. Verify update on detail screen
         composeTestRule.onNodeWithText(updatedDescription).assertIsDisplayed()

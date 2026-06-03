@@ -24,12 +24,12 @@ package io.pm.finlight
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.utils.DateUtils
+import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToLong
@@ -48,7 +48,8 @@ class DashboardViewModel(
     private val budgetDao: BudgetDao,
     private val settingsRepository: SettingsRepository,
     private val merchantRenameRuleRepository: MerchantRenameRuleRepository,
-    private val timeProvider: TimeProvider, // Added dependency
+    // Added dependency
+    private val timeProvider: TimeProvider,
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
@@ -137,7 +138,7 @@ class DashboardViewModel(
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         val calendar = timeProvider.now()
-        monthYear = SimpleDateFormat("MMMM", Locale.getDefault()).format(calendar.time)
+        monthYear = FormatUtils.getFormatter("MMMM", Locale.getDefault()).format(calendar.time)
 
         checkForLastMonthSummary()
 
@@ -310,7 +311,7 @@ class DashboardViewModel(
                 }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-        val yearMonthString = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(calendar.time)
+        val yearMonthString = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(calendar.time)
         budgetStatus =
             budgetDao.getBudgetsWithSpendingForMonth(yearMonthString, currentMonth, currentYear)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -365,15 +366,16 @@ class DashboardViewModel(
             val key = (original ?: currentDesc).lowercase(Locale.getDefault())
             val alias = aliases[key]
 
-            val newDescription = if (alias != null) {
-                if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
-                    alias
+            val newDescription =
+                if (alias != null) {
+                    if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
+                        alias
+                    } else {
+                        currentDesc
+                    }
                 } else {
                     currentDesc
                 }
-            } else {
-                currentDesc
-            }
             details.copy(transaction = details.transaction.copy(description = newDescription))
         }
     }

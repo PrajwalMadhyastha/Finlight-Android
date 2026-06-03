@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +29,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.Tag
 import io.pm.finlight.TagViewModel
+import io.pm.finlight.ui.components.ConfirmationDialog
+import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
@@ -68,18 +71,11 @@ fun TagManagementScreen(
             AddTagInput(onAddTag = viewModel::addTag)
 
             if (tags.isEmpty()) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "No tags created yet. Add one above!",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                EmptyStateMessage(
+                    message = "No tags created yet. Add one above!",
+                    icon = Icons.Default.Info,
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                )
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(tags, key = { it.id }) { tag ->
@@ -131,11 +127,14 @@ fun TagManagementScreen(
     }
 
     if (showDeleteDialog && selectedTag != null) {
-        DeleteTagDialog(
-            tag = selectedTag!!,
+        ConfirmationDialog(
+            title = "Delete Tag?",
+            text = "Are you sure you want to delete the tag '${selectedTag!!.name}'?",
+            confirmButtonText = "Delete",
+            isDestructive = true,
             onDismiss = { showDeleteDialog = false },
             onConfirm = {
-                viewModel.deleteTag(it)
+                viewModel.deleteTag(selectedTag!!)
                 showDeleteDialog = false
             },
         )
@@ -214,34 +213,6 @@ private fun EditTagDialog(
                 enabled = tagName.text.isNotBlank(),
             ) {
                 Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-        containerColor = popupContainerColor,
-    )
-}
-
-@Composable
-private fun DeleteTagDialog(
-    tag: Tag,
-    onDismiss: () -> Unit,
-    onConfirm: (Tag) -> Unit,
-) {
-    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Delete Tag?") },
-        text = { Text("Are you sure you want to delete the tag '${tag.name}'?") },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(tag) },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-            ) {
-                Text("Delete")
             }
         },
         dismissButton = {

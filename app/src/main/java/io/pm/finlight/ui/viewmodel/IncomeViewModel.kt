@@ -13,9 +13,9 @@ package io.pm.finlight.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
+import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -132,7 +132,7 @@ class IncomeViewModel(
 
                 transactionRepository.getMonthlyTrends(startDate)
                     .map { trends ->
-                        val dateFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+                        val dateFormat = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault())
                         val monthMap =
                             trends.associate {
                                 val cal = Calendar.getInstance().apply { time = dateFormat.parse(it.monthYear) ?: Date() }

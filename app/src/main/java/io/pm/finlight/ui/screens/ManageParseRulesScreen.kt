@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,9 +36,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.CustomSmsRule
 import io.pm.finlight.ManageParseRulesViewModel
+import io.pm.finlight.ui.components.ConfirmationDialog
+import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.theme.PopupSurfaceDark
-import io.pm.finlight.ui.theme.PopupSurfaceLight
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -52,17 +53,20 @@ fun ManageParseRulesScreen(
     var ruleToDelete by remember { mutableStateOf<CustomSmsRule?>(null) }
 
     if (rules.isEmpty()) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-            contentAlignment = Alignment.Center,
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                "No custom parsing rules have been created yet.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            EmptyStateMessage(
+                message = "No custom parsing rules have been created yet.",
+                icon = Icons.Default.Info,
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
             )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = { navController.navigate("rule_creation_screen") }) {
+                Text("Add New Rule")
+            }
         }
     } else {
         LazyColumn(
@@ -79,34 +83,29 @@ fun ManageParseRulesScreen(
                     onDeleteClick = { ruleToDelete = rule },
                 )
             }
+            item {
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = { navController.navigate("rule_creation_screen") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Add New Rule")
+                }
+            }
         }
     }
 
     if (ruleToDelete != null) {
-        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-        val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-
-        AlertDialog(
-            onDismissRequest = { ruleToDelete = null },
-            title = { Text("Delete Rule?") },
-            text = { Text("Are you sure you want to delete this parsing rule? This action cannot be undone.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.deleteRule(ruleToDelete!!)
-                        ruleToDelete = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) {
-                    Text("Delete")
-                }
+        ConfirmationDialog(
+            title = "Delete Rule?",
+            text = "Are you sure you want to delete this parsing rule? This action cannot be undone.",
+            confirmButtonText = "Delete",
+            isDestructive = true,
+            onDismiss = { ruleToDelete = null },
+            onConfirm = {
+                viewModel.deleteRule(ruleToDelete!!)
+                ruleToDelete = null
             },
-            dismissButton = {
-                TextButton(onClick = { ruleToDelete = null }) {
-                    Text("Cancel")
-                }
-            },
-            containerColor = popupContainerColor,
         )
     }
 }

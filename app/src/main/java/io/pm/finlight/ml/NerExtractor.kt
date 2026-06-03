@@ -283,13 +283,14 @@ class NerExtractor private constructor(
             val avgConf = uniquePairs.map { it.second }.average().toFloat()
 
             // Post-process AMOUNT to remove currency prefixes and commas
-            val processedValue = if (type == "AMOUNT") {
-                joined
-                    .replace(Regex("""(?i)^(?:rs\.?|inr\.?|₹)\s*"""), "")
-                    .replace(Regex(""",(?=\d{2,3})"""), "") // Remove Indian-style commas
-            } else {
-                joined
-            }
+            val processedValue =
+                if (type == "AMOUNT") {
+                    joined
+                        .replace(Regex("""(?i)^(?:rs\.?|inr\.?|₹)\s*"""), "")
+                        .replace(Regex(""",(?=\d{2,3})"""), "") // Remove Indian-style commas
+                } else {
+                    joined
+                }
             NerEntity(processedValue, avgConf)
         }
     }
@@ -343,7 +344,10 @@ class NerExtractor private constructor(
      *
      * Uses the numerically-stable max-subtraction trick to prevent float overflow.
      */
-    private fun softmaxConfidence(logits: FloatArray, predictedIndex: Int): Float {
+    private fun softmaxConfidence(
+        logits: FloatArray,
+        predictedIndex: Int,
+    ): Float {
         if (logits.isEmpty()) return 1f
         val max = logits.max()
         val expValues = logits.map { Math.exp((it - max).toDouble()).toFloat() }

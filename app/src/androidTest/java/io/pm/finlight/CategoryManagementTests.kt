@@ -39,15 +39,15 @@ class CategoryManagementTests {
         composeTestRule.waitUntil(timeoutMillis = 10000) {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
-        
+
         composeTestRule.onNodeWithText("Profile").performClick()
-        
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Manage Categories").fetchSemanticsNodes().isNotEmpty()
         }
-        
+
         composeTestRule.onNodeWithText("Manage Categories").performScrollTo().performClick()
-        
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Add New Category").fetchSemanticsNodes().isNotEmpty()
         }
@@ -69,7 +69,7 @@ class CategoryManagementTests {
         nameInput.performTextInput(uniqueCategoryName)
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         composeTestRule.waitForIdle()
-        
+
         composeTestRule.onNodeWithText("Add").performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 8000) {

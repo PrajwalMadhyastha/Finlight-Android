@@ -7,6 +7,7 @@
 // =================================================================================
 package io.pm.finlight
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
@@ -97,6 +98,16 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_SEARCH = "io.pm.finlight.ACTION_SEARCH"
     }
 
+    /**
+     * Public wrapper around the protected [onNewIntent] for use in instrumented tests.
+     * This allows tests to simulate an incoming deep link intent while the activity
+     * is already running (i.e., the same way a notification PendingIntent works).
+     */
+    @androidx.annotation.VisibleForTesting
+    fun handleIntentForTesting(intent: android.content.Intent) {
+        onNewIntent(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -145,6 +156,7 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+@SuppressLint("NewApi")
 @Composable
 fun FinanceAppWithLockScreen(
     isInitiallyLocked: Boolean,
@@ -1461,7 +1473,8 @@ fun ForceAppScaling(content: @Composable () -> Unit) {
     val customDensity =
         Density(
             density = density.density * densityMultiplier,
-            fontScale = 1f, // Always enforce 1.0 font scale
+            // Always enforce 1.0 font scale
+            fontScale = 1f,
         )
 
     CompositionLocalProvider(
