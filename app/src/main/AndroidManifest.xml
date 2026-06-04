@@ -37,6 +37,7 @@
         tools:targetApi="33"
         android:enableOnBackInvokedCallback="true"
         android:backupAgent=".FinlightBackupAgent"
+        android:usesCleartextTraffic="false"
         tools:replace="android:fullBackupContent">
 
         <meta-data

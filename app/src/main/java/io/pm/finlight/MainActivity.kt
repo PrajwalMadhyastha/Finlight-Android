@@ -213,6 +213,7 @@ fun FinanceAppWithLockScreen(
     }
 }
 
+@SuppressWarnings("kotlin:S5324")
 @Composable
 fun LockScreen(onUnlock: () -> Unit) {
     val context = LocalContext.current
