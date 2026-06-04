@@ -68,6 +68,11 @@ fun TransactionItem(
             )
         }
 
+    val isDark = isSystemInDarkTheme()
+    val needsReview = transactionDetails.transaction.needsReview
+    val reviewBgColor = if (needsReview) MaterialTheme.colorScheme.errorContainer.copy(alpha = if (isDark) 0.3f else 0.8f) else null
+    val reviewBorderColor = if (needsReview) MaterialTheme.colorScheme.error.copy(alpha = if (isDark) 0.5f else 1.0f) else null
+
     GlassPanel(
         modifier =
             modifier
@@ -76,6 +81,8 @@ fun TransactionItem(
                 .heightIn(min = 72.dp)
                 .testTag("transaction_item_${transactionDetails.transaction.description}")
                 .then(clickModifier),
+        backgroundColor = reviewBgColor,
+        borderColor = reviewBorderColor,
     ) {
         Row(
             modifier = Modifier.padding(16.dp),

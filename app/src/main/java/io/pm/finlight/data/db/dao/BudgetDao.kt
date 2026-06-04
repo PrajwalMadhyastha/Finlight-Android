@@ -19,6 +19,13 @@ interface BudgetDao {
         year: Int,
     ): Flow<List<Budget>>
 
+    // --- NEW: Query to get all budgets for a specific category in a given year. ---
+    @Query("SELECT * FROM budgets WHERE categoryName = :categoryName AND year = :year")
+    suspend fun getBudgetsForCategoryAndYear(
+        categoryName: String,
+        year: Int,
+    ): List<Budget>
+
     // --- UPDATED: This query now carries over the last known budget for each category. ---
     @Query(
         """

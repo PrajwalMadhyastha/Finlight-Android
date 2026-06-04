@@ -1405,14 +1405,7 @@ fun TransactionTypeToggle(
                         } else {
                             Color.Transparent
                         },
-                    disabledContentColor =
-                        if (expenseSelected) {
-                            MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = 0.38f,
-                            )
-                        } else {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                        },
+                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                 ),
             elevation = null,
         ) {
@@ -1439,14 +1432,7 @@ fun TransactionTypeToggle(
                         } else {
                             Color.Transparent
                         },
-                    disabledContentColor =
-                        if (incomeSelected) {
-                            MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = 0.38f,
-                            )
-                        } else {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                        },
+                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                 ),
             elevation = null,
         ) {

@@ -217,31 +217,89 @@ class AccountViewModel(
         return transactionRepository.getTransactionsForAccountDetails(accountId)
     }
 
-    fun addAccount(
+    suspend fun checkAccountName(
         name: String,
-        type: String,
-    ) = viewModelScope.launch {
-        try {
-            if (name.isNotBlank() && type.isNotBlank()) {
-                // This check should ideally be in the repository or a UseCase,
-                // but keeping it here to match existing pattern.
-                val existingAccount = repository.allAccounts.first().find { it.name.equals(name, ignoreCase = true) }
-                if (existingAccount != null) {
-                    _uiEvent.send("An account named '$name' already exists.")
-                } else {
-                    repository.insert(Account(name = name, type = type))
-                    _uiEvent.send("Account '$name' created.")
+        excludeAccountId: Int? = null
+    ): AccountMatch {
+        val accounts = repository.allAccounts.first()
+        val normalizedInput = normalizeAccountName(name)
+
+        val exactMatch = accounts.find { it.name.equals(name, ignoreCase = true) && it.id != excludeAccountId }
+        if (exactMatch != null) return AccountMatch(exactMatch, MatchType.EXACT)
+
+        if (normalizedInput.isNotBlank()) {
+            for (account in accounts) {
+                if (account.id == excludeAccountId) continue
+                val normalizedExisting = normalizeAccountName(account.name)
+                if (normalizedExisting.isBlank()) continue
+                if (calculateSimilarity(normalizedInput, normalizedExisting) > 0.85) {
+                    return AccountMatch(account, MatchType.SIMILAR)
                 }
             }
-        } catch (e: Exception) {
-            _uiEvent.send("Error creating account: ${e.message}")
+        }
+        return AccountMatch(null, MatchType.NONE)
+    }
+
+    fun mergeAccounts(
+        destinationAccountId: Int,
+        sourceAccountIds: List<Int>,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.mergeAccounts(destinationAccountId, sourceAccountIds)
+                _uiEvent.send("Accounts merged successfully.")
+                onComplete(true)
+            } catch (e: Exception) {
+                _uiEvent.send("Error merging accounts: ${e.message}")
+                onComplete(false)
+            }
         }
     }
 
-    fun updateAccount(account: Account) =
-        viewModelScope.launch {
-            repository.update(account)
+    fun addAccount(
+        name: String,
+        type: String,
+        onComplete: (Boolean) -> Unit = {}
+    ) = viewModelScope.launch {
+        try {
+            if (name.isNotBlank() && type.isNotBlank()) {
+                val existingAccount = repository.allAccounts.first().find { it.name.equals(name, ignoreCase = true) }
+                if (existingAccount != null) {
+                    _uiEvent.send("An account named '$name' already exists.")
+                    onComplete(false)
+                } else {
+                    repository.insert(Account(name = name, type = type))
+                    _uiEvent.send("Account '$name' created.")
+                    onComplete(true)
+                }
+            } else {
+                onComplete(false)
+            }
+        } catch (e: Exception) {
+            _uiEvent.send("Error creating account: ${e.message}")
+            onComplete(false)
         }
+    }
+
+    fun updateAccount(
+        account: Account,
+        onComplete: (Boolean) -> Unit = {}
+    ) = viewModelScope.launch {
+        try {
+            val existingAccount = repository.allAccounts.first().find { it.name.equals(account.name, ignoreCase = true) && it.id != account.id }
+            if (existingAccount != null) {
+                _uiEvent.send("An account named '${account.name}' already exists.")
+                onComplete(false)
+            } else {
+                repository.update(account)
+                onComplete(true)
+            }
+        } catch (e: Exception) {
+            _uiEvent.send("Error updating account: ${e.message}")
+            onComplete(false)
+        }
+    }
 
     fun renameAccount(
         accountId: Int,
@@ -266,3 +324,7 @@ class AccountViewModel(
             }
         }
 }
+
+enum class MatchType { EXACT, SIMILAR, NONE }
+
+data class AccountMatch(val account: Account?, val matchType: MatchType)

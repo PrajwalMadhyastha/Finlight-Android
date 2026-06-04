@@ -1203,7 +1203,9 @@ class TransactionViewModel(
             transactionRepository.deleteImage(image)
             withContext(Dispatchers.IO) {
                 try {
-                    File(image.imageUri).delete()
+                    if (!File(image.imageUri).delete()) {
+                        Log.w(TAG, "Failed to delete image file: ${image.imageUri}")
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to delete image file: ${image.imageUri}", e)
                 }
@@ -1399,6 +1401,16 @@ class TransactionViewModel(
         }
     }
 
+    fun markAsReviewed(transactionId: Int) =
+        viewModelScope.launch {
+            try {
+                transactionRepository.clearReviewFlag(transactionId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to clear review flag", e)
+                _uiEvent.send("Failed to mark as reviewed.")
+            }
+        }
+
     fun updateTagsForTransaction(transactionId: Int) =
         viewModelScope.launch {
             try {
@@ -1556,7 +1568,17 @@ class TransactionViewModel(
                         // 3. No exact match, create a new account
                         val newAccount = Account(name = accountName, type = accountType)
                         val newId = accountRepository.insert(newAccount)
-                        account = db.accountDao().getAccountById(newId.toInt()).first()
+                        // BUG FIX: AccountDao.insert uses OnConflictStrategy.IGNORE, which returns -1
+                        // if the account already exists (e.g., created by a concurrent operation or
+                        // a prior findByName cache miss). Passing -1 to getAccountById always returns
+                        // null, silently dropping the transaction. Fall back to findByName instead.
+                        account =
+                            if (newId != -1L) {
+                                db.accountDao().getAccountById(newId.toInt()).first()
+                            } else {
+                                Log.d(TAG, "Account '$accountName' already existed (IGNORE conflict). Fetching by name.")
+                                db.accountDao().findByName(accountName)
+                            }
                     }
                     finalAccountId = account?.id
                 }

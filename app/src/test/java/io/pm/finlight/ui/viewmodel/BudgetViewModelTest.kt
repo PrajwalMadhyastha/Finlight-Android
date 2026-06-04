@@ -39,6 +39,7 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.ArgumentMatchers.anyFloat
 import org.mockito.Mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.`when`
@@ -470,5 +471,182 @@ class BudgetViewModelTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
             verify(budgetRepository).getBudgetById(budgetId)
+        }
+
+    // --- NEW: Tests for Annual Budget Planning ---
+
+    @Test
+    fun `saveAnnualOverallBudget saves flexible correctly`() =
+        runTest {
+            val year = 2026
+            val target = "12000"
+
+            `when`(settingsRepository.getOverallBudgetsForYear(year)).thenReturn(emptyMap())
+
+            viewModel.setSelectedPlanningYear(year)
+            viewModel.saveAnnualOverallBudget(target, false)
+            advanceUntilIdle()
+
+            for (month in 1..12) {
+                verify(settingsRepository).saveOverallBudgetForMonth(year, month, 1000f)
+            }
+        }
+
+    @Test
+    fun `saveAnnualOverallBudget saves strict correctly`() =
+        runTest {
+            val year = 2026
+            val target = "14000"
+
+            `when`(settingsRepository.getOverallBudgetsForYear(year)).thenReturn(mapOf(1 to 3000f))
+
+            viewModel.setSelectedPlanningYear(year)
+            viewModel.saveAnnualOverallBudget(target, true)
+            advanceUntilIdle()
+
+            for (month in 2..12) {
+                verify(settingsRepository).saveOverallBudgetForMonth(year, month, 1000f)
+            }
+            verify(settingsRepository, never()).saveOverallBudgetForMonth(year, 1, 3000f)
+        }
+
+    @Test
+    fun `saveAnnualCategoryBudget saves strict correctly`() =
+        runTest {
+            val year = 2026
+            val categoryName = "Food"
+            val target = "1400"
+
+            val existing = listOf(Budget(id = 1, categoryName = categoryName, amount = 300.0, month = 1, year = year))
+            `when`(budgetRepository.getBudgetsForCategoryAndYear(categoryName, year)).thenReturn(existing)
+
+            viewModel.setSelectedPlanningYear(year)
+            viewModel.saveAnnualCategoryBudget(categoryName, target, true)
+            advanceUntilIdle()
+
+            val captor = org.mockito.kotlin.argumentCaptor<List<Budget>>()
+            verify(budgetRepository).insertAll(captor.capture())
+            val insertedBudgets = captor.firstValue
+
+            assertEquals(11, insertedBudgets.size)
+            assertEquals(true, insertedBudgets.all { it.amount == 100.0 })
+        }
+
+    @Test
+    fun `saveAnnualOverallBudget with invalid amount sends error event`() =
+        runTest {
+            viewModel.uiEvent.test {
+                viewModel.saveAnnualOverallBudget("-100", true)
+                assertEquals("Please enter a valid amount.", awaitItem())
+                verify(settingsRepository, never()).saveOverallBudgetForMonth(anyInt(), anyInt(), anyFloat())
+            }
+        }
+
+    @Test
+    fun `saveAnnualOverallBudget strict with overrides exceeding target sends error`() =
+        runTest {
+            val year = 2026
+            `when`(settingsRepository.getOverallBudgetsForYear(year)).thenReturn(mapOf(1 to 5000f, 2 to 6000f)) // sum 11000
+
+            viewModel.setSelectedPlanningYear(year)
+            viewModel.uiEvent.test {
+                viewModel.saveAnnualOverallBudget("10000", true)
+                assertEquals("Overrides exceed annual target.", awaitItem())
+                verify(settingsRepository, never()).saveOverallBudgetForMonth(anyInt(), anyInt(), anyFloat())
+            }
+        }
+
+    @Test
+    fun `saveAnnualOverallBudget exception sends error event`() =
+        runTest {
+            val year = 2026
+            `when`(settingsRepository.getOverallBudgetsForYear(year)).thenReturn(emptyMap())
+            `when`(settingsRepository.saveOverallBudgetForMonth(anyInt(), anyInt(), anyFloat())).thenThrow(RuntimeException("DB Error"))
+
+            viewModel.setSelectedPlanningYear(year)
+            viewModel.uiEvent.test {
+                viewModel.saveAnnualOverallBudget("10000", true)
+                assertEquals("Error saving annual budget: DB Error", awaitItem())
+            }
+        }
+
+    @Test
+    fun `saveAnnualCategoryBudget with invalid amount sends error event`() =
+        runTest {
+            viewModel.uiEvent.test {
+                viewModel.saveAnnualCategoryBudget("Food", "-100", true)
+                assertEquals("Please enter a valid amount and select a category.", awaitItem())
+                verify(budgetRepository, never()).insertAll(any())
+            }
+        }
+
+    @Test
+    fun `saveAnnualCategoryBudget strict with overrides exceeding target sends error`() =
+        runTest {
+            val year = 2026
+            val categoryName = "Food"
+            val existing =
+                listOf(
+                    Budget(1, categoryName, 5000.0, 1, year),
+                    Budget(2, categoryName, 6000.0, 2, year)
+                )
+            `when`(budgetRepository.getBudgetsForCategoryAndYear(categoryName, year)).thenReturn(existing)
+
+            viewModel.setSelectedPlanningYear(year)
+            viewModel.uiEvent.test {
+                viewModel.saveAnnualCategoryBudget(categoryName, "10000", true)
+                assertEquals("Overrides exceed annual target.", awaitItem())
+                verify(budgetRepository, never()).insertAll(any())
+            }
+        }
+
+    @Test
+    fun `saveAnnualCategoryBudget exception sends error event`() =
+        runTest {
+            val year = 2026
+            val categoryName = "Food"
+            `when`(budgetRepository.getBudgetsForCategoryAndYear(categoryName, year)).thenReturn(emptyList())
+            `when`(budgetRepository.insertAll(any())).thenThrow(RuntimeException("DB Error"))
+
+            viewModel.setSelectedPlanningYear(year)
+            viewModel.uiEvent.test {
+                viewModel.saveAnnualCategoryBudget(categoryName, "10000", true)
+                assertEquals("Error saving annual budget: DB Error", awaitItem())
+            }
+        }
+
+    @Test
+    fun `refreshAnnualSummaries populates overall and category summaries`() =
+        runTest {
+            val year = 2026
+            `when`(settingsRepository.getOverallBudgetsForYear(year)).thenReturn(mapOf(1 to 1000f, 2 to 2000f))
+
+            val categories = listOf(Category(1, "Food", "icon1", "color1"))
+            `when`(categoryRepository.allCategories).thenReturn(flowOf(categories))
+
+            val existingCatBudgets = listOf(Budget(1, "Food", 500.0, 1, year))
+            `when`(budgetRepository.getBudgetsForCategoryAndYear("Food", year)).thenReturn(existingCatBudgets)
+
+            // Reset view model with the new mock behaviors
+            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+
+            viewModel.setSelectedPlanningYear(year)
+            advanceUntilIdle()
+
+            viewModel.annualOverallSummary.test {
+                val summary = awaitItem()
+                assertEquals(3000f, summary?.totalBudget)
+                assertEquals(2, summary?.overrideCount)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            viewModel.annualCategorySummaries.test {
+                val summaries = awaitItem()
+                assertEquals(1, summaries.size)
+                assertEquals("Food", summaries[0].categoryName)
+                assertEquals(500.0, summaries[0].totalBudget, 0.0)
+                assertEquals(1, summaries[0].overrideCount)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 }

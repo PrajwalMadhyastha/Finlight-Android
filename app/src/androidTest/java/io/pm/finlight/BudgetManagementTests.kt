@@ -190,4 +190,43 @@ class BudgetManagementTests {
         // Verify the Save button is not enabled since amount is empty
         composeTestRule.onNodeWithText("Save Budget").assertIsNotEnabled()
     }
+
+    /**
+     * Test navigating to Annual Budget Planning and setting an overall budget.
+     */
+    @Test
+    fun test_annualBudgetPlanning_setsOverallBudget() {
+        navigateToBudgetScreen()
+
+        // Click Annual Plan button
+        composeTestRule.onNodeWithText("Annual Plan").performClick()
+
+        // Wait for Annual Plan screen
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Annual Budget Plan").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Tap Overall Annual Budget card
+        composeTestRule.onNodeWithText("Overall Annual Budget").performClick()
+
+        // Wait for dialog
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Total Annual Amount").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Enter budget
+        val amountInput = composeTestRule.onNodeWithText("Total Annual Amount")
+        amountInput.performTextClearance()
+        amountInput.performTextInput("900")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
+
+        // Click Save
+        composeTestRule.onNodeWithText("Save").performClick()
+
+        // Ensure we are back on the Annual Budget Plan screen and it shows ₹900
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("₹900", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
 }

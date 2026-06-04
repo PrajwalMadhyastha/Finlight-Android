@@ -443,4 +443,22 @@ class SettingsRepositoryTest : BaseViewModelTest() {
             }
             assertEquals(currentBudget, repository.getOverallBudgetForMonthBlocking(2025, 10))
         }
+
+    @Test
+    fun `getOverallBudgetsForYear returns list of Pair of month and budget`() =
+        runTest {
+            val year = 2026
+            prefs.edit()
+                .putFloat(getBudgetKey(year, 1), 1000f)
+                .putFloat(getBudgetKey(year, 3), 3000f)
+                .putFloat(getBudgetKey(year, 12), 12000f)
+                .putFloat(getBudgetKey(2025, 1), 500f) // Should be ignored
+                .commit()
+
+            val budgets = repository.getOverallBudgetsForYear(year)
+            assertEquals(3, budgets.size)
+            assertEquals(1000f, budgets[1])
+            assertEquals(3000f, budgets[3])
+            assertEquals(12000f, budgets[12])
+        }
 }

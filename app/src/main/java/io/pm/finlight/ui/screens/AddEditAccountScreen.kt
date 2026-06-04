@@ -21,7 +21,14 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.theme.PopupSurfaceDark
+import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.AccountMatch
 import io.pm.finlight.ui.viewmodel.AccountViewModel
+import io.pm.finlight.ui.viewmodel.MatchType
+import kotlinx.coroutines.launch
+
+private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
 @Composable
 fun AddEditAccountScreen(
@@ -35,6 +42,8 @@ fun AddEditAccountScreen(
     var accountName by remember { mutableStateOf(TextFieldValue("")) }
     var accountType by remember { mutableStateOf(TextFieldValue("")) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var matchDialogState by remember { mutableStateOf<AccountMatch?>(null) }
 
     val accountToEdit by if (isEditMode) {
         viewModel.getAccountById(accountId!!).collectAsState(initial = null)
@@ -126,14 +135,23 @@ fun AddEditAccountScreen(
             }
             Button(
                 onClick = {
-                    if (isEditMode) {
-                        accountToEdit?.let {
-                            viewModel.updateAccount(it.copy(name = accountName.text, type = accountType.text))
+                    scope.launch {
+                        val match = viewModel.checkAccountName(accountName.text, accountId)
+                        if (match.matchType != MatchType.NONE) {
+                            matchDialogState = match
+                        } else {
+                            val onComplete = { success: Boolean ->
+                                if (success) navController.popBackStack()
+                            }
+                            if (isEditMode) {
+                                accountToEdit?.let {
+                                    viewModel.updateAccount(it.copy(name = accountName.text, type = accountType.text), onComplete)
+                                }
+                            } else {
+                                viewModel.addAccount(accountName.text, accountType.text, onComplete)
+                            }
                         }
-                    } else {
-                        viewModel.addAccount(accountName.text, accountType.text)
                     }
-                    navController.popBackStack()
                 },
                 modifier = Modifier.weight(1f),
                 enabled = accountName.text.isNotBlank() && accountType.text.isNotBlank(),
@@ -141,6 +159,85 @@ fun AddEditAccountScreen(
                 Text(if (isEditMode) "Update" else "Save")
             }
         }
+    }
+
+    if (matchDialogState != null) {
+        val match = matchDialogState!!
+        val isExact = match.matchType == MatchType.EXACT
+        val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+        val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+
+        AlertDialog(
+            onDismissRequest = { matchDialogState = null },
+            title = { Text(if (isExact) "Account Already Exists" else "Similar Account Found", color = MaterialTheme.colorScheme.onSurface) },
+            text = {
+                if (isExact) {
+                    Text(
+                        "An exact match was found.\n\n" +
+                            "Existing Account Details:\n" +
+                            "• Name: ${match.account?.name}\n" +
+                            "• Type: ${match.account?.type}\n\n" +
+                            if (isEditMode) "You cannot create a duplicate. Would you like to merge your current account into this one?" else "You cannot create a duplicate account. Please choose another name.",
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                } else {
+                    Text(
+                        "A similar account was found.\n\n" +
+                            "Existing Account Details:\n" +
+                            "• Name: ${match.account?.name}\n" +
+                            "• Type: ${match.account?.type}\n\n" +
+                            if (isEditMode) "Would you like to merge your current account into this one, or save anyway?" else "Would you like to save anyway?",
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            containerColor = popupContainerColor,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!isExact) {
+                        TextButton(onClick = {
+                            val onComplete = { success: Boolean ->
+                                if (success) navController.popBackStack()
+                            }
+                            if (isEditMode) {
+                                accountToEdit?.let {
+                                    viewModel.updateAccount(it.copy(name = accountName.text, type = accountType.text), onComplete)
+                                }
+                            } else {
+                                viewModel.addAccount(accountName.text, accountType.text, onComplete)
+                            }
+                            matchDialogState = null
+                        }) {
+                            Text("Save Anyway")
+                        }
+                    }
+                    if (isEditMode && match.account != null) {
+                        Button(onClick = {
+                            val onComplete = { success: Boolean ->
+                                if (success) navController.popBackStack()
+                            }
+                            viewModel.mergeAccounts(match.account.id, listOf(accountId!!), onComplete)
+                            matchDialogState = null
+                        }) {
+                            Text("Merge")
+                        }
+                    } else if (isExact) {
+                        Button(onClick = { matchDialogState = null }) {
+                            Text("Choose another name")
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                if (!isExact || isEditMode) {
+                    OutlinedButton(onClick = { matchDialogState = null }) {
+                        Text(if (isEditMode) "Rename differently" else "Choose another name")
+                    }
+                }
+            }
+        )
     }
 
     if (showDeleteDialog && accountToEdit != null) {

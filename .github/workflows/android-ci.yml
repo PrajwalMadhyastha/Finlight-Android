@@ -3,6 +3,7 @@ name: Android CI (Fast Checks)
 # Explicitly limit permissions for security (principle of least privilege)
 permissions:
   contents: read
+  checks: write
 
 # Runs on PRs targeting develop and main branches.
 # For instrumented UI tests (slower, emulator-based), see:
@@ -47,3 +48,22 @@ jobs:
       # 6. Build debug APK — confirms the project compiles cleanly
       - name: Build debug APK
         run: ./gradlew assembleDebug
+
+      # 7. Upload raw test results (XML)
+      - name: Upload raw test results (XML)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: app/build/test-results/testDebugUnitTest/
+          retention-days: 14
+
+      # 8. Publish test report
+      - name: Publish test report
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Unit Tests
+          path: app/build/test-results/testDebugUnitTest/**/*.xml
+          reporter: java-junit
+          fail-on-error: true

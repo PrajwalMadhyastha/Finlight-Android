@@ -14,3 +14,9 @@ plugins {
     // --- ADDED: Compose Multiplatform Plugin for Desktop Analyzer ---
     id("org.jetbrains.compose") version "1.6.11" apply false
 }
+
+allprojects {
+    dependencyLocking {
+        lockAllConfigurations()
+    }
+}

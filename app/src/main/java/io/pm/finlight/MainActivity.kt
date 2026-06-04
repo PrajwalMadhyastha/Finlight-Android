@@ -213,6 +213,7 @@ fun FinanceAppWithLockScreen(
     }
 }
 
+@SuppressWarnings("kotlin:S5324")
 @Composable
 fun LockScreen(onUnlock: () -> Unit) {
     val context = LocalContext.current
@@ -349,6 +350,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
             "link_recurring_transaction",
             "add_edit_goal",
             "approve_transaction_screen",
+            "annual_budget_planning",
         )
 
     val showMainTopBar = baseCurrentRoute !in screensWithCustomTopBars
@@ -1036,6 +1038,13 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { BudgetScreen(navController, budgetViewModel) }
+        composable(
+            "annual_budget_planning",
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
+        ) { AnnualBudgetPlanningScreen(navController, budgetViewModel) }
         composable(
             "add_budget",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },

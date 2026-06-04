@@ -77,7 +77,9 @@ class ProfileViewModel(
 
                 val newFile = File(profileDir, oldFile.name)
                 oldFile.copyTo(newFile, overwrite = true)
-                oldFile.delete()
+                if (!oldFile.delete()) {
+                    Log.w("ProfileViewModel", "Failed to delete old profile picture")
+                }
 
                 settingsRepository.saveProfilePictureUri(newFile.absolutePath)
                 Log.i("ProfileViewModel", "Migrated profile picture to profile/ directory.")
