@@ -124,38 +124,4 @@ class NavigationSmokeTests {
         composeTestRule.onNodeWithContentDescription("Add Transaction", useUnmergedTree = true).assertIsDisplayed()
     }
 
-    @org.junit.Ignore("App is locked to portrait mode in AndroidManifest.xml. Forcing landscape in tests causes flaky lifecycle thrashing.")
-    @Test
-    fun test_noUnhandledCrash_onScreenRotation() {
-        // Wait for dashboard to load
-        composeTestRule.waitUntil(timeoutMillis = 10000) {
-            composeTestRule.onAllNodesWithTag("nav_item_Dashboard").fetchSemanticsNodes().isNotEmpty()
-        }
-
-        // Rotate to landscape
-        composeTestRule.activityRule.scenario.onActivity { activity ->
-            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        }
-
-        // Wait for composition to settle
-        composeTestRule.waitForIdle()
-
-        // Verify dashboard is still displayed (meaning no crash)
-        composeTestRule.onAllNodesWithText("Dashboard").onFirst().assertIsDisplayed()
-
-        // Navigate to another screen (Transactions)
-        composeTestRule.onNodeWithTag("nav_item_Transactions").performClick()
-        composeTestRule.waitForIdle()
-        composeTestRule.onAllNodesWithText("Transactions").onFirst().assertIsDisplayed()
-
-        // Rotate back to portrait
-        composeTestRule.activityRule.scenario.onActivity { activity ->
-            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        }
-
-        composeTestRule.waitForIdle()
-
-        // Still on Transactions
-        composeTestRule.onAllNodesWithText("Transactions").onFirst().assertIsDisplayed()
-    }
 }
