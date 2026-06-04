@@ -304,10 +304,10 @@ class AccountManagementTests {
 
         // Verify the dialog elements
         composeTestRule.onNodeWithText("Choose another name", useUnmergedTree = true).assertIsDisplayed()
-        
+
         // Dismiss the dialog
         composeTestRule.onNodeWithText("Choose another name", useUnmergedTree = true).performClick()
-        
+
         // Dialog goes away, we are still on the Add New Account screen
         composeTestRule.onNodeWithText("Account Already Exists", useUnmergedTree = true).assertDoesNotExist()
         composeTestRule.onAllNodesWithText("Add New Account").onFirst().assertIsDisplayed()
