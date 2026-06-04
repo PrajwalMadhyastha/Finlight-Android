@@ -23,29 +23,20 @@ import androidx.core.app.ActivityCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import io.pm.finlight.CategoryFinderProvider
-import io.pm.finlight.CustomSmsRule
-import io.pm.finlight.CustomSmsRuleProvider
-import io.pm.finlight.IgnoreRule
-import io.pm.finlight.IgnoreRuleProvider
 import io.pm.finlight.MerchantCategoryMapping
-import io.pm.finlight.MerchantCategoryMappingProvider
 import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.MerchantRenameRule
-import io.pm.finlight.MerchantRenameRuleProvider
 import io.pm.finlight.ParseResult
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsMessage
-import io.pm.finlight.SmsParseTemplate
-import io.pm.finlight.SmsParseTemplateProvider
 import io.pm.finlight.SmsParser
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionNotificationWorker
 import io.pm.finlight.TripType
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ml.MlModelFactory
-import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.NotificationHelper
+import io.pm.finlight.utils.SmsProviderHelper
 import io.pm.finlight.utils.SmsTransactionSaver
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -80,46 +71,12 @@ class SmsProcessorWorker(
         val existingSmsHashes = db.transactionDao().getAllSmsHashes().first().toSet()
 
         // --- Build providers ---
-        val categoryFinderProvider =
-            object : CategoryFinderProvider {
-                override fun getCategoryIdByName(name: String): Int? = CategoryIconHelper.getCategoryIdByName(name)
-            }
-        val customSmsRuleProvider =
-            object : CustomSmsRuleProvider {
-                override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
-            }
-        val merchantRenameRuleProvider =
-            object : MerchantRenameRuleProvider {
-                override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
-
-                override suspend fun getAllRulesMap(): Map<String, String> =
-                    db.merchantRenameRuleDao().getAllRulesList().associateBy(
-                        { it.originalName.lowercase() },
-                        { it.newName },
-                    )
-            }
-        val ignoreRuleProvider =
-            object : IgnoreRuleProvider {
-                override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
-            }
-        val merchantCategoryMappingProvider =
-            object : MerchantCategoryMappingProvider {
-                override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
-                    db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-
-                override suspend fun getAllMappings(): Map<String, Int> =
-                    db.merchantCategoryMappingDao().getAll().associateBy(
-                        { it.parsedName.lowercase() },
-                        { it.categoryId },
-                    )
-            }
-        val smsParseTemplateProvider =
-            object : SmsParseTemplateProvider {
-                override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
-
-                override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
-                    db.smsParseTemplateDao().getTemplatesBySignature(signature)
-            }
+        val categoryFinderProvider = SmsProviderHelper.getCategoryFinderProvider()
+        val customSmsRuleProvider = SmsProviderHelper.getCustomSmsRuleProvider(db)
+        val merchantRenameRuleProvider = SmsProviderHelper.getMerchantRenameRuleProvider(db)
+        val ignoreRuleProvider = SmsProviderHelper.getIgnoreRuleProvider(db)
+        val merchantCategoryMappingProvider = SmsProviderHelper.getMerchantCategoryMappingProvider(db)
+        val smsParseTemplateProvider = SmsProviderHelper.getSmsParseTemplateProvider(db)
 
         // --- HIERARCHY STEP 1: Check custom rules ---
         var parseResult =

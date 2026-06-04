@@ -282,18 +282,18 @@ class TransactionViewModelTest : BaseViewModelTest() {
             val potentialTxn =
                 PotentialTransaction(1L, "Test", 100.0, "expense", "Auto Merchant", "Msg", PotentialAccount("ConcurrentAccount", "Bank"), "hash", 1)
             val transactionCaptor = argumentCaptor<Transaction>()
-            
+
             whenever(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            
+
             // 1st call returns null (simulate race condition start)
             // 2nd call returns the existing account (simulate finding it after IGNORE)
             whenever(accountDao.findByName("ConcurrentAccount"))
                 .thenReturn(null)
                 .thenReturn(Account(99, "ConcurrentAccount", "Bank"))
-                
+
             // Simulate IGNORE conflict returning -1
             whenever(accountRepository.insert(any())).thenReturn(-1L)
-            
+
             whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
 
             // ACT

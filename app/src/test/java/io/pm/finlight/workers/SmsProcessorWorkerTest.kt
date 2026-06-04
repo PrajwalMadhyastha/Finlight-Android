@@ -295,10 +295,11 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     @Test
     fun `travel mode correctly applies foreign currency flag`() =
         runTest {
-            val travelSettings = io.pm.finlight.TravelModeSettings(
-                isEnabled = true, tripName = "Trip", tripType = io.pm.finlight.TripType.INTERNATIONAL,
-                startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "USD", conversionRate = 80f
-            )
+            val travelSettings =
+                io.pm.finlight.TravelModeSettings(
+                    isEnabled = true, tripName = "Trip", tripType = io.pm.finlight.TripType.INTERNATIONAL,
+                    startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "USD", conversionRate = 80f
+                )
             every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
 
             val txn =
