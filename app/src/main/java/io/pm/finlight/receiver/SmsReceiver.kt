@@ -1,314 +1,59 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/receiver/SmsReceiver.kt
-// REASON: FIX (Testing) - The receiver's internal CoroutineScope is now exposed
-// via an 'internal var'. This allows tests to replace it with a TestScope,
-// ensuring that the asynchronous work inside onReceive completes synchronously
-// within the test's execution context. This is the definitive fix for the
-// "PendingResult.finish() was not called" test failures.
+// REASON: REFACTOR (Bug Fix) — The receiver is now a thin dispatcher.
+// All heavy processing (ML inference, NER, parsing, DB writes) has been moved
+// to SmsProcessorWorker, which runs under WorkManager with a 10-minute
+// guaranteed execution window. This eliminates the risk of the Android OS
+// killing the receiver mid-work (Doze mode, memory pressure) before the
+// transaction is saved.
+//
+// The receiver's only job is now to extract the raw SMS data from the Intent
+// and immediately enqueue a SmsProcessorWorker for each message. goAsync()
+// is no longer needed.
 // =================================================================================
 package io.pm.finlight
 
-import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.provider.Telephony
 import android.util.Log
-import androidx.core.app.ActivityCompat
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.ml.NerExtractor
-import io.pm.finlight.ml.SmsClassifier
-import io.pm.finlight.ml.SmsEntityExtractor
-import io.pm.finlight.utils.CategoryIconHelper
-import io.pm.finlight.utils.NotificationHelper
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import java.util.Date
+import io.pm.finlight.workers.SmsProcessorWorker
 
 class SmsReceiver : BroadcastReceiver() {
     private val tag = "SmsReceiver"
-
-    // --- REFACTOR: Allow injecting a mock classifier for testing ---
-    internal var smsClassifier: SmsClassifier? = null
-    internal var nerExtractor: SmsEntityExtractor? = null
-
-    // --- NEW: Expose CoroutineScope for test injection ---
-    internal var coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
     override fun onReceive(
         context: Context,
         intent: Intent,
     ) {
-        if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
-            val pendingResult = goAsync()
+        if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
-            // --- REFACTOR: Initialize only if not already set (by a test) ---
-            if (smsClassifier == null) {
-                smsClassifier = SmsClassifier(context)
-            }
-            if (nerExtractor == null) {
-                nerExtractor = NerExtractor(context)
-            }
+        val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+        val messagesBySender = messages.groupBy { it.originatingAddress }
 
-            // --- UPDATED: Use the injectable coroutineScope ---
-            coroutineScope.launch {
-                try {
-                    val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-                    val messagesBySender = messages.groupBy { it.originatingAddress }
+        for ((sender, parts) in messagesBySender) {
+            if (sender == null) continue
+            val body = parts.joinToString("") { it.messageBody }
+            val date = parts.first().timestampMillis
 
-                    for ((sender, parts) in messagesBySender) {
-                        if (sender == null) continue
+            Log.d(tag, "SMS received from $sender. Enqueuing SmsProcessorWorker.")
 
-                        val fullBody = parts.joinToString("") { it.messageBody }
-                        val smsId = parts.first().timestampMillis
-
-                        val db = AppDatabase.getInstance(context)
-                        val settingsRepository = SettingsRepository(context)
-                        val transactionDao = db.transactionDao()
-                        val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
-
-                        val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
-                        val existingSmsHashes = transactionDao.getAllSmsHashes().first().toSet()
-                        val smsMessage = SmsMessage(id = smsId, sender = sender, body = fullBody, date = smsId)
-
-                        // --- Instantiate all providers needed for the parsing stages ---
-                        val categoryFinderProvider =
-                            object : CategoryFinderProvider {
-                                override fun getCategoryIdByName(name: String): Int? = CategoryIconHelper.getCategoryIdByName(name)
-                            }
-                        val customSmsRuleProvider =
-                            object : CustomSmsRuleProvider {
-                                override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
-                            }
-                        val merchantRenameRuleProvider =
-                            object : MerchantRenameRuleProvider {
-                                override suspend fun getAllRules(): List<MerchantRenameRule> =
-                                    db.merchantRenameRuleDao().getAllRules().first()
-
-                                override suspend fun getAllRulesMap(): Map<String, String> {
-                                    return db.merchantRenameRuleDao().getAllRulesList().associateBy(
-                                        { it.originalName.lowercase() },
-                                        { it.newName },
-                                    )
-                                }
-                            }
-                        val ignoreRuleProvider =
-                            object : IgnoreRuleProvider {
-                                override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
-                            }
-                        val merchantCategoryMappingProvider =
-                            object : MerchantCategoryMappingProvider {
-                                override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
-                                    db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-
-                                override suspend fun getAllMappings(): Map<String, Int> {
-                                    return db.merchantCategoryMappingDao().getAll().associateBy(
-                                        { it.parsedName.lowercase() },
-                                        { it.categoryId },
-                                    )
-                                }
-                            }
-                        val smsParseTemplateProvider =
-                            object : SmsParseTemplateProvider {
-                                override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
-
-                                override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
-                                    db.smsParseTemplateDao().getTemplatesBySignature(
-                                        signature,
-                                    )
-                            }
-
-                        // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
-                        var parseResult =
-                            SmsParser.parseWithOnlyCustomRules(
-                                sms = smsMessage,
-                                customSmsRuleProvider = customSmsRuleProvider,
-                                merchantRenameRuleProvider = merchantRenameRuleProvider,
-                                merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                                categoryFinderProvider = categoryFinderProvider,
-                            )
-
-                        // --- HIERARCHY STEP 2: If no custom rule matched, run ML pre-filter ---
-                        if (parseResult == null) {
-                            val transactionConfidence = smsClassifier!!.classify(fullBody)
-                            if (transactionConfidence < 0.1) {
-                                Log.d(tag, "ML model ignored SMS with confidence: ${1 - transactionConfidence}. Body: $fullBody")
-                                continue // Skip to the next message
-                            }
-
-                            // --- HIERARCHY STEP 3: Run NER to extract entities, then run the main parser ---
-                            val nerEntities = nerExtractor?.extract(fullBody)
-                            Log.d(tag, "NER entities for SMS: $nerEntities")
-
-                            parseResult =
-                                SmsParser.parseWithReason(
-                                    sms = smsMessage,
-                                    mappings = existingMappings,
-                                    customSmsRuleProvider = customSmsRuleProvider,
-                                    merchantRenameRuleProvider = merchantRenameRuleProvider,
-                                    ignoreRuleProvider = ignoreRuleProvider,
-                                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                                    categoryFinderProvider = categoryFinderProvider,
-                                    smsParseTemplateProvider = smsParseTemplateProvider,
-                                    nerEntities = nerEntities,
-                                )
-                        }
-
-                        // --- FINAL STEP: Process the result from whichever step succeeded ---
-                        if (parseResult is ParseResult.Success) {
-                            // --- AUTO-HEALING WITH NER SIMILARITY ENGINE ---
-                            parseResult.newlyDiscoveredRenameAlias?.let { (oldName, newName) ->
-                                Log.d(tag, "Auto-healing rename rule for NER fallback: $oldName -> $newName")
-                                db.merchantRenameRuleDao().insert(MerchantRenameRule(oldName, newName))
-                            }
-                            parseResult.newlyDiscoveredCategoryAlias?.let { (merchant, catId) ->
-                                Log.d(tag, "Auto-healing category rule for NER fallback: $merchant -> $catId")
-                                db.merchantCategoryMappingDao().insert(MerchantCategoryMapping(merchant, catId))
-                            }
-
-                            val potentialTxn = parseResult.transaction
-                            if (potentialTxn.sourceSmsHash != null && !existingSmsHashes.contains(potentialTxn.sourceSmsHash)) {
-                                val travelSettings = settingsRepository.getTravelModeSettings().first()
-                                val homeCurrency = settingsRepository.getHomeCurrency().first()
-                                val isTravelModeActive =
-                                    travelSettings?.isEnabled == true &&
-                                        Date().time in travelSettings.startDate..travelSettings.endDate
-
-                                if (isTravelModeActive && travelSettings != null && travelSettings.tripType == TripType.INTERNATIONAL) {
-                                    when (potentialTxn.detectedCurrencyCode) {
-                                        travelSettings.currencyCode -> {
-                                            saveTransaction(context, potentialTxn, isForeign = true, travelSettings = travelSettings)
-                                        }
-                                        homeCurrency -> {
-                                            saveTransaction(context, potentialTxn, isForeign = false, travelSettings = null)
-                                        }
-                                        else -> {
-                                            NotificationHelper.showTravelModeSmsNotification(context, potentialTxn, travelSettings)
-                                        }
-                                    }
-                                } else {
-                                    saveTransaction(context, potentialTxn, isForeign = false, travelSettings = null)
-                                }
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e(tag, "Error processing SMS", e)
-                } finally {
-                    pendingResult.finish()
-                }
-            }
-        }
-    }
-
-    private suspend fun saveTransaction(
-        context: Context,
-        potentialTxn: PotentialTransaction,
-        isForeign: Boolean,
-        travelSettings: TravelModeSettings?,
-    ) {
-        val db = AppDatabase.getInstance(context)
-        val accountDao = db.accountDao()
-        val accountAliasDao = db.accountAliasDao()
-        val transactionDao = db.transactionDao()
-        val settingsRepository = SettingsRepository(context)
-        val tagRepository = TagRepository(db.tagDao(), transactionDao)
-        val transactionRepository = TransactionRepository(transactionDao, settingsRepository, tagRepository)
-
-        val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
-        val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
-
-        var finalAccountId: Int? = null
-        val alias = accountAliasDao.findByAlias(accountName)
-        if (alias != null) {
-            finalAccountId = alias.destinationAccountId
-            Log.d(tag, "Found account alias for '$accountName'. Mapping to account ID: $finalAccountId")
-        } else {
-            var account = accountDao.findByName(accountName)
-            if (account == null) {
-                val newAccount = Account(name = accountName, type = accountType)
-                val newId = accountDao.insert(newAccount)
-                account = accountDao.getAccountByIdBlocking(newId.toInt())
-            }
-            finalAccountId = account?.id
-        }
-
-        if (finalAccountId != null) {
-            val conversionRate = travelSettings?.conversionRate?.toDouble() ?: 1.0
-            val transactionToSave =
-                if (isForeign && travelSettings != null) {
-                    Transaction(
-                        description = potentialTxn.merchantName ?: "Unknown Merchant",
-                        originalDescription = potentialTxn.merchantName,
-                        amount = potentialTxn.amount * conversionRate,
-                        originalAmount = potentialTxn.amount,
-                        currencyCode = travelSettings.currencyCode,
-                        conversionRate = conversionRate,
-                        date = potentialTxn.date,
-                        accountId = finalAccountId,
-                        categoryId = potentialTxn.categoryId,
-                        notes = "",
-                        transactionType = potentialTxn.transactionType,
-                        sourceSmsId = potentialTxn.sourceSmsId,
-                        sourceSmsHash = potentialTxn.sourceSmsHash,
-                        source = "Auto-Captured",
-                        smsSignature = potentialTxn.smsSignature,
-                        needsReview = potentialTxn.needsReview,
+            val workRequest =
+                OneTimeWorkRequestBuilder<SmsProcessorWorker>()
+                    .setInputData(
+                        workDataOf(
+                            SmsProcessorWorker.KEY_SENDER to sender,
+                            SmsProcessorWorker.KEY_BODY to body,
+                            SmsProcessorWorker.KEY_DATE to date,
+                        ),
                     )
-                } else {
-                    Transaction(
-                        description = potentialTxn.merchantName ?: "Unknown Merchant",
-                        originalDescription = potentialTxn.merchantName,
-                        amount = potentialTxn.amount,
-                        date = potentialTxn.date,
-                        accountId = finalAccountId,
-                        categoryId = potentialTxn.categoryId,
-                        notes = "",
-                        transactionType = potentialTxn.transactionType,
-                        sourceSmsId = potentialTxn.sourceSmsId,
-                        sourceSmsHash = potentialTxn.sourceSmsHash,
-                        source = "Auto-Captured",
-                        smsSignature = potentialTxn.smsSignature,
-                        needsReview = potentialTxn.needsReview,
-                    )
-                }
+                    .build()
 
-            // The repository will now handle travel tagging automatically.
-            val newTransactionId = transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
-
-            val canShowNotification =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-                } else {
-                    true
-                }
-
-            if (canShowNotification) {
-                if (potentialTxn.needsReview) {
-                    // Suspicious amount — show a high-priority review notification regardless of user pref
-                    val savedTxn = transactionToSave.copy(id = newTransactionId.toInt())
-                    NotificationHelper.showSuspiciousAmountNotification(
-                        context,
-                        savedTxn,
-                        potentialTxn.suspicionReason ?: "Amount flagged for review.",
-                    )
-                } else if (settingsRepository.isAutoCaptureNotificationEnabledBlocking()) {
-                    val workRequest =
-                        OneTimeWorkRequestBuilder<TransactionNotificationWorker>()
-                            .setInputData(workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to newTransactionId.toInt()))
-                            .build()
-                    WorkManager.getInstance(context).enqueue(workRequest)
-                }
-            }
-        } else {
-            Log.e(tag, "Failed to find or create an account for the transaction.")
+            WorkManager.getInstance(context).enqueue(workRequest)
         }
     }
 }

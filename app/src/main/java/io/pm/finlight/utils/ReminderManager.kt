@@ -26,6 +26,7 @@ import io.pm.finlight.MonthlySummaryWorker
 import io.pm.finlight.RecurringPatternWorker
 import io.pm.finlight.RecurringTransactionWorker
 import io.pm.finlight.WeeklySummaryWorker
+import io.pm.finlight.workers.SmsCatchupWorker
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -36,6 +37,7 @@ object ReminderManager {
     private const val RECURRING_TRANSACTION_WORK_TAG = "recurring_transaction_work"
     private const val RECURRING_PATTERN_WORK_TAG = "recurring_pattern_work"
     private const val AUTO_BACKUP_WORK_TAG = "auto_backup_work"
+    private const val SMS_CATCHUP_WORK_TAG = "sms_catchup_work"
     // --- DELETED: SNAPSHOT_WORKER_TAG ---
 
     // New preference key for enabling/disabling the recurring transaction feature
@@ -69,9 +71,35 @@ object ReminderManager {
         }
 
         // --- DELETED: scheduleSnapshotWorker(context) ---
+
+        // Always schedule the SMS catch-up worker — it is always needed regardless
+        // of any user preferences.
+        scheduleSmsRecoveryWorker(context)
     }
 
     // --- DELETED: scheduleSnapshotWorker function ---
+
+    /**
+     * Schedules the [SmsCatchupWorker] to run every 4 hours as a periodic job.
+     * This worker silently recovers any SMS transactions missed by [SmsReceiver].
+     * Uses KEEP policy so re-scheduling on boot does not reset the timer.
+     */
+    fun scheduleSmsRecoveryWorker(context: Context) {
+        val request =
+            PeriodicWorkRequestBuilder<SmsCatchupWorker>(4, TimeUnit.HOURS)
+                .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            SMS_CATCHUP_WORK_TAG,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+        Log.d("ReminderManager", "SMS catch-up worker scheduled (every 4 hours).")
+    }
+
+    fun cancelSmsRecoveryWorker(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(SMS_CATCHUP_WORK_TAG)
+        Log.d("ReminderManager", "SMS catch-up worker cancelled.")
+    }
 
     fun scheduleAutoBackup(context: Context) {
         // --- REFACTORED: Changed to an 8-hour periodic worker ---
