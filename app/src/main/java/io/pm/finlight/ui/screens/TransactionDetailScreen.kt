@@ -327,6 +327,19 @@ fun TransactionDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 16.dp),
                 ) {
+                    if (details.transaction.needsReview) {
+                        item {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                ReviewBannerCard(
+                                    reason = "Suspicious amount detected. Please verify this transaction.",
+                                    onReviewClick = {
+                                        viewModel.markAsReviewed(details.transaction.id)
+                                    }
+                                )
+                            }
+                        }
+                    }
+
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             TransactionSpotlightHeader(
@@ -2114,6 +2127,56 @@ private fun CanonicalNudgeSheetContent(
                 Text(
                     text = if (selectedCount > 0) "Apply to $selectedCount variant${if (selectedCount != 1) "s" else ""}" else "Apply",
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewBannerCard(
+    reason: String,
+    onReviewClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Needs Review",
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = "Needs Review",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+            Text(
+                text = reason,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Button(
+                onClick = onReviewClick,
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Text("Mark as Reviewed")
             }
         }
     }

@@ -144,4 +144,38 @@ class BudgetRepositoryTest : BaseViewModelTest() {
             // Assert
             verify(budgetDao).getById(budgetId)
         }
+
+    @Test
+    fun `getBudgetsForCategoryAndYear calls DAO`() =
+        runTest {
+            // Arrange
+            val categoryName = "Food"
+            val year = 2026
+            val budgets = listOf(Budget(categoryName = categoryName, amount = 1000.0, month = 1, year = year))
+            `when`(budgetDao.getBudgetsForCategoryAndYear(categoryName, year)).thenReturn(budgets)
+
+            // Act
+            val result = repository.getBudgetsForCategoryAndYear(categoryName, year)
+
+            // Assert
+            assertEquals(budgets, result)
+            verify(budgetDao).getBudgetsForCategoryAndYear(categoryName, year)
+        }
+
+    @Test
+    fun `insertAll calls DAO`() =
+        runTest {
+            // Arrange
+            val budgets =
+                listOf(
+                    Budget(categoryName = "Food", amount = 1000.0, month = 1, year = 2026),
+                    Budget(categoryName = "Travel", amount = 2000.0, month = 2, year = 2026)
+                )
+
+            // Act
+            repository.insertAll(budgets)
+
+            // Assert
+            verify(budgetDao).insertAll(budgets)
+        }
 }

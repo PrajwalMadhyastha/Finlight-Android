@@ -409,6 +409,15 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     // --- NEW: Tests for individual update methods ---
 
     @Test
+    fun `clearReviewFlag calls DAO`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository)
+            repository.clearReviewFlag(1)
+            verify(transactionDao).clearReviewFlag(1)
+        }
+
+    @Test
     fun `updateDescription calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()

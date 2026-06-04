@@ -79,9 +79,11 @@ object DataExportService {
                 val success = importDataFromJsonString(context, jsonString)
 
                 if (success) {
-                    // CRITICAL: Delete the file after a successful restore to prevent re-importing on every app launch
-                    snapshotFile.delete()
-                    Log.d("DataExportService", "Restore successful. Snapshot file deleted.")
+                    if (snapshotFile.delete()) {
+                        Log.d("DataExportService", "Restore successful. Snapshot file deleted.")
+                    } else {
+                        Log.w("DataExportService", "Restore successful, but failed to delete snapshot file.")
+                    }
                 } else {
                     Log.e("DataExportService", "Restore failed during data import phase.")
                 }
@@ -89,7 +91,9 @@ object DataExportService {
             } catch (e: Exception) {
                 Log.e("DataExportService", "Failed to restore from backup snapshot", e)
                 // Attempt to delete the corrupted file to prevent future errors
-                snapshotFile.delete()
+                if (!snapshotFile.delete()) {
+                    Log.w("DataExportService", "Failed to delete corrupted snapshot file")
+                }
                 return@withContext false
             }
         }

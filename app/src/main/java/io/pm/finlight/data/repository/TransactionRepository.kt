@@ -158,6 +158,10 @@ class TransactionRepository(
         transactionDao.updateTransactionType(id, transactionType)
     }
 
+    suspend fun clearReviewFlag(id: Int) {
+        transactionDao.clearReviewFlag(id)
+    }
+
     fun getTransactionDetailsById(id: Int): Flow<TransactionDetails?> {
         return transactionDao.getTransactionDetailsById(id)
     }

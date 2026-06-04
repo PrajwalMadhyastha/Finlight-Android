@@ -84,6 +84,8 @@ open class SecurityManager(private val context: Context) {
                     setUnlockedDeviceRequired(false)
                     setIsStrongBoxBacked(false)
                 }
+                // Explicitly set to false to allow background DB access (e.g. WorkManager) without user prompt
+                setUserAuthenticationRequired(false)
             }.build()
         keyGenerator.init(parameterSpec)
         return keyGenerator.generateKey()

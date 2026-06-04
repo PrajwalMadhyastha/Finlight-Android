@@ -276,6 +276,37 @@ class TransactionViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `autoSaveSmsTransaction handles IGNORE conflict on account creation`() =
+        runTest {
+            // ARRANGE
+            val potentialTxn =
+                PotentialTransaction(1L, "Test", 100.0, "expense", "Auto Merchant", "Msg", PotentialAccount("ConcurrentAccount", "Bank"), "hash", 1)
+            val transactionCaptor = argumentCaptor<Transaction>()
+
+            whenever(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+
+            // 1st call returns null (simulate race condition start)
+            // 2nd call returns the existing account (simulate finding it after IGNORE)
+            whenever(accountDao.findByName("ConcurrentAccount"))
+                .thenReturn(null)
+                .thenReturn(Account(99, "ConcurrentAccount", "Bank"))
+
+            // Simulate IGNORE conflict returning -1
+            whenever(accountRepository.insert(any())).thenReturn(-1L)
+
+            whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
+
+            // ACT
+            val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+            advanceUntilIdle()
+
+            // ASSERT
+            assertTrue(result)
+            verify(transactionRepository).insertTransactionWithTags(transactionCaptor.capture(), eq(emptySet()))
+            assertEquals(99, transactionCaptor.firstValue.accountId)
+        }
+
+    @Test
     fun `reparseTransactionFromSms updates transaction with new parsed data`() =
         runTest {
             // ARRANGE
@@ -685,6 +716,20 @@ class TransactionViewModelTest : BaseViewModelTest() {
         }
 
     // --- NEW: Simple Update Function Tests (Success Path) ---
+
+    @Test
+    fun `markAsReviewed calls repository successfully`() =
+        runTest {
+            // Arrange
+            val transactionId = 1
+
+            // Act
+            viewModel.markAsReviewed(transactionId)
+            advanceUntilIdle()
+
+            // Assert
+            verify(transactionRepository).clearReviewFlag(transactionId)
+        }
 
     @Test
     fun `updateTransactionAmount calls repository successfully`() =

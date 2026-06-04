@@ -18,6 +18,7 @@ on:
 permissions:
   contents: read
   pull-requests: write # Required if we use a PR generation action later
+  issues: write # Required to create bug issues from QA failures
 
 jobs:
   agent-qa:

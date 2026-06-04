@@ -189,6 +189,24 @@ class BudgetDaoTest {
         }
 
     @Test
+    fun `getBudgetsForCategoryAndYear returns budgets for specific year`() =
+        runTest {
+            // Arrange
+            budgetDao.insert(Budget(categoryName = "Food", amount = 1000.0, month = 1, year = 2026))
+            budgetDao.insert(Budget(categoryName = "Food", amount = 2000.0, month = 2, year = 2026))
+            budgetDao.insert(Budget(categoryName = "Food", amount = 3000.0, month = 1, year = 2025))
+            budgetDao.insert(Budget(categoryName = "Travel", amount = 4000.0, month = 1, year = 2026))
+
+            // Act
+            val budgets = budgetDao.getBudgetsForCategoryAndYear("Food", 2026)
+
+            // Assert
+            assertEquals(2, budgets.size)
+            assertEquals(1000.0, budgets.find { it.month == 1 }?.amount)
+            assertEquals(2000.0, budgets.find { it.month == 2 }?.amount)
+        }
+
+    @Test
     fun `getActualSpendingForCategory calculates correctly`() =
         runTest {
             // Arrange

@@ -247,4 +247,165 @@ class BudgetViewModel(
                 _uiEvent.send("Error deleting budget: ${e.message}")
             }
         }
+
+    // --- NEW: Add dynamic year selection for Annual Planning ---
+    private val _selectedPlanningYear = MutableStateFlow(Calendar.getInstance().get(Calendar.YEAR))
+    val selectedPlanningYear: StateFlow<Int> = _selectedPlanningYear.asStateFlow()
+
+    data class AnnualCategorySummary(
+        val categoryName: String,
+        val totalBudget: Double,
+        val overrideCount: Int,
+        val iconKey: String?,
+        val colorKey: String?
+    )
+
+    data class AnnualOverallSummary(
+        val totalBudget: Float,
+        val overrideCount: Int
+    )
+
+    private val _annualOverallSummary = MutableStateFlow<AnnualOverallSummary?>(null)
+    val annualOverallSummary: StateFlow<AnnualOverallSummary?> = _annualOverallSummary.asStateFlow()
+
+    private val _annualCategorySummaries = MutableStateFlow<List<AnnualCategorySummary>>(emptyList())
+    val annualCategorySummaries: StateFlow<List<AnnualCategorySummary>> = _annualCategorySummaries.asStateFlow()
+
+    private fun refreshAnnualSummaries() {
+        viewModelScope.launch {
+            val year = _selectedPlanningYear.value
+
+            // Overall
+            val existingOverall = settingsRepository.getOverallBudgetsForYear(year)
+            val totalOverall = existingOverall.values.sum()
+            _annualOverallSummary.value =
+                AnnualOverallSummary(
+                    totalBudget = totalOverall,
+                    overrideCount = existingOverall.size
+                )
+
+            // Categories
+            val categories = allCategories.firstOrNull() ?: emptyList()
+            val categorySummaries =
+                categories.map { category ->
+                    val existingCatBudgets = budgetRepository.getBudgetsForCategoryAndYear(category.name, year)
+                    AnnualCategorySummary(
+                        categoryName = category.name,
+                        totalBudget = existingCatBudgets.sumOf { it.amount },
+                        overrideCount = existingCatBudgets.size,
+                        iconKey = category.iconKey,
+                        colorKey = category.colorKey
+                    )
+                }.sortedByDescending { it.totalBudget }
+
+            _annualCategorySummaries.value = categorySummaries
+        }
+    }
+
+    fun setSelectedPlanningYear(year: Int) {
+        _selectedPlanningYear.value = year
+        refreshAnnualSummaries()
+    }
+
+    fun saveAnnualOverallBudget(
+        amountStr: String,
+        isStrict: Boolean
+    ) {
+        viewModelScope.launch {
+            try {
+                val amount = amountStr.toFloatOrNull()
+                if (amount == null || amount <= 0) {
+                    _uiEvent.send("Please enter a valid amount.")
+                    return@launch
+                }
+                val year = _selectedPlanningYear.value
+                val existingBudgets = settingsRepository.getOverallBudgetsForYear(year)
+
+                var remainingAmount = amount
+                var remainingMonths = 12
+
+                if (isStrict) {
+                    val overridesSum = existingBudgets.values.sum()
+                    remainingAmount = amount - overridesSum
+                    remainingMonths = 12 - existingBudgets.size
+
+                    if (remainingAmount < 0) {
+                        _uiEvent.send("Overrides exceed annual target.")
+                        return@launch
+                    }
+                }
+
+                val baseline = if (remainingMonths > 0) remainingAmount / remainingMonths else 0f
+
+                for (month in 1..12) {
+                    if (!existingBudgets.containsKey(month)) {
+                        val valToSave = if (isStrict) baseline else (amount / 12)
+                        settingsRepository.saveOverallBudgetForMonth(year, month, valToSave)
+                    }
+                }
+                _uiEvent.send("Annual overall budget saved.")
+                refreshAnnualSummaries()
+            } catch (e: Exception) {
+                _uiEvent.send("Error saving annual budget: ${e.message}")
+            }
+        }
+    }
+
+    fun saveAnnualCategoryBudget(
+        categoryName: String,
+        amountStr: String,
+        isStrict: Boolean
+    ) {
+        viewModelScope.launch {
+            try {
+                val amount = amountStr.toDoubleOrNull()
+                if (amount == null || amount <= 0 || categoryName.isBlank()) {
+                    _uiEvent.send("Please enter a valid amount and select a category.")
+                    return@launch
+                }
+                val year = _selectedPlanningYear.value
+                val existingBudgets = budgetRepository.getBudgetsForCategoryAndYear(categoryName, year)
+
+                var remainingAmount = amount
+                var remainingMonths = 12
+
+                if (isStrict) {
+                    val overridesSum = existingBudgets.sumOf { it.amount }
+                    remainingAmount = amount - overridesSum
+                    remainingMonths = 12 - existingBudgets.size
+
+                    if (remainingAmount < 0) {
+                        _uiEvent.send("Overrides exceed annual target.")
+                        return@launch
+                    }
+                }
+
+                val baseline = if (remainingMonths > 0) remainingAmount / remainingMonths else 0.0
+
+                val existingMonths = existingBudgets.map { it.month }.toSet()
+                val budgetsToInsert = mutableListOf<Budget>()
+
+                for (month in 1..12) {
+                    if (month !in existingMonths) {
+                        val valToSave = if (isStrict) baseline else (amount / 12)
+                        budgetsToInsert.add(
+                            Budget(
+                                categoryName = categoryName,
+                                amount = valToSave,
+                                month = month,
+                                year = year
+                            )
+                        )
+                    }
+                }
+                if (budgetsToInsert.isNotEmpty()) {
+                    budgetRepository.insertAll(budgetsToInsert)
+                }
+                _uiEvent.send("Annual budget for '$categoryName' saved.")
+                refreshAnnualSummaries()
+            } catch (e: Exception) {
+                _uiEvent.send("Error saving annual budget: ${e.message}")
+            }
+        }
+    }
 }
