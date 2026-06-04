@@ -1203,7 +1203,9 @@ class TransactionViewModel(
             transactionRepository.deleteImage(image)
             withContext(Dispatchers.IO) {
                 try {
-                    File(image.imageUri).delete()
+                    if (!File(image.imageUri).delete()) {
+                        Log.w(TAG, "Failed to delete image file: ${image.imageUri}")
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to delete image file: ${image.imageUri}", e)
                 }
