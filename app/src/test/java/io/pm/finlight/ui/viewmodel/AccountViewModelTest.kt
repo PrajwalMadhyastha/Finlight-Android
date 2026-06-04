@@ -496,4 +496,118 @@ class AccountViewModelTest : BaseViewModelTest() {
             assertTrue(viewModel.isSelectionModeActive.value)
             assertTrue(viewModel.selectedAccountIds.value.isEmpty())
         }
+
+    @Test
+    fun `checkAccountName returns EXACT for exact match`() = runTest {
+        val account = Account(id = 1, name = "Exact Name", type = "Bank")
+        `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(account)))
+        
+        val match = viewModel.checkAccountName("exact name", null)
+        
+        assertEquals(MatchType.EXACT, match.matchType)
+        assertEquals(account, match.account)
+    }
+
+    @Test
+    fun `checkAccountName returns SIMILAR for similar match`() = runTest {
+        val account = Account(id = 1, name = "Amazon Pay", type = "Wallet")
+        `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(account)))
+        
+        val match = viewModel.checkAccountName("Amazon Pays", null)
+        
+        assertEquals(MatchType.SIMILAR, match.matchType)
+        assertEquals(account, match.account)
+    }
+
+    @Test
+    fun `checkAccountName returns NONE for no match`() = runTest {
+        val account = Account(id = 1, name = "Amazon Pay", type = "Wallet")
+        `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(account)))
+        
+        val match = viewModel.checkAccountName("Google Pay", null)
+        
+        assertEquals(MatchType.NONE, match.matchType)
+    }
+
+    @Test
+    fun `checkAccountName excludes given account ID`() = runTest {
+        val account = Account(id = 1, name = "Amazon Pay", type = "Wallet")
+        `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(account)))
+        
+        val match = viewModel.checkAccountName("Amazon Pay", excludeAccountId = 1)
+        
+        assertEquals(MatchType.NONE, match.matchType)
+    }
+
+    @Test
+    fun `mergeAccounts overload triggers success callback`() = runTest {
+        var callbackTriggered = false
+        var successResult = false
+        
+        viewModel.mergeAccounts(1, listOf(2)) { success ->
+            callbackTriggered = true
+            successResult = success
+        }
+        advanceUntilIdle()
+        
+        verify(accountRepository).mergeAccounts(1, listOf(2))
+        assertTrue(callbackTriggered)
+        assertTrue(successResult)
+    }
+
+    @Test
+    fun `mergeAccounts overload triggers error callback on exception`() = runTest {
+        val errorMessage = "Merge Error"
+        `when`(accountRepository.mergeAccounts(anyInt(), anyList())).thenThrow(RuntimeException(errorMessage))
+        
+        var callbackTriggered = false
+        var successResult = true
+        
+        viewModel.mergeAccounts(1, listOf(2)) { success ->
+            callbackTriggered = true
+            successResult = success
+        }
+        advanceUntilIdle()
+        
+        assertTrue(callbackTriggered)
+        assertEquals(false, successResult)
+    }
+
+    @Test
+    fun `updateAccount with existing name triggers error callback`() = runTest {
+        val account = Account(id = 1, name = "Duplicate", type = "Bank")
+        val existing = Account(id = 2, name = "Duplicate", type = "Bank")
+        `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(existing)))
+        
+        var callbackTriggered = false
+        var successResult = true
+        
+        viewModel.updateAccount(account) { success ->
+            callbackTriggered = true
+            successResult = success
+        }
+        advanceUntilIdle()
+        
+        verify(accountRepository, never()).update(account)
+        assertTrue(callbackTriggered)
+        assertEquals(false, successResult)
+    }
+
+    @Test
+    fun `addAccount success triggers callback`() = runTest {
+        `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
+        
+        var callbackTriggered = false
+        var successResult = false
+        
+        viewModel.addAccount("New Account", "Bank") { success ->
+            callbackTriggered = true
+            successResult = success
+        }
+        advanceUntilIdle()
+        
+        verify(accountRepository).insert(anyObject())
+        assertTrue(callbackTriggered)
+        assertTrue(successResult)
+    }
 }

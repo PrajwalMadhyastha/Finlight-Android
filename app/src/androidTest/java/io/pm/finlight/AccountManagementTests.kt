@@ -264,4 +264,52 @@ class AccountManagementTests {
                 .format(-450.0)
         composeTestRule.onNodeWithText(expectedBalance).assertExists()
     }
+
+    /**
+     * Test adding an account with an existing name shows the duplicate match dialog.
+     */
+    @Test
+    fun test_addAccount_withDuplicateName_showsMergeDialog() {
+        navigateToAccountList()
+
+        // Click Add FAB
+        composeTestRule.onNodeWithContentDescription("Add").performClick()
+
+        // Wait for AddEditAccountScreen to load
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Add New Account").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Fill Name with an existing seeded account name
+        val nameInput = composeTestRule.onNodeWithText("Account Name (e.g., Savings, Credit Card)")
+        nameInput.performTextClearance()
+        nameInput.performTextInput(TestDataSeeder.ACCOUNT_BANK_NAME)
+
+        val typeInput = composeTestRule.onNodeWithText("Account Type (e.g., Bank, Wallet)")
+        typeInput.performTextClearance()
+        typeInput.performTextInput("Bank")
+
+        // Click Save
+        composeTestRule.onNodeWithText("Save").performClick()
+
+        // Wait for duplicate dialog to appear
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            try {
+                composeTestRule.onNodeWithText("Account Already Exists", useUnmergedTree = true).assertIsDisplayed()
+                true
+            } catch (e: AssertionError) {
+                false
+            }
+        }
+
+        // Verify the dialog elements
+        composeTestRule.onNodeWithText("Choose another name", useUnmergedTree = true).assertIsDisplayed()
+        
+        // Dismiss the dialog
+        composeTestRule.onNodeWithText("Choose another name", useUnmergedTree = true).performClick()
+        
+        // Dialog goes away, we are still on the Add New Account screen
+        composeTestRule.onNodeWithText("Account Already Exists", useUnmergedTree = true).assertDoesNotExist()
+        composeTestRule.onAllNodesWithText("Add New Account").onFirst().assertIsDisplayed()
+    }
 }
