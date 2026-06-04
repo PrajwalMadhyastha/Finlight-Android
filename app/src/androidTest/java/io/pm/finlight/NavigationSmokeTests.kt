@@ -1,7 +1,6 @@
 package io.pm.finlight
 
 import android.Manifest
-import android.content.pm.ActivityInfo
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -123,5 +122,4 @@ class NavigationSmokeTests {
         composeTestRule.onNodeWithTag("nav_item_Transactions").performClick()
         composeTestRule.onNodeWithContentDescription("Add Transaction", useUnmergedTree = true).assertIsDisplayed()
     }
-
 }
