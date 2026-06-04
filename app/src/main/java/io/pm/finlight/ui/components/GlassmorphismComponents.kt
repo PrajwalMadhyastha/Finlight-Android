@@ -72,25 +72,31 @@ import kotlin.math.roundToInt
 fun GlassPanel(
     modifier: Modifier = Modifier,
     isCustomizationMode: Boolean = false,
+    backgroundColor: Color? = null,
+    borderColor: Color? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val finalBorderColor = borderColor ?: GlassPanelBorder
+
     val borderModifier =
         if (isCustomizationMode) {
             Modifier.border(
                 width = 1.dp,
-                brush = Brush.horizontalGradient(listOf(GlassPanelBorder, GlassPanelBorder.copy(alpha = 0.5f))),
+                brush = Brush.horizontalGradient(listOf(finalBorderColor, finalBorderColor.copy(alpha = 0.5f))),
                 shape = RoundedCornerShape(24.dp),
             )
         } else {
-            Modifier.border(1.dp, GlassPanelBorder, RoundedCornerShape(24.dp))
+            Modifier.border(1.dp, finalBorderColor, RoundedCornerShape(24.dp))
         }
 
-    val glassFillColor =
+    val defaultFillColor =
         if (isSystemInDarkTheme()) {
             Color.White.copy(alpha = 0.08f)
         } else {
             Color.Black.copy(alpha = 0.04f)
         }
+
+    val glassFillColor = backgroundColor ?: defaultFillColor
 
     Box(
         modifier =

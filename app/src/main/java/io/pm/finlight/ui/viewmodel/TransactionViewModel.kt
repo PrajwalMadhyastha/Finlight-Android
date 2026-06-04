@@ -1401,6 +1401,16 @@ class TransactionViewModel(
         }
     }
 
+    fun markAsReviewed(transactionId: Int) =
+        viewModelScope.launch {
+            try {
+                transactionRepository.clearReviewFlag(transactionId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to clear review flag", e)
+                _uiEvent.send("Failed to mark as reviewed.")
+            }
+        }
+
     fun updateTagsForTransaction(transactionId: Int) =
         viewModelScope.launch {
             try {

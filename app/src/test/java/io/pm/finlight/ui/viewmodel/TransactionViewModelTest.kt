@@ -718,6 +718,20 @@ class TransactionViewModelTest : BaseViewModelTest() {
     // --- NEW: Simple Update Function Tests (Success Path) ---
 
     @Test
+    fun `markAsReviewed calls repository successfully`() =
+        runTest {
+            // Arrange
+            val transactionId = 1
+
+            // Act
+            viewModel.markAsReviewed(transactionId)
+            advanceUntilIdle()
+
+            // Assert
+            verify(transactionRepository).clearReviewFlag(transactionId)
+        }
+
+    @Test
     fun `updateTransactionAmount calls repository successfully`() =
         runTest {
             // Arrange

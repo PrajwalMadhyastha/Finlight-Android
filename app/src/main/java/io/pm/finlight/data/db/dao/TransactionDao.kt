@@ -621,6 +621,9 @@ interface TransactionDao {
         date: Long,
     )
 
+    @Query("UPDATE transactions SET needsReview = 0 WHERE id = :id")
+    suspend fun clearReviewFlag(id: Int)
+
     @androidx.room.Transaction
     @Query(
         """
