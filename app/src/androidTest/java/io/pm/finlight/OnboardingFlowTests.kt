@@ -124,6 +124,51 @@ class OnboardingFlowTests {
     }
 
     @Test
+    fun test_onboarding_clearButton_worksCorrectly() {
+        composeTestRule.waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Next").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Next").performClick() // to User Name
+
+        composeTestRule.waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Your Name").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Initially no clear button
+        composeTestRule.onNodeWithContentDescription("Clear Name").assertDoesNotExist()
+
+        // Type text
+        composeTestRule.onNodeWithText("Your Name").performTextInput("John Doe")
+        composeTestRule.waitForIdle()
+
+        // Clear button should appear and we click it
+        composeTestRule.onNodeWithContentDescription("Clear Name").assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+
+        // Value should be empty (Next is disabled)
+        composeTestRule.onNodeWithText("Next").assertIsNotEnabled()
+
+        // Type a name again to proceed
+        composeTestRule.onNodeWithText("Your Name").performTextInput("Jane")
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Next").performClick() // to Budget
+
+        composeTestRule.waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Set a Monthly Budget").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Test budget clear
+        composeTestRule.onNodeWithContentDescription("Clear Budget").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Total Monthly Budget").performTextInput("5000")
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithContentDescription("Clear Budget").assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+
+        // Ensure that there is no clear button after clearing
+        composeTestRule.onNodeWithContentDescription("Clear Budget").assertDoesNotExist()
+    }
+
+    @Test
     fun test_onboarding_backNavigation_worksCorrectly() {
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("Next").fetchSemanticsNodes().isNotEmpty()
