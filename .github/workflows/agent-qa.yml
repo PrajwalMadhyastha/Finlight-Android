@@ -45,6 +45,15 @@ jobs:
           workflow_conclusion: completed
         continue-on-error: true
 
+      - name: Show Downloaded Memory
+        run: |
+          if [ -f "agent_memory.txt" ]; then
+            echo "✅ Successfully downloaded previous agent memory:"
+            cat agent_memory.txt
+          else
+            echo "⚠️ No previous agent memory found (starting fresh)."
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
