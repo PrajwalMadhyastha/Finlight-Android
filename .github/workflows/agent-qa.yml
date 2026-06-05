@@ -109,7 +109,7 @@ jobs:
 
       - name: Upload Agent Memory
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: qa-agent-memory
           path: agent_memory.txt
