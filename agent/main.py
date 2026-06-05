@@ -16,15 +16,8 @@ def main():
     
     import random
     import agent.personas as personas
-    
-    goal = args.goal
-    if goal == "random":
-        goal = random.choice(personas.PERSONAS)
-        print(f"Random persona selected: {goal}")
-    else:
-        print(f"Goal selected: {goal}")
-        
     import os
+    
     memory_text = ""
     if os.path.exists("agent_memory.txt"):
         with open("agent_memory.txt", "r", encoding="utf-8") as f:
@@ -36,6 +29,18 @@ def main():
                 print("----------------------")
             else:
                 print("--- MEMORY CONTENT IS EMPTY ---")
+                
+    goal = args.goal
+    if goal == "random":
+        available_personas = [p for p in personas.PERSONAS if p not in memory_text]
+        if not available_personas:
+            print("All personas have been tested! Resetting the persona list.")
+            available_personas = personas.PERSONAS
+            
+        goal = random.choice(available_personas)
+        print(f"Random persona selected: {goal}")
+    else:
+        print(f"Goal selected: {goal}")
         
     # Run the loop
     result = loop.run_agent_loop(goal=goal, max_steps=args.max_steps, memory_text=memory_text)
