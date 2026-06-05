@@ -45,11 +45,13 @@ class OnboardingViewModel(
     }
 
     fun onNameChanged(newName: String) {
-        _userName.value = newName
+        if (newName.length <= 50) {
+            _userName.value = newName
+        }
     }
 
     fun onBudgetChanged(newBudget: String) {
-        if (newBudget.all { it.isDigit() }) {
+        if (newBudget.length <= 12 && newBudget.all { it.isDigit() }) {
             _monthlyBudget.value = newBudget
         }
     }

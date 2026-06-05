@@ -198,6 +198,17 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `onNameChanged ignores name longer than 50 characters`() =
+        runTest {
+            // Act
+            val newName = "A".repeat(51)
+            viewModel.onNameChanged(newName)
+
+            // Assert
+            assertEquals("", viewModel.userName.value)
+        }
+
+    @Test
     fun `onBudgetChanged updates monthlyBudget state with valid input`() =
         runTest {
             // Act
@@ -206,6 +217,17 @@ class OnboardingViewModelTest : BaseViewModelTest() {
 
             // Assert
             assertEquals(newBudget, viewModel.monthlyBudget.value)
+        }
+
+    @Test
+    fun `onBudgetChanged ignores budget longer than 12 digits`() =
+        runTest {
+            // Act
+            val newBudget = "1".repeat(13)
+            viewModel.onBudgetChanged(newBudget)
+
+            // Assert
+            assertEquals("", viewModel.monthlyBudget.value)
         }
 
     @Test
