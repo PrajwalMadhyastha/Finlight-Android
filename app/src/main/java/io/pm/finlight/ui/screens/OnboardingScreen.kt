@@ -296,6 +296,13 @@ fun UserNamePage(
                 value = name,
                 onValueChange = { viewModel.onNameChanged(it) },
                 label = { Text("Your Name") },
+                trailingIcon = {
+                    if (name.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.onNameChanged("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear Name")
+                        }
+                    }
+                },
                 keyboardOptions =
                     KeyboardOptions(
                         keyboardType = KeyboardType.Text,
@@ -372,6 +379,13 @@ fun BudgetSetupPage(
                 onValueChange = { viewModel.onBudgetChanged(it) },
                 label = { Text("Total Monthly Budget") },
                 leadingIcon = { Text("₹", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                trailingIcon = {
+                    if (budget.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.onBudgetChanged("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear Budget")
+                        }
+                    }
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier =
                     Modifier
