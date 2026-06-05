@@ -19,6 +19,7 @@ permissions:
   contents: read
   pull-requests: write # Required if we use a PR generation action later
   issues: write # Required to create bug issues from QA failures
+  actions: read # Required to download artifacts from previous runs
 
 jobs:
   agent-qa:
@@ -38,11 +39,17 @@ jobs:
           cache: gradle
 
       - name: Download Previous Agent Memory
-        uses: dawidd6/action-download-artifact@v3
-        with:
-          name: qa-agent-memory
-          path: .
-          workflow_conclusion: completed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Find the last successful run ID
+          LAST_RUN_ID=$(gh run list --workflow=agent-qa.yml --status success --limit 1 --json databaseId -q '.[0].databaseId')
+          if [ -n "$LAST_RUN_ID" ] && [ "$LAST_RUN_ID" != "null" ]; then
+            echo "Downloading memory from run $LAST_RUN_ID"
+            gh run download $LAST_RUN_ID -n qa-agent-memory || echo "Memory artifact not found in run $LAST_RUN_ID"
+          else
+            echo "No successful previous runs found."
+          fi
         continue-on-error: true
 
       - name: Show Downloaded Memory
@@ -118,7 +125,7 @@ jobs:
 
       - name: Upload Agent Memory
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: qa-agent-memory
           path: agent_memory.txt
