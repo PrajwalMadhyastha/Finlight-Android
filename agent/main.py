@@ -30,6 +30,12 @@ def main():
         with open("agent_memory.txt", "r", encoding="utf-8") as f:
             memory_text = f.read()
             print("Loaded previous agent memory.")
+            if memory_text.strip():
+                print("--- MEMORY CONTENT ---")
+                print(memory_text)
+                print("----------------------")
+            else:
+                print("--- MEMORY CONTENT IS EMPTY ---")
         
     # Run the loop
     result = loop.run_agent_loop(goal=goal, max_steps=args.max_steps, memory_text=memory_text)
