@@ -3,14 +3,11 @@ package io.pm.finlight.utils
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
 class FormatUtilsTest {
-
     @Test
     fun `getFormatter returns correct SimpleDateFormat`() {
         val formatter = FormatUtils.getFormatter("yyyy-MM-dd", Locale.US)
