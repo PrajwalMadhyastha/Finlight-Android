@@ -187,5 +187,6 @@ private fun DashboardCard(
                 }
             }
         }
+        DashboardCardType.FINANCIAL_SIMULATORS -> AuroraSimulatorsCard(navController = navController)
     }
 }

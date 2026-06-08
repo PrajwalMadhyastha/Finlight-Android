@@ -608,6 +608,14 @@ class TransactionViewModel(
             try {
                 val idsToDelete = _selectedTransactionIds.value.toList()
                 if (idsToDelete.isNotEmpty()) {
+                    // Record all SMS hashes for the to-be-deleted transactions so
+                    // SmsCatchupWorker never re-creates them.
+                    val hashes = db.transactionDao().getSmsHashesByIds(idsToDelete)
+                    hashes.forEach { hash ->
+                        db.deletedSmsHashDao().insert(
+                            io.pm.finlight.data.db.entity.DeletedSmsHash(hash),
+                        )
+                    }
                     transactionRepository.deleteByIds(idsToDelete)
                 }
                 _showDeleteConfirmation.value = false

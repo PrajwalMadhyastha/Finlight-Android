@@ -44,6 +44,8 @@ class ProfileViewModel(
                 initialValue = null,
             )
 
+    val appVersion: String = io.pm.finlight.BuildConfig.VERSION_NAME
+
     init {
         // --- MIGRATION: Move profile picture from attachments/ to profile/ on first run ---
         viewModelScope.launch {

@@ -173,6 +173,22 @@ fun ProfileScreen(
                 }
             }
         }
+
+        item {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, bottom = 32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Version ${profileViewModel.appVersion}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                )
+            }
+        }
     }
 }
 
