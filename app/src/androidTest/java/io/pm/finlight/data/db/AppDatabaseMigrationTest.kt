@@ -7,6 +7,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_39_40
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_40_41
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_41_42
+import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_43_44
+import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_44_45
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -210,6 +212,50 @@ class AppDatabaseMigrationTest {
             }
             assertTrue("Column 'needsReview' should exist in transactions table", found)
             cursor.close()
+            close()
+        }
+    }
+
+    /**
+     * Test MIGRATION_44_45: Creates deleted_sms_hashes deny-list table.
+     *
+     * Verifies that:
+     * 1. The table is created with the correct schema.
+     * 2. Hashes can be inserted and retrieved.
+     * 3. Duplicate inserts are silently ignored (PRIMARY KEY constraint).
+     */
+    @Test
+    fun migrate44To45_createsDeletedSmsHashesTable() {
+        helper.createDatabase(testDbName, 44).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 45, true, MIGRATION_44_45).apply {
+            // Verify table exists with correct schema
+            val cursor = query("PRAGMA table_info(deleted_sms_hashes)")
+            var found = false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "smsHash") {
+                    found = true
+                }
+            }
+            assertTrue("Column 'smsHash' should exist in deleted_sms_hashes table", found)
+            cursor.close()
+
+            // Verify data can be inserted
+            execSQL("INSERT INTO deleted_sms_hashes (smsHash) VALUES ('hash_test_1')")
+            val dataCursor = query("SELECT COUNT(*) FROM deleted_sms_hashes")
+            assertTrue(dataCursor.moveToFirst())
+            assertEquals(1, dataCursor.getInt(0))
+            dataCursor.close()
+
+            // Verify duplicate insert is silently ignored (PRIMARY KEY)
+            execSQL("INSERT OR IGNORE INTO deleted_sms_hashes (smsHash) VALUES ('hash_test_1')")
+            val dupCursor = query("SELECT COUNT(*) FROM deleted_sms_hashes")
+            assertTrue(dupCursor.moveToFirst())
+            assertEquals("Duplicate hash should be ignored", 1, dupCursor.getInt(0))
+            dupCursor.close()
+
             close()
         }
     }

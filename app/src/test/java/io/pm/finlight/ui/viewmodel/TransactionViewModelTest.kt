@@ -97,6 +97,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
     @Mock private lateinit var accountAliasDao: AccountAliasDao
 
+    @Mock private lateinit var deletedSmsHashDao: io.pm.finlight.data.db.dao.DeletedSmsHashDao
+
     private lateinit var viewModel: TransactionViewModel
 
     @Before
@@ -115,6 +117,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         whenever(db.smsParseTemplateDao()).thenReturn(smsParseTemplateDao)
         whenever(db.splitTransactionDao()).thenReturn(splitTransactionDao)
         whenever(db.accountAliasDao()).thenReturn(accountAliasDao)
+        whenever(db.deletedSmsHashDao()).thenReturn(deletedSmsHashDao)
 
         // Setup default mock behaviors for ViewModel initialization
         setupDefaultMocks()
@@ -873,6 +876,50 @@ class TransactionViewModelTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
             assertFalse("onSaveComplete should not be called on failure", onSaveCompleteCalled)
+        }
+
+    @Test
+    fun `deleteTransaction records sourceSmsHash in deny-list before deleting`() =
+        runTest {
+            // ARRANGE
+            val hash = "sms_hash_abc123"
+            val transactionToDelete =
+                Transaction(
+                    id = 1, description = "Test", amount = 1.0, date = 0,
+                    accountId = 1, categoryId = 1, notes = null,
+                    sourceSmsHash = hash,
+                )
+
+            // ACT
+            viewModel.deleteTransaction(transactionToDelete)
+            advanceUntilIdle()
+
+            // ASSERT: deny-list insert must be called with the hash
+            verify(deletedSmsHashDao).insert(
+                io.pm.finlight.data.db.entity.DeletedSmsHash(hash),
+            )
+            // AND the transaction itself must be deleted
+            verify(transactionRepository).delete(transactionToDelete)
+        }
+
+    @Test
+    fun `deleteTransaction without sourceSmsHash does not insert into deny-list`() =
+        runTest {
+            // ARRANGE — manual entry, no SMS hash
+            val transactionToDelete =
+                Transaction(
+                    id = 2, description = "Manual", amount = 50.0, date = 0,
+                    accountId = 1, categoryId = 1, notes = null,
+                    sourceSmsHash = null,
+                )
+
+            // ACT
+            viewModel.deleteTransaction(transactionToDelete)
+            advanceUntilIdle()
+
+            // ASSERT: deny-list must NOT be touched for non-SMS transactions
+            verify(deletedSmsHashDao, never()).insert(any())
+            verify(transactionRepository).delete(transactionToDelete)
         }
 
     @Test

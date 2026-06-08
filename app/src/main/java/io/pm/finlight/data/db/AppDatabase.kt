@@ -17,6 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.data.db.entity.AccountAlias
+import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.security.SecurityManager
 import io.pm.finlight.utils.CategoryIconHelper
@@ -47,8 +48,9 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         SmsParseTemplate::class,
         Trip::class,
         AccountAlias::class,
+        DeletedSmsHash::class,
     ],
-    version = 44,
+    version = 45,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -85,6 +87,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun tripDao(): TripDao
 
     abstract fun accountAliasDao(): AccountAliasDao
+
+    abstract fun deletedSmsHashDao(): DeletedSmsHashDao
 
     companion object {
         @Volatile
@@ -683,11 +687,21 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
-        // --- NEW: Migration for version 44 --- Adds needsReview flag to transactions
+        // --- Migration 43→44: Add needsReview flag ---
         val MIGRATION_43_44 =
             object : Migration(43, 44) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE `transactions` ADD COLUMN `needsReview` INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+
+        // --- Migration 44→45: Add deleted_sms_hashes deny-list table ---
+        val MIGRATION_44_45 =
+            object : Migration(44, 45) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `deleted_sms_hashes` (`smsHash` TEXT NOT NULL, PRIMARY KEY(`smsHash`))",
+                    )
                 }
             }
 
@@ -721,8 +735,8 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_41_42,
                             // --- ADDED ---
                             MIGRATION_42_43,
-                            // --- ADDED: needsReview column ---
                             MIGRATION_43_44,
+                            MIGRATION_44_45,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

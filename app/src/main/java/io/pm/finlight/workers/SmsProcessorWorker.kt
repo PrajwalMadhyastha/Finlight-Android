@@ -69,6 +69,8 @@ class SmsProcessorWorker(
         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
         val existingSmsHashes = db.transactionDao().getAllSmsHashes().first().toSet()
+        // Permanently skipped hashes (user deliberately deleted these transactions).
+        val deletedHashes = db.deletedSmsHashDao().getAllHashes().toSet()
 
         // --- Build providers ---
         val categoryFinderProvider = SmsProviderHelper.getCategoryFinderProvider()
@@ -138,8 +140,9 @@ class SmsProcessorWorker(
         val potentialTxn = parseResult.transaction
 
         // --- Duplicate guard ---
-        if (potentialTxn.sourceSmsHash == null || existingSmsHashes.contains(potentialTxn.sourceSmsHash)) {
-            Log.d(tag, "SMS already processed (hash match). Skipping.")
+        val hash = potentialTxn.sourceSmsHash
+        if (hash == null || hash in existingSmsHashes || hash in deletedHashes) {
+            Log.d(tag, "SMS already processed or intentionally deleted (hash match). Skipping.")
             return Result.success()
         }
 
