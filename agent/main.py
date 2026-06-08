@@ -48,8 +48,8 @@ def main():
     # Generate the report
     reporter.generate_report(goal, result)
     
-    # Exit with code 1 if it explicitly failed, helps CI know it failed
-    if result.get("status", "").lower() == "fail":
+    # Exit with code 1 if it explicitly failed or was incomplete, helps CI know it failed
+    if result.get("status", "").lower() != "pass":
         sys.exit(1)
     else:
         sys.exit(0)

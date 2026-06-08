@@ -1615,6 +1615,13 @@ class TransactionViewModel(
     fun deleteTransaction(transaction: Transaction) =
         viewModelScope.launch {
             try {
+                // If this transaction was created from an SMS, permanently record its hash
+                // in the deny-list so SmsCatchupWorker never re-creates it.
+                transaction.sourceSmsHash?.let { hash ->
+                    db.deletedSmsHashDao().insert(
+                        io.pm.finlight.data.db.entity.DeletedSmsHash(hash),
+                    )
+                }
                 transactionRepository.delete(transaction)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to delete transaction", e)

@@ -48,6 +48,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
     private lateinit var accountAliasDao: AccountAliasDao
     private lateinit var tagDao: TagDao
     private lateinit var smsRepository: SmsRepository
+    private lateinit var deletedSmsHashDao: DeletedSmsHashDao
     private lateinit var mockClassifier: SmsClassifier
     private lateinit var mockNerExtractor: NerExtractor
 
@@ -92,6 +93,10 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
         every { db.accountDao() } returns accountDao
         every { db.accountAliasDao() } returns accountAliasDao
         every { db.tagDao() } returns tagDao
+
+        deletedSmsHashDao = mockk(relaxed = true)
+        every { db.deletedSmsHashDao() } returns deletedSmsHashDao
+        coEvery { deletedSmsHashDao.getAllHashes() } returns emptyList()
 
         mockkConstructor(SmsRepository::class)
         coEvery { anyConstructed<SmsRepository>().fetchAllSms(any()) } returns emptyList()
@@ -225,5 +230,35 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
             assertEquals(ListenableWorker.Result.success(), result)
             // Should only be inserted once because the worker tracks saved hashes internally during the run
             coVerify(exactly = 1) { transactionDao.insert(any()) }
+        }
+
+    @Test
+    fun `skips transaction whose hash is in the deleted deny-list`() =
+        runTest {
+            val sms = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
+            coEvery { anyConstructed<SmsRepository>().fetchAllSms(any()) } returns listOf(sms)
+
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 100.0,
+                    transactionType = "expense", merchantName = "Swiggy",
+                    originalMessage = "Spent Rs.100 at Swiggy", sourceSmsHash = "deleted_hash",
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery {
+                SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns ParseResult.Success(txn)
+
+            // Hash is NOT in the live transactions table …
+            coEvery { transactionDao.getAllSmsHashes() } returns flowOf(emptyList())
+            // … but IS in the deleted deny-list
+            coEvery { deletedSmsHashDao.getAllHashes() } returns listOf("deleted_hash")
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            // Must NOT be re-created
+            coVerify(exactly = 0) { transactionDao.insert(any()) }
         }
 }
