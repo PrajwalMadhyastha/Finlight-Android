@@ -24,18 +24,18 @@ object FormatUtils {
         }.get()!!
     }
 
-    private val _defaultDateFormatter = ThreadLocalFormatter("yyyy-MM-dd", Locale.getDefault())
-    private val _monthYearFormatter = ThreadLocalFormatter("yyyy-MM", Locale.getDefault())
-    private val _shortMonthFormatter = ThreadLocalFormatter("LLL", Locale.getDefault())
-    private val _monthYearDisplayFormatter = ThreadLocalFormatter("LLLL yyyy", Locale.getDefault())
-    private val _fullDateTimeFormatter = ThreadLocalFormatter("EEE, dd MMMM yy, h:mm a", Locale.getDefault())
-    private val _shortYearDateFormatter = ThreadLocalFormatter("dd MMM, yy", Locale.getDefault())
-    private val _isoDateFormatter = ThreadLocalFormatter("yyyy-MM-dd", Locale.getDefault())
-    private val _dateTimeFormatter = ThreadLocalFormatter("dd MMM yyyy, hh:mm a", Locale.getDefault())
-    private val _longDateFormatter = ThreadLocalFormatter("dd MMMM, yyyy", Locale.getDefault())
-    private val _dayOfWeekFormatter = ThreadLocalFormatter("EEEE", Locale.getDefault())
-    private val _displayDateFormatter = ThreadLocalFormatter("dd MMM, yyyy", Locale.getDefault())
-    private val _timestampFormatter = ThreadLocalFormatter("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+    private val _defaultDateFormatter = ThreadLocalFormatter("yyyy-MM-dd", Locale.US)
+    private val _monthYearFormatter = ThreadLocalFormatter("yyyy-MM", Locale.US)
+    private val _shortMonthFormatter = ThreadLocalFormatter("LLL", Locale.US)
+    private val _monthYearDisplayFormatter = ThreadLocalFormatter("LLLL yyyy", Locale.US)
+    private val _fullDateTimeFormatter = ThreadLocalFormatter("EEE, dd MMMM yy, h:mm a", Locale.US)
+    private val _shortYearDateFormatter = ThreadLocalFormatter("dd MMM, yy", Locale.US)
+    private val _isoDateFormatter = ThreadLocalFormatter("yyyy-MM-dd", Locale.US)
+    private val _dateTimeFormatter = ThreadLocalFormatter("dd MMM yyyy, hh:mm a", Locale.US)
+    private val _longDateFormatter = ThreadLocalFormatter("dd MMMM, yyyy", Locale.US)
+    private val _dayOfWeekFormatter = ThreadLocalFormatter("EEEE", Locale.US)
+    private val _displayDateFormatter = ThreadLocalFormatter("dd MMM, yyyy", Locale.US)
+    private val _timestampFormatter = ThreadLocalFormatter("yyyy-MM-dd HH:mm:ss", Locale.US)
     private val _currencyFormatter = ThreadLocalCurrencyFormatter(Locale("en", "IN"))
 
     val defaultDateFormatter: SimpleDateFormat

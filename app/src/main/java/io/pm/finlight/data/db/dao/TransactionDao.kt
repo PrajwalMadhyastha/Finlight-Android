@@ -263,6 +263,9 @@ interface TransactionDao {
     )
     fun searchMerchants(query: String): Flow<List<MerchantPrediction>>
 
+    @Query("SELECT sourceSmsHash FROM transactions WHERE id IN (:transactionIds) AND sourceSmsHash IS NOT NULL")
+    suspend fun getSmsHashesByIds(transactionIds: List<Int>): List<String>
+
     @Query("DELETE FROM transactions WHERE id IN (:transactionIds)")
     suspend fun deleteByIds(transactionIds: List<Int>)
 

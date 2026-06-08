@@ -5,14 +5,11 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
 class FormatUtilsTest {
-    @Before
-    fun setup() {
-        Locale.setDefault(Locale.ENGLISH)
-    }
 
     @Test
     fun `getFormatter returns correct SimpleDateFormat`() {

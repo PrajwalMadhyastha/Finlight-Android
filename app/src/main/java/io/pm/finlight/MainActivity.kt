@@ -1039,6 +1039,28 @@ fun AppNavHost(
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { BudgetScreen(navController, budgetViewModel) }
         composable(
+            "what_if_simulator",
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
+        ) {
+            val factory = WhatIfViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
+            val whatIfViewModel: WhatIfViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
+            io.pm.finlight.ui.screens.WhatIfSimulatorScreen(navController, whatIfViewModel)
+        }
+        composable(
+            "annual_simulator",
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
+        ) {
+            val factory = io.pm.finlight.ui.viewmodel.AnnualSimulatorViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
+            val annualSimulatorViewModel: io.pm.finlight.ui.viewmodel.AnnualSimulatorViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
+            io.pm.finlight.ui.screens.AnnualSimulatorScreen(navController, annualSimulatorViewModel)
+        }
+        composable(
             "annual_budget_planning",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
             exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },

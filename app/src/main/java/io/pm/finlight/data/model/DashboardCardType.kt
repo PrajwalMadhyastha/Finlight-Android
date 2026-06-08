@@ -16,4 +16,5 @@ enum class DashboardCardType {
     ACCOUNTS_CAROUSEL,
     BUDGET_WATCH,
     SPENDING_CONSISTENCY,
+    FINANCIAL_SIMULATORS,
 }
