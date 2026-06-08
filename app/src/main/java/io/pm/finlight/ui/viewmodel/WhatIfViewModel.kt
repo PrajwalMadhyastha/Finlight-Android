@@ -2,6 +2,7 @@ package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.utils.DateUtils
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.flow.*
@@ -43,25 +44,7 @@ class WhatIfViewModel(
             settingsRepository.getPrivacyModeEnabled()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-        val monthStart =
-            (calendar.clone() as Calendar).apply {
-                set(Calendar.DAY_OF_MONTH, 1)
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
-
-        val monthEnd =
-            (calendar.clone() as Calendar).apply {
-                add(Calendar.MONTH, 1)
-                set(Calendar.DAY_OF_MONTH, 1)
-                add(Calendar.DAY_OF_MONTH, -1)
-                set(Calendar.HOUR_OF_DAY, 23)
-                set(Calendar.MINUTE, 59)
-                set(Calendar.SECOND, 59)
-                set(Calendar.MILLISECOND, 999)
-            }.timeInMillis
+        val (monthStart, monthEnd) = DateUtils.getCurrentMonthDateRange(calendar)
 
         val financialSummaryFlow =
             transactionRepository.getFinancialSummaryForRangeFlow(monthStart, monthEnd)
