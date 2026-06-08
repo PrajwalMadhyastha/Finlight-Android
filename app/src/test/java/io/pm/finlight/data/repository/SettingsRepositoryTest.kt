@@ -179,6 +179,7 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                         DashboardCardType.QUICK_ACTIONS,
                         DashboardCardType.RECENT_TRANSACTIONS,
                         DashboardCardType.SPENDING_CONSISTENCY,
+                        DashboardCardType.FINANCIAL_SIMULATORS,
                         DashboardCardType.BUDGET_WATCH,
                         DashboardCardType.ACCOUNTS_CAROUSEL,
                     ),

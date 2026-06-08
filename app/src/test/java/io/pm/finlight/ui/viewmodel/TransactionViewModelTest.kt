@@ -156,6 +156,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
             whenever(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
             // --- NEW: Default mocks for Quick Fill ---
             whenever(transactionRepository.getRecentManualTransactions(anyInt())).thenReturn(flowOf(emptyList()))
+            // Default: no SMS hashes for bulk-delete (avoid NPE when iterating)
+            whenever(transactionDao.getSmsHashesByIds(any())).thenReturn(emptyList())
         }
     }
 
@@ -1155,6 +1157,33 @@ class TransactionViewModelTest : BaseViewModelTest() {
             assertFalse("Selection mode should be inactive", viewModel.isSelectionModeActive.value)
             assertFalse("Dialog should be hidden", viewModel.showDeleteConfirmation.value)
             assertTrue("Selected IDs should be empty", viewModel.selectedTransactionIds.value.isEmpty())
+        }
+
+    @Test
+    fun `onConfirmDeleteSelection records SMS hashes in deny-list before deleting`() =
+        runTest {
+            // Arrange
+            val id1 = 1
+            val id2 = 2
+            val hash1 = "sms_hash_bulk_1"
+            val hash2 = "sms_hash_bulk_2"
+            viewModel.enterSelectionMode(id1)
+            viewModel.toggleTransactionSelection(id2)
+            viewModel.onDeleteSelectionClick()
+            advanceUntilIdle()
+
+            // Stub: both selected transactions have SMS hashes
+            whenever(transactionDao.getSmsHashesByIds(any())).thenReturn(listOf(hash1, hash2))
+
+            // Act
+            viewModel.onConfirmDeleteSelection()
+            advanceUntilIdle()
+
+            // Assert: deny-list must be updated for each hash
+            verify(deletedSmsHashDao).insert(io.pm.finlight.data.db.entity.DeletedSmsHash(hash1))
+            verify(deletedSmsHashDao).insert(io.pm.finlight.data.db.entity.DeletedSmsHash(hash2))
+            // And the bulk delete must still happen
+            verify(transactionRepository).deleteByIds(any())
         }
 
     @Test

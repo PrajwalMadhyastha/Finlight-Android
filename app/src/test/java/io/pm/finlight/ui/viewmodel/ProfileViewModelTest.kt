@@ -117,6 +117,14 @@ class ProfileViewModelTest : BaseViewModelTest() {
             verify(settingsRepository).saveProfilePictureUri(null)
         }
 
+    @Test
+    fun `appVersion returns BuildConfig VERSION_NAME`() {
+        setupDefaultRepo()
+        viewModel = ProfileViewModel(application, settingsRepository)
+
+        assertEquals(io.pm.finlight.BuildConfig.VERSION_NAME, viewModel.appVersion)
+    }
+
     // ---- Migration tests ----
 
     @Test

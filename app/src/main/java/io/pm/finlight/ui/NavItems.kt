@@ -72,4 +72,6 @@ val screenTitles =
         "trip_detail/{tripId}/{tagId}" to "Trip Details",
         "analysis_screen" to "Spending Analysis",
         "analysis_detail_screen/{dimension}/{dimensionId}/{startDate}/{endDate}?title={title}" to "Analysis Details",
+        "what_if_simulator" to "Monthly What-If Simulator",
+        "annual_simulator" to "Life Events",
     )
