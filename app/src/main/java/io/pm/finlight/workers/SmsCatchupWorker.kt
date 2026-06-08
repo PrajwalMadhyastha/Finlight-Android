@@ -59,6 +59,10 @@ class SmsCatchupWorker(
         // Load current hashes once — this is our duplicate guard.
         val existingSmsHashes = db.transactionDao().getAllSmsHashes().first().toSet()
 
+        // Load deleted hashes — transactions the user intentionally removed should
+        // never be re-created by this worker, even if their SMS reappears in the inbox.
+        val deletedHashes = db.deletedSmsHashDao().getAllHashes().toSet()
+
         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
 
@@ -116,8 +120,9 @@ class SmsCatchupWorker(
                 val potentialTxn = parseResult.transaction
                 val hash = potentialTxn.sourceSmsHash ?: continue
 
-                // Skip if already in DB or already saved during this run.
-                if (hash in existingSmsHashes || hash in savedHashesThisRun) continue
+                // Skip if already in DB, already saved during this run,
+                // or intentionally deleted by the user.
+                if (hash in existingSmsHashes || hash in deletedHashes || hash in savedHashesThisRun) continue
 
                 // Save silently — no notifications for catch-up transactions.
                 val newId =

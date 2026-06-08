@@ -42,8 +42,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Find the last successful run ID
-          LAST_RUN_ID=$(gh run list --workflow=agent-qa.yml --status success --limit 1 --json databaseId -q '.[0].databaseId')
+          # Find the last run ID (regardless of success/failure so we don't forget bugs)
+          LAST_RUN_ID=$(gh run list --workflow=agent-qa.yml --limit 1 --json databaseId -q '.[0].databaseId')
           if [ -n "$LAST_RUN_ID" ] && [ "$LAST_RUN_ID" != "null" ]; then
             echo "Downloading memory from run $LAST_RUN_ID"
             gh run download $LAST_RUN_ID -n qa-agent-memory || echo "Memory artifact not found in run $LAST_RUN_ID"
@@ -98,14 +98,14 @@ jobs:
             ./gradlew installDebug --no-daemon
             
             echo "Running AI Agent..."
-            python -m agent.main --goal "${{ github.event.inputs.goal || 'random' }}"
+            python -m agent.main --goal "${{ github.event.inputs.goal || 'random' }}" --max-steps 100
 
       - name: Create GitHub Issue on Bug Found
         if: failure()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          REPORT_FILE=$(ls qa-report-*.md | head -n 1)
+          REPORT_FILE=$(find . -maxdepth 1 -name "qa-report-*.md" | head -n 1)
           if [ -f "$REPORT_FILE" ]; then
             gh issue create \
               --title "🤖 AI QA Agent Bug: ${{ github.event.inputs.goal || 'random' }}" \
@@ -134,9 +134,13 @@ jobs:
       - name: Display Report in Actions UI
         if: always()
         run: |
-          cat qa-report-*.md >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Agent Memory (Last 10 Runs)" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          cat agent_memory.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          if ls qa-report-*.md 1> /dev/null 2>&1; then
+            cat qa-report-*.md >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -f "agent_memory.txt" ]; then
+            echo "## Agent Memory (Last 10 Runs)" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            cat agent_memory.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
