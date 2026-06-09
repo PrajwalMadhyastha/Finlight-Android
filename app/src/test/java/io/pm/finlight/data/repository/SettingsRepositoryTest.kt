@@ -365,6 +365,17 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `save and get simulator privacy mode`() =
+        runTest {
+            repository.getSimulatorPrivacyModeEnabled().test {
+                assertEquals(false, awaitItem()) // Default
+                repository.saveSimulatorPrivacyModeEnabled(true)
+                assertEquals(true, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `save and get last backup timestamp`() =
         runTest {
             val timestamp = System.currentTimeMillis()

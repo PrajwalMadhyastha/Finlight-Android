@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.UUID
@@ -40,6 +41,10 @@ class AnnualSimulatorViewModel(
 
     private val _baseAnnualBudget = MutableStateFlow(0.0)
     val baseAnnualBudget = _baseAnnualBudget.asStateFlow()
+
+    val privacyModeEnabled =
+        settingsRepository.getSimulatorPrivacyModeEnabled()
+            .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
 
     init {
         val cal = timeProvider.now()
@@ -125,5 +130,9 @@ class AnnualSimulatorViewModel(
             }
         }
         return totalImpact
+    }
+
+    fun togglePrivacyMode() {
+        settingsRepository.saveSimulatorPrivacyModeEnabled(!privacyModeEnabled.value)
     }
 }

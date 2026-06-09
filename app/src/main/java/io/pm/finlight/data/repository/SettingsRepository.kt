@@ -82,6 +82,7 @@ class SettingsRepository(context: Context) {
         private const val KEY_LAST_MONTH_SUMMARY_DISMISSED = "last_month_summary_dismissed_"
         private const val KEY_DISMISSED_MERGES = "dismissed_merge_suggestions"
         private const val KEY_PRIVACY_MODE_ENABLED = "privacy_mode_enabled"
+        private const val KEY_SIMULATOR_PRIVACY_MODE_ENABLED = "simulator_privacy_mode_enabled"
 
         // --- NEW: Key for the first launch flag ---
         private const val KEY_IS_FIRST_LAUNCH_COMPLETE = "is_first_launch_complete"
@@ -930,6 +931,27 @@ class SettingsRepository(context: Context) {
             prefs.registerOnSharedPreferenceChangeListener(listener)
             // Default to false (disabled)
             trySend(prefs.getBoolean(KEY_PRIVACY_MODE_ENABLED, false))
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+    }
+
+    fun saveSimulatorPrivacyModeEnabled(isEnabled: Boolean) {
+        prefs.edit {
+            putBoolean(KEY_SIMULATOR_PRIVACY_MODE_ENABLED, isEnabled)
+        }
+    }
+
+    fun getSimulatorPrivacyModeEnabled(): Flow<Boolean> {
+        return callbackFlow {
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_SIMULATOR_PRIVACY_MODE_ENABLED) {
+                        trySend(sp.getBoolean(key, false))
+                    }
+                }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            // Default to false (disabled)
+            trySend(prefs.getBoolean(KEY_SIMULATOR_PRIVACY_MODE_ENABLED, false))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
     }
