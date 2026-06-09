@@ -351,6 +351,8 @@ fun MainAppScreen(shortcutAction: String? = null) {
             "add_edit_goal",
             "approve_transaction_screen",
             "annual_budget_planning",
+            "what_if_simulator",
+            "annual_simulator",
         )
 
     val showMainTopBar = baseCurrentRoute !in screensWithCustomTopBars
