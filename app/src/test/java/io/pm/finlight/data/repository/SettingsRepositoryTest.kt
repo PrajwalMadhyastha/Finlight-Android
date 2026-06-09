@@ -212,13 +212,42 @@ class SettingsRepositoryTest : BaseViewModelTest() {
 
             // Assert Order
             repository.getDashboardCardOrder().test {
-                assertEquals(newOrder, awaitItem())
+                val missingCards = DashboardCardType.entries.filter { it !in newOrder }
+                assertEquals(newOrder + missingCards, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
 
             // Assert Visibility
             repository.getDashboardVisibleCards().test {
-                assertEquals(newVisible, awaitItem())
+                val missingCards = DashboardCardType.entries.filter { it !in newOrder }.toSet()
+                assertEquals(newVisible + missingCards, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `loadCardOrder_appendsNewFeatures`() =
+        runTest {
+            val oldOrder = listOf(DashboardCardType.HERO_BUDGET)
+            repository.saveDashboardLayout(oldOrder, setOf(DashboardCardType.HERO_BUDGET))
+            
+            repository.getDashboardCardOrder().test {
+                val missingCards = DashboardCardType.entries.filter { it !in oldOrder }
+                assertEquals(oldOrder + missingCards, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `loadVisibleCards_makesNewFeaturesVisible`() =
+        runTest {
+            val oldOrder = listOf(DashboardCardType.HERO_BUDGET)
+            val oldVisible = setOf(DashboardCardType.HERO_BUDGET)
+            repository.saveDashboardLayout(oldOrder, oldVisible)
+            
+            repository.getDashboardVisibleCards().test {
+                val missingCards = DashboardCardType.entries.filter { it !in oldOrder }.toSet()
+                assertEquals(oldVisible + missingCards, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
         }
