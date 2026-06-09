@@ -43,7 +43,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Find the last run ID (regardless of success/failure so we don't forget bugs)
-          LAST_RUN_ID=$(gh run list --workflow=agent-qa.yml --limit 1 --json databaseId -q '.[0].databaseId')
+          # Exclude the current run ID to avoid trying to download from the in-progress run
+          LAST_RUN_ID=$(gh run list --workflow=agent-qa.yml --limit 10 --json databaseId -q '[.[] | select(.databaseId != ${{ github.run_id }})][0].databaseId')
           if [ -n "$LAST_RUN_ID" ] && [ "$LAST_RUN_ID" != "null" ]; then
             echo "Downloading memory from run $LAST_RUN_ID"
             gh run download $LAST_RUN_ID -n qa-agent-memory || echo "Memory artifact not found in run $LAST_RUN_ID"

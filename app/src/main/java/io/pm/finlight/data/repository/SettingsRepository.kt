@@ -447,15 +447,18 @@ class SettingsRepository(context: Context) {
         return if (json != null) {
             val type = object : TypeToken<List<String>>() {}.type
             val names: List<String> = gson.fromJson(json, type)
-            names.mapNotNull { name ->
-                runCatching {
-                    if (name == "RECENT_ACTIVITY") {
-                        DashboardCardType.RECENT_TRANSACTIONS
-                    } else {
-                        DashboardCardType.valueOf(name)
-                    }
-                }.getOrNull()
-            }
+            val savedList =
+                names.mapNotNull { name ->
+                    runCatching {
+                        if (name == "RECENT_ACTIVITY") {
+                            DashboardCardType.RECENT_TRANSACTIONS
+                        } else {
+                            DashboardCardType.valueOf(name)
+                        }
+                    }.getOrNull()
+                }
+            val missingCards = DashboardCardType.entries.filter { it !in savedList }
+            savedList + missingCards
         } else {
             listOf(
                 DashboardCardType.HERO_BUDGET,
@@ -474,15 +477,37 @@ class SettingsRepository(context: Context) {
         return if (json != null) {
             val type = object : TypeToken<Set<String>>() {}.type
             val names: Set<String> = gson.fromJson(json, type)
-            names.mapNotNull { name ->
-                runCatching {
-                    if (name == "RECENT_ACTIVITY") {
-                        DashboardCardType.RECENT_TRANSACTIONS
-                    } else {
-                        DashboardCardType.valueOf(name)
-                    }
-                }.getOrNull()
-            }.toSet()
+            val savedVisible =
+                names.mapNotNull { name ->
+                    runCatching {
+                        if (name == "RECENT_ACTIVITY") {
+                            DashboardCardType.RECENT_TRANSACTIONS
+                        } else {
+                            DashboardCardType.valueOf(name)
+                        }
+                    }.getOrNull()
+                }.toSet()
+
+            val orderJson = sp.getString(KEY_DASHBOARD_CARD_ORDER, null)
+            val knownCards =
+                if (orderJson != null) {
+                    val orderType = object : TypeToken<List<String>>() {}.type
+                    val orderNames: List<String> = gson.fromJson(orderJson, orderType)
+                    orderNames.mapNotNull { name ->
+                        runCatching {
+                            if (name == "RECENT_ACTIVITY") {
+                                DashboardCardType.RECENT_TRANSACTIONS
+                            } else {
+                                DashboardCardType.valueOf(name)
+                            }
+                        }.getOrNull()
+                    }.toSet()
+                } else {
+                    emptySet()
+                }
+
+            val newCards = DashboardCardType.entries.filter { it !in knownCards }
+            savedVisible + newCards
         } else {
             DashboardCardType.entries.toSet()
         }
