@@ -230,7 +230,7 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         runTest {
             val oldOrder = listOf(DashboardCardType.HERO_BUDGET)
             repository.saveDashboardLayout(oldOrder, setOf(DashboardCardType.HERO_BUDGET))
-            
+
             repository.getDashboardCardOrder().test {
                 val missingCards = DashboardCardType.entries.filter { it !in oldOrder }
                 assertEquals(oldOrder + missingCards, awaitItem())
@@ -244,7 +244,7 @@ class SettingsRepositoryTest : BaseViewModelTest() {
             val oldOrder = listOf(DashboardCardType.HERO_BUDGET)
             val oldVisible = setOf(DashboardCardType.HERO_BUDGET)
             repository.saveDashboardLayout(oldOrder, oldVisible)
-            
+
             repository.getDashboardVisibleCards().test {
                 val missingCards = DashboardCardType.entries.filter { it !in oldOrder }.toSet()
                 assertEquals(oldVisible + missingCards, awaitItem())
