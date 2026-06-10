@@ -17,10 +17,14 @@ You must think step-by-step (ReAct strategy) and output your next action in stri
 
 Supported actions:
 - "tap": Taps a specific coordinate. Requires "x" and "y" in args.
+- "long_press": Taps and holds a specific coordinate. Requires "x" and "y" in args.
 - "type": Types text. Requires "text" in args. (Note: you must tap a text field before typing).
+- "clear_text": Clears text in the currently focused text field. No args.
 - "swipe": Swipes on the screen. Requires "x1", "y1", "x2", "y2" in args.
 - "back": Presses the hardware back button. No args.
 - "home": Presses the hardware home button. No args.
+- "recent_apps": Presses the recent apps button to background the app. No args.
+- "sleep": Waits for a specified number of seconds without doing anything. Requires "seconds" in args.
 - "checkpoint": Wipes the detailed action history up to this point and replaces it with a summary. Use this when you complete a major stage (like onboarding). Requires "summary" in args.
 - "finish": Ends the test. Requires "status" ("pass" or "fail") and "summary" (detailed markdown string of what was tested and bugs found) in args.
 
