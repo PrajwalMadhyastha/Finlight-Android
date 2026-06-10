@@ -45,19 +45,28 @@ jobs:
           # Find the last 10 run IDs (regardless of success/failure so we don't forget bugs)
           RUN_IDS=$(gh run list --workflow=agent-qa.yml --limit 10 --json databaseId -q '.[] | select(.databaseId != ${{ github.run_id }}) | .databaseId')
           
+          # First, try to find the new App Map format in any of the last 10 runs
           SUCCESS=0
           for ID in $RUN_IDS; do
-            echo "Checking run $ID for memory artifacts..."
+            echo "Checking run $ID for qa-app-map..."
             if gh run download $ID -n qa-app-map 2>/dev/null; then
               echo "✅ Downloaded qa-app-map from run $ID"
               SUCCESS=1
               break
-            elif gh run download $ID -n qa-agent-memory 2>/dev/null; then
-              echo "✅ Downloaded qa-agent-memory from run $ID"
-              SUCCESS=1
-              break
             fi
           done
+          
+          # If no App Map was found, fallback to the old agent memory format
+          if [ $SUCCESS -eq 0 ]; then
+            for ID in $RUN_IDS; do
+              echo "Checking run $ID for qa-agent-memory..."
+              if gh run download $ID -n qa-agent-memory 2>/dev/null; then
+                echo "✅ Downloaded qa-agent-memory from run $ID"
+                SUCCESS=1
+                break
+              fi
+            done
+          fi
           
           if [ $SUCCESS -eq 0 ]; then
             echo "⚠️ No successful previous runs with memory found in the last 10 runs."
