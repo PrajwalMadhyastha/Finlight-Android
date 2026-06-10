@@ -42,14 +42,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Find the last run ID (regardless of success/failure so we don't forget bugs)
-          # Exclude the current run ID to avoid trying to download from the in-progress run
-          LAST_RUN_ID=$(gh run list --workflow=agent-qa.yml --limit 10 --json databaseId -q '[.[] | select(.databaseId != ${{ github.run_id }})][0].databaseId')
-          if [ -n "$LAST_RUN_ID" ] && [ "$LAST_RUN_ID" != "null" ]; then
-            echo "Downloading memory from run $LAST_RUN_ID"
-            gh run download $LAST_RUN_ID -n qa-app-map || gh run download $LAST_RUN_ID -n qa-agent-memory || echo "Memory artifact not found in run $LAST_RUN_ID"
-          else
-            echo "No successful previous runs found."
+          # Find the last 10 run IDs (regardless of success/failure so we don't forget bugs)
+          RUN_IDS=$(gh run list --workflow=agent-qa.yml --limit 10 --json databaseId -q '[.[] | select(.databaseId != ${{ github.run_id }})].databaseId')
+          
+          SUCCESS=0
+          for ID in $RUN_IDS; do
+            echo "Checking run $ID for memory artifacts..."
+            if gh run download $ID -n qa-app-map 2>/dev/null; then
+              echo "✅ Downloaded qa-app-map from run $ID"
+              SUCCESS=1
+              break
+            elif gh run download $ID -n qa-agent-memory 2>/dev/null; then
+              echo "✅ Downloaded qa-agent-memory from run $ID"
+              SUCCESS=1
+              break
+            fi
+          done
+          
+          if [ $SUCCESS -eq 0 ]; then
+            echo "⚠️ No successful previous runs with memory found in the last 10 runs."
           fi
         continue-on-error: true
 
