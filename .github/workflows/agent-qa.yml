@@ -43,7 +43,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Find the last 10 run IDs (regardless of success/failure so we don't forget bugs)
-          RUN_IDS=$(gh run list --workflow=agent-qa.yml --limit 10 --json databaseId -q '[.[] | select(.databaseId != ${{ github.run_id }})].databaseId')
+          RUN_IDS=$(gh run list --workflow=agent-qa.yml --limit 10 --json databaseId -q '.[] | select(.databaseId != ${{ github.run_id }}) | .databaseId')
           
           SUCCESS=0
           for ID in $RUN_IDS; do
