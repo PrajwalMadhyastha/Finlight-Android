@@ -43,7 +43,7 @@ Return ONLY valid JSON. If there are no bugs, return an empty list for Known_Bug
 """
 
     response = client.models.generate_content(
-        model='gemini-3.1-pro',
+        model='gemini-3.1-flash-lite',
         contents=prompt,
         config=types.GenerateContentConfig(
             temperature=0.0
