@@ -59,9 +59,10 @@ fun AddRecurringTransactionScreen(
         viewModel(
             factory = RecurringTransactionViewModelFactory(context.applicationContext as Application)
         )
-    val transactionViewModel: TransactionViewModel = viewModel(
-        factory = io.pm.finlight.ui.viewmodel.TransactionViewModelFactory(context.applicationContext as Application)
-    )
+    val transactionViewModel: TransactionViewModel =
+        viewModel(
+            factory = io.pm.finlight.ui.viewmodel.TransactionViewModelFactory(context.applicationContext as Application)
+        )
 
     val isEditMode = ruleId != null
     val titleText = if (isEditMode) "Edit Recurring Rule" else "Add Recurring Rule"
@@ -135,14 +136,15 @@ fun AddRecurringTransactionScreen(
             GlassPanel {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .semantics(mergeDescendants = true) {}
-                            .toggleable(
-                                value = isVariableBill,
-                                onValueChange = { isVariableBill = it },
-                                role = androidx.compose.ui.semantics.Role.Switch
-                            ),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .semantics(mergeDescendants = true) {}
+                                .toggleable(
+                                    value = isVariableBill,
+                                    onValueChange = { isVariableBill = it },
+                                    role = androidx.compose.ui.semantics.Role.Switch
+                                ),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -152,14 +154,15 @@ fun AddRecurringTransactionScreen(
 
                     if (!isVariableBill) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .semantics(mergeDescendants = true) {}
-                                .toggleable(
-                                    value = autoApprove,
-                                    onValueChange = { autoApprove = it },
-                                    role = androidx.compose.ui.semantics.Role.Switch
-                                ),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .semantics(mergeDescendants = true) {}
+                                    .toggleable(
+                                        value = autoApprove,
+                                        onValueChange = { autoApprove = it },
+                                        role = androidx.compose.ui.semantics.Role.Switch
+                                    ),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {

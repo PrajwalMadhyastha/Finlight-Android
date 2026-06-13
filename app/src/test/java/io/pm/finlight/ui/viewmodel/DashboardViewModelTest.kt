@@ -745,7 +745,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
             val rule2 = RecurringTransaction(2, "Sub2", 20.0, "expense", "Monthly", now + 10L * 24 * 60 * 60 * 1000, 1, 1, null)
             // rule3 is due today + 5 days
             val rule3 = RecurringTransaction(3, "Sub3", 30.0, "expense", "Monthly", now - 25L * 24 * 60 * 60 * 1000, 1, 1, null)
-            
+
             `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(listOf(rule1, rule2, rule3)))
             initializeViewModel()
 

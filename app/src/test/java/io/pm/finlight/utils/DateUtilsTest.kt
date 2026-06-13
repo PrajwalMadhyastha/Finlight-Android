@@ -147,24 +147,27 @@ class DateUtilsTest : BaseViewModelTest() {
     @Test
     fun `getCurrentMonthDateRange returns correct start and end`() {
         // Arrange: Current date is October 15, 2025
-        val calendar = Calendar.getInstance(testTimeZone).apply {
-            set(2025, Calendar.OCTOBER, 15, 10, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
+        val calendar =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2025, Calendar.OCTOBER, 15, 10, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
 
         // Act
         val (start, end) = DateUtils.getCurrentMonthDateRange(calendar)
 
         // Assert: Current month is October 2025
-        val expectedStart = Calendar.getInstance(testTimeZone).apply {
-            set(2025, Calendar.OCTOBER, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        val expectedStart =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2025, Calendar.OCTOBER, 1, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
 
-        val expectedEnd = Calendar.getInstance(testTimeZone).apply {
-            set(2025, Calendar.OCTOBER, 31, 23, 59, 59)
-            set(Calendar.MILLISECOND, 999)
-        }.timeInMillis
+        val expectedEnd =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2025, Calendar.OCTOBER, 31, 23, 59, 59)
+                set(Calendar.MILLISECOND, 999)
+            }.timeInMillis
 
         assertEquals(expectedStart, start)
         assertEquals(expectedEnd, end)

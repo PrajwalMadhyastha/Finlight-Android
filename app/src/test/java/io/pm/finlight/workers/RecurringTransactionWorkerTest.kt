@@ -140,10 +140,10 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
             val now = System.currentTimeMillis()
             val past = now - 86400000
             val rule = RecurringTransaction(id = 1, description = "Expired", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, endDate = past, lastRunDate = null, accountId = 1, categoryId = 1)
-            
+
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
             val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
-            
+
             worker.doWork()
 
             coVerify(exactly = 0) { transactionDao.insert(any<Transaction>()) }

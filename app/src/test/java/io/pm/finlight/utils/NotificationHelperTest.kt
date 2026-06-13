@@ -782,7 +782,7 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showVariableBillAnomalyNotification_buildsCorrectly`() {
         // Arrange
         val rule = RecurringTransaction(id = 201, description = "Electricity Bill", amount = 1500.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
-        
+
         // Act
         NotificationHelper.showVariableBillAnomalyNotification(context, rule, 2500.0, 1500.0)
 
@@ -798,7 +798,7 @@ class NotificationHelperTest : BaseViewModelTest() {
     fun `showAutoApprovedPaymentNotification_buildsCorrectly`() {
         // Arrange
         val rule = RecurringTransaction(id = 202, description = "Internet", amount = 999.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
-        
+
         // Act
         NotificationHelper.showAutoApprovedPaymentNotification(context, rule)
 
@@ -825,11 +825,11 @@ class NotificationHelperTest : BaseViewModelTest() {
         val notification = shadowNotificationManager.getNotification(305)
         assertNotNull(notification)
         assertEquals("⚠️ Suspicious Amount Detected", notification.extras.getString(Notification.EXTRA_TITLE))
-        
+
         val contentPI = notification.contentIntent
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals(expectedUri, contentIntent.data.toString())
-        
+
         assertEquals("Review Now", notification.actions[0].title)
     }
 }
