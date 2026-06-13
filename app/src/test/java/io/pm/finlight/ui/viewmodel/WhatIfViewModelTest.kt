@@ -13,6 +13,7 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import java.util.Calendar
 
@@ -44,6 +45,7 @@ class WhatIfViewModelTest : BaseViewModelTest() {
 
         // Mock settings
         `when`(settingsRepository.getOverallBudgetForMonth(2026, 6)).thenReturn(flowOf(5000f))
+        `when`(settingsRepository.getSimulatorPrivacyModeEnabled()).thenReturn(flowOf(false))
 
         // Mock transactions repository
         `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(testCalendar.timeInMillis - 86400000L))
@@ -103,5 +105,16 @@ class WhatIfViewModelTest : BaseViewModelTest() {
 
             val expenses = viewModel.hypotheticalExpenses.first()
             assertTrue(expenses.isEmpty())
+        }
+
+    @Test
+    fun `togglePrivacyMode toggles simulator privacy mode`() =
+        runTest {
+            createViewModel()
+
+            viewModel.togglePrivacyMode()
+
+            // Initially false, so toggling should save true
+            verify(settingsRepository).saveSimulatorPrivacyModeEnabled(true)
         }
 }

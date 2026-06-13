@@ -41,7 +41,7 @@ class WhatIfViewModel(
         monthYear = FormatUtils.getFormatter("MMMM", Locale.getDefault()).format(calendar.time)
 
         privacyModeEnabled =
-            settingsRepository.getPrivacyModeEnabled()
+            settingsRepository.getSimulatorPrivacyModeEnabled()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
         val (monthStart, monthEnd) = DateUtils.getCurrentMonthDateRange(calendar)
@@ -95,5 +95,9 @@ class WhatIfViewModel(
 
     fun removeHypotheticalExpense(id: String) {
         _hypotheticalExpenses.update { list -> list.filterNot { it.id == id } }
+    }
+
+    fun togglePrivacyMode() {
+        settingsRepository.saveSimulatorPrivacyModeEnabled(!privacyModeEnabled.value)
     }
 }

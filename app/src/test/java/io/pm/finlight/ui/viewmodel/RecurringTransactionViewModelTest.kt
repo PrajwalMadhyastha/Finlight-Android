@@ -44,6 +44,9 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var recurringTransactionRepository: RecurringTransactionRepository
 
+    @Mock
+    private lateinit var recurringPatternDao: RecurringPatternDao
+
     @Captor
     private lateinit var recurringTransactionCaptor: ArgumentCaptor<RecurringTransaction>
 
@@ -63,7 +66,8 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
 
     private fun initializeViewModel(initialRules: List<RecurringTransaction> = emptyList()) {
         `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(initialRules))
-        viewModel = RecurringTransactionViewModel(application, recurringTransactionRepository)
+        `when`(recurringPatternDao.getUnacknowledgedPatterns()).thenReturn(flowOf(emptyList()))
+        viewModel = RecurringTransactionViewModel(application, recurringTransactionRepository, recurringPatternDao)
     }
 
     @Test
@@ -106,7 +110,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             initializeViewModel()
 
             // Act
-            viewModel.saveRule(null, "Spotify", 129.0, "expense", "Monthly", 0L, 1, 1, null)
+            viewModel.saveRule(null, "Spotify", 129.0, "expense", "Monthly", 0L, 1, 1, null, true, true, 1000L, "SPOTIFY", 5)
             advanceUntilIdle()
 
             // Assert
@@ -115,6 +119,11 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             assertEquals("Spotify", capturedRule.description)
             assertEquals(129.0, capturedRule.amount, 0.0)
             assertEquals(0, capturedRule.id) // ID is 0 for new entities
+            assertEquals("SPOTIFY", capturedRule.smsSenderId)
+            assertEquals(true, capturedRule.isVariableBill)
+            assertEquals(true, capturedRule.autoApprove)
+            assertEquals(1000L, capturedRule.endDate)
+            assertEquals(5, capturedRule.skipCount)
         }
 
     @Test
@@ -125,7 +134,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             val ruleId = 10
 
             // Act
-            viewModel.saveRule(ruleId, "Updated Spotify", 199.0, "expense", "Monthly", 0L, 1, 1, null)
+            viewModel.saveRule(ruleId, "Updated Spotify", 199.0, "expense", "Monthly", 0L, 1, 1, null, false, false, null, null)
             advanceUntilIdle()
 
             // Assert
@@ -134,6 +143,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             assertEquals("Updated Spotify", capturedRule.description)
             assertEquals(199.0, capturedRule.amount, 0.0)
             assertEquals(ruleId, capturedRule.id)
+            assertEquals(false, capturedRule.isVariableBill)
         }
 
     @Test
@@ -149,5 +159,21 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(recurringTransactionRepository).delete(ruleToDelete)
+        }
+
+    @Test
+    fun `dismissPatternSuggestion calls dao update with isDismissed true`() =
+        runTest {
+            // Arrange
+            val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, "expense", 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
+            initializeViewModel()
+
+            // Act
+            viewModel.dismissPatternSuggestion(pattern)
+            advanceUntilIdle()
+
+            // Assert
+            val expectedPattern = pattern.copy(isDismissed = true)
+            verify(recurringPatternDao).update(expectedPattern)
         }
 }

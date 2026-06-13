@@ -11,15 +11,32 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class RecurringTransactionViewModel(
     private val application: Application,
     private val repository: RecurringTransactionRepository,
+    private val patternDao: RecurringPatternDao,
 ) : ViewModel() {
     val allRecurringTransactions: Flow<List<RecurringTransaction>> = repository.getAll()
 
+    val patternSuggestions: StateFlow<List<RecurringPattern>> =
+        patternDao.getUnacknowledgedPatterns()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+
     fun getRuleById(id: Int): Flow<RecurringTransaction?> = repository.getById(id)
+
+    fun dismissPatternSuggestion(pattern: RecurringPattern) =
+        viewModelScope.launch {
+            patternDao.update(pattern.copy(isDismissed = true))
+        }
 
     fun saveRule(
         // Null for new rules
@@ -33,6 +50,12 @@ class RecurringTransactionViewModel(
         categoryId: Int?,
         // Preserve last run date on edit
         lastRunDate: Long?,
+        // New Issue #105 fields
+        isVariableBill: Boolean = false,
+        autoApprove: Boolean = false,
+        endDate: Long? = null,
+        smsSenderId: String? = null,
+        skipCount: Int = 0,
     ) = viewModelScope.launch {
         val rule =
             RecurringTransaction(
@@ -45,6 +68,11 @@ class RecurringTransactionViewModel(
                 accountId = accountId,
                 categoryId = categoryId,
                 lastRunDate = lastRunDate,
+                isVariableBill = isVariableBill,
+                autoApprove = autoApprove,
+                endDate = endDate,
+                smsSenderId = smsSenderId,
+                skipCount = skipCount,
             )
 
         if (ruleId != null) {

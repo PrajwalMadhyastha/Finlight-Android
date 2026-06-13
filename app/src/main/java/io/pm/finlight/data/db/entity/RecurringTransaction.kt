@@ -48,6 +48,16 @@ data class RecurringTransaction(
     val startDate: Long,
     val accountId: Int,
     val categoryId: Int?,
-    // --- NEW: Track the last execution date of this rule ---
+    // --- Track the last execution date of this rule ---
     val lastRunDate: Long? = null,
+    // --- NEW: The SMS sender ID for variable bills (e.g. "AM-BESCOM") ---
+    val smsSenderId: String? = null,
+    // --- NEW: If true, amount is variable and determined from SMS; Amount field is baseline ---
+    val isVariableBill: Boolean = false,
+    // --- NEW: If true, skip user confirmation when SMS perfectly matches ---
+    val autoApprove: Boolean = false,
+    // --- NEW: Optional end date for free-trial or limited-period rules ---
+    val endDate: Long? = null,
+    // --- NEW: Tracks consecutive cycles missed/skipped (groundwork for cancellation detection) ---
+    val skipCount: Int = 0,
 )

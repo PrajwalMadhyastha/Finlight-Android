@@ -181,6 +181,13 @@ class SettingsViewModel(
             initialValue = false,
         )
 
+    val simulatorPrivacyModeEnabled: StateFlow<Boolean> =
+        settingsRepository.getSimulatorPrivacyModeEnabled().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false,
+        )
+
     val lastBackupTimestamp: StateFlow<Long> =
         settingsRepository.getLastBackupTimestamp().stateIn(
             scope = viewModelScope,
@@ -210,6 +217,10 @@ class SettingsViewModel(
 
     fun setPrivacyModeEnabled(enabled: Boolean) {
         settingsRepository.savePrivacyModeEnabled(enabled)
+    }
+
+    fun setSimulatorPrivacyModeEnabled(enabled: Boolean) {
+        settingsRepository.saveSimulatorPrivacyModeEnabled(enabled)
     }
 
     suspend fun applyLearningAndAutoImport(mapping: MerchantCategoryMapping): Int {

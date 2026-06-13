@@ -6,7 +6,7 @@ import agent.reporter as reporter
 def main():
     parser = argparse.ArgumentParser(description="Autonomous QA Agent Runner")
     parser.add_argument("--goal", type=str, required=False, default="random", help="The high level testing goal.")
-    parser.add_argument("--max-steps", type=int, default=50, help="Maximum number of steps the agent can take.")
+    parser.add_argument("--max-steps", type=int, default=100, help="Maximum number of steps the agent can take.")
     
     args = parser.parse_args()
     
@@ -19,16 +19,21 @@ def main():
     import os
     
     memory_text = ""
-    if os.path.exists("agent_memory.txt"):
-        with open("agent_memory.txt", "r", encoding="utf-8") as f:
-            memory_text = f.read()
-            print("Loaded previous agent memory.")
-            if memory_text.strip():
-                print("--- MEMORY CONTENT ---")
+    app_map_file = "app_map.json"
+    if os.path.exists(app_map_file):
+        import json
+        with open(app_map_file, "r", encoding="utf-8") as f:
+            try:
+                app_map = json.load(f)
+                memory_text = json.dumps(app_map, indent=2)
+                print("Loaded previous agent memory (App Map).")
+                print("--- APP MAP CONTENT ---")
                 print(memory_text)
-                print("----------------------")
-            else:
-                print("--- MEMORY CONTENT IS EMPTY ---")
+                print("-----------------------")
+            except json.JSONDecodeError:
+                print("Failed to parse app_map.json.")
+    else:
+        print("--- NO APP MAP FOUND ---")
                 
     goal = args.goal
     if goal == "random":

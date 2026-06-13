@@ -77,7 +77,7 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `doWork correctly detects monthly pattern and creates rule`() =
+    fun `doWork correctly detects monthly pattern and notifies user`() =
         runTest {
             // Arrange
             val signature = "monthly_sig"
@@ -131,10 +131,7 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
 
             // Assert
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify { recurringTransactionDao.insert(capture(ruleCaptor)) }
-            assertEquals("Monthly", ruleCaptor.captured.recurrenceInterval)
             coVerify { NotificationHelper.showRecurringPatternDetectedNotification(any(), any()) }
-            coVerify { patternDao.deleteBySignature(signature) }
             coVerify { ReminderManager.scheduleRecurringPatternWorker(context) }
         }
 

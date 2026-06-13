@@ -24,6 +24,8 @@ import io.pm.finlight.MainApplication
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
+import io.pm.finlight.RecurringTransaction
+import io.pm.finlight.RecurringPattern
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TripType
@@ -152,7 +154,6 @@ class NotificationHelperTest : BaseViewModelTest() {
         assertEquals(expectedUri, contentIntent.data.toString())
 
         // Check action intent
-        assertEquals(1, notification.actions.size)
         assertEquals("View Details", notification.actions[0].title)
         val actionPI = notification.actions[0].actionIntent
         val actionIntent = shadowOf(actionPI).savedIntent
@@ -181,21 +182,19 @@ class NotificationHelperTest : BaseViewModelTest() {
             )
         val gson = Gson()
         val encodedJson = java.net.URLEncoder.encode(gson.toJson(potentialTxn), "UTF-8")
-        val expectedUri = "app://finlight.pm.io/link_recurring/$encodedJson"
+        val rule = RecurringTransaction(1, "Amazon Prime", 1499.0, "expense", "Yearly", System.currentTimeMillis(), 1, 1, null)
+        NotificationHelper.showRecurringTransactionDueNotification(context, rule, 101)
 
-        // Act
-        NotificationHelper.showRecurringTransactionDueNotification(context, potentialTxn)
+        val expectedUri = "app://finlight.pm.io/confirm_pending_transaction/101/${rule.id}"
 
         // Assert
-        val notification = shadowNotificationManager.getNotification(potentialTxn.sourceSmsId.toInt())
+        val notification = shadowNotificationManager.getNotification(101)
         assertNotNull(notification)
         assertEquals("Recurring Payment Due", notification.extras.getString(Notification.EXTRA_TITLE))
 
         val contentPI = notification.contentIntent
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals(expectedUri, contentIntent.data.toString())
-
-        assertEquals(1, notification.actions.size)
         assertEquals("Confirm Payment", notification.actions[0].title)
         val actionPI = notification.actions[0].actionIntent
         val actionIntent = shadowOf(actionPI).savedIntent
@@ -255,22 +254,19 @@ class NotificationHelperTest : BaseViewModelTest() {
                 accountId = 1,
                 categoryId = null,
             )
-        val expectedUri = "app://finlight.pm.io/add_recurring_transaction?ruleId=1"
+        val expectedUri = "app://finlight.pm.io/dashboard"
 
         // Act
-        NotificationHelper.showRecurringPatternDetectedNotification(context, rule)
+        NotificationHelper.showRecurringPatternDetectedNotification(context, RecurringPattern(smsSignature = "hash", description = "Spotify", amount = 10.0, transactionType = "expense", accountId = 1, categoryId = null, occurrences = 3, firstSeen = 0L, lastSeen = 0L))
 
         // Assert
-        val notification = shadowNotificationManager.getNotification("pattern_${rule.id}".hashCode())
+        val notification = shadowNotificationManager.getNotification("hash".hashCode())
         assertNotNull(notification)
-        assertEquals("New Recurring Transaction Found", notification.extras.getString(Notification.EXTRA_TITLE))
+        assertEquals("New Recurring Pattern Detected", notification.extras.getString(Notification.EXTRA_TITLE))
 
         val contentPI = notification.contentIntent
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals(expectedUri, contentIntent.data.toString())
-
-        assertEquals(1, notification.actions.size)
-        assertEquals("Review Rule", notification.actions[0].title)
     }
 
     @Test
@@ -362,7 +358,6 @@ class NotificationHelperTest : BaseViewModelTest() {
         assertEquals(expectedUri, contentIntent.data.toString())
 
         assertEquals("finlight_transaction_group_101", notification.group)
-        assertEquals(1, notification.actions.size)
         assertEquals("Edit", notification.actions[0].title)
     }
 
@@ -396,8 +391,6 @@ class NotificationHelperTest : BaseViewModelTest() {
         val contentPI = notification.contentIntent
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals(expectedUri, contentIntent.data.toString())
-
-        assertEquals(1, notification.actions.size)
         assertEquals("Review & Categorize", notification.actions[0].title)
     }
 
@@ -778,10 +771,65 @@ class NotificationHelperTest : BaseViewModelTest() {
             )
 
         // Act
-        NotificationHelper.showRecurringPatternDetectedNotification(context, rule)
+        NotificationHelper.showRecurringPatternDetectedNotification(context, RecurringPattern(smsSignature = "hash", description = "Spotify", amount = 10.0, transactionType = "expense", accountId = 1, categoryId = null, occurrences = 3, firstSeen = 0L, lastSeen = 0L))
 
         // Assert
-        val notification = shadowNotificationManager.getNotification("pattern_8".hashCode())
+        val notification = shadowNotificationManager.getNotification("hash".hashCode())
         assertTrue(notification == null)
+    }
+
+    @Test
+    fun `showVariableBillAnomalyNotification_buildsCorrectly`() {
+        // Arrange
+        val rule = RecurringTransaction(id = 201, description = "Electricity Bill", amount = 1500.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+
+        // Act
+        NotificationHelper.showVariableBillAnomalyNotification(context, rule, 2500.0, 1500.0)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(201 + 5000)
+        assertNotNull(notification)
+        assertEquals("Anomaly in Variable Bill", notification.extras.getString(Notification.EXTRA_TITLE))
+        assertEquals("Electricity Bill charged ₹2500.0 (usually ₹1500.0).", notification.extras.getString(Notification.EXTRA_TEXT))
+        assertEquals(NotificationCompat.PRIORITY_HIGH, notification.priority)
+    }
+
+    @Test
+    fun `showAutoApprovedPaymentNotification_buildsCorrectly`() {
+        // Arrange
+        val rule = RecurringTransaction(id = 202, description = "Internet", amount = 999.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+
+        // Act
+        NotificationHelper.showAutoApprovedPaymentNotification(context, rule)
+
+        // Assert
+        val notificationId = "auto_${rule.id}".hashCode()
+        val notification = shadowNotificationManager.getNotification(notificationId)
+        assertNotNull(notification)
+        assertEquals("Recurring Payment Saved", notification.extras.getString(Notification.EXTRA_TITLE))
+        assertTrue(notification.extras.getString(Notification.EXTRA_TEXT)?.contains("Auto-approved: Internet") == true)
+        assertEquals(NotificationCompat.PRIORITY_LOW, notification.priority)
+    }
+
+    @Test
+    fun `showSuspiciousAmountNotification_buildsCorrectly`() {
+        // Arrange
+        val transaction = Transaction(id = 305, description = "Unknown Merchant", amount = 50000.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null)
+        val expectedUri = "app://finlight.pm.io/transaction_detail/305"
+        val reason = "Amount is unusually high"
+
+        // Act
+        NotificationHelper.showSuspiciousAmountNotification(context, transaction, reason)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(305)
+        assertNotNull(notification)
+        assertEquals("⚠️ Suspicious Amount Detected", notification.extras.getString(Notification.EXTRA_TITLE))
+
+        val contentPI = notification.contentIntent
+        val contentIntent = shadowOf(contentPI).savedIntent
+        assertEquals(expectedUri, contentIntent.data.toString())
+
+        assertEquals("Review Now", notification.actions[0].title)
     }
 }

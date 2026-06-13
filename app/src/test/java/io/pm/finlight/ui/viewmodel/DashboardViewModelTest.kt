@@ -51,6 +51,12 @@ class DashboardViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var merchantRenameRuleRepository: MerchantRenameRuleRepository
 
+    @Mock
+    private lateinit var recurringTransactionDao: RecurringTransactionDao
+
+    @Mock
+    private lateinit var recurringPatternDao: RecurringPatternDao
+
     private lateinit var viewModel: DashboardViewModel
 
     // --- List of possible messages from ViewModel for assertions ---
@@ -130,6 +136,9 @@ class DashboardViewModelTest : BaseViewModelTest() {
         // --- FIX: Add missing mock for the new dependency ---
         `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
+        `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(emptyList()))
+        `when`(recurringPatternDao.getUnacknowledgedPatterns()).thenReturn(flowOf(emptyList()))
+
         // Default mock time: Not 1st of month
         val mockNow = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 15) }
         `when`(timeProvider.now()).thenReturn(mockNow)
@@ -143,6 +152,8 @@ class DashboardViewModelTest : BaseViewModelTest() {
                 settingsRepository = settingsRepository,
                 merchantRenameRuleRepository = merchantRenameRuleRepository,
                 timeProvider = timeProvider,
+                recurringTransactionDao = recurringTransactionDao,
+                recurringPatternDao = recurringPatternDao,
             )
     }
 
@@ -155,6 +166,8 @@ class DashboardViewModelTest : BaseViewModelTest() {
                 settingsRepository = settingsRepository,
                 merchantRenameRuleRepository = merchantRenameRuleRepository,
                 timeProvider = timeProvider,
+                recurringTransactionDao = recurringTransactionDao,
+                recurringPatternDao = recurringPatternDao,
             )
     }
 
@@ -699,6 +712,67 @@ class DashboardViewModelTest : BaseViewModelTest() {
                     assertEquals(SpendingStatus.OVER_LIMIT, day3Status?.status)
                 }
                 cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `upcomingPayments are loaded correctly from dao`() =
+        runTest {
+            // Arrange
+            val now = System.currentTimeMillis()
+            val rule = RecurringTransaction(1, "Netflix", 149.0, "expense", "Monthly", now, 1, 1, null)
+            `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(listOf(rule)))
+            initializeViewModel()
+
+            // Act & Assert
+            viewModel.upcomingPayments.test {
+                advanceUntilIdle()
+                val payments = awaitItem()
+                assertEquals(1, payments.size)
+                assertEquals("Netflix", payments.first().description)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `upcomingPayments filters and sorts correctly`() =
+        runTest {
+            // Arrange
+            val now = System.currentTimeMillis()
+            // rule1 is due today + 10 days
+            val rule1 = RecurringTransaction(1, "Sub1", 10.0, "expense", "Monthly", now - 20L * 24 * 60 * 60 * 1000, 1, 1, null)
+            // rule2 is due today + 40 days (should be filtered out)
+            val rule2 = RecurringTransaction(2, "Sub2", 20.0, "expense", "Monthly", now + 10L * 24 * 60 * 60 * 1000, 1, 1, null)
+            // rule3 is due today + 5 days
+            val rule3 = RecurringTransaction(3, "Sub3", 30.0, "expense", "Monthly", now - 25L * 24 * 60 * 60 * 1000, 1, 1, null)
+
+            `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(listOf(rule1, rule2, rule3)))
+            initializeViewModel()
+
+            // Act & Assert
+            viewModel.upcomingPayments.test {
+                advanceUntilIdle()
+                val payments = awaitItem()
+                assertEquals(2, payments.size)
+                assertEquals("Sub3", payments[0].description) // rule3 is due sooner (5 days) than rule1 (10 days)
+                assertEquals("Sub1", payments[1].description)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `patternSuggestions flow receives data from dao`() =
+        runTest {
+            // Arrange
+            val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, "expense", 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
+            `when`(recurringPatternDao.getUnacknowledgedPatterns()).thenReturn(flowOf(listOf(pattern)))
+            initializeViewModel()
+
+            // Act & Assert
+            viewModel.patternSuggestions.test {
+                val suggestions = awaitItem()
+                assertEquals(1, suggestions.size)
+                assertEquals(pattern, suggestions[0])
             }
         }
 }

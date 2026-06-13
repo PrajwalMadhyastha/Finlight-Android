@@ -1,9 +1,19 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/RecurringTransactionWorker.kt
-// REASON: FIX - Added check for `recurring_transactions_enabled` preference.
-// If disabled, the worker reschedules itself and returns success immediately,
-// preventing notifications and processing. This ensures the feature is completely
-// disabled at the platform level.
+// FILE: ./app/src/main/java/io/pm/finlight/workers/RecurringTransactionWorker.kt
+// REASON: FEATURE (Issue #105) - Replaced the notification-only approach with a
+// draft transaction model. When a rule is due, the worker now creates a PENDING
+// Transaction in the database instead of just firing a notification. This "draft"
+// is the single source of truth for what needs user action.
+//
+// Two execution paths:
+// 1. autoApprove = true → Saves the transaction directly as CONFIRMED, updates
+//    lastRunDate, and sends a quiet "Auto-paid" notification.
+// 2. autoApprove = false (default) → Saves as PENDING, fires the existing
+//    "due" notification (deep link updated to ConfirmPending sheet).
+//
+// Guards:
+// - Skips expired rules (endDate is in the past).
+// - Skips rules where a PENDING draft already exists (idempotent run).
 // =================================================================================
 package io.pm.finlight
 
@@ -23,48 +33,87 @@ class RecurringTransactionWorker(
     private val context: Context,
     workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
+    private val tag = "RecurringTxnWorker"
+
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
-                // FIX: Check if the feature is enabled before proceeding
                 val settingsRepo = SettingsRepository(context)
                 val isEnabled = settingsRepo.getRecurringTransactionsEnabled().first()
 
                 if (!isEnabled) {
-                    Log.d("RecurringTransactionWorker", "Feature disabled. Rescheduling and exiting.")
-                    // Important: We must still reschedule the worker, otherwise it will stop running forever.
-                    // If the user re-enables the feature later, we want the worker to be alive to catch it.
+                    Log.d(tag, "Feature disabled. Rescheduling and exiting.")
                     ReminderManager.scheduleRecurringTransactionWorker(context)
                     return@withContext Result.success()
                 }
 
                 val db = AppDatabase.getInstance(context)
                 val recurringDao = db.recurringTransactionDao()
+                val transactionDao = db.transactionDao()
 
                 val allRules = recurringDao.getAllRulesList()
+                val now = System.currentTimeMillis()
 
                 allRules.forEach { rule ->
+                    // --- Guard 1: Skip expired rules ---
+                    if (rule.endDate != null && now > rule.endDate) {
+                        Log.d(tag, "Rule '${rule.description}' has passed its end date. Skipping.")
+                        return@forEach
+                    }
+
                     if (isDue(rule)) {
-                        val potentialTxn =
-                            PotentialTransaction(
-                                sourceSmsId = rule.id.toLong(),
-                                smsSender = "Recurring Rule",
-                                amount = rule.amount,
-                                transactionType = rule.transactionType,
-                                merchantName = rule.description,
-                                originalMessage = "Recurring payment for ${rule.description}",
-                                sourceSmsHash = "recurring_${rule.id}",
-                                // Use current time for due transactions
-                                date = System.currentTimeMillis(),
-                            )
-                        NotificationHelper.showRecurringTransactionDueNotification(context, potentialTxn)
+                        // --- Guard 2: Idempotency — skip if a PENDING draft already exists ---
+                        val existingDraft = transactionDao.getPendingTransactionForRule(rule.id)
+                        if (existingDraft != null) {
+                            Log.d(tag, "Rule '${rule.description}' already has a pending draft (id=${existingDraft.id}). Skipping.")
+                            return@forEach
+                        }
+
+                        if (rule.autoApprove) {
+                            // --- Auto-Approve Path: Confirm immediately ---
+                            val confirmedTxn =
+                                Transaction(
+                                    description = rule.description,
+                                    amount = rule.amount,
+                                    transactionType = rule.transactionType,
+                                    date = now,
+                                    accountId = rule.accountId,
+                                    categoryId = rule.categoryId,
+                                    notes = "Auto-approved by recurring rule",
+                                    source = "Recurring Rule",
+                                    status = "CONFIRMED",
+                                    recurringRuleId = rule.id,
+                                )
+                            transactionDao.insert(confirmedTxn)
+                            recurringDao.updateLastRunDate(rule.id, now)
+                            Log.i(tag, "Auto-approved recurring payment: '${rule.description}'")
+                            NotificationHelper.showAutoApprovedPaymentNotification(context, rule)
+                        } else {
+                            // --- Standard Path: Create a PENDING draft ---
+                            val draftTxn =
+                                Transaction(
+                                    description = rule.description,
+                                    amount = rule.amount,
+                                    transactionType = rule.transactionType,
+                                    date = now,
+                                    accountId = rule.accountId,
+                                    categoryId = rule.categoryId,
+                                    notes = "",
+                                    source = "Recurring Rule (Pending)",
+                                    status = "PENDING",
+                                    recurringRuleId = rule.id,
+                                )
+                            val newDraftId = transactionDao.insert(draftTxn)
+                            Log.i(tag, "Created PENDING draft (id=$newDraftId) for rule '${rule.description}'")
+                            NotificationHelper.showRecurringTransactionDueNotification(context, rule, newDraftId.toInt())
+                        }
                     }
                 }
 
                 ReminderManager.scheduleRecurringTransactionWorker(context)
                 Result.success()
             } catch (e: Exception) {
-                Log.e("RecurringTxnWorker", "Worker failed", e)
+                Log.e(tag, "Worker failed", e)
                 Result.retry()
             }
         }

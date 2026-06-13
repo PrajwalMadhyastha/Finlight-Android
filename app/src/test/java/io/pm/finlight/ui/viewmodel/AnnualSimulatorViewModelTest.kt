@@ -12,6 +12,7 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
@@ -51,6 +52,7 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
         // Mock SettingsRepository
         val mockBudgets = mapOf(1 to 1000f, 2 to 1000f, 3 to 1000f, 4 to 1000f, 5 to 1000f, 6 to 1000f)
         `when`(settingsRepository.getOverallBudgetsForYear(2026)).thenReturn(mockBudgets)
+        `when`(settingsRepository.getSimulatorPrivacyModeEnabled()).thenReturn(flowOf(false))
 
         // Mock TransactionRepository
         `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), anyString(), anyObject(), anyObject()))
@@ -86,6 +88,29 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
             // YTD income is empty list -> 0.0
             val baseIncome = viewModel.baseAnnualIncome.first()
             assertEquals(0.0, baseIncome, 0.0)
+        }
+
+    @Test
+    fun `initialization calculates projected annual income correctly`() =
+        runTest {
+            val incomeTxn =
+                io.pm.finlight.TransactionDetails(
+                    transaction = io.pm.finlight.Transaction(id = 1, description = "Salary", amount = 5000.0, transactionType = "income", date = 100L, accountId = 1, categoryId = null, notes = null),
+                    images = emptyList(),
+                    accountName = "Bank",
+                    categoryName = "Salary",
+                    categoryIconKey = null,
+                    categoryColorKey = null,
+                    tagNames = null
+                )
+            `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), anyString(), anyObject(), anyObject()))
+                .thenReturn(flowOf(listOf(incomeTxn)))
+
+            createViewModel()
+
+            // It should calculate (5000 / 6) * 12 = 10000.0 (since current month index is 6)
+            val baseIncome = viewModel.baseAnnualIncome.first()
+            assertEquals(10000.0, baseIncome, 0.0)
         }
 
     @Test
@@ -135,5 +160,16 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
             val impact = viewModel.calculateProjectedAnnualImpact()
 
             assertEquals(300.0, impact, 0.0)
+        }
+
+    @Test
+    fun `togglePrivacyMode toggles simulator privacy mode`() =
+        runTest {
+            createViewModel()
+
+            viewModel.togglePrivacyMode()
+
+            // Initially false, so toggling should save true
+            verify(settingsRepository).saveSimulatorPrivacyModeEnabled(true)
         }
 }
