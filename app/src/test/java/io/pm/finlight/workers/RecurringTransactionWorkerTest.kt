@@ -48,8 +48,12 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
         recurringTransactionDao = mockk()
 
         mockkObject(AppDatabase)
+        val transactionDao = mockk<TransactionDao>()
         every { AppDatabase.getInstance(any()) } returns db
         every { db.recurringTransactionDao() } returns recurringTransactionDao
+        every { db.transactionDao() } returns transactionDao
+        coEvery { transactionDao.insert(any<Transaction>()) } returns 101L
+        coEvery { transactionDao.getPendingTransactionForRule(any()) } returns null
 
         val config =
             Configuration.Builder()
@@ -60,7 +64,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
 
         mockkObject(NotificationHelper)
         mockkObject(ReminderManager)
-        every { NotificationHelper.showRecurringTransactionDueNotification(any(), any()) } just runs
+        every { NotificationHelper.showRecurringTransactionDueNotification(any(), any(), any()) } just runs
         coEvery { ReminderManager.scheduleRecurringTransactionWorker(any()) } returns Unit
     }
 
@@ -95,7 +99,8 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
                 )
 
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(dueRule, notDueRule, futureRule)
-            val capturedTxn = slot<PotentialTransaction>()
+            val capturedRule = slot<RecurringTransaction>()
+            val capturedDraftId = slot<Int>()
 
             val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
 
@@ -105,10 +110,11 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
             // Assert
             assertEquals(ListenableWorker.Result.success(), result)
             coVerify(exactly = 1) { ReminderManager.scheduleRecurringTransactionWorker(context) }
-            verify(exactly = 1) { NotificationHelper.showRecurringTransactionDueNotification(any(), capture(capturedTxn)) }
+            verify(exactly = 1) { NotificationHelper.showRecurringTransactionDueNotification(any(), capture(capturedRule), capture(capturedDraftId)) }
 
-            assertEquals("Due", capturedTxn.captured.merchantName)
-            assertEquals(1, capturedTxn.captured.sourceSmsId)
+            assertEquals("Due", capturedRule.captured.description)
+            assertEquals(1, capturedRule.captured.id)
+            assertEquals(101, capturedDraftId.captured)
         }
 
     @Test
@@ -123,7 +129,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
 
             // Assert
             assertEquals(ListenableWorker.Result.success(), result)
-            verify(exactly = 0) { NotificationHelper.showRecurringTransactionDueNotification(any(), any()) }
+            verify(exactly = 0) { NotificationHelper.showRecurringTransactionDueNotification(any(), any(), any()) }
             coVerify(exactly = 1) { ReminderManager.scheduleRecurringTransactionWorker(context) }
         }
 

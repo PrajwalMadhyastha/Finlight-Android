@@ -43,7 +43,9 @@ import kotlin.math.abs
 object NotificationHelper {
     private const val DEEP_LINK_URI_EDIT = "app://finlight.pm.io/transaction_detail"
     private const val DEEP_LINK_URI_REPORT_BASE = "app://finlight.pm.io/report"
-    private const val DEEP_LINK_URI_LINK_RECURRING = "app://finlight.pm.io/link_recurring"
+
+    // --- UPDATED: New deep link for the confirm-pending bottom sheet ---
+    private const val DEEP_LINK_URI_CONFIRM_PENDING = "app://finlight.pm.io/confirm_pending_transaction"
     private const val DEEP_LINK_URI_ADD_RECURRING = "app://finlight.pm.io/add_recurring_transaction"
     private const val DEEP_LINK_URI_APPROVE = "app://finlight.pm.io/approve_transaction_screen"
     const val BACKUP_NOTIFICATION_ID = 99
@@ -381,9 +383,15 @@ object NotificationHelper {
         }
     }
 
+    /**
+     * Fired when a recurring rule becomes due. Points to the ConfirmPendingBottomSheet
+     * via the confirm_pending_transaction deep link, passing both the draft transaction
+     * ID and the rule ID so the sheet can load all the context it needs.
+     */
     fun showRecurringTransactionDueNotification(
         context: Context,
-        potentialTxn: PotentialTransaction,
+        rule: RecurringTransaction,
+        draftTransactionId: Int,
     ) {
         val canShowNotification =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -396,9 +404,8 @@ object NotificationHelper {
             return
         }
 
-        val json = Gson().toJson(potentialTxn)
-        val encodedJson = URLEncoder.encode(json, "UTF-8")
-        val deepLinkUri = "$DEEP_LINK_URI_LINK_RECURRING/$encodedJson".toUri()
+        // Deep link: confirm_pending_transaction/{draftTransactionId}/{ruleId}
+        val deepLinkUri = "$DEEP_LINK_URI_CONFIRM_PENDING/$draftTransactionId/${rule.id}".toUri()
 
         val intent =
             Intent(Intent.ACTION_VIEW, deepLinkUri).apply {
@@ -409,14 +416,14 @@ object NotificationHelper {
             TaskStackBuilder.create(context).run {
                 addNextIntentWithParentStack(intent)
                 getPendingIntent(
-                    potentialTxn.sourceSmsId.toInt(),
+                    draftTransactionId,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
             }
 
         val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
         val contentText =
-            "Your payment of ${currencyFormat.format(potentialTxn.amount)} for ${potentialTxn.merchantName} is due. Tap to confirm."
+            "Your payment of ${currencyFormat.format(rule.amount)} for ${rule.description} is due. Tap to confirm."
 
         val builder =
             NotificationCompat.Builder(context, MainApplication.TRANSACTION_CHANNEL_ID)
@@ -430,7 +437,40 @@ object NotificationHelper {
                 .addAction(0, "Confirm Payment", pendingIntent)
 
         with(NotificationManagerCompat.from(context)) {
-            notify(potentialTxn.sourceSmsId.toInt(), builder.build())
+            notify(draftTransactionId, builder.build())
+        }
+    }
+
+    /**
+     * Quiet, low-priority notification fired when a recurring payment was auto-approved.
+     * Gives the user awareness without demanding attention.
+     */
+    fun showAutoApprovedPaymentNotification(
+        context: Context,
+        rule: RecurringTransaction,
+    ) {
+        val canShowNotification =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+
+        if (!canShowNotification) return
+
+        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+        val contentText = "Auto-approved: ${rule.description} · ${currencyFormat.format(rule.amount)}"
+
+        val builder =
+            NotificationCompat.Builder(context, MainApplication.TRANSACTION_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_logo)
+                .setContentTitle("Recurring Payment Saved")
+                .setContentText(contentText)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setAutoCancel(true)
+
+        with(NotificationManagerCompat.from(context)) {
+            notify("auto_${rule.id}".hashCode(), builder.build())
         }
     }
 

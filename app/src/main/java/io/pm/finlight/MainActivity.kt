@@ -353,6 +353,8 @@ fun MainAppScreen(shortcutAction: String? = null) {
             "annual_budget_planning",
             "what_if_simulator",
             "annual_simulator",
+            "recurring_transactions",
+            "add_recurring_transaction",
         )
 
     val showMainTopBar = baseCurrentRoute !in screensWithCustomTopBars
@@ -1151,6 +1153,56 @@ fun AppNavHost(
         ) { backStackEntry ->
             val json = backStackEntry.arguments?.getString("potentialTransactionJson") ?: ""
             LinkRecurringTransactionScreen(navController = navController, potentialTransactionJson = json)
+        }
+
+        // --- NEW (Issue #105): Recurring Transactions Routes ---
+        composable(
+            "recurring_transactions",
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
+        ) {
+            RecurringTransactionScreen(navController = navController)
+        }
+
+        composable(
+            route = "add_recurring_transaction?ruleId={ruleId}&patternSignature={patternSignature}",
+            arguments =
+                listOf(
+                    navArgument("ruleId") {
+                        type = NavType.StringType
+                        nullable = true
+                    },
+                    navArgument("patternSignature") {
+                        type = NavType.StringType
+                        nullable = true
+                    }
+                ),
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
+        ) { backStackEntry ->
+            val ruleIdStr = backStackEntry.arguments?.getString("ruleId")
+            val ruleId = ruleIdStr?.toIntOrNull()
+            AddRecurringTransactionScreen(navController = navController, ruleId = ruleId)
+        }
+
+        composable(
+            route = "confirm_pending_transaction/{transactionId}/{ruleId}",
+            arguments =
+                listOf(
+                    navArgument("transactionId") { type = NavType.IntType },
+                    navArgument("ruleId") { type = NavType.IntType }
+                ),
+            deepLinks = listOf(navDeepLink { uriPattern = "app://finlight.pm.io/confirm_pending/{transactionId}/{ruleId}" })
+        ) { backStackEntry ->
+            LaunchedEffect(Unit) {
+                navController.navigate(BottomNavItem.Dashboard.route) {
+                    popUpTo(BottomNavItem.Dashboard.route) { inclusive = true }
+                }
+            }
         }
 
         composable(

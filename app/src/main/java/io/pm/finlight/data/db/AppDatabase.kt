@@ -50,7 +50,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         AccountAlias::class,
         DeletedSmsHash::class,
     ],
-    version = 45,
+    version = 46,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -705,6 +705,29 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 45→46: Recurring rules rework & draft transactions ---
+        val MIGRATION_45_46 =
+            object : Migration(45, 46) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // transactions: status column for draft/confirm/skip lifecycle
+                    db.execSQL("ALTER TABLE `transactions` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'CONFIRMED'")
+                    // transactions: link a PENDING draft back to its originating rule
+                    db.execSQL("ALTER TABLE `transactions` ADD COLUMN `recurringRuleId` INTEGER")
+                    // recurring_transactions: SMS sender ID for variable bill matching
+                    db.execSQL("ALTER TABLE `recurring_transactions` ADD COLUMN `smsSenderId` TEXT")
+                    // recurring_transactions: flag for variable bills
+                    db.execSQL("ALTER TABLE `recurring_transactions` ADD COLUMN `isVariableBill` INTEGER NOT NULL DEFAULT 0")
+                    // recurring_transactions: flag for zero-tap auto-approval
+                    db.execSQL("ALTER TABLE `recurring_transactions` ADD COLUMN `autoApprove` INTEGER NOT NULL DEFAULT 0")
+                    // recurring_transactions: optional end date for free trial tracking
+                    db.execSQL("ALTER TABLE `recurring_transactions` ADD COLUMN `endDate` INTEGER")
+                    // recurring_transactions: consecutive skips counter
+                    db.execSQL("ALTER TABLE `recurring_transactions` ADD COLUMN `skipCount` INTEGER NOT NULL DEFAULT 0")
+                    // recurring_patterns: dismissed flag for surface-once suggestions
+                    db.execSQL("ALTER TABLE `recurring_patterns` ADD COLUMN `isDismissed` INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -737,6 +760,8 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_42_43,
                             MIGRATION_43_44,
                             MIGRATION_44_45,
+                            // --- ADDED ---
+                            MIGRATION_45_46,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

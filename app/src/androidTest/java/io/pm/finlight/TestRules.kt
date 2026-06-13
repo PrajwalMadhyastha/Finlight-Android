@@ -100,6 +100,17 @@ class ClearDatabaseRule : TestRule {
             override fun evaluate() {
                 val context = InstrumentationRegistry.getInstrumentation().targetContext
                 val db = AppDatabase.getInstance(context)
+                
+                // Clear any stored budgets from SharedPreferences to avoid cross-test contamination
+                val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
+                val editor = prefs.edit()
+                prefs.all.keys.forEach { key ->
+                    if (key.startsWith("budget_")) {
+                        editor.remove(key)
+                    }
+                }
+                editor.commit()
+
                 runBlocking {
                     // Use a raw transaction to clear all tables in correct dependency order,
                     // guaranteeing no foreign key constraint failures or orphan rows.

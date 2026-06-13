@@ -71,4 +71,21 @@ object DateUtils {
 
         return Pair(start, end)
     }
+
+    /**
+     * Calculates the next due date for a recurring transaction.
+     */
+    fun calculateNextDueDate(
+        lastRunOrStartDate: Long,
+        interval: String
+    ): Long {
+        val calendar = Calendar.getInstance().apply { timeInMillis = lastRunOrStartDate }
+        when (interval.lowercase()) {
+            "daily" -> calendar.add(Calendar.DAY_OF_YEAR, 1)
+            "weekly" -> calendar.add(Calendar.WEEK_OF_YEAR, 1)
+            "monthly" -> calendar.add(Calendar.MONTH, 1)
+            "yearly" -> calendar.add(Calendar.YEAR, 1)
+        }
+        return calendar.timeInMillis
+    }
 }

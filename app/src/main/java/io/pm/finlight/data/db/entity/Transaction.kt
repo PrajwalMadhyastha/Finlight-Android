@@ -63,4 +63,9 @@ data class Transaction(
     val isSplit: Boolean = false,
     // --- NEW: Flag for amounts that failed sanity checks and need user review ---
     val needsReview: Boolean = false,
+    // --- NEW: Transaction lifecycle status for recurring draft support ---
+    // Values: "CONFIRMED" (normal), "PENDING" (draft awaiting user confirm), "SKIPPED" (user skipped a cycle)
+    val status: String = "CONFIRMED",
+    // --- NEW: Links a PENDING draft back to its originating recurring rule ---
+    val recurringRuleId: Int? = null,
 )

@@ -9,6 +9,7 @@ import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_40_41
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_41_42
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_43_44
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_44_45
+import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_45_46
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -255,6 +256,58 @@ class AppDatabaseMigrationTest {
             assertTrue(dupCursor.moveToFirst())
             assertEquals("Duplicate hash should be ignored", 1, dupCursor.getInt(0))
             dupCursor.close()
+
+            close()
+        }
+    }
+
+    /**
+     * Test MIGRATION_45_46: Adds fields to support recurring transactions epic #105.
+     *
+     * Verifies that:
+     * 1. `status` and `recurringRuleId` added to `transactions`.
+     * 2. `smsSenderId`, `isVariableBill`, `autoApprove`, `endDate`, `skipCount` added to `recurring_transactions`.
+     * 3. `isDismissed` added to `recurring_patterns`.
+     */
+    @Test
+    fun migrate45To46_addsRecurringFields() {
+        helper.createDatabase(testDbName, 45).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 46, true, MIGRATION_45_46).apply {
+            // Check transactions table
+            var cursor = query("PRAGMA table_info(transactions)")
+            var foundStatus = false
+            var foundRuleId = false
+            while (cursor.moveToNext()) {
+                val colName = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                if (colName == "status") foundStatus = true
+                if (colName == "recurringRuleId") foundRuleId = true
+            }
+            assertTrue("Column 'status' should exist in transactions", foundStatus)
+            assertTrue("Column 'recurringRuleId' should exist in transactions", foundRuleId)
+            cursor.close()
+
+            // Check recurring_transactions table
+            cursor = query("PRAGMA table_info(recurring_transactions)")
+            var foundIsVariableBill = false
+            while (cursor.moveToNext()) {
+                val colName = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                if (colName == "isVariableBill") foundIsVariableBill = true
+            }
+            assertTrue("Column 'isVariableBill' should exist in recurring_transactions", foundIsVariableBill)
+            cursor.close()
+
+            // Check recurring_patterns table
+            cursor = query("PRAGMA table_info(recurring_patterns)")
+            var foundIsDismissed = false
+            while (cursor.moveToNext()) {
+                val colName = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                if (colName == "isDismissed") foundIsDismissed = true
+            }
+            assertTrue("Column 'isDismissed' should exist in recurring_patterns", foundIsDismissed)
+            cursor.close()
 
             close()
         }

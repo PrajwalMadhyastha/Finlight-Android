@@ -402,7 +402,7 @@ interface TransactionDao {
             UNION ALL
             SELECT
                 P.id, P.description, S.categoryId, S.amount, P.date, P.accountId, S.notes, P.transactionType, P.sourceSmsId, P.sourceSmsHash, P.source,
-                P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit, P.needsReview
+                P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit, P.needsReview, P.status, P.recurringRuleId
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'income' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
               AND (:accountId IS NULL OR P.accountId = :accountId)
@@ -1241,4 +1241,22 @@ interface TransactionDao {
     """,
     )
     fun getRecentManualTransactions(limit: Int): Flow<List<TransactionDetails>>
+
+    // --- NEW: Recurring draft lifecycle queries ---
+
+    /** Returns all PENDING draft transactions, ordered by date. */
+    @Query("SELECT * FROM transactions WHERE status = 'PENDING' ORDER BY date ASC")
+    fun getPendingTransactions(): Flow<List<Transaction>>
+
+    /** Checks if a specific recurring rule already has an unconfirmed draft waiting. */
+    @Query("SELECT * FROM transactions WHERE status = 'PENDING' AND recurringRuleId = :ruleId LIMIT 1")
+    suspend fun getPendingTransactionForRule(ruleId: Int): Transaction?
+
+    /** Confirms a PENDING draft — sets status to CONFIRMED. */
+    @Query("UPDATE transactions SET status = 'CONFIRMED' WHERE id = :id")
+    suspend fun confirmTransaction(id: Int)
+
+    /** Skips a pending draft — sets status to SKIPPED. */
+    @Query("UPDATE transactions SET status = 'SKIPPED' WHERE id = :id")
+    suspend fun skipTransaction(id: Int)
 }

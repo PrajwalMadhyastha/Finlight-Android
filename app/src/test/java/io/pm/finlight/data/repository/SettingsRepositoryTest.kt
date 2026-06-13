@@ -182,6 +182,8 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                         DashboardCardType.FINANCIAL_SIMULATORS,
                         DashboardCardType.BUDGET_WATCH,
                         DashboardCardType.ACCOUNTS_CAROUSEL,
+                        DashboardCardType.UPCOMING_PAYMENTS,
+                        DashboardCardType.RECURRING_SUGGESTIONS,
                     ),
                     defaultOrder,
                 )

@@ -17,4 +17,8 @@ enum class DashboardCardType {
     BUDGET_WATCH,
     SPENDING_CONSISTENCY,
     FINANCIAL_SIMULATORS,
+
+    // --- NEW (Issue #105): Recurring transaction dashboard cards ---
+    UPCOMING_PAYMENTS,
+    RECURRING_SUGGESTIONS,
 }

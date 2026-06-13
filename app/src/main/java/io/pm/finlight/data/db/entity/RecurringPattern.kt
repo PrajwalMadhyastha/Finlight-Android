@@ -41,4 +41,6 @@ data class RecurringPattern(
     var occurrences: Int,
     val firstSeen: Long,
     var lastSeen: Long,
+    // --- NEW: True once the suggestion has been dismissed or converted to a rule ---
+    var isDismissed: Boolean = false,
 )

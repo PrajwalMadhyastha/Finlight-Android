@@ -24,6 +24,7 @@ import io.pm.finlight.MainApplication
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
+import io.pm.finlight.RecurringTransaction
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TripType
@@ -181,13 +182,13 @@ class NotificationHelperTest : BaseViewModelTest() {
             )
         val gson = Gson()
         val encodedJson = java.net.URLEncoder.encode(gson.toJson(potentialTxn), "UTF-8")
-        val expectedUri = "app://finlight.pm.io/link_recurring/$encodedJson"
+        val rule = RecurringTransaction(1, "Amazon Prime", 1499.0, "expense", "Yearly", System.currentTimeMillis(), 1, 1, null)
+        NotificationHelper.showRecurringTransactionDueNotification(context, rule, 101)
 
-        // Act
-        NotificationHelper.showRecurringTransactionDueNotification(context, potentialTxn)
+        val expectedUri = "app://finlight.pm.io/confirm_pending_transaction/101/${rule.id}"
 
         // Assert
-        val notification = shadowNotificationManager.getNotification(potentialTxn.sourceSmsId.toInt())
+        val notification = shadowNotificationManager.getNotification(101)
         assertNotNull(notification)
         assertEquals("Recurring Payment Due", notification.extras.getString(Notification.EXTRA_TITLE))
 
