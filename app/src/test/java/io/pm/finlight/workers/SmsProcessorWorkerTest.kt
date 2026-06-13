@@ -54,6 +54,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     private lateinit var tagDao: TagDao
     private lateinit var mockClassifier: SmsClassifier
     private lateinit var mockNerExtractor: NerExtractor
+    private lateinit var recurringDao: RecurringTransactionDao
 
     private fun buildWorker(
         sender: String,
@@ -96,6 +97,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         accountDao = mockk(relaxed = true)
         accountAliasDao = mockk(relaxed = true)
         tagDao = mockk(relaxed = true)
+        recurringDao = mockk(relaxed = true)
 
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
@@ -109,6 +111,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         every { db.accountDao() } returns accountDao
         every { db.accountAliasDao() } returns accountAliasDao
         every { db.tagDao() } returns tagDao
+        every { db.recurringTransactionDao() } returns recurringDao
 
         coEvery { merchantMappingDao.getAllMappings() } returns flowOf(emptyList())
         coEvery { transactionDao.getAllSmsHashes() } returns flowOf(emptyList())
@@ -146,6 +149,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         mockkObject(NotificationHelper)
         every { NotificationHelper.showSuspiciousAmountNotification(any(), any(), any()) } just runs
         every { NotificationHelper.showTravelModeSmsNotification(any(), any(), any()) } just runs
+        every { NotificationHelper.showVariableBillAnomalyNotification(any(), any(), any(), any()) } just runs
 
         Shadows.shadowOf(context as Application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
 
@@ -354,4 +358,59 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             // WorkManager enqueue is hard to verify with standard mocks here since we are using
             // WorkManager.getInstance(context).enqueue, but we can assume it hits the branch.
         }
+
+    @Test
+    fun `auto-link variable bill without anomaly`() = runTest {
+        val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+        val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1100.0, transactionType = "expense", date = 100L, accountId = 1, categoryId = 1, notes = null)
+        
+        coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
+        coEvery { recurringDao.getRuleBySmsSenderId("BESCOM") } returns rule
+
+        val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "BESCOM", amount = 1100.0, transactionType = "expense", merchantName = "Electricity", originalMessage = "Bill", sourceSmsHash = "hash200")
+        coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+        buildWorker("BESCOM", "Bill").doWork()
+
+        coVerify { transactionDao.updateRecurringRuleId(10, 5) }
+        coVerify { recurringDao.updateLastRunDate(5, 100L) }
+        verify(exactly = 0) { NotificationHelper.showVariableBillAnomalyNotification(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `auto-link variable bill with anomaly triggers notification`() = runTest {
+        val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+        val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1500.0, transactionType = "expense", date = 100L, accountId = 1, categoryId = 1, notes = null)
+        
+        coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
+        coEvery { recurringDao.getRuleBySmsSenderId("BESCOM") } returns rule
+
+        val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "BESCOM", amount = 1500.0, transactionType = "expense", merchantName = "Electricity", originalMessage = "Bill", sourceSmsHash = "hash201")
+        coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+        buildWorker("BESCOM", "Bill").doWork()
+
+        coVerify { transactionDao.updateRecurringRuleId(10, 5) }
+        coVerify { recurringDao.updateLastRunDate(5, 100L) }
+        verify(exactly = 1) { NotificationHelper.showVariableBillAnomalyNotification(context, rule, 1500.0, 1000.0) }
+    }
+
+    @Test
+    fun `auto-link fixed bill by finding matching pending draft`() = runTest {
+        val savedTxn = Transaction(id = 10, description = "Netflix", amount = 149.0, transactionType = "expense", date = 100L, accountId = 1, categoryId = 1, notes = null)
+        val draft = Transaction(id = 20, description = "Netflix", amount = 149.0, transactionType = "expense", date = 99L, accountId = 1, categoryId = 1, notes = null, status = "PENDING", recurringRuleId = 7)
+        
+        coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
+        coEvery { recurringDao.getRuleBySmsSenderId(any()) } returns null
+        coEvery { transactionDao.getPendingTransactionsSync() } returns listOf(draft)
+
+        val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "NETFLIX", amount = 149.0, transactionType = "expense", merchantName = "Netflix", originalMessage = "Sub", sourceSmsHash = "hash202")
+        coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+        buildWorker("NETFLIX", "Sub").doWork()
+
+        coVerify { transactionDao.delete(draft) }
+        coVerify { transactionDao.updateRecurringRuleId(10, 7) }
+        coVerify { recurringDao.updateLastRunDate(7, 100L) }
+    }
 }

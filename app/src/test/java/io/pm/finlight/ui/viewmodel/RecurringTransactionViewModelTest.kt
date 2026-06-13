@@ -110,7 +110,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             initializeViewModel()
 
             // Act
-            viewModel.saveRule(null, "Spotify", 129.0, "expense", "Monthly", 0L, 1, 1, null, true, true, 1000L, "SPOTIFY")
+            viewModel.saveRule(null, "Spotify", 129.0, "expense", "Monthly", 0L, 1, 1, null, true, true, 1000L, "SPOTIFY", 5)
             advanceUntilIdle()
 
             // Assert
@@ -123,6 +123,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             assertEquals(true, capturedRule.isVariableBill)
             assertEquals(true, capturedRule.autoApprove)
             assertEquals(1000L, capturedRule.endDate)
+            assertEquals(5, capturedRule.skipCount)
         }
 
     @Test

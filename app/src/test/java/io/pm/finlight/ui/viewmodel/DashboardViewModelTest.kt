@@ -719,7 +719,8 @@ class DashboardViewModelTest : BaseViewModelTest() {
     fun `upcomingPayments are loaded correctly from dao`() =
         runTest {
             // Arrange
-            val rule = RecurringTransaction(1, "Netflix", 149.0, "expense", "Monthly", System.currentTimeMillis(), 1, 1, null)
+            val now = System.currentTimeMillis()
+            val rule = RecurringTransaction(1, "Netflix", 149.0, "expense", "Monthly", now, 1, 1, null)
             `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(listOf(rule)))
             initializeViewModel()
 
@@ -729,6 +730,32 @@ class DashboardViewModelTest : BaseViewModelTest() {
                 val payments = awaitItem()
                 assertEquals(1, payments.size)
                 assertEquals("Netflix", payments.first().description)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `upcomingPayments filters and sorts correctly`() =
+        runTest {
+            // Arrange
+            val now = System.currentTimeMillis()
+            // rule1 is due today + 10 days
+            val rule1 = RecurringTransaction(1, "Sub1", 10.0, "expense", "Monthly", now - 20L * 24 * 60 * 60 * 1000, 1, 1, null)
+            // rule2 is due today + 40 days (should be filtered out)
+            val rule2 = RecurringTransaction(2, "Sub2", 20.0, "expense", "Monthly", now + 10L * 24 * 60 * 60 * 1000, 1, 1, null)
+            // rule3 is due today + 5 days
+            val rule3 = RecurringTransaction(3, "Sub3", 30.0, "expense", "Monthly", now - 25L * 24 * 60 * 60 * 1000, 1, 1, null)
+            
+            `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(listOf(rule1, rule2, rule3)))
+            initializeViewModel()
+
+            // Act & Assert
+            viewModel.upcomingPayments.test {
+                advanceUntilIdle()
+                val payments = awaitItem()
+                assertEquals(2, payments.size)
+                assertEquals("Sub3", payments[0].description) // rule3 is due sooner (5 days) than rule1 (10 days)
+                assertEquals("Sub1", payments[1].description)
                 cancelAndIgnoreRemainingEvents()
             }
         }

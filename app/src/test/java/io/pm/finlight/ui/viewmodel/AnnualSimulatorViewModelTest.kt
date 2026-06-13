@@ -91,6 +91,28 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `initialization calculates projected annual income correctly`() =
+        runTest {
+            val incomeTxn = io.pm.finlight.TransactionDetails(
+                transaction = io.pm.finlight.Transaction(id = 1, description = "Salary", amount = 5000.0, transactionType = "income", date = 100L, accountId = 1, categoryId = null, notes = null),
+                images = emptyList(),
+                accountName = "Bank", 
+                categoryName = "Salary",
+                categoryIconKey = null,
+                categoryColorKey = null,
+                tagNames = null
+            )
+            `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), anyString(), anyObject(), anyObject()))
+                .thenReturn(flowOf(listOf(incomeTxn)))
+                
+            createViewModel()
+
+            // It should calculate (5000 / 6) * 12 = 10000.0 (since current month index is 6)
+            val baseIncome = viewModel.baseAnnualIncome.first()
+            assertEquals(10000.0, baseIncome, 0.0)
+        }
+
+    @Test
     fun `addLifeEvent adds event correctly`() =
         runTest {
             createViewModel()

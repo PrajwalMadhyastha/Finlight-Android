@@ -32,6 +32,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
     private lateinit var recurringTransactionDao: RecurringTransactionDao
+    private lateinit var transactionDao: TransactionDao
 
     @Before
     override fun setup() {
@@ -44,11 +45,11 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
             .putBoolean("recurring_transactions_enabled", true)
             .apply()
 
-        db = mockk()
-        recurringTransactionDao = mockk()
+        db = mockk(relaxed = true)
+        recurringTransactionDao = mockk(relaxed = true)
 
         mockkObject(AppDatabase)
-        val transactionDao = mockk<TransactionDao>()
+        transactionDao = mockk<TransactionDao>(relaxed = true)
         every { AppDatabase.getInstance(any()) } returns db
         every { db.recurringTransactionDao() } returns recurringTransactionDao
         every { db.transactionDao() } returns transactionDao
@@ -131,6 +132,59 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
             assertEquals(ListenableWorker.Result.success(), result)
             verify(exactly = 0) { NotificationHelper.showRecurringTransactionDueNotification(any(), any(), any()) }
             coVerify(exactly = 1) { ReminderManager.scheduleRecurringTransactionWorker(context) }
+        }
+
+    @Test
+    fun `doWork skips expired rules`() =
+        runTest {
+            val now = System.currentTimeMillis()
+            val past = now - 86400000
+            val rule = RecurringTransaction(id = 1, description = "Expired", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, endDate = past, lastRunDate = null, accountId = 1, categoryId = 1)
+            
+            coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
+            val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
+            
+            worker.doWork()
+
+            coVerify(exactly = 0) { transactionDao.insert(any<Transaction>()) }
+        }
+
+    @Test
+    fun `doWork skips rule if pending draft already exists`() =
+        runTest {
+            val now = System.currentTimeMillis()
+            val rule = RecurringTransaction(id = 1, description = "Draft Exists", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, lastRunDate = null, accountId = 1, categoryId = 1)
+            val draft = Transaction(id = 100, description = "Draft", amount = 10.0, transactionType = "expense", date = now, accountId = 1, categoryId = 1, notes = null, status = "PENDING")
+
+            coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
+            coEvery { db.transactionDao().getPendingTransactionForRule(1) } returns draft
+
+            val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
+            worker.doWork()
+
+            coVerify(exactly = 0) { transactionDao.insert(any<Transaction>()) }
+        }
+
+    @Test
+    fun `doWork creates CONFIRMED transaction and updates lastRunDate if autoApprove is true`() =
+        runTest {
+            val now = System.currentTimeMillis()
+            val rule = RecurringTransaction(id = 1, description = "Auto Approve", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, lastRunDate = null, accountId = 1, categoryId = 1, autoApprove = true)
+
+            coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
+            val capturedTxn = slot<Transaction>()
+            coEvery { transactionDao.insert(capture(capturedTxn)) } returns 101L
+            every { NotificationHelper.showAutoApprovedPaymentNotification(any(), any()) } just runs
+
+            val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
+            worker.doWork()
+
+            coVerify(exactly = 1) { transactionDao.insert(any<Transaction>()) }
+            coVerify(exactly = 1) { recurringTransactionDao.updateLastRunDate(1, any()) }
+            verify(exactly = 1) { NotificationHelper.showAutoApprovedPaymentNotification(any(), any()) }
+
+            assertEquals("CONFIRMED", capturedTxn.captured.status)
+            assertEquals("Auto Approve", capturedTxn.captured.description)
         }
 
     @Test

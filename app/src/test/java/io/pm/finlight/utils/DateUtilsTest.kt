@@ -143,4 +143,55 @@ class DateUtilsTest : BaseViewModelTest() {
         assertEquals(expectedStart, start)
         assertEquals(expectedEnd, end)
     }
+
+    @Test
+    fun `getCurrentMonthDateRange returns correct start and end`() {
+        // Arrange: Current date is October 15, 2025
+        val calendar = Calendar.getInstance(testTimeZone).apply {
+            set(2025, Calendar.OCTOBER, 15, 10, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        // Act
+        val (start, end) = DateUtils.getCurrentMonthDateRange(calendar)
+
+        // Assert: Current month is October 2025
+        val expectedStart = Calendar.getInstance(testTimeZone).apply {
+            set(2025, Calendar.OCTOBER, 1, 0, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val expectedEnd = Calendar.getInstance(testTimeZone).apply {
+            set(2025, Calendar.OCTOBER, 31, 23, 59, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+
+        assertEquals(expectedStart, start)
+        assertEquals(expectedEnd, end)
+    }
+
+    @Test
+    fun `calculateNextDueDate calculates correctly for all intervals`() {
+        val baseDate = getTestTime(2025, Calendar.JANUARY, 1)
+
+        // Daily
+        var nextDate = DateUtils.calculateNextDueDate(baseDate, "daily")
+        var expected = getTestTime(2025, Calendar.JANUARY, 2)
+        assertEquals(expected, nextDate)
+
+        // Weekly
+        nextDate = DateUtils.calculateNextDueDate(baseDate, "weekly")
+        expected = getTestTime(2025, Calendar.JANUARY, 8)
+        assertEquals(expected, nextDate)
+
+        // Monthly
+        nextDate = DateUtils.calculateNextDueDate(baseDate, "monthly")
+        expected = getTestTime(2025, Calendar.FEBRUARY, 1)
+        assertEquals(expected, nextDate)
+
+        // Yearly
+        nextDate = DateUtils.calculateNextDueDate(baseDate, "yearly")
+        expected = getTestTime(2026, Calendar.JANUARY, 1)
+        assertEquals(expected, nextDate)
+    }
 }
