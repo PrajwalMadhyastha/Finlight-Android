@@ -848,11 +848,12 @@ class TransactionViewModel(
         viewModelScope.launch {
             _validationError.value = null
 
-            if ((amountStr.toDoubleOrNull() ?: 0.0) <= 0.0) {
+            val amount = amountStr.toDoubleOrNull()
+            if (amount == null || amount <= 0.0) {
                 _validationError.value = "Please enter a valid, positive amount."
                 return@launch
             }
-            if ((amountStr.toDoubleOrNull() ?: 0.0) > 1_000_000_000.0) {
+            if (amount > 1_000_000_000.0) {
                 _validationError.value = "Maximum limit of 1 Billion (1,000,000,000) reached."
                 return@launch
             }
@@ -907,15 +908,7 @@ class TransactionViewModel(
         categoryId: Int?,
     ): Boolean {
         _validationError.value = null
-        val enteredAmount = data.amountStr.toDoubleOrNull()
-        if (enteredAmount == null || enteredAmount <= 0.0) {
-            _validationError.value = "Please enter a valid, positive amount."
-            return false
-        }
-        if (enteredAmount > 1_000_000_000.0) {
-            _validationError.value = "Maximum limit of 1 Billion (1,000,000,000) reached."
-            return false
-        }
+        val enteredAmount = data.amountStr.toDoubleOrNull() ?: 0.0
 
         val travelSettings = travelModeSettings.value
         val isInternationalTravel =
