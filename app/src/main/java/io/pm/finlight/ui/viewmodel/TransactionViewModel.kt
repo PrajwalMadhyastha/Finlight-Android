@@ -853,7 +853,7 @@ class TransactionViewModel(
                 return@launch
             }
             if ((amountStr.toDoubleOrNull() ?: 0.0) > 1_000_000_000.0) {
-                _validationError.value = "Amount exceeds the maximum allowed limit of 1,000,000,000."
+                _validationError.value = "Maximum limit of 1 Billion (1,000,000,000) reached."
                 return@launch
             }
             if (accountId == null) {
@@ -913,7 +913,7 @@ class TransactionViewModel(
             return false
         }
         if (enteredAmount > 1_000_000_000.0) {
-            _validationError.value = "Amount exceeds the maximum allowed limit of 1,000,000,000."
+            _validationError.value = "Maximum limit of 1 Billion (1,000,000,000) reached."
             return false
         }
 
@@ -1350,6 +1350,10 @@ class TransactionViewModel(
         amountStr: String,
     ) = viewModelScope.launch {
         amountStr.toDoubleOrNull()?.let {
+            if (it > 1_000_000_000.0) {
+                _validationError.value = "Maximum limit of 1 Billion (1,000,000,000) reached."
+                return@launch
+            }
             if (it > 0) {
                 transactionRepository.updateAmount(id, it)
             }

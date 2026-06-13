@@ -314,7 +314,11 @@ fun AddTransactionScreen(
                         // Regex to match a valid decimal number (up to 2 decimal places)
                         val regex = Regex("^\\d*\\.?\\d{0,2}\$")
                         if (newValue.isEmpty() || regex.matches(newValue)) {
-                            viewModel.onAddTransactionAmountChanged(newValue)
+                            if ((newValue.toDoubleOrNull() ?: 0.0) <= 1_000_000_000.0) {
+                                viewModel.onAddTransactionAmountChanged(newValue)
+                            } else {
+                                Toast.makeText(context, "Maximum limit of 1 Billion (1,000,000,000) reached.", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     },
                     focusRequester = focusRequester,

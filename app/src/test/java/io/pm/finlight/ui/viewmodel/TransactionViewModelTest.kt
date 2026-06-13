@@ -680,7 +680,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
             // ASSERT
             viewModel.validationError.test {
-                assertEquals("Amount exceeds the maximum allowed limit of 1,000,000,000.", awaitItem())
+                assertEquals("Maximum limit of 1 Billion (1,000,000,000) reached.", awaitItem())
             }
             verify(transactionRepository, never()).insertTransactionWithTagsAndImages(any(), any(), any())
         }
@@ -764,6 +764,24 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(transactionRepository).updateAmount(transactionId, newAmountDouble)
+        }
+
+    @Test
+    fun `updateTransactionAmount shows validation error for amount exceeding limit`() =
+        runTest {
+            // Arrange
+            val transactionId = 1
+            val newAmountStr = "2000000000.0"
+
+            // Act
+            viewModel.updateTransactionAmount(transactionId, newAmountStr)
+            advanceUntilIdle()
+
+            // Assert
+            viewModel.validationError.test {
+                assertEquals("Maximum limit of 1 Billion (1,000,000,000) reached.", awaitItem())
+            }
+            verify(transactionRepository, never()).updateAmount(any(), any())
         }
 
     @Test
