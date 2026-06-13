@@ -12,6 +12,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RecurringPatternDao {
@@ -50,4 +51,17 @@ interface RecurringPatternDao {
      */
     @Query("DELETE FROM recurring_patterns")
     suspend fun deleteAll()
+
+    /**
+     * Returns all patterns that have not been dismissed yet, as a reactive Flow.
+     * Used by the dashboard's RECURRING_SUGGESTIONS card.
+     */
+    @Query("SELECT * FROM recurring_patterns WHERE isDismissed = 0 ORDER BY occurrences DESC")
+    fun getUnacknowledgedPatterns(): Flow<List<RecurringPattern>>
+
+    /**
+     * Marks a pattern as dismissed so it no longer surfaces in suggestions.
+     */
+    @Query("UPDATE recurring_patterns SET isDismissed = 1 WHERE smsSignature = :signature")
+    suspend fun dismissBySignature(signature: String)
 }

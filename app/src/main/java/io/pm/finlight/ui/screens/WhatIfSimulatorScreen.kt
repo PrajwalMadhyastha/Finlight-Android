@@ -12,10 +12,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -54,12 +58,39 @@ fun WhatIfSimulatorScreen(
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
-    Scaffold { paddingValues ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("What-If Simulator") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.togglePrivacyMode() }) {
+                        Icon(
+                            imageVector = if (privacyModeEnabled) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = "Toggle Privacy"
+                        )
+                    }
+                },
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent
+                    )
+            )
+        }
+    ) { paddingValues ->
         LazyColumn(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues)
+                    .testTag("what_if_lazy_column"),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -127,6 +158,7 @@ fun WhatIfSimulatorScreen(
                     HypotheticalExpenseItem(
                         name = expense.name,
                         amount = expense.amount,
+                        isPrivacyModeEnabled = privacyModeEnabled,
                         onDelete = { viewModel.removeHypotheticalExpense(expense.id) }
                     )
                 }
@@ -331,6 +363,7 @@ private fun SimulatedHeroCard(
 private fun HypotheticalExpenseItem(
     name: String,
     amount: Long,
+    isPrivacyModeEnabled: Boolean,
     onDelete: () -> Unit
 ) {
     GlassPanel {
@@ -349,12 +382,21 @@ private fun HypotheticalExpenseItem(
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
-            Text(
-                text = "-₹$amount",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.error
-            )
+            Row {
+                Text(
+                    text = "- ",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                PrivacyAwareText(
+                    amount = amount,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error,
+                    isPrivacyMode = isPrivacyModeEnabled
+                )
+            }
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Close,

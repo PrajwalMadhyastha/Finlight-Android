@@ -40,4 +40,15 @@ interface RecurringTransactionDao {
         id: Int,
         lastRunDate: Long,
     )
+
+    // --- NEW: Look up a rule by its linked SMS sender for variable bill auto-matching ---
+    @Query("SELECT * FROM recurring_transactions WHERE smsSenderId = :smsSenderId AND isVariableBill = 1 LIMIT 1")
+    suspend fun getRuleBySmsSenderId(smsSenderId: String): RecurringTransaction?
+
+    // --- NEW: Update the skip counter after a cycle is missed ---
+    @Query("UPDATE recurring_transactions SET skipCount = :skipCount WHERE id = :id")
+    suspend fun updateSkipCount(
+        id: Int,
+        skipCount: Int
+    )
 }

@@ -50,6 +50,8 @@ class DashboardViewModel(
     private val merchantRenameRuleRepository: MerchantRenameRuleRepository,
     // Added dependency
     private val timeProvider: TimeProvider,
+    private val recurringTransactionDao: RecurringTransactionDao,
+    private val recurringPatternDao: RecurringPatternDao,
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
@@ -82,6 +84,10 @@ class DashboardViewModel(
 
     private val _showLastMonthSummaryCard = MutableStateFlow(false)
     val showLastMonthSummaryCard: StateFlow<Boolean> = _showLastMonthSummaryCard.asStateFlow()
+
+    // --- NEW (Issue #105): Data for Recurring Cards ---
+    val upcomingPayments: StateFlow<List<RecurringTransaction>>
+    val patternSuggestions: StateFlow<List<RecurringPattern>>
 
     val privacyModeEnabled: StateFlow<Boolean>
     private val merchantAliases: StateFlow<Map<String, String>>
@@ -186,6 +192,25 @@ class DashboardViewModel(
             combine(overallMonthlyBudget, monthlyExpenses) { budget, expenses ->
                 budget - expenses
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+        // --- NEW (Issue #105): Initialize flows for recurring cards ---
+        upcomingPayments =
+            recurringTransactionDao.getAllRulesFlow()
+                .map { rules ->
+                    val now = System.currentTimeMillis()
+                    rules.filter { rule ->
+                        val nextDue = DateUtils.calculateNextDueDate(rule.lastRunDate ?: rule.startDate, rule.recurrenceInterval)
+                        // Consider it upcoming if due within the next 30 days
+                        (nextDue - now) <= 30L * 24 * 60 * 60 * 1000
+                    }.sortedBy { rule ->
+                        DateUtils.calculateNextDueDate(rule.lastRunDate ?: rule.startDate, rule.recurrenceInterval)
+                    }
+                }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        patternSuggestions =
+            recurringPatternDao.getUnacknowledgedPatterns()
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         safeToSpendPerDay =
             amountRemaining.map { remaining ->

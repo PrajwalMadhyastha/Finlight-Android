@@ -182,6 +182,8 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                         DashboardCardType.FINANCIAL_SIMULATORS,
                         DashboardCardType.BUDGET_WATCH,
                         DashboardCardType.ACCOUNTS_CAROUSEL,
+                        DashboardCardType.UPCOMING_PAYMENTS,
+                        DashboardCardType.RECURRING_SUGGESTIONS,
                     ),
                     defaultOrder,
                 )
@@ -359,6 +361,17 @@ class SettingsRepositoryTest : BaseViewModelTest() {
             repository.getPrivacyModeEnabled().test {
                 assertEquals(false, awaitItem()) // Default
                 repository.savePrivacyModeEnabled(true)
+                assertEquals(true, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `save and get simulator privacy mode`() =
+        runTest {
+            repository.getSimulatorPrivacyModeEnabled().test {
+                assertEquals(false, awaitItem()) // Default
+                repository.saveSimulatorPrivacyModeEnabled(true)
                 assertEquals(true, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }

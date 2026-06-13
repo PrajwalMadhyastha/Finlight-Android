@@ -227,6 +227,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         // --- DELETED: `getAutoBackupTime` mock ---
         `when`(settingsRepository.getAutoBackupNotificationEnabled()).thenReturn(flowOf(true))
         `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
+        `when`(settingsRepository.getSimulatorPrivacyModeEnabled()).thenReturn(flowOf(false))
         // --- ADDED: Mock for `getLastBackupTimestamp` ---
         `when`(settingsRepository.getLastBackupTimestamp()).thenReturn(flowOf(0L))
     }
@@ -529,6 +530,32 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
         // Assert
         verify(settingsRepository).savePrivacyModeEnabled(true)
+    }
+
+    @Test
+    fun `simulatorPrivacyModeEnabled flow emits value from repository`() =
+        runTest {
+            // Arrange
+            `when`(settingsRepository.getSimulatorPrivacyModeEnabled()).thenReturn(flowOf(true))
+            initializeViewModel()
+
+            // Assert
+            viewModel.simulatorPrivacyModeEnabled.test {
+                assertEquals(true, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `setSimulatorPrivacyModeEnabled calls repository`() {
+        // Arrange
+        initializeViewModel()
+
+        // Act
+        viewModel.setSimulatorPrivacyModeEnabled(true)
+
+        // Assert
+        verify(settingsRepository).saveSimulatorPrivacyModeEnabled(true)
     }
 
     @Test

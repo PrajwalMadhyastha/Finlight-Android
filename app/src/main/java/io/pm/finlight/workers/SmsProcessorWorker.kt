@@ -173,6 +173,44 @@ class SmsProcessorWorker(
 
         newTransactionId ?: return Result.success()
 
+        // --- NEW: Recurring transaction auto-linking ---
+        val recurringDao = db.recurringTransactionDao()
+        val transactionDao = db.transactionDao()
+        val savedTxn = transactionDao.getTransactionByIdSync(newTransactionId.toInt())
+
+        if (savedTxn != null) {
+            val senderRule = recurringDao.getRuleBySmsSenderId(sender)
+            if (senderRule != null) {
+                // It's a variable bill match
+                val isAnomaly = Math.abs(savedTxn.amount - senderRule.amount) > senderRule.amount * 0.3
+
+                transactionDao.updateRecurringRuleId(savedTxn.id, senderRule.id)
+                recurringDao.updateLastRunDate(senderRule.id, savedTxn.date)
+
+                if (isAnomaly) {
+                    NotificationHelper.showVariableBillAnomalyNotification(context, senderRule, savedTxn.amount, senderRule.amount)
+                }
+            } else {
+                // Check if pending drafts exist
+                val pendingDrafts = transactionDao.getPendingTransactionsSync()
+                val match =
+                    pendingDrafts.find {
+                        it.description == savedTxn.description &&
+                            Math.abs(it.amount - savedTxn.amount) < 1.0 &&
+                            Math.abs(it.date - savedTxn.date) < 4 * 24 * 60 * 60 * 1000L
+                    }
+
+                if (match != null) {
+                    // Auto-link fixed bill
+                    transactionDao.delete(match)
+                    match.recurringRuleId?.let { ruleId ->
+                        transactionDao.updateRecurringRuleId(savedTxn.id, ruleId)
+                        recurringDao.updateLastRunDate(ruleId, savedTxn.date)
+                    }
+                }
+            }
+        }
+
         // --- Notifications ---
         val canNotify =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

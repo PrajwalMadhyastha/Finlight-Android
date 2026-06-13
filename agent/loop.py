@@ -49,14 +49,22 @@ def run_agent_loop(goal: str, max_steps: int = 50, memory_text: str = ""):
         # Execute Action
         if action == "tap":
             adb_utils.tap(args.get("x", 0), args.get("y", 0))
+        elif action == "long_press":
+            adb_utils.long_press(args.get("x", 0), args.get("y", 0))
         elif action == "type":
             adb_utils.type_text(args.get("text", ""))
+        elif action == "clear_text":
+            adb_utils.clear_text()
         elif action == "swipe":
             adb_utils.swipe(args.get("x1", 0), args.get("y1", 0), args.get("x2", 0), args.get("y2", 0))
         elif action == "back":
             adb_utils.press_back()
         elif action == "home":
             adb_utils.press_home()
+        elif action == "recent_apps":
+            adb_utils.recent_apps()
+        elif action == "sleep":
+            time.sleep(args.get("seconds", 2))
         elif action == "checkpoint":
             checkpoint_summary = args.get("summary", "Reached a checkpoint.")
             print(f"\n[CHECKPOINT REACHED]: {checkpoint_summary}")

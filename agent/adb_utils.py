@@ -70,3 +70,17 @@ def random_monkey_events(count=5):
             y2 = random.randint(0, height)
             swipe(x1, y1, x2, y2, duration_ms=random.randint(100, 500))
         time.sleep(0.5)
+
+def long_press(x: int, y: int, duration_ms: int = 1000):
+    """Long presses at coordinates x, y"""
+    run_adb(f"input swipe {x} {y} {x} {y} {duration_ms}")
+
+def recent_apps():
+    """Presses the recent apps button to background the app"""
+    run_adb("input keyevent 187")
+
+def clear_text(length: int = 50):
+    """Clears text in the focused field by sending multiple backspace events."""
+    for _ in range(length):
+        run_adb("input keyevent 67")
+

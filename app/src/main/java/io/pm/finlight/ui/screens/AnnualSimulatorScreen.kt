@@ -8,10 +8,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -23,7 +27,6 @@ import io.pm.finlight.ui.components.PrivacyAwareText
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.AnnualSimulatorViewModel
-import io.pm.finlight.utils.FormatUtils
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
@@ -37,6 +40,7 @@ fun AnnualSimulatorScreen(
     val baseAnnualIncome by viewModel.baseAnnualIncome.collectAsState()
     val baseAnnualBudget by viewModel.baseAnnualBudget.collectAsState()
     val currentYear by viewModel.currentYear.collectAsState()
+    val privacyModeEnabled by viewModel.privacyModeEnabled.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -46,13 +50,40 @@ fun AnnualSimulatorScreen(
     val projectedImpact = viewModel.calculateProjectedAnnualImpact()
     val projectedDeficitSurplus = baseAnnualIncome - baseAnnualBudget - projectedImpact
 
-    Scaffold { paddingValues ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Annual Simulator") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.togglePrivacyMode() }) {
+                        Icon(
+                            imageVector = if (privacyModeEnabled) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = "Toggle Privacy"
+                        )
+                    }
+                },
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent
+                    )
+            )
+        }
+    ) { paddingValues ->
         LazyColumn(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 16.dp)
+                    .testTag("annual_lazy_column"),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
@@ -75,13 +106,13 @@ fun AnnualSimulatorScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        // No privacy mode required for sandbox by default
+                        // Privacy mode handled by state
                         PrivacyAwareText(
                             amount = projectedDeficitSurplus,
                             style = MaterialTheme.typography.displayMedium,
                             fontWeight = FontWeight.Bold,
                             color = if (projectedDeficitSurplus >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                            isPrivacyMode = false
+                            isPrivacyMode = privacyModeEnabled
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -93,10 +124,11 @@ fun AnnualSimulatorScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Text(
-                                    FormatUtils.currencyFormatter.apply { maximumFractionDigits = 0 }.format(baseAnnualIncome),
+                                PrivacyAwareText(
+                                    amount = baseAnnualIncome,
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    isPrivacyMode = privacyModeEnabled
                                 )
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -105,20 +137,30 @@ fun AnnualSimulatorScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Text(
-                                    FormatUtils.currencyFormatter.apply { maximumFractionDigits = 0 }.format(baseAnnualBudget),
+                                PrivacyAwareText(
+                                    amount = baseAnnualBudget,
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    isPrivacyMode = privacyModeEnabled
                                 )
                             }
                         }
                         if (projectedImpact > 0) {
-                            Text(
-                                "Event Impact: -${FormatUtils.currencyFormatter.apply { maximumFractionDigits = 0 }.format(projectedImpact)}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Row {
+                                Text(
+                                    "Event Impact: -",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                PrivacyAwareText(
+                                    amount = projectedImpact,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.SemiBold,
+                                    isPrivacyMode = privacyModeEnabled
+                                )
+                            }
                         }
                     }
                 }
@@ -188,13 +230,21 @@ fun AnnualSimulatorScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Text(
-                                text = "-${FormatUtils.currencyFormatter.apply { maximumFractionDigits = 0 }.format(event.amount)}",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.error,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(end = 16.dp)
-                            )
+                            Row(modifier = Modifier.padding(end = 16.dp)) {
+                                Text(
+                                    text = "-",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                PrivacyAwareText(
+                                    amount = event.amount,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.Bold,
+                                    isPrivacyMode = privacyModeEnabled
+                                )
+                            }
                             IconButton(onClick = { viewModel.removeLifeEvent(event.id) }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Delete Event", tint = MaterialTheme.colorScheme.error)
                             }

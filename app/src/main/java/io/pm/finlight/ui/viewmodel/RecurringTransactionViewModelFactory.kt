@@ -18,8 +18,9 @@ class RecurringTransactionViewModelFactory(private val application: Application)
         if (modelClass.isAssignableFrom(RecurringTransactionViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val repository = RecurringTransactionRepository(db.recurringTransactionDao())
+            val patternDao = db.recurringPatternDao()
             @Suppress("UNCHECKED_CAST")
-            return RecurringTransactionViewModel(application, repository) as T
+            return RecurringTransactionViewModel(application, repository, patternDao) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
