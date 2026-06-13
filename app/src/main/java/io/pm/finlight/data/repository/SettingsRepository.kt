@@ -469,7 +469,6 @@ class SettingsRepository(context: Context) {
                 DashboardCardType.FINANCIAL_SIMULATORS,
                 DashboardCardType.BUDGET_WATCH,
                 DashboardCardType.ACCOUNTS_CAROUSEL,
-                // --- NEW (Issue #105): Recurring cards at the bottom by default ---
                 DashboardCardType.UPCOMING_PAYMENTS,
                 DashboardCardType.RECURRING_SUGGESTIONS,
             )

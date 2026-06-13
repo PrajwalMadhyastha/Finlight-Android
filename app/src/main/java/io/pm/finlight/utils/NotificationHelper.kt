@@ -334,7 +334,7 @@ object NotificationHelper {
 
     fun showRecurringPatternDetectedNotification(
         context: Context,
-        rule: RecurringTransaction,
+        pattern: RecurringPattern,
     ) {
         val canShowNotification =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -347,40 +347,31 @@ object NotificationHelper {
             return
         }
 
-        val deepLinkUri = "$DEEP_LINK_URI_ADD_RECURRING?ruleId=${rule.id}".toUri()
+        val deepLinkUri = "app://finlight.pm.io/dashboard".toUri()
 
         val intent =
             Intent(Intent.ACTION_VIEW, deepLinkUri).apply {
                 `package` = context.packageName
             }
 
-        val notificationId = "pattern_${rule.id}".hashCode()
-        val pendingIntent: PendingIntent? =
-            TaskStackBuilder.create(context).run {
-                addNextIntentWithParentStack(intent)
-                getPendingIntent(
-                    notificationId,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                )
-            }
-
-        val contentText =
-            "We noticed a recurring ${rule.transactionType} for '${rule.description}'. We've created a rule for you. Tap to review."
+        val pendingIntent =
+            PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
 
         val builder =
             NotificationCompat.Builder(context, MainApplication.TRANSACTION_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification_logo)
-                .setContentTitle("New Recurring Transaction Found")
-                .setContentText(contentText)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
+                .setContentTitle("New Recurring Pattern Detected")
+                .setContentText("We noticed you pay ${pattern.description} regularly. Tap to review.")
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
-                .addAction(0, "Review Rule", pendingIntent)
 
-        with(NotificationManagerCompat.from(context)) {
-            notify(notificationId, builder.build())
-        }
+        NotificationManagerCompat.from(context).notify(pattern.smsSignature.hashCode(), builder.build())
     }
 
     /**
@@ -445,6 +436,32 @@ object NotificationHelper {
      * Quiet, low-priority notification fired when a recurring payment was auto-approved.
      * Gives the user awareness without demanding attention.
      */
+    fun showVariableBillAnomalyNotification(
+        context: Context,
+        rule: RecurringTransaction,
+        actualAmount: Double,
+        averageAmount: Double
+    ) {
+        val canShowNotification =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+
+        if (!canShowNotification) {
+            return
+        }
+        val builder =
+            NotificationCompat.Builder(context, MainApplication.TRANSACTION_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_logo)
+                .setContentTitle("Anomaly in Variable Bill")
+                .setContentText("${rule.description} charged ₹$actualAmount (usually ₹$averageAmount).")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+        NotificationManagerCompat.from(context).notify(rule.id + 5000, builder.build())
+    }
+
     fun showAutoApprovedPaymentNotification(
         context: Context,
         rule: RecurringTransaction,

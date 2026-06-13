@@ -132,24 +132,10 @@ class RecurringPatternWorker(
         pattern: RecurringPattern,
         interval: String,
     ) {
-        // Create the recurring transaction rule
-        val newRule =
-            RecurringTransaction(
-                description = pattern.description,
-                amount = pattern.amount,
-                transactionType = pattern.transactionType,
-                recurrenceInterval = interval,
-                startDate = pattern.lastSeen,
-                accountId = pattern.accountId,
-                categoryId = pattern.categoryId,
-                lastRunDate = pattern.lastSeen,
-            )
-        val newRuleId = recurringTransactionDao.insert(newRule).toInt()
+        // Notify the user about the pattern suggestion
+        NotificationHelper.showRecurringPatternDetectedNotification(context, pattern)
 
-        // Notify the user
-        NotificationHelper.showRecurringPatternDetectedNotification(context, newRule.copy(id = newRuleId))
-
-        // Clean up the pattern from the analysis table to prevent re-detection
-        patternDao.deleteBySignature(pattern.smsSignature)
+        // We do NOT create a RecurringTransaction or delete the pattern.
+        // The dashboard will show this pattern since isDismissed is false by default.
     }
 }

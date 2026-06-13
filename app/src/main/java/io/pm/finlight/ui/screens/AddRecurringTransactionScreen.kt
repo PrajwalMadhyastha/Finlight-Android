@@ -26,6 +26,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import java.text.SimpleDateFormat
@@ -52,10 +55,13 @@ fun AddRecurringTransactionScreen(
     ruleId: Int?,
 ) {
     val context = LocalContext.current
-    val recurringViewModel: RecurringTransactionViewModel = viewModel(
-        factory = RecurringTransactionViewModelFactory(context.applicationContext as Application)
+    val recurringViewModel: RecurringTransactionViewModel =
+        viewModel(
+            factory = RecurringTransactionViewModelFactory(context.applicationContext as Application)
+        )
+    val transactionViewModel: TransactionViewModel = viewModel(
+        factory = io.pm.finlight.ui.viewmodel.TransactionViewModelFactory(context.applicationContext as Application)
     )
-    val transactionViewModel: TransactionViewModel = viewModel()
 
     val isEditMode = ruleId != null
     val titleText = if (isEditMode) "Edit Recurring Rule" else "Add Recurring Rule"
@@ -129,25 +135,39 @@ fun AddRecurringTransactionScreen(
             GlassPanel {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics(mergeDescendants = true) {}
+                            .toggleable(
+                                value = isVariableBill,
+                                onValueChange = { isVariableBill = it },
+                                role = androidx.compose.ui.semantics.Role.Switch
+                            ),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("Variable Bill", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                        Switch(checked = isVariableBill, onCheckedChange = { isVariableBill = it })
+                        Switch(checked = isVariableBill, onCheckedChange = null)
                     }
 
                     if (!isVariableBill) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics(mergeDescendants = true) {}
+                                .toggleable(
+                                    value = autoApprove,
+                                    onValueChange = { autoApprove = it },
+                                    role = androidx.compose.ui.semantics.Role.Switch
+                                ),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Auto-Approve Payments", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                                Text("Automatically confirm without asking", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Automatically add this transaction when SMS is received", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Switch(checked = autoApprove, onCheckedChange = { autoApprove = it })
+                            Switch(checked = autoApprove, onCheckedChange = null)
                         }
                     }
                 }

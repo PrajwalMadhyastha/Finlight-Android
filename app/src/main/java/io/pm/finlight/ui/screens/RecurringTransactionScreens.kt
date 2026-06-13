@@ -49,9 +49,10 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun RecurringTransactionScreen(navController: NavController) {
     val context = LocalContext.current
-    val viewModel: RecurringTransactionViewModel = viewModel(
-        factory = RecurringTransactionViewModelFactory(context.applicationContext as Application)
-    )
+    val viewModel: RecurringTransactionViewModel =
+        viewModel(
+            factory = RecurringTransactionViewModelFactory(context.applicationContext as Application)
+        )
     val recurringTransactions by viewModel.allRecurringTransactions.collectAsState(initial = emptyList())
     var ruleToDelete by remember { mutableStateOf<RecurringTransaction?>(null) }
 
@@ -285,9 +286,10 @@ fun UpcomingPaymentsCard(navController: NavController) {
     var selectedTransaction by remember { mutableStateOf<Transaction?>(null) }
 
     val context = LocalContext.current
-    val recurringViewModel: RecurringTransactionViewModel = viewModel(
-        factory = RecurringTransactionViewModelFactory(context.applicationContext as Application)
-    )
+    val recurringViewModel: RecurringTransactionViewModel =
+        viewModel(
+            factory = RecurringTransactionViewModelFactory(context.applicationContext as Application)
+        )
     val allRules by recurringViewModel.allRecurringTransactions.collectAsState(initial = emptyList())
 
     GlassPanel(modifier = Modifier.fillMaxWidth()) {
@@ -356,9 +358,10 @@ fun UpcomingPaymentsCard(navController: NavController) {
 @Composable
 fun RecurringSuggestionsCard(navController: NavController) {
     val context = LocalContext.current
-    val recurringViewModel: RecurringTransactionViewModel = viewModel(
-        factory = RecurringTransactionViewModelFactory(context.applicationContext as Application)
-    )
+    val recurringViewModel: RecurringTransactionViewModel =
+        viewModel(
+            factory = RecurringTransactionViewModelFactory(context.applicationContext as Application)
+        )
     val patterns by recurringViewModel.patternSuggestions.collectAsState()
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 

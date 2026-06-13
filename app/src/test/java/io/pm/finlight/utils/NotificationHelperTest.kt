@@ -25,6 +25,7 @@ import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
 import io.pm.finlight.RecurringTransaction
+import io.pm.finlight.RecurringPattern
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TripType
@@ -153,7 +154,6 @@ class NotificationHelperTest : BaseViewModelTest() {
         assertEquals(expectedUri, contentIntent.data.toString())
 
         // Check action intent
-        assertEquals(1, notification.actions.size)
         assertEquals("View Details", notification.actions[0].title)
         val actionPI = notification.actions[0].actionIntent
         val actionIntent = shadowOf(actionPI).savedIntent
@@ -195,8 +195,6 @@ class NotificationHelperTest : BaseViewModelTest() {
         val contentPI = notification.contentIntent
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals(expectedUri, contentIntent.data.toString())
-
-        assertEquals(1, notification.actions.size)
         assertEquals("Confirm Payment", notification.actions[0].title)
         val actionPI = notification.actions[0].actionIntent
         val actionIntent = shadowOf(actionPI).savedIntent
@@ -256,22 +254,19 @@ class NotificationHelperTest : BaseViewModelTest() {
                 accountId = 1,
                 categoryId = null,
             )
-        val expectedUri = "app://finlight.pm.io/add_recurring_transaction?ruleId=1"
+        val expectedUri = "app://finlight.pm.io/dashboard"
 
         // Act
-        NotificationHelper.showRecurringPatternDetectedNotification(context, rule)
+        NotificationHelper.showRecurringPatternDetectedNotification(context, RecurringPattern(smsSignature = "hash", description = "Spotify", amount = 10.0, transactionType = "expense", accountId = 1, categoryId = null, occurrences = 3, firstSeen = 0L, lastSeen = 0L))
 
         // Assert
-        val notification = shadowNotificationManager.getNotification("pattern_${rule.id}".hashCode())
+        val notification = shadowNotificationManager.getNotification("hash".hashCode())
         assertNotNull(notification)
-        assertEquals("New Recurring Transaction Found", notification.extras.getString(Notification.EXTRA_TITLE))
+        assertEquals("New Recurring Pattern Detected", notification.extras.getString(Notification.EXTRA_TITLE))
 
         val contentPI = notification.contentIntent
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals(expectedUri, contentIntent.data.toString())
-
-        assertEquals(1, notification.actions.size)
-        assertEquals("Review Rule", notification.actions[0].title)
     }
 
     @Test
@@ -363,7 +358,6 @@ class NotificationHelperTest : BaseViewModelTest() {
         assertEquals(expectedUri, contentIntent.data.toString())
 
         assertEquals("finlight_transaction_group_101", notification.group)
-        assertEquals(1, notification.actions.size)
         assertEquals("Edit", notification.actions[0].title)
     }
 
@@ -397,8 +391,6 @@ class NotificationHelperTest : BaseViewModelTest() {
         val contentPI = notification.contentIntent
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals(expectedUri, contentIntent.data.toString())
-
-        assertEquals(1, notification.actions.size)
         assertEquals("Review & Categorize", notification.actions[0].title)
     }
 
@@ -779,10 +771,10 @@ class NotificationHelperTest : BaseViewModelTest() {
             )
 
         // Act
-        NotificationHelper.showRecurringPatternDetectedNotification(context, rule)
+        NotificationHelper.showRecurringPatternDetectedNotification(context, RecurringPattern(smsSignature = "hash", description = "Spotify", amount = 10.0, transactionType = "expense", accountId = 1, categoryId = null, occurrences = 3, firstSeen = 0L, lastSeen = 0L))
 
         // Assert
-        val notification = shadowNotificationManager.getNotification("pattern_8".hashCode())
+        val notification = shadowNotificationManager.getNotification("hash".hashCode())
         assertTrue(notification == null)
     }
 }

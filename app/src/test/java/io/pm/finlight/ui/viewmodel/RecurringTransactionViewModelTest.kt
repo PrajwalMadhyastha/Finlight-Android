@@ -159,4 +159,20 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             // Assert
             verify(recurringTransactionRepository).delete(ruleToDelete)
         }
+
+    @Test
+    fun `dismissPatternSuggestion calls dao update with isDismissed true`() =
+        runTest {
+            // Arrange
+            val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, "expense", 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
+            initializeViewModel()
+
+            // Act
+            viewModel.dismissPatternSuggestion(pattern)
+            advanceUntilIdle()
+
+            // Assert
+            val expectedPattern = pattern.copy(isDismissed = true)
+            verify(recurringPatternDao).update(expectedPattern)
+        }
 }

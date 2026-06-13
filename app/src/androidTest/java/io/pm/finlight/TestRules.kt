@@ -100,7 +100,7 @@ class ClearDatabaseRule : TestRule {
             override fun evaluate() {
                 val context = InstrumentationRegistry.getInstrumentation().targetContext
                 val db = AppDatabase.getInstance(context)
-                
+
                 // Clear any stored budgets from SharedPreferences to avoid cross-test contamination
                 val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
                 val editor = prefs.edit()

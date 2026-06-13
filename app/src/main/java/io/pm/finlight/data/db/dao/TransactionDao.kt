@@ -18,11 +18,11 @@ interface TransactionDao {
         """
         WITH AtomicExpenses AS (
             SELECT T.amount FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.date BETWEEN :startDate AND :endDate
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED' AND T.date BETWEEN :startDate AND :endDate
             UNION ALL
             SELECT S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.date BETWEEN :startDate AND :endDate
+            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED' AND P.date BETWEEN :startDate AND :endDate
         )
         SELECT SUM(AE.amount) / (CAST((:endDate - :startDate) AS REAL) / 86400000.0)
         FROM AtomicExpenses AS AE
@@ -38,11 +38,11 @@ interface TransactionDao {
         """
         WITH AtomicExpenses AS (
             SELECT T.amount FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.date >= :startDate
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED' AND T.date >= :startDate
             UNION ALL
             SELECT S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.date >= :startDate
+            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED' AND P.date >= :startDate
         )
         SELECT SUM(AE.amount) FROM AtomicExpenses AS AE
     """,
@@ -52,7 +52,7 @@ interface TransactionDao {
     // --- UPDATED: Spending Analysis Queries with Filtering ---
 
     @Query(
-        "SELECT DISTINCT description FROM transactions WHERE transactionType = 'expense' AND isExcluded = 0 AND description IS NOT NULL ORDER BY description ASC",
+        "SELECT DISTINCT description FROM transactions WHERE transactionType = 'expense' AND isExcluded = 0 AND status != 'PENDING' AND status != 'SKIPPED' AND description IS NOT NULL ORDER BY description ASC",
     )
     fun getAllExpenseMerchants(): Flow<List<String>>
 
@@ -61,12 +61,12 @@ interface TransactionDao {
         WITH AllExpenses AS (
             SELECT T.id, T.categoryId, T.amount, T.description
             FROM transactions T
-            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0)
+            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED') AND T.status != 'PENDING' AND T.status != 'SKIPPED'
             UNION ALL
             SELECT P.id, S.categoryId, S.amount, P.description
             FROM split_transactions S
             JOIN transactions P ON S.parentTransactionId = P.id
-            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0)
+            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED') AND P.status != 'PENDING' AND P.status != 'SKIPPED'
         )
         SELECT
             C.id as dimensionId,
@@ -103,12 +103,12 @@ interface TransactionDao {
         WITH AllExpenses AS (
             SELECT T.id, T.categoryId, T.amount, T.description
             FROM transactions T
-            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0)
+            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED') AND T.status != 'PENDING' AND T.status != 'SKIPPED'
             UNION ALL
             SELECT P.id, S.categoryId, S.amount, P.description
             FROM split_transactions S
             JOIN transactions P ON S.parentTransactionId = P.id
-            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0)
+            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED') AND P.status != 'PENDING' AND P.status != 'SKIPPED'
         )
         SELECT
             TG.id AS dimensionId,
@@ -149,12 +149,12 @@ interface TransactionDao {
         WITH AllExpenses AS (
             SELECT T.id, T.categoryId, T.amount, T.description
             FROM transactions T
-            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0)
+            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED') AND T.status != 'PENDING' AND T.status != 'SKIPPED'
             UNION ALL
             SELECT P.id, S.categoryId, S.amount, P.description
             FROM split_transactions S
             JOIN transactions P ON S.parentTransactionId = P.id
-            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0)
+            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND (:includeExcluded = 1 OR P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED') AND P.status != 'PENDING' AND P.status != 'SKIPPED'
         )
         SELECT
             LOWER(AE.description) as dimensionId,
@@ -308,12 +308,12 @@ interface TransactionDao {
         WITH AtomicExpenses AS (
             -- 1. Regular, non-split transactions
             SELECT T.categoryId, T.amount FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED'
             UNION ALL
             -- 2. Child items from split transactions
             SELECT S.categoryId, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED'
         )
         SELECT C.name as categoryName, SUM(AE.amount) as totalAmount, C.iconKey as iconKey, C.colorKey as colorKey
         FROM AtomicExpenses AS AE
@@ -333,11 +333,11 @@ interface TransactionDao {
         """
         WITH AtomicExpenses AS (
             SELECT T.categoryId, T.amount FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED'
             UNION ALL
             SELECT S.categoryId, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+            WHERE P.transactionType = 'expense' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED'
         )
         SELECT C.name as categoryName, SUM(AE.amount) as totalAmount, C.iconKey as iconKey, C.colorKey as colorKey
         FROM AtomicExpenses AS AE
@@ -397,14 +397,14 @@ interface TransactionDao {
         WITH AtomicIncomes AS (
             SELECT T.*
             FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'income' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+            WHERE T.isSplit = 0 AND T.transactionType = 'income' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED'
               AND (:accountId IS NULL OR T.accountId = :accountId)
             UNION ALL
             SELECT
                 P.id, P.description, S.categoryId, S.amount, P.date, P.accountId, S.notes, P.transactionType, P.sourceSmsId, P.sourceSmsHash, P.source,
                 P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit, P.needsReview, P.status, P.recurringRuleId
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'income' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+            WHERE P.transactionType = 'income' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED'
               AND (:accountId IS NULL OR P.accountId = :accountId)
         )
         SELECT
@@ -435,12 +435,12 @@ interface TransactionDao {
         WITH AtomicIncomes AS (
             SELECT T.categoryId, T.amount, T.description, T.notes, T.accountId
             FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'income' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+            WHERE T.isSplit = 0 AND T.transactionType = 'income' AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED'
               AND (:accountId IS NULL OR T.accountId = :accountId)
             UNION ALL
             SELECT S.categoryId, S.amount, P.description, S.notes, P.accountId
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'income' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+            WHERE P.transactionType = 'income' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED'
               AND (:accountId IS NULL OR P.accountId = :accountId)
         )
         SELECT 
@@ -473,7 +473,7 @@ interface TransactionDao {
             COUNT(T.id) as transactionCount
         FROM transactions AS T
         WHERE (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate
-          AND T.isExcluded = 0
+          AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED'
           AND T.isSplit = 0
           AND (:keyword IS NULL OR LOWER(T.description) LIKE '%' || LOWER(:keyword) || '%' OR LOWER(T.notes) LIKE '%' || LOWER(:keyword) || '%')
           AND (:accountId IS NULL OR T.accountId = :accountId)
@@ -533,11 +533,11 @@ interface TransactionDao {
             SELECT P.date, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
             JOIN categories AS C ON S.categoryId = C.id
-            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND C.name = :categoryName
+            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED' AND C.name = :categoryName
             UNION ALL
             SELECT T.date, T.amount FROM transactions AS T
             JOIN categories AS C ON T.categoryId = C.id
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND C.name = :categoryName
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED' AND C.name = :categoryName
         )
         SELECT
             strftime('%Y-%m', date / 1000, 'unixepoch', 'localtime') as period,
@@ -559,10 +559,10 @@ interface TransactionDao {
         WITH AtomicExpenses AS (
             SELECT P.date, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.description = :merchantName
+            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED' AND P.description = :merchantName
             UNION ALL
             SELECT T.date, T.amount FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.description = :merchantName
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED' AND T.description = :merchantName
         )
         SELECT
             strftime('%Y-%m', date / 1000, 'unixepoch', 'localtime') as period,
@@ -729,6 +729,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE id = :id")
     fun getTransactionById(id: Int): Flow<Transaction?>
 
+    @Query("SELECT * FROM transactions WHERE id = :id")
+    suspend fun getTransactionByIdSync(id: Int): Transaction?
+
     @Query("SELECT * FROM transactions WHERE accountId = :accountId ORDER BY date DESC")
     fun getTransactionsForAccount(accountId: Int): Flow<List<Transaction>>
 
@@ -737,12 +740,12 @@ interface TransactionDao {
         WITH AtomicExpenses AS (
             SELECT T.categoryId, T.amount, T.description, T.notes, T.accountId
             FROM transactions AS T
-            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+            WHERE T.isSplit = 0 AND (:transactionType IS NULL OR T.transactionType = :transactionType) AND T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED'
               AND (:accountId IS NULL OR T.accountId = :accountId)
             UNION ALL
             SELECT S.categoryId, S.amount, P.description, S.notes, P.accountId
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0
+            WHERE (:transactionType IS NULL OR P.transactionType = :transactionType) AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED'
               AND (:accountId IS NULL OR P.accountId = :accountId)
         )
         SELECT 
@@ -773,11 +776,11 @@ interface TransactionDao {
         SELECT
             strftime('%Y-%m', T1.date / 1000, 'unixepoch', 'localtime') as monthYear,
             SUM(CASE WHEN T1.transactionType = 'income' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
-            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%m', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.transactionType = 'income') as totalIncome,
+            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%m', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.status != 'PENDING' AND p.status != 'SKIPPED' AND p.transactionType = 'income') as totalIncome,
             SUM(CASE WHEN T1.transactionType = 'expense' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
-            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%m', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.transactionType = 'expense') as totalExpenses
+            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%m', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.status != 'PENDING' AND p.status != 'SKIPPED' AND p.transactionType = 'expense') as totalExpenses
         FROM transactions AS T1
-        WHERE T1.date >= :startDate AND T1.isExcluded = 0
+        WHERE T1.date >= :startDate AND T1.isExcluded = 0 AND T1.status != 'PENDING' AND T1.status != 'SKIPPED'
         GROUP BY monthYear
         ORDER BY monthYear ASC
     """,
@@ -793,10 +796,10 @@ interface TransactionDao {
     @Query(
         """
         SELECT
-            SUM(CASE WHEN T.transactionType = 'income' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'income' AND p.isExcluded = 0) as totalIncome,
-            SUM(CASE WHEN T.transactionType = 'expense' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'expense' AND p.isExcluded = 0) as totalExpenses
+            SUM(CASE WHEN T.transactionType = 'income' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'income' AND p.isExcluded = 0 AND p.status != 'PENDING' AND p.status != 'SKIPPED') as totalIncome,
+            SUM(CASE WHEN T.transactionType = 'expense' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'expense' AND p.isExcluded = 0 AND p.status != 'PENDING' AND p.status != 'SKIPPED') as totalExpenses
         FROM transactions AS T
-        WHERE T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+        WHERE T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED'
     """,
     )
     suspend fun getFinancialSummaryForRange(
@@ -807,10 +810,10 @@ interface TransactionDao {
     @Query(
         """
         SELECT
-            SUM(CASE WHEN T.transactionType = 'income' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'income' AND p.isExcluded = 0) as totalIncome,
-            SUM(CASE WHEN T.transactionType = 'expense' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'expense' AND p.isExcluded = 0) as totalExpenses
+            SUM(CASE WHEN T.transactionType = 'income' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'income' AND p.isExcluded = 0 AND p.status != 'PENDING' AND p.status != 'SKIPPED') as totalIncome,
+            SUM(CASE WHEN T.transactionType = 'expense' AND T.isSplit = 0 THEN T.amount ELSE 0 END) + (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE p.date BETWEEN :startDate AND :endDate AND p.transactionType = 'expense' AND p.isExcluded = 0 AND p.status != 'PENDING' AND p.status != 'SKIPPED') as totalExpenses
         FROM transactions AS T
-        WHERE T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0
+        WHERE T.date BETWEEN :startDate AND :endDate AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED'
     """,
     )
     fun getFinancialSummaryForRangeFlow(
@@ -934,11 +937,11 @@ interface TransactionDao {
         """
         WITH AtomicExpenses AS (
             SELECT T.date, T.amount FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED'
             UNION ALL
             SELECT P.date, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.isExcluded = 0
+            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED'
         )
         SELECT
             strftime('%Y-%m-%d', date / 1000, 'unixepoch', 'localtime') as date,
@@ -959,10 +962,10 @@ interface TransactionDao {
         WITH AtomicExpenses AS (
             SELECT P.date, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.isExcluded = 0
+            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED'
             UNION ALL
             SELECT T.date, T.amount FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED'
         )
         SELECT
             strftime('%Y-%W', date / 1000, 'unixepoch', 'localtime') as period,
@@ -983,10 +986,10 @@ interface TransactionDao {
         WITH AtomicExpenses AS (
             SELECT P.date, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND P.isExcluded = 0
+            WHERE P.transactionType = 'expense' AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED'
             UNION ALL
             SELECT T.date, T.amount FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0
+            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND T.isExcluded = 0 AND T.status != 'PENDING' AND T.status != 'SKIPPED'
         )
         SELECT
             strftime('%Y-%m', date / 1000, 'unixepoch', 'localtime') as period,
@@ -1007,11 +1010,11 @@ interface TransactionDao {
         SELECT
             strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime') as date,
             SUM(CASE WHEN T1.transactionType = 'income' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
-            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%m-%d', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.transactionType = 'income') as totalIncome,
+            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%m-%d', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.status != 'PENDING' AND p.status != 'SKIPPED' AND p.transactionType = 'income') as totalIncome,
             SUM(CASE WHEN T1.transactionType = 'expense' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
-            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%m-%d', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.transactionType = 'expense') as totalExpenses
+            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%m-%d', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.status != 'PENDING' AND p.status != 'SKIPPED' AND p.transactionType = 'expense') as totalExpenses
         FROM transactions AS T1
-        WHERE T1.date BETWEEN :startDate AND :endDate AND T1.isExcluded = 0
+        WHERE T1.date BETWEEN :startDate AND :endDate AND T1.isExcluded = 0 AND T1.status != 'PENDING' AND T1.status != 'SKIPPED'
         GROUP BY strftime('%Y-%m-%d', T1.date / 1000, 'unixepoch', 'localtime')
         ORDER BY date ASC
     """,
@@ -1026,11 +1029,11 @@ interface TransactionDao {
         SELECT
             strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime') as period,
             SUM(CASE WHEN T1.transactionType = 'income' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
-            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%W', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.transactionType = 'income') as totalIncome,
+            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%W', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.status != 'PENDING' AND p.status != 'SKIPPED' AND p.transactionType = 'income') as totalIncome,
             SUM(CASE WHEN T1.transactionType = 'expense' AND T1.isSplit = 0 THEN T1.amount ELSE 0 END) + 
-            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%W', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.transactionType = 'expense') as totalExpenses
+            (SELECT IFNULL(SUM(s.amount), 0) FROM split_transactions s JOIN transactions p ON s.parentTransactionId = p.id WHERE strftime('%Y-%W', p.date / 1000, 'unixepoch', 'localtime') = strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime') AND p.isExcluded = 0 AND p.status != 'PENDING' AND p.status != 'SKIPPED' AND p.transactionType = 'expense') as totalExpenses
         FROM transactions AS T1
-        WHERE T1.date BETWEEN :startDate AND :endDate AND T1.isExcluded = 0
+        WHERE T1.date BETWEEN :startDate AND :endDate AND T1.isExcluded = 0 AND T1.status != 'PENDING' AND T1.status != 'SKIPPED'
         GROUP BY strftime('%Y-%W', T1.date / 1000, 'unixepoch', 'localtime')
         ORDER BY period ASC
     """,
@@ -1069,7 +1072,7 @@ interface TransactionDao {
         """
         SELECT COUNT(*) FROM transactions
         WHERE LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description)
-        AND isExcluded = 0
+        AND isExcluded = 0 AND status != 'PENDING' AND status != 'SKIPPED'
     """,
     )
     fun getTransactionCountForMerchant(description: String): Flow<Int>
@@ -1078,7 +1081,7 @@ interface TransactionDao {
         """
         SELECT COUNT(*) FROM transactions
         WHERE (LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description))
-        AND isExcluded = 0
+        AND isExcluded = 0 AND status != 'PENDING' AND status != 'SKIPPED'
     """,
     )
     suspend fun getTransactionCountForMerchantSuspend(description: String): Int
@@ -1088,7 +1091,7 @@ interface TransactionDao {
         SELECT * FROM transactions
         WHERE (LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description))
         AND id != :excludeId
-        AND isExcluded = 0
+        AND isExcluded = 0 AND status != 'PENDING' AND status != 'SKIPPED'
     """,
     )
     suspend fun findSimilarTransactions(
@@ -1100,7 +1103,7 @@ interface TransactionDao {
      * Returns all distinct, non-null originalDescription values across all non-excluded
      * transactions. Used by the cross-account canonical nudge to find unmatched variants.
      */
-    @Query("SELECT DISTINCT originalDescription FROM transactions WHERE originalDescription IS NOT NULL AND isExcluded = 0")
+    @Query("SELECT DISTINCT originalDescription FROM transactions WHERE originalDescription IS NOT NULL AND isExcluded = 0 AND status != 'PENDING' AND status != 'SKIPPED'")
     suspend fun getDistinctOriginalDescriptions(): List<String>
 
     /**
@@ -1108,7 +1111,7 @@ interface TransactionDao {
      * the given value (case-insensitive). Used to bulk-update transactions for a confirmed
      * canonical nudge selection.
      */
-    @Query("SELECT id FROM transactions WHERE LOWER(originalDescription) = LOWER(:originalDesc) AND isExcluded = 0")
+    @Query("SELECT id FROM transactions WHERE LOWER(originalDescription) = LOWER(:originalDesc) AND isExcluded = 0 AND status != 'PENDING' AND status != 'SKIPPED'")
     suspend fun getTransactionIdsByOriginalDescription(originalDesc: String): List<Int>
 
     @Query("UPDATE transactions SET categoryId = :categoryId WHERE id IN (:ids)")
@@ -1248,6 +1251,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE status = 'PENDING' ORDER BY date ASC")
     fun getPendingTransactions(): Flow<List<Transaction>>
 
+    @Query("SELECT * FROM transactions WHERE status = 'PENDING' ORDER BY date ASC")
+    suspend fun getPendingTransactionsSync(): List<Transaction>
+
     /** Checks if a specific recurring rule already has an unconfirmed draft waiting. */
     @Query("SELECT * FROM transactions WHERE status = 'PENDING' AND recurringRuleId = :ruleId LIMIT 1")
     suspend fun getPendingTransactionForRule(ruleId: Int): Transaction?
@@ -1259,4 +1265,10 @@ interface TransactionDao {
     /** Skips a pending draft — sets status to SKIPPED. */
     @Query("UPDATE transactions SET status = 'SKIPPED' WHERE id = :id")
     suspend fun skipTransaction(id: Int)
+
+    @Query("UPDATE transactions SET recurringRuleId = :ruleId WHERE id = :id")
+    suspend fun updateRecurringRuleId(
+        id: Int,
+        ruleId: Int
+    )
 }
