@@ -309,7 +309,7 @@ fun AddTransactionScreen(
                     amount = amount,
                     onAmountChange = { newValue ->
                         if (!hasInteracted) hasInteracted = true
-                        if (newValue.length > 9) return@AmountComposer
+                        if (newValue.length > 15) return@AmountComposer
 
                         // Regex to match a valid decimal number (up to 2 decimal places)
                         val regex = Regex("^\\d*\\.?\\d{0,2}\$")

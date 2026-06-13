@@ -672,6 +672,20 @@ class TransactionViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `onSaveTapped shows validation error for amount exceeding limit`() =
+        runTest {
+            // ACT
+            viewModel.onSaveTapped("Test", "2000000000.0", 1, 1, null, 0L, "expense", emptyList()) {}
+            advanceUntilIdle()
+
+            // ASSERT
+            viewModel.validationError.test {
+                assertEquals("Amount exceeds the maximum allowed limit.", awaitItem())
+            }
+            verify(transactionRepository, never()).insertTransactionWithTagsAndImages(any(), any(), any())
+        }
+
+    @Test
     fun `onAttemptToLeaveScreen prepares retro update sheet when changes are detected`() =
         runTest {
             // ARRANGE

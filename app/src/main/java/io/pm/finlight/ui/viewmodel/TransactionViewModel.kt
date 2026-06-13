@@ -852,6 +852,10 @@ class TransactionViewModel(
                 _validationError.value = "Please enter a valid, positive amount."
                 return@launch
             }
+            if ((amountStr.toDoubleOrNull() ?: 0.0) > 1_000_000_000.0) {
+                _validationError.value = "Amount exceeds the maximum allowed limit."
+                return@launch
+            }
             if (accountId == null) {
                 _validationError.value = "An account must be selected."
                 return@launch
@@ -906,6 +910,10 @@ class TransactionViewModel(
         val enteredAmount = data.amountStr.toDoubleOrNull()
         if (enteredAmount == null || enteredAmount <= 0.0) {
             _validationError.value = "Please enter a valid, positive amount."
+            return false
+        }
+        if (enteredAmount > 1_000_000_000.0) {
+            _validationError.value = "Amount exceeds the maximum allowed limit."
             return false
         }
 
