@@ -853,7 +853,7 @@ class TransactionViewModel(
                 return@launch
             }
             if ((amountStr.toDoubleOrNull() ?: 0.0) > 1_000_000_000.0) {
-                _validationError.value = "Amount exceeds the maximum allowed limit."
+                _validationError.value = "Amount exceeds the maximum allowed limit of 1,000,000,000."
                 return@launch
             }
             if (accountId == null) {
@@ -913,7 +913,7 @@ class TransactionViewModel(
             return false
         }
         if (enteredAmount > 1_000_000_000.0) {
-            _validationError.value = "Amount exceeds the maximum allowed limit."
+            _validationError.value = "Amount exceeds the maximum allowed limit of 1,000,000,000."
             return false
         }
 

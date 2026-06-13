@@ -680,7 +680,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
             // ASSERT
             viewModel.validationError.test {
-                assertEquals("Amount exceeds the maximum allowed limit.", awaitItem())
+                assertEquals("Amount exceeds the maximum allowed limit of 1,000,000,000.", awaitItem())
             }
             verify(transactionRepository, never()).insertTransactionWithTagsAndImages(any(), any(), any())
         }
