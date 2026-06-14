@@ -893,12 +893,150 @@ class NotificationHelperTest : BaseViewModelTest() {
         assertTrue(bigText?.contains("staying under budget") == true)
     }
 
+    // --- Goal Milestone Notification Tests ---
+
     @Test
-    fun `showGoalSurplusNotification_whenPermissionDenied_doesNotPost`() {
+    fun `showGoalMilestoneNotification_goalReached_postsCorrectNotification`() {
+        // Act
+        NotificationHelper.showGoalMilestoneNotification(context, "Vacation Fund", 100)
+
+        // Assert
+        val notificationId = "milestone_Vacation Fund".hashCode()
+        val notification = shadowNotificationManager.getNotification(notificationId)
+        assertNotNull(notification)
+        assertEquals("Goal Reached! 🥳", notification.extras.getString(Notification.EXTRA_TITLE))
+        val text = notification.extras.getString(Notification.EXTRA_TEXT)
+        assertTrue(text?.contains("Congratulations") == true)
+        assertTrue(text?.contains("Vacation Fund") == true)
+    }
+
+    @Test
+    fun `showGoalMilestoneNotification_milestoneBelow100_postsCorrectNotification`() {
+        // Act
+        NotificationHelper.showGoalMilestoneNotification(context, "New Car", 50)
+
+        // Assert
+        val notificationId = "milestone_New Car".hashCode()
+        val notification = shadowNotificationManager.getNotification(notificationId)
+        assertNotNull(notification)
+        assertEquals("Milestone Reached! 🚀", notification.extras.getString(Notification.EXTRA_TITLE))
+        val text = notification.extras.getString(Notification.EXTRA_TEXT)
+        assertTrue(text?.contains("50%") == true)
+        assertTrue(text?.contains("New Car") == true)
+    }
+
+    @Test
+    fun `showGoalMilestoneNotification_whenPermissionDenied_doesNotPost`() {
+        // Arrange
         shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
-        NotificationHelper.showGoalSurplusNotification(context, 200.0, null)
-        val notificationId = "surplus_nudge".hashCode()
+
+        // Act
+        NotificationHelper.showGoalMilestoneNotification(context, "Emergency Fund", 75)
+
+        // Assert
+        val notificationId = "milestone_Emergency Fund".hashCode()
         val notification = shadowNotificationManager.getNotification(notificationId)
         assertTrue(notification == null)
+    }
+
+    // --- Auto-Save Confirmation Notification Tests ---
+
+    @Test
+    fun `showAutoSaveConfirmationNotification_postsCorrectNotification`() {
+        // Arrange
+        val txn =
+            Transaction(
+                id = 42,
+                description = "Swiggy",
+                amount = 250.0,
+                date = 0L,
+                accountId = 1,
+                categoryId = null,
+                notes = null,
+            )
+
+        // Act
+        NotificationHelper.showAutoSaveConfirmationNotification(context, txn)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(42)
+        assertNotNull(notification)
+        assertEquals("Transaction Auto-Saved", notification.extras.getString(Notification.EXTRA_TITLE))
+        val text = notification.extras.getString(Notification.EXTRA_TEXT)
+        assertTrue(text?.contains("Swiggy") == true)
+        assertTrue(text?.contains("250.00") == true)
+    }
+
+    @Test
+    fun `showAutoSaveConfirmationNotification_whenPermissionDenied_doesNotPost`() {
+        // Arrange
+        shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val txn =
+            Transaction(
+                id = 43,
+                description = "Test",
+                amount = 100.0,
+                date = 0L,
+                accountId = 1,
+                categoryId = null,
+                notes = null,
+            )
+
+        // Act
+        NotificationHelper.showAutoSaveConfirmationNotification(context, txn)
+
+        // Assert
+        assertTrue(shadowNotificationManager.getNotification(43) == null)
+    }
+
+    // --- Show Transaction Notification Tests ---
+
+    @Test
+    fun `showTransactionNotification_postsCorrectNotification`() {
+        // Arrange
+        val txn =
+            Transaction(
+                id = 55,
+                description = "Amazon",
+                amount = 999.0,
+                date = 0L,
+                accountId = 1,
+                categoryId = null,
+                notes = null,
+                transactionType = "expense",
+            )
+
+        // Act
+        NotificationHelper.showTransactionNotification(context, txn)
+
+        // Assert
+        val notification = shadowNotificationManager.getNotification(55)
+        assertNotNull(notification)
+        assertEquals("New Transaction Found", notification.extras.getString(Notification.EXTRA_TITLE))
+        val bigText = notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+        assertTrue(bigText?.contains("Amazon") == true)
+        assertTrue(bigText?.contains("999.00") == true)
+    }
+
+    @Test
+    fun `showTransactionNotification_whenPermissionDenied_doesNotPost`() {
+        // Arrange
+        shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val txn =
+            Transaction(
+                id = 56,
+                description = "Zomato",
+                amount = 300.0,
+                date = 0L,
+                accountId = 1,
+                categoryId = null,
+                notes = null,
+            )
+
+        // Act
+        NotificationHelper.showTransactionNotification(context, txn)
+
+        // Assert
+        assertTrue(shadowNotificationManager.getNotification(56) == null)
     }
 }

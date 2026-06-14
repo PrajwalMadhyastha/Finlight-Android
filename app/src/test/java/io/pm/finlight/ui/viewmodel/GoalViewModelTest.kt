@@ -287,4 +287,106 @@ class GoalViewModelTest : BaseViewModelTest() {
             }
             verify(goalRepository).getLinkedTotal(goalId)
         }
+
+    @Test
+    fun `getLinkedTransactions calls repository and returns flow`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val goalId = 2
+            val expectedTxns =
+                listOf(
+                    Transaction(id = 1, description = "Coffee", amount = 50.0, date = 0L, accountId = 1, categoryId = null, notes = null),
+                )
+            `when`(goalRepository.getLinkedTransactions(goalId)).thenReturn(flowOf(expectedTxns))
+
+            // Act
+            val resultFlow = viewModel.getLinkedTransactions(goalId)
+
+            // Assert
+            resultFlow.test {
+                assertEquals(expectedTxns, awaitItem())
+                awaitComplete()
+            }
+            verify(goalRepository).getLinkedTransactions(goalId)
+        }
+
+    @Test
+    fun `getLinkedTransactionCount calls repository and returns flow`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val goalId = 3
+            `when`(goalRepository.getLinkedTransactionCount(goalId)).thenReturn(flowOf(5))
+
+            // Act
+            val resultFlow = viewModel.getLinkedTransactionCount(goalId)
+
+            // Assert
+            resultFlow.test {
+                assertEquals(5, awaitItem())
+                awaitComplete()
+            }
+            verify(goalRepository).getLinkedTransactionCount(goalId)
+        }
+
+    @Test
+    fun `getLinkedTransactionIds calls repository and returns flow`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val goalId = 4
+            val expectedIds = listOf(10, 20, 30)
+            `when`(goalRepository.getLinkedTransactionIds(goalId)).thenReturn(flowOf(expectedIds))
+
+            // Act
+            val resultFlow = viewModel.getLinkedTransactionIds(goalId)
+
+            // Assert
+            resultFlow.test {
+                assertEquals(expectedIds, awaitItem())
+                awaitComplete()
+            }
+            verify(goalRepository).getLinkedTransactionIds(goalId)
+        }
+
+    @Test
+    fun `getActiveGoalsSnapshot calls repository and returns list`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val expectedGoals = listOf(Goal(id = 1, name = "Emergency Fund", targetAmount = 50000.0, targetDate = null, accountId = 1))
+            `when`(goalRepository.getActiveGoalsSnapshot()).thenReturn(expectedGoals)
+
+            // Act
+            val result = viewModel.getActiveGoalsSnapshot()
+
+            // Assert
+            assertEquals(expectedGoals, result)
+            verify(goalRepository).getActiveGoalsSnapshot()
+        }
+
+    @Test
+    fun `getRecentTransactions calls repository and returns flow`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val start = 1000L
+            val end = 2000L
+            val expectedTxns =
+                listOf(
+                    Transaction(id = 5, description = "Lunch", amount = 150.0, date = 1500L, accountId = 1, categoryId = null, notes = null),
+                )
+            `when`(goalRepository.getRecentTransactions(start, end)).thenReturn(flowOf(expectedTxns))
+
+            // Act
+            val resultFlow = viewModel.getRecentTransactions(start, end)
+
+            // Assert
+            resultFlow.test {
+                assertEquals(expectedTxns, awaitItem())
+                awaitComplete()
+            }
+            verify(goalRepository).getRecentTransactions(start, end)
+        }
 }

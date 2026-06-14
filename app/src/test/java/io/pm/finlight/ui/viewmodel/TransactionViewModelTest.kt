@@ -3126,4 +3126,65 @@ class TransactionViewModelTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `updateTransactionAmount does nothing when amountStr is not a valid number`() =
+        runTest {
+            // Arrange - non-parseable string
+            val transactionId = 1
+
+            // Act
+            viewModel.updateTransactionAmount(transactionId, "not_a_number")
+            advanceUntilIdle()
+
+            // Assert — repository must NOT be called since toDoubleOrNull() returns null
+            verify(transactionRepository, never()).updateAmount(any(), any())
+        }
+
+    @Test
+    fun `updateTransactionAmount does nothing when amount is zero or negative`() =
+        runTest {
+            // Arrange - zero amount (not > 0)
+            val transactionId = 1
+
+            // Act
+            viewModel.updateTransactionAmount(transactionId, "0.0")
+            advanceUntilIdle()
+
+            // Assert — repository must NOT be called since 0.0 is not > 0
+            verify(transactionRepository, never()).updateAmount(any(), any())
+        }
+
+    @Test
+    fun `createCategory with default icon and color keys applies normalization`() =
+        runTest {
+            // Arrange
+            // When iconKey == "category" it is normalized to "letter_default"
+            // When colorKey == "gray_light" it is replaced by getNextAvailableColor()
+            val newCategoryName = "Hobbies"
+            val defaultIconKey = "category"
+            val defaultColorKey = "gray_light"
+            val resolvedIconKey = "letter_default" // expected after normalization
+            // CategoryIconHelper.getNextAvailableColor([]) returns the first color
+            // We only need to verify insert was called with the resolved icon key.
+            val createdCategory = Category(1, newCategoryName, resolvedIconKey, "blue_light")
+            var callbackResult: Category? = null
+
+            whenever(db.categoryDao().findByName(newCategoryName)).thenReturn(null)
+            whenever(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
+            whenever(categoryRepository.insert(any())).thenReturn(1L)
+            whenever(categoryRepository.getCategoryById(1)).thenReturn(createdCategory)
+
+            // Act
+            viewModel.createCategory(newCategoryName, defaultIconKey, defaultColorKey) { callbackResult = it }
+            advanceUntilIdle()
+
+            // Assert — icon key must have been normalized from "category" to "letter_default"
+            val captor = argumentCaptor<Category>()
+            verify(categoryRepository).insert(captor.capture())
+            assertEquals(resolvedIconKey, captor.firstValue.iconKey)
+            // color key must have been replaced (anything other than "gray_light")
+            assertTrue("Color should have been resolved", captor.firstValue.colorKey != defaultColorKey)
+            assertEquals(createdCategory, callbackResult)
+        }
 }
