@@ -551,16 +551,16 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         runTest {
             repository.getExcludedIncomeMonths().test {
                 assertEquals(emptySet(), awaitItem())
-                
+
                 repository.toggleIncomeMonthExclusion("2026_01")
                 assertEquals(setOf("2026_01"), awaitItem())
-                
+
                 repository.toggleIncomeMonthExclusion("2026_02")
                 assertEquals(setOf("2026_01", "2026_02"), awaitItem())
-                
+
                 repository.toggleIncomeMonthExclusion("2026_01")
                 assertEquals(setOf("2026_02"), awaitItem())
-                
+
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -570,13 +570,13 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         runTest {
             repository.getExcludedExpenseMonths().test {
                 assertEquals(emptySet(), awaitItem())
-                
+
                 repository.toggleExpenseMonthExclusion("2026_03")
                 assertEquals(setOf("2026_03"), awaitItem())
-                
+
                 repository.toggleExpenseMonthExclusion("2026_03")
                 assertEquals(emptySet(), awaitItem())
-                
+
                 cancelAndIgnoreRemainingEvents()
             }
         }
