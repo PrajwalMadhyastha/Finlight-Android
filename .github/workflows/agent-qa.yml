@@ -134,17 +134,26 @@ jobs:
             python -m agent.main --goal "${{ github.event.inputs.goal || 'random' }}" --max-steps 100
 
       - name: Create GitHub Issue on Bug Found
-        if: failure()
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -f "new_bugs_found.txt" ]; then
             REPORT_FILE=$(find . -maxdepth 1 -name "qa-report-*.md" | head -n 1)
             if [ -f "$REPORT_FILE" ]; then
-              gh issue create \
-                --title "🤖 AI QA Agent Bug: ${{ github.event.inputs.goal || 'random' }}" \
-                --body-file "$REPORT_FILE" \
-                --label "bug"
+              ISSUE_TITLE="🤖 AI QA Agent Bug: ${{ github.event.inputs.goal || 'random' }}"
+              # Check if an issue with this exact title already exists and is open
+              EXISTING_ISSUE=$(gh issue list --state open --search "in:title \"$ISSUE_TITLE\"" --json number -q '.[0].number')
+              
+              if [ -n "$EXISTING_ISSUE" ] && [ "$EXISTING_ISSUE" != "null" ]; then
+                echo "An open issue already exists (#$EXISTING_ISSUE). Adding a comment instead of creating a duplicate."
+                gh issue comment "$EXISTING_ISSUE" --body-file "$REPORT_FILE"
+              else
+                gh issue create \
+                  --title "$ISSUE_TITLE" \
+                  --body-file "$REPORT_FILE" \
+                  --label "bug"
+              fi
             else
               echo "No report file found to attach to the issue."
             fi
