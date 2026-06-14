@@ -99,4 +99,102 @@ class GoalSurplusWorkerTest {
             val notifications = shadowNotificationManager.allNotifications
             assertTrue("Notification should be sent", notifications.isNotEmpty())
         }
+
+    @Test
+    fun testDoWork_nudgesDisabled() = runTest {
+        val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("goal_nudges_enabled", false).apply()
+
+        val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notifications = shadowOf(notificationManager).allNotifications
+        assertTrue("No notification should be sent when nudges are disabled", notifications.isEmpty())
+    }
+
+    @Test
+    fun testDoWork_noBudgetSet() = runTest {
+        val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
+        // No budget is set in prefs
+
+        val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notifications = shadowOf(notificationManager).allNotifications
+        assertTrue("No notification should be sent when no budget is set", notifications.isEmpty())
+    }
+
+    @Test
+    fun testDoWork_noSurplus() = runTest {
+        val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
+
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.MONTH, -1)
+        val prevYear = cal.get(Calendar.YEAR)
+        val prevMonth = String.format("%02d", cal.get(Calendar.MONTH) + 1)
+        // Set budget to a low amount
+        prefs.edit().putFloat("overall_budget_${prevYear}_$prevMonth", 1000f).apply()
+
+        // Insert expenses greater than budget
+        db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))
+        db.categoryDao().insert(io.pm.finlight.Category(id = 1, name = "Food", iconKey = "food", colorKey = "red"))
+        
+        val calDate = Calendar.getInstance()
+        calDate.add(Calendar.MONTH, -1)
+        val txDate = calDate.timeInMillis
+
+        transactionDao.insert(
+            Transaction(accountId = 1, categoryId = 1, amount = 1500.0, date = txDate, notes = "", description = "Food", transactionType = "expense")
+        )
+
+        val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notifications = shadowOf(notificationManager).allNotifications
+        assertTrue("No notification should be sent when expenses exceed budget", notifications.isEmpty())
+    }
+
+    @Test
+    fun testDoWork_noActiveGoals() = runTest {
+        val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
+
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.MONTH, -1)
+        val prevYear = cal.get(Calendar.YEAR)
+        val prevMonth = String.format("%02d", cal.get(Calendar.MONTH) + 1)
+        prefs.edit().putFloat("overall_budget_${prevYear}_$prevMonth", 5000f).apply()
+
+        // Insert only income, no expenses, so there is surplus
+        db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))
+        db.categoryDao().insert(io.pm.finlight.Category(id = 1, name = "Salary", iconKey = "work", colorKey = "green"))
+        
+        val calDate = Calendar.getInstance()
+        calDate.add(Calendar.MONTH, -1)
+        val txDate = calDate.timeInMillis
+
+        transactionDao.insert(
+            Transaction(accountId = 1, categoryId = 1, amount = 5000.0, date = txDate, notes = "", description = "Salary", transactionType = "income")
+        )
+
+        // DO NOT insert any active goals
+
+        val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
+        val result = worker.doWork()
+
+        assertEquals(ListenableWorker.Result.success(), result)
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notifications = shadowOf(notificationManager).allNotifications
+        // Worker only sends notification when surplus > 0 AND activeGoals.isNotEmpty().
+        // Since no goals exist, no notification is sent.
+        assertTrue("No notification should be sent when no active goals exist", notifications.isEmpty())
+    }
 }

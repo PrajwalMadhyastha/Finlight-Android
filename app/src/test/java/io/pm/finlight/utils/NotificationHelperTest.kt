@@ -72,6 +72,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                         NotificationManager.IMPORTANCE_HIGH,
                     ),
                     NotificationChannel(MainApplication.TRANSACTION_CHANNEL_ID, "Transactions", NotificationManager.IMPORTANCE_DEFAULT),
+                    NotificationChannel(MainApplication.GOALS_CHANNEL_ID, "Goals", NotificationManager.IMPORTANCE_DEFAULT),
                 )
             channels.forEach(notificationManager::createNotificationChannel)
         }
@@ -831,5 +832,73 @@ class NotificationHelperTest : BaseViewModelTest() {
         assertEquals(expectedUri, contentIntent.data.toString())
 
         assertEquals("Review Now", notification.actions[0].title)
+    }
+
+    @Test
+    fun `showSuspiciousAmountNotification_whenPermissionDenied_doesNotPost`() {
+        shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val transaction = Transaction(id = 306, description = "Test", amount = 100.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null)
+        NotificationHelper.showSuspiciousAmountNotification(context, transaction, "reason")
+        val notification = shadowNotificationManager.getNotification(306)
+        assertTrue(notification == null)
+    }
+
+    @Test
+    fun `showVariableBillAnomalyNotification_whenPermissionDenied_doesNotPost`() {
+        shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val rule = RecurringTransaction(id = 205, description = "Test", amount = 100.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+        NotificationHelper.showVariableBillAnomalyNotification(context, rule, 150.0, 100.0)
+        val notification = shadowNotificationManager.getNotification(205 + 5000)
+        assertTrue(notification == null)
+    }
+
+    @Test
+    fun `showAutoApprovedPaymentNotification_whenPermissionDenied_doesNotPost`() {
+        shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val rule = RecurringTransaction(id = 206, description = "Test", amount = 100.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+        NotificationHelper.showAutoApprovedPaymentNotification(context, rule)
+        val notificationId = "auto_${rule.id}".hashCode()
+        val notification = shadowNotificationManager.getNotification(notificationId)
+        assertTrue(notification == null)
+    }
+
+    @Test
+    fun `showGoalSurplusNotification_buildsCorrectly`() {
+        // GoalWithAccountName: id, name, targetAmount, savedAmount, targetDate, accountId, accountName, notes, iconEmoji, priority
+        val topGoal = io.pm.finlight.GoalWithAccountName(1, "Vacation", 1000.0, 500.0, null, 1, "Savings", null, "🌴", 0)
+        NotificationHelper.showGoalSurplusNotification(context, 200.0, topGoal)
+
+        val notificationId = "surplus_nudge".hashCode()
+        val notification = shadowNotificationManager.getNotification(notificationId)
+        assertNotNull(notification)
+        assertEquals("Budget Surplus! 🎉", notification.extras.getString(Notification.EXTRA_TITLE))
+        // Check big text contains goal name
+        val bigText = notification.extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT)?.toString()
+        assertTrue(bigText?.contains("Vacation") == true)
+
+        val contentPI = notification.contentIntent
+        assertNotNull(contentPI)
+    }
+
+    @Test
+    fun `showGoalSurplusNotification_buildsCorrectly_noActiveGoals`() {
+        NotificationHelper.showGoalSurplusNotification(context, 300.0, null)
+
+        val notificationId = "surplus_nudge".hashCode()
+        val notification = shadowNotificationManager.getNotification(notificationId)
+        assertNotNull(notification)
+        assertEquals("Budget Surplus! 🎉", notification.extras.getString(Notification.EXTRA_TITLE))
+        // When no goal, big text should mention "staying under budget"
+        val bigText = notification.extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT)?.toString()
+        assertTrue(bigText?.contains("staying under budget") == true)
+    }
+
+    @Test
+    fun `showGoalSurplusNotification_whenPermissionDenied_doesNotPost`() {
+        shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        NotificationHelper.showGoalSurplusNotification(context, 200.0, null)
+        val notificationId = "surplus_nudge".hashCode()
+        val notification = shadowNotificationManager.getNotification(notificationId)
+        assertTrue(notification == null)
     }
 }
