@@ -16,6 +16,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
+import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.verify
 import org.robolectric.annotation.Config
 
@@ -94,14 +95,14 @@ class GoalRepositoryTest : BaseViewModelTest() {
     @Test
     fun `getActiveGoals calls DAO`() {
         repository.getActiveGoals()
-        verify(goalDao).getActiveGoals()
+        verify(goalDao).getActiveGoals(anyLong())
     }
 
     @Test
     fun `getActiveGoalsSnapshot calls DAO`() =
         runTest {
             repository.getActiveGoalsSnapshot()
-            verify(goalDao).getActiveGoalsSnapshot()
+            verify(goalDao).getActiveGoalsSnapshot(anyLong())
         }
 
     @Test
