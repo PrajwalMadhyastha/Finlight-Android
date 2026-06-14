@@ -9,7 +9,6 @@ import io.pm.finlight.GoalRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.TransactionDao
 import io.pm.finlight.data.db.dao.GoalTransactionLinkDao
-import io.pm.finlight.data.db.entity.GoalTransactionLink
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -18,6 +17,7 @@ import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.verify
+import org.mockito.kotlin.argThat
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
@@ -115,7 +115,12 @@ class GoalRepositoryTest : BaseViewModelTest() {
     fun `linkTransaction calls linkDao insertLink`() =
         runTest {
             repository.linkTransaction(1, 2)
-            verify(linkDao).insertLink(GoalTransactionLink(goalId = 1, transactionId = 2))
+            // Use argThat to avoid flakiness caused by GoalTransactionLink's
+            // `linkedAt = System.currentTimeMillis()` default arg differing
+            // between the actual call and the verify() call.
+            verify(linkDao).insertLink(
+                argThat { link -> link.goalId == 1 && link.transactionId == 2 },
+            )
         }
 
     @Test
