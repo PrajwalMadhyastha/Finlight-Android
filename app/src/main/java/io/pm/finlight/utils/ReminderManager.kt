@@ -38,6 +38,7 @@ object ReminderManager {
     private const val RECURRING_PATTERN_WORK_TAG = "recurring_pattern_work"
     private const val AUTO_BACKUP_WORK_TAG = "auto_backup_work"
     private const val SMS_CATCHUP_WORK_TAG = "sms_catchup_work"
+    private const val GOAL_SURPLUS_WORK_TAG = "goal_surplus_work"
     // --- DELETED: SNAPSHOT_WORKER_TAG ---
 
     // New preference key for enabling/disabling the recurring transaction feature
@@ -75,6 +76,9 @@ object ReminderManager {
         // Always schedule the SMS catch-up worker — it is always needed regardless
         // of any user preferences.
         scheduleSmsRecoveryWorker(context)
+
+        // Schedule Goal Surplus Check
+        scheduleGoalSurplusWorker(context)
     }
 
     // --- DELETED: scheduleSnapshotWorker function ---
@@ -294,5 +298,33 @@ object ReminderManager {
 
     fun cancelMonthlySummary(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(MONTHLY_SUMMARY_WORK_TAG)
+    }
+
+    fun scheduleGoalSurplusWorker(context: Context) {
+        val now = Calendar.getInstance()
+        val nextRun =
+            Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 10) // 10 AM on the 1st
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+            }
+
+        if (nextRun.before(now)) {
+            nextRun.add(Calendar.MONTH, 1)
+        }
+
+        val initialDelay = nextRun.timeInMillis - now.timeInMillis
+        val goalSurplusRequest =
+            OneTimeWorkRequestBuilder<io.pm.finlight.workers.GoalSurplusWorker>()
+                .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            GOAL_SURPLUS_WORK_TAG,
+            ExistingWorkPolicy.REPLACE,
+            goalSurplusRequest,
+        )
+        Log.d("ReminderManager", "Goal surplus check scheduled for ${nextRun.time}")
     }
 }

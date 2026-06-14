@@ -191,5 +191,6 @@ private fun DashboardCard(
         // --- NEW (Issue #105): Rendering recurring cards ---
         DashboardCardType.UPCOMING_PAYMENTS -> UpcomingPaymentsCard(navController = navController)
         DashboardCardType.RECURRING_SUGGESTIONS -> RecurringSuggestionsCard(navController = navController)
+        DashboardCardType.SAVINGS_GOALS -> SavingsGoalsCard(navController = navController)
     }
 }

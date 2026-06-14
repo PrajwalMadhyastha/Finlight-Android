@@ -103,6 +103,7 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 fun AddTransactionScreen(
     navController: NavController,
     viewModel: TransactionViewModel,
+    goalViewModel: GoalViewModel,
     isCsvEdit: Boolean = false,
     initialDataJson: String? = null,
     initialTransactionType: String? = null,
@@ -138,6 +139,24 @@ fun AddTransactionScreen(
     val selectedTags by viewModel.selectedTags.collectAsState()
     val defaultAccount by viewModel.defaultAccount.collectAsState()
     val validationError by viewModel.validationError.collectAsState()
+
+    val activeGoals by goalViewModel.activeGoals.collectAsState()
+    val goalIncomeThreshold by viewModel.goalIncomeThreshold.collectAsState()
+    var showGoalAllocationDialog by remember { mutableStateOf<Long?>(null) }
+
+    val handleSaveComplete: (Long?) -> Unit = { savedTxnId ->
+        val amtDouble = amount.toDoubleOrNull() ?: 0.0
+        if (transactionType.equals("income", ignoreCase = true) &&
+            amtDouble >= goalIncomeThreshold &&
+            activeGoals.isNotEmpty() &&
+            savedTxnId != null
+        ) {
+            showGoalAllocationDialog = savedTxnId
+        } else {
+            navController.popBackStack()
+        }
+    }
+
     val travelModeSettings by viewModel.travelModeSettings.collectAsState()
     val categoryNudgeData by viewModel.showCategoryNudge.collectAsState()
     val suggestedCategory by viewModel.suggestedCategory.collectAsState()
@@ -405,7 +424,7 @@ fun AddTransactionScreen(
                             date = selectedDateTime.timeInMillis,
                             transactionType = transactionType,
                             imageUris = attachedImageUris,
-                            onSaveComplete = { navController.popBackStack() },
+                            onSaveComplete = handleSaveComplete,
                         )
                     },
                     enabled = isSaveEnabled,
@@ -428,8 +447,8 @@ fun AddTransactionScreen(
         ModalBottomSheet(
             onDismissRequest = {
                 if (categoryNudgeData != null) {
-                    viewModel.saveWithSelectedCategory(null) {
-                        navController.popBackStack()
+                    viewModel.saveWithSelectedCategory(null) { txnId ->
+                        handleSaveComplete(txnId)
                     }
                 }
                 activeSheet = null
@@ -463,8 +482,8 @@ fun AddTransactionScreen(
                             onCategorySelected = {
                                 viewModel.onAddTransactionCategoryChanged(it)
                                 if (categoryNudgeData != null) {
-                                    viewModel.saveWithSelectedCategory(it.id) {
-                                        navController.popBackStack()
+                                    viewModel.saveWithSelectedCategory(it.id) { txnId ->
+                                        handleSaveComplete(txnId)
                                     }
                                 }
                                 activeSheet = null
@@ -615,6 +634,24 @@ fun AddTransactionScreen(
                 }
                 showCreateCategoryDialog = false
             },
+        )
+    }
+
+    if (showGoalAllocationDialog != null) {
+        GoalAllocationDialog(
+            transactionAmount = amount.toDoubleOrNull() ?: 0.0,
+            activeGoals = activeGoals,
+            onDismiss = {
+                showGoalAllocationDialog = null
+                navController.popBackStack()
+            },
+            onConfirm = { goalsToLink ->
+                goalsToLink.forEach { goal ->
+                    goalViewModel.linkTransactionToGoal(goal.id, showGoalAllocationDialog!!.toInt())
+                }
+                showGoalAllocationDialog = null
+                navController.popBackStack()
+            }
         )
     }
 }

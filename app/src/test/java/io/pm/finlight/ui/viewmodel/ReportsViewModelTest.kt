@@ -128,10 +128,12 @@ class ReportsViewModelTest : BaseViewModelTest() {
     fun `setReportView updates view type and displayed stats`() =
         runTest {
             // Arrange
+            // Use yesterday's date to ensure data is never considered "future" and filtered out
+            val testDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }.time
             val yearlyData: List<CalendarDayStatus> =
-                listOf(CalendarDayStatus(Calendar.getInstance().time, SpendingStatus.OVER_LIMIT, 120, 100))
+                listOf(CalendarDayStatus(testDate, SpendingStatus.OVER_LIMIT, 120, 100))
             val monthlyData: List<CalendarDayStatus> =
-                listOf(CalendarDayStatus(Calendar.getInstance().time, SpendingStatus.WITHIN_LIMIT, 80, 100))
+                listOf(CalendarDayStatus(testDate, SpendingStatus.WITHIN_LIMIT, 80, 100))
 
             val currentMonth = Calendar.getInstance().get(Calendar.MONTH) + 1
             val currentYear = Calendar.getInstance().get(Calendar.YEAR)

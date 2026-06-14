@@ -791,4 +791,100 @@ object NotificationHelper {
             notify(transaction.id, builder.build())
         }
     }
+
+    // --- NEW: Goal Notifications ---
+    fun showGoalSurplusNotification(
+        context: Context,
+        surplusAmount: Double,
+        topGoal: GoalWithAccountName?,
+    ) {
+        val canShowNotification =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+
+        if (!canShowNotification) return
+
+        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+        val surplusStr = currencyFormat.format(surplusAmount)
+
+        val deepLinkUri = "app://finlight.pm.io/dashboard".toUri()
+        val intent = Intent(Intent.ACTION_VIEW, deepLinkUri).apply { `package` = context.packageName }
+        val pendingIntent =
+            PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+        val bigText =
+            if (topGoal != null) {
+                "You had a surplus of $surplusStr last month! Want to put some of it towards '${topGoal.name}'?"
+            } else {
+                "You had a surplus of $surplusStr last month! Great job staying under budget."
+            }
+
+        val builder =
+            NotificationCompat.Builder(context, MainApplication.GOALS_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_logo)
+                .setContentTitle("Budget Surplus! 🎉")
+                .setContentText("You saved $surplusStr last month. Tap to view.")
+                .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+
+        with(NotificationManagerCompat.from(context)) {
+            notify("surplus_nudge".hashCode(), builder.build())
+        }
+    }
+
+    fun showGoalMilestoneNotification(
+        context: Context,
+        goalName: String,
+        percentReached: Int,
+    ) {
+        val canShowNotification =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+
+        if (!canShowNotification) return
+
+        val deepLinkUri = "app://finlight.pm.io/dashboard".toUri()
+        val intent = Intent(Intent.ACTION_VIEW, deepLinkUri).apply { `package` = context.packageName }
+        val pendingIntent =
+            PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+        val title = if (percentReached >= 100) "Goal Reached! 🥳" else "Milestone Reached! 🚀"
+        val text =
+            if (percentReached >= 100) {
+                "Congratulations! You've reached your savings goal for '$goalName'."
+            } else {
+                "You're $percentReached% of the way to your goal for '$goalName'. Keep it up!"
+            }
+
+        val builder =
+            NotificationCompat.Builder(context, MainApplication.GOALS_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_logo)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+
+        with(NotificationManagerCompat.from(context)) {
+            notify("milestone_$goalName".hashCode(), builder.build())
+        }
+    }
 }

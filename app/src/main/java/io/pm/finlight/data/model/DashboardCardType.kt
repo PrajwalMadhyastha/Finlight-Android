@@ -21,4 +21,7 @@ enum class DashboardCardType {
     // --- NEW (Issue #105): Recurring transaction dashboard cards ---
     UPCOMING_PAYMENTS,
     RECURRING_SUGGESTIONS,
+
+    // --- NEW (Issue #104): Savings Goals card ---
+    SAVINGS_GOALS,
 }

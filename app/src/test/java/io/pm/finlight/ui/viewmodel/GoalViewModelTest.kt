@@ -48,7 +48,7 @@ class GoalViewModelTest : BaseViewModelTest() {
             // Arrange
             val goals =
                 listOf(
-                    GoalWithAccountName(1, "Vacation", 50000.0, 10000.0, null, 1, "Savings"),
+                    GoalWithAccountName(1, "Vacation", 50000.0, 10000.0, null, 1, "Savings", null, null, 0),
                 )
             initializeViewModel(goals)
 
@@ -64,7 +64,7 @@ class GoalViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val goalId = 1
-            val goal = Goal(goalId, "Vacation", 50000.0, 10000.0, null, 1)
+            val goal = Goal(goalId, "Vacation", 50000.0, 10000.0, null, 1, null, null, 0)
             `when`(goalRepository.getGoalById(goalId)).thenReturn(flowOf(goal))
             initializeViewModel()
 
@@ -82,7 +82,7 @@ class GoalViewModelTest : BaseViewModelTest() {
             initializeViewModel()
 
             // Act
-            viewModel.saveGoal(null, "New Car", 200000.0, 50000.0, null, 1)
+            viewModel.saveGoal(null, "New Car", 200000.0, null, 1)
             advanceUntilIdle()
 
             // Assert
@@ -101,7 +101,7 @@ class GoalViewModelTest : BaseViewModelTest() {
             val goalId = 5
 
             // Act
-            viewModel.saveGoal(goalId, "Updated Goal", 1500.0, 500.0, null, 2)
+            viewModel.saveGoal(goalId, "Updated Goal", 1500.0, null, 2)
             advanceUntilIdle()
 
             // Assert
@@ -117,7 +117,7 @@ class GoalViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             initializeViewModel()
-            val goalToDelete = Goal(1, "Old Goal", 1000.0, 1000.0, null, 1)
+            val goalToDelete = Goal(1, "Old Goal", 1000.0, 1000.0, null, 1, null, null, 0)
 
             // Act
             viewModel.deleteGoal(goalToDelete)
@@ -136,7 +136,7 @@ class GoalViewModelTest : BaseViewModelTest() {
 
             // Act & Assert
             viewModel.uiEvent.test {
-                viewModel.saveGoal(null, "Test", 1.0, 0.0, null, 1)
+                viewModel.saveGoal(null, "Test", 1.0, null, 1)
                 advanceUntilIdle()
                 assertEquals("Error saving goal: $errorMessage", awaitItem())
             }
@@ -151,7 +151,7 @@ class GoalViewModelTest : BaseViewModelTest() {
 
             // Act & Assert
             viewModel.uiEvent.test {
-                viewModel.saveGoal(1, "Test", 1.0, 0.0, null, 1)
+                viewModel.saveGoal(1, "Test", 1.0, null, 1)
                 advanceUntilIdle()
                 assertEquals("Error saving goal: $errorMessage", awaitItem())
             }
@@ -161,7 +161,7 @@ class GoalViewModelTest : BaseViewModelTest() {
     fun `deleteGoal success sends success event`() =
         runTest {
             // Arrange
-            val goal = Goal(1, "Test", 1.0, 0.0, null, 1)
+            val goal = Goal(1, "Test", 1.0, 0.0, null, 1, null, null, 0)
 
             // Act & Assert
             viewModel.uiEvent.test {
@@ -177,7 +177,7 @@ class GoalViewModelTest : BaseViewModelTest() {
     fun `deleteGoal failure sends error event`() =
         runTest {
             // Arrange
-            val goal = Goal(1, "Test", 1.0, 0.0, null, 1)
+            val goal = Goal(1, "Test", 1.0, 0.0, null, 1, null, null, 0)
             val errorMessage = "DB Error"
             `when`(goalRepository.delete(anyObject())).thenThrow(RuntimeException(errorMessage))
 
@@ -188,5 +188,103 @@ class GoalViewModelTest : BaseViewModelTest() {
 
                 assertEquals("Error deleting goal: $errorMessage", awaitItem())
             }
+        }
+
+    @Test
+    fun `linkTransactionToGoal calls repository and sends success event`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val goalId = 1
+            val transactionId = 100
+
+            // Act
+            viewModel.uiEvent.test {
+                viewModel.linkTransactionToGoal(goalId, transactionId)
+                advanceUntilIdle()
+
+                // Assert
+                verify(goalRepository).linkTransaction(goalId, transactionId)
+                assertEquals("Transaction linked to goal.", awaitItem())
+            }
+        }
+
+    @Test
+    fun `linkTransactionToGoal on failure sends error event`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val goalId = 1
+            val transactionId = 100
+            val errorMessage = "Link Error"
+            `when`(goalRepository.linkTransaction(goalId, transactionId)).thenThrow(RuntimeException(errorMessage))
+
+            // Act
+            viewModel.uiEvent.test {
+                viewModel.linkTransactionToGoal(goalId, transactionId)
+                advanceUntilIdle()
+
+                // Assert
+                assertEquals("Error linking transaction: $errorMessage", awaitItem())
+            }
+        }
+
+    @Test
+    fun `unlinkTransactionFromGoal calls repository and sends success event`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val goalId = 1
+            val transactionId = 100
+
+            // Act
+            viewModel.uiEvent.test {
+                viewModel.unlinkTransactionFromGoal(goalId, transactionId)
+                advanceUntilIdle()
+
+                // Assert
+                verify(goalRepository).unlinkTransaction(goalId, transactionId)
+                assertEquals("Transaction unlinked from goal.", awaitItem())
+            }
+        }
+
+    @Test
+    fun `unlinkTransactionFromGoal on failure sends error event`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val goalId = 1
+            val transactionId = 100
+            val errorMessage = "Unlink Error"
+            `when`(goalRepository.unlinkTransaction(goalId, transactionId)).thenThrow(RuntimeException(errorMessage))
+
+            // Act
+            viewModel.uiEvent.test {
+                viewModel.unlinkTransactionFromGoal(goalId, transactionId)
+                advanceUntilIdle()
+
+                // Assert
+                assertEquals("Error unlinking transaction: $errorMessage", awaitItem())
+            }
+        }
+
+    @Test
+    fun `getLinkedTotal calls repository and returns flow`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val goalId = 1
+            val expectedTotal = 1500.0
+            `when`(goalRepository.getLinkedTotal(goalId)).thenReturn(flowOf(expectedTotal))
+
+            // Act
+            val resultFlow = viewModel.getLinkedTotal(goalId)
+
+            // Assert
+            resultFlow.test {
+                assertEquals(expectedTotal, awaitItem(), 0.0)
+                awaitComplete()
+            }
+            verify(goalRepository).getLinkedTotal(goalId)
         }
 }

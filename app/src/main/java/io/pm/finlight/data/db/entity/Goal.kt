@@ -1,8 +1,10 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/Goal.kt
-// REASON: FEATURE (Backup Phase 2) - Added the @Serializable annotation. This is
-// required by the kotlinx.serialization library to include this entity's data
-// in the JSON backup snapshot.
+// REASON: FEATURE (Issue #104) - Reworked for dynamic progress tracking.
+// - `savedAmount` is deprecated (kept for migration compat, defaults to 0.0).
+//   Progress is now computed dynamically from linked transactions.
+// - Added `notes`, `iconEmoji`, and `priority` fields for personalization
+//   and future Waterfall Savings support.
 // =================================================================================
 package io.pm.finlight
 
@@ -30,7 +32,13 @@ data class Goal(
     val id: Int = 0,
     val name: String,
     val targetAmount: Double,
-    var savedAmount: Double,
+    // Deprecated: progress is now computed from linked transactions.
+    // Kept for backward compatibility with existing data.
+    var savedAmount: Double = 0.0,
     val targetDate: Long?,
     val accountId: Int,
+    val notes: String? = null,
+    val iconEmoji: String? = null,
+    // Placeholder for future Waterfall Savings priority ordering
+    val priority: Int = 0,
 )

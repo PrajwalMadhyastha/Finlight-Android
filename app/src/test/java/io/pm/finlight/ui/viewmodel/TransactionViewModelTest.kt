@@ -500,8 +500,9 @@ class TransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // ARRANGE
             val accountId = 1
-            var onSaveCompleteCalled = false
-            whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(1L)
+            var capturedId: Long? = null
+            val expectedId = 1L
+            whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(expectedId)
 
             // ACT
             viewModel.onSaveTapped(
@@ -514,13 +515,13 @@ class TransactionViewModelTest : BaseViewModelTest() {
                 date = 0L,
                 transactionType = "expense",
                 imageUris = emptyList(),
-            ) { onSaveCompleteCalled = true }
+            ) { capturedId = it }
             advanceUntilIdle()
 
             // ASSERT
             assertNull(viewModel.showCategoryNudge.value)
             verify(transactionRepository).insertTransactionWithTagsAndImages(any(), any(), any())
-            assertTrue(onSaveCompleteCalled)
+            assertEquals(expectedId, capturedId)
         }
 
     @Test
@@ -528,7 +529,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // ARRANGE
             val accountId = 1
-            var onSaveCompleteCalled = false
+            var callbackInvoked = false
 
             // ACT
             viewModel.onSaveTapped(
@@ -542,14 +543,14 @@ class TransactionViewModelTest : BaseViewModelTest() {
                 date = 0L,
                 transactionType = "expense",
                 imageUris = emptyList(),
-            ) { onSaveCompleteCalled = true }
+            ) { callbackInvoked = true }
             advanceUntilIdle()
 
             // ASSERT
             assertNotNull(viewModel.showCategoryNudge.value)
             assertEquals("Coffee", viewModel.showCategoryNudge.value?.description)
             verify(transactionRepository, never()).insertTransactionWithTagsAndImages(any(), any(), any())
-            assertFalse(onSaveCompleteCalled)
+            assertFalse(callbackInvoked)
         }
 
     @Test
@@ -557,11 +558,12 @@ class TransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // ARRANGE
             val accountId = 1
-            var onSaveCompleteCalled = false
+            var capturedId: Long? = null
+            val expectedId = 1L
             val newCategoryId = 5
             val transactionCaptor = argumentCaptor<Transaction>()
 
-            whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(1L)
+            whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(expectedId)
 
             // First, trigger the nudge
             viewModel.onSaveTapped(
@@ -578,7 +580,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
             assertNotNull(viewModel.showCategoryNudge.value)
 
             // ACT
-            viewModel.saveWithSelectedCategory(newCategoryId) { onSaveCompleteCalled = true }
+            viewModel.saveWithSelectedCategory(newCategoryId) { capturedId = it }
             advanceUntilIdle()
 
             // ASSERT
@@ -590,7 +592,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
             assertEquals(newCategoryId, savedTransaction.categoryId)
             assertEquals("With friends", savedTransaction.notes)
             assertEquals(12345L, savedTransaction.date)
-            assertTrue(onSaveCompleteCalled)
+            assertEquals(expectedId, capturedId)
             assertNull(viewModel.showCategoryNudge.value) // Nudge should be cleared
         }
 

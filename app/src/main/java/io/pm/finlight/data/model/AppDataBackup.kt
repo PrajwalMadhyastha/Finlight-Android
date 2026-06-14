@@ -1,13 +1,13 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/model/AppDataBackup.kt
-// REASON: FEATURE (Backup Phase 2) - The data class has been updated to include
-// lists for all remaining user-generated content: Tags, Goals, Trips,
-// AccountAliases, and the Transaction-Tag cross-references.
+// REASON: FEATURE (Issue #104) - Added `goalTransactionLinks` field to include
+// the new goal-transaction junction table in backup/restore operations.
 // =================================================================================
 package io.pm.finlight.data.model
 
 import io.pm.finlight.*
 import io.pm.finlight.data.db.entity.AccountAlias
+import io.pm.finlight.data.db.entity.GoalTransactionLink
 import io.pm.finlight.data.db.entity.Trip
 import kotlinx.serialization.Serializable
 
@@ -33,6 +33,7 @@ data class AppDataBackup(
     val tags: List<Tag> = emptyList(),
     val transactionTagCrossRefs: List<TransactionTagCrossRef> = emptyList(),
     val goals: List<Goal> = emptyList(),
+    val goalTransactionLinks: List<GoalTransactionLink> = emptyList(),
     val trips: List<Trip> = emptyList(),
     val accountAliases: List<AccountAlias> = emptyList(),
     // --- Phase 3: App-Learned Recurring Patterns ---

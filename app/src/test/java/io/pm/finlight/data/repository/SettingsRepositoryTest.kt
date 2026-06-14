@@ -184,6 +184,7 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                         DashboardCardType.ACCOUNTS_CAROUSEL,
                         DashboardCardType.UPCOMING_PAYMENTS,
                         DashboardCardType.RECURRING_SUGGESTIONS,
+                        DashboardCardType.SAVINGS_GOALS,
                     ),
                     defaultOrder,
                 )

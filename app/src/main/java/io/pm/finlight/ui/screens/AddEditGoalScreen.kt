@@ -1,12 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/screens/AddEditGoalScreen.kt
-// REASON: FIX - Integrated the user-provided, working solution for the
-// DatePickerDialog. The dialog is now explicitly given a solid, theme-aware
-// background color, which prevents it from inheriting the screen's transparency
-// and ensures it is always visible.
-// FIX (UI) - Removed the local Scaffold and TopAppBar. The main NavHost now
-// provides a centralized TopAppBar, and this change removes the duplicate,
-// resolving a UI bug.
+// REASON: FEATURE (Issue #104) - Removed the manual "Already Saved" field.
+// Goal progress is now computed dynamically from linked transactions.
+// Added an optional notes field for goal personalization.
+// Updated saveGoal() call to match the new ViewModel signature.
 // =================================================================================
 package io.pm.finlight.ui.screens
 
@@ -42,10 +39,9 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 fun AddEditGoalScreen(
     navController: NavController,
     goalId: Int? = null,
+    goalViewModel: GoalViewModel,
+    txnViewModel: TransactionViewModel,
 ) {
-    // View-models
-    val goalViewModel: GoalViewModel = viewModel()
-    val txnViewModel: TransactionViewModel = viewModel()
 
     // Screen mode
     val isEditMode = goalId != null
@@ -57,9 +53,9 @@ fun AddEditGoalScreen(
     // Local UI state
     var name by remember { mutableStateOf(TextFieldValue("")) }
     var targetAmount by remember { mutableStateOf(TextFieldValue("")) }
-    var savedAmount by remember { mutableStateOf(TextFieldValue("")) }
     var selectedAccount by remember { mutableStateOf<Account?>(null) }
     var targetDateMillis by remember { mutableStateOf<Long?>(null) }
+    var notes by remember { mutableStateOf(TextFieldValue("")) }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var accountExpanded by remember { mutableStateOf(false) }
@@ -75,10 +71,10 @@ fun AddEditGoalScreen(
         goalToEdit?.let { goal ->
             val nameStr = goal.name
             val targetStr = NumberFormat.getNumberInstance().format(goal.targetAmount)
-            val savedStr = NumberFormat.getNumberInstance().format(goal.savedAmount)
+            val notesStr = goal.notes ?: ""
             name = TextFieldValue(nameStr, TextRange(nameStr.length))
             targetAmount = TextFieldValue(targetStr, TextRange(targetStr.length))
-            savedAmount = TextFieldValue(savedStr, TextRange(savedStr.length))
+            notes = TextFieldValue(notesStr, TextRange(notesStr.length))
             targetDateMillis = goal.targetDate
             selectedAccount = accounts.find { it.id == goal.accountId }
         }
@@ -121,14 +117,11 @@ fun AddEditGoalScreen(
                         colors = auroraTextFieldColors(),
                     )
                     OutlinedTextField(
-                        value = savedAmount,
-                        onValueChange = { tfv ->
-                            savedAmount = tfv.copy(text = tfv.text.filter { ch -> ch.isDigit() || ch == '.' })
-                        },
-                        label = { Text("Already Saved") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        leadingIcon = { Text("₹") },
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text("Notes (optional)") },
+                        singleLine = false,
+                        maxLines = 3,
                         modifier = Modifier.fillMaxWidth(),
                         colors = auroraTextFieldColors(),
                     )
@@ -232,15 +225,14 @@ fun AddEditGoalScreen(
                 Button(
                     onClick = {
                         val tgtAmt = targetAmount.text.toDouble()
-                        val svdAmt = savedAmount.text.toDoubleOrNull() ?: 0.0
 
                         goalViewModel.saveGoal(
                             id = goalId,
                             name = name.text.trim(),
                             targetAmount = tgtAmt,
-                            savedAmount = svdAmt,
                             targetDate = targetDateMillis,
                             accountId = selectedAccount!!.id,
+                            notes = notes.text.trim().ifBlank { null },
                         )
                         navController.popBackStack()
                     },

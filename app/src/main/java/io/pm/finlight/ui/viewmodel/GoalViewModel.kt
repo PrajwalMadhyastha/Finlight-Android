@@ -1,12 +1,11 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/GoalViewModel.kt
-// REASON: REFACTOR (Testing) - The ViewModel now uses constructor dependency
-// injection for GoalRepository and extends ViewModel instead of AndroidViewModel.
-// This decouples it from the Application context, making it fully unit-testable.
-// REASON: FEATURE (Error Handling) - Added a UI event channel and wrapped all
-// data modification methods (`saveGoal`, `deleteGoal`) in try-catch blocks.
-// This ensures repository exceptions are handled gracefully and communicated to
-// the user, enhancing app stability.
+// REASON: FEATURE (Issue #104) - Reworked for dynamic progress tracking.
+// - Removed `savedAmount` from `saveGoal()` — progress is now computed from
+//   linked transactions.
+// - Added `linkTransactionToGoal()` and `unlinkTransactionFromGoal()` methods.
+// - Exposed `activeGoals` flow and `getLinkedTotal()` for dynamic progress.
+// - Added `notes`, `iconEmoji`, `priority` fields to `saveGoal()`.
 // =================================================================================
 package io.pm.finlight
 
@@ -32,17 +31,46 @@ class GoalViewModel(private val goalRepository: GoalRepository) : ViewModel() {
                 initialValue = emptyList(),
             )
 
+    val activeGoals: StateFlow<List<Goal>> =
+        goalRepository.getActiveGoals()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
+
     fun getGoalById(id: Int): Flow<Goal?> {
         return goalRepository.getGoalById(id)
+    }
+
+    fun getLinkedTotal(goalId: Int): Flow<Double> = goalRepository.getLinkedTotal(goalId)
+
+    fun getLinkedTransactions(goalId: Int): Flow<List<Transaction>> = goalRepository.getLinkedTransactions(goalId)
+
+    fun getLinkedTransactionCount(goalId: Int): Flow<Int> = goalRepository.getLinkedTransactionCount(goalId)
+
+    fun getLinkedTransactionIds(goalId: Int): Flow<List<Int>> = goalRepository.getLinkedTransactionIds(goalId)
+
+    suspend fun getActiveGoalsSnapshot(): List<Goal> = goalRepository.getActiveGoalsSnapshot()
+
+    fun getRecentTransactions(
+        startTime: Long,
+        endTime: Long
+    ): Flow<List<Transaction>> {
+        // Expose recent transactions for the linking picker.
+        // In a real app we might inject TransactionRepository, but GoalRepository has access to DB.
+        return goalRepository.getRecentTransactions(startTime, endTime)
     }
 
     fun saveGoal(
         id: Int?,
         name: String,
         targetAmount: Double,
-        savedAmount: Double,
         targetDate: Long?,
         accountId: Int,
+        notes: String? = null,
+        iconEmoji: String? = null,
+        priority: Int = 0,
     ) {
         viewModelScope.launch {
             try {
@@ -51,9 +79,11 @@ class GoalViewModel(private val goalRepository: GoalRepository) : ViewModel() {
                         id = id ?: 0,
                         name = name,
                         targetAmount = targetAmount,
-                        savedAmount = savedAmount,
                         targetDate = targetDate,
                         accountId = accountId,
+                        notes = notes,
+                        iconEmoji = iconEmoji,
+                        priority = priority,
                     )
                 if (id == null) {
                     goalRepository.insert(goal)
@@ -75,6 +105,34 @@ class GoalViewModel(private val goalRepository: GoalRepository) : ViewModel() {
                 _uiEvent.send("Goal '${goal.name}' deleted.")
             } catch (e: Exception) {
                 _uiEvent.send("Error deleting goal: ${e.message}")
+            }
+        }
+    }
+
+    fun linkTransactionToGoal(
+        goalId: Int,
+        transactionId: Int
+    ) {
+        viewModelScope.launch {
+            try {
+                goalRepository.linkTransaction(goalId, transactionId)
+                _uiEvent.send("Transaction linked to goal.")
+            } catch (e: Exception) {
+                _uiEvent.send("Error linking transaction: ${e.message}")
+            }
+        }
+    }
+
+    fun unlinkTransactionFromGoal(
+        goalId: Int,
+        transactionId: Int
+    ) {
+        viewModelScope.launch {
+            try {
+                goalRepository.unlinkTransaction(goalId, transactionId)
+                _uiEvent.send("Transaction unlinked from goal.")
+            } catch (e: Exception) {
+                _uiEvent.send("Error unlinking transaction: ${e.message}")
             }
         }
     }
