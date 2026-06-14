@@ -242,8 +242,10 @@ class DataExportServiceTest : BaseViewModelTest() {
             coJustRun { categoryDao.deleteAll() }
             coJustRun { budgetDao.deleteAll() }
             coJustRun { merchantMappingDao.deleteAll() }
-            coJustRun { goalDao.deleteAll()
-                goalTransactionLinkDao.deleteAll() }
+            coJustRun {
+                goalDao.deleteAll()
+                goalTransactionLinkDao.deleteAll()
+            }
             coJustRun { goalTransactionLinkDao.deleteAll() }
             coJustRun { tripDao.deleteAll() }
             coJustRun { accountAliasDao.deleteAll() }
@@ -336,8 +338,10 @@ class DataExportServiceTest : BaseViewModelTest() {
             coJustRun { categoryDao.deleteAll() }
             coJustRun { budgetDao.deleteAll() }
             coJustRun { merchantMappingDao.deleteAll() }
-            coJustRun { goalDao.deleteAll()
-                goalTransactionLinkDao.deleteAll() }
+            coJustRun {
+                goalDao.deleteAll()
+                goalTransactionLinkDao.deleteAll()
+            }
             coJustRun { goalTransactionLinkDao.deleteAll() }
             coJustRun { tripDao.deleteAll() }
             coJustRun { accountAliasDao.deleteAll() }

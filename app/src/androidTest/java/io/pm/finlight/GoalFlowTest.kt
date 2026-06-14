@@ -68,12 +68,12 @@ class GoalFlowTest {
         // Wait for screen to be ready
         composeTestRule.onNodeWithText("Goal Name", substring = true).performTextInput("Dream Car")
         composeTestRule.onNodeWithText("Target Amount", substring = true).performTextInput("50000")
-        
+
         // Select Account (ExposedDropdownMenuBox)
         composeTestRule.onNodeWithText("Allocate To Account", substring = true).performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(TestDataSeeder.ACCOUNT_BANK_NAME, substring = true).performClick()
-        
+
         // Click Save
         composeTestRule.onNodeWithText("Save", substring = true).performClick()
 
@@ -85,7 +85,7 @@ class GoalFlowTest {
         composeTestRule.waitForIdle()
         // Assert we are on the detail screen for "Dream Car"
         composeTestRule.onNodeWithText("Dream Car", substring = true).assertExists()
-        
+
         // Click "Link Transaction"
         composeTestRule.onNodeWithText("Link Transaction", substring = true, useUnmergedTree = true)
             .assertExists()
@@ -94,13 +94,13 @@ class GoalFlowTest {
         // Now TransactionPickerSheet is shown
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Select Transaction to Link", substring = true).assertExists()
-        
+
         // Click the first transaction (e.g. Test Salary, etc. from SeedDatabaseRule)
         composeTestRule.onNodeWithText(TestDataSeeder.TXN_GROCERY_DESC, substring = true).performScrollTo().performClick()
 
         // Sheet dismisses, back on GoalDetailScreen
         composeTestRule.waitForIdle()
-        
+
         // Assert transaction description appears in Linked Transactions
         composeTestRule.onNodeWithText(TestDataSeeder.TXN_GROCERY_DESC, substring = true).performScrollTo().assertExists()
     }
