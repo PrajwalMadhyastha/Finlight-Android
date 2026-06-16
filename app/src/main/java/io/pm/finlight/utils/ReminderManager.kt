@@ -66,9 +66,9 @@ object ReminderManager {
         //     scheduleRecurringTransactionWorker(context)
         //     scheduleRecurringPatternWorker(context)
         // } else {
-            Log.d("ReminderManager", "Recurring transaction feature is disabled. Not scheduling workers.")
-            // Also cancel any existing workers if the feature is now disabled.
-            cancelRecurringTransactionWorkers(context)
+        Log.d("ReminderManager", "Recurring transaction feature is disabled. Not scheduling workers.")
+        // Also cancel any existing workers if the feature is now disabled.
+        cancelRecurringTransactionWorkers(context)
         // }
 
         // --- DELETED: scheduleSnapshotWorker(context) ---
