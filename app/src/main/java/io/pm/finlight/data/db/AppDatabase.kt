@@ -18,6 +18,7 @@ import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.data.db.entity.DeletedSmsHash
+import io.pm.finlight.data.db.entity.GoalTransactionLink
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.security.SecurityManager
 import io.pm.finlight.utils.CategoryIconHelper
@@ -49,8 +50,9 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         Trip::class,
         AccountAlias::class,
         DeletedSmsHash::class,
+        GoalTransactionLink::class,
     ],
-    version = 46,
+    version = 47,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -89,6 +91,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun accountAliasDao(): AccountAliasDao
 
     abstract fun deletedSmsHashDao(): DeletedSmsHashDao
+
+    abstract fun goalTransactionLinkDao(): GoalTransactionLinkDao
 
     companion object {
         @Volatile
@@ -728,6 +732,33 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 46→47: Savings Goals rework (Issue #104) ---
+        val MIGRATION_46_47 =
+            object : Migration(46, 47) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // Add new columns to goals table
+                    db.execSQL("ALTER TABLE `goals` ADD COLUMN `notes` TEXT")
+                    db.execSQL("ALTER TABLE `goals` ADD COLUMN `iconEmoji` TEXT")
+                    db.execSQL("ALTER TABLE `goals` ADD COLUMN `priority` INTEGER NOT NULL DEFAULT 0")
+
+                    // Create the goal-transaction junction table
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `goal_transaction_links` (
+                            `goalId` INTEGER NOT NULL, 
+                            `transactionId` INTEGER NOT NULL, 
+                            `linkedAt` INTEGER NOT NULL, 
+                            PRIMARY KEY(`goalId`, `transactionId`), 
+                            FOREIGN KEY(`goalId`) REFERENCES `goals`(`id`) ON DELETE CASCADE, 
+                            FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) ON DELETE CASCADE
+                        )
+                    """,
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_goal_transaction_links_goalId` ON `goal_transaction_links` (`goalId`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_goal_transaction_links_transactionId` ON `goal_transaction_links` (`transactionId`)")
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -760,8 +791,9 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_42_43,
                             MIGRATION_43_44,
                             MIGRATION_44_45,
-                            // --- ADDED ---
                             MIGRATION_45_46,
+                            // --- ADDED: Issue #104 ---
+                            MIGRATION_46_47,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

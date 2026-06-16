@@ -56,6 +56,7 @@ class DataExportServiceTest : BaseViewModelTest() {
     private val tripDao: TripDao = mockk(relaxed = true)
     private val accountAliasDao: AccountAliasDao = mockk(relaxed = true)
     private val recurringPatternDao: RecurringPatternDao = mockk(relaxed = true)
+    private val goalTransactionLinkDao: GoalTransactionLinkDao = mockk(relaxed = true)
 
     @Before
     override fun setup() {
@@ -84,6 +85,7 @@ class DataExportServiceTest : BaseViewModelTest() {
         every { db.tripDao() } returns tripDao
         every { db.accountAliasDao() } returns accountAliasDao
         every { db.recurringPatternDao() } returns recurringPatternDao
+        every { db.goalTransactionLinkDao() } returns goalTransactionLinkDao
     }
 
     @After
@@ -127,6 +129,7 @@ class DataExportServiceTest : BaseViewModelTest() {
         } returns listOf(Trip(id = 1, name = "Test Trip", startDate = 1L, endDate = 2L, tagId = 1, tripType = TripType.DOMESTIC, currencyCode = null, conversionRate = null))
         coEvery { accountAliasDao.getAll() } returns listOf(AccountAlias(aliasName = "Alias Acc", destinationAccountId = 1))
         coEvery { recurringPatternDao.getAllPatterns() } returns emptyList()
+        coEvery { goalTransactionLinkDao.getAll() } returns emptyList()
     }
 
     @Test
@@ -156,6 +159,7 @@ class DataExportServiceTest : BaseViewModelTest() {
             assertEquals(1, backupData.tags.size)
             assertEquals(1, backupData.transactionTagCrossRefs.size)
             assertEquals(1, backupData.goals.size)
+            assertEquals(0, backupData.goalTransactionLinks.size)
             assertEquals(1, backupData.trips.size)
             assertEquals(1, backupData.accountAliases.size)
         }
@@ -215,6 +219,7 @@ class DataExportServiceTest : BaseViewModelTest() {
                     ignoreRules = emptyList(),
                     smsParseTemplates = emptyList(),
                     goals = emptyList(),
+                    goalTransactionLinks = emptyList(),
                     trips = emptyList(),
                     accountAliases = emptyList(),
                 )
@@ -237,7 +242,11 @@ class DataExportServiceTest : BaseViewModelTest() {
             coJustRun { categoryDao.deleteAll() }
             coJustRun { budgetDao.deleteAll() }
             coJustRun { merchantMappingDao.deleteAll() }
-            coJustRun { goalDao.deleteAll() }
+            coJustRun {
+                goalDao.deleteAll()
+                goalTransactionLinkDao.deleteAll()
+            }
+            coJustRun { goalTransactionLinkDao.deleteAll() }
             coJustRun { tripDao.deleteAll() }
             coJustRun { accountAliasDao.deleteAll() }
             coJustRun { customSmsRuleDao.deleteAll() }
@@ -270,6 +279,7 @@ class DataExportServiceTest : BaseViewModelTest() {
                 budgetDao.deleteAll()
                 merchantMappingDao.deleteAll()
                 goalDao.deleteAll()
+                goalTransactionLinkDao.deleteAll()
                 tripDao.deleteAll()
                 accountAliasDao.deleteAll()
                 customSmsRuleDao.deleteAll()
@@ -328,7 +338,11 @@ class DataExportServiceTest : BaseViewModelTest() {
             coJustRun { categoryDao.deleteAll() }
             coJustRun { budgetDao.deleteAll() }
             coJustRun { merchantMappingDao.deleteAll() }
-            coJustRun { goalDao.deleteAll() }
+            coJustRun {
+                goalDao.deleteAll()
+                goalTransactionLinkDao.deleteAll()
+            }
+            coJustRun { goalTransactionLinkDao.deleteAll() }
             coJustRun { tripDao.deleteAll() }
             coJustRun { accountAliasDao.deleteAll() }
             coJustRun { customSmsRuleDao.deleteAll() }

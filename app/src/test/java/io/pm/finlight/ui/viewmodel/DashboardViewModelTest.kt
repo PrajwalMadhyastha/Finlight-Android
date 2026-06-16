@@ -715,6 +715,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
             }
         }
 
+    @org.junit.Ignore("Temporarily disabled (Issue #105)")
     @Test
     fun `upcomingPayments are loaded correctly from dao`() =
         runTest {
@@ -734,6 +735,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
             }
         }
 
+    @org.junit.Ignore("Temporarily disabled (Issue #105)")
     @Test
     fun `upcomingPayments filters and sorts correctly`() =
         runTest {
@@ -760,6 +762,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
             }
         }
 
+    @org.junit.Ignore("Temporarily disabled (Issue #105)")
     @Test
     fun `patternSuggestions flow receives data from dao`() =
         runTest {

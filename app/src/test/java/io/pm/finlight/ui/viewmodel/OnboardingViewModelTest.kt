@@ -209,6 +209,36 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `onNameChanged with valid characters updates isNameValid to true`() =
+        runTest {
+            // Act
+            viewModel.onNameChanged("John Doe")
+
+            // Assert
+            assertEquals(true, viewModel.isNameValid.value)
+        }
+
+    @Test
+    fun `onNameChanged with special characters updates isNameValid to false`() =
+        runTest {
+            // Act
+            viewModel.onNameChanged("John!@#")
+
+            // Assert
+            assertEquals(false, viewModel.isNameValid.value)
+        }
+
+    @Test
+    fun `onNameChanged with numbers updates isNameValid to false`() =
+        runTest {
+            // Act
+            viewModel.onNameChanged("John123")
+
+            // Assert
+            assertEquals(false, viewModel.isNameValid.value)
+        }
+
+    @Test
     fun `onBudgetChanged updates monthlyBudget state with valid input`() =
         runTest {
             // Act

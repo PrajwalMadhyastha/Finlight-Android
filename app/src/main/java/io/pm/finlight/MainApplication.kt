@@ -20,6 +20,7 @@ class MainApplication : Application() {
         const val SUMMARY_CHANNEL_ID = "summary_channel"
         const val MONTHLY_SUMMARY_CHANNEL_ID = "monthly_summary_channel"
         const val BACKUP_CHANNEL_ID = "backup_channel"
+        const val GOALS_CHANNEL_ID = "goals_channel"
     }
 
     override fun onCreate() {
@@ -36,6 +37,22 @@ class MainApplication : Application() {
         createSummaryNotificationChannel()
         createMonthlySummaryNotificationChannel()
         createBackupNotificationChannel()
+        createGoalsNotificationChannel()
+    }
+
+    private fun createGoalsNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "Savings Goals"
+            val descriptionText = "Notifications for savings goal progress and nudges."
+            val importance = NotificationManager.IMPORTANCE_DEFAULT
+            val channel =
+                NotificationChannel(GOALS_CHANNEL_ID, name, importance).apply {
+                    description = descriptionText
+                }
+            val notificationManager: NotificationManager =
+                getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
     }
 
     private fun createBackupNotificationChannel() {

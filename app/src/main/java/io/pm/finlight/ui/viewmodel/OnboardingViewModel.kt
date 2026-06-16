@@ -34,6 +34,9 @@ class OnboardingViewModel(
     private val _userName = MutableStateFlow("")
     val userName = _userName.asStateFlow()
 
+    private val _isNameValid = MutableStateFlow(true)
+    val isNameValid = _isNameValid.asStateFlow()
+
     private val _monthlyBudget = MutableStateFlow("")
     val monthlyBudget = _monthlyBudget.asStateFlow()
 
@@ -47,6 +50,7 @@ class OnboardingViewModel(
     fun onNameChanged(newName: String) {
         if (newName.length <= 50) {
             _userName.value = newName
+            _isNameValid.value = newName.all { it.isLetter() || it.isWhitespace() }
         }
     }
 

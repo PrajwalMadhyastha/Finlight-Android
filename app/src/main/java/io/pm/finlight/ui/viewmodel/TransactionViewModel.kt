@@ -153,7 +153,16 @@ class TransactionViewModel(
             Pair(month, filters)
         }
 
-    private val merchantAliases: StateFlow<Map<String, String>>
+    val hasSeenOnboarding: Flow<Boolean> =
+        flow {
+            emit(settingsRepository.hasSeenOnboarding())
+        }
+
+    val goalIncomeThreshold: StateFlow<Int> =
+        settingsRepository.getGoalIncomeThreshold()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 5000)
+
+    val merchantAliases: StateFlow<Map<String, String>>
 
     val transactionsForSelectedMonth: StateFlow<List<TransactionDetails>>
     val monthlyIncome: StateFlow<Double>
@@ -843,13 +852,18 @@ class TransactionViewModel(
         date: Long,
         transactionType: String,
         imageUris: List<Uri>,
-        onSaveComplete: () -> Unit,
+        onSaveComplete: (Long?) -> Unit,
     ) {
         viewModelScope.launch {
             _validationError.value = null
 
-            if ((amountStr.toDoubleOrNull() ?: 0.0) <= 0.0) {
+            val amount = amountStr.toDoubleOrNull()
+            if (amount == null || amount <= 0.0) {
                 _validationError.value = "Please enter a valid, positive amount."
+                return@launch
+            }
+            if (amount > 1_000_000_000.0) {
+                _validationError.value = "Maximum limit of 1 Billion (1,000,000,000) reached."
                 return@launch
             }
             if (accountId == null) {
@@ -874,9 +888,9 @@ class TransactionViewModel(
             if (categoryId == null && description.isNotBlank()) {
                 _showCategoryNudge.value = transactionData
             } else {
-                val success = saveManualTransaction(transactionData, categoryId)
-                if (success) {
-                    onSaveComplete()
+                val transactionId = saveManualTransaction(transactionData, categoryId)
+                if (transactionId != null) {
+                    onSaveComplete(transactionId)
                 }
             }
         }
@@ -884,14 +898,14 @@ class TransactionViewModel(
 
     fun saveWithSelectedCategory(
         categoryId: Int?,
-        onComplete: () -> Unit,
+        onComplete: (Long?) -> Unit,
     ) {
         viewModelScope.launch {
             val transactionData = _showCategoryNudge.value
             if (transactionData != null) {
-                val success = saveManualTransaction(transactionData, categoryId)
-                if (success) {
-                    onComplete()
+                val transactionId = saveManualTransaction(transactionData, categoryId)
+                if (transactionId != null) {
+                    onComplete(transactionId)
                 }
             }
             _showCategoryNudge.value = null
@@ -901,13 +915,9 @@ class TransactionViewModel(
     private suspend fun saveManualTransaction(
         data: ManualTransactionData,
         categoryId: Int?,
-    ): Boolean {
+    ): Long? {
         _validationError.value = null
-        val enteredAmount = data.amountStr.toDoubleOrNull()
-        if (enteredAmount == null || enteredAmount <= 0.0) {
-            _validationError.value = "Please enter a valid, positive amount."
-            return false
-        }
+        val enteredAmount = data.amountStr.toDoubleOrNull() ?: 0.0
 
         val travelSettings = travelModeSettings.value
         val isInternationalTravel =
@@ -957,16 +967,17 @@ class TransactionViewModel(
                 data.imageUris.mapNotNull { uri ->
                     saveImageToInternalStorage(uri)
                 }
-            transactionRepository.insertTransactionWithTagsAndImages(
-                transactionToSave,
-                data.tags,
-                savedImagePaths,
-            )
-            true
+            val newTransactionId =
+                transactionRepository.insertTransactionWithTagsAndImages(
+                    transactionToSave,
+                    data.tags,
+                    savedImagePaths,
+                )
+            newTransactionId
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save transaction", e)
             _validationError.value = "An error occurred while saving."
-            false
+            null
         }
     }
 
@@ -1342,6 +1353,10 @@ class TransactionViewModel(
         amountStr: String,
     ) = viewModelScope.launch {
         amountStr.toDoubleOrNull()?.let {
+            if (it > 1_000_000_000.0) {
+                _validationError.value = "Maximum limit of 1 Billion (1,000,000,000) reached."
+                return@launch
+            }
             if (it > 0) {
                 transactionRepository.updateAmount(id, it)
             }

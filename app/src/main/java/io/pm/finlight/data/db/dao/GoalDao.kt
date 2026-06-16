@@ -1,8 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/GoalDao.kt
-// REASON: FEATURE (Backup Phase 2) - Added `getAll`, `insertAll`, and `deleteAll`
-// functions. These are required by the DataExportService to back up and restore
-// all user-created savings goals.
+// REASON: FEATURE (Issue #104) - Updated for dynamic progress tracking.
+// - Expanded `GoalWithAccountName` to include `notes`, `iconEmoji`, `priority`.
+// - Added `getActiveGoals` query for fetching non-completed goals.
+// - Retained all backup/restore methods from Backup Phase 2.
 // =================================================================================
 package io.pm.finlight
 
@@ -25,6 +26,9 @@ data class GoalWithAccountName(
     val targetDate: Long?,
     val accountId: Int,
     val accountName: String,
+    val notes: String?,
+    val iconEmoji: String?,
+    val priority: Int,
 )
 
 @Dao
@@ -62,10 +66,11 @@ interface GoalDao {
     @Query(
         """
         SELECT
-            g.id, g.name, g.targetAmount, g.savedAmount, g.targetDate, g.accountId, a.name as accountName
+            g.id, g.name, g.targetAmount, g.savedAmount, g.targetDate, g.accountId,
+            a.name as accountName, g.notes, g.iconEmoji, g.priority
         FROM goals as g
         INNER JOIN accounts as a ON g.accountId = a.id
-        ORDER BY g.targetDate ASC
+        ORDER BY g.priority DESC, g.targetDate ASC
     """,
     )
     fun getAllGoalsWithAccountName(): Flow<List<GoalWithAccountName>>
@@ -73,7 +78,20 @@ interface GoalDao {
     @Query("SELECT * FROM goals WHERE accountId = :accountId")
     fun getGoalsForAccount(accountId: Int): Flow<List<Goal>>
 
-    // --- NEW: Reassigns goals from source accounts to a destination account ---
+    /**
+     * Returns all active (non-completed) goals. A goal is considered active if
+     * its target date is in the future or null.
+     */
+    @Query("SELECT * FROM goals WHERE targetDate IS NULL OR targetDate > :currentTimeMillis ORDER BY priority DESC")
+    fun getActiveGoals(currentTimeMillis: Long = System.currentTimeMillis()): Flow<List<Goal>>
+
+    /**
+     * Snapshot of active goals for immediate use (non-Flow).
+     */
+    @Query("SELECT * FROM goals WHERE targetDate IS NULL OR targetDate > :currentTimeMillis ORDER BY priority DESC")
+    suspend fun getActiveGoalsSnapshot(currentTimeMillis: Long = System.currentTimeMillis()): List<Goal>
+
+    // --- Reassigns goals from source accounts to a destination account ---
     @Query("UPDATE goals SET accountId = :destinationAccountId WHERE accountId IN (:sourceAccountIds)")
     suspend fun reassignGoals(
         sourceAccountIds: List<Int>,

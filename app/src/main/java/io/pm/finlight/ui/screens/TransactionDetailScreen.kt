@@ -178,10 +178,18 @@ fun TransactionDetailScreen(
     val scope = rememberCoroutineScope()
     val retroUpdateSheetState by viewModel.retroUpdateSheetState.collectAsState()
     val canonicalNudgeState by viewModel.canonicalNudgeState.collectAsState()
+    val validationError by viewModel.validationError.collectAsState()
 
     // Observe ViewModel-driven navigation events (e.g. after canonical nudge resolves).
     LaunchedEffect(Unit) {
         viewModel.navigateBackEvent.collect { navigateBack() }
+    }
+
+    LaunchedEffect(validationError) {
+        validationError?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
     }
 
     var showMenu by remember { mutableStateOf(false) }
@@ -1343,6 +1351,7 @@ private fun TransactionEditSheetContent(
     onAddNewCategory: () -> Unit,
 ) {
     val transactionId = details.transaction.id
+    val context = LocalContext.current
 
     when (sheetContent) {
         is SheetContent.Merchant -> {
@@ -1369,6 +1378,16 @@ private fun TransactionEditSheetContent(
                 title = "Edit Amount",
                 initialValue = "%.2f".format(details.transaction.amount),
                 keyboardType = KeyboardType.Number,
+                onValueChangeFilter = { newValue ->
+                    if (newValue.isEmpty()) {
+                        true
+                    } else if ((newValue.toDoubleOrNull() ?: 0.0) <= 1_000_000_000.0) {
+                        true
+                    } else {
+                        Toast.makeText(context, "Maximum limit of 1 Billion (1,000,000,000) reached.", Toast.LENGTH_SHORT).show()
+                        false
+                    }
+                },
                 onConfirm = {
                     viewModel.updateTransactionAmount(transactionId, it)
                     onDismiss()
@@ -1597,6 +1616,7 @@ private fun EditTextFieldSheet(
     title: String,
     initialValue: String,
     keyboardType: KeyboardType = KeyboardType.Text,
+    onValueChangeFilter: ((String) -> Boolean)? = null,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
     additionalContent: @Composable (() -> Unit)? = null,
@@ -1616,7 +1636,11 @@ private fun EditTextFieldSheet(
         Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
         OutlinedTextField(
             value = textFieldValue,
-            onValueChange = { textFieldValue = it },
+            onValueChange = {
+                if (onValueChangeFilter == null || onValueChangeFilter(it.text)) {
+                    textFieldValue = it
+                }
+            },
             label = { Text("Value") },
             keyboardOptions =
                 KeyboardOptions(

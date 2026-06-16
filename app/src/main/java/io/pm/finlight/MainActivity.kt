@@ -972,6 +972,7 @@ fun AppNavHost(
             AddTransactionScreen(
                 navController = navController,
                 viewModel = transactionViewModel,
+                goalViewModel = goalViewModel,
                 isCsvEdit = arguments.getBoolean("isCsvEdit"),
                 initialDataJson = arguments.getString("initialDataJson")?.let { URLDecoder.decode(it, "UTF-8") },
                 initialTransactionType = arguments.getString("transactionType"),
@@ -1042,6 +1043,41 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) { BudgetScreen(navController, budgetViewModel) }
+
+        composable(
+            "goal_screen",
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
+        ) {
+            io.pm.finlight.ui.screens.GoalScreen(navController, goalViewModel)
+        }
+
+        composable(
+            "add_edit_goal/{goalId}",
+            arguments = listOf(navArgument("goalId") { type = NavType.StringType }),
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
+        ) { backStackEntry ->
+            val goalIdString = backStackEntry.arguments?.getString("goalId")
+            val goalId = if (goalIdString == "new" || goalIdString == null) null else goalIdString.toIntOrNull()
+            io.pm.finlight.ui.screens.AddEditGoalScreen(navController, goalId, goalViewModel, transactionViewModel)
+        }
+
+        composable(
+            "goal_detail/{goalId}",
+            arguments = listOf(navArgument("goalId") { type = NavType.IntType }),
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
+        ) { backStackEntry ->
+            val goalId = backStackEntry.arguments?.getInt("goalId") ?: 0
+            io.pm.finlight.ui.screens.GoalDetailScreen(goalId, navController, goalViewModel)
+        }
         composable(
             "what_if_simulator",
             enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
