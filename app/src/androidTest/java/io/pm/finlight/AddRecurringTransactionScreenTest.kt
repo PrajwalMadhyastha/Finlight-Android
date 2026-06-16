@@ -7,6 +7,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@org.junit.Ignore("Temporarily disabled (Issue #105)")
 @RunWith(AndroidJUnit4::class)
 class AddRecurringTransactionScreenTest {
     @get:Rule

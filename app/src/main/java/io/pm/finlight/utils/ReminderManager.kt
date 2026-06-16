@@ -61,15 +61,15 @@ object ReminderManager {
             scheduleAutoBackup(context)
         }
 
-        // Check the app-level flag before scheduling recurring transaction workers
-        if (settings.getBoolean(KEY_RECURRING_TRANSACTION_FEATURE_ENABLED, false)) { // Default to false
-            scheduleRecurringTransactionWorker(context)
-            scheduleRecurringPatternWorker(context)
-        } else {
+        // Temporarily disabled (Issue #105)
+        // if (settings.getBoolean(KEY_RECURRING_TRANSACTION_FEATURE_ENABLED, false)) { // Default to false
+        //     scheduleRecurringTransactionWorker(context)
+        //     scheduleRecurringPatternWorker(context)
+        // } else {
             Log.d("ReminderManager", "Recurring transaction feature is disabled. Not scheduling workers.")
             // Also cancel any existing workers if the feature is now disabled.
             cancelRecurringTransactionWorkers(context)
-        }
+        // }
 
         // --- DELETED: scheduleSnapshotWorker(context) ---
 
