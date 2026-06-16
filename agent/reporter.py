@@ -71,11 +71,17 @@ def generate_report(goal: str, result: dict):
                 app_map["Features_Tested"].append(f)
                 
     if "New_Bugs" in diff and isinstance(diff["New_Bugs"], list):
+        new_bugs_added = False
         for b in diff["New_Bugs"]:
             # Ensure it's not a duplicate description
             exists = any(existing_bug.get("Description") == b.get("Description") for existing_bug in app_map.setdefault("Known_Bugs", []))
             if not exists:
                 app_map["Known_Bugs"].append(b)
+                new_bugs_added = True
+        
+        if new_bugs_added:
+            with open("new_bugs_found.txt", "w") as f:
+                f.write("true")
                 
     if "Resolved_Bugs" in diff and isinstance(diff["Resolved_Bugs"], list):
         for rb in diff["Resolved_Bugs"]:

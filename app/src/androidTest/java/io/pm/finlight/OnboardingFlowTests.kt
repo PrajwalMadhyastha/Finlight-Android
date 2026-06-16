@@ -124,6 +124,35 @@ class OnboardingFlowTests {
     }
 
     @Test
+    fun test_onboarding_invalidName_showsErrorAndDisablesNext() {
+        composeTestRule.waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Next").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Next").performClick() // to User Name
+
+        composeTestRule.waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Your Name").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Enter a name with special characters
+        composeTestRule.onNodeWithText("Your Name").performTextInput("John!")
+        composeTestRule.waitForIdle()
+
+        // Verify the error message is displayed and Next is disabled
+        composeTestRule.onNodeWithText("Name can only contain letters and spaces").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Next").assertIsNotEnabled()
+
+        // Clear and enter a valid name
+        composeTestRule.onNodeWithContentDescription("Clear Name").performClick()
+        composeTestRule.onNodeWithText("Your Name").performTextInput("John")
+        composeTestRule.waitForIdle()
+
+        // Verify the error message is gone and Next is enabled
+        composeTestRule.onNodeWithText("Name can only contain letters and spaces").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Next").assertIsEnabled()
+    }
+
+    @Test
     fun test_onboarding_clearButton_worksCorrectly() {
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("Next").fetchSemanticsNodes().isNotEmpty()

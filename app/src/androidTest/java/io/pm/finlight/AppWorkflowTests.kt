@@ -157,4 +157,47 @@ class AppWorkflowTests {
         composeTestRule.onNodeWithText("Compose Transaction").assertIsDisplayed()
         composeTestRule.onNodeWithText("Save Transaction").assertIsNotEnabled()
     }
+
+    /**
+     * Tests that entering an amount exceeding the maximum limit prevents the transaction from saving.
+     */
+    @Test
+    fun test_addTransaction_failsWithAmountExceedingLimit_remainsOnScreen() {
+        // 1. Wait for the dashboard and navigate to the Add Transaction Screen.
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasText("Recent Transactions"))
+        composeTestRule.onNodeWithContentDescription("Add Transaction").performClick()
+
+        // 2. Fill out the form with a huge amount.
+        composeTestRule.onNodeWithText("Compose Transaction").assertIsDisplayed()
+
+        // Click search icon to open Merchant BottomSheet
+        composeTestRule.onNodeWithContentDescription("Search Predictions").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty()
+        }
+        val searchInput = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()
+        searchInput.performTextInput("Test Huge Amount")
+        composeTestRule.onAllNodesWithText("Test Huge Amount").onFirst().performClick()
+
+        // Enter amount exceeding limit
+        composeTestRule.onNodeWithTag("amount_text_field").performTextInput("2000000000.0")
+
+        // Select Account and Category
+        composeTestRule.onNodeWithTag("account_select_chip").performClick()
+        composeTestRule.onAllNodesWithText(TestDataSeeder.ACCOUNT_BANK_NAME).onLast().performClick()
+
+        composeTestRule.onNodeWithTag("category_select_chip").performClick()
+        composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_FOOD_NAME).onLast().performClick()
+
+        // 3. Attempt to save the transaction.
+        composeTestRule.onNodeWithText("Save Transaction").performScrollTo().performClick()
+
+        // 4. Verify that we remain on the same screen because the save operation failed due to validation.
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Compose Transaction").assertIsDisplayed()
+    }
 }

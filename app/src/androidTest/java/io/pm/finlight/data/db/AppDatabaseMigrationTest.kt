@@ -312,4 +312,30 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    /**
+     * Test MIGRATION_46_47: Creates goal_transaction_links table.
+     */
+    @Test
+    fun migrate46To47_createsGoalTransactionLinksTable() {
+        helper.createDatabase(testDbName, 46).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 47, true, io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_46_47).apply {
+            val cursor = query("PRAGMA table_info(goal_transaction_links)")
+            var foundGoalId = false
+            var foundTransactionId = false
+            while (cursor.moveToNext()) {
+                val colName = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                if (colName == "goalId") foundGoalId = true
+                if (colName == "transactionId") foundTransactionId = true
+            }
+            assertTrue("Column 'goalId' should exist in goal_transaction_links", foundGoalId)
+            assertTrue("Column 'transactionId' should exist in goal_transaction_links", foundTransactionId)
+            cursor.close()
+
+            close()
+        }
+    }
 }

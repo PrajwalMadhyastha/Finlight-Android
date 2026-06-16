@@ -184,6 +184,7 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                         DashboardCardType.ACCOUNTS_CAROUSEL,
                         DashboardCardType.UPCOMING_PAYMENTS,
                         DashboardCardType.RECURRING_SUGGESTIONS,
+                        DashboardCardType.SAVINGS_GOALS,
                     ),
                     defaultOrder,
                 )
@@ -504,4 +505,86 @@ class SettingsRepositoryTest : BaseViewModelTest() {
             assertEquals(3000f, budgets[3])
             assertEquals(12000f, budgets[12])
         }
+
+    @Test
+    fun `save and get recurring transactions enabled`() =
+        runTest {
+            repository.getRecurringTransactionsEnabled().test {
+                assertEquals(false, awaitItem()) // Default
+                repository.saveRecurringTransactionsEnabled(true)
+                assertEquals(true, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `save and get goal income threshold`() =
+        runTest {
+            repository.getGoalIncomeThreshold().test {
+                assertEquals(5000, awaitItem()) // Default
+                repository.saveGoalIncomeThreshold(10000)
+                assertEquals(10000, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `save and get goal nudges enabled`() =
+        runTest {
+            repository.getGoalNudgesEnabled().test {
+                assertEquals(true, awaitItem()) // Default
+                repository.saveGoalNudgesEnabled(false)
+                assertEquals(false, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `isGoalNudgesEnabledBlocking works correctly`() {
+        assertTrue(repository.isGoalNudgesEnabledBlocking()) // Default
+        repository.saveGoalNudgesEnabled(false)
+        assertFalse(repository.isGoalNudgesEnabledBlocking())
+    }
+
+    @Test
+    fun `toggle and get excluded income months`() =
+        runTest {
+            repository.getExcludedIncomeMonths().test {
+                assertEquals(emptySet(), awaitItem())
+
+                repository.toggleIncomeMonthExclusion("2026_01")
+                assertEquals(setOf("2026_01"), awaitItem())
+
+                repository.toggleIncomeMonthExclusion("2026_02")
+                assertEquals(setOf("2026_01", "2026_02"), awaitItem())
+
+                repository.toggleIncomeMonthExclusion("2026_01")
+                assertEquals(setOf("2026_02"), awaitItem())
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `toggle and get excluded expense months`() =
+        runTest {
+            repository.getExcludedExpenseMonths().test {
+                assertEquals(emptySet(), awaitItem())
+
+                repository.toggleExpenseMonthExclusion("2026_03")
+                assertEquals(setOf("2026_03"), awaitItem())
+
+                repository.toggleExpenseMonthExclusion("2026_03")
+                assertEquals(emptySet(), awaitItem())
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `save and get ignore rules checksum`() {
+        assertEquals(0, repository.getIgnoreRulesChecksum()) // Default
+        repository.saveIgnoreRulesChecksum(12345)
+        assertEquals(12345, repository.getIgnoreRulesChecksum())
+    }
 }

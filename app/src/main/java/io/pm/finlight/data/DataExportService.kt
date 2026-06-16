@@ -126,6 +126,7 @@ object DataExportService {
                         tags = db.tagDao().getAllTagsList(),
                         transactionTagCrossRefs = db.transactionDao().getAllCrossRefs(),
                         goals = db.goalDao().getAll(),
+                        goalTransactionLinks = db.goalTransactionLinkDao().getAll(),
                         trips = db.tripDao().getAll(),
                         accountAliases = db.accountAliasDao().getAll(),
                         // --- Phase 3: Export App-Learned Recurring Patterns ---
@@ -178,6 +179,7 @@ object DataExportService {
             db.budgetDao().deleteAll()
             db.merchantMappingDao().deleteAll()
             db.goalDao().deleteAll()
+            db.goalTransactionLinkDao().deleteAll()
             db.tripDao().deleteAll()
             db.accountAliasDao().deleteAll()
             // --- Phase 1: Clear Core Parsing Intelligence Tables ---
@@ -196,6 +198,7 @@ object DataExportService {
             db.merchantMappingDao().insertAll(backupData.merchantMappings)
             db.tagDao().insertAll(backupData.tags)
             db.goalDao().insertAll(backupData.goals)
+            db.goalTransactionLinkDao().insertAll(backupData.goalTransactionLinks)
             db.tripDao().insertAll(backupData.trips)
             db.accountAliasDao().insertAll(backupData.accountAliases)
             db.transactionDao().insertAll(backupData.transactions)

@@ -316,4 +316,44 @@ class TransactionCrudTests {
         composeTestRule.onNodeWithText(TestDataSeeder.CATEGORY_FOOD_NAME).assertIsDisplayed()
         composeTestRule.onNodeWithText(TestDataSeeder.ACCOUNT_WALLET_NAME).assertIsDisplayed()
     }
+
+    /**
+     * Tests that typing an amount over 1,000,000,000 is rejected by the UI filter.
+     */
+    @Test
+    fun test_addTransaction_amountExceedingLimit_isBlockedByUiFilter() {
+        // 1. Wait for Dashboard and click FAB
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasText("Recent Transactions"))
+        composeTestRule.onNodeWithContentDescription("Add Transaction").performClick()
+
+        // 2. Wait for Add Screen
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Save Transaction").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 3. Find Amount Input and type 200 Million
+        val amountInput = composeTestRule.onNodeWithTag("amount_text_field")
+
+        // Initially it's empty. We type "200000000" (200 Million). This is valid.
+        amountInput.performTextInput("200000000")
+        composeTestRule.waitForIdle()
+
+        // Now we append "0" which makes it "2000000000" (2 Billion).
+        // This is invalid and should be dropped by the UI filter.
+        amountInput.performTextInput("0")
+        composeTestRule.waitForIdle()
+
+        // Wait, if it's dropped, the text should be just "200000000"
+        // Let's assert the text field's content. The text field has text "200000000".
+        // Wait, compose test rule doesn't have an exact assertTextEquals for editable text directly unless we check text value.
+        // But assert(hasTextExactly("200000000")) might fail if it contains a hint.
+        // Actually, in `AmountComposer`, the text field is just BasicTextField.
+        // Let's use `assert(hasText("200000000"))`
+        amountInput.assert(hasText("200000000"))
+    }
 }

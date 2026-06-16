@@ -99,6 +99,10 @@ class SettingsRepository(context: Context) {
         // --- NEW: Outlier Exclusions ---
         private const val KEY_EXCLUDED_INCOME_MONTHS = "excluded_income_months"
         private const val KEY_EXCLUDED_EXPENSE_MONTHS = "excluded_expense_months"
+
+        // --- NEW: Savings Goals Settings ---
+        private const val KEY_GOAL_INCOME_THRESHOLD = "goal_income_threshold"
+        private const val KEY_GOAL_NUDGES_ENABLED = "goal_nudges_enabled"
     }
 
     // --- NEW: Recurring Transaction Settings ---
@@ -122,6 +126,48 @@ class SettingsRepository(context: Context) {
             trySend(prefs.getBoolean(KEY_RECURRING_TRANSACTIONS_ENABLED, false))
             awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
         }
+    }
+
+    // --- NEW: Savings Goals Settings ---
+
+    fun saveGoalIncomeThreshold(amount: Int) {
+        prefs.edit { putInt(KEY_GOAL_INCOME_THRESHOLD, amount) }
+    }
+
+    fun getGoalIncomeThreshold(): Flow<Int> {
+        return callbackFlow {
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_GOAL_INCOME_THRESHOLD) {
+                        trySend(sp.getInt(key, 5000))
+                    }
+                }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(prefs.getInt(KEY_GOAL_INCOME_THRESHOLD, 5000))
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+    }
+
+    fun saveGoalNudgesEnabled(isEnabled: Boolean) {
+        prefs.edit { putBoolean(KEY_GOAL_NUDGES_ENABLED, isEnabled) }
+    }
+
+    fun getGoalNudgesEnabled(): Flow<Boolean> {
+        return callbackFlow {
+            val listener =
+                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
+                    if (key == KEY_GOAL_NUDGES_ENABLED) {
+                        trySend(sp.getBoolean(key, true))
+                    }
+                }
+            prefs.registerOnSharedPreferenceChangeListener(listener)
+            trySend(prefs.getBoolean(KEY_GOAL_NUDGES_ENABLED, true))
+            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+    }
+
+    fun isGoalNudgesEnabledBlocking(): Boolean {
+        return prefs.getBoolean(KEY_GOAL_NUDGES_ENABLED, true)
     }
 
     // --- NEW: Outlier Month Management Functions ---
@@ -471,6 +517,7 @@ class SettingsRepository(context: Context) {
                 DashboardCardType.ACCOUNTS_CAROUSEL,
                 DashboardCardType.UPCOMING_PAYMENTS,
                 DashboardCardType.RECURRING_SUGGESTIONS,
+                DashboardCardType.SAVINGS_GOALS,
             )
         }
     }

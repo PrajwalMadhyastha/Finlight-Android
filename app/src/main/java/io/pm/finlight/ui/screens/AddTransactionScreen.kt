@@ -103,6 +103,7 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 fun AddTransactionScreen(
     navController: NavController,
     viewModel: TransactionViewModel,
+    goalViewModel: GoalViewModel,
     isCsvEdit: Boolean = false,
     initialDataJson: String? = null,
     initialTransactionType: String? = null,
@@ -138,6 +139,24 @@ fun AddTransactionScreen(
     val selectedTags by viewModel.selectedTags.collectAsState()
     val defaultAccount by viewModel.defaultAccount.collectAsState()
     val validationError by viewModel.validationError.collectAsState()
+
+    val activeGoals by goalViewModel.activeGoals.collectAsState()
+    val goalIncomeThreshold by viewModel.goalIncomeThreshold.collectAsState()
+    var showGoalAllocationDialog by remember { mutableStateOf<Long?>(null) }
+
+    val handleSaveComplete: (Long?) -> Unit = { savedTxnId ->
+        val amtDouble = amount.toDoubleOrNull() ?: 0.0
+        if (transactionType.equals("income", ignoreCase = true) &&
+            amtDouble >= goalIncomeThreshold &&
+            activeGoals.isNotEmpty() &&
+            savedTxnId != null
+        ) {
+            showGoalAllocationDialog = savedTxnId
+        } else {
+            navController.popBackStack()
+        }
+    }
+
     val travelModeSettings by viewModel.travelModeSettings.collectAsState()
     val categoryNudgeData by viewModel.showCategoryNudge.collectAsState()
     val suggestedCategory by viewModel.suggestedCategory.collectAsState()
@@ -309,12 +328,16 @@ fun AddTransactionScreen(
                     amount = amount,
                     onAmountChange = { newValue ->
                         if (!hasInteracted) hasInteracted = true
-                        if (newValue.length > 9) return@AmountComposer
+                        if (newValue.length > 15) return@AmountComposer
 
                         // Regex to match a valid decimal number (up to 2 decimal places)
                         val regex = Regex("^\\d*\\.?\\d{0,2}\$")
                         if (newValue.isEmpty() || regex.matches(newValue)) {
-                            viewModel.onAddTransactionAmountChanged(newValue)
+                            if ((newValue.toDoubleOrNull() ?: 0.0) <= 1_000_000_000.0) {
+                                viewModel.onAddTransactionAmountChanged(newValue)
+                            } else {
+                                Toast.makeText(context, "Maximum limit of 1 Billion (1,000,000,000) reached.", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     },
                     focusRequester = focusRequester,
@@ -401,7 +424,7 @@ fun AddTransactionScreen(
                             date = selectedDateTime.timeInMillis,
                             transactionType = transactionType,
                             imageUris = attachedImageUris,
-                            onSaveComplete = { navController.popBackStack() },
+                            onSaveComplete = handleSaveComplete,
                         )
                     },
                     enabled = isSaveEnabled,
@@ -424,8 +447,8 @@ fun AddTransactionScreen(
         ModalBottomSheet(
             onDismissRequest = {
                 if (categoryNudgeData != null) {
-                    viewModel.saveWithSelectedCategory(null) {
-                        navController.popBackStack()
+                    viewModel.saveWithSelectedCategory(null) { txnId ->
+                        handleSaveComplete(txnId)
                     }
                 }
                 activeSheet = null
@@ -459,8 +482,8 @@ fun AddTransactionScreen(
                             onCategorySelected = {
                                 viewModel.onAddTransactionCategoryChanged(it)
                                 if (categoryNudgeData != null) {
-                                    viewModel.saveWithSelectedCategory(it.id) {
-                                        navController.popBackStack()
+                                    viewModel.saveWithSelectedCategory(it.id) { txnId ->
+                                        handleSaveComplete(txnId)
                                     }
                                 }
                                 activeSheet = null
@@ -611,6 +634,24 @@ fun AddTransactionScreen(
                 }
                 showCreateCategoryDialog = false
             },
+        )
+    }
+
+    if (showGoalAllocationDialog != null) {
+        GoalAllocationDialog(
+            transactionAmount = amount.toDoubleOrNull() ?: 0.0,
+            activeGoals = activeGoals,
+            onDismiss = {
+                showGoalAllocationDialog = null
+                navController.popBackStack()
+            },
+            onConfirm = { goalsToLink ->
+                goalsToLink.forEach { goal ->
+                    goalViewModel.linkTransactionToGoal(goal.id, showGoalAllocationDialog!!.toInt())
+                }
+                showGoalAllocationDialog = null
+                navController.popBackStack()
+            }
         )
     }
 }

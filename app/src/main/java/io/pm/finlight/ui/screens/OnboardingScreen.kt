@@ -121,6 +121,7 @@ fun OnboardingBottomBar(
     onFinishClicked: () -> Unit,
 ) {
     val userName by viewModel.userName.collectAsState()
+    val isNameValid by viewModel.isNameValid.collectAsState()
 
     Surface(shadowElevation = 8.dp) {
         Row(
@@ -142,7 +143,7 @@ fun OnboardingBottomBar(
 
             val isNextEnabled =
                 if (pagerState.currentPage == 1) {
-                    userName.isNotBlank()
+                    userName.isNotBlank() && isNameValid
                 } else {
                     true
                 }
@@ -260,6 +261,7 @@ fun UserNamePage(
     pagerState: PagerState,
 ) {
     val name by viewModel.userName.collectAsState()
+    val isNameValid by viewModel.isNameValid.collectAsState()
 
     Column(
         modifier =
@@ -296,6 +298,12 @@ fun UserNamePage(
                 value = name,
                 onValueChange = { viewModel.onNameChanged(it) },
                 label = { Text("Your Name") },
+                isError = !isNameValid,
+                supportingText = {
+                    if (!isNameValid) {
+                        Text("Name can only contain letters and spaces", color = MaterialTheme.colorScheme.error)
+                    }
+                },
                 trailingIcon = {
                     if (name.isNotEmpty()) {
                         IconButton(onClick = { viewModel.onNameChanged("") }) {

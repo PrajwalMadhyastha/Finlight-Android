@@ -500,8 +500,9 @@ class TransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // ARRANGE
             val accountId = 1
-            var onSaveCompleteCalled = false
-            whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(1L)
+            var capturedId: Long? = null
+            val expectedId = 1L
+            whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(expectedId)
 
             // ACT
             viewModel.onSaveTapped(
@@ -514,13 +515,13 @@ class TransactionViewModelTest : BaseViewModelTest() {
                 date = 0L,
                 transactionType = "expense",
                 imageUris = emptyList(),
-            ) { onSaveCompleteCalled = true }
+            ) { capturedId = it }
             advanceUntilIdle()
 
             // ASSERT
             assertNull(viewModel.showCategoryNudge.value)
             verify(transactionRepository).insertTransactionWithTagsAndImages(any(), any(), any())
-            assertTrue(onSaveCompleteCalled)
+            assertEquals(expectedId, capturedId)
         }
 
     @Test
@@ -528,7 +529,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // ARRANGE
             val accountId = 1
-            var onSaveCompleteCalled = false
+            var callbackInvoked = false
 
             // ACT
             viewModel.onSaveTapped(
@@ -542,14 +543,14 @@ class TransactionViewModelTest : BaseViewModelTest() {
                 date = 0L,
                 transactionType = "expense",
                 imageUris = emptyList(),
-            ) { onSaveCompleteCalled = true }
+            ) { callbackInvoked = true }
             advanceUntilIdle()
 
             // ASSERT
             assertNotNull(viewModel.showCategoryNudge.value)
             assertEquals("Coffee", viewModel.showCategoryNudge.value?.description)
             verify(transactionRepository, never()).insertTransactionWithTagsAndImages(any(), any(), any())
-            assertFalse(onSaveCompleteCalled)
+            assertFalse(callbackInvoked)
         }
 
     @Test
@@ -557,11 +558,12 @@ class TransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // ARRANGE
             val accountId = 1
-            var onSaveCompleteCalled = false
+            var capturedId: Long? = null
+            val expectedId = 1L
             val newCategoryId = 5
             val transactionCaptor = argumentCaptor<Transaction>()
 
-            whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(1L)
+            whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(expectedId)
 
             // First, trigger the nudge
             viewModel.onSaveTapped(
@@ -578,7 +580,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
             assertNotNull(viewModel.showCategoryNudge.value)
 
             // ACT
-            viewModel.saveWithSelectedCategory(newCategoryId) { onSaveCompleteCalled = true }
+            viewModel.saveWithSelectedCategory(newCategoryId) { capturedId = it }
             advanceUntilIdle()
 
             // ASSERT
@@ -590,7 +592,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
             assertEquals(newCategoryId, savedTransaction.categoryId)
             assertEquals("With friends", savedTransaction.notes)
             assertEquals(12345L, savedTransaction.date)
-            assertTrue(onSaveCompleteCalled)
+            assertEquals(expectedId, capturedId)
             assertNull(viewModel.showCategoryNudge.value) // Nudge should be cleared
         }
 
@@ -667,6 +669,20 @@ class TransactionViewModelTest : BaseViewModelTest() {
             // ASSERT
             viewModel.validationError.test {
                 assertEquals("An account must be selected.", awaitItem())
+            }
+            verify(transactionRepository, never()).insertTransactionWithTagsAndImages(any(), any(), any())
+        }
+
+    @Test
+    fun `onSaveTapped shows validation error for amount exceeding limit`() =
+        runTest {
+            // ACT
+            viewModel.onSaveTapped("Test", "2000000000.0", 1, 1, null, 0L, "expense", emptyList()) {}
+            advanceUntilIdle()
+
+            // ASSERT
+            viewModel.validationError.test {
+                assertEquals("Maximum limit of 1 Billion (1,000,000,000) reached.", awaitItem())
             }
             verify(transactionRepository, never()).insertTransactionWithTagsAndImages(any(), any(), any())
         }
@@ -750,6 +766,24 @@ class TransactionViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(transactionRepository).updateAmount(transactionId, newAmountDouble)
+        }
+
+    @Test
+    fun `updateTransactionAmount shows validation error for amount exceeding limit`() =
+        runTest {
+            // Arrange
+            val transactionId = 1
+            val newAmountStr = "2000000000.0"
+
+            // Act
+            viewModel.updateTransactionAmount(transactionId, newAmountStr)
+            advanceUntilIdle()
+
+            // Assert
+            viewModel.validationError.test {
+                assertEquals("Maximum limit of 1 Billion (1,000,000,000) reached.", awaitItem())
+            }
+            verify(transactionRepository, never()).updateAmount(any(), any())
         }
 
     @Test
@@ -3091,5 +3125,66 @@ class TransactionViewModelTest : BaseViewModelTest() {
                 awaitItem() // navigateBackEvent emitted
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `updateTransactionAmount does nothing when amountStr is not a valid number`() =
+        runTest {
+            // Arrange - non-parseable string
+            val transactionId = 1
+
+            // Act
+            viewModel.updateTransactionAmount(transactionId, "not_a_number")
+            advanceUntilIdle()
+
+            // Assert — repository must NOT be called since toDoubleOrNull() returns null
+            verify(transactionRepository, never()).updateAmount(any(), any())
+        }
+
+    @Test
+    fun `updateTransactionAmount does nothing when amount is zero or negative`() =
+        runTest {
+            // Arrange - zero amount (not > 0)
+            val transactionId = 1
+
+            // Act
+            viewModel.updateTransactionAmount(transactionId, "0.0")
+            advanceUntilIdle()
+
+            // Assert — repository must NOT be called since 0.0 is not > 0
+            verify(transactionRepository, never()).updateAmount(any(), any())
+        }
+
+    @Test
+    fun `createCategory with default icon and color keys applies normalization`() =
+        runTest {
+            // Arrange
+            // When iconKey == "category" it is normalized to "letter_default"
+            // When colorKey == "gray_light" it is replaced by getNextAvailableColor()
+            val newCategoryName = "Hobbies"
+            val defaultIconKey = "category"
+            val defaultColorKey = "gray_light"
+            val resolvedIconKey = "letter_default" // expected after normalization
+            // CategoryIconHelper.getNextAvailableColor([]) returns the first color
+            // We only need to verify insert was called with the resolved icon key.
+            val createdCategory = Category(1, newCategoryName, resolvedIconKey, "blue_light")
+            var callbackResult: Category? = null
+
+            whenever(db.categoryDao().findByName(newCategoryName)).thenReturn(null)
+            whenever(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
+            whenever(categoryRepository.insert(any())).thenReturn(1L)
+            whenever(categoryRepository.getCategoryById(1)).thenReturn(createdCategory)
+
+            // Act
+            viewModel.createCategory(newCategoryName, defaultIconKey, defaultColorKey) { callbackResult = it }
+            advanceUntilIdle()
+
+            // Assert — icon key must have been normalized from "category" to "letter_default"
+            val captor = argumentCaptor<Category>()
+            verify(categoryRepository).insert(captor.capture())
+            assertEquals(resolvedIconKey, captor.firstValue.iconKey)
+            // color key must have been replaced (anything other than "gray_light")
+            assertTrue("Color should have been resolved", captor.firstValue.colorKey != defaultColorKey)
+            assertEquals(createdCategory, callbackResult)
         }
 }
