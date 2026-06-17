@@ -3,7 +3,7 @@ import os
 import json
 import agent.brain as brain
 
-def generate_report(goal: str, result: dict):
+def generate_report(goal: str, result: dict, metadata: dict = None):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"qa-report-{timestamp}.md"
     
@@ -47,7 +47,7 @@ def generate_report(goal: str, result: dict):
     # Update Memory File
     app_map_file = os.path.join(os.getcwd(), "app_map.json")
     
-    app_map = {"Screens_Visited": [], "Features_Tested": [], "Known_Bugs": []}
+    app_map = {"Metadata": {"App_Version": "Unknown", "API_Level": "Unknown", "Execution_Time_Seconds": 0}, "Screens": {}, "Known_Bugs": []}
     if os.path.exists(app_map_file):
         with open(app_map_file, "r", encoding="utf-8") as f:
             try:
@@ -55,25 +55,33 @@ def generate_report(goal: str, result: dict):
             except json.JSONDecodeError:
                 pass
                 
+    if metadata:
+        if "Metadata" not in app_map:
+            app_map["Metadata"] = {}
+        app_map["Metadata"].update(metadata)
+                
     client = brain.setup_gemini()
     print("Summarizing run to update App Map...")
     diff = brain.summarize_run_to_app_map(client, app_map, goal, summary, history)
     
     # Merge diff
-    if "New_Screens" in diff and isinstance(diff["New_Screens"], list):
-        for s in diff["New_Screens"]:
-            if s not in app_map.setdefault("Screens_Visited", []):
-                app_map["Screens_Visited"].append(s)
-                
-    if "New_Features" in diff and isinstance(diff["New_Features"], list):
-        for f in diff["New_Features"]:
-            if f not in app_map.setdefault("Features_Tested", []):
-                app_map["Features_Tested"].append(f)
-                
+    if "Screens" in diff and isinstance(diff["Screens"], dict):
+        if "Screens" not in app_map:
+            app_map["Screens"] = {}
+        for screen_name, screen_data in diff["Screens"].items():
+            if screen_name not in app_map["Screens"]:
+                app_map["Screens"][screen_name] = {"Features_Tested": []}
+            
+            if "Features_Tested" in screen_data:
+                existing_features = app_map["Screens"][screen_name].setdefault("Features_Tested", [])
+                for feature in screen_data["Features_Tested"]:
+                    # Avoid duplicates by Name
+                    if not any(f.get("Name") == feature.get("Name") for f in existing_features):
+                        existing_features.append(feature)
+                        
     if "New_Bugs" in diff and isinstance(diff["New_Bugs"], list):
         new_bugs_added = False
         for b in diff["New_Bugs"]:
-            # Ensure it's not a duplicate description
             exists = any(existing_bug.get("Description") == b.get("Description") for existing_bug in app_map.setdefault("Known_Bugs", []))
             if not exists:
                 app_map["Known_Bugs"].append(b)
@@ -85,9 +93,11 @@ def generate_report(goal: str, result: dict):
                 
     if "Resolved_Bugs" in diff and isinstance(diff["Resolved_Bugs"], list):
         for rb in diff["Resolved_Bugs"]:
-            # Try to match the description and mark as resolved
             for existing_bug in app_map.setdefault("Known_Bugs", []):
-                if existing_bug.get("Status") == "Open" and (rb.lower() in existing_bug.get("Description", "").lower() or existing_bug.get("Description", "").lower() in rb.lower()):
+                rb_str = str(rb).lower()
+                desc = existing_bug.get("Description", "").lower()
+                bug_id = str(existing_bug.get("Id", "")).lower()
+                if existing_bug.get("Status") == "Open" and (rb_str in desc or desc in rb_str or rb_str in bug_id):
                     existing_bug["Status"] = "Resolved"
                     print(f"Marked bug as Resolved: {existing_bug.get('Description')}")
                     
