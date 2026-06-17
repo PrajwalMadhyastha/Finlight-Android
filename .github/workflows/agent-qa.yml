@@ -6,8 +6,8 @@ on:
     branches:
       - main
   schedule:
-    # Runs at 02:00 IST every day (20:30 UTC)
-    - cron: '30 20 * * *'
+    # Runs at 02:00 and 14:00 IST every day (20:30 and 08:30 UTC)
+    - cron: '30 8,20 * * *'
   workflow_dispatch:
     inputs:
       goal:
