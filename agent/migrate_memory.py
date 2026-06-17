@@ -4,16 +4,28 @@ from google import genai
 from google.genai import types
 
 def main():
-    if not os.path.exists("agent_memory.txt"):
-        print("agent_memory.txt not found. Creating empty app_map.json.")
-        create_empty_app_map()
-        return
-
-    with open("agent_memory.txt", "r", encoding="utf-8") as f:
-        memory_text = f.read()
+    memory_text = ""
+    
+    if os.path.exists("app_map.json"):
+        with open("app_map.json", "r", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+                if "Metadata" in data and "Screens" in data:
+                    print("app_map.json is already in the new format. No migration needed.")
+                    return
+                # It's the old format, we need to migrate it
+                memory_text = json.dumps(data)
+                print("Found old format app_map.json. Migrating...")
+            except json.JSONDecodeError:
+                pass
+                
+    if not memory_text and os.path.exists("agent_memory.txt"):
+        with open("agent_memory.txt", "r", encoding="utf-8") as f:
+            memory_text = f.read()
+            print("Found agent_memory.txt. Migrating...")
 
     if not memory_text.strip():
-        print("agent_memory.txt is empty. Creating empty app_map.json.")
+        print("No old memory found. Creating empty relational app_map.json.")
         create_empty_app_map()
         return
 
@@ -26,16 +38,35 @@ def main():
     client = genai.Client(api_key=api_key)
     
     prompt = f"""
-You are an expert at parsing raw testing logs. We are migrating our testing agent to use a structured "App Map".
-Here is the raw text from the previous test runs:
+You are an expert at parsing raw testing logs or old flat JSON app maps. We are migrating our testing agent to use a relational structured "App Map".
+Here is the raw data from the previous test runs:
 {memory_text}
 
-Extract the information into the following JSON schema:
+Extract and reorganize the information into the following JSON schema. Try to infer which features were tested on which screens. If you cannot determine the screen for a feature or bug, place it under an "Uncategorized" screen or leave the Screen field blank for bugs.
+
 {{
-  "Screens_Visited": ["Screen 1", "Screen 2"],
-  "Features_Tested": ["Feature 1", "Feature 2"],
+  "Metadata": {{
+    "App_Version": "Unknown",
+    "API_Level": "Unknown",
+    "Execution_Time_Seconds": 0
+  }},
+  "Screens": {{
+    "Screen Name": {{
+      "Features_Tested": [
+        {{
+          "Name": "Feature Name",
+          "Status": "PASS"
+        }}
+      ]
+    }}
+  }},
   "Known_Bugs": [
-    {{"Description": "Crash on transfer", "Status": "Open"}}
+    {{
+      "Id": "bug_001",
+      "Screen": "Screen Name",
+      "Description": "Crash on transfer",
+      "Status": "Open"
+    }}
   ]
 }}
 
@@ -72,8 +103,8 @@ Return ONLY valid JSON. If there are no bugs, return an empty list for Known_Bug
 
 def create_empty_app_map():
     empty_map = {
-        "Screens_Visited": [],
-        "Features_Tested": [],
+        "Metadata": { "App_Version": "Unknown", "API_Level": "Unknown", "Execution_Time_Seconds": 0 },
+        "Screens": {},
         "Known_Bugs": []
     }
     with open("app_map.json", "w", encoding="utf-8") as f:

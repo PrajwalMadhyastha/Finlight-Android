@@ -99,10 +99,8 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          if [ -f "agent_memory.txt" ] && [ ! -f "app_map.json" ]; then
-            echo "Migrating old agent_memory.txt to app_map.json..."
-            python agent/migrate_memory.py
-          fi
+          echo "Checking if memory needs migration..."
+          python agent/migrate_memory.py
 
       - name: Enable KVM group permissions
         run: |

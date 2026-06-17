@@ -63,6 +63,12 @@ def run_agent_loop(goal: str, max_steps: int = 50, memory_text: str = ""):
             adb_utils.press_home()
         elif action == "recent_apps":
             adb_utils.recent_apps()
+        elif action == "background_app":
+            adb_utils.background_app(args.get("seconds", 3))
+        elif action == "trigger_process_death":
+            adb_utils.trigger_process_death()
+        elif action == "toggle_dark_mode":
+            adb_utils.toggle_dark_mode()
         elif action == "sleep":
             time.sleep(args.get("seconds", 2))
         elif action == "checkpoint":
