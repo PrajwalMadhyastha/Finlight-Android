@@ -80,17 +80,17 @@ fun GoalDetailScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    TextButton(onClick = { showTransactionPicker = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Link")
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Link")
+                    }
+                },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent
                     )
-            )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showTransactionPicker = true },
-                icon = { Icon(Icons.Default.Add, contentDescription = "Link") },
-                text = { Text("Link Transaction") }
             )
         },
         containerColor = MaterialTheme.colorScheme.background

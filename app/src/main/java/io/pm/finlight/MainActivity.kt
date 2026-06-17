@@ -503,6 +503,11 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                     HelpActionIcon(helpKey = "account_list")
                                 }
                                 BottomNavItem.Reports.route -> HelpActionIcon(helpKey = "reports_screen")
+                                "goal_screen" -> {
+                                    IconButton(onClick = { navController.navigate("add_edit_goal/new") }) {
+                                        Icon(Icons.Default.Add, contentDescription = "Add Goal")
+                                    }
+                                }
                                 "budget_screen" -> HelpActionIcon(helpKey = "budget_screen")
                                 "income_screen" -> HelpActionIcon(helpKey = "income_screen")
                                 "appearance_settings" -> HelpActionIcon(helpKey = "appearance_settings")

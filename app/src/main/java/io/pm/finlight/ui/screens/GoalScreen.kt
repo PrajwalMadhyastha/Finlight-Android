@@ -52,12 +52,7 @@ fun GoalScreen(
     var goalToDelete by remember { mutableStateOf<Goal?>(null) }
 
     Scaffold(
-        containerColor = Color.Transparent,
-        floatingActionButton = {
-            FloatingActionButton(onClick = { navController.navigate("add_edit_goal/new") }) {
-                Icon(Icons.Default.Add, contentDescription = "Add Goal")
-            }
-        }
+        containerColor = Color.Transparent
     ) { innerPadding ->
         if (goals.isEmpty()) {
             EmptyStateMessage(
