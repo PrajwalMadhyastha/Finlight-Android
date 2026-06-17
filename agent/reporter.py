@@ -59,6 +59,10 @@ def generate_report(goal: str, result: dict, metadata: dict = None):
         if "Metadata" not in app_map:
             app_map["Metadata"] = {}
         app_map["Metadata"].update(metadata)
+        
+    # Remove deprecated keys that might be lingering from older app maps
+    if "Metadata" in app_map and "Execution_Time_Seconds" in app_map["Metadata"]:
+        app_map["Metadata"].pop("Execution_Time_Seconds", None)
                 
     client = brain.setup_gemini()
     print("Summarizing run to update App Map...")
