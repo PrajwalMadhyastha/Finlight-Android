@@ -17,6 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -62,6 +65,14 @@ fun GoalDetailScreen(
         animationSpec = tween(durationMillis = 1500, easing = EaseOutCubic),
         label = "DetailGoalProgress"
     )
+
+    var offlineAmountText by remember(currentGoal.savedAmount) {
+        val amt = currentGoal.savedAmount
+        val str = if (amt > 0.0) {
+            if (amt % 1.0 == 0.0) amt.toLong().toString() else amt.toString()
+        } else ""
+        mutableStateOf(TextFieldValue(str))
+    }
 
     val currencyFormat = remember { FormatUtils.currencyFormatter }
     val dateFormat = remember { FormatUtils.displayDateFormatter }
@@ -180,6 +191,54 @@ fun GoalDetailScreen(
                             modifier = Modifier.padding(16.dp),
                             style = MaterialTheme.typography.bodyMedium
                         )
+                    }
+                }
+            }
+
+            item {
+                Text("Offline Savings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                GlassPanel {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = offlineAmountText,
+                            onValueChange = { tfv ->
+                                offlineAmountText = tfv.copy(text = tfv.text.filter { ch -> ch.isDigit() || ch == '.' })
+                            },
+                            label = { Text("Amount manually saved") },
+                            leadingIcon = { Text("₹") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                            )
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Button(
+                            onClick = {
+                                val amt = offlineAmountText.text.toDoubleOrNull() ?: 0.0
+                                goalViewModel.saveGoal(
+                                    id = currentGoal.id,
+                                    name = currentGoal.name,
+                                    targetAmount = currentGoal.targetAmount,
+                                    targetDate = currentGoal.targetDate,
+                                    accountId = currentGoal.accountId,
+                                    offlineContribution = amt,
+                                    notes = currentGoal.notes,
+                                    iconEmoji = currentGoal.iconEmoji,
+                                    priority = currentGoal.priority
+                                )
+                            },
+                            enabled = offlineAmountText.text.isBlank() || offlineAmountText.text.toDoubleOrNull() != null
+                        ) {
+                            Text("Update")
+                        }
                     }
                 }
             }
