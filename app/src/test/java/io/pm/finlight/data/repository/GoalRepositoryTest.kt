@@ -9,6 +9,8 @@ import io.pm.finlight.GoalRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.TransactionDao
 import io.pm.finlight.data.db.dao.GoalTransactionLinkDao
+import io.pm.finlight.data.db.dao.GoalContributionDao
+import io.pm.finlight.data.db.entity.GoalContribution
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -33,12 +35,15 @@ class GoalRepositoryTest : BaseViewModelTest() {
     @Mock
     private lateinit var transactionDao: TransactionDao
 
+    @Mock
+    private lateinit var contributionDao: GoalContributionDao
+
     private lateinit var repository: GoalRepository
 
     @Before
     override fun setup() {
         super.setup()
-        repository = GoalRepository(goalDao, linkDao, transactionDao)
+        repository = GoalRepository(goalDao, linkDao, transactionDao, contributionDao)
     }
 
     @Test
@@ -141,4 +146,40 @@ class GoalRepositoryTest : BaseViewModelTest() {
         repository.getLinkedTotal(1)
         verify(linkDao).getLinkedTransactionsTotal(1)
     }
+
+    @Test
+    fun `getContributionsForGoal calls contributionDao`() {
+        repository.getContributionsForGoal(1)
+        verify(contributionDao).getContributionsForGoal(1)
+    }
+
+    @Test
+    fun `getTotalContributionForGoal calls contributionDao`() {
+        repository.getTotalContributionForGoal(1)
+        verify(contributionDao).getTotalContributionForGoal(1)
+    }
+
+    @Test
+    fun `insertContribution calls contributionDao`() =
+        runTest {
+            val contribution = GoalContribution(goalId = 1, amount = 100.0, date = 1000L, description = "Test")
+            repository.insertContribution(contribution)
+            verify(contributionDao).insertContribution(contribution)
+        }
+
+    @Test
+    fun `updateContribution calls contributionDao`() =
+        runTest {
+            val contribution = GoalContribution(id = 1, goalId = 1, amount = 100.0, date = 1000L, description = "Test")
+            repository.updateContribution(contribution)
+            verify(contributionDao).updateContribution(contribution)
+        }
+
+    @Test
+    fun `deleteContribution calls contributionDao`() =
+        runTest {
+            val contribution = GoalContribution(id = 1, goalId = 1, amount = 100.0, date = 1000L, description = "Test")
+            repository.deleteContribution(contribution)
+            verify(contributionDao).deleteContribution(contribution)
+        }
 }

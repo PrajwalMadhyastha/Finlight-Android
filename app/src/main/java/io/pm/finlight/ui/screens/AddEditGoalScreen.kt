@@ -27,7 +27,6 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.FormatUtils
-import java.text.NumberFormat
 import java.util.*
 
 // Helper to detect perceived luminance.
@@ -68,11 +67,12 @@ fun AddEditGoalScreen(
     LaunchedEffect(goalToEdit, accounts) {
         goalToEdit?.let { goal ->
             val nameStr = goal.name
-            val targetStr = if (goal.targetAmount % 1.0 == 0.0) {
-                goal.targetAmount.toLong().toString()
-            } else {
-                goal.targetAmount.toString()
-            }
+            val targetStr =
+                if (goal.targetAmount % 1.0 == 0.0) {
+                    goal.targetAmount.toLong().toString()
+                } else {
+                    goal.targetAmount.toString()
+                }
             val notesStr = goal.notes ?: ""
             name = TextFieldValue(nameStr, TextRange(nameStr.length))
             targetAmount = TextFieldValue(targetStr, TextRange(targetStr.length))

@@ -86,14 +86,15 @@ class GoalFlowTest {
         // Assert we are on the detail screen for "Dream Car"
         composeTestRule.onNodeWithText("Dream Car", substring = true).assertExists()
 
-        // Click "Link Transaction"
-        composeTestRule.onNodeWithText("Link Transaction", substring = true, useUnmergedTree = true)
+        // Click "Link a transaction"
+        composeTestRule.onNodeWithText("Link a transaction", substring = true, useUnmergedTree = true)
             .assertExists()
             .performClick()
 
         // Now TransactionPickerSheet is shown
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Select Transaction to Link", substring = true).assertExists()
+        composeTestRule.onNodeWithText("Select Transaction", substring = true)
+            .assertExists()
 
         // Click the first transaction (e.g. Test Salary, etc. from SeedDatabaseRule)
         composeTestRule.onNodeWithText(TestDataSeeder.TXN_GROCERY_DESC, substring = true).performScrollTo().performClick()
@@ -103,5 +104,76 @@ class GoalFlowTest {
 
         // Assert transaction description appears in Linked Transactions
         composeTestRule.onNodeWithText(TestDataSeeder.TXN_GROCERY_DESC, substring = true).performScrollTo().assertExists()
+    }
+
+    @Test
+    fun testCreateGoalWithOfflineContribution() {
+        runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val db = AppDatabase.getInstance(context)
+
+            db.goalDao().insert(
+                Goal(
+                    name = "Test Goal #1",
+                    targetAmount = 1000.0,
+                    targetDate = null,
+                    accountId = TestDataSeeder.ACCOUNT_BANK_ID
+                )
+            )
+        }
+
+        composeTestRule.waitForIdle()
+
+        // Wait for dashboard to load
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Scroll to Savings Goals and click it
+        composeTestRule.onNode(hasTestTag("dashboard_lazy_column"))
+            .performScrollToNode(hasText("Savings Goals", substring = true))
+        composeTestRule.onNodeWithText("Savings Goals", substring = true).performClick()
+
+        // Now on GoalScreen
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithContentDescription("Add Goal").assertExists().performClick()
+
+        // Now on AddEditGoalScreen
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Goal Name", substring = true).performTextInput("Vacation")
+        composeTestRule.onNodeWithText("Target Amount", substring = true).performTextInput("5000")
+
+        // Select Account (ExposedDropdownMenuBox)
+        composeTestRule.onNodeWithText("Allocate To Account", substring = true).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(TestDataSeeder.ACCOUNT_BANK_NAME, substring = true).performClick()
+
+        // Click Save
+        composeTestRule.onNodeWithText("Save", substring = true).performClick()
+
+        // Should return to GoalScreen and display "Vacation"
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Vacation", substring = true).assertExists().performClick()
+
+        // Now on GoalDetailScreen
+        composeTestRule.waitForIdle()
+        // Assert we are on the detail screen for "Vacation"
+        composeTestRule.onNodeWithText("Vacation", substring = true).assertExists()
+        
+        // Add an offline contribution via GoalDetailScreen
+        composeTestRule.onNodeWithText("Add", substring = true, useUnmergedTree = true).performClick()
+        composeTestRule.waitForIdle()
+        
+        // Inside Add Contribution Dialog
+        composeTestRule.onNodeWithText("Amount", substring = true).performTextInput("1000")
+        composeTestRule.onNodeWithText("Description (Optional)", substring = true).performTextInput("Cash savings")
+        
+        // Save the contribution
+        composeTestRule.onNodeWithText("Save", substring = true, useUnmergedTree = true).performClick()
+        composeTestRule.waitForIdle()
+
+        // Assert that the offline contribution is displayed. (1,000 offline)
+        composeTestRule.onAllNodesWithText("1,000", substring = true).onFirst().assertExists()
+        composeTestRule.onNodeWithText("Cash savings", substring = true).assertExists()
     }
 }

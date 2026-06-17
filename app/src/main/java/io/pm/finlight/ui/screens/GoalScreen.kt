@@ -20,7 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -250,7 +249,7 @@ private fun GoalItem(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    
+
                     if (offlineTotal > 0.0) {
                         Text(
                             text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(offlineTotal)} offline)",
@@ -275,7 +274,7 @@ private fun GoalItem(
                     }
                 }
             }
-            
+
             Spacer(Modifier.height(16.dp))
             OutlinedButton(
                 onClick = onClick,
