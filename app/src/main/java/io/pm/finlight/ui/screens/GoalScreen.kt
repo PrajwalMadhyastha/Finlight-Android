@@ -116,12 +116,12 @@ private fun GoalItem(
     onDelete: () -> Unit,
     onClick: () -> Unit,
 ) {
-    // Dynamic progress from linked transactions
     val linkedTotal by goalViewModel.getLinkedTotal(goal.id).collectAsState(initial = 0.0)
     val linkedCount by goalViewModel.getLinkedTransactionCount(goal.id).collectAsState(initial = 0)
     val linkedTransactions by goalViewModel.getLinkedTransactions(goal.id).collectAsState(initial = emptyList())
 
-    val progress = if (goal.targetAmount > 0) (linkedTotal / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+    val totalSaved = linkedTotal + goal.savedAmount
+    val progress = if (goal.targetAmount > 0) (totalSaved / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(durationMillis = 1000, easing = EaseOutCubic),
@@ -140,13 +140,13 @@ private fun GoalItem(
 
     // Calculate projected completion date
     val projectedDate =
-        remember(linkedTotal, linkedTransactions, goal.targetAmount) {
+        remember(linkedTotal, linkedTransactions, goal.targetAmount, totalSaved) {
             if (linkedTransactions.isEmpty() || linkedTotal <= 0) return@remember null
             val firstDate = linkedTransactions.minByOrNull { it.date }?.date ?: return@remember null
             val daysSinceFirst = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - firstDate).coerceAtLeast(1)
             val avgPerDay = linkedTotal / daysSinceFirst
             if (avgPerDay <= 0) return@remember null
-            val remainingAmount = goal.targetAmount - linkedTotal
+            val remainingAmount = goal.targetAmount - totalSaved
             if (remainingAmount <= 0) return@remember System.currentTimeMillis()
             val daysToComplete = remainingAmount / avgPerDay
             System.currentTimeMillis() + TimeUnit.DAYS.toMillis(daysToComplete.toLong())
@@ -244,11 +244,19 @@ private fun GoalItem(
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "${currencyFormat.format(linkedTotal)} / ${currencyFormat.format(goal.targetAmount)}",
+                        text = "${currencyFormat.format(totalSaved)} / ${currencyFormat.format(goal.targetAmount)}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
+                    
+                    if (goal.savedAmount > 0.0) {
+                        Text(
+                            text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(goal.savedAmount)} offline)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
 
                     // Countdown or Projection
                     if (daysRemaining != null) {

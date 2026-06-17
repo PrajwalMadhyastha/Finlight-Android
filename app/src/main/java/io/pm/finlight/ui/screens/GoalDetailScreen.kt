@@ -55,7 +55,8 @@ fun GoalDetailScreen(
     }
 
     val currentGoal = goal!!
-    val progress = if (currentGoal.targetAmount > 0) (linkedTotal / currentGoal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+    val totalSaved = linkedTotal + currentGoal.savedAmount
+    val progress = if (currentGoal.targetAmount > 0) (totalSaved / currentGoal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(durationMillis = 1500, easing = EaseOutCubic),
@@ -145,10 +146,18 @@ fun GoalDetailScreen(
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Text(
-                            text = "${currencyFormat.format(linkedTotal)} saved of ${currencyFormat.format(currentGoal.targetAmount)}",
+                            text = "${currencyFormat.format(totalSaved)} saved of ${currencyFormat.format(currentGoal.targetAmount)}",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        if (currentGoal.savedAmount > 0.0) {
+                            Text(
+                                text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(currentGoal.savedAmount)} offline)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
 
                         if (daysRemaining != null) {
                             Text(

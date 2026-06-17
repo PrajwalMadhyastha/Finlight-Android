@@ -53,6 +53,7 @@ fun AddEditGoalScreen(
     var targetAmount by remember { mutableStateOf(TextFieldValue("")) }
     var selectedAccount by remember { mutableStateOf<Account?>(null) }
     var targetDateMillis by remember { mutableStateOf<Long?>(null) }
+    var offlineContribution by remember { mutableStateOf(TextFieldValue("")) }
     var notes by remember { mutableStateOf(TextFieldValue("")) }
 
     var showDatePicker by remember { mutableStateOf(false) }
@@ -73,9 +74,13 @@ fun AddEditGoalScreen(
             } else {
                 goal.targetAmount.toString()
             }
+            val offlineStr = if (goal.savedAmount > 0.0) {
+                if (goal.savedAmount % 1.0 == 0.0) goal.savedAmount.toLong().toString() else goal.savedAmount.toString()
+            } else ""
             val notesStr = goal.notes ?: ""
             name = TextFieldValue(nameStr, TextRange(nameStr.length))
             targetAmount = TextFieldValue(targetStr, TextRange(targetStr.length))
+            offlineContribution = TextFieldValue(offlineStr, TextRange(offlineStr.length))
             notes = TextFieldValue(notesStr, TextRange(notesStr.length))
             targetDateMillis = goal.targetDate
             selectedAccount = accounts.find { it.id == goal.accountId }
@@ -112,6 +117,18 @@ fun AddEditGoalScreen(
                             targetAmount = tfv.copy(text = tfv.text.filter { ch -> ch.isDigit() || ch == '.' })
                         },
                         label = { Text("Target Amount") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        leadingIcon = { Text("₹") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = auroraTextFieldColors(),
+                    )
+                    OutlinedTextField(
+                        value = offlineContribution,
+                        onValueChange = { tfv ->
+                            offlineContribution = tfv.copy(text = tfv.text.filter { ch -> ch.isDigit() || ch == '.' })
+                        },
+                        label = { Text("Already Saved (Offline/Manual)") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         leadingIcon = { Text("₹") },
@@ -222,11 +239,13 @@ fun AddEditGoalScreen(
                 val saveEnabled =
                     name.text.isNotBlank() &&
                         targetAmount.text.toDoubleOrNull() != null &&
+                        (offlineContribution.text.isBlank() || offlineContribution.text.toDoubleOrNull() != null) &&
                         selectedAccount != null
 
                 Button(
                     onClick = {
                         val tgtAmt = targetAmount.text.toDouble()
+                        val offlineAmt = offlineContribution.text.toDoubleOrNull() ?: 0.0
 
                         goalViewModel.saveGoal(
                             id = goalId,
@@ -234,6 +253,7 @@ fun AddEditGoalScreen(
                             targetAmount = tgtAmt,
                             targetDate = targetDateMillis,
                             accountId = selectedAccount!!.id,
+                            offlineContribution = offlineAmt,
                             notes = notes.text.trim().ifBlank { null },
                         )
                         navController.popBackStack()
