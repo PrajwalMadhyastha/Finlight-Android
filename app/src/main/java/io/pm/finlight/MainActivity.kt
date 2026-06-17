@@ -355,6 +355,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
             "annual_simulator",
             "recurring_transactions",
             "add_recurring_transaction",
+            "goal_detail",
         )
 
     val showMainTopBar = baseCurrentRoute !in screensWithCustomTopBars
