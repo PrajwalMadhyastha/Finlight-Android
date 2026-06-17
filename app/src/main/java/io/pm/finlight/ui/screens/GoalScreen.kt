@@ -117,10 +117,11 @@ private fun GoalItem(
     onClick: () -> Unit,
 ) {
     val linkedTotal by goalViewModel.getLinkedTotal(goal.id).collectAsState(initial = 0.0)
+    val offlineTotal by goalViewModel.getTotalContributionForGoal(goal.id).collectAsState(initial = 0.0)
     val linkedCount by goalViewModel.getLinkedTransactionCount(goal.id).collectAsState(initial = 0)
     val linkedTransactions by goalViewModel.getLinkedTransactions(goal.id).collectAsState(initial = emptyList())
 
-    val totalSaved = linkedTotal + goal.savedAmount
+    val totalSaved = linkedTotal + offlineTotal
     val progress = if (goal.targetAmount > 0) (totalSaved / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
@@ -250,9 +251,9 @@ private fun GoalItem(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     
-                    if (goal.savedAmount > 0.0) {
+                    if (offlineTotal > 0.0) {
                         Text(
-                            text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(goal.savedAmount)} offline)",
+                            text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(offlineTotal)} offline)",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

@@ -18,6 +18,7 @@ import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.data.db.entity.DeletedSmsHash
+import io.pm.finlight.data.db.entity.GoalContribution
 import io.pm.finlight.data.db.entity.GoalTransactionLink
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.security.SecurityManager
@@ -51,8 +52,9 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         AccountAlias::class,
         DeletedSmsHash::class,
         GoalTransactionLink::class,
+        GoalContribution::class,
     ],
-    version = 47,
+    version = 48,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -93,6 +95,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun deletedSmsHashDao(): DeletedSmsHashDao
 
     abstract fun goalTransactionLinkDao(): GoalTransactionLinkDao
+
+    abstract fun goalContributionDao(): GoalContributionDao
 
     companion object {
         @Volatile
@@ -759,6 +763,26 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 47→48: Goal Contribution History ---
+        val MIGRATION_47_48 =
+            object : Migration(47, 48) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `goal_contributions` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                            `goalId` INTEGER NOT NULL, 
+                            `amount` REAL NOT NULL, 
+                            `date` INTEGER NOT NULL, 
+                            `description` TEXT NOT NULL,
+                            FOREIGN KEY(`goalId`) REFERENCES `goals`(`id`) ON DELETE CASCADE
+                        )
+                    """
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_goal_contributions_goalId` ON `goal_contributions` (`goalId`)")
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -792,8 +816,8 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_43_44,
                             MIGRATION_44_45,
                             MIGRATION_45_46,
-                            // --- ADDED: Issue #104 ---
                             MIGRATION_46_47,
+                            MIGRATION_47_48,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.GoalViewModel
 import io.pm.finlight.Transaction
+import io.pm.finlight.data.db.entity.GoalContribution
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.TransactionPickerSheet
 import io.pm.finlight.utils.FormatUtils
@@ -41,6 +43,8 @@ fun GoalDetailScreen(
 ) {
     val goal by goalViewModel.getGoalById(goalId).collectAsState(initial = null)
     val linkedTotal by goalViewModel.getLinkedTotal(goalId).collectAsState(initial = 0.0)
+    val offlineTotal by goalViewModel.getTotalContributionForGoal(goalId).collectAsState(initial = 0.0)
+    val offlineContributions by goalViewModel.getContributionsForGoal(goalId).collectAsState(initial = emptyList())
     val linkedTransactions by goalViewModel.getLinkedTransactions(goalId).collectAsState(initial = emptyList<Transaction>())
 
     // We'll just fetch all recent transactions for the picker and filter out already linked ones.
@@ -58,7 +62,7 @@ fun GoalDetailScreen(
     }
 
     val currentGoal = goal!!
-    val totalSaved = linkedTotal + currentGoal.savedAmount
+    val totalSaved = linkedTotal + offlineTotal
     val progress = if (currentGoal.targetAmount > 0) (totalSaved / currentGoal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
@@ -66,13 +70,8 @@ fun GoalDetailScreen(
         label = "DetailGoalProgress"
     )
 
-    var offlineAmountText by remember(currentGoal.savedAmount) {
-        val amt = currentGoal.savedAmount
-        val str = if (amt > 0.0) {
-            if (amt % 1.0 == 0.0) amt.toLong().toString() else amt.toString()
-        } else ""
-        mutableStateOf(TextFieldValue(str))
-    }
+    var showContributionDialog by remember { mutableStateOf(false) }
+    var contributionToEdit by remember { mutableStateOf<GoalContribution?>(null) }
 
     val currencyFormat = remember { FormatUtils.currencyFormatter }
     val dateFormat = remember { FormatUtils.displayDateFormatter }
@@ -161,9 +160,9 @@ fun GoalDetailScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        if (currentGoal.savedAmount > 0.0) {
+                        if (offlineTotal > 0.0) {
                             Text(
-                                text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(currentGoal.savedAmount)} offline)",
+                                text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(offlineTotal)} offline)",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 4.dp)
@@ -196,48 +195,51 @@ fun GoalDetailScreen(
             }
 
             item {
-                Text("Offline Savings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                GlassPanel {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = offlineAmountText,
-                            onValueChange = { tfv ->
-                                offlineAmountText = tfv.copy(text = tfv.text.filter { ch -> ch.isDigit() || ch == '.' })
-                            },
-                            label = { Text("Amount manually saved") },
-                            leadingIcon = { Text("₹") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                            )
-                        )
-                        Spacer(Modifier.width(16.dp))
-                        Button(
-                            onClick = {
-                                val amt = offlineAmountText.text.toDoubleOrNull() ?: 0.0
-                                goalViewModel.saveGoal(
-                                    id = currentGoal.id,
-                                    name = currentGoal.name,
-                                    targetAmount = currentGoal.targetAmount,
-                                    targetDate = currentGoal.targetDate,
-                                    accountId = currentGoal.accountId,
-                                    offlineContribution = amt,
-                                    notes = currentGoal.notes,
-                                    iconEmoji = currentGoal.iconEmoji,
-                                    priority = currentGoal.priority
-                                )
-                            },
-                            enabled = offlineAmountText.text.isBlank() || offlineAmountText.text.toDoubleOrNull() != null
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Manual Contributions (${offlineContributions.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { 
+                        contributionToEdit = null
+                        showContributionDialog = true 
+                    }) {
+                        Icon(Icons.Default.Add, contentDescription = "Add")
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add")
+                    }
+                }
+            }
+
+            if (offlineContributions.isEmpty()) {
+                item {
+                    Text("No manual contributions yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                items(offlineContributions, key = { "offline_${it.id}" }) { contrib ->
+                    GlassPanel(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Update")
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = contrib.description.ifBlank { "Manual Addition" }, style = MaterialTheme.typography.titleMedium)
+                                Text(text = dateFormat.format(Date(contrib.date)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text(text = currencyFormat.format(contrib.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 8.dp))
+                            Row {
+                                IconButton(onClick = {
+                                    contributionToEdit = contrib
+                                    showContributionDialog = true
+                                }) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                IconButton(onClick = { goalViewModel.deleteContribution(contrib) }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
                         }
                     }
                 }
@@ -304,6 +306,54 @@ fun GoalDetailScreen(
                 goalViewModel.linkTransactionToGoal(goalId, txn.id)
             },
             onDismiss = { showTransactionPicker = false }
+        )
+    }
+
+    if (showContributionDialog) {
+        var amount by remember { mutableStateOf(TextFieldValue(contributionToEdit?.amount?.let { if (it % 1 == 0.0) it.toLong().toString() else it.toString() } ?: "")) }
+        var description by remember { mutableStateOf(TextFieldValue(contributionToEdit?.description ?: "")) }
+
+        AlertDialog(
+            onDismissRequest = { showContributionDialog = false },
+            title = { Text(if (contributionToEdit == null) "Add Contribution" else "Edit Contribution") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = { tfv -> amount = tfv.copy(text = tfv.text.filter { ch -> ch.isDigit() || ch == '.' }) },
+                        label = { Text("Amount") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        leadingIcon = { Text("₹") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Description (Optional)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val amt = amount.text.toDoubleOrNull() ?: 0.0
+                        if (contributionToEdit == null) {
+                            goalViewModel.insertContribution(GoalContribution(goalId = goalId, amount = amt, date = System.currentTimeMillis(), description = description.text.trim()))
+                        } else {
+                            goalViewModel.updateContribution(contributionToEdit!!.copy(amount = amt, description = description.text.trim()))
+                        }
+                        showContributionDialog = false
+                    },
+                    enabled = amount.text.isNotBlank() && amount.text.toDoubleOrNull() != null
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showContributionDialog = false }) { Text("Cancel") }
+            }
         )
     }
 }
