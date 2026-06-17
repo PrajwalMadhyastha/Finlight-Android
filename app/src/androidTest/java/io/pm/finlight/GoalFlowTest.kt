@@ -159,15 +159,15 @@ class GoalFlowTest {
         composeTestRule.waitForIdle()
         // Assert we are on the detail screen for "Vacation"
         composeTestRule.onNodeWithText("Vacation", substring = true).assertExists()
-        
+
         // Add an offline contribution via GoalDetailScreen
         composeTestRule.onNodeWithText("Add", substring = true, useUnmergedTree = true).performClick()
         composeTestRule.waitForIdle()
-        
+
         // Inside Add Contribution Dialog
         composeTestRule.onNodeWithText("Amount", substring = true).performTextInput("1000")
         composeTestRule.onNodeWithText("Description (Optional)", substring = true).performTextInput("Cash savings")
-        
+
         // Save the contribution
         composeTestRule.onNodeWithText("Save", substring = true, useUnmergedTree = true).performClick()
         composeTestRule.waitForIdle()
