@@ -48,7 +48,7 @@ Extract and reorganize the information into the following JSON schema. Try to in
   "Metadata": {{
     "App_Version": "Unknown",
     "API_Level": "Unknown",
-    "Execution_Time_Seconds": 0
+    "Execution_Time": "0 seconds"
   }},
   "Screens": {{
     "Screen Name": {{
@@ -103,7 +103,7 @@ Return ONLY valid JSON. If there are no bugs, return an empty list for Known_Bug
 
 def create_empty_app_map():
     empty_map = {
-        "Metadata": { "App_Version": "Unknown", "API_Level": "Unknown", "Execution_Time_Seconds": 0 },
+        "Metadata": { "App_Version": "Unknown", "API_Level": "Unknown", "Execution_Time": "0 seconds" },
         "Screens": {},
         "Known_Bugs": []
     }

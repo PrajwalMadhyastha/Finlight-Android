@@ -55,11 +55,29 @@ def main():
     # Run the loop
     result = loop.run_agent_loop(goal=goal, max_steps=args.max_steps, memory_text=memory_text)
     
-    execution_time = int(time.time() - start_time)
+    execution_time_seconds = int(time.time() - start_time)
+    minutes = execution_time_seconds // 60
+    seconds = execution_time_seconds % 60
+    execution_time_str = f"{minutes} minutes {seconds} seconds" if minutes > 0 else f"{seconds} seconds"
+    
+    app_version = args.app_version
+    if app_version == "Unknown":
+        try:
+            import re
+            with open("version.properties", "r") as f:
+                content = f.read()
+                major = re.search(r"VERSION_MAJOR=(\d+)", content)
+                minor = re.search(r"VERSION_MINOR=(\d+)", content)
+                patch = re.search(r"VERSION_PATCH=(\d+)", content)
+                if major and minor and patch:
+                    app_version = f"{major.group(1)}.{minor.group(1)}.{patch.group(1)}"
+        except Exception:
+            pass
+
     metadata = {
-        "App_Version": args.app_version,
+        "App_Version": app_version,
         "API_Level": args.api_level,
-        "Execution_Time_Seconds": execution_time
+        "Execution_Time": execution_time_str
     }
     
     # Generate the report

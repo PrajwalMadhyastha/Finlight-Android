@@ -128,12 +128,8 @@ jobs:
             echo "Installing App..."
             ./gradlew installDebug --no-daemon
             
-            # Extract version from version.properties
-            APP_VERSION=$(grep -E 'VERSION_MAJOR|VERSION_MINOR|VERSION_PATCH' version.properties | cut -d'=' -f2 | tr '\n' '.' | sed 's/\.$//')
-            if [ -z "$APP_VERSION" ]; then APP_VERSION="Unknown"; fi
-            
-            echo "Running AI Agent for App Version $APP_VERSION..."
-            python -m agent.main --goal "${{ github.event.inputs.goal || 'random' }}" --max-steps 100 --api-level 34 --app-version "$APP_VERSION"
+            echo "Running AI Agent..."
+            python -m agent.main --goal "${{ github.event.inputs.goal || 'random' }}" --max-steps 100 --api-level 34
 
       - name: Create GitHub Issue on Bug Found
         if: always()

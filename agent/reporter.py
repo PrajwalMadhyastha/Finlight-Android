@@ -47,7 +47,7 @@ def generate_report(goal: str, result: dict, metadata: dict = None):
     # Update Memory File
     app_map_file = os.path.join(os.getcwd(), "app_map.json")
     
-    app_map = {"Metadata": {"App_Version": "Unknown", "API_Level": "Unknown", "Execution_Time_Seconds": 0}, "Screens": {}, "Known_Bugs": []}
+    app_map = {"Metadata": {"App_Version": "Unknown", "API_Level": "Unknown", "Execution_Time": "0 seconds"}, "Screens": {}, "Known_Bugs": []}
     if os.path.exists(app_map_file):
         with open(app_map_file, "r", encoding="utf-8") as f:
             try:
