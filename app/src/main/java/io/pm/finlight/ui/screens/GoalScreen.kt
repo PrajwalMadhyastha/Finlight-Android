@@ -220,6 +220,7 @@ private fun GoalItem(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
                     Text(
@@ -256,6 +257,14 @@ private fun GoalItem(
                         )
                     }
                 }
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = onClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("View & Link Transactions")
             }
         }
     }
