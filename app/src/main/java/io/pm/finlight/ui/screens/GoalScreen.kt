@@ -172,10 +172,18 @@ private fun GoalItem(
                         strokeCap = StrokeCap.Round,
                         trackColor = Color.Transparent,
                     )
-                    if (!goal.iconEmoji.isNullOrBlank()) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (!goal.iconEmoji.isNullOrBlank()) {
+                            Text(
+                                text = goal.iconEmoji,
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
                         Text(
-                            text = goal.iconEmoji,
-                            style = MaterialTheme.typography.headlineMedium,
+                            text = "${(progress * 100).roundToInt()}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
