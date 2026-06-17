@@ -68,7 +68,11 @@ fun AddEditGoalScreen(
     LaunchedEffect(goalToEdit, accounts) {
         goalToEdit?.let { goal ->
             val nameStr = goal.name
-            val targetStr = NumberFormat.getNumberInstance().format(goal.targetAmount)
+            val targetStr = if (goal.targetAmount % 1.0 == 0.0) {
+                goal.targetAmount.toLong().toString()
+            } else {
+                goal.targetAmount.toString()
+            }
             val notesStr = goal.notes ?: ""
             name = TextFieldValue(nameStr, TextRange(nameStr.length))
             targetAmount = TextFieldValue(targetStr, TextRange(targetStr.length))
