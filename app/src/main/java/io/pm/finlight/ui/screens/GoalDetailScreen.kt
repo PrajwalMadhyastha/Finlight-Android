@@ -84,7 +84,7 @@ fun GoalDetailScreen(
                     TextButton(onClick = { showTransactionPicker = true }) {
                         Icon(Icons.Default.Add, contentDescription = "Link")
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Link")
+                        Text("Link a transaction")
                     }
                 },
                 colors =
