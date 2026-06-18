@@ -15,7 +15,7 @@ def generate_report(goal: str, result: dict, metadata: dict = None):
         f"# Autonomous QA Agent Report",
         f"**Date:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         f"**Goal:** {goal}",
-        f"**Status:** {'✅ PASS' if status.lower() == 'pass' else '❌ FAIL'}",
+        f"**Status:** {'PASS' if status.lower() == 'pass' else 'FAIL'}",
         f"",
         f"## Summary",
         f"{summary}",
