@@ -580,10 +580,6 @@ class NotificationHelperTest : BaseViewModelTest() {
         val inboxLines = notification.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
         assertTrue(inboxLines!![1].toString().contains("This is your 3rd visit here."))
 
-        // Assert random emoji is present from the list
-        val emojis = listOf("🛍️", "✨", "🎉", "👍", "💸", "💳", "🛒", "✅", "💯", "🤩", "🚀", "🙌", "🔥")
-        val line = inboxLines[1].toString()
-        assertTrue("Line should contain a random emoji from the list: $line", emojis.any { line.contains(it) })
     }
 
     @Test

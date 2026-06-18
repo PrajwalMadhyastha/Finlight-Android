@@ -196,10 +196,6 @@ object NotificationHelper {
 
         val categoryBitmap = createCategoryIconBitmap(context, details)
 
-        // --- NEW: List of emojis for personalization ---
-        val emojis = listOf("🛍️", "✨", "🎉", "👍", "💸", "💳", "🛒", "✅", "💯", "🤩", "🚀", "🙌", "🔥")
-        val randomEmoji = emojis.random()
-
         val inboxStyle =
             NotificationCompat.InboxStyle()
                 // --- MODIFIED: Use the contentText for the big title ---
@@ -210,7 +206,7 @@ object NotificationHelper {
             if (details.transaction.transactionType == "income") "income this month" else "spent this month"
         inboxStyle.addLine("${currencyFormat.format(monthlyTotal)} $totalLabel")
 
-        if (visitCount > 0) {
+        if (visitCount > 0 && details.transaction.transactionType != "income") {
             val visitText =
                 when (visitCount) {
                     1 -> "This is your first visit here."
@@ -218,8 +214,7 @@ object NotificationHelper {
                     3 -> "This is your 3rd visit here."
                     else -> "This is your ${visitCount}th visit here."
                 }
-            // --- MODIFIED: Append the random emoji to the visit count line ---
-            inboxStyle.addLine("$visitText $randomEmoji")
+            inboxStyle.addLine(visitText)
         }
 
         val builder =
