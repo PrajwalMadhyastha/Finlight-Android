@@ -197,6 +197,10 @@ class TransactionRepository(
         return transactionDao.getTransactionById(id)
     }
 
+    suspend fun getTransactionSync(id: Int): Transaction? {
+        return transactionDao.getTransactionByIdSync(id)
+    }
+
     fun getTransactionsForAccount(accountId: Int): Flow<List<Transaction>> {
         return transactionDao.getTransactionsForAccount(accountId)
     }
@@ -505,5 +509,63 @@ class TransactionRepository(
     // --- NEW: Expose the quick fill query ---
     fun getRecentManualTransactions(limit: Int): Flow<List<TransactionDetails>> {
         return transactionDao.getRecentManualTransactions(limit)
+    }
+
+    // --- NEW: Smart Transaction Merge ---
+    suspend fun findRecentTransactionForMerge(
+        merchant: String,
+        accountId: Int,
+        transactionType: String,
+        timeWindowStart: Long,
+        newTxnId: Int
+    ): Transaction? {
+        return transactionDao.findRecentTransactionForMerge(merchant, accountId, transactionType, timeWindowStart, newTxnId)
+    }
+
+    suspend fun dismissMerge(id: Int) {
+        transactionDao.updateMergeDismissed(id, true)
+    }
+
+    suspend fun mergeTransactions(
+        parentTxnId: Int,
+        childTxnId: Int,
+        childSmsBody: String? = null,
+        childSmsDate: Long? = null
+    ) {
+        val parentTxn = transactionDao.getTransactionByIdSync(parentTxnId)
+        val childTxn = transactionDao.getTransactionByIdSync(childTxnId)
+
+        if (parentTxn == null || childTxn == null) return
+
+        transactionDao.updateMergeDismissed(childTxnId, true)
+
+        val newAmount = parentTxn.amount + childTxn.amount
+        val newDate = maxOf(parentTxn.date, childTxn.date)
+
+        val existingNotes = parentTxn.notes ?: ""
+        val dateString = if (childSmsDate != null) {
+            java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(childSmsDate))
+        } else {
+            java.util.Date(childTxn.date).toString()
+        }
+        
+        val childNote = if (childSmsBody != null) {
+            "Merged on $dateString:\n$childSmsBody"
+        } else {
+            "Merged Transaction: $${childTxn.amount} on $dateString"
+        }
+
+        val newNotes =
+            if (existingNotes.isBlank()) {
+                childNote
+            } else {
+                "$existingNotes\n\n$childNote"
+            }
+
+        transactionDao.updateAmount(parentTxnId, newAmount)
+        transactionDao.updateDate(parentTxnId, newDate)
+        transactionDao.updateNotes(parentTxnId, newNotes)
+
+        transactionDao.delete(childTxn)
     }
 }

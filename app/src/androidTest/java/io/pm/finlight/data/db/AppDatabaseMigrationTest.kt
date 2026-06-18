@@ -365,4 +365,33 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    /**
+     * Test MIGRATION_48_49: Adds mergeDismissed column to transactions
+     */
+    @Test
+    fun migrate48To49_addsMergeDismissedColumnToTransactions() {
+        helper.createDatabase(testDbName, 48).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 49, true, io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_48_49).apply {
+            val cursor = query("PRAGMA table_info(transactions)")
+            var found = false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "mergeDismissed") {
+                    found = true
+                    assertEquals(
+                        "mergeDismissed should default to 0 (false) and not null",
+                        1,
+                        cursor.getInt(cursor.getColumnIndexOrThrow("notnull")),
+                    )
+                    assertEquals("0", cursor.getString(cursor.getColumnIndexOrThrow("dflt_value")))
+                }
+            }
+            assertTrue("Column 'mergeDismissed' should exist in transactions table", found)
+            cursor.close()
+            close()
+        }
+    }
 }

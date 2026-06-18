@@ -68,4 +68,6 @@ data class Transaction(
     val status: String = "CONFIRMED",
     // --- NEW: Links a PENDING draft back to its originating recurring rule ---
     val recurringRuleId: Int? = null,
+    // --- NEW: Flag to track if the user dismissed a merge prompt for this transaction ---
+    val mergeDismissed: Boolean = false,
 )

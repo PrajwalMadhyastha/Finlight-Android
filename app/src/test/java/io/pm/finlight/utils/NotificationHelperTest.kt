@@ -1034,4 +1034,22 @@ class NotificationHelperTest : BaseViewModelTest() {
         // Assert
         assertTrue(shadowNotificationManager.getNotification(56) == null)
     }
+
+    // --- NEW: Smart Transaction Merge Notification Tests ---
+    @Test
+    fun `showMergeTransactionNotification_buildsCorrectly`() {
+        val childTxn = Transaction(id = 10, description = "Amazon", amount = 50.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null)
+        val parentTxn = Transaction(id = 9, description = "Amazon", amount = 100.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null)
+
+        NotificationHelper.showMergeTransactionNotification(context, childTxn, parentTxn)
+
+        val notificationId = 10010
+        val notification = shadowNotificationManager.getNotification(notificationId)
+        assertNotNull(notification)
+        assertEquals("Merge Transactions?", notification.extras.getString(Notification.EXTRA_TITLE))
+
+        assertEquals(2, notification.actions.size)
+        assertEquals("Merge", notification.actions[0].title)
+        assertEquals("Dismiss", notification.actions[1].title)
+    }
 }

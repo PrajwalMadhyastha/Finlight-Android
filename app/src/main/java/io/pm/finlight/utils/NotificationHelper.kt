@@ -551,6 +551,71 @@ object NotificationHelper {
         }
     }
 
+    // --- NEW: Smart Transaction Merge ---
+    fun showMergeTransactionNotification(
+        context: Context,
+        newTxn: Transaction,
+        parentTxn: Transaction
+    ) {
+        val canShowNotification =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+
+        if (!canShowNotification) return
+
+        val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+        val totalAmount = currencyFormat.format(newTxn.amount + parentTxn.amount)
+
+        val mergeIntent =
+            Intent().apply {
+                setClassName(context, "io.pm.finlight.receiver.MergeActionReceiver")
+                action = "ACTION_MERGE"
+                putExtra("parentTxnId", parentTxn.id)
+                putExtra("childTxnId", newTxn.id)
+            }
+        val mergePendingIntent =
+            PendingIntent.getBroadcast(
+                context,
+                newTxn.id * 10,
+                mergeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+        val dismissIntent =
+            Intent().apply {
+                setClassName(context, "io.pm.finlight.receiver.MergeActionReceiver")
+                action = "ACTION_DISMISS"
+                putExtra("childTxnId", newTxn.id)
+            }
+        val dismissPendingIntent =
+            PendingIntent.getBroadcast(
+                context,
+                newTxn.id * 10 + 1,
+                dismissIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+        val contentText = "Another charge at ${newTxn.description}. Merge for a total of $totalAmount?"
+
+        val builder =
+            NotificationCompat.Builder(context, MainApplication.TRANSACTION_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_logo)
+                .setContentTitle("Merge Transactions?")
+                .setContentText(contentText)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .addAction(0, "Merge", mergePendingIntent)
+                .addAction(0, "Dismiss", dismissPendingIntent)
+
+        with(NotificationManagerCompat.from(context)) {
+            notify(newTxn.id + 10000, builder.build())
+        }
+    }
+
     fun showDailyReportNotification(
         context: Context,
         // --- UPDATED: Receive the intelligent title directly

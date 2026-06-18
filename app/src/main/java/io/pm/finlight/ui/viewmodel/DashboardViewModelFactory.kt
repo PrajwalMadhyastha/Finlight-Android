@@ -38,6 +38,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                 timeProvider = SystemTimeProvider(),
                 recurringTransactionDao = db.recurringTransactionDao(),
                 recurringPatternDao = db.recurringPatternDao(),
+                smsRepository = SmsRepository(application),
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

@@ -921,4 +921,44 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             }
             verify(transactionDao).getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, "expense")
         }
+
+    // --- NEW: Tests for Smart Transaction Merge ---
+    @Test
+    fun `dismissMerge calls DAO updateMergeDismissed`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository)
+            repository.dismissMerge(1)
+            verify(transactionDao).updateMergeDismissed(1, true)
+        }
+
+    @Test
+    fun `mergeTransactions sums amounts, updates parent, appends notes, and deletes child`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository)
+
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense")
+
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
+
+            repository.mergeTransactions(1, 2)
+
+            verify(transactionDao).getTransactionByIdSync(1)
+            verify(transactionDao).getTransactionByIdSync(2)
+
+            verify(transactionDao).updateAmount(1, 150.0)
+            verify(transactionDao).updateDate(1, 2000L)
+
+            val notesCaptor = ArgumentCaptor.forClass(String::class.java)
+            verify(transactionDao).updateNotes(org.mockito.ArgumentMatchers.eq(1), notesCaptor.capture() ?: "")
+
+            val updatedNotes = notesCaptor.value
+            assertTrue(updatedNotes.contains("Merged Transaction:"))
+            assertTrue(updatedNotes.contains("Parent note"))
+
+            verify(transactionDao).delete(childTxn)
+        }
 }

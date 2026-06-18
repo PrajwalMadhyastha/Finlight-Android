@@ -52,6 +52,7 @@ class DashboardViewModel(
     private val timeProvider: TimeProvider,
     private val recurringTransactionDao: RecurringTransactionDao,
     private val recurringPatternDao: RecurringPatternDao,
+    private val smsRepository: SmsRepository,
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
@@ -91,6 +92,9 @@ class DashboardViewModel(
 
     val privacyModeEnabled: StateFlow<Boolean>
     private val merchantAliases: StateFlow<Map<String, String>>
+
+    // --- NEW: Smart Transaction Merge ---
+    val mergeSuggestion: StateFlow<Pair<TransactionDetails, TransactionDetails>?>
 
     init {
         userName =
@@ -336,6 +340,30 @@ class DashboardViewModel(
                 }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+        mergeSuggestion =
+            recentTransactions.map { transactions ->
+                for (i in 0 until transactions.size) {
+                    val current = transactions[i]
+                    if (current.transaction.mergeDismissed) continue
+
+                    for (j in i + 1 until transactions.size) {
+                        val potentialMatch = transactions[j]
+                        if (potentialMatch.transaction.mergeDismissed) continue
+
+                        if (current.transaction.description == potentialMatch.transaction.description &&
+                            current.transaction.accountId == potentialMatch.transaction.accountId &&
+                            current.transaction.transactionType == potentialMatch.transaction.transactionType
+                        ) {
+
+                            if (Math.abs(current.transaction.date - potentialMatch.transaction.date) <= 3 * 60 * 60 * 1000L) {
+                                return@map Pair(potentialMatch, current)
+                            }
+                        }
+                    }
+                }
+                null
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
         val yearMonthString = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(calendar.time)
         budgetStatus =
             budgetDao.getBudgetsWithSpendingForMonth(yearMonthString, currentMonth, currentYear)
@@ -460,6 +488,32 @@ class DashboardViewModel(
         }
         viewModelScope.launch {
             settingsRepository.saveDashboardLayout(_cardOrder.value, _visibleCardsSet.value)
+        }
+    }
+
+    // --- NEW: Smart Transaction Merge Actions ---
+    fun dismissMergeSuggestion(childTxnId: Int) {
+        viewModelScope.launch {
+            transactionRepository.dismissMerge(childTxnId)
+        }
+    }
+
+    fun executeMerge(
+        parentTxnId: Int,
+        childTxnId: Int
+    ) {
+        viewModelScope.launch {
+            val childTxn = transactionRepository.getTransactionSync(childTxnId)
+            var childSmsBody: String? = null
+            var childSmsDate: Long? = null
+            if (childTxn?.sourceSmsId != null) {
+                val sms = smsRepository.getSmsDetailsById(childTxn.sourceSmsId)
+                if (sms != null) {
+                    childSmsBody = sms.body
+                    childSmsDate = sms.date
+                }
+            }
+            transactionRepository.mergeTransactions(parentTxnId, childTxnId, childSmsBody, childSmsDate)
         }
     }
 }

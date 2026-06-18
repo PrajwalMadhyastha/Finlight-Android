@@ -179,6 +179,21 @@ class SmsProcessorWorker(
         val savedTxn = transactionDao.getTransactionByIdSync(newTransactionId.toInt())
 
         if (savedTxn != null) {
+            // --- NEW: Smart Transaction Merge Check ---
+            val timeWindowStart = savedTxn.date - (3 * 60 * 60 * 1000L) // 3 hours ago
+            val recentTxn =
+                transactionDao.findRecentTransactionForMerge(
+                    merchant = savedTxn.description,
+                    accountId = savedTxn.accountId,
+                    transactionType = savedTxn.transactionType,
+                    timeWindowStart = timeWindowStart,
+                    newTxnId = savedTxn.id
+                )
+
+            if (recentTxn != null) {
+                NotificationHelper.showMergeTransactionNotification(context, savedTxn, recentTxn)
+            }
+
             val senderRule = recurringDao.getRuleBySmsSenderId(sender)
             if (senderRule != null) {
                 // It's a variable bill match

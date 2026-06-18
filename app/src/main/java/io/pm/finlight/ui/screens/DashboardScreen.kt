@@ -38,6 +38,9 @@ fun DashboardScreen(
     val showLastMonthSummary by dashboardViewModel.showLastMonthSummaryCard.collectAsState()
     val lastMonthSummary by dashboardViewModel.lastMonthSummary.collectAsState()
 
+    // --- NEW: Collect state for the merge suggestion ---
+    val mergeSuggestion by dashboardViewModel.mergeSuggestion.collectAsState()
+
     LaunchedEffect(Unit) {
         dashboardViewModel.refreshBudgetSummary()
     }
@@ -59,6 +62,21 @@ fun DashboardScreen(
                     yearlyConsistencyData = yearlyConsistencyData,
                     budgetHealthSummary = budgetHealthSummary,
                     isPrivacyModeEnabled = isPrivacyModeEnabled,
+                )
+            }
+        }
+
+        // --- NEW: Conditionally display the Merge Suggestion card ---
+        if (mergeSuggestion != null) {
+            item(key = "merge_suggestion_card") {
+                MergeSuggestionCard(
+                    suggestion = mergeSuggestion!!,
+                    onMerge = {
+                        dashboardViewModel.executeMerge(mergeSuggestion!!.first.transaction.id, mergeSuggestion!!.second.transaction.id)
+                    },
+                    onDismiss = {
+                        dashboardViewModel.dismissMergeSuggestion(mergeSuggestion!!.second.transaction.id)
+                    }
                 )
             }
         }
