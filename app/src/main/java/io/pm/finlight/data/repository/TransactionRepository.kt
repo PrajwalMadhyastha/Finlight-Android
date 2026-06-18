@@ -543,17 +543,19 @@ class TransactionRepository(
         val newDate = maxOf(parentTxn.date, childTxn.date)
 
         val existingNotes = parentTxn.notes ?: ""
-        val dateString = if (childSmsDate != null) {
-            java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(childSmsDate))
-        } else {
-            java.util.Date(childTxn.date).toString()
-        }
-        
-        val childNote = if (childSmsBody != null) {
-            "Merged on $dateString:\n$childSmsBody"
-        } else {
-            "Merged Transaction: $${childTxn.amount} on $dateString"
-        }
+        val dateString =
+            if (childSmsDate != null) {
+                java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(childSmsDate))
+            } else {
+                java.util.Date(childTxn.date).toString()
+            }
+
+        val childNote =
+            if (childSmsBody != null) {
+                "Merged on $dateString:\n$childSmsBody"
+            } else {
+                "Merged Transaction: $${childTxn.amount} on $dateString"
+            }
 
         val newNotes =
             if (existingNotes.isBlank()) {

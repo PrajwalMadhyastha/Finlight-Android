@@ -74,9 +74,10 @@ fun MergeSuggestionCard(
 
             Button(
                 onClick = onMerge,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("merge_button"),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .testTag("merge_button"),
                 colors =
                     ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
