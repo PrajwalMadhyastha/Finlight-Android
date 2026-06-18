@@ -50,7 +50,7 @@ jobs:
           for ID in $RUN_IDS; do
             echo "Checking run $ID for qa-app-map..."
             if gh run download $ID -n qa-app-map 2>/dev/null; then
-              echo "✅ Downloaded qa-app-map from run $ID"
+              echo "Downloaded qa-app-map from run $ID"
               SUCCESS=1
               break
             fi
@@ -61,7 +61,7 @@ jobs:
             for ID in $RUN_IDS; do
               echo "Checking run $ID for qa-agent-memory..."
               if gh run download $ID -n qa-agent-memory 2>/dev/null; then
-                echo "✅ Downloaded qa-agent-memory from run $ID"
+                echo "Downloaded qa-agent-memory from run $ID"
                 SUCCESS=1
                 break
               fi
@@ -69,20 +69,20 @@ jobs:
           fi
           
           if [ $SUCCESS -eq 0 ]; then
-            echo "⚠️ No successful previous runs with memory found in the last 10 runs."
+            echo "No successful previous runs with memory found in the last 10 runs."
           fi
         continue-on-error: true
 
       - name: Show Downloaded Memory
         run: |
           if [ -f "app_map.json" ]; then
-            echo "✅ Successfully downloaded previous App Map:"
+            echo "Successfully downloaded previous App Map:"
             cat app_map.json
           elif [ -f "agent_memory.txt" ]; then
-            echo "⚠️ Found old agent_memory.txt. It will be migrated:"
+            echo "Found old agent_memory.txt. It will be migrated:"
             cat agent_memory.txt
           else
-            echo "⚠️ No previous memory found (starting fresh)."
+            echo "No previous memory found (starting fresh)."
           fi
 
       - name: Set up Python
@@ -139,7 +139,7 @@ jobs:
           if [ -f "new_bugs_found.txt" ]; then
             REPORT_FILE=$(find . -maxdepth 1 -name "qa-report-*.md" | head -n 1)
             if [ -f "$REPORT_FILE" ]; then
-              ISSUE_TITLE="🤖 AI QA Agent Bug: ${{ github.event.inputs.goal || 'random' }}"
+              ISSUE_TITLE="AI QA Agent Bug: ${{ github.event.inputs.goal || 'random' }}"
               # Check if an issue with this exact title already exists and is open
               EXISTING_ISSUE=$(gh issue list --state open --search "in:title \"$ISSUE_TITLE\"" --json number -q '.[0].number')
               
