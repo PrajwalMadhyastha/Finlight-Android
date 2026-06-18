@@ -62,13 +62,14 @@ class TransactionNotificationWorker(
                 val monthlyTotal = if (details.transaction.transactionType == "income") summary?.totalIncome else summary?.totalExpenses
 
                 // 3. Get visit count
-                val visitCount = if (details.transaction.transactionType != "income") {
-                    transactionDao.getTransactionCountForMerchantSuspend(
-                        details.transaction.originalDescription ?: details.transaction.description,
-                    )
-                } else {
-                    0
-                }
+                val visitCount =
+                    if (details.transaction.transactionType != "income") {
+                        transactionDao.getTransactionCountForMerchantSuspend(
+                            details.transaction.originalDescription ?: details.transaction.description,
+                        )
+                    } else {
+                        0
+                    }
 
                 // 4. Show the rich notification
                 NotificationHelper.showRichTransactionNotification(

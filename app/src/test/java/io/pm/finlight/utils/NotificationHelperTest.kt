@@ -579,7 +579,6 @@ class NotificationHelperTest : BaseViewModelTest() {
         val notification = shadowNotificationManager.getNotification(transactionId)
         val inboxLines = notification.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
         assertTrue(inboxLines!![1].toString().contains("This is your 3rd visit here."))
-
     }
 
     @Test
