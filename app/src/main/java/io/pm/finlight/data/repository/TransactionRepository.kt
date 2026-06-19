@@ -18,10 +18,14 @@ import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToLong
 
+import io.pm.finlight.data.db.dao.DeletedSmsHashDao
+import io.pm.finlight.data.db.entity.DeletedSmsHash
+
 class TransactionRepository(
     private val transactionDao: TransactionDao,
     private val settingsRepository: SettingsRepository,
     private val tagRepository: TagRepository,
+    private val deletedSmsHashDao: DeletedSmsHashDao,
 ) {
     // --- NEW: Function for Spending Velocity feature ---
     suspend fun getTotalExpensesSince(startDate: Long): Double {
@@ -554,7 +558,7 @@ class TransactionRepository(
             if (childSmsBody != null) {
                 "Merged on $dateString:\n$childSmsBody"
             } else {
-                "Merged Transaction: $${childTxn.amount} on $dateString"
+                "Merged Transaction: ${childTxn.amount} on $dateString"
             }
 
         val newNotes =
@@ -567,6 +571,10 @@ class TransactionRepository(
         transactionDao.updateAmount(parentTxnId, newAmount)
         transactionDao.updateDate(parentTxnId, newDate)
         transactionDao.updateNotes(parentTxnId, newNotes)
+
+        childTxn.sourceSmsHash?.let { hash ->
+            deletedSmsHashDao.insert(DeletedSmsHash(smsHash = hash))
+        }
 
         transactionDao.delete(childTxn)
     }

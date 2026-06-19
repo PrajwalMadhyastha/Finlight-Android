@@ -24,7 +24,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
             return TransactionViewModel(
                 application = application,
                 db = db,
-                transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository),
+                transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao()),
                 accountRepository = AccountRepository(db),
                 categoryRepository = CategoryRepository(db.categoryDao()),
                 tagRepository = tagRepository,
