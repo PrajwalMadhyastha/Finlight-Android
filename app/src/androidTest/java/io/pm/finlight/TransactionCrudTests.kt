@@ -225,7 +225,7 @@ class TransactionCrudTests {
 
         // 5. Click Save
         composeTestRule.onNodeWithText("Save").performClick()
-
+        
         // Wait for the sheet to close and the detail screen to update
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText(updatedDescription).fetchSemanticsNodes().isNotEmpty()
@@ -236,6 +236,12 @@ class TransactionCrudTests {
 
         // 7. Back to Dashboard
         composeTestRule.onNodeWithContentDescription("Back").performClick()
+        
+        // Handle new Smart Update sheet triggered by description edit upon leaving
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Apply Changes").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Apply Changes").performClick()
 
         // 8. Verify on Transactions List
         composeTestRule.waitUntil(timeoutMillis = 8000) {

@@ -533,11 +533,12 @@ class TransactionViewModel(
             val similar = transactionRepository.findSimilarTransactions(originalDescriptionForSearch, initial.id)
 
             // --- FIX: Filter out past transactions that already have the new name or category
-            val actionableSimilar = similar.filter { txn ->
-                val needsDescUpdate = descriptionChanged && !txn.description.equals(current.description, ignoreCase = true)
-                val needsCatUpdate = categoryChanged && txn.categoryId != current.categoryId
-                needsDescUpdate || needsCatUpdate
-            }
+            val actionableSimilar =
+                similar.filter { txn ->
+                    val needsDescUpdate = descriptionChanged && !txn.description.equals(current.description, ignoreCase = true)
+                    val needsCatUpdate = categoryChanged && txn.categoryId != current.categoryId
+                    needsDescUpdate || needsCatUpdate
+                }
 
             if (actionableSimilar.isNotEmpty()) {
                 _retroUpdateSheetState.value =
@@ -548,7 +549,8 @@ class TransactionViewModel(
                         similarTransactions = actionableSimilar,
                         selectedIds = actionableSimilar.map { it.id }.toSet(),
                         isLoading = false,
-                        totalMatchingCount = similar.size + 1, // Keep original count in case needed for metrics
+                        // Keep original count in case needed for metrics
+                        totalMatchingCount = similar.size + 1,
                         updateFutureTransactions = true,
                     )
             } else {
@@ -567,7 +569,6 @@ class TransactionViewModel(
                         updateFutureTransactions = true,
                     )
             }
-
         }
     }
 

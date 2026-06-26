@@ -1706,37 +1706,6 @@ class TransactionViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `performBatchUpdate does NOT create rule when not all selected`() =
-        runTest {
-            // ARRANGE
-            setupRetroSheet(newDesc = "Starbucks Coffee", newCatId = 5, numSimilar = 2)
-
-            // ACT: Deselect one to make it not 'all selected'
-            viewModel.toggleRetroUpdateSelection(3) // Now only 2 is selected out of {2, 3}
-            advanceUntilIdle()
-
-            val state = viewModel.retroUpdateSheetState.value
-            assertEquals(setOf(2), state?.selectedIds) // Only 1 selected
-            val expectedIdsToUpdate = listOf(2)
-
-            viewModel.uiEvent.test {
-                viewModel.performBatchUpdate()
-                advanceUntilIdle()
-
-                // Verify it DOES NOT insert rule
-                verify(merchantRenameRuleRepository, never()).insert(any())
-
-                // Verify it still updates DB for the selected ID
-                verify(transactionRepository).updateDescriptionForIds(expectedIdsToUpdate, "Starbucks Coffee")
-                verify(transactionRepository).updateCategoryForIds(expectedIdsToUpdate, 5)
-
-                assertEquals("Updated 1 transaction(s).", awaitItem())
-                assertNull("Sheet should be dismissed", viewModel.retroUpdateSheetState.value)
-                cancelAndIgnoreRemainingEvents()
-            }
-        }
-
-    @Test
     fun `performBatchUpdate deletes rule when reverting to original name and all selected`() =
         runTest {
             // ARRANGE
@@ -1770,25 +1739,129 @@ class TransactionViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `performBatchUpdate with no IDs selected just dismisses`() =
+    fun `performBatchUpdate saves global rule when updateFutureTransactions is true`() =
         runTest {
             // ARRANGE
-            setupRetroSheet()
-            assertNotNull(viewModel.retroUpdateSheetState.value)
+            val initialTxn = Transaction(id = 1, description = "Uber", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Uber", notes = null)
+            val currentTxn = initialTxn.copy(description = "Uber Rides")
+            val similarTxn1 = Transaction(id = 2, description = "Uber", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Uber", notes = null)
+            val similarTxn2 = Transaction(id = 3, description = "Uber", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Uber", notes = null)
 
-            // ACT: Deselect all
-            viewModel.toggleRetroUpdateSelectAll() // Deselects {2, 3}
+            whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(initialTxn), flowOf(currentTxn))
+            whenever(transactionRepository.findSimilarTransactions("Uber", 1)).thenReturn(listOf(similarTxn1, similarTxn2))
+            whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+            whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+            viewModel.loadTransactionForDetailScreen(1)
             advanceUntilIdle()
-            assertEquals(emptySet<Int>(), viewModel.retroUpdateSheetState.value?.selectedIds)
 
+            viewModel.onAttemptToLeaveScreen { }
+            advanceUntilIdle()
+
+            val state = viewModel.retroUpdateSheetState.value
+            assertNotNull(state)
+            assertTrue(state!!.updateFutureTransactions)
+
+            // ACT
+            viewModel.performBatchUpdate()
+            advanceUntilIdle()
+
+            // ASSERT: Rule saved
+            verify(merchantRenameRuleRepository).insert(MerchantRenameRule("Uber", "Uber Rides"))
+        }
+
+    @Test
+    fun `performBatchUpdate deletes rule when reverting name and updateFutureTransactions is true`() =
+        runTest {
+            // ARRANGE
+            val initialTxn = Transaction(id = 1, description = "Uber Rides", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Uber", notes = null)
+            val currentTxn = initialTxn.copy(description = "Uber")
+            val similarTxn1 = Transaction(id = 2, description = "Uber Rides", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Uber", notes = null)
+            val similarTxn2 = Transaction(id = 3, description = "Uber Rides", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Uber", notes = null)
+
+            whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(initialTxn), flowOf(currentTxn))
+            whenever(transactionRepository.findSimilarTransactions("Uber", 1)).thenReturn(listOf(similarTxn1, similarTxn2))
+            whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+            whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+            viewModel.loadTransactionForDetailScreen(1)
+            advanceUntilIdle()
+
+            viewModel.onAttemptToLeaveScreen { }
+            advanceUntilIdle()
+
+            // ACT
+            viewModel.performBatchUpdate()
+            advanceUntilIdle()
+
+            // ASSERT: Rule deleted
+            verify(merchantRenameRuleRepository).deleteByOriginalName("Uber")
+        }
+
+    @Test
+    fun `performBatchUpdate skips global rule when updateFutureTransactions is false`() =
+        runTest {
+            // ARRANGE
+            val initialTxn = Transaction(id = 1, description = "Uber", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Uber", notes = null)
+            val currentTxn = initialTxn.copy(description = "Uber Rides")
+            val similarTxn1 = Transaction(id = 2, description = "Uber", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Uber", notes = null)
+            val similarTxn2 = Transaction(id = 3, description = "Uber", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Uber", notes = null)
+
+            whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(initialTxn), flowOf(currentTxn))
+            whenever(transactionRepository.findSimilarTransactions("Uber", 1)).thenReturn(listOf(similarTxn1, similarTxn2))
+            whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+            whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+            viewModel.loadTransactionForDetailScreen(1)
+            advanceUntilIdle()
+
+            viewModel.onAttemptToLeaveScreen { }
+            advanceUntilIdle()
+
+            // Toggle to false
+            viewModel.toggleUpdateFutureTransactions()
+
+            // ACT
+            viewModel.performBatchUpdate()
+            advanceUntilIdle()
+
+            // ASSERT: Rule NOT saved, but past txns updated
+            verify(merchantRenameRuleRepository, never()).insert(any())
+            verify(transactionRepository).updateDescriptionForIds(any(), any())
+        }
+
+    @Test
+    fun `performBatchUpdate saves category mapping when category changed and updateFutureTransactions is true`() =
+        runTest {
+            // ARRANGE
+            val initialTxn = Transaction(id = 1, description = "Uber", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Uber", notes = null)
+            val currentTxn = initialTxn.copy(categoryId = 2) // Category changed
+
+            whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(initialTxn), flowOf(currentTxn))
+            whenever(transactionRepository.findSimilarTransactions("Uber", 1)).thenReturn(emptyList()) // No history needed for mapping test
+            whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+            whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+            viewModel.loadTransactionForDetailScreen(1)
+            advanceUntilIdle()
+
+            viewModel.onAttemptToLeaveScreen { }
+            advanceUntilIdle()
+
+            // ACT
             viewModel.performBatchUpdate()
             advanceUntilIdle()
 
             // ASSERT
-            verify(merchantRenameRuleRepository, never()).insert(any())
-            verify(transactionRepository, never()).updateDescriptionForIds(any(), anyString())
-            verify(transactionRepository, never()).updateCategoryForIds(any(), anyInt())
-            assertNull("Sheet should be dismissed", viewModel.retroUpdateSheetState.value)
+            verify(merchantCategoryMappingRepository).insert(MerchantCategoryMapping("Uber", 2))
         }
 
     @Test
@@ -2772,7 +2845,7 @@ class TransactionViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `onAttemptToLeaveScreen silently saves rename rule when no similar transactions exist`() =
+    fun `onAttemptToLeaveScreen triggers sheet when no similar transactions exist`() =
         runTest {
             // ARRANGE: "Annual Maintenance" renamed from "Water charges", no similar txns
             setupUniqueRenameScenario(
@@ -2787,39 +2860,76 @@ class TransactionViewModelTest : BaseViewModelTest() {
             viewModel.onAttemptToLeaveScreen { hasNavigated = true }
             advanceUntilIdle()
 
-            // ASSERT: Navigation should be allowed immediately (no sheet shown)
-            assertTrue("Should navigate when no similar transactions", hasNavigated)
-            assertNull("Sheet state should remain null", viewModel.retroUpdateSheetState.value)
-            // ASSERT: The rename rule must have been saved silently
-            verify(merchantRenameRuleRepository).insert(
-                MerchantRenameRule(originalName = "Water charges", newName = "Annual Maintenance"),
-            )
-            verify(merchantRenameRuleRepository, never()).deleteByOriginalName(anyString())
+            // ASSERT: Navigation should NOT happen immediately
+            assertFalse("Should not navigate when renaming even with no similar txns", hasNavigated)
+
+            // ASSERT: Sheet should be shown with empty list
+            val sheetState = viewModel.retroUpdateSheetState.value
+            assertNotNull("Sheet state should not be null", sheetState)
+            assertEquals(0, sheetState?.similarTransactions?.size)
+            assertEquals(true, sheetState?.updateFutureTransactions)
+
+            // Rule should NOT be saved yet
+            verify(merchantRenameRuleRepository, never()).insert(any())
         }
 
     @Test
-    fun `onAttemptToLeaveScreen silently deletes rule when reverting name with no similar transactions`() =
+    fun `onAttemptToLeaveScreen filters out similar transactions that already match target`() =
         runTest {
-            // ARRANGE: User is reverting "Gateway" back to "Gateway" (same as originalDescription)
-            setupUniqueRenameScenario(
-                initialDesc = "Annual Maintenance",
-                // Reverting back to original name
-                currentDesc = "Water charges",
-                originalDescription = "Water charges",
-            )
+            // ARRANGE:
+            val initialTxn = Transaction(id = 1, description = "Swiggy", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Metro", notes = null)
+            val currentTxn = initialTxn.copy(description = "Metro") // Reverting name
 
-            var hasNavigated = false
+            whenever(transactionRepository.getTransactionById(1))
+                .thenReturn(flowOf(initialTxn), flowOf(currentTxn))
 
-            // ACT
-            viewModel.onAttemptToLeaveScreen { hasNavigated = true }
+            // Return two similar transactions: one already "Metro", one "Swiggy"
+            val similarTxn1 = Transaction(id = 2, description = "Metro", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Metro", notes = null)
+            val similarTxn2 = Transaction(id = 3, description = "Swiggy", categoryId = 1, amount = 10.0, date = 0L, accountId = 1, originalDescription = "Metro", notes = null)
+
+            whenever(transactionRepository.findSimilarTransactions("Metro", 1))
+                .thenReturn(listOf(similarTxn1, similarTxn2))
+
+            whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+            whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+            viewModel.loadTransactionForDetailScreen(1)
             advanceUntilIdle()
 
-            // ASSERT: Navigation allowed, sheet not shown
-            assertTrue("Should navigate when no similar transactions", hasNavigated)
-            assertNull("Sheet state should remain null", viewModel.retroUpdateSheetState.value)
-            // ASSERT: Existing rule for this original name should be removed
-            verify(merchantRenameRuleRepository).deleteByOriginalName("Water charges")
-            verify(merchantRenameRuleRepository, never()).insert(any())
+            // ACT
+            viewModel.onAttemptToLeaveScreen { }
+            advanceUntilIdle()
+
+            // ASSERT
+            val sheetState = viewModel.retroUpdateSheetState.value
+            assertNotNull(sheetState)
+            // Should only include the one that DOES NOT already match "Metro"
+            assertEquals(1, sheetState?.similarTransactions?.size)
+            assertEquals("Swiggy", sheetState?.similarTransactions?.first()?.description)
+        }
+
+    @Test
+    fun `toggleUpdateFutureTransactions flips boolean state`() =
+        runTest {
+            // ARRANGE: setup a state
+            setupUniqueRenameScenario(
+                initialDesc = "Water charges",
+                currentDesc = "Annual Maintenance",
+                originalDescription = "Water charges",
+            )
+            viewModel.onAttemptToLeaveScreen { }
+            advanceUntilIdle()
+
+            val initialState = viewModel.retroUpdateSheetState.value?.updateFutureTransactions
+            assertEquals(true, initialState)
+
+            // ACT
+            viewModel.toggleUpdateFutureTransactions()
+
+            // ASSERT
+            assertEquals(false, viewModel.retroUpdateSheetState.value?.updateFutureTransactions)
         }
 
     @Test
@@ -2857,73 +2967,6 @@ class TransactionViewModelTest : BaseViewModelTest() {
             assertNull(viewModel.retroUpdateSheetState.value)
             verify(merchantRenameRuleRepository, never()).insert(any())
             verify(merchantRenameRuleRepository, never()).deleteByOriginalName(anyString())
-        }
-
-    // =========================================================================
-    // --- NEW TESTS: isAllSelected Fix (Bug Fix 2) ---
-    // The new formula is (idsToUpdate.size + 1) == totalMatchingCount.
-    // setupRetroSheet with numSimilar=N sets totalMatchingCount = N+1.
-    // =========================================================================
-
-    @Test
-    fun `performBatchUpdate saves rule only when idsToUpdate plus current equals totalMatchingCount`() =
-        runTest {
-            // ARRANGE: 1 similar transaction + 1 current = totalMatchingCount 2
-            // User keeps the 1 similar selected → (1+1)==2 → isAllSelected=true → rule saved
-            setupRetroSheet(newDesc = "Annual Maintenance", numSimilar = 1)
-
-            val state = viewModel.retroUpdateSheetState.value
-            assertNotNull(state)
-            assertEquals(2, state?.totalMatchingCount)
-            assertEquals(setOf(2), state?.selectedIds) // Only similar txn #2 selected
-
-            // ACT & ASSERT
-            viewModel.uiEvent.test {
-                viewModel.performBatchUpdate()
-                advanceUntilIdle()
-
-                // isAllSelected: (1+1)==2 → TRUE → rule must be saved
-                verify(merchantRenameRuleRepository).insert(
-                    MerchantRenameRule("Starbucks", "Annual Maintenance"),
-                )
-                verify(transactionRepository).updateDescriptionForIds(listOf(2), "Annual Maintenance")
-
-                assertEquals("Updated 1 transaction(s).", awaitItem())
-                assertNull(viewModel.retroUpdateSheetState.value)
-                cancelAndIgnoreRemainingEvents()
-            }
-        }
-
-    @Test
-    fun `performBatchUpdate skips rule when partial selection even if similar count matches old logic`() =
-        runTest {
-            // ARRANGE: 3 similar transactions → totalMatchingCount=4
-            // Old (buggy) logic: idsToUpdate.size==similarTransactions.size → 2==3 → false → no rule (OK)
-            // Partial deselect: user deselects 1 → selectedIds={2,3} (2 out of 3)
-            // New logic: (2+1)==4 → false → no rule saved
-            setupRetroSheet(newDesc = "Annual Maintenance", numSimilar = 3)
-
-            // Deselect txn 4 → selectedIds = {2, 3}
-            viewModel.toggleRetroUpdateSelection(4)
-            advanceUntilIdle()
-
-            val state = viewModel.retroUpdateSheetState.value
-            assertEquals(setOf(2, 3), state?.selectedIds)
-            assertEquals(4, state?.totalMatchingCount) // 3 similar + 1 current
-
-            // ACT & ASSERT
-            viewModel.uiEvent.test {
-                viewModel.performBatchUpdate()
-                advanceUntilIdle()
-
-                // (2+1)==4 → FALSE → no rule should be saved
-                verify(merchantRenameRuleRepository, never()).insert(any())
-                verify(transactionRepository).updateDescriptionForIds(listOf(2, 3), "Annual Maintenance")
-
-                assertEquals("Updated 2 transaction(s).", awaitItem())
-                assertNull(viewModel.retroUpdateSheetState.value)
-                cancelAndIgnoreRemainingEvents()
-            }
         }
 
     @Test
@@ -3171,8 +3214,8 @@ class TransactionViewModelTest : BaseViewModelTest() {
             var callbackResult: Category? = null
 
             whenever(db.categoryDao().findByName(newCategoryName)).thenReturn(null)
-            whenever(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
-            whenever(categoryRepository.insert(any())).thenReturn(1L)
+            whenever(categoryRepository.allCategories).thenReturn(flowOf(emptyList<Category>()))
+            whenever(categoryRepository.insert(any<Category>())).thenReturn(1L)
             whenever(categoryRepository.getCategoryById(1)).thenReturn(createdCategory)
 
             // Act
