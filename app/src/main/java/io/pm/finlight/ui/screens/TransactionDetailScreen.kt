@@ -180,6 +180,12 @@ fun TransactionDetailScreen(
     val canonicalNudgeState by viewModel.canonicalNudgeState.collectAsState()
     val validationError by viewModel.validationError.collectAsState()
 
+    // --- NEW: Reimbursement feature state ---
+    val reimbursements by viewModel.reimbursementsForCurrentExpense.collectAsState()
+    val linkedExpense by viewModel.linkedExpenseForCurrentIncome.collectAsState()
+    val showReimbursementPicker by viewModel.showReimbursementPicker.collectAsState()
+    val candidateReimbursements by viewModel.candidateReimbursements.collectAsState()
+
     // Observe ViewModel-driven navigation events (e.g. after canonical nudge resolves).
     LaunchedEffect(Unit) {
         viewModel.navigateBackEvent.collect { navigateBack() }
@@ -392,6 +398,29 @@ fun TransactionDetailScreen(
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 SplitSummaryCard(splits = splits)
+                            }
+                        }
+                    }
+
+                    // --- NEW: Reimbursement card for expense transactions ---
+                    if (details.transaction.transactionType == "expense") {
+                        item {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                ReimbursementCard(
+                                    currentExpenseAmount = details.transaction.amount,
+                                    reimbursements = reimbursements,
+                                    onLinkClick = { viewModel.openReimbursementPicker(transactionId) },
+                                    onUnlinkClick = { incomeId -> viewModel.unlinkReimbursement(incomeId) },
+                                )
+                            }
+                        }
+                    }
+
+                    // --- NEW: Badge for income transactions that are linked as a repayment ---
+                    if (details.transaction.transactionType == "income" && linkedExpense != null) {
+                        item {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                LinkedAsReimbursementBadge(linkedExpense = linkedExpense!!)
                             }
                         }
                     }
@@ -661,6 +690,17 @@ fun TransactionDetailScreen(
                     )
                 }
             }
+        }
+
+        // --- NEW: Reimbursement picker sheet ---
+        if (showReimbursementPicker) {
+            TransactionPickerSheet(
+                transactions = candidateReimbursements.map { it.transaction },
+                onTransactionSelected = { selectedIncome ->
+                    viewModel.linkReimbursement(selectedIncome.id, transactionId)
+                },
+                onDismiss = { viewModel.dismissReimbursementPicker() },
+            )
         }
     }
 }

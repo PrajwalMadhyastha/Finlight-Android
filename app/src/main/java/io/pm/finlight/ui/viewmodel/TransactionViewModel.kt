@@ -139,6 +139,17 @@ class TransactionViewModel(
     private val _selectedTransactionIds = MutableStateFlow<Set<Int>>(emptySet())
     val selectedTransactionIds: StateFlow<Set<Int>> = _selectedTransactionIds.asStateFlow()
 
+    // --- NEW: True when selection has exactly 1 expense + 1+ incomes (enables "Link Repayment" action) ---
+    val canLinkAsReimbursement: StateFlow<Boolean> by lazy {
+        combine(_selectedTransactionIds, transactionsForSelectedMonth) { ids, txns ->
+            if (ids.size < 2) return@combine false
+            val selected = txns.filter { it.transaction.id in ids }
+            val expenseCount = selected.count { it.transaction.transactionType == "expense" }
+            val incomeCount = selected.count { it.transaction.transactionType == "income" }
+            expenseCount == 1 && incomeCount >= 1
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    }
+
     private val _showShareSheet = MutableStateFlow(false)
     val showShareSheet: StateFlow<Boolean> = _showShareSheet.asStateFlow()
 
@@ -200,6 +211,19 @@ class TransactionViewModel(
     /** State for the cross-account canonical nudge sheet. Non-null means the sheet is visible. */
     private val _canonicalNudgeState = MutableStateFlow<CanonicalNudgeSheetState?>(null)
     val canonicalNudgeState = _canonicalNudgeState.asStateFlow()
+
+    // --- NEW: Reimbursement feature state ---
+    private val _reimbursementsForCurrentExpense = MutableStateFlow<List<TransactionDetails>>(emptyList())
+    val reimbursementsForCurrentExpense: StateFlow<List<TransactionDetails>> = _reimbursementsForCurrentExpense.asStateFlow()
+
+    private val _candidateReimbursements = MutableStateFlow<List<TransactionDetails>>(emptyList())
+    val candidateReimbursements: StateFlow<List<TransactionDetails>> = _candidateReimbursements.asStateFlow()
+
+    private val _linkedExpenseForCurrentIncome = MutableStateFlow<TransactionDetails?>(null)
+    val linkedExpenseForCurrentIncome: StateFlow<TransactionDetails?> = _linkedExpenseForCurrentIncome.asStateFlow()
+
+    private val _showReimbursementPicker = MutableStateFlow(false)
+    val showReimbursementPicker: StateFlow<Boolean> = _showReimbursementPicker.asStateFlow()
 
     /**
      * Emits [Unit] whenever the ViewModel determines that navigation back is safe.
@@ -504,7 +528,71 @@ class TransactionViewModel(
                 loadImagesForTransaction(it.id)
                 loadOriginalSms(it.sourceSmsId)
                 loadVisitCount(it.originalDescription, it.description)
+
+                // --- NEW: Load reimbursement-related data ---
+                if (it.transactionType == "expense") {
+                    transactionRepository.getReimbursementsForExpense(it.id).collect { reimbursements ->
+                        _reimbursementsForCurrentExpense.value = reimbursements
+                    }
+                } else if (it.transactionType == "income" && it.parentReimbursementId != null) {
+                    transactionRepository.getLinkedExpenseForReimbursement(it.id).collect { expense ->
+                        _linkedExpenseForCurrentIncome.value = expense
+                    }
+                }
             }
+        }
+    }
+
+    fun openReimbursementPicker(expenseId: Int) {
+        viewModelScope.launch {
+            transactionRepository.getCandidateReimbursements(expenseId).collect { candidates ->
+                _candidateReimbursements.value = candidates
+            }
+        }
+        _showReimbursementPicker.value = true
+    }
+
+    fun dismissReimbursementPicker() {
+        _showReimbursementPicker.value = false
+    }
+
+    fun linkReimbursement(
+        incomeId: Int,
+        expenseId: Int
+    ) {
+        viewModelScope.launch {
+            transactionRepository.linkReimbursement(incomeId, expenseId)
+            _showReimbursementPicker.value = false
+        }
+    }
+
+    fun unlinkReimbursement(incomeId: Int) {
+        viewModelScope.launch {
+            transactionRepository.unlinkReimbursement(incomeId)
+        }
+    }
+
+    /**
+     * Called from the multi-select action bar in the Transaction List tab.
+     * Requires exactly 1 expense and 1+ income transactions to be selected.
+     * The expense becomes the parent; all selected income transactions are linked as reimbursements.
+     */
+    fun linkReimbursementFromSelection() {
+        viewModelScope.launch {
+            val allTxns = transactionsForSelectedMonth.value
+            val selected = allTxns.filter { it.transaction.id in _selectedTransactionIds.value }
+            val expenses = selected.filter { it.transaction.transactionType == "expense" }
+            val incomes = selected.filter { it.transaction.transactionType == "income" }
+            if (expenses.size != 1 || incomes.isEmpty()) {
+                _uiEvent.send("Select exactly 1 expense and 1 or more income transactions.")
+                return@launch
+            }
+            val expenseId = expenses.first().transaction.id
+            incomes.forEach { income ->
+                transactionRepository.linkReimbursement(income.transaction.id, expenseId)
+            }
+            _uiEvent.send("${incomes.size} repayment(s) linked.")
+            clearSelectionMode()
         }
     }
 

@@ -273,6 +273,79 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE id = :transactionId")
     fun getTransactionWithSplits(transactionId: Int): Flow<TransactionWithSplits?>
 
+    // --- NEW: Reimbursement queries ---
+
+    /**
+     * Returns all income transactions linked to a given expense as reimbursements,
+     * with full account/category join for display in the detail screen.
+     */
+    @androidx.room.Transaction
+    @Query(
+        """
+        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
+        (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
+        FROM transactions AS T
+        LEFT JOIN accounts AS A ON T.accountId = A.id
+        LEFT JOIN categories AS C ON T.categoryId = C.id
+        WHERE T.parentReimbursementId = :expenseId
+        ORDER BY T.date DESC
+    """,
+    )
+    fun getReimbursementsForExpense(expenseId: Int): Flow<List<TransactionDetails>>
+
+    /**
+     * Returns the expense transaction that a given income is linked to as a reimbursement.
+     * Used to show a badge on the income transaction's detail screen.
+     */
+    @androidx.room.Transaction
+    @Query(
+        """
+        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
+        (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
+        FROM transactions AS T
+        LEFT JOIN accounts AS A ON T.accountId = A.id
+        LEFT JOIN categories AS C ON T.categoryId = C.id
+        WHERE T.id = (SELECT parentReimbursementId FROM transactions WHERE id = :incomeId)
+    """,
+    )
+    fun getLinkedExpenseForReimbursement(incomeId: Int): Flow<TransactionDetails?>
+
+    /**
+     * Links an income transaction to an expense as a reimbursement.
+     */
+    @Query("UPDATE transactions SET parentReimbursementId = :expenseId, isExcluded = 1 WHERE id = :incomeId")
+    suspend fun linkReimbursement(
+        incomeId: Int,
+        expenseId: Int
+    )
+
+    /**
+     * Removes the link from an income transaction, restoring it as a standalone credit.
+     */
+    @Query("UPDATE transactions SET parentReimbursementId = NULL, isExcluded = 0 WHERE id = :incomeId")
+    suspend fun unlinkReimbursement(incomeId: Int)
+
+    /**
+     * Returns recent income transactions that are NOT yet linked as reimbursements,
+     * to populate the picker sheet when the user wants to link a repayment.
+     */
+    @androidx.room.Transaction
+    @Query(
+        """
+        SELECT T.*, A.name as accountName, C.name as categoryName, C.iconKey as categoryIconKey, C.colorKey as categoryColorKey,
+        (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
+        FROM transactions AS T
+        LEFT JOIN accounts AS A ON T.accountId = A.id
+        LEFT JOIN categories AS C ON T.categoryId = C.id
+        WHERE T.transactionType = 'income'
+          AND T.parentReimbursementId IS NULL
+          AND T.id != :excludeExpenseId
+        ORDER BY T.date DESC
+        LIMIT 50
+    """,
+    )
+    fun getCandidateReimbursements(excludeExpenseId: Int): Flow<List<TransactionDetails>>
+
     @Query(
         "UPDATE transactions SET isSplit = :isSplit, categoryId = CASE WHEN :isSplit = 1 THEN NULL ELSE categoryId END, description = CASE WHEN :isSplit = 1 THEN 'Split Transaction' ELSE description END WHERE id = :transactionId",
     )
@@ -402,7 +475,7 @@ interface TransactionDao {
             UNION ALL
             SELECT
                 P.id, P.description, S.categoryId, S.amount, P.date, P.accountId, S.notes, P.transactionType, P.sourceSmsId, P.sourceSmsHash, P.source,
-                P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit, P.needsReview, P.status, P.recurringRuleId, P.mergeDismissed
+                P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit, P.needsReview, P.status, P.recurringRuleId, P.mergeDismissed, P.parentReimbursementId
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'income' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED'
               AND (:accountId IS NULL OR P.accountId = :accountId)

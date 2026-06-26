@@ -404,6 +404,13 @@ fun MainAppScreen(shortcutAction: String? = null) {
                             }
                         },
                         actions = {
+                            // --- NEW: Link Repayment action (visible only when 1 expense + 1+ incomes selected) ---
+                            val canLinkAsReimbursement by transactionViewModel.canLinkAsReimbursement.collectAsState()
+                            if (canLinkAsReimbursement) {
+                                IconButton(onClick = { transactionViewModel.linkReimbursementFromSelection() }) {
+                                    Icon(Icons.Default.Payments, contentDescription = "Link Repayment")
+                                }
+                            }
                             IconButton(onClick = { transactionViewModel.onDeleteSelectionClick() }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Delete")
                             }

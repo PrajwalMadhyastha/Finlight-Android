@@ -131,6 +131,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
             whenever(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
             whenever(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getRecentManualTransactions(anyInt())).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getReimbursementsForExpense(anyInt())).thenReturn(flowOf(emptyList()))
             whenever(transactionDao.getSmsHashesByIds(any())).thenReturn(emptyList())
         }
     }

@@ -394,4 +394,34 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    @Test
+    fun migrate49To50_addsParentReimbursementIdColumnToTransactions() {
+        helper.createDatabase(testDbName, 49).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 50, true, AppDatabase.MIGRATION_49_50).apply {
+            val cursor = query("PRAGMA table_info(transactions)")
+            var found = false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "parentReimbursementId") {
+                    found = true
+                    assertEquals(
+                        "parentReimbursementId should be nullable (notnull=0)",
+                        0,
+                        cursor.getInt(cursor.getColumnIndexOrThrow("notnull")),
+                    )
+                    val dfltValue = cursor.getString(cursor.getColumnIndexOrThrow("dflt_value"))
+                    assertTrue(
+                        "Default value should be NULL or string 'NULL'",
+                        dfltValue == null || dfltValue.equals("NULL", ignoreCase = true)
+                    )
+                }
+            }
+            assertTrue("Column 'parentReimbursementId' should exist in transactions table", found)
+            cursor.close()
+            close()
+        }
+    }
 }

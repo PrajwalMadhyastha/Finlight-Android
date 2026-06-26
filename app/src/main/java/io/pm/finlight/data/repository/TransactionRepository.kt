@@ -515,6 +515,48 @@ class TransactionRepository(
         return transactionDao.getRecentManualTransactions(limit)
     }
 
+    // --- NEW: Reimbursement / Offset Feature ---
+
+    fun getReimbursementsForExpense(expenseId: Int): Flow<List<TransactionDetails>> =
+        transactionDao.getReimbursementsForExpense(expenseId)
+
+    fun getCandidateReimbursements(excludeExpenseId: Int): Flow<List<TransactionDetails>> =
+        transactionDao.getCandidateReimbursements(excludeExpenseId)
+
+    fun getLinkedExpenseForReimbursement(incomeId: Int): Flow<TransactionDetails?> =
+        transactionDao.getLinkedExpenseForReimbursement(incomeId)
+
+    /**
+     * Links [incomeId] as a reimbursement for [expenseId]:
+     * - Sets parentReimbursementId on the income and marks it as excluded from totals.
+     * - Deducts the income amount from the expense, so budget/spending totals
+     *   automatically reflect the net cost.
+     */
+    suspend fun linkReimbursement(
+        incomeId: Int,
+        expenseId: Int
+    ) {
+        val incomeTxn = transactionDao.getTransactionByIdSync(incomeId) ?: return
+        val expenseTxn = transactionDao.getTransactionByIdSync(expenseId) ?: return
+        transactionDao.linkReimbursement(incomeId, expenseId)
+        val newExpenseAmount = (expenseTxn.amount - incomeTxn.amount).coerceAtLeast(0.0)
+        transactionDao.updateAmount(expenseId, newExpenseAmount)
+    }
+
+    /**
+     * Removes the reimbursement link from [incomeId]:
+     * - Clears parentReimbursementId and removes the excluded flag.
+     * - Adds the income amount back onto the parent expense.
+     */
+    suspend fun unlinkReimbursement(incomeId: Int) {
+        val incomeTxn = transactionDao.getTransactionByIdSync(incomeId) ?: return
+        val parentId = incomeTxn.parentReimbursementId ?: return
+        val expenseTxn = transactionDao.getTransactionByIdSync(parentId) ?: return
+        transactionDao.unlinkReimbursement(incomeId)
+        val restoredExpenseAmount = expenseTxn.amount + incomeTxn.amount
+        transactionDao.updateAmount(parentId, restoredExpenseAmount)
+    }
+
     // --- NEW: Smart Transaction Merge ---
     suspend fun findRecentTransactionForMerge(
         merchant: String,

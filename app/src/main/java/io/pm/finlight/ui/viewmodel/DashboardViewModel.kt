@@ -137,14 +137,32 @@ class DashboardViewModel(
             }
         }
 
-        allCards = _cardOrder.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        val isRecurringEnabled = settingsRepository.getRecurringTransactionsEnabled()
+
+        allCards =
+            combine(
+                _cardOrder,
+                isRecurringEnabled,
+            ) { order, isRecurring ->
+                if (isRecurring) {
+                    order
+                } else {
+                    order.filter {
+                        it != DashboardCardType.UPCOMING_PAYMENTS &&
+                            it != DashboardCardType.RECURRING_SUGGESTIONS
+                    }
+                }
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         visibleCards =
             combine(
                 _cardOrder,
                 _visibleCardsSet,
-            ) { order, visible ->
-                order.filter { it in visible }
+                isRecurringEnabled,
+            ) { order, visible, isRecurring ->
+                order.filter {
+                    it in visible && (isRecurring || (it != DashboardCardType.UPCOMING_PAYMENTS && it != DashboardCardType.RECURRING_SUGGESTIONS))
+                }
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         val calendar = timeProvider.now()

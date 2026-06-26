@@ -206,7 +206,7 @@ class TransactionCrudTests {
 
         // 2. Wait for detail screen
         composeTestRule.waitUntil(timeoutMillis = 8000) {
-            composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().isNotEmpty()
         }
 
         // 3. Click the description to edit (opens the MerchantPredictionSheet)
@@ -270,7 +270,7 @@ class TransactionCrudTests {
 
         // 2. Click 'More' menu
         composeTestRule.waitUntil(timeoutMillis = 8000) {
-            composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithContentDescription("More options", useUnmergedTree = true).performClick()
 

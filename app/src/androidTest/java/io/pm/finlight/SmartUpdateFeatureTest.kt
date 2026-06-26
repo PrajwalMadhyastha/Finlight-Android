@@ -120,7 +120,7 @@ class SmartUpdateFeatureTest {
 
         // 3. Wait for Detail Screen to load
         composeTestRule.waitUntil(timeoutMillis = 8000) {
-            composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().isNotEmpty()
         }
 
         // 4. Click the description to edit (opens the MerchantPredictionSheet)

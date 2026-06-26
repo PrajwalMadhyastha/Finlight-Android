@@ -997,4 +997,58 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             verify(deletedSmsHashDaoMock, never()).insert(org.mockito.kotlin.any())
         }
+
+    @Test
+    fun `linkReimbursement deducts income amount from expense amount`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+
+            val expenseTxn = Transaction(id = 1, description = "Expense", amount = 1500.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = "expense")
+            val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = "income")
+
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(incomeTxn)
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(expenseTxn)
+
+            repository.linkReimbursement(incomeId = 2, expenseId = 1)
+
+            verify(transactionDao).linkReimbursement(2, 1)
+            verify(transactionDao).updateAmount(1, 1000.0)
+        }
+
+    @Test
+    fun `linkReimbursement does not set expense amount below zero`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+
+            val expenseTxn = Transaction(id = 1, description = "Expense", amount = 300.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = "expense")
+            val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = "income")
+
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(incomeTxn)
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(expenseTxn)
+
+            repository.linkReimbursement(incomeId = 2, expenseId = 1)
+
+            verify(transactionDao).linkReimbursement(2, 1)
+            verify(transactionDao).updateAmount(1, 0.0) // coerceAtLeast(0.0)
+        }
+
+    @Test
+    fun `unlinkReimbursement restores amount to expense`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+
+            val expenseTxn = Transaction(id = 1, description = "Expense", amount = 1000.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = "expense")
+            val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = "income", parentReimbursementId = 1)
+
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(incomeTxn)
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(expenseTxn)
+
+            repository.unlinkReimbursement(incomeId = 2)
+
+            verify(transactionDao).unlinkReimbursement(2)
+            verify(transactionDao).updateAmount(1, 1500.0)
+        }
 }

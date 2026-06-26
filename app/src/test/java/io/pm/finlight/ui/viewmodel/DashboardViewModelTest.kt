@@ -103,6 +103,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
         `when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(emptyList()))
         `when`(settingsRepository.getDashboardVisibleCards()).thenReturn(flowOf(emptySet()))
+        `when`(settingsRepository.getRecurringTransactionsEnabled()).thenReturn(flowOf(true))
         `when`(
             transactionRepository.getFinancialSummaryForRangeFlow(
                 Mockito.anyLong(),

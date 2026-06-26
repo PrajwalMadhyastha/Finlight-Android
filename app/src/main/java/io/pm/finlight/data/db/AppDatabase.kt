@@ -54,7 +54,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         GoalTransactionLink::class,
         GoalContribution::class,
     ],
-    version = 49,
+    version = 50,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -791,6 +791,14 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        val MIGRATION_49_50 =
+            object : Migration(49, 50) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `transactions` ADD COLUMN `parentReimbursementId` INTEGER DEFAULT NULL")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_parentReimbursementId` ON `transactions` (`parentReimbursementId`)")
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -827,6 +835,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_46_47,
                             MIGRATION_47_48,
                             MIGRATION_48_49,
+                            MIGRATION_49_50,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))
