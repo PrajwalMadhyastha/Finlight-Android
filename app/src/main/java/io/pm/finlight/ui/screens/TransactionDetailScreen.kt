@@ -257,6 +257,7 @@ fun TransactionDetailScreen(
                     state = retroUpdateSheetState!!,
                     onToggleSelection = viewModel::toggleRetroUpdateSelection,
                     onToggleSelectAll = viewModel::toggleRetroUpdateSelectAll,
+                    onToggleUpdateFuture = viewModel::toggleUpdateFutureTransactions,
                     onConfirm = {
                         // Navigation is now driven by the ViewModel via navigateBackEvent.
                         viewModel.performBatchUpdate()
@@ -1908,14 +1909,20 @@ private fun ChipWithIcon(
 }
 
 @Composable
+// =================================================================================
+// FEATURE (#225 / FIX #224): Unified "Smart Update" bottom sheet.
+// Now shows an explicit "Update future transactions" toggle independent of
+// past-transaction selection. The historical list is hidden when empty.
+// =================================================================================
 private fun RetrospectiveUpdateSheetContent(
     state: RetroUpdateSheetState,
     onToggleSelection: (Int) -> Unit,
     onToggleSelectAll: () -> Unit,
+    onToggleUpdateFuture: () -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val changeType = if (state.newDescription != null) "description" else "category"
+    val changeType = if (state.newDescription != null) "name" else "category"
 
     Column(
         modifier =
@@ -1923,20 +1930,55 @@ private fun RetrospectiveUpdateSheetContent(
                 .fillMaxHeight()
                 .navigationBarsPadding()
                 .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         Text(
-            "Update Similar Transactions",
+            "Smart Update",
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier.padding(bottom = 4.dp),
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            "You've changed the $changeType for transactions like '${state.originalDescription}'. Apply this change to other similar transactions?",
+            "You changed the $changeType for '${state.originalDescription}'. How should this apply?",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(bottom = 16.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
+        // --- Section 1: Future rule toggle (always shown) ---
+        GlassPanel(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggleUpdateFuture)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text(
+                        "Update future transactions",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        "Teach the app to auto-apply this change to new incoming SMS",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = state.updateFutureTransactions,
+                    onCheckedChange = { onToggleUpdateFuture() },
+                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.onPrimary),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // --- Section 2: Past transaction list (only shown if there are similar txns) ---
         if (state.isLoading) {
             Box(
                 modifier =
@@ -1947,7 +1989,13 @@ private fun RetrospectiveUpdateSheetContent(
             ) {
                 CircularProgressIndicator()
             }
-        } else {
+        } else if (state.similarTransactions.isNotEmpty()) {
+            Text(
+                "Also update ${state.similarTransactions.size} similar past transaction(s):",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
@@ -1982,6 +2030,14 @@ private fun RetrospectiveUpdateSheetContent(
                     )
                 }
             }
+        } else {
+            // No past history to show
+            Text(
+                "No earlier similar transactions to update.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
         }
 
         Spacer(Modifier.height(16.dp))
@@ -1994,14 +2050,15 @@ private fun RetrospectiveUpdateSheetContent(
                 onClick = onDismiss,
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Just This One")
+                Text("Cancel")
             }
             Button(
                 onClick = onConfirm,
                 modifier = Modifier.weight(1f),
-                enabled = state.selectedIds.isNotEmpty(),
+                // Enable if the user opted in for the future rule OR selected some past txns
+                enabled = state.updateFutureTransactions || state.selectedIds.isNotEmpty(),
             ) {
-                Text("Update ${state.selectedIds.size} Items")
+                Text("Apply Changes")
             }
         }
     }

@@ -57,6 +57,9 @@ data class RetroUpdateSheetState(
      *  correctly determine whether the user selected ALL affected transactions so a global
      *  rename rule can be saved or deleted. */
     val totalMatchingCount: Int = 0,
+    // --- FIX (#224/#225): Controls whether to upsert the MerchantRenameRule /
+    // MerchantCategoryMapping for future SMS. Independent of past-transaction selection.
+    val updateFutureTransactions: Boolean = true,
 )
 
 data class ManualTransactionData(
@@ -541,42 +544,25 @@ class TransactionViewModel(
                         selectedIds = similar.map { it.id }.toSet(),
                         isLoading = false,
                         totalMatchingCount = similar.size + 1,
+                        updateFutureTransactions = true,
                     )
             } else {
-                // --- FIX 1: No similar transactions found, but a rename still happened.
-                // Silently persist the global rule so the parser remembers this rename
-                // for future incoming transactions, then check for cross-account variants.
-                if (descriptionChanged) {
-                    val newDesc = current.description
-                    val originalDesc = originalDescriptionForSearch
-                    if (originalDesc.isNotBlank() && !originalDesc.equals(newDesc, ignoreCase = true)) {
-                        try {
-                            val rule = MerchantRenameRule(originalName = originalDesc, newName = newDesc)
-                            merchantRenameRuleRepository.insert(rule)
-                            Log.d(TAG, "Silently saved rename rule: '$originalDesc' -> '$newDesc' (no similar transactions).")
-                            // Layer B: scan for cross-account variants. If found, the nudge
-                            // will emit navigateBackEvent after the user responds.
-                            val foundVariants = findCrossAccountVariants(newDesc, originalDesc)
-                            if (!foundVariants) onNavigationAllowed()
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to save rename rule silently", e)
-                            onNavigationAllowed()
-                        }
-                    } else if (originalDesc.isNotBlank() && originalDesc.equals(newDesc, ignoreCase = true)) {
-                        // User reverted the name — remove any existing rule for this name.
-                        try {
-                            merchantRenameRuleRepository.deleteByOriginalName(originalDesc)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to delete rename rule on revert", e)
-                        }
-                        onNavigationAllowed()
-                    } else {
-                        onNavigationAllowed()
-                    }
-                } else {
-                    onNavigationAllowed()
-                }
+                // --- FIX (#224/#225): Show the sheet even with no past history so the user
+                // has explicit control over whether a future rule is created, instead of
+                // silently saving one. The sheet renders without the past-transaction list.
+                _retroUpdateSheetState.value =
+                    RetroUpdateSheetState(
+                        originalDescription = originalDescriptionForSearch,
+                        newDescription = if (descriptionChanged) current.description else null,
+                        newCategoryId = if (categoryChanged) current.categoryId else null,
+                        similarTransactions = emptyList(),
+                        selectedIds = emptySet(),
+                        isLoading = false,
+                        totalMatchingCount = 1,
+                        updateFutureTransactions = true,
+                    )
             }
+
         }
     }
 
@@ -1697,11 +1683,19 @@ class TransactionViewModel(
         }
     }
 
+    /** Toggles the 'Update future transactions' switch on the Smart Update sheet. */
+    fun toggleUpdateFutureTransactions() {
+        _retroUpdateSheetState.update { it?.copy(updateFutureTransactions = !it.updateFutureTransactions) }
+    }
+
     fun performBatchUpdate() {
         viewModelScope.launch {
             val state = _retroUpdateSheetState.value ?: return@launch
             val idsToUpdate = state.selectedIds.toList()
-            if (idsToUpdate.isEmpty()) {
+
+            // --- FIX (#224/#225): No longer early-return when idsToUpdate is empty.
+            // The user may still want to save a future rule without touching past records.
+            if (idsToUpdate.isEmpty() && !state.updateFutureTransactions) {
                 _retroUpdateSheetState.value = null
                 _navigateBackEvent.send(Unit)
                 return@launch
@@ -1712,38 +1706,42 @@ class TransactionViewModel(
                 var savedCanonical: String? = null
                 var savedOriginal: String? = null
 
-                state.newDescription?.let { newDesc ->
-                    val originalDesc = state.originalDescription
-                    val isAllSelected = (idsToUpdate.size + 1) == state.totalMatchingCount
-                    if (isAllSelected) {
+                // --- FIX (#224/#225): Gate on explicit checkbox, not on isAllSelected.
+                // This means any partial selection + future toggle ON will correctly save the rule.
+                if (state.updateFutureTransactions) {
+                    state.newDescription?.let { newDesc ->
+                        val originalDesc = state.originalDescription
                         if (originalDesc.isNotBlank() && !originalDesc.equals(newDesc, ignoreCase = true)) {
                             val rule = MerchantRenameRule(originalName = originalDesc, newName = newDesc)
                             merchantRenameRuleRepository.insert(rule)
-                            Log.d(
-                                TAG,
-                                "Batch: saved global rename rule '$originalDesc' -> '$newDesc' (all ${state.totalMatchingCount} selected).",
-                            )
+                            Log.d(TAG, "Smart Update: saved rename rule '$originalDesc' -> '$newDesc'.")
                             ruleSaved = true
                             savedCanonical = newDesc
                             savedOriginal = originalDesc
                         } else if (originalDesc.isNotBlank() && originalDesc.equals(newDesc, ignoreCase = true)) {
+                            // User reverted name — remove any existing rule.
                             merchantRenameRuleRepository.deleteByOriginalName(originalDesc)
                         }
-                    } else {
-                        Log.d(
-                            TAG,
-                            "Batch: partial selection (${idsToUpdate.size + 1}/${state.totalMatchingCount}) — skipping global rule change.",
-                        )
                     }
+                    state.newCategoryId?.let { newCategoryId ->
+                        val originalDesc = state.originalDescription
+                        if (originalDesc.isNotBlank()) {
+                            merchantCategoryMappingRepository.insert(
+                                MerchantCategoryMapping(parsedName = originalDesc, categoryId = newCategoryId)
+                            )
+                            Log.d(TAG, "Smart Update: upserted category mapping '$originalDesc' -> $newCategoryId.")
+                        }
+                    }
+                } else {
+                    Log.d(TAG, "Smart Update: user opted out of future rule — skipping rule save.")
                 }
 
-                state.newDescription?.let {
-                    transactionRepository.updateDescriptionForIds(idsToUpdate, it)
+                // Retroactive ledger updates for selected past transactions
+                if (idsToUpdate.isNotEmpty()) {
+                    state.newDescription?.let { transactionRepository.updateDescriptionForIds(idsToUpdate, it) }
+                    state.newCategoryId?.let { transactionRepository.updateCategoryForIds(idsToUpdate, it) }
+                    _uiEvent.send("Updated ${idsToUpdate.size} transaction(s).")
                 }
-                state.newCategoryId?.let {
-                    transactionRepository.updateCategoryForIds(idsToUpdate, it)
-                }
-                _uiEvent.send("Updated ${idsToUpdate.size} transaction(s).")
 
                 // Layer B: if a global rule was saved, scan for cross-account variants.
                 // The canonical nudge (if shown) will emit navigateBackEvent when resolved.
