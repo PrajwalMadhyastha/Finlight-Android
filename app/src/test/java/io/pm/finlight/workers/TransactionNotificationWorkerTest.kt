@@ -185,10 +185,10 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
                     "color",
                     null,
                 )
-            
+
             coEvery { transactionDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
             coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns null
-            
+
             val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to transactionId)
             val worker =
                 TestListenableWorkerBuilder<TransactionNotificationWorker>(context)

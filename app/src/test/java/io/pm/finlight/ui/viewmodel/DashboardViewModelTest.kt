@@ -491,7 +491,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
             Mockito.`when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(order))
             Mockito.`when`(settingsRepository.getDashboardVisibleCards()).thenReturn(flowOf(visible))
             Mockito.`when`(settingsRepository.getRecurringTransactionsEnabled()).thenReturn(flowOf(false))
-            
+
             initializeViewModel()
 
             // Assert allCards
@@ -501,7 +501,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
                 assertEquals(listOf(DashboardCardType.RECENT_TRANSACTIONS), finalState)
                 cancelAndIgnoreRemainingEvents()
             }
-            
+
             // Assert visibleCards
             viewModel.visibleCards.test {
                 advanceUntilIdle()
@@ -864,18 +864,19 @@ class DashboardViewModelTest : BaseViewModelTest() {
     @Test
     fun `executeMerge calls repository and fetches SMS if sourceSmsId is present`() =
         runTest {
-            val childTxn = Transaction(
-                id = 2,
-                description = "Child",
-                amount = 100.0,
-                transactionType = "expense",
-                date = 0L,
-                accountId = 1,
-                categoryId = 1,
-                notes = null,
-                originalDescription = "Child",
-                sourceSmsId = 5
-            )
+            val childTxn =
+                Transaction(
+                    id = 2,
+                    description = "Child",
+                    amount = 100.0,
+                    transactionType = "expense",
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    originalDescription = "Child",
+                    sourceSmsId = 5
+                )
             val sms = io.pm.finlight.SmsMessage(id = 5, sender = "Bank", body = "Test SMS body", date = 1000L)
 
             `when`(transactionRepository.getTransactionSync(2)).thenReturn(childTxn)
@@ -884,7 +885,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
             initializeViewModel()
             viewModel.executeMerge(1, 2)
             advanceUntilIdle()
-            
+
             verify(transactionRepository).mergeTransactions(1, 2, "Test SMS body", 1000L)
         }
 
