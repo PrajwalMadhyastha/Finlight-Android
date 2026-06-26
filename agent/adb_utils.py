@@ -84,3 +84,29 @@ def clear_text(length: int = 50):
     for _ in range(length):
         run_adb("input keyevent 67")
 
+def background_app(seconds: int = 3, package_name="io.pm.finlight", activity=".MainActivity"):
+    """Backgrounds the app, waits, and brings it back to foreground."""
+    print(f"Backgrounding app for {seconds} seconds...")
+    press_home()
+    time.sleep(seconds)
+    launch_app(package_name, activity)
+
+def trigger_process_death(package_name="io.pm.finlight", activity=".MainActivity"):
+    """Simulates the Android OS killing the app for memory while it's in the background."""
+    print("Triggering process death...")
+    press_home()
+    time.sleep(1)
+    run_adb(f"am kill {package_name}")
+    time.sleep(2)
+    launch_app(package_name, activity)
+
+def toggle_dark_mode():
+    """Toggles the system dark mode state."""
+    print("Toggling dark mode...")
+    current_mode = run_adb("cmd uimode night")
+    if "yes" in current_mode.lower():
+        run_adb("cmd uimode night no")
+    else:
+        run_adb("cmd uimode night yes")
+
+

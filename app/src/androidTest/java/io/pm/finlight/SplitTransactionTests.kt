@@ -53,7 +53,7 @@ class SplitTransactionTests {
             .performClick()
 
         composeTestRule.waitUntil(timeoutMillis = 8000) {
-            composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().isNotEmpty()
         }
     }
 

@@ -16,7 +16,7 @@ class GoalViewModelFactory(private val application: Application) : ViewModelProv
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(GoalViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
-            val repository = GoalRepository(db.goalDao(), db.goalTransactionLinkDao(), db.transactionDao())
+            val repository = GoalRepository(db.goalDao(), db.goalTransactionLinkDao(), db.transactionDao(), db.goalContributionDao())
             @Suppress("UNCHECKED_CAST")
             return GoalViewModel(repository) as T
         }

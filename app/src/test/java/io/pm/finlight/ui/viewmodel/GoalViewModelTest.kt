@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.data.db.entity.GoalContribution
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -90,7 +91,24 @@ class GoalViewModelTest : BaseViewModelTest() {
             val capturedGoal = goalCaptor.value
             assertEquals("New Car", capturedGoal.name)
             assertEquals(200000.0, capturedGoal.targetAmount, 0.0)
+            assertEquals(0.0, capturedGoal.savedAmount, 0.0) // default offline contribution
             assertEquals(0, capturedGoal.id) // Should be 0 for new item
+        }
+
+    @Test
+    fun `saveGoal with offline contribution sets savedAmount`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+
+            // Act
+            viewModel.saveGoal(null, "New Car", 200000.0, null, 1, 5000.0)
+            advanceUntilIdle()
+
+            // Assert
+            verify(goalRepository).insert(capture(goalCaptor))
+            val capturedGoal = goalCaptor.value
+            assertEquals(5000.0, capturedGoal.savedAmount, 0.0)
         }
 
     @Test
@@ -388,5 +406,152 @@ class GoalViewModelTest : BaseViewModelTest() {
                 awaitComplete()
             }
             verify(goalRepository).getRecentTransactions(start, end)
+        }
+
+    // --- Manual Contributions ---
+
+    @Test
+    fun `getContributionsForGoal calls repository and returns flow`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val goalId = 1
+            val expectedContributions = listOf(GoalContribution(id = 1, goalId = goalId, amount = 100.0, date = 1000L, description = "Test"))
+            `when`(goalRepository.getContributionsForGoal(goalId)).thenReturn(flowOf(expectedContributions))
+
+            // Act
+            val resultFlow = viewModel.getContributionsForGoal(goalId)
+
+            // Assert
+            resultFlow.test {
+                assertEquals(expectedContributions, awaitItem())
+                awaitComplete()
+            }
+            verify(goalRepository).getContributionsForGoal(goalId)
+        }
+
+    @Test
+    fun `getTotalContributionForGoal calls repository and returns flow`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val goalId = 1
+            val expectedTotal = 150.0
+            `when`(goalRepository.getTotalContributionForGoal(goalId)).thenReturn(flowOf(expectedTotal))
+
+            // Act
+            val resultFlow = viewModel.getTotalContributionForGoal(goalId)
+
+            // Assert
+            resultFlow.test {
+                assertEquals(expectedTotal, awaitItem(), 0.0)
+                awaitComplete()
+            }
+            verify(goalRepository).getTotalContributionForGoal(goalId)
+        }
+
+    @Test
+    fun `insertContribution success sends success event`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val contribution = GoalContribution(goalId = 1, amount = 100.0, date = 1000L, description = "Test")
+
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.insertContribution(contribution)
+                advanceUntilIdle()
+
+                verify(goalRepository).insertContribution(contribution)
+                assertEquals("Manual contribution added.", awaitItem())
+            }
+        }
+
+    @Test
+    fun `insertContribution failure sends error event`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val contribution = GoalContribution(goalId = 1, amount = 100.0, date = 1000L, description = "Test")
+            val errorMessage = "DB Error"
+            `when`(goalRepository.insertContribution(anyObject())).thenThrow(RuntimeException(errorMessage))
+
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.insertContribution(contribution)
+                advanceUntilIdle()
+
+                assertEquals("Error adding contribution: $errorMessage", awaitItem())
+            }
+        }
+
+    @Test
+    fun `updateContribution success sends success event`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val contribution = GoalContribution(id = 1, goalId = 1, amount = 100.0, date = 1000L, description = "Test")
+
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.updateContribution(contribution)
+                advanceUntilIdle()
+
+                verify(goalRepository).updateContribution(contribution)
+                assertEquals("Manual contribution updated.", awaitItem())
+            }
+        }
+
+    @Test
+    fun `updateContribution failure sends error event`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val contribution = GoalContribution(id = 1, goalId = 1, amount = 100.0, date = 1000L, description = "Test")
+            val errorMessage = "DB Error"
+            `when`(goalRepository.updateContribution(anyObject())).thenThrow(RuntimeException(errorMessage))
+
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.updateContribution(contribution)
+                advanceUntilIdle()
+
+                assertEquals("Error updating contribution: $errorMessage", awaitItem())
+            }
+        }
+
+    @Test
+    fun `deleteContribution success sends success event`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val contribution = GoalContribution(id = 1, goalId = 1, amount = 100.0, date = 1000L, description = "Test")
+
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.deleteContribution(contribution)
+                advanceUntilIdle()
+
+                verify(goalRepository).deleteContribution(contribution)
+                assertEquals("Manual contribution deleted.", awaitItem())
+            }
+        }
+
+    @Test
+    fun `deleteContribution failure sends error event`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val contribution = GoalContribution(id = 1, goalId = 1, amount = 100.0, date = 1000L, description = "Test")
+            val errorMessage = "DB Error"
+            `when`(goalRepository.deleteContribution(anyObject())).thenThrow(RuntimeException(errorMessage))
+
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.deleteContribution(contribution)
+                advanceUntilIdle()
+
+                assertEquals("Error deleting contribution: $errorMessage", awaitItem())
+            }
         }
 }

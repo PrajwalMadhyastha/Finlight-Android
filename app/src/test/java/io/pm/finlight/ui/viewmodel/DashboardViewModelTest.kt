@@ -57,6 +57,9 @@ class DashboardViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var recurringPatternDao: RecurringPatternDao
 
+    @Mock
+    private lateinit var smsRepository: SmsRepository
+
     private lateinit var viewModel: DashboardViewModel
 
     // --- List of possible messages from ViewModel for assertions ---
@@ -100,6 +103,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
         `when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(emptyList()))
         `when`(settingsRepository.getDashboardVisibleCards()).thenReturn(flowOf(emptySet()))
+        `when`(settingsRepository.getRecurringTransactionsEnabled()).thenReturn(flowOf(true))
         `when`(
             transactionRepository.getFinancialSummaryForRangeFlow(
                 Mockito.anyLong(),
@@ -154,6 +158,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
                 timeProvider = timeProvider,
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
+                smsRepository = smsRepository,
             )
     }
 
@@ -168,6 +173,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
                 timeProvider = timeProvider,
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
+                smsRepository = smsRepository,
             )
     }
 
@@ -477,6 +483,35 @@ class DashboardViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `visibleCards and allCards filter out recurring cards when recurring is disabled`() =
+        runTest {
+            // Arrange
+            val order = listOf(DashboardCardType.RECENT_TRANSACTIONS, DashboardCardType.UPCOMING_PAYMENTS, DashboardCardType.RECURRING_SUGGESTIONS)
+            val visible = setOf(DashboardCardType.RECENT_TRANSACTIONS, DashboardCardType.UPCOMING_PAYMENTS, DashboardCardType.RECURRING_SUGGESTIONS)
+            Mockito.`when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(order))
+            Mockito.`when`(settingsRepository.getDashboardVisibleCards()).thenReturn(flowOf(visible))
+            Mockito.`when`(settingsRepository.getRecurringTransactionsEnabled()).thenReturn(flowOf(false))
+
+            initializeViewModel()
+
+            // Assert allCards
+            viewModel.allCards.test {
+                advanceUntilIdle()
+                val finalState = awaitItem()
+                assertEquals(listOf(DashboardCardType.RECENT_TRANSACTIONS), finalState)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            // Assert visibleCards
+            viewModel.visibleCards.test {
+                advanceUntilIdle()
+                val finalState = awaitItem()
+                assertEquals(listOf(DashboardCardType.RECENT_TRANSACTIONS), finalState)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `dismissLastMonthSummaryCard calls repository and updates state`() =
         runTest {
             // Arrange - Force the time to be the 1st of the month
@@ -777,5 +812,89 @@ class DashboardViewModelTest : BaseViewModelTest() {
                 assertEquals(1, suggestions.size)
                 assertEquals(pattern, suggestions[0])
             }
+        }
+
+    // --- NEW: Tests for Smart Transaction Merge ---
+    @Test
+    fun `mergeSuggestion identifies valid mergeable transactions`() =
+        runTest {
+            val now = System.currentTimeMillis()
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = now - 3600000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = false)
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = now, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = false)
+
+            val parentDetails = TransactionDetails(parentTxn, emptyList(), "Account", "Category", null, null, null)
+            val childDetails = TransactionDetails(childTxn, emptyList(), "Account", "Category", null, null, null)
+
+            // DESC order: child is newer
+            `when`(transactionRepository.recentTransactions).thenReturn(flowOf(listOf(childDetails, parentDetails)))
+            `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
+            initializeViewModel()
+
+            viewModel.mergeSuggestion.test {
+                advanceUntilIdle()
+                val suggestion = awaitItem()
+                assertEquals(1, suggestion?.first?.transaction?.id)
+                assertEquals(2, suggestion?.second?.transaction?.id)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `mergeSuggestion ignores dismissed transactions`() =
+        runTest {
+            val now = System.currentTimeMillis()
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = now - 3600000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = true)
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = now, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = false)
+
+            val parentDetails = TransactionDetails(parentTxn, emptyList(), "Account", "Category", null, null, null)
+            val childDetails = TransactionDetails(childTxn, emptyList(), "Account", "Category", null, null, null)
+
+            `when`(transactionRepository.recentTransactions).thenReturn(flowOf(listOf(childDetails, parentDetails)))
+            `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
+            initializeViewModel()
+
+            viewModel.mergeSuggestion.test {
+                advanceUntilIdle()
+                val suggestion = awaitItem()
+                assertEquals(null, suggestion)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `executeMerge calls repository and fetches SMS if sourceSmsId is present`() =
+        runTest {
+            val childTxn =
+                Transaction(
+                    id = 2,
+                    description = "Child",
+                    amount = 100.0,
+                    transactionType = "expense",
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    originalDescription = "Child",
+                    sourceSmsId = 5
+                )
+            val sms = io.pm.finlight.SmsMessage(id = 5, sender = "Bank", body = "Test SMS body", date = 1000L)
+
+            `when`(transactionRepository.getTransactionSync(2)).thenReturn(childTxn)
+            `when`(smsRepository.getSmsDetailsById(5)).thenReturn(sms)
+
+            initializeViewModel()
+            viewModel.executeMerge(1, 2)
+            advanceUntilIdle()
+
+            verify(transactionRepository).mergeTransactions(1, 2, "Test SMS body", 1000L)
+        }
+
+    @Test
+    fun `dismissMergeSuggestion calls repository`() =
+        runTest {
+            initializeViewModel()
+            viewModel.dismissMergeSuggestion(2)
+            advanceUntilIdle()
+            verify(transactionRepository).dismissMerge(2)
         }
 }

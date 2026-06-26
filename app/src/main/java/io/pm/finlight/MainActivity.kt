@@ -355,6 +355,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
             "annual_simulator",
             "recurring_transactions",
             "add_recurring_transaction",
+            "goal_detail",
         )
 
     val showMainTopBar = baseCurrentRoute !in screensWithCustomTopBars
@@ -403,6 +404,13 @@ fun MainAppScreen(shortcutAction: String? = null) {
                             }
                         },
                         actions = {
+                            // --- NEW: Link Repayment action (visible only when 1 expense + 1+ incomes selected) ---
+                            val canLinkAsReimbursement by transactionViewModel.canLinkAsReimbursement.collectAsState()
+                            if (canLinkAsReimbursement) {
+                                IconButton(onClick = { transactionViewModel.linkReimbursementFromSelection() }) {
+                                    Icon(Icons.Default.Payments, contentDescription = "Link Repayment")
+                                }
+                            }
                             IconButton(onClick = { transactionViewModel.onDeleteSelectionClick() }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Delete")
                             }
@@ -502,6 +510,13 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                     HelpActionIcon(helpKey = "account_list")
                                 }
                                 BottomNavItem.Reports.route -> HelpActionIcon(helpKey = "reports_screen")
+                                "goal_screen" -> {
+                                    TextButton(onClick = { navController.navigate("add_edit_goal/new") }) {
+                                        Icon(Icons.Default.Add, contentDescription = "Add Goal")
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Add New Goal")
+                                    }
+                                }
                                 "budget_screen" -> HelpActionIcon(helpKey = "budget_screen")
                                 "income_screen" -> HelpActionIcon(helpKey = "income_screen")
                                 "appearance_settings" -> HelpActionIcon(helpKey = "appearance_settings")

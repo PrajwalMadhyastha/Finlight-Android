@@ -180,6 +180,12 @@ fun TransactionDetailScreen(
     val canonicalNudgeState by viewModel.canonicalNudgeState.collectAsState()
     val validationError by viewModel.validationError.collectAsState()
 
+    // --- NEW: Reimbursement feature state ---
+    val reimbursements by viewModel.reimbursementsForCurrentExpense.collectAsState()
+    val linkedExpense by viewModel.linkedExpenseForCurrentIncome.collectAsState()
+    val showReimbursementPicker by viewModel.showReimbursementPicker.collectAsState()
+    val candidateReimbursements by viewModel.candidateReimbursements.collectAsState()
+
     // Observe ViewModel-driven navigation events (e.g. after canonical nudge resolves).
     LaunchedEffect(Unit) {
         viewModel.navigateBackEvent.collect { navigateBack() }
@@ -257,6 +263,7 @@ fun TransactionDetailScreen(
                     state = retroUpdateSheetState!!,
                     onToggleSelection = viewModel::toggleRetroUpdateSelection,
                     onToggleSelectAll = viewModel::toggleRetroUpdateSelectAll,
+                    onToggleUpdateFuture = viewModel::toggleUpdateFutureTransactions,
                     onConfirm = {
                         // Navigation is now driven by the ViewModel via navigateBackEvent.
                         viewModel.performBatchUpdate()
@@ -391,6 +398,29 @@ fun TransactionDetailScreen(
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 SplitSummaryCard(splits = splits)
+                            }
+                        }
+                    }
+
+                    // --- NEW: Reimbursement card for expense transactions ---
+                    if (details.transaction.transactionType == "expense") {
+                        item {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                ReimbursementCard(
+                                    currentExpenseAmount = details.transaction.amount,
+                                    reimbursements = reimbursements,
+                                    onLinkClick = { viewModel.openReimbursementPicker(transactionId) },
+                                    onUnlinkClick = { incomeId -> viewModel.unlinkReimbursement(incomeId) },
+                                )
+                            }
+                        }
+                    }
+
+                    // --- NEW: Badge for income transactions that are linked as a repayment ---
+                    if (details.transaction.transactionType == "income" && linkedExpense != null) {
+                        item {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                LinkedAsReimbursementBadge(linkedExpense = linkedExpense!!)
                             }
                         }
                     }
@@ -660,6 +690,17 @@ fun TransactionDetailScreen(
                     )
                 }
             }
+        }
+
+        // --- NEW: Reimbursement picker sheet ---
+        if (showReimbursementPicker) {
+            TransactionPickerSheet(
+                transactions = candidateReimbursements.map { it.transaction },
+                onTransactionSelected = { selectedIncome ->
+                    viewModel.linkReimbursement(selectedIncome.id, transactionId)
+                },
+                onDismiss = { viewModel.dismissReimbursementPicker() },
+            )
         }
     }
 }
@@ -1908,14 +1949,20 @@ private fun ChipWithIcon(
 }
 
 @Composable
+// =================================================================================
+// FEATURE (#225 / FIX #224): Unified "Smart Update" bottom sheet.
+// Now shows an explicit "Update future transactions" toggle independent of
+// past-transaction selection. The historical list is hidden when empty.
+// =================================================================================
 private fun RetrospectiveUpdateSheetContent(
     state: RetroUpdateSheetState,
     onToggleSelection: (Int) -> Unit,
     onToggleSelectAll: () -> Unit,
+    onToggleUpdateFuture: () -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val changeType = if (state.newDescription != null) "description" else "category"
+    val changeType = if (state.newDescription != null) "name" else "category"
 
     Column(
         modifier =
@@ -1923,20 +1970,56 @@ private fun RetrospectiveUpdateSheetContent(
                 .fillMaxHeight()
                 .navigationBarsPadding()
                 .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         Text(
-            "Update Similar Transactions",
+            "Smart Update",
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier.padding(bottom = 4.dp),
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            "You've changed the $changeType for transactions like '${state.originalDescription}'. Apply this change to other similar transactions?",
+            "You changed the $changeType for '${state.originalDescription}'. How should this apply?",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(bottom = 16.dp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
+        // --- Section 1: Future rule toggle (always shown) ---
+        GlassPanel(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onToggleUpdateFuture)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text(
+                        "Update future transactions",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        "Teach the app to auto-apply this change to new incoming SMS",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = state.updateFutureTransactions,
+                    onCheckedChange = { onToggleUpdateFuture() },
+                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.onPrimary),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // --- Section 2: Past transaction list (only shown if there are similar txns) ---
         if (state.isLoading) {
             Box(
                 modifier =
@@ -1947,7 +2030,13 @@ private fun RetrospectiveUpdateSheetContent(
             ) {
                 CircularProgressIndicator()
             }
-        } else {
+        } else if (state.similarTransactions.isNotEmpty()) {
+            Text(
+                "Also update ${state.similarTransactions.size} similar past transaction(s):",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth(),
@@ -1982,6 +2071,14 @@ private fun RetrospectiveUpdateSheetContent(
                     )
                 }
             }
+        } else {
+            // No past history to show
+            Text(
+                "No earlier similar transactions to update.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
         }
 
         Spacer(Modifier.height(16.dp))
@@ -1994,16 +2091,27 @@ private fun RetrospectiveUpdateSheetContent(
                 onClick = onDismiss,
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Just This One")
+                Text("Cancel")
             }
             Button(
                 onClick = onConfirm,
                 modifier = Modifier.weight(1f),
-                enabled = state.selectedIds.isNotEmpty(),
+                // Enable if the user opted in for the future rule OR selected some past txns
+                enabled = state.updateFutureTransactions || state.selectedIds.isNotEmpty(),
             ) {
-                Text("Update ${state.selectedIds.size} Items")
+                Text("Apply Changes")
             }
         }
+        Text(
+            text = "Cancelling applies the edit only to this transaction — past transactions and future SMS will not be affected.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+        )
     }
 }
 

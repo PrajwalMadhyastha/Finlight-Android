@@ -14,7 +14,10 @@ You will be provided with:
 3. The CURRENT UI STATE (a JSON array of interactable elements on the screen, with their center coordinates).
 4. The ACTION HISTORY (what you have done so far).
 
-Your secondary goal is to verify bugs. If the APP MAP contains bugs with Status "Open", you must attempt to reproduce them if you find yourself on the relevant screen. If you attempt to reproduce an "Open" bug and the behavior is now correct, explicitly state in your finish summary that the bug appears to be resolved.
+Your secondary goal is to verify bugs and explore unknown areas.
+- **Novelty:** Prioritize navigating to screens that you haven't visited yet, or screens that have few tested features. Avoid getting stuck testing the same screen repeatedly unless it's necessary for your goal.
+- **Verification:** If the APP MAP contains bugs with Status "Open", attempt to reproduce them if you find yourself on the relevant screen. If you attempt to reproduce an "Open" bug and the behavior is now correct, state in your finish summary that it appears resolved.
+- **Lifecycle Testing:** Occasionally use the `trigger_process_death` and `background_app` tools when in the middle of data entry (like composing a transaction) to verify that state is correctly saved and restored.
 
 You must think step-by-step (ReAct strategy) and output your next action in strict JSON format.
 
@@ -27,6 +30,9 @@ Supported actions:
 - "back": Presses the hardware back button. No args.
 - "home": Presses the hardware home button. No args.
 - "recent_apps": Presses the recent apps button to background the app. No args.
+- "background_app": Backgrounds the app, waits, and restores it. Requires "seconds" (int) in args.
+- "trigger_process_death": Simulates OS process death by backgrounding the app, killing it, and relaunching. No args.
+- "toggle_dark_mode": Toggles system dark mode on/off. No args.
 - "sleep": Waits for a specified number of seconds without doing anything. Requires "seconds" in args.
 - "checkpoint": Wipes the detailed action history up to this point and replaces it with a summary. Use this when you complete a major stage (like onboarding). Requires "summary" in args.
 - "finish": Ends the test. Requires "status" ("pass" or "fail") and "summary" (detailed markdown string of what was tested and bugs found) in args.
@@ -120,20 +126,26 @@ Run Summary (Contains found bugs and verified bugs):
 History of actions taken:
 {json.dumps(history, indent=2)}
 
-Based on the run summary and history, generate a JSON diff to update the App Map.
-Only include NEW screens visited, NEW features tested, NEW bugs found, and any known bugs that should be marked as "Resolved".
+Based on the run summary and history, generate a JSON diff to update the relational App Map.
+Only include NEW features tested, NEW bugs found, and any known bugs that should be marked as "Resolved".
+Try to accurately map the features and bugs to the specific Screen Name where they occurred.
 
 Output schema:
 {{
-  "New_Screens": ["Screen Name"],
-  "New_Features": ["Feature Name"],
+  "Screens": {{
+    "Screen Name": {{
+      "Features_Tested": [
+        {{ "Name": "New Feature Tested", "Status": "PASS" }}
+      ]
+    }}
+  }},
   "New_Bugs": [
-    {{"Description": "Bug description", "Status": "Open"}}
+    {{"Id": "bug_XYZ", "Screen": "Screen Name", "Description": "Bug description", "Status": "Open"}}
   ],
-  "Resolved_Bugs": ["Description of the previously Open bug that is now resolved"]
+  "Resolved_Bugs": ["Description or ID of the previously Open bug that is now resolved"]
 }}
 
-Return ONLY valid JSON. If there are no new items for a category, return an empty list.
+Return ONLY valid JSON. If there are no new items for a category, omit the key or return an empty dict/list.
 """
     try:
         response = client.models.generate_content(

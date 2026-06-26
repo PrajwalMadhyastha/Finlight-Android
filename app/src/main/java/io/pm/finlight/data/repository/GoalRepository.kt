@@ -7,13 +7,16 @@
 package io.pm.finlight
 
 import io.pm.finlight.data.db.dao.GoalTransactionLinkDao
+import io.pm.finlight.data.db.dao.GoalContributionDao
 import io.pm.finlight.data.db.entity.GoalTransactionLink
+import io.pm.finlight.data.db.entity.GoalContribution
 import kotlinx.coroutines.flow.Flow
 
 class GoalRepository(
     private val goalDao: GoalDao,
     private val linkDao: GoalTransactionLinkDao,
     private val transactionDao: TransactionDao,
+    private val contributionDao: GoalContributionDao,
 ) {
     fun getAllGoalsWithAccountName(): Flow<List<GoalWithAccountName>> = goalDao.getAllGoalsWithAccountName()
 
@@ -71,4 +74,16 @@ class GoalRepository(
     fun getLinkedTransactionCount(goalId: Int): Flow<Int> = linkDao.getLinkedTransactionCount(goalId)
 
     fun getLinkedTransactionIds(goalId: Int): Flow<List<Int>> = linkDao.getLinkedTransactionIds(goalId)
+
+    // --- Manual Contributions ---
+
+    fun getContributionsForGoal(goalId: Int): Flow<List<GoalContribution>> = contributionDao.getContributionsForGoal(goalId)
+
+    fun getTotalContributionForGoal(goalId: Int): Flow<Double> = contributionDao.getTotalContributionForGoal(goalId)
+
+    suspend fun insertContribution(contribution: GoalContribution) = contributionDao.insertContribution(contribution)
+
+    suspend fun updateContribution(contribution: GoalContribution) = contributionDao.updateContribution(contribution)
+
+    suspend fun deleteContribution(contribution: GoalContribution) = contributionDao.deleteContribution(contribution)
 }

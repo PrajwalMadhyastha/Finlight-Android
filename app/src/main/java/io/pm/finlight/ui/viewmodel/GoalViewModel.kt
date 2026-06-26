@@ -11,6 +11,7 @@ package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.data.db.entity.GoalContribution
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -68,6 +69,7 @@ class GoalViewModel(private val goalRepository: GoalRepository) : ViewModel() {
         targetAmount: Double,
         targetDate: Long?,
         accountId: Int,
+        offlineContribution: Double = 0.0,
         notes: String? = null,
         iconEmoji: String? = null,
         priority: Int = 0,
@@ -79,6 +81,7 @@ class GoalViewModel(private val goalRepository: GoalRepository) : ViewModel() {
                         id = id ?: 0,
                         name = name,
                         targetAmount = targetAmount,
+                        savedAmount = offlineContribution,
                         targetDate = targetDate,
                         accountId = accountId,
                         notes = notes,
@@ -133,6 +136,45 @@ class GoalViewModel(private val goalRepository: GoalRepository) : ViewModel() {
                 _uiEvent.send("Transaction unlinked from goal.")
             } catch (e: Exception) {
                 _uiEvent.send("Error unlinking transaction: ${e.message}")
+            }
+        }
+    }
+
+    // --- Manual Contributions ---
+
+    fun getContributionsForGoal(goalId: Int): Flow<List<GoalContribution>> = goalRepository.getContributionsForGoal(goalId)
+
+    fun getTotalContributionForGoal(goalId: Int): Flow<Double> = goalRepository.getTotalContributionForGoal(goalId)
+
+    fun insertContribution(contribution: GoalContribution) {
+        viewModelScope.launch {
+            try {
+                goalRepository.insertContribution(contribution)
+                _uiEvent.send("Manual contribution added.")
+            } catch (e: Exception) {
+                _uiEvent.send("Error adding contribution: ${e.message}")
+            }
+        }
+    }
+
+    fun updateContribution(contribution: GoalContribution) {
+        viewModelScope.launch {
+            try {
+                goalRepository.updateContribution(contribution)
+                _uiEvent.send("Manual contribution updated.")
+            } catch (e: Exception) {
+                _uiEvent.send("Error updating contribution: ${e.message}")
+            }
+        }
+    }
+
+    fun deleteContribution(contribution: GoalContribution) {
+        viewModelScope.launch {
+            try {
+                goalRepository.deleteContribution(contribution)
+                _uiEvent.send("Manual contribution deleted.")
+            } catch (e: Exception) {
+                _uiEvent.send("Error deleting contribution: ${e.message}")
             }
         }
     }

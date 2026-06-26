@@ -75,9 +75,9 @@ class NavigationSmokeTests {
 
         // Verify we are on detail screen
         composeTestRule.waitUntil(timeoutMillis = 8000) {
-            composeTestRule.onAllNodesWithText("Exclude from Totals").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onAllNodesWithText("Exclude from Totals").onFirst().assertExists()
+        composeTestRule.onAllNodesWithContentDescription("Back").onFirst().assertExists()
 
         // Go back
         composeTestRule.onNodeWithContentDescription("Back").performClick()

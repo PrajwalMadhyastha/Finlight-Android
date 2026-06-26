@@ -22,7 +22,7 @@ class AccountViewModelFactory(private val application: Application) : ViewModelP
             val db = AppDatabase.getInstance(application)
             val settingsRepository = SettingsRepository(application)
             val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository)
+            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao())
             val accountRepository = AccountRepository(db)
 
             @Suppress("UNCHECKED_CAST")

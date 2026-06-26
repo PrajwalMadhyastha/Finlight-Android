@@ -85,6 +85,10 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".receiver.MergeActionReceiver"
+            android:exported="false" />
+
         <activity
             android:name="com.canhub.cropper.CropImageActivity"
             android:theme="@style/Theme.AppCompat.DayNight"

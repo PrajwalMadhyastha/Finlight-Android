@@ -17,6 +17,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -73,6 +75,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 transactionDao = db.transactionDao(),
                 settingsRepository = settingsRepository,
                 tagRepository = tagRepository,
+                deletedSmsHashDao = db.deletedSmsHashDao(),
             )
         accountRepository = AccountRepository(db)
         categoryRepository = CategoryRepository(db.categoryDao())
@@ -155,5 +158,58 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
 
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `feature transaction merge correctly deletes child and records smsHash`() =
+        runTest {
+            // Arrange
+            db.accountDao().insert(Account(id = 1, name = "Test Wallet", type = "Wallet"))
+            db.categoryDao().insert(Category(id = 1, name = "Food", iconKey = "food", colorKey = "red"))
+
+            val parentTxnId =
+                transactionRepository.insertTransactionWithTagsAndImages(
+                    Transaction(
+                        description = "Parent",
+                        amount = 100.0,
+                        date = System.currentTimeMillis(),
+                        accountId = 1,
+                        categoryId = 1,
+                        notes = "Parent note",
+                        transactionType = "expense"
+                    ),
+                    emptySet(),
+                    emptyList()
+                ).toLong()
+
+            val childTxnId =
+                transactionRepository.insertTransactionWithTagsAndImages(
+                    Transaction(
+                        description = "Child",
+                        amount = 50.0,
+                        date = System.currentTimeMillis(),
+                        accountId = 1,
+                        categoryId = 1,
+                        notes = "Child note",
+                        transactionType = "expense",
+                        sourceSmsHash = "xyz_hash_123"
+                    ),
+                    emptySet(),
+                    emptyList()
+                ).toLong()
+
+            // Act
+            transactionRepository.mergeTransactions(parentTxnId.toInt(), childTxnId.toInt())
+
+            // Assert
+            val deletedHashes = db.deletedSmsHashDao().getAllHashes()
+            assertTrue("Deleted hash should be recorded", deletedHashes.contains("xyz_hash_123"))
+
+            val parentTxn = transactionRepository.getTransactionSync(parentTxnId.toInt())
+            assertNotNull(parentTxn)
+            assertEquals(150.0, parentTxn?.amount ?: 0.0, 0.0)
+
+            val childTxn = transactionRepository.getTransactionSync(childTxnId.toInt())
+            assertNull("Child should be deleted", childTxn)
         }
 }
