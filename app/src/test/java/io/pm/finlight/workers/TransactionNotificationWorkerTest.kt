@@ -169,4 +169,49 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
             // Assert
             assertEquals(ListenableWorker.Result.retry(), result)
         }
+
+    @Test
+    fun `doWork handles income transaction and null summary correctly`() =
+        runTest {
+            // Arrange
+            val transactionId = 2
+            val details =
+                TransactionDetails(
+                    Transaction(id = transactionId, description = "Salary", amount = 5000.0, transactionType = "income", date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null, originalDescription = null),
+                    emptyList(),
+                    "Account",
+                    "Category",
+                    "icon",
+                    "color",
+                    null,
+                )
+            
+            coEvery { transactionDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
+            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns null
+            
+            val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to transactionId)
+            val worker =
+                TestListenableWorkerBuilder<TransactionNotificationWorker>(context)
+                    .setInputData(inputData)
+                    .build()
+
+            val totalCaptor = slot<Double>()
+            val visitCaptor = slot<Int>()
+
+            // Act
+            val result = worker.doWork()
+
+            // Assert
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify {
+                NotificationHelper.showRichTransactionNotification(
+                    context = any(),
+                    details = any(),
+                    monthlyTotal = capture(totalCaptor),
+                    visitCount = capture(visitCaptor),
+                )
+            }
+            assertEquals(0.0, totalCaptor.captured, 0.0) // null summary fallback to 0.0
+            assertEquals(0, visitCaptor.captured) // income transaction has 0 visit count
+        }
 }

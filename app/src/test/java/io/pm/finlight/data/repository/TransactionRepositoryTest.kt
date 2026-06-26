@@ -995,7 +995,30 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             repository.mergeTransactions(1, 2)
 
-            verify(deletedSmsHashDaoMock, never()).insert(org.mockito.kotlin.any())
+            verify(deletedSmsHashDaoMock, org.mockito.Mockito.never()).insert(org.mockito.kotlin.any())
+        }
+
+    @Test
+    fun `mergeTransactions formats notes correctly when childSmsBody is provided`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense")
+
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
+
+            repository.mergeTransactions(1, 2, "Test SMS body", 1000000L)
+
+            val notesCaptor = ArgumentCaptor.forClass(String::class.java)
+            verify(transactionDao).updateNotes(org.mockito.ArgumentMatchers.eq(1), notesCaptor.capture() ?: "")
+
+            val updatedNotes = notesCaptor.value
+            assertTrue(updatedNotes.contains("Merged on"))
+            assertTrue(updatedNotes.contains("Test SMS body"))
+            assertTrue(updatedNotes.contains("Parent note"))
         }
 
     @Test

@@ -483,6 +483,35 @@ class DashboardViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `visibleCards and allCards filter out recurring cards when recurring is disabled`() =
+        runTest {
+            // Arrange
+            val order = listOf(DashboardCardType.RECENT_TRANSACTIONS, DashboardCardType.UPCOMING_PAYMENTS, DashboardCardType.RECURRING_SUGGESTIONS)
+            val visible = setOf(DashboardCardType.RECENT_TRANSACTIONS, DashboardCardType.UPCOMING_PAYMENTS, DashboardCardType.RECURRING_SUGGESTIONS)
+            Mockito.`when`(settingsRepository.getDashboardCardOrder()).thenReturn(flowOf(order))
+            Mockito.`when`(settingsRepository.getDashboardVisibleCards()).thenReturn(flowOf(visible))
+            Mockito.`when`(settingsRepository.getRecurringTransactionsEnabled()).thenReturn(flowOf(false))
+            
+            initializeViewModel()
+
+            // Assert allCards
+            viewModel.allCards.test {
+                advanceUntilIdle()
+                val finalState = awaitItem()
+                assertEquals(listOf(DashboardCardType.RECENT_TRANSACTIONS), finalState)
+                cancelAndIgnoreRemainingEvents()
+            }
+            
+            // Assert visibleCards
+            viewModel.visibleCards.test {
+                advanceUntilIdle()
+                val finalState = awaitItem()
+                assertEquals(listOf(DashboardCardType.RECENT_TRANSACTIONS), finalState)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `dismissLastMonthSummaryCard calls repository and updates state`() =
         runTest {
             // Arrange - Force the time to be the 1st of the month
@@ -833,12 +862,30 @@ class DashboardViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `executeMerge calls repository`() =
+    fun `executeMerge calls repository and fetches SMS if sourceSmsId is present`() =
         runTest {
+            val childTxn = Transaction(
+                id = 2,
+                description = "Child",
+                amount = 100.0,
+                transactionType = "expense",
+                date = 0L,
+                accountId = 1,
+                categoryId = 1,
+                notes = null,
+                originalDescription = "Child",
+                sourceSmsId = 5
+            )
+            val sms = io.pm.finlight.SmsMessage(id = 5, sender = "Bank", body = "Test SMS body", date = 1000L)
+
+            `when`(transactionRepository.getTransactionSync(2)).thenReturn(childTxn)
+            `when`(smsRepository.getSmsDetailsById(5)).thenReturn(sms)
+
             initializeViewModel()
             viewModel.executeMerge(1, 2)
             advanceUntilIdle()
-            verify(transactionRepository).mergeTransactions(1, 2)
+            
+            verify(transactionRepository).mergeTransactions(1, 2, "Test SMS body", 1000L)
         }
 
     @Test

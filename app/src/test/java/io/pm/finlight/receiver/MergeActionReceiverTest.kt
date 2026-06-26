@@ -86,4 +86,37 @@ class MergeActionReceiverTest {
 
             coVerify(timeout = 2000) { anyConstructed<TransactionRepository>().dismissMerge(2) }
         }
+
+    @Test
+    fun `ACTION_MERGE fetches SMS if child transaction has sourceSmsId`() =
+        runTest {
+            val childTxn = io.pm.finlight.Transaction(
+                id = 2,
+                description = "Child",
+                amount = 100.0,
+                transactionType = "expense",
+                date = 0L,
+                accountId = 1,
+                categoryId = 1,
+                notes = null,
+                originalDescription = "Child",
+                sourceSmsId = 5
+            )
+            val sms = io.pm.finlight.SmsMessage(id = 5, sender = "Bank", body = "Test SMS body", date = 1000L)
+
+            coEvery { anyConstructed<TransactionRepository>().getTransactionSync(2) } returns childTxn
+            coEvery { anyConstructed<SmsRepository>().getSmsDetailsById(5) } returns sms
+
+            val intent =
+                Intent("ACTION_MERGE").apply {
+                    putExtra("parentTxnId", 1)
+                    putExtra("childTxnId", 2)
+                }
+
+            receiver.onReceive(context, intent)
+
+            coVerify(timeout = 2000) { 
+                anyConstructed<TransactionRepository>().mergeTransactions(1, 2, "Test SMS body", 1000L) 
+            }
+        }
 }
