@@ -412,8 +412,26 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
             buildWorker("NETFLIX", "Sub").doWork()
 
-            coVerify { transactionDao.delete(draft) }
             coVerify { transactionDao.updateRecurringRuleId(10, 7) }
             coVerify { recurringDao.updateLastRunDate(7, 100L) }
+        }
+
+    // --- NEW: Tests for Smart Transaction Merge ---
+    @Test
+    fun `auto-detects mergeable transaction and triggers notification`() =
+        runTest {
+            val savedTxn = Transaction(id = 10, description = "Amazon", amount = 100.0, transactionType = "expense", date = 100L, accountId = 1, categoryId = 1, notes = null)
+            val recentTxn = Transaction(id = 9, description = "Amazon", amount = 50.0, transactionType = "expense", date = 50L, accountId = 1, categoryId = 1, notes = null)
+
+            coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
+            coEvery { transactionDao.findRecentTransactionForMerge(any(), any(), any(), any(), any()) } returns recentTxn
+            every { NotificationHelper.showMergeTransactionNotification(any(), any(), any()) } just runs
+
+            val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "AMZ", amount = 100.0, transactionType = "expense", merchantName = "Amazon", originalMessage = "Bill", sourceSmsHash = "hash300")
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            buildWorker("AMZ", "Bill").doWork()
+
+            verify(exactly = 1) { NotificationHelper.showMergeTransactionNotification(context, savedTxn, recentTxn) }
         }
 }

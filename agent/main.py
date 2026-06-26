@@ -7,6 +7,8 @@ def main():
     parser = argparse.ArgumentParser(description="Autonomous QA Agent Runner")
     parser.add_argument("--goal", type=str, required=False, default="random", help="The high level testing goal.")
     parser.add_argument("--max-steps", type=int, default=100, help="Maximum number of steps the agent can take.")
+    parser.add_argument("--api-level", type=str, default="Unknown", help="API Level of the emulator")
+    parser.add_argument("--app-version", type=str, default="Unknown", help="App version being tested")
     
     args = parser.parse_args()
     
@@ -47,11 +49,39 @@ def main():
     else:
         print(f"Goal selected: {goal}")
         
+    import time
+    start_time = time.time()
+    
     # Run the loop
     result = loop.run_agent_loop(goal=goal, max_steps=args.max_steps, memory_text=memory_text)
     
+    execution_time_seconds = int(time.time() - start_time)
+    minutes = execution_time_seconds // 60
+    seconds = execution_time_seconds % 60
+    execution_time_str = f"{minutes} minutes {seconds} seconds" if minutes > 0 else f"{seconds} seconds"
+    
+    app_version = args.app_version
+    if app_version == "Unknown":
+        try:
+            import re
+            with open("version.properties", "r") as f:
+                content = f.read()
+                major = re.search(r"VERSION_MAJOR=(\d+)", content)
+                minor = re.search(r"VERSION_MINOR=(\d+)", content)
+                patch = re.search(r"VERSION_PATCH=(\d+)", content)
+                if major and minor and patch:
+                    app_version = f"{major.group(1)}.{minor.group(1)}.{patch.group(1)}"
+        except Exception:
+            pass
+
+    metadata = {
+        "App_Version": app_version,
+        "API_Level": args.api_level,
+        "Execution_Time": execution_time_str
+    }
+    
     # Generate the report
-    reporter.generate_report(goal, result)
+    reporter.generate_report(goal, result, metadata)
     
     # Exit with code 1 if it explicitly failed or was incomplete, helps CI know it failed
     if result.get("status", "").lower() != "pass":

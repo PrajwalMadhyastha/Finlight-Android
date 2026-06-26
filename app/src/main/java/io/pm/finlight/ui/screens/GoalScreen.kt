@@ -20,7 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,12 +51,7 @@ fun GoalScreen(
     var goalToDelete by remember { mutableStateOf<Goal?>(null) }
 
     Scaffold(
-        containerColor = Color.Transparent,
-        floatingActionButton = {
-            FloatingActionButton(onClick = { navController.navigate("add_edit_goal/new") }) {
-                Icon(Icons.Default.Add, contentDescription = "Add Goal")
-            }
-        }
+        containerColor = Color.Transparent
     ) { innerPadding ->
         if (goals.isEmpty()) {
             EmptyStateMessage(
@@ -121,12 +115,13 @@ private fun GoalItem(
     onDelete: () -> Unit,
     onClick: () -> Unit,
 ) {
-    // Dynamic progress from linked transactions
     val linkedTotal by goalViewModel.getLinkedTotal(goal.id).collectAsState(initial = 0.0)
+    val offlineTotal by goalViewModel.getTotalContributionForGoal(goal.id).collectAsState(initial = 0.0)
     val linkedCount by goalViewModel.getLinkedTransactionCount(goal.id).collectAsState(initial = 0)
     val linkedTransactions by goalViewModel.getLinkedTransactions(goal.id).collectAsState(initial = emptyList())
 
-    val progress = if (goal.targetAmount > 0) (linkedTotal / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+    val totalSaved = linkedTotal + offlineTotal
+    val progress = if (goal.targetAmount > 0) (totalSaved / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(durationMillis = 1000, easing = EaseOutCubic),
@@ -145,13 +140,13 @@ private fun GoalItem(
 
     // Calculate projected completion date
     val projectedDate =
-        remember(linkedTotal, linkedTransactions, goal.targetAmount) {
+        remember(linkedTotal, linkedTransactions, goal.targetAmount, totalSaved) {
             if (linkedTransactions.isEmpty() || linkedTotal <= 0) return@remember null
             val firstDate = linkedTransactions.minByOrNull { it.date }?.date ?: return@remember null
             val daysSinceFirst = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - firstDate).coerceAtLeast(1)
             val avgPerDay = linkedTotal / daysSinceFirst
             if (avgPerDay <= 0) return@remember null
-            val remainingAmount = goal.targetAmount - linkedTotal
+            val remainingAmount = goal.targetAmount - totalSaved
             if (remainingAmount <= 0) return@remember System.currentTimeMillis()
             val daysToComplete = remainingAmount / avgPerDay
             System.currentTimeMillis() + TimeUnit.DAYS.toMillis(daysToComplete.toLong())
@@ -177,10 +172,18 @@ private fun GoalItem(
                         strokeCap = StrokeCap.Round,
                         trackColor = Color.Transparent,
                     )
-                    if (!goal.iconEmoji.isNullOrBlank()) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (!goal.iconEmoji.isNullOrBlank()) {
+                            Text(
+                                text = goal.iconEmoji,
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
                         Text(
-                            text = goal.iconEmoji,
-                            style = MaterialTheme.typography.headlineMedium,
+                            text = "${(progress * 100).roundToInt()}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -225,6 +228,7 @@ private fun GoalItem(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
                     Text(
@@ -240,11 +244,19 @@ private fun GoalItem(
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "${currencyFormat.format(linkedTotal)} / ${currencyFormat.format(goal.targetAmount)}",
+                        text = "${currencyFormat.format(totalSaved)} / ${currencyFormat.format(goal.targetAmount)}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
+
+                    if (offlineTotal > 0.0) {
+                        Text(
+                            text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(offlineTotal)} offline)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
 
                     // Countdown or Projection
                     if (daysRemaining != null) {
@@ -261,6 +273,14 @@ private fun GoalItem(
                         )
                     }
                 }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = onClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("View & Link Transactions")
             }
         }
     }

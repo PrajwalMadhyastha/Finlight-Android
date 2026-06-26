@@ -23,6 +23,7 @@ import kotlinx.serialization.Serializable
         Index(value = ["accountId"]),
         Index(value = ["smsSignature"]),
         Index(value = ["date"]), // --- NEW: Add index for date-based queries ---
+        Index(value = ["parentReimbursementId"]), // --- NEW: Index for reimbursement lookups ---
     ],
     foreignKeys = [
         ForeignKey(
@@ -68,4 +69,10 @@ data class Transaction(
     val status: String = "CONFIRMED",
     // --- NEW: Links a PENDING draft back to its originating recurring rule ---
     val recurringRuleId: Int? = null,
+    // --- NEW: Flag to track if the user dismissed a merge prompt for this transaction ---
+    val mergeDismissed: Boolean = false,
+    // --- NEW: Links an income transaction back to the expense it is reimbursing.
+    // When set, this income transaction's amount has already been deducted from the
+    // parent expense, and this income is marked isExcluded = true.
+    val parentReimbursementId: Int? = null,
 )

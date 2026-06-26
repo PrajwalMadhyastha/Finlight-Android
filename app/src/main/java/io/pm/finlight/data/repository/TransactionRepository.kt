@@ -18,10 +18,14 @@ import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToLong
 
+import io.pm.finlight.data.db.dao.DeletedSmsHashDao
+import io.pm.finlight.data.db.entity.DeletedSmsHash
+
 class TransactionRepository(
     private val transactionDao: TransactionDao,
     private val settingsRepository: SettingsRepository,
     private val tagRepository: TagRepository,
+    private val deletedSmsHashDao: DeletedSmsHashDao,
 ) {
     // --- NEW: Function for Spending Velocity feature ---
     suspend fun getTotalExpensesSince(startDate: Long): Double {
@@ -195,6 +199,10 @@ class TransactionRepository(
 
     fun getTransactionById(id: Int): Flow<Transaction?> {
         return transactionDao.getTransactionById(id)
+    }
+
+    suspend fun getTransactionSync(id: Int): Transaction? {
+        return transactionDao.getTransactionByIdSync(id)
     }
 
     fun getTransactionsForAccount(accountId: Int): Flow<List<Transaction>> {
@@ -505,5 +513,111 @@ class TransactionRepository(
     // --- NEW: Expose the quick fill query ---
     fun getRecentManualTransactions(limit: Int): Flow<List<TransactionDetails>> {
         return transactionDao.getRecentManualTransactions(limit)
+    }
+
+    // --- NEW: Reimbursement / Offset Feature ---
+
+    fun getReimbursementsForExpense(expenseId: Int): Flow<List<TransactionDetails>> =
+        transactionDao.getReimbursementsForExpense(expenseId)
+
+    fun getCandidateReimbursements(excludeExpenseId: Int): Flow<List<TransactionDetails>> =
+        transactionDao.getCandidateReimbursements(excludeExpenseId)
+
+    fun getLinkedExpenseForReimbursement(incomeId: Int): Flow<TransactionDetails?> =
+        transactionDao.getLinkedExpenseForReimbursement(incomeId)
+
+    /**
+     * Links [incomeId] as a reimbursement for [expenseId]:
+     * - Sets parentReimbursementId on the income and marks it as excluded from totals.
+     * - Deducts the income amount from the expense, so budget/spending totals
+     *   automatically reflect the net cost.
+     */
+    suspend fun linkReimbursement(
+        incomeId: Int,
+        expenseId: Int
+    ) {
+        val incomeTxn = transactionDao.getTransactionByIdSync(incomeId) ?: return
+        val expenseTxn = transactionDao.getTransactionByIdSync(expenseId) ?: return
+        transactionDao.linkReimbursement(incomeId, expenseId)
+        val newExpenseAmount = (expenseTxn.amount - incomeTxn.amount).coerceAtLeast(0.0)
+        transactionDao.updateAmount(expenseId, newExpenseAmount)
+    }
+
+    /**
+     * Removes the reimbursement link from [incomeId]:
+     * - Clears parentReimbursementId and removes the excluded flag.
+     * - Adds the income amount back onto the parent expense.
+     */
+    suspend fun unlinkReimbursement(incomeId: Int) {
+        val incomeTxn = transactionDao.getTransactionByIdSync(incomeId) ?: return
+        val parentId = incomeTxn.parentReimbursementId ?: return
+        val expenseTxn = transactionDao.getTransactionByIdSync(parentId) ?: return
+        transactionDao.unlinkReimbursement(incomeId)
+        val restoredExpenseAmount = expenseTxn.amount + incomeTxn.amount
+        transactionDao.updateAmount(parentId, restoredExpenseAmount)
+    }
+
+    // --- NEW: Smart Transaction Merge ---
+    suspend fun findRecentTransactionForMerge(
+        merchant: String,
+        accountId: Int,
+        transactionType: String,
+        timeWindowStart: Long,
+        newTxnId: Int
+    ): Transaction? {
+        return transactionDao.findRecentTransactionForMerge(merchant, accountId, transactionType, timeWindowStart, newTxnId)
+    }
+
+    suspend fun dismissMerge(id: Int) {
+        transactionDao.updateMergeDismissed(id, true)
+    }
+
+    suspend fun mergeTransactions(
+        parentTxnId: Int,
+        childTxnId: Int,
+        childSmsBody: String? = null,
+        childSmsDate: Long? = null
+    ) {
+        val parentTxn = transactionDao.getTransactionByIdSync(parentTxnId)
+        val childTxn = transactionDao.getTransactionByIdSync(childTxnId)
+
+        if (parentTxn == null || childTxn == null) return
+
+        transactionDao.updateMergeDismissed(childTxnId, true)
+
+        val newAmount = parentTxn.amount + childTxn.amount
+        val newDate = maxOf(parentTxn.date, childTxn.date)
+
+        val existingNotes = parentTxn.notes ?: ""
+        val dateString =
+            if (childSmsDate != null) {
+                java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(childSmsDate))
+            } else {
+                java.util.Date(childTxn.date).toString()
+            }
+
+        val childNote =
+            if (childSmsBody != null) {
+                "Merged on $dateString:\n$childSmsBody"
+            } else {
+                "Merged Transaction: ${childTxn.amount} on $dateString"
+            }
+
+        val newNotes =
+            if (existingNotes.isBlank()) {
+                childNote
+            } else {
+                "$existingNotes\n\n$childNote"
+            }
+
+        transactionDao.updateAmount(parentTxnId, newAmount)
+        transactionDao.updateDate(parentTxnId, newDate)
+        transactionDao.updateNotes(parentTxnId, newNotes)
+
+        childTxn.sourceSmsHash?.let { hash ->
+            deletedSmsHashDao.insert(DeletedSmsHash(smsHash = hash))
+        }
+
+        transactionDao.delete(childTxn)
     }
 }

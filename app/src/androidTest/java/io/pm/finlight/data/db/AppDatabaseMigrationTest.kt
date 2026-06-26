@@ -10,6 +10,7 @@ import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_41_42
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_43_44
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_44_45
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_45_46
+import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_47_48
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -335,6 +336,91 @@ class AppDatabaseMigrationTest {
             assertTrue("Column 'transactionId' should exist in goal_transaction_links", foundTransactionId)
             cursor.close()
 
+            close()
+        }
+    }
+
+    /**
+     * Test MIGRATION_47_48: Creates goal_contributions table.
+     */
+    @Test
+    fun migrate47To48_createsGoalContributionsTable() {
+        helper.createDatabase(testDbName, 47).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 48, true, MIGRATION_47_48).apply {
+            val cursor = query("PRAGMA table_info(goal_contributions)")
+            var foundGoalId = false
+            var foundAmount = false
+            while (cursor.moveToNext()) {
+                val colName = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                if (colName == "goalId") foundGoalId = true
+                if (colName == "amount") foundAmount = true
+            }
+            assertTrue("Column 'goalId' should exist in goal_contributions", foundGoalId)
+            assertTrue("Column 'amount' should exist in goal_contributions", foundAmount)
+            cursor.close()
+
+            close()
+        }
+    }
+
+    /**
+     * Test MIGRATION_48_49: Adds mergeDismissed column to transactions
+     */
+    @Test
+    fun migrate48To49_addsMergeDismissedColumnToTransactions() {
+        helper.createDatabase(testDbName, 48).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 49, true, io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_48_49).apply {
+            val cursor = query("PRAGMA table_info(transactions)")
+            var found = false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "mergeDismissed") {
+                    found = true
+                    assertEquals(
+                        "mergeDismissed should default to 0 (false) and not null",
+                        1,
+                        cursor.getInt(cursor.getColumnIndexOrThrow("notnull")),
+                    )
+                    assertEquals("0", cursor.getString(cursor.getColumnIndexOrThrow("dflt_value")))
+                }
+            }
+            assertTrue("Column 'mergeDismissed' should exist in transactions table", found)
+            cursor.close()
+            close()
+        }
+    }
+
+    @Test
+    fun migrate49To50_addsParentReimbursementIdColumnToTransactions() {
+        helper.createDatabase(testDbName, 49).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 50, true, AppDatabase.MIGRATION_49_50).apply {
+            val cursor = query("PRAGMA table_info(transactions)")
+            var found = false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "parentReimbursementId") {
+                    found = true
+                    assertEquals(
+                        "parentReimbursementId should be nullable (notnull=0)",
+                        0,
+                        cursor.getInt(cursor.getColumnIndexOrThrow("notnull")),
+                    )
+                    val dfltValue = cursor.getString(cursor.getColumnIndexOrThrow("dflt_value"))
+                    assertTrue(
+                        "Default value should be NULL or string 'NULL'",
+                        dfltValue == null || dfltValue.equals("NULL", ignoreCase = true)
+                    )
+                }
+            }
+            assertTrue("Column 'parentReimbursementId' should exist in transactions table", found)
+            cursor.close()
             close()
         }
     }
