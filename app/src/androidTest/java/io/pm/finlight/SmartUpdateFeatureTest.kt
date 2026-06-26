@@ -5,8 +5,6 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
-import io.pm.finlight.data.db.AppDatabase
-import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
@@ -131,7 +129,7 @@ class SmartUpdateFeatureTest {
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty()
         }
-        
+
         val searchInput = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()
         searchInput.performTextClearance()
         searchInput.performTextInput("Starbucks Coffee")
@@ -140,7 +138,7 @@ class SmartUpdateFeatureTest {
 
         // 5. Hit Save to close Merchant Bottom Sheet
         composeTestRule.onNodeWithText("Save").performClick()
-        
+
         // Wait for the sheet to close and the detail screen to update
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Starbucks Coffee").fetchSemanticsNodes().isNotEmpty()
