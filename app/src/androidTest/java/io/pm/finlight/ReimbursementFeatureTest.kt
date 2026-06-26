@@ -36,7 +36,7 @@ class ReimbursementFeatureTest {
         val appDatabase = AppDatabase.getInstance(composeTestRule.activity.applicationContext)
         runBlocking {
             appDatabase.transactionDao().deleteAll()
-            
+
             val now = System.currentTimeMillis()
             val expenseId = 9001
             appDatabase.transactionDao().insert(
@@ -61,7 +61,7 @@ class ReimbursementFeatureTest {
                     date = now,
                     transactionType = "income",
                     notes = "",
-                    parentReimbursementId = expenseId // Link it!
+                    parentReimbursementId = expenseId
                 )
             )
         }
@@ -86,7 +86,7 @@ class ReimbursementFeatureTest {
 
         // Open Expense details
         composeTestRule.onNodeWithText("Group Dinner Expense", ignoreCase = true).performClick()
-        
+
         // Wait for detail screen
         composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule.onAllNodesWithText("Debit transaction", ignoreCase = true).fetchSemanticsNodes().isNotEmpty()
@@ -95,7 +95,7 @@ class ReimbursementFeatureTest {
         // Verify the linked repayment is shown
         composeTestRule.onNodeWithText("Repayments").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Alice Repayment").performScrollTo().assertIsDisplayed()
-        
+
         // Verify Net Cost calculation: 1500 - 500 = 1000
         composeTestRule.onNodeWithText("Net cost", substring = true, ignoreCase = true).performScrollTo().assertIsDisplayed()
     }
