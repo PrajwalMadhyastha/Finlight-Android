@@ -1092,6 +1092,7 @@ interface TransactionDao {
         WHERE (LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description))
         AND id != :excludeId
         AND isExcluded = 0 AND status != 'PENDING' AND status != 'SKIPPED'
+        ORDER BY date DESC
     """,
     )
     suspend fun findSimilarTransactions(

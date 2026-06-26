@@ -2061,6 +2061,15 @@ private fun RetrospectiveUpdateSheetContent(
                 Text("Apply Changes")
             }
         }
+        Text(
+            text = "Cancelling applies the edit only to this transaction — past transactions and future SMS will not be affected.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        )
     }
 }
 
