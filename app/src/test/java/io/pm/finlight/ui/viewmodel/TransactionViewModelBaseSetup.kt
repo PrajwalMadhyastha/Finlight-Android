@@ -2,30 +2,19 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import app.cash.turbine.test
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.core.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.data.db.entity.*
-import io.pm.finlight.data.model.MerchantPrediction
-import io.pm.finlight.ui.components.ShareableField
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
-import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyLong
@@ -33,16 +22,8 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
-import org.mockito.kotlin.argumentCaptor
-import org.mockito.kotlin.capture
-import org.mockito.kotlin.eq
-import org.mockito.kotlin.never
 import org.mockito.kotlin.times
-import org.mockito.kotlin.verify
 import org.robolectric.annotation.Config
-import java.lang.RuntimeException
-import java.util.Calendar
-import kotlin.time.Duration.Companion.seconds
 import org.mockito.Mockito.`when` as whenever
 
 @ExperimentalCoroutinesApi
@@ -53,29 +34,50 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
 
     // Mocks for all dependencies
     @Mock protected lateinit var db: AppDatabase
+
     @Mock protected lateinit var transactionRepository: TransactionRepository
+
     @Mock protected lateinit var accountRepository: AccountRepository
+
     @Mock protected lateinit var categoryRepository: CategoryRepository
+
     @Mock protected lateinit var tagRepository: TagRepository
+
     @Mock protected lateinit var settingsRepository: SettingsRepository
+
     @Mock protected lateinit var smsRepository: SmsRepository
+
     @Mock protected lateinit var merchantRenameRuleRepository: MerchantRenameRuleRepository
+
     @Mock protected lateinit var merchantCategoryMappingRepository: MerchantCategoryMappingRepository
+
     @Mock protected lateinit var merchantMappingRepository: MerchantMappingRepository
+
     @Mock protected lateinit var splitTransactionRepository: SplitTransactionRepository
+
     @Mock protected lateinit var smsParseTemplateDao: SmsParseTemplateDao
 
     // Mocks for DAOs used by the ViewModel and internal logic
     @Mock protected lateinit var accountDao: AccountDao
+
     @Mock protected lateinit var categoryDao: CategoryDao
+
     @Mock protected lateinit var tagDao: TagDao
+
     @Mock protected lateinit var transactionDao: TransactionDao
+
     @Mock protected lateinit var customSmsRuleDao: CustomSmsRuleDao
+
     @Mock protected lateinit var ignoreRuleDao: IgnoreRuleDao
+
     @Mock protected lateinit var splitTransactionDao: SplitTransactionDao
+
     @Mock protected lateinit var merchantCategoryMappingDao: MerchantCategoryMappingDao
+
     @Mock protected lateinit var merchantRenameRuleDao: MerchantRenameRuleDao
+
     @Mock protected lateinit var accountAliasDao: AccountAliasDao
+
     @Mock protected lateinit var deletedSmsHashDao: io.pm.finlight.data.db.dao.DeletedSmsHashDao
 
     protected lateinit var viewModel: TransactionViewModel
