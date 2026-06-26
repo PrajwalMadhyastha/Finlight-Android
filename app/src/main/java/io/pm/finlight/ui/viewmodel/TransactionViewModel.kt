@@ -532,18 +532,23 @@ class TransactionViewModel(
             val originalDescriptionForSearch = initial.originalDescription ?: initial.description
             val similar = transactionRepository.findSimilarTransactions(originalDescriptionForSearch, initial.id)
 
-            if (similar.isNotEmpty()) {
-                // Pass totalMatchingCount = similar.size + 1 (the current transaction itself)
-                // so performBatchUpdate can correctly evaluate "did the user select ALL?"
+            // --- FIX: Filter out past transactions that already have the new name or category
+            val actionableSimilar = similar.filter { txn ->
+                val needsDescUpdate = descriptionChanged && !txn.description.equals(current.description, ignoreCase = true)
+                val needsCatUpdate = categoryChanged && txn.categoryId != current.categoryId
+                needsDescUpdate || needsCatUpdate
+            }
+
+            if (actionableSimilar.isNotEmpty()) {
                 _retroUpdateSheetState.value =
                     RetroUpdateSheetState(
                         originalDescription = originalDescriptionForSearch,
                         newDescription = if (descriptionChanged) current.description else null,
                         newCategoryId = if (categoryChanged) current.categoryId else null,
-                        similarTransactions = similar,
-                        selectedIds = similar.map { it.id }.toSet(),
+                        similarTransactions = actionableSimilar,
+                        selectedIds = actionableSimilar.map { it.id }.toSet(),
                         isLoading = false,
-                        totalMatchingCount = similar.size + 1,
+                        totalMatchingCount = similar.size + 1, // Keep original count in case needed for metrics
                         updateFutureTransactions = true,
                     )
             } else {
