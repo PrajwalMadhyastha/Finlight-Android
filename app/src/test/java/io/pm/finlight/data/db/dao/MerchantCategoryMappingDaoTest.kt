@@ -2,6 +2,7 @@ package io.pm.finlight.data.db.dao
 
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.pm.finlight.Category
 import io.pm.finlight.MerchantCategoryMapping
 import io.pm.finlight.MerchantCategoryMappingDao
 import io.pm.finlight.TestApplication
@@ -35,6 +36,7 @@ class MerchantCategoryMappingDaoTest {
     fun `getCategoryIdForMerchant retrieves correct category ID`() =
         runTest {
             // Arrange
+            dbRule.db.categoryDao().insert(Category(id = 4, name = "Food"))
             val mapping = MerchantCategoryMapping(parsedName = "Zomato", categoryId = 4) // Assuming 4 is Food
             merchantCategoryMappingDao.insert(mapping)
 
@@ -51,6 +53,7 @@ class MerchantCategoryMappingDaoTest {
     fun `getAll returns all mappings`() =
         runTest {
             // Arrange
+            dbRule.db.categoryDao().insert(Category(id = 1, name = "Misc"))
             val mappings =
                 listOf(
                     MerchantCategoryMapping("Zomato", 1),
@@ -69,6 +72,7 @@ class MerchantCategoryMappingDaoTest {
     fun `deleteAll removes all mappings`() =
         runTest {
             // Arrange
+            dbRule.db.categoryDao().insert(Category(id = 1, name = "Misc"))
             val mappings =
                 listOf(
                     MerchantCategoryMapping("Zomato", 1),

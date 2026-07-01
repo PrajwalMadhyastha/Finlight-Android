@@ -74,11 +74,15 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithText("Merge Suggestion").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Verify the suggestion card is displayed
+        // Scroll to the suggestion card and verify it's displayed
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasText("Merge Suggestion"))
         composeTestRule.onNodeWithText("Merge Suggestion").assertIsDisplayed()
 
         // Click dismiss
-        composeTestRule.onNodeWithContentDescription("Dismiss").performClick()
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasTestTag("dismiss_merge_button"))
+        composeTestRule.onNodeWithTag("dismiss_merge_button").performClick()
 
         // Verify card disappears
         composeTestRule.waitUntil(timeoutMillis = 5000) {
@@ -97,11 +101,13 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithText("Merge Suggestion").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Verify the suggestion card is displayed
+        // Scroll to the suggestion card and verify it's displayed
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasText("Merge Suggestion"))
         composeTestRule.onNodeWithText("Merge Suggestion").assertIsDisplayed()
 
         // Click merge
-        composeTestRule.onNodeWithTag("dashboard_lazy_column").performScrollToNode(androidx.compose.ui.test.hasTestTag("merge_button"))
+        composeTestRule.onNodeWithTag("dashboard_lazy_column").performScrollToNode(hasTestTag("merge_button"))
         composeTestRule.onNodeWithTag("merge_button").performClick()
 
         // Verify card disappears
