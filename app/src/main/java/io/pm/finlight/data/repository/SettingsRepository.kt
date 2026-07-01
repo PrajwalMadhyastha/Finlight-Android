@@ -496,13 +496,15 @@ class SettingsRepository(context: Context) {
             val names: List<String> = gson.fromJson(json, type)
             val savedList =
                 names.mapNotNull { name ->
-                    runCatching {
+                    try {
                         if (name == "RECENT_ACTIVITY") {
                             DashboardCardType.RECENT_TRANSACTIONS
                         } else {
                             DashboardCardType.valueOf(name)
                         }
-                    }.getOrNull()
+                    } catch (e: IllegalArgumentException) {
+                        null
+                    }
                 }
             val missingCards = DashboardCardType.entries.filter { it !in savedList }
             savedList + missingCards
@@ -529,13 +531,15 @@ class SettingsRepository(context: Context) {
             val names: Set<String> = gson.fromJson(json, type)
             val savedVisible =
                 names.mapNotNull { name ->
-                    runCatching {
+                    try {
                         if (name == "RECENT_ACTIVITY") {
                             DashboardCardType.RECENT_TRANSACTIONS
                         } else {
                             DashboardCardType.valueOf(name)
                         }
-                    }.getOrNull()
+                    } catch (e: IllegalArgumentException) {
+                        null
+                    }
                 }.toSet()
 
             val orderJson = sp.getString(KEY_DASHBOARD_CARD_ORDER, null)
@@ -544,13 +548,15 @@ class SettingsRepository(context: Context) {
                     val orderType = object : TypeToken<List<String>>() {}.type
                     val orderNames: List<String> = gson.fromJson(orderJson, orderType)
                     orderNames.mapNotNull { name ->
-                        runCatching {
+                        try {
                             if (name == "RECENT_ACTIVITY") {
                                 DashboardCardType.RECENT_TRANSACTIONS
                             } else {
                                 DashboardCardType.valueOf(name)
                             }
-                        }.getOrNull()
+                        } catch (e: IllegalArgumentException) {
+                            null
+                        }
                     }.toSet()
                 } else {
                     emptySet()
