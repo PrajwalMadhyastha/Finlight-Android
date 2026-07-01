@@ -53,5 +53,4 @@ class WorkerIntegrationTest {
     fun tearDownWorkManager() {
         androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase()
     }
-
 }

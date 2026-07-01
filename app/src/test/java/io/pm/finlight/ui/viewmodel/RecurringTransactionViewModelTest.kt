@@ -183,5 +183,4 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
     fun tearDownWorkManager() {
         androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase()
     }
-
 }
