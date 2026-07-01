@@ -73,6 +73,24 @@ class SmsRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
+    fun `fetchAllSms respects limit parameter`() {
+        // Arrange
+        val cursor = MatrixCursor(smsColumns)
+        cursor.addRow(arrayOf(1L, "Sender1", "Body1", 1000L))
+        cursor.addRow(arrayOf(2L, "Sender2", "Body2", 2000L))
+        cursor.addRow(arrayOf(3L, "Sender3", "Body3", 3000L))
+        `when`(contentResolver.query(any(Uri::class.java), any(), any(), any(), any())).thenReturn(cursor)
+
+        // Act
+        val result = repository.fetchAllSms(null, limit = 2)
+
+        // Assert
+        assertEquals(2, result.size)
+        assertEquals(1L, result[0].id)
+        assertEquals(2L, result[1].id)
+    }
+
+    @Test
     fun `fetchAllSms with startDate applies correct selection`() {
         // Arrange
         val startDate = 500L

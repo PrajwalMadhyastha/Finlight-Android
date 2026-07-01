@@ -10,11 +10,21 @@ package io.pm.finlight.ml
 import android.content.Context
 
 object MlModelFactory {
+    @Volatile
+    private var classifierInstance: SmsClassifier? = null
+
+    @Volatile
+    private var nerExtractorInstance: NerExtractor? = null
+
     fun getClassifier(context: Context): SmsClassifier {
-        return SmsClassifier(context)
+        return classifierInstance ?: synchronized(this) {
+            classifierInstance ?: SmsClassifier(context.applicationContext).also { classifierInstance = it }
+        }
     }
 
     fun getNerExtractor(context: Context): NerExtractor {
-        return NerExtractor(context)
+        return nerExtractorInstance ?: synchronized(this) {
+            nerExtractorInstance ?: NerExtractor(context.applicationContext).also { nerExtractorInstance = it }
+        }
     }
 }

@@ -15,8 +15,11 @@
 // =================================================================================
 package io.pm.finlight.workers
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.MerchantMappingRepository
@@ -43,13 +46,18 @@ class SmsCatchupWorker(
     override suspend fun doWork(): Result {
         Log.d(tag, "Starting catch-up scan for missed SMS transactions...")
 
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            Log.w(tag, "READ_SMS permission not granted. Aborting catch-up scan.")
+            return Result.failure()
+        }
+
         val db = AppDatabase.getInstance(context)
         val settingsRepository = SettingsRepository(context)
         val saver = SmsTransactionSaver(db, settingsRepository)
         val smsRepository = SmsRepository(context)
 
         val startDate = System.currentTimeMillis() - lookbackMs
-        val recentSms: List<SmsMessage> = smsRepository.fetchAllSms(startDate)
+        val recentSms: List<SmsMessage> = smsRepository.fetchAllSms(startDate, limit = 200)
 
         if (recentSms.isEmpty()) {
             Log.d(tag, "No SMS messages found in the last 48 hours. Nothing to catch up.")
@@ -138,8 +146,7 @@ class SmsCatchupWorker(
                 }
             }
         } finally {
-            classifier.close()
-            nerExtractor.close()
+            // ML models are now singletons and should not be closed.
         }
 
         if (savedCount > 0) {

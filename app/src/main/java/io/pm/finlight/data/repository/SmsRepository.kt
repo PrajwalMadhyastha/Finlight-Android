@@ -19,7 +19,10 @@ class SmsRepository(private val context: Context) {
      * Fetches all SMS messages from the device's inbox.
      * @return A list of SmsMessage objects.
      */
-    fun fetchAllSms(startDate: Long?): List<SmsMessage> {
+    fun fetchAllSms(
+        startDate: Long?,
+        limit: Int? = null
+    ): List<SmsMessage> {
         val smsList = mutableListOf<SmsMessage>()
         // Define the columns we want to retrieve
         val projection =
@@ -35,14 +38,15 @@ class SmsRepository(private val context: Context) {
         if (startDate != null) {
             selection = "${Telephony.Sms.DATE} >= ?"
             selectionArgs = arrayOf(startDate.toString())
-            Log.d("SmsRepository", "Querying SMS with start date: $startDate")
+            Log.d("SmsRepository", "Querying SMS with start date: $startDate" + (if (limit != null) " (limit: $limit)" else ""))
         } else {
             selection = null
             selectionArgs = null
-            Log.d("SmsRepository", "Querying all SMS messages.")
+            Log.d("SmsRepository", "Querying all SMS messages." + (if (limit != null) " (limit: $limit)" else ""))
         }
 
-        // Query the SMS inbox, sorting by date in descending order
+        // We use cursor limiting for broader compatibility across Android versions
+        // instead of appending LIMIT to the sortOrder.
         val cursor =
             context.contentResolver.query(
                 Telephony.Sms.Inbox.CONTENT_URI,
@@ -59,7 +63,8 @@ class SmsRepository(private val context: Context) {
             val bodyIndex = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
             val dateIndex = it.getColumnIndexOrThrow(Telephony.Sms.DATE)
 
-            while (it.moveToNext()) {
+            var count = 0
+            while (it.moveToNext() && (limit == null || count < limit)) {
                 smsList.add(
                     SmsMessage(
                         id = it.getLong(idIndex),
@@ -68,6 +73,7 @@ class SmsRepository(private val context: Context) {
                         date = it.getLong(dateIndex),
                     ),
                 )
+                count++
             }
         }
         return smsList

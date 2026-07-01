@@ -57,6 +57,7 @@ class ReminderManagerTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
+        androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase()
         super.tearDown()
         // Cancel all work after each test to ensure a clean state
         workManager.cancelAllWork()

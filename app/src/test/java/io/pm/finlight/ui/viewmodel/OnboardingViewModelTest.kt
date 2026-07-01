@@ -73,6 +73,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
+        androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase()
         // Clean up static mocks after tests
         unmockkObject(ReminderManager)
         super.tearDown()

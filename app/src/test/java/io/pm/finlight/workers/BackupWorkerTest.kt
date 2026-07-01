@@ -90,6 +90,7 @@ class BackupWorkerTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
+        androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase()
         unmockkConstructor(SettingsRepository::class)
         unmockkConstructor(BackupManager::class) // <-- NEW
         unmockkObject(DataExportService) // <-- NEW
