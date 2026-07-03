@@ -88,4 +88,27 @@ class NotificationDeepLinkTests {
             scenario.close()
         }
     }
+
+    @Test
+    fun test_deepLinkToTransactionDetailScreen() {
+        // Deep link to transaction detail (transaction ID 1 is seeded by SeedDatabaseRule)
+        val intent =
+            Intent(baseIntent).apply {
+                data = Uri.parse("app://finlight.pm.io/transaction_detail/1")
+            }
+
+        val scenario = ActivityScenario.launch<MainActivity>(intent)
+
+        try {
+            // Wait for the TransactionDetailScreen to load
+            composeTestRule.waitUntil(timeoutMillis = 15000) {
+                composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
+            }
+
+            // Verify the screen actually loaded
+            composeTestRule.onNodeWithTag("transaction_detail_lazy_column").assertIsDisplayed()
+        } finally {
+            scenario.close()
+        }
+    }
 }
