@@ -57,7 +57,7 @@ fun MergeSuggestionCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp).testTag("dismiss_merge_button")) {
                     Icon(
                         imageVector = Icons.Rounded.Close,
                         contentDescription = "Dismiss",

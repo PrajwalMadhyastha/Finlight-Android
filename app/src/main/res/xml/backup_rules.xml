@@ -2,18 +2,27 @@
 <!--
 // =================================================================================
 // FILE: ./app/src/main/res/xml/backup_rules.xml
-// REASON: FIX - Added an <include> rule for the "file" domain. This is required
-// for the subsequent <exclude> rule to be valid, as you can only exclude a path
-// that is part of an included set. This resolves the lintVitalRelease build error.
+// REASON: FIX (Audit #228 / F-03) - Removed the <include domain="database"> rule.
+// The database is encrypted with SQLCipher using a key stored in the Android Keystore.
+// The Keystore key is hardware-bound and NOT included in backups, which means any
+// restored database file would be permanently unreadable. Including it provides a
+// false sense of backup security. The API 31+ data_extraction_rules.xml already
+// omits the database domain for cloud-backup — this aligns the legacy rules file
+// to the same, correct policy.
 // =================================================================================
 -->
 <full-backup-content>
     <!-- Include the shared preferences file -->
     <include domain="sharedpref" path="."/>
-    <!-- Include the entire database -->
-    <include domain="database" path="."/>
+
     <!--
-    NEW: Include all files in the app's internal storage directory.
+    DO NOT include the 'database' domain. The database is encrypted with SQLCipher
+    using a key that lives in the Android Keystore (hardware-backed, non-exportable).
+    A restored .db file would be permanently unreadable without the original Keystore key.
+    -->
+
+    <!--
+    Include all files in the app's internal storage directory.
     This is necessary so we can then exclude a specific subdirectory from it.
     -->
     <include domain="file" path="."/>
@@ -21,7 +30,6 @@
     <!--
     Exclude the 'attachments' directory. This directory contains user-uploaded
     images like profile pictures, which can be large and are not critical to back up.
-    The primary database snapshot is the most important part of the backup.
     -->
     <exclude domain="file" path="attachments/" />
 

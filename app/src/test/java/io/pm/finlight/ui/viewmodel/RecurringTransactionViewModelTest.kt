@@ -34,6 +34,7 @@ import org.mockito.Mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
+import org.junit.After
 
 @org.junit.Ignore("Temporarily disabled (Issue #105)")
 @ExperimentalCoroutinesApi
@@ -177,4 +178,9 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             val expectedPattern = pattern.copy(isDismissed = true)
             verify(recurringPatternDao).update(expectedPattern)
         }
+
+    @After
+    fun tearDownWorkManager() {
+        androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase()
+    }
 }

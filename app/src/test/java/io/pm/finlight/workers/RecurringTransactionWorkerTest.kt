@@ -72,6 +72,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
+        androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase()
         unmockkAll()
         super.tearDown()
     }

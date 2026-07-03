@@ -91,6 +91,7 @@ class DailyReportWorkerTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
+        androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase()
         // Clear all MockK mocks after each test.
         unmockkAll()
         super.tearDown()

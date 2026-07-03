@@ -117,7 +117,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             val sms3 = SmsMessage(3, "Sender3", "Not parsed", 3L)
             val successTxnRule = CustomSmsRule(1, "spent Rs", "on (.+)", "spent Rs ([\\d,.]+)", null, null, null, null, 10, "")
 
-            `when`(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms1, sms2, sms3))
+            `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull())).thenReturn(listOf(sms1, sms2, sms3))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
             `when`(smsClassifier.classify(sms2.body)).thenReturn(0.05f) // Should be ignored
             `when`(smsClassifier.classify(sms3.body)).thenReturn(0.9f)
@@ -154,7 +154,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             val sms2 = SmsMessage(2, "S2", "Problem", 2L)
             val successTxnRule = CustomSmsRule(1, "spent Rs", null, "spent Rs ([\\d,.]+)", null, null, null, null, 10, "")
 
-            `when`(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms1, sms2))
+            `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull())).thenReturn(listOf(sms1, sms2))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
             `when`(smsClassifier.classify(sms2.body)).thenReturn(0.9f)
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule))) // Will parse sms1
@@ -189,7 +189,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             setupDefaultDaoBehaviors()
             val initialSms = List(100) { SmsMessage(it.toLong(), "Sender", "Body", it.toLong()) }
             val moreSms = List(200) { SmsMessage(it.toLong(), "Sender", "Body", it.toLong()) }
-            `when`(smsRepository.fetchAllSms(null)).thenReturn(initialSms).thenReturn(moreSms)
+            `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull())).thenReturn(initialSms).thenReturn(moreSms)
             `when`(smsClassifier.classify(anyString())).thenReturn(0.0f) // Ignore all for simplicity
             initializeViewModel()
 
@@ -239,7 +239,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             var capturedSource: String? = null
 
             // Mocks for the INITIAL scan (no custom rules)
-            `when`(smsRepository.fetchAllSms(any())).thenReturn(listOf(sms1))
+            `when`(smsRepository.fetchAllSms(anyObject(), org.mockito.ArgumentMatchers.isNull())).thenReturn(listOf(sms1))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
             `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
@@ -305,7 +305,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                     sourceSmsBody = sms.body,
                 )
 
-            `when`(smsRepository.fetchAllSms(anyObject())).thenReturn(listOf(sms))
+            `when`(smsRepository.fetchAllSms(anyObject(), org.mockito.ArgumentMatchers.isNull())).thenReturn(listOf(sms))
             `when`(smsClassifier.classify(sms.body)).thenReturn(0.9f)
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList())).thenReturn(flowOf(listOf(successTxnRule)))
             // Mocks for failure
@@ -356,7 +356,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             // "Swiggy" matches "Food & Drinks" (ID 4)
             // Adding "Spent" and a period to trigger merchant extraction via regex
             val sms = SmsMessage(1, "S1", "Spent Rs 500 at Swiggy.", 1L)
-            `when`(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms))
+            `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull())).thenReturn(listOf(sms))
             `when`(smsClassifier.classify(anyString())).thenReturn(0.9f)
             `when`(nerExtractor.extract(anyString())).thenReturn(emptyMap())
             `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)

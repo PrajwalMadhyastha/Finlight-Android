@@ -54,7 +54,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         GoalTransactionLink::class,
         GoalContribution::class,
     ],
-    version = 50,
+    version = 51,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -102,7 +102,10 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // --- All existing migrations (1-2 through 41-42) remain here ---
+        // NOTE (Audit #228): Schema JSON exports start from version 32 as an informed decision —
+        // there are no users running a schema version below 32 in production. The full migration
+        // chain from v1→v50 is implemented and registered below, so Room can always migrate any
+        // installed version to current without requiring the intermediate schema files.
         val MIGRATION_1_2 =
             object : Migration(1, 2) {
                 override fun migrate(db: SupportSQLiteDatabase) {
@@ -799,9 +802,45 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 50→51: Add FK + index on merchant_category_mapping.categoryId (Audit #228 / F-11) ---
+        // SQLite cannot add foreign keys to existing tables via ALTER TABLE; the table must be
+        // recreated. Data is preserved by copying rows before dropping the old table.
+        val MIGRATION_50_51 =
+            object : Migration(50, 51) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `merchant_category_mapping_new` (
+                            `parsedName` TEXT NOT NULL,
+                            `categoryId` INTEGER NOT NULL,
+                            PRIMARY KEY(`parsedName`),
+                            FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON DELETE CASCADE
+                        )
+                    """,
+                    )
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_merchant_category_mapping_categoryId` ON `merchant_category_mapping_new` (`categoryId`)")
+                    // Copy rows; any orphaned rows (categoryId not in categories) are dropped here,
+                    // which is exactly what the new FK would have prevented in the first place.
+                    db.execSQL(
+                        """
+                        INSERT OR IGNORE INTO `merchant_category_mapping_new` (parsedName, categoryId)
+                        SELECT parsedName, categoryId FROM `merchant_category_mapping`
+                        WHERE categoryId IN (SELECT id FROM categories)
+                    """,
+                    )
+                    db.execSQL("DROP TABLE `merchant_category_mapping`")
+                    db.execSQL("ALTER TABLE `merchant_category_mapping_new` RENAME TO `merchant_category_mapping`")
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
+        }
+
+        @androidx.annotation.VisibleForTesting
+        fun clearTestInstance() {
+            INSTANCE = null
         }
 
         fun getInstance(context: Context): AppDatabase {
@@ -836,8 +875,13 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_47_48,
                             MIGRATION_48_49,
                             MIGRATION_49_50,
+                            MIGRATION_50_51,
                         )
-                        .fallbackToDestructiveMigration()
+                        // NOTE (Audit #228): fallbackToDestructiveMigration() has been intentionally
+                        // removed. For a financial data app, silently wiping the database is worse
+                        // than a crash. If a migration path is missing or corrupt, Room will throw
+                        // an IllegalStateException, which is the correct fail-loud behaviour.
+                        // The full v1→v50 migration chain is registered above — no gaps exist.
                         .addCallback(DatabaseCallback(context))
                         .build()
                 INSTANCE = instance

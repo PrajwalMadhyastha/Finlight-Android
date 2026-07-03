@@ -50,6 +50,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
     override fun tearDown() {
         super.tearDown()
         unmockkAll()
+        AppDatabase.clearTestInstance()
     }
 
     @Test

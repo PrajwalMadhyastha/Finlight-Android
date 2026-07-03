@@ -5,9 +5,12 @@
 // =================================================================================
 package io.pm.finlight.workers
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.*
@@ -99,7 +102,10 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
         coEvery { deletedSmsHashDao.getAllHashes() } returns emptyList()
 
         mockkConstructor(SmsRepository::class)
-        coEvery { anyConstructed<SmsRepository>().fetchAllSms(any()) } returns emptyList()
+        coEvery { anyConstructed<SmsRepository>().fetchAllSms(any(), any()) } returns emptyList()
+
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), Manifest.permission.READ_SMS) } returns PackageManager.PERMISSION_GRANTED
 
         coEvery { merchantMappingDao.getAllMappings() } returns flowOf(emptyList())
         coEvery { transactionDao.getAllSmsHashes() } returns flowOf(emptyList())
@@ -138,6 +144,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
+        androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase()
         unmockkAll()
         super.tearDown()
     }
@@ -145,7 +152,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
     @Test
     fun `returns success when no recent SMS are found`() =
         runTest {
-            coEvery { anyConstructed<SmsRepository>().fetchAllSms(any()) } returns emptyList()
+            coEvery { anyConstructed<SmsRepository>().fetchAllSms(any(), any()) } returns emptyList()
 
             val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
             val result = worker.doWork()
@@ -158,7 +165,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
     fun `recovers missed transaction silently`() =
         runTest {
             val sms = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
-            coEvery { anyConstructed<SmsRepository>().fetchAllSms(any()) } returns listOf(sms)
+            coEvery { anyConstructed<SmsRepository>().fetchAllSms(any(), any()) } returns listOf(sms)
 
             val txn =
                 PotentialTransaction(
@@ -185,7 +192,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
     fun `skips transaction already in database`() =
         runTest {
             val sms = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
-            coEvery { anyConstructed<SmsRepository>().fetchAllSms(any()) } returns listOf(sms)
+            coEvery { anyConstructed<SmsRepository>().fetchAllSms(any(), any()) } returns listOf(sms)
 
             val txn =
                 PotentialTransaction(
@@ -212,7 +219,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
             // Two identical SMS messages in the inbox
             val sms1 = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
             val sms2 = SmsMessage(2L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis() + 1000)
-            coEvery { anyConstructed<SmsRepository>().fetchAllSms(any()) } returns listOf(sms1, sms2)
+            coEvery { anyConstructed<SmsRepository>().fetchAllSms(any(), any()) } returns listOf(sms1, sms2)
 
             val txn =
                 PotentialTransaction(
@@ -236,7 +243,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
     fun `skips transaction whose hash is in the deleted deny-list`() =
         runTest {
             val sms = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
-            coEvery { anyConstructed<SmsRepository>().fetchAllSms(any()) } returns listOf(sms)
+            coEvery { anyConstructed<SmsRepository>().fetchAllSms(any(), any()) } returns listOf(sms)
 
             val txn =
                 PotentialTransaction(
@@ -260,5 +267,25 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
             assertEquals(ListenableWorker.Result.success(), result)
             // Must NOT be re-created
             coVerify(exactly = 0) { transactionDao.insert(any()) }
+        }
+
+    @Test
+    fun `doWork returns failure when READ_SMS permission is denied`() =
+        runTest {
+            every { ContextCompat.checkSelfPermission(any(), Manifest.permission.READ_SMS) } returns PackageManager.PERMISSION_DENIED
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+        }
+
+    @Test
+    fun `doWork requests limit of 200 from SmsRepository`() =
+        runTest {
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            worker.doWork()
+
+            coVerify { anyConstructed<SmsRepository>().fetchAllSms(any(), eq(200)) }
         }
 }

@@ -7,6 +7,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_39_40
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_40_41
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_41_42
+import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_42_43
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_43_44
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_44_45
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_45_46
@@ -22,11 +23,24 @@ import org.junit.runner.RunWith
  * These tests use Room's MigrationTestHelper to verify database migrations work correctly.
  * They create temporary test databases and DO NOT affect the actual app database.
  *
- * Tested Migrations:
+ * Tested Migrations (39→51):
  * - 39→40: Add index on transactions.date
  * - 40→41: Deduplicate sms_parse_templates and add UNIQUE index
  * - 41→42: Recreate sms_parse_templates table with new schema
  * - 42→43: Add transactionType column to custom_sms_rules
+ * - 43→44: Add needsReview column to transactions
+ * - 44→45: Create deleted_sms_hashes table
+ * - 45→46: Add recurring transaction fields (status, smsSenderId, etc.)
+ * - 46→47: Create goal_transaction_links table
+ * - 47→48: Create goal_contributions table
+ * - 48→49: Add mergeDismissed column to transactions
+ * - 49→50: Add parentReimbursementId column to transactions
+ * - 50→51: Add categoryId ForeignKey to merchant_category_mapping
+ *
+ * NOTE (Audit #228): Migrations 1→38 do not have individual test cases. This is an
+ * informed decision — there are no users in production running a schema version below 32,
+ * and schema export JSON files are only available from v32 onward (a prerequisite for
+ * MigrationTestHelper). The full migration chain is registered and functional.
  *
  * NOTE: These are instrumented tests and must run on a device/emulator.
  */
@@ -178,6 +192,34 @@ class AppDatabaseMigrationTest {
             assertEquals("Should have 1 record (old data was dropped)", 1, countCursor.getInt(0))
             countCursor.close()
 
+            close()
+        }
+    }
+
+    /**
+     * Test MIGRATION_42_43: Adds transactionType column to custom_sms_rules
+     */
+    @Test
+    fun migrate42To43_addsTransactionTypeToCustomSmsRules() {
+        helper.createDatabase(testDbName, 42).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 43, true, MIGRATION_42_43).apply {
+            val cursor = query("PRAGMA table_info(custom_sms_rules)")
+            var found = false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(cursor.getColumnIndexOrThrow("name")) == "transactionType") {
+                    found = true
+                    assertEquals(
+                        "transactionType should be nullable (notnull=0)",
+                        0,
+                        cursor.getInt(cursor.getColumnIndexOrThrow("notnull")),
+                    )
+                }
+            }
+            assertTrue("Column 'transactionType' should exist in custom_sms_rules table", found)
+            cursor.close()
             close()
         }
     }
@@ -421,6 +463,60 @@ class AppDatabaseMigrationTest {
             }
             assertTrue("Column 'parentReimbursementId' should exist in transactions table", found)
             cursor.close()
+            close()
+        }
+    }
+
+    @Test
+    fun migrate50To51_addsForeignKeyToMerchantCategoryMapping() {
+        helper.createDatabase(testDbName, 50).apply {
+            // Insert a dummy category to satisfy the FK constraint
+            execSQL("INSERT INTO categories (id, name, iconKey, colorKey) VALUES (99, 'Test Category', 'letter_default', 'blue_light')")
+
+            // Insert a mapping that WILL NOT be orphaned
+            execSQL("INSERT INTO merchant_category_mapping (parsedName, categoryId) VALUES ('valid_merchant', 99)")
+
+            // Insert a mapping that WILL be orphaned (category 88 doesn't exist)
+            execSQL("INSERT INTO merchant_category_mapping (parsedName, categoryId) VALUES ('orphaned_merchant', 88)")
+
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 51, true, AppDatabase.MIGRATION_50_51).apply {
+            // Verify that the orphaned merchant was dropped during migration
+            val cursor1 = query("SELECT COUNT(*) FROM merchant_category_mapping WHERE parsedName = 'orphaned_merchant'")
+            cursor1.moveToFirst()
+            assertEquals("Orphaned mapping should have been dropped", 0, cursor1.getInt(0))
+            cursor1.close()
+
+            // Verify that the valid merchant was preserved
+            val cursor2 = query("SELECT COUNT(*) FROM merchant_category_mapping WHERE parsedName = 'valid_merchant'")
+            cursor2.moveToFirst()
+            assertEquals("Valid mapping should be preserved", 1, cursor2.getInt(0))
+            cursor2.close()
+
+            // Verify foreign key pragma exists
+            val fkCursor = query("PRAGMA foreign_key_list(merchant_category_mapping)")
+            var foundFk = false
+            while (fkCursor.moveToNext()) {
+                val table = fkCursor.getString(fkCursor.getColumnIndexOrThrow("table"))
+                val from = fkCursor.getString(fkCursor.getColumnIndexOrThrow("from"))
+                val to = fkCursor.getString(fkCursor.getColumnIndexOrThrow("to"))
+                if (table == "categories" && from == "categoryId" && to == "id") {
+                    foundFk = true
+                }
+            }
+            assertTrue("Foreign key on categoryId should exist", foundFk)
+            fkCursor.close()
+
+            // Verify ON DELETE CASCADE behavior
+            execSQL("PRAGMA foreign_keys=ON")
+            execSQL("DELETE FROM categories WHERE id = 99")
+            val cursor3 = query("SELECT COUNT(*) FROM merchant_category_mapping WHERE parsedName = 'valid_merchant'")
+            cursor3.moveToFirst()
+            assertEquals("Mapping should be swept by ON DELETE CASCADE", 0, cursor3.getInt(0))
+            cursor3.close()
+
             close()
         }
     }

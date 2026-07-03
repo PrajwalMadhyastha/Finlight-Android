@@ -158,6 +158,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
+        androidx.work.testing.WorkManagerTestInitHelper.closeWorkDatabase()
         unmockkAll()
         super.tearDown()
     }
@@ -173,6 +174,29 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val worker = TestListenableWorkerBuilder<SmsProcessorWorker>(context, inputData).build()
             val result = worker.doWork()
             assertEquals(ListenableWorker.Result.failure(), result)
+        }
+
+    @Test
+    fun `doWork returns failure when SmsTransactionSaver fails (returns null)`() =
+        runTest {
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 100.0,
+                    transactionType = "expense", merchantName = "Swiggy",
+                    originalMessage = "Spent Rs.100 at Swiggy", sourceSmsHash = "failhash",
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            // Force account creation to fail
+            coEvery { accountDao.findByName(any()) } returns null
+            coEvery { accountDao.insert(any()) } returns -1L
+
+            val worker = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy")
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+            coVerify(exactly = 0) { transactionDao.insert(any()) }
         }
 
     @Test
