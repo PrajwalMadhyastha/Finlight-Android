@@ -2,19 +2,21 @@
 // FILE: ./app/src/main/java/io/pm/finlight/ui/components/ReimbursementCard.kt
 // REASON: NEW FILE - UI card for the "Link Repayment" feature. Shown on expense
 // detail screens to display linked income transactions and net cost. Also provides
-// a badge for income screens to show which expense they offset.
+// a card for income screens to show which expense they offset, with options to
+// navigate to that expense or unlink the repayment.
 // =================================================================================
 package io.pm.finlight.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -194,46 +196,121 @@ fun ReimbursementCard(
 
 /**
  * Shown on an income transaction's detail screen when it is linked as a repayment for an expense.
+ * Allows the user to navigate to the linked expense detail screen or unlink the repayment.
+ *
+ * @param linkedExpense The expense transaction this income is linked to.
+ * @param onNavigateToExpense Called when the user taps the expense row to navigate to it.
+ * @param onUnlinkClick Called when the user confirms unlinking the repayment.
  */
 @Composable
 fun LinkedAsReimbursementBadge(
     linkedExpense: TransactionDetails,
+    onNavigateToExpense: () -> Unit,
+    onUnlinkClick: () -> Unit,
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+    var showUnlinkConfirmation by remember { mutableStateOf(false) }
+
+    if (showUnlinkConfirmation) {
+        ConfirmationDialog(
+            title = "Unlink Repayment?",
+            text = "This will remove the link to \"${linkedExpense.transaction.description}\" and restore the original expense amount.",
+            confirmButtonText = "Unlink",
+            isDestructive = true,
+            onDismiss = { showUnlinkConfirmation = false },
+            onConfirm = {
+                showUnlinkConfirmation = false
+                onUnlinkClick()
+            },
+        )
+    }
+
     GlassPanel(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        Column(
+            modifier = Modifier.padding(vertical = 8.dp),
         ) {
-            Icon(
-                imageVector = Icons.Default.LinkOff,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(20.dp),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Linked as repayment for",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // --- Header row ---
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LinkOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(20.dp),
                 )
                 Text(
-                    text = linkedExpense.transaction.description,
+                    text = "Linked as repayment",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    onClick = { showUnlinkConfirmation = true },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                ) {
+                    Text(
+                        text = "Unlink",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+            )
+
+            // --- Tappable expense row ---
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onNavigateToExpense)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "For expense",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = linkedExpense.transaction.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    linkedExpense.accountName?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Text(
+                    text = currencyFormat.format(linkedExpense.transaction.amount),
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                    contentDescription = "View expense",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
             }
-            Text(
-                text = currencyFormat.format(linkedExpense.transaction.amount),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
         }
     }
 }

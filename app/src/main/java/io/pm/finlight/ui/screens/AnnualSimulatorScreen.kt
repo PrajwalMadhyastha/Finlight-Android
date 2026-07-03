@@ -63,6 +63,7 @@ fun AnnualSimulatorScreen(
                     }
                 },
                 actions = {
+                    io.pm.finlight.ui.components.HelpActionIcon(helpKey = "annual_simulator")
                     IconButton(onClick = { viewModel.togglePrivacyMode() }) {
                         Icon(
                             imageVector = if (privacyModeEnabled) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,

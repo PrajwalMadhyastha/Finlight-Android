@@ -49,7 +49,10 @@ class MergeActionReceiver : BroadcastReceiver() {
             } else if (action == "ACTION_DISMISS" && childTxnId != -1) {
                 transactionRepository.dismissMerge(childTxnId)
             }
-            NotificationManagerCompat.from(context).cancel(notificationId)
+            with(NotificationManagerCompat.from(context)) {
+                cancel(notificationId)
+                if (childTxnId != -1) cancel(childTxnId)
+            }
         }
     }
 }

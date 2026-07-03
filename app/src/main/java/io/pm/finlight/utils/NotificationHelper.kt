@@ -600,6 +600,22 @@ object NotificationHelper {
 
         val contentText = "Another charge at ${newTxn.description}. Merge for a total of $totalAmount?"
 
+        val intent =
+            Intent(
+                Intent.ACTION_VIEW,
+                "$DEEP_LINK_URI_EDIT/${newTxn.id}".toUri(),
+            ).apply {
+                `package` = context.packageName
+            }
+        val contentPendingIntent: PendingIntent? =
+            TaskStackBuilder.create(context).run {
+                addNextIntentWithParentStack(intent)
+                getPendingIntent(
+                    newTxn.id,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+            }
+
         val builder =
             NotificationCompat.Builder(context, MainApplication.TRANSACTION_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification_logo)
@@ -608,6 +624,7 @@ object NotificationHelper {
                 .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
+                .setContentIntent(contentPendingIntent)
                 .addAction(0, "Merge", mergePendingIntent)
                 .addAction(0, "Dismiss", dismissPendingIntent)
 
