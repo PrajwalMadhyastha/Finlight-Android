@@ -1051,5 +1051,10 @@ class NotificationHelperTest : BaseViewModelTest() {
         assertEquals(2, notification.actions.size)
         assertEquals("Merge", notification.actions[0].title)
         assertEquals("Dismiss", notification.actions[1].title)
+
+        val contentPI = notification.contentIntent
+        assertNotNull("Content intent should be set", contentPI)
+        val contentIntent = shadowOf(contentPI).savedIntent
+        assertEquals("app://finlight.pm.io/transaction_detail/10", contentIntent.data.toString())
     }
 }

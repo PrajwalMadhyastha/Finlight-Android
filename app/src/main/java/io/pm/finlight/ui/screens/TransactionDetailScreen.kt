@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextRange
@@ -420,7 +421,15 @@ fun TransactionDetailScreen(
                     if (details.transaction.transactionType == "income" && linkedExpense != null) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                LinkedAsReimbursementBadge(linkedExpense = linkedExpense!!)
+                                LinkedAsReimbursementBadge(
+                                    linkedExpense = linkedExpense!!,
+                                    onNavigateToExpense = {
+                                        navController.navigate("transaction_detail/${linkedExpense!!.transaction.id}")
+                                    },
+                                    onUnlinkClick = {
+                                        viewModel.unlinkReimbursement(transactionId)
+                                    },
+                                )
                             }
                         }
                     }
@@ -1086,13 +1095,19 @@ private fun TransactionSpotlightHeader(
             }
 
             if (visitCount > 1) {
+                val chipLabel =
+                    if (details.transaction.transactionType == "income") {
+                        "$visitCount credits"
+                    } else {
+                        "$visitCount visits"
+                    }
                 AssistChip(
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
                             .padding(16.dp),
                     onClick = onVisitCountClick,
-                    label = { Text("$visitCount visits") },
+                    label = { Text(chipLabel) },
                     leadingIcon = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     colors =
                         AssistChipDefaults.assistChipColors(
@@ -1666,62 +1681,65 @@ private fun EditTextFieldSheet(
         mutableStateOf(TextFieldValue(initialValue, TextRange(initialValue.length)))
     }
     val focusRequester = remember { FocusRequester() }
+    val inlineToolbar = rememberInlineTextToolbar()
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-        OutlinedTextField(
-            value = textFieldValue,
-            onValueChange = {
-                if (onValueChangeFilter == null || onValueChangeFilter(it.text)) {
-                    textFieldValue = it
-                }
-            },
-            label = { Text("Value") },
-            keyboardOptions =
-                KeyboardOptions(
-                    keyboardType = keyboardType,
-                    capitalization = if (keyboardType == KeyboardType.Text) KeyboardCapitalization.Sentences else KeyboardCapitalization.None,
-                ),
-            singleLine = true,
+    CompositionLocalProvider(LocalTextToolbar provides inlineToolbar) {
+        Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .testTag("value_input")
-                    .focusRequester(focusRequester),
-            colors =
-                OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                ),
-        )
-        additionalContent?.invoke()
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = {
-                onConfirm(textFieldValue.text)
-            }) { Text("Save") }
+            Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+
+            InlineTextToolbarActionBar(inlineToolbar)
+
+            OutlinedTextField(
+                value = textFieldValue,
+                onValueChange = {
+                    if (onValueChangeFilter == null || onValueChangeFilter(it.text)) {
+                        textFieldValue = it
+                    }
+                },
+                label = { Text("Value") },
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = keyboardType,
+                        capitalization = if (keyboardType == KeyboardType.Text) KeyboardCapitalization.Sentences else KeyboardCapitalization.None,
+                    ),
+                singleLine = true,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .testTag("value_input")
+                        .focusRequester(focusRequester),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                    ),
+            )
+            additionalContent?.invoke()
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = { onConfirm(textFieldValue.text) }) { Text("Save") }
+            }
         }
     }
-
     LaunchedEffect(Unit) {
         delay(100)
         focusRequester.requestFocus()

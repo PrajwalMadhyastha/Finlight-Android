@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -153,6 +154,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        NotificationManagerCompat.from(this).cancelAll()
     }
 }
 
@@ -530,6 +536,9 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                 "tag_management" -> HelpActionIcon(helpKey = "tag_management")
                                 "manage_parse_rules" -> HelpActionIcon(helpKey = "manage_parse_rules")
                                 "manage_ignore_rules" -> HelpActionIcon(helpKey = "manage_ignore_rules")
+                                "add_budget", "edit_budget" -> HelpActionIcon(helpKey = "add_budget")
+                                "analysis_detail_screen" -> HelpActionIcon(helpKey = "analysis_detail_screen")
+                                "trip_detail" -> HelpActionIcon(helpKey = "trip_detail")
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),

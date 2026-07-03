@@ -108,7 +108,7 @@ sonar {
                 "**/*_Impl*",
         )
         property("sonar.exclusions", "**/*ViewModelFactory*.kt")
-        property("sonar.cpd.exclusions", "**/ui/screens/**")
+        property("sonar.cpd.exclusions", "**/ui/screens/**,**/ui/components/HelpSystem.kt")
     }
 }
 

@@ -10,6 +10,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
 import org.junit.Assert.*
 import org.junit.Test
+import org.mockito.ArgumentMatchers.anyLong
+import org.mockito.ArgumentMatchers.anyString
 import org.mockito.kotlin.any
 import org.mockito.kotlin.verify
 import org.mockito.Mockito.`when` as whenever
@@ -139,5 +141,121 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
 
             verify(transactionRepository).linkReimbursement(2, 1)
             assertFalse(viewModel.showReimbursementPicker.value)
+        }
+
+    // -----------------------------------------------------------------------
+    // NEW: Tests for unlink from income screen (unlink by income ID)
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `unlinkReimbursement delegates to repository with the correct incomeId`() =
+        runTest {
+            initializeViewModel()
+
+            viewModel.unlinkReimbursement(incomeId = 42)
+            advanceUntilIdle()
+
+            verify(transactionRepository).unlinkReimbursement(42)
+        }
+
+    @Test
+    fun `loadTransactionForDetailScreen populates linkedExpenseForCurrentIncome for a linked income transaction`() =
+        runTest {
+            val incomeId = 10
+            val parentExpenseId = 5
+
+            // The income transaction knows which expense it belongs to via parentReimbursementId
+            val incomeTxn =
+                Transaction(
+                    id = incomeId,
+                    description = "Alice Repayment",
+                    amount = 500.0,
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    transactionType = "income",
+                    notes = "",
+                    parentReimbursementId = parentExpenseId,
+                )
+
+            val linkedExpense =
+                TransactionDetails(
+                    transaction =
+                        Transaction(
+                            id = parentExpenseId,
+                            description = "Group Dinner",
+                            amount = 1000.0,
+                            date = 0L,
+                            accountId = 1,
+                            categoryId = 1,
+                            transactionType = "expense",
+                            notes = "",
+                        ),
+                    accountName = "HDFC Savings",
+                    categoryName = "Food",
+                    categoryIconKey = "food",
+                    categoryColorKey = "green",
+                    tagNames = "",
+                    images = emptyList(),
+                )
+
+            // Mock all methods called inside loadTransactionForDetailScreen
+            whenever(transactionRepository.getTransactionById(incomeId)).thenReturn(flowOf(incomeTxn))
+            whenever(transactionRepository.getTagsForTransaction(incomeId)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getImagesForTransaction(incomeId)).thenReturn(flowOf(emptyList()))
+            whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+            whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+            whenever(transactionRepository.getLinkedExpenseForReimbursement(incomeId)).thenReturn(flowOf(linkedExpense))
+
+            initializeViewModel()
+
+            // Initially null
+            assertNull(viewModel.linkedExpenseForCurrentIncome.value)
+
+            viewModel.loadTransactionForDetailScreen(incomeId)
+            advanceUntilIdle()
+
+            // After loading, the state should be populated with the linked expense
+            val result = viewModel.linkedExpenseForCurrentIncome.value
+            assertNotNull("linkedExpenseForCurrentIncome should be populated for a linked income", result)
+            assertEquals(parentExpenseId, result!!.transaction.id)
+            assertEquals("Group Dinner", result.transaction.description)
+        }
+
+    @Test
+    fun `loadTransactionForDetailScreen does NOT populate linkedExpenseForCurrentIncome for an unlinked income`() =
+        runTest {
+            val incomeId = 20
+
+            // An income with no parentReimbursementId — standalone credit
+            val unlinkedIncome =
+                Transaction(
+                    id = incomeId,
+                    description = "Salary",
+                    amount = 5000.0,
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    transactionType = "income",
+                    notes = "",
+                    parentReimbursementId = null,
+                )
+
+            whenever(transactionRepository.getTransactionById(incomeId)).thenReturn(flowOf(unlinkedIncome))
+            whenever(transactionRepository.getTagsForTransaction(incomeId)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getImagesForTransaction(incomeId)).thenReturn(flowOf(emptyList()))
+            whenever(smsRepository.getSmsDetailsById(anyLong())).thenReturn(null)
+            whenever(transactionRepository.getTransactionCountForMerchant(anyString())).thenReturn(flowOf(0))
+
+            initializeViewModel()
+
+            viewModel.loadTransactionForDetailScreen(incomeId)
+            advanceUntilIdle()
+
+            // getLinkedExpenseForReimbursement must NOT be called — income has no parent
+            assertNull(
+                "linkedExpenseForCurrentIncome must remain null for an unlinked income",
+                viewModel.linkedExpenseForCurrentIncome.value,
+            )
         }
 }

@@ -1144,7 +1144,7 @@ interface TransactionDao {
     @Query(
         """
         SELECT COUNT(*) FROM transactions
-        WHERE LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description)
+        WHERE (LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description))
         AND isExcluded = 0 AND status != 'PENDING' AND status != 'SKIPPED'
     """,
     )

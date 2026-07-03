@@ -11,6 +11,9 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
+import io.mockk.mockkStatic
+import io.mockk.verify
+import androidx.core.app.NotificationManagerCompat
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.TransactionDao
@@ -33,6 +36,7 @@ class MergeActionReceiverTest {
     private lateinit var transactionDao: TransactionDao
     private lateinit var transactionRepository: TransactionRepository
     private lateinit var receiver: MergeActionReceiver
+    private lateinit var mockNotificationManager: NotificationManagerCompat
 
     @Before
     fun setup() {
@@ -52,6 +56,10 @@ class MergeActionReceiverTest {
         coEvery { anyConstructed<TransactionRepository>().getTransactionSync(any()) } returns null
         coEvery { anyConstructed<TransactionRepository>().dismissMerge(any()) } returns Unit
 
+        mockkStatic(NotificationManagerCompat::class)
+        mockNotificationManager = mockk<NotificationManagerCompat>(relaxed = true)
+        every { NotificationManagerCompat.from(any()) } returns mockNotificationManager
+
         receiver = MergeActionReceiver()
     }
 
@@ -67,11 +75,14 @@ class MergeActionReceiverTest {
                 Intent("ACTION_MERGE").apply {
                     putExtra("parentTxnId", 1)
                     putExtra("childTxnId", 2)
+                    putExtra("notificationId", 10002)
                 }
 
             receiver.onReceive(context, intent)
 
             coVerify(timeout = 2000) { anyConstructed<TransactionRepository>().mergeTransactions(1, 2, any(), any()) }
+            verify(timeout = 2000) { mockNotificationManager.cancel(10002) }
+            verify(timeout = 2000) { mockNotificationManager.cancel(2) }
         }
 
     @Test
@@ -80,11 +91,14 @@ class MergeActionReceiverTest {
             val intent =
                 Intent("ACTION_DISMISS").apply {
                     putExtra("childTxnId", 2)
+                    putExtra("notificationId", 10002)
                 }
 
             receiver.onReceive(context, intent)
 
             coVerify(timeout = 2000) { anyConstructed<TransactionRepository>().dismissMerge(2) }
+            verify(timeout = 2000) { mockNotificationManager.cancel(10002) }
+            verify(timeout = 2000) { mockNotificationManager.cancel(2) }
         }
 
     @Test
@@ -112,6 +126,7 @@ class MergeActionReceiverTest {
                 Intent("ACTION_MERGE").apply {
                     putExtra("parentTxnId", 1)
                     putExtra("childTxnId", 2)
+                    putExtra("notificationId", 10002)
                 }
 
             receiver.onReceive(context, intent)
