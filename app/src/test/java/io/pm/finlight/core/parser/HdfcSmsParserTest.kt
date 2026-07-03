@@ -14,6 +14,7 @@ import io.pm.finlight.SmsParser
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class HdfcSmsParserTest : BaseSmsParserTest() {
@@ -676,5 +677,32 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             assertNotNull(result?.potentialAccount)
             assertEquals("HDFC Bank - 4677", result?.potentialAccount?.formattedName)
             assertEquals("Bank Account", result?.potentialAccount?.accountType)
+        }
+
+    @Test
+    fun `test ignores HDFC debit card expiration alert`() =
+        runBlocking {
+            setupTest()
+            val smsBody = "Alert! HDFC Bank Debit Card X1234 expires on 00-Aug. Stop renew/Hotlist by 00-00-00 via online/Branch. Update address: https://1.hdfc.bank.in/HDFCBK/s/qbMlvaJX"
+            val mockSms =
+                SmsMessage(
+                    id = 9019L,
+                    sender = "AM-HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNull("Parser should ignore this expiration alert", result)
         }
 }

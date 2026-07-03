@@ -132,6 +132,8 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "Statement is sent to", "into SmartEMIS",
     "is under process",
     "will be credited",
+    "expires on",
+    "Stop renew",
 
     ).map { IgnoreRule(pattern = it, type = RuleType.BODY_PHRASE, isDefault = true) } + listOf(
     // Existing Senders
