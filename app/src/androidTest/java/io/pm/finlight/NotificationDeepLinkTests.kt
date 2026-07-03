@@ -94,7 +94,7 @@ class NotificationDeepLinkTests {
         // Deep link to transaction detail (transaction ID 1 is seeded by SeedDatabaseRule)
         val intent =
             Intent(baseIntent).apply {
-                data = Uri.parse("app://finlight.pm.io/transaction_detail/1")
+                data = Uri.parse("app://finlight.pm.io/transaction_detail/${TestDataSeeder.TXN_COFFEE_ID}")
             }
 
         val scenario = ActivityScenario.launch<MainActivity>(intent)

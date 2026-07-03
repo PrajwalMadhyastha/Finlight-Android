@@ -42,6 +42,7 @@ object TestDataSeeder {
     const val TAG_ID = 9001
 
     // Stable descriptions so tests can look them up by text
+    const val TXN_COFFEE_ID = 1
     const val TXN_COFFEE_DESC = "Test Coffee"
     const val TXN_BUS_DESC = "Test Bus Fare"
     const val TXN_GROCERY_DESC = "Test Grocery Run"
@@ -115,6 +116,7 @@ object TestDataSeeder {
             // ---- Expenses ----
             insert(
                 Transaction(
+                    id = TXN_COFFEE_ID,
                     description = TXN_COFFEE_DESC,
                     amount = 150.0,
                     categoryId = CATEGORY_FOOD_ID,

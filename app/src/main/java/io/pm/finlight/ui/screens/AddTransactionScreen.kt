@@ -1383,7 +1383,7 @@ fun TextInputSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-            
+
             InlineTextToolbarActionBar(inlineToolbar)
 
             OutlinedTextField(

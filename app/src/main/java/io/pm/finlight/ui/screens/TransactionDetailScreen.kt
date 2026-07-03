@@ -1692,53 +1692,53 @@ private fun EditTextFieldSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-            
-            InlineTextToolbarActionBar(inlineToolbar)
-            
-            OutlinedTextField(
-            value = textFieldValue,
-            onValueChange = {
-                if (onValueChangeFilter == null || onValueChangeFilter(it.text)) {
-                    textFieldValue = it
-                }
-            },
-            label = { Text("Value") },
-            keyboardOptions =
-                KeyboardOptions(
-                    keyboardType = keyboardType,
-                    capitalization = if (keyboardType == KeyboardType.Text) KeyboardCapitalization.Sentences else KeyboardCapitalization.None,
-                ),
-            singleLine = true,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .testTag("value_input")
-                    .focusRequester(focusRequester),
-            colors =
-                OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                ),
-        )
-        additionalContent?.invoke()
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = { onConfirm(textFieldValue.text) }) { Text("Save") }
+            InlineTextToolbarActionBar(inlineToolbar)
+
+            OutlinedTextField(
+                value = textFieldValue,
+                onValueChange = {
+                    if (onValueChangeFilter == null || onValueChangeFilter(it.text)) {
+                        textFieldValue = it
+                    }
+                },
+                label = { Text("Value") },
+                keyboardOptions =
+                    KeyboardOptions(
+                        keyboardType = keyboardType,
+                        capitalization = if (keyboardType == KeyboardType.Text) KeyboardCapitalization.Sentences else KeyboardCapitalization.None,
+                    ),
+                singleLine = true,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .testTag("value_input")
+                        .focusRequester(focusRequester),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                    ),
+            )
+            additionalContent?.invoke()
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = { onConfirm(textFieldValue.text) }) { Text("Save") }
+            }
         }
-    }
     }
     LaunchedEffect(Unit) {
         delay(100)
