@@ -405,6 +405,82 @@ object HelpContentRegistry {
                         - **Link:** If this SMS is for a transaction you've already entered manually (e.g., a cash payment that was later confirmed via SMS), tap 'Link' to connect the SMS to the existing entry.
                         """,
                 ),
+            "add_budget" to
+                helpEntry(
+                    title = "Managing Budgets",
+                    content =
+                        """
+                        Setting up a budget helps you monitor and restrict your spending for specific categories.
+
+                        - **Amount:** Set the target maximum you wish to spend for this category in the given month.
+                        - **Category:** Choose which specific category this budget applies to. You will be alerted when you approach or exceed this limit.
+                        """,
+                ),
+            "analysis_detail_screen" to
+                helpEntry(
+                    title = "Analysis Details",
+                    content =
+                        """
+                        This screen provides a focused view of your transactions for a specific category or merchant over the selected time period.
+
+                        - Review all individual transactions contributing to the total spent.
+                        - Tap any transaction to view or edit its full details.
+                        """,
+                ),
+            "annual_budget_planning" to
+                helpEntry(
+                    title = "Annual Budget Planning",
+                    content =
+                        """
+                        Plan your expenses across the entire year to anticipate high-spending months and balance your finances.
+
+                        - **Monthly Setup:** Assign different overall budget limits to each month depending on upcoming expected expenses (like holidays or renewals).
+                        - Track how your planned annual budget aligns with your long-term goals.
+                        """,
+                ),
+            "annual_simulator" to
+                helpEntry(
+                    title = "Annual Simulator",
+                    content =
+                        """
+                        Project your financial future by simulating your savings, income changes, and major life events over a long period.
+
+                        - **How to use it:** Tap the '+' button to add future "Life Events". For example, you can add an expected "Salary Increase" in 2027, or a major expense like "Buying a Car" in 2029. You can also adjust your base expected annual return on investments.
+                        - **What happens:** The simulator automatically recalculates your long-term trajectory. It generates a graph and a year-by-year breakdown showing exactly how these events will impact your net worth. It helps you see if you'll have a surplus or if a major purchase will push you into a deficit in the future.
+                        """,
+                ),
+            "link_transaction_screen" to
+                helpEntry(
+                    title = "Linking Transactions",
+                    content =
+                        """
+                        When Finlight detects a new pending transaction (like from an SMS), you can link it to an existing manual entry instead of creating a duplicate.
+
+                        - Select the matching manual transaction from the list to merge the new data (like exact timestamp or bank details) with your existing entry.
+                        """,
+                ),
+            "trip_detail" to
+                helpEntry(
+                    title = "Trip Details",
+                    content =
+                        """
+                        Manage and track all expenses related to a specific trip or grouped tag.
+
+                        - Monitor your total trip spending against your planned trip budget.
+                        - View a chronological list of all transactions associated with this trip.
+                        """,
+                ),
+            "what_if_simulator" to
+                helpEntry(
+                    title = "What-If Simulator",
+                    content =
+                        """
+                        Explore hypothetical scenarios to see how an immediate, unplanned purchase affects your current financial standing.
+
+                        - **How to use it:** Tap the '+' button to add a hypothetical expense. Enter a description (e.g., "New iPhone") and the cost. You can add multiple items to build a scenario.
+                        - **What happens:** Finlight instantly recalculates your current month's finances. It shows you exactly how much your "Safe-to-Spend" daily limit will drop, how much of your overall monthly budget will be eaten up, and whether you'll still be able to meet your monthly savings goals if you make this purchase today.
+                        """,
+                ),
         )
 }
 

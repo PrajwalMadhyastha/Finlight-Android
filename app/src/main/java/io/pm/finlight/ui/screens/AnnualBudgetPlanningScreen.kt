@@ -56,6 +56,9 @@ fun AnnualBudgetPlanningScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, "Back")
                     }
+                },
+                actions = {
+                    io.pm.finlight.ui.components.HelpActionIcon(helpKey = "annual_budget_planning")
                 }
             )
         }

@@ -536,6 +536,9 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                 "tag_management" -> HelpActionIcon(helpKey = "tag_management")
                                 "manage_parse_rules" -> HelpActionIcon(helpKey = "manage_parse_rules")
                                 "manage_ignore_rules" -> HelpActionIcon(helpKey = "manage_ignore_rules")
+                                "add_budget", "edit_budget" -> HelpActionIcon(helpKey = "add_budget")
+                                "analysis_detail_screen" -> HelpActionIcon(helpKey = "analysis_detail_screen")
+                                "trip_detail" -> HelpActionIcon(helpKey = "trip_detail")
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),

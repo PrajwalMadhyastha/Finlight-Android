@@ -15,6 +15,8 @@ import android.app.Application
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,36 +54,55 @@ fun LinkTransactionScreen(
     var showConfirmationDialog by remember { mutableStateOf(false) }
     var transactionToLink by remember { mutableStateOf<Transaction?>(null) }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        SmsDetailsCard(potentialTxn)
+    Scaffold(
+        topBar = {
+            @OptIn(ExperimentalMaterial3Api::class)
+            TopAppBar(
+                title = { Text("Link Transaction") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    io.pm.finlight.ui.components.HelpActionIcon(helpKey = "link_transaction_screen")
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color.Transparent)
+            )
+        },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent
+    ) { paddingValues ->
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            SmsDetailsCard(potentialTxn)
 
-        Text("Select a transaction to link:", style = MaterialTheme.typography.titleMedium)
+            Text("Select a transaction to link:", style = MaterialTheme.typography.titleMedium)
 
-        if (candidates.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No potential matches found.")
-            }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(candidates, key = { it.id }) { transaction ->
-                    LinkCandidateItem(
-                        transaction = transaction,
-                        onClick = {
-                            transactionToLink = transaction
-                            showConfirmationDialog = true
-                        },
-                    )
+            if (candidates.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No potential matches found.")
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(candidates, key = { it.id }) { transaction ->
+                        LinkCandidateItem(
+                            transaction = transaction,
+                            onClick = {
+                                transactionToLink = transaction
+                                showConfirmationDialog = true
+                            },
+                        )
+                    }
                 }
             }
         }
     }
-
     if (showConfirmationDialog && transactionToLink != null) {
         ConfirmationDialog(
             title = "Confirm Link",
