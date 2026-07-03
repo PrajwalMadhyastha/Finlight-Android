@@ -420,7 +420,15 @@ fun TransactionDetailScreen(
                     if (details.transaction.transactionType == "income" && linkedExpense != null) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                LinkedAsReimbursementBadge(linkedExpense = linkedExpense!!)
+                                LinkedAsReimbursementBadge(
+                                    linkedExpense = linkedExpense!!,
+                                    onNavigateToExpense = {
+                                        navController.navigate("transaction_detail/${linkedExpense!!.transaction.id}")
+                                    },
+                                    onUnlinkClick = {
+                                        viewModel.unlinkReimbursement(transactionId)
+                                    },
+                                )
                             }
                         }
                     }
