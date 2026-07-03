@@ -1094,13 +1094,19 @@ private fun TransactionSpotlightHeader(
             }
 
             if (visitCount > 1) {
+                val chipLabel =
+                    if (details.transaction.transactionType == "income") {
+                        "$visitCount credits"
+                    } else {
+                        "$visitCount visits"
+                    }
                 AssistChip(
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
                             .padding(16.dp),
                     onClick = onVisitCountClick,
-                    label = { Text("$visitCount visits") },
+                    label = { Text(chipLabel) },
                     leadingIcon = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     colors =
                         AssistChipDefaults.assistChipColors(
