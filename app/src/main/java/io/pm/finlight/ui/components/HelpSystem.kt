@@ -71,9 +71,8 @@ object HelpContentRegistry {
         mapOf(
             "automation_settings" to
                 helpEntry(
-                    title = "About Automation",
-                    content =
-                        """
+                    "About Automation",
+                    """
                         This screen controls how Finlight automatically processes your SMS messages.
 
                         - **Scan Inbox:** Manually trigger a scan of your SMS inbox to find new transactions.
@@ -84,9 +83,8 @@ object HelpContentRegistry {
                 ),
             "data_settings" to
                 helpEntry(
-                    title = "About Security & Data",
-                    content =
-                        """
+                    "About Security & Data",
+                    """
                         Your data's security and portability are managed here.
 
                         - **App Lock:** Secure the app with your device's biometrics (fingerprint/face).
@@ -97,9 +95,8 @@ object HelpContentRegistry {
                 ),
             "dashboard_customize" to
                 helpEntry(
-                    title = "Customizing Your Dashboard",
-                    content =
-                        """
+                    "Customizing Your Dashboard",
+                    """
                         Tailor the dashboard to your needs.
 
                         - **Toggle Visibility:** Use the switch to show or hide a card.
@@ -110,9 +107,8 @@ object HelpContentRegistry {
             // --- NEW CONTENT FROM AUDIT ---
             "manage_parse_rules" to
                 helpEntry(
-                    title = "About Parse Rules",
-                    content =
-                        """
+                    "About Parse Rules",
+                    """
                         Custom Parse Rules are powerful tools that teach Finlight how to read new or tricky SMS formats.
 
                         - **How they are created:** When you edit a transaction that came from an SMS, you can choose to 'Fix Parsing'. This takes you to a screen where you can highlight the parts of the message to create a new, high-priority rule.
@@ -121,9 +117,8 @@ object HelpContentRegistry {
                 ),
             "manage_ignore_rules" to
                 helpEntry(
-                    title = "About the Ignore List",
-                    content =
-                        """
+                    "About the Ignore List",
+                    """
                         The ignore list tells the SMS parser to completely skip messages that match certain patterns, reducing clutter from non-transactional messages.
 
                         - **Rule Types:** You can ignore messages based on the **Sender** (e.g., `*Jio*`) or a **Body Phrase** (e.g., "Your OTP is").
@@ -133,9 +128,8 @@ object HelpContentRegistry {
                 ),
             "reports_screen" to
                 helpEntry(
-                    title = "About Reports",
-                    content =
-                        """
+                    "About Reports",
+                    """
                         This screen provides a high-level overview of your financial health.
 
                         - **Time Period:** Select a time period at the top to change the scope of the entire report.
@@ -146,9 +140,8 @@ object HelpContentRegistry {
                 ),
             "budget_screen" to
                 helpEntry(
-                    title = "About Budgets",
-                    content =
-                        """
+                    "About Budgets",
+                    """
                         The Budget Hub helps you track and control your spending.
 
                         - **Overall Budget:** This is your main spending target for the entire month. Tap the large card at the top to set or edit it.
@@ -158,9 +151,8 @@ object HelpContentRegistry {
                 ),
             "currency_travel_settings" to
                 helpEntry(
-                    title = "Currency & Travel Mode",
-                    content =
-                        """
+                    "Currency & Travel Mode",
+                    """
                         Manage your home currency and automate tracking for your trips.
 
                         - **Home Currency:** This is the default currency for all your budgets and reports.
@@ -171,9 +163,8 @@ object HelpContentRegistry {
                 ),
             "appearance_settings" to
                 helpEntry(
-                    title = "About Appearance",
-                    content =
-                        """
+                    "About Appearance",
+                    """
                         Customize the look and feel of the app.
 
                         - **System:** Automatically switches between a light and dark theme based on your phone's system settings.
@@ -183,9 +174,8 @@ object HelpContentRegistry {
                 ),
             "notification_settings" to
                 helpEntry(
-                    title = "About Notifications",
-                    content =
-                        """
+                    "About Notifications",
+                    """
                         Control the alerts and summaries you receive from Finlight.
 
                         - **Auto-Captured Transactions:** Get a notification each time Finlight successfully saves a new transaction from an SMS.
@@ -194,9 +184,8 @@ object HelpContentRegistry {
                 ),
             "account_list" to
                 helpEntry(
-                    title = "Managing Accounts",
-                    content =
-                        """
+                    "Managing Accounts",
+                    """
                         This screen lists all your financial accounts.
 
                         - **View Details:** Tap any account to see its transaction history.
@@ -205,9 +194,8 @@ object HelpContentRegistry {
                 ),
             "rule_creation_screen" to
                 helpEntry(
-                    title = "How to Create a Rule",
-                    content =
-                        """
+                    "How to Create a Rule",
+                    """
                         This screen teaches Finlight how to read new SMS formats.
 
                         - **1. Select Text:** **Long-press and drag** on the message text above to highlight the part you want to define (like the merchant name or amount).
@@ -219,9 +207,8 @@ object HelpContentRegistry {
                 ),
             "sms_debug_screen" to
                 helpEntry(
-                    title = "About the SMS Debugger",
-                    content =
-                        """
+                    "About the SMS Debugger",
+                    """
                         This is a power-user tool that shows exactly how Finlight's parser interpreted your most recent SMS messages.
 
                         - **Parsed Successfully:** The parser understood the message and it was likely saved as a transaction.
@@ -233,9 +220,8 @@ object HelpContentRegistry {
                 ),
             "csv_validation_screen" to
                 helpEntry(
-                    title = "Reviewing Your CSV Import",
-                    content =
-                        """
+                    "Reviewing Your CSV Import",
+                    """
                         This screen shows a preview of the transactions from your CSV file before they are permanently added to your database.
 
                         - **Status Icons:** Each row has a status icon. Green means the row is valid. Yellow means the app needs to create a new Category or Account, which it will do automatically. Red indicates an error (like a wrong date format) that you must fix.
@@ -246,9 +232,8 @@ object HelpContentRegistry {
                 ),
             "account_mapping_screen" to
                 helpEntry(
-                    title = "Why Map Accounts?",
-                    content =
-                        """
+                    "Why Map Accounts?",
+                    """
                         During a bulk SMS scan, Finlight found transactions from new senders it hasn't seen before (e.g., "VK-ICIBNK").
 
                         To import these transactions correctly, you need to tell the app which of your accounts they belong to.
@@ -260,9 +245,8 @@ object HelpContentRegistry {
             // --- NEW: Phase 2 Help Content ---
             "transaction_detail" to
                 helpEntry(
-                    title = "Editing a Transaction",
-                    content =
-                        """
+                    "Editing a Transaction",
+                    """
                         This screen gives you full control over a single transaction.
 
                         - **Tap to Edit:** Almost every field on this screen is tappable! Tap the description, amount, category, or date to change them.
@@ -273,9 +257,8 @@ object HelpContentRegistry {
                 ),
             "add_transaction" to
                 helpEntry(
-                    title = "Adding a Transaction",
-                    content =
-                        """
+                    "Adding a Transaction",
+                    """
                         This is the composer for manually adding a new expense or income.
 
                         - **Smart Suggestions:** As you type in the "Description", the app will try to automatically suggest a category for you based on your past habits and common keywords.
@@ -286,9 +269,8 @@ object HelpContentRegistry {
                 ),
             "split_transaction" to
                 helpEntry(
-                    title = "How to Split a Transaction",
-                    content =
-                        """
+                    "How to Split a Transaction",
+                    """
                         Splitting is useful when one payment covers multiple categories.
 
                         - **The Goal:** Adjust the amounts and categories for each item until the "Remaining" amount at the top is exactly zero.
@@ -299,9 +281,8 @@ object HelpContentRegistry {
                 ),
             "transaction_list" to
                 helpEntry(
-                    title = "Navigating Your Transactions",
-                    content =
-                        """
+                    "Navigating Your Transactions",
+                    """
                         This is your main transaction feed.
 
                         - **Tabs:** Switch between viewing individual **Transactions**, a summary grouped by **Categories**, or a summary grouped by **Merchants**.
@@ -312,9 +293,8 @@ object HelpContentRegistry {
                 ),
             "income_screen" to
                 helpEntry(
-                    title = "Tracking Your Income",
-                    content =
-                        """
+                    "Tracking Your Income",
+                    """
                         This screen works just like the main transaction list but is filtered to only show your income.
 
                         - **Tabs:** Switch between viewing individual income **Credits** or seeing a summary grouped by **Categories**.
@@ -323,9 +303,8 @@ object HelpContentRegistry {
                 ),
             "search_screen" to
                 helpEntry(
-                    title = "How to Search",
-                    content =
-                        """
+                    "How to Search",
+                    """
                         Use the search screen to find specific transactions across your entire history.
 
                         - **Keyword:** Searches the **Description** and **Notes** of your transactions.
@@ -335,9 +314,8 @@ object HelpContentRegistry {
                 ),
             "analysis_screen" to
                 helpEntry(
-                    title = "About Spending Analysis",
-                    content =
-                        """
+                    "About Spending Analysis",
+                    """
                         This hub provides powerful tools to understand your spending habits over time.
 
                         - **Dimensions:** The tabs at the top let you group your spending by **Category**, **Tag**, or **Merchant**.
@@ -348,9 +326,8 @@ object HelpContentRegistry {
             // --- NEW: Phase 3 (Low Priority) Help Content ---
             "time_period_report_screen" to
                 helpEntry(
-                    title = "About Reports",
-                    content =
-                        """
+                    "About Reports",
+                    """
                         These screens provide a detailed look at your finances over a specific period (Day, Week, or Month).
 
                         - **Navigation:** **Swipe left or right** anywhere on the screen to move to the next or previous period.
@@ -361,9 +338,8 @@ object HelpContentRegistry {
                 ),
             "account_detail" to
                 helpEntry(
-                    title = "About Account Details",
-                    content =
-                        """
+                    "About Account Details",
+                    """
                         This screen shows the complete, unfiltered transaction history for a single account.
 
                         - **View & Edit:** Tap on any transaction in the list to navigate to its detail screen, where you can make edits.
@@ -372,9 +348,8 @@ object HelpContentRegistry {
                 ),
             "category_list" to
                 helpEntry(
-                    title = "Managing Categories",
-                    content =
-                        """
+                    "Managing Categories",
+                    """
                         Categories are the primary way to organize your transactions.
 
                         - **Create:** Tap the 'Add New Category' button to create a new one. You can choose a name, icon, and color.
@@ -384,9 +359,8 @@ object HelpContentRegistry {
                 ),
             "tag_management" to
                 helpEntry(
-                    title = "Managing Tags",
-                    content =
-                        """
+                    "Managing Tags",
+                    """
                         Tags offer a flexible, secondary way to group transactions that might span multiple categories. They are perfect for tracking specific events like "Vacation 2025" or "Work Project X".
 
                         - **Create:** Type a name in the text field at the top and tap the '+' button.
@@ -395,9 +369,8 @@ object HelpContentRegistry {
                 ),
             "review_sms_screen" to
                 helpEntry(
-                    title = "Reviewing SMS Transactions",
-                    content =
-                        """
+                    "Reviewing SMS Transactions",
+                    """
                         This screen appears after a bulk SMS scan if Finlight found transactions from new senders it doesn't recognize.
 
                         - **Why it's important:** To correctly import these transactions, you must first map each new sender to one of your accounts.
@@ -407,9 +380,8 @@ object HelpContentRegistry {
                 ),
             "add_budget" to
                 helpEntry(
-                    title = "Managing Budgets",
-                    content =
-                        """
+                    "Managing Budgets",
+                    """
                         Setting up a budget helps you monitor and restrict your spending for specific categories.
 
                         - **Amount:** Set the target maximum you wish to spend for this category in the given month.
@@ -418,9 +390,8 @@ object HelpContentRegistry {
                 ),
             "analysis_detail_screen" to
                 helpEntry(
-                    title = "Analysis Details",
-                    content =
-                        """
+                    "Analysis Details",
+                    """
                         This screen provides a focused view of your transactions for a specific category or merchant over the selected time period.
 
                         - Review all individual transactions contributing to the total spent.
@@ -429,9 +400,8 @@ object HelpContentRegistry {
                 ),
             "annual_budget_planning" to
                 helpEntry(
-                    title = "Annual Budget Planning",
-                    content =
-                        """
+                    "Annual Budget Planning",
+                    """
                         Plan your expenses across the entire year to anticipate high-spending months and balance your finances.
 
                         - **Monthly Setup:** Assign different overall budget limits to each month depending on upcoming expected expenses (like holidays or renewals).
@@ -440,9 +410,8 @@ object HelpContentRegistry {
                 ),
             "annual_simulator" to
                 helpEntry(
-                    title = "Annual Simulator",
-                    content =
-                        """
+                    "Annual Simulator",
+                    """
                         Project your financial future by simulating your savings, income changes, and major life events over a long period.
 
                         - **How to use it:** Tap the '+' button to add future "Life Events". For example, you can add an expected "Salary Increase" in 2027, or a major expense like "Buying a Car" in 2029. You can also adjust your base expected annual return on investments.
@@ -451,9 +420,8 @@ object HelpContentRegistry {
                 ),
             "link_transaction_screen" to
                 helpEntry(
-                    title = "Linking Transactions",
-                    content =
-                        """
+                    "Linking Transactions",
+                    """
                         When Finlight detects a new pending transaction (like from an SMS), you can link it to an existing manual entry instead of creating a duplicate.
 
                         - Select the matching manual transaction from the list to merge the new data (like exact timestamp or bank details) with your existing entry.
@@ -461,9 +429,8 @@ object HelpContentRegistry {
                 ),
             "trip_detail" to
                 helpEntry(
-                    title = "Trip Details",
-                    content =
-                        """
+                    "Trip Details",
+                    """
                         Manage and track all expenses related to a specific trip or grouped tag.
 
                         - Monitor your total trip spending against your planned trip budget.
@@ -472,9 +439,8 @@ object HelpContentRegistry {
                 ),
             "what_if_simulator" to
                 helpEntry(
-                    title = "What-If Simulator",
-                    content =
-                        """
+                    "What-If Simulator",
+                    """
                         Explore hypothetical scenarios to see how an immediate, unplanned purchase affects your current financial standing.
 
                         - **How to use it:** Tap the '+' button to add a hypothetical expense. Enter a description (e.g., "New iPhone") and the cost. You can add multiple items to build a scenario.
