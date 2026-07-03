@@ -55,11 +55,14 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1360,40 +1363,48 @@ fun TextInputSheet(
     initialValue: String,
     onConfirm: (String) -> Unit,
 ) {
-    var text by remember { mutableStateOf(initialValue) }
+    var textValue by remember {
+        mutableStateOf(TextFieldValue(initialValue, TextRange(initialValue.length)))
+    }
     val focusRequester = remember { FocusRequester() }
+    val inlineToolbar = rememberInlineTextToolbar()
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .navigationBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
-            label = { Text("Value") },
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+    CompositionLocalProvider(LocalTextToolbar provides inlineToolbar) {
+        Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .focusRequester(focusRequester),
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
+                    .padding(16.dp)
+                    .navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            TextButton(onClick = { onConfirm(initialValue) }) { Text("Cancel") }
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = { onConfirm(text) }) { Text("Done") }
+            Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+            
+            InlineTextToolbarActionBar(inlineToolbar)
+
+            OutlinedTextField(
+                value = textValue,
+                onValueChange = { textValue = it },
+                label = { Text("Value") },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { onConfirm(initialValue) }) { Text("Cancel") }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = { onConfirm(textValue.text) }) { Text("Done") }
+            }
         }
     }
 }

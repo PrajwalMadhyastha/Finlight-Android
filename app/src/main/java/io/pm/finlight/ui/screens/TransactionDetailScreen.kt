@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextRange
@@ -1680,16 +1681,21 @@ private fun EditTextFieldSheet(
         mutableStateOf(TextFieldValue(initialValue, TextRange(initialValue.length)))
     }
     val focusRequester = remember { FocusRequester() }
+    val inlineToolbar = rememberInlineTextToolbar()
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-        OutlinedTextField(
+    CompositionLocalProvider(LocalTextToolbar provides inlineToolbar) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+            
+            InlineTextToolbarActionBar(inlineToolbar)
+            
+            OutlinedTextField(
             value = textFieldValue,
             onValueChange = {
                 if (onValueChangeFilter == null || onValueChangeFilter(it.text)) {
@@ -1730,12 +1736,10 @@ private fun EditTextFieldSheet(
         ) {
             TextButton(onClick = onDismiss) { Text("Cancel") }
             Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = {
-                onConfirm(textFieldValue.text)
-            }) { Text("Save") }
+            Button(onClick = { onConfirm(textFieldValue.text) }) { Text("Save") }
         }
     }
-
+    }
     LaunchedEffect(Unit) {
         delay(100)
         focusRequester.requestFocus()
