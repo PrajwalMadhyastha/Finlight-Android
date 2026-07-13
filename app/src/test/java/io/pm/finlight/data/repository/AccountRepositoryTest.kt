@@ -160,8 +160,8 @@ class AccountRepositoryTest : BaseViewModelTest() {
             coEvery { db.withTransaction<Any?>(any()) } coAnswers {
                 writableDb.beginTransaction()
                 try {
-                    @Suppress("UNCHECKED_CAST")
                     // In mockk for extension functions, args[1] is typically the block, args[0] is the receiver
+                    @Suppress("UNCHECKED_CAST")
                     val block = it.invocation.args[1] as suspend () -> Any?
                     val result = block()
                     writableDb.setTransactionSuccessful()
