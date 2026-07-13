@@ -111,11 +111,75 @@ class AccountRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `update calls DAO`() =
+    fun `update calls DAO and creates alias if name changed`() =
         runTest {
-            val account = Account(id = 1, name = "Test", type = "Bank")
+            val oldAccount = Account(id = 1, name = "Old Name", type = "Bank")
+            val newAccount = Account(id = 1, name = "New Name", type = "Bank")
+
+            `when`(accountDao.getAccountByIdBlocking(1)).thenReturn(oldAccount)
+
+            mockkStatic("androidx.room.RoomDatabaseKt")
+            coEvery { db.withTransaction<Any?>(any()) } coAnswers {
+                writableDb.beginTransaction()
+                try {
+                    @Suppress("UNCHECKED_CAST")
+                    val block = it.invocation.args[1] as suspend () -> Any?
+                    val result = block()
+                    writableDb.setTransactionSuccessful()
+                    result
+                } finally {
+                    writableDb.endTransaction()
+                }
+            }
+
+            val aliasCaptor = argumentCaptor<List<AccountAlias>>()
+
+            repository.update(newAccount)
+
+            val inOrder = inOrder(accountDao, accountAliasDao, writableDb)
+            inOrder.verify(writableDb).beginTransaction()
+            inOrder.verify(accountDao).getAccountByIdBlocking(1)
+            inOrder.verify(accountAliasDao).insertAll(capture(aliasCaptor))
+            inOrder.verify(accountDao).update(newAccount)
+            inOrder.verify(writableDb).setTransactionSuccessful()
+            inOrder.verify(writableDb).endTransaction()
+
+            assertEquals(1, aliasCaptor.value.size)
+            assertEquals("Old Name", aliasCaptor.value[0].aliasName)
+            assertEquals(1, aliasCaptor.value[0].destinationAccountId)
+        }
+
+    @Test
+    fun `update calls DAO and does not create alias if name unchanged`() =
+        runTest {
+            val account = Account(id = 1, name = "Same Name", type = "Bank")
+
+            `when`(accountDao.getAccountByIdBlocking(1)).thenReturn(account)
+
+            mockkStatic("androidx.room.RoomDatabaseKt")
+            coEvery { db.withTransaction<Any?>(any()) } coAnswers {
+                writableDb.beginTransaction()
+                try {
+                    @Suppress("UNCHECKED_CAST")
+                    // In mockk for extension functions, args[1] is typically the block, args[0] is the receiver
+                    val block = it.invocation.args[1] as suspend () -> Any?
+                    val result = block()
+                    writableDb.setTransactionSuccessful()
+                    result
+                } finally {
+                    writableDb.endTransaction()
+                }
+            }
+
             repository.update(account)
-            verify(accountDao).update(account)
+
+            val inOrder = inOrder(accountDao, accountAliasDao, writableDb)
+            inOrder.verify(writableDb).beginTransaction()
+            inOrder.verify(accountDao).getAccountByIdBlocking(1)
+            inOrder.verify(accountDao).update(account)
+            inOrder.verify(writableDb).setTransactionSuccessful()
+            inOrder.verify(writableDb).endTransaction()
+            verify(accountAliasDao, never()).insertAll(org.mockito.kotlin.any())
         }
 
     @Test
