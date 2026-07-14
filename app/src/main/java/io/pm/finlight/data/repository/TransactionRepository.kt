@@ -19,13 +19,16 @@ import java.util.Locale
 import kotlin.math.roundToLong
 
 import io.pm.finlight.data.db.dao.DeletedSmsHashDao
+import io.pm.finlight.data.db.dao.MergeRecordDao
 import io.pm.finlight.data.db.entity.DeletedSmsHash
+import io.pm.finlight.data.db.entity.MergeRecord
 
 class TransactionRepository(
     private val transactionDao: TransactionDao,
     private val settingsRepository: SettingsRepository,
     private val tagRepository: TagRepository,
     private val deletedSmsHashDao: DeletedSmsHashDao,
+    private val mergeRecordDao: MergeRecordDao,
 ) {
     // --- NEW: Function for Spending Velocity feature ---
     suspend fun getTotalExpensesSince(startDate: Long): Double {
@@ -583,6 +586,31 @@ class TransactionRepository(
 
         if (parentTxn == null || childTxn == null) return
 
+        // ── Snapshot BEFORE any mutation so the merge is fully reversible ────
+        mergeRecordDao.insert(
+            MergeRecord(
+                parentTxnId = parentTxnId,
+                originalParentAmount = parentTxn.amount,
+                originalParentDate = parentTxn.date,
+                originalParentNotes = parentTxn.notes,
+                childDescription = childTxn.description,
+                childAmount = childTxn.amount,
+                childDate = childTxn.date,
+                childAccountId = childTxn.accountId,
+                childCategoryId = childTxn.categoryId,
+                childTransactionType = childTxn.transactionType,
+                childSource = childTxn.source,
+                childNotes = childTxn.notes,
+                childSourceSmsId = childTxn.sourceSmsId,
+                childSourceSmsHash = childTxn.sourceSmsHash,
+                childSmsSignature = childTxn.smsSignature,
+                childOriginalDescription = childTxn.originalDescription,
+                childOriginalAmount = childTxn.originalAmount,
+                childCurrencyCode = childTxn.currencyCode,
+                childConversionRate = childTxn.conversionRate,
+            )
+        )
+
         transactionDao.updateMergeDismissed(childTxnId, true)
 
         val newAmount = parentTxn.amount + childTxn.amount
@@ -619,5 +647,63 @@ class TransactionRepository(
         }
 
         transactionDao.delete(childTxn)
+    }
+
+    // ─── Unmerge ────────────────────────────────────────────────────────────
+
+    /**
+     * Observes whether a merge snapshot exists for the given parent transaction.
+     * The UI uses this to decide whether to show the "Unmerge" option.
+     * Emits null when no snapshot is found (never merged, or already unmerged).
+     */
+    fun observeMergeRecord(parentTxnId: Int): Flow<MergeRecord?> =
+        mergeRecordDao.observeForParent(parentTxnId)
+
+    /**
+     * Fully reverses the most recent merge for [parentTxnId]:
+     * 1. Restores the parent's original amount, date, and notes from the snapshot.
+     * 2. Re-inserts the child transaction as a fresh row.
+     * 3. Removes the child's SMS hash from the deny-list so the SMS is no longer blocked.
+     * 4. Deletes the [MergeRecord] to clean up.
+     *
+     * This is a no-op if no snapshot exists for the given parent.
+     */
+    suspend fun unmergeTransactions(parentTxnId: Int) {
+        val record = mergeRecordDao.getForParentSync(parentTxnId) ?: return
+
+        // 1. Restore parent to its pre-merge state
+        transactionDao.updateAmount(parentTxnId, record.originalParentAmount)
+        transactionDao.updateDate(parentTxnId, record.originalParentDate)
+        transactionDao.updateNotes(parentTxnId, record.originalParentNotes)
+
+        // 2. Re-create the child transaction
+        val restoredChild =
+            Transaction(
+                description = record.childDescription,
+                amount = record.childAmount,
+                date = record.childDate,
+                accountId = record.childAccountId,
+                categoryId = record.childCategoryId,
+                transactionType = record.childTransactionType,
+                source = record.childSource,
+                notes = record.childNotes,
+                sourceSmsId = record.childSourceSmsId,
+                sourceSmsHash = record.childSourceSmsHash,
+                smsSignature = record.childSmsSignature,
+                originalDescription = record.childOriginalDescription,
+                originalAmount = record.childOriginalAmount,
+                currencyCode = record.childCurrencyCode,
+                conversionRate = record.childConversionRate,
+                mergeDismissed = false,
+            )
+        transactionDao.insert(restoredChild)
+
+        // 3. Remove the child's SMS hash from the deny-list
+        record.childSourceSmsHash?.let { hash ->
+            deletedSmsHashDao.deleteByHash(hash)
+        }
+
+        // 4. Clean up the snapshot
+        mergeRecordDao.deleteById(record.id)
     }
 }

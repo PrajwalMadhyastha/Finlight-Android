@@ -14,7 +14,7 @@ class AnnualSimulatorViewModelFactory(private val application: Application) : Vi
             val database = AppDatabase.getInstance(application)
             val settingsRepository = SettingsRepository(application)
             val tagRepository = TagRepository(database.tagDao(), database.transactionDao())
-            val transactionRepository = TransactionRepository(database.transactionDao(), settingsRepository, tagRepository, database.deletedSmsHashDao())
+            val transactionRepository = TransactionRepository(database.transactionDao(), settingsRepository, tagRepository, database.deletedSmsHashDao(), database.mergeRecordDao())
             @Suppress("UNCHECKED_CAST")
             return AnnualSimulatorViewModel(transactionRepository, settingsRepository) as T
         }

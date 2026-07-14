@@ -104,7 +104,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         // Initialize with default mock behaviors
         `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
         // --- FIX: Do NOT initialize repository here. It will be initialized in each test. ---
-        // repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+        // repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
     }
 
     /**
@@ -121,7 +121,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val transaction =
                 Transaction(
@@ -175,7 +175,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val transaction =
                 Transaction(
@@ -223,7 +223,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val transaction =
                 Transaction(
@@ -257,7 +257,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val transaction =
                 Transaction(
@@ -303,7 +303,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val transaction =
                 Transaction(
@@ -338,7 +338,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `delete calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
             val transaction =
                 Transaction(id = 1, description = "Test", amount = 1.0, date = 0L, accountId = 1, categoryId = 1, notes = null)
             repository.delete(transaction)
@@ -350,7 +350,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `setSmsHash calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
             val hash = "testhash"
             repository.setSmsHash(1, hash)
             verify(transactionDao).setSmsHash(1, hash)
@@ -361,7 +361,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `getTransactionCountForMerchant calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
             val desc = "Amazon"
             `when`(transactionDao.getTransactionCountForMerchant(desc)).thenReturn(flowOf(5))
             repository.getTransactionCountForMerchant(desc).test {
@@ -376,7 +376,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `findSimilarTransactions calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
             val desc = "Amazon"
             repository.findSimilarTransactions(desc, 1)
             verify(transactionDao).findSimilarTransactions(desc, 1)
@@ -387,7 +387,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateCategoryForIds calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
             val ids = listOf(1, 2)
             val categoryId = 5
             repository.updateCategoryForIds(ids, categoryId)
@@ -399,7 +399,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateDescriptionForIds calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
             val ids = listOf(1, 2)
             val newDesc = "New Description"
             repository.updateDescriptionForIds(ids, newDesc)
@@ -412,7 +412,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `clearReviewFlag calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.clearReviewFlag(1)
             verify(transactionDao).clearReviewFlag(1)
         }
@@ -421,7 +421,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateDescription calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.updateDescription(1, "New Desc")
             verify(transactionDao).updateDescription(1, "New Desc")
         }
@@ -430,7 +430,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateAmount calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.updateAmount(1, 123.45)
             verify(transactionDao).updateAmount(1, 123.45)
         }
@@ -439,7 +439,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateNotes calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.updateNotes(1, "New Note")
             verify(transactionDao).updateNotes(1, "New Note")
         }
@@ -448,7 +448,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateCategoryId calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.updateCategoryId(1, 5)
             verify(transactionDao).updateCategoryId(1, 5)
         }
@@ -457,7 +457,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateAccountId calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.updateAccountId(1, 2)
             verify(transactionDao).updateAccountId(1, 2)
         }
@@ -466,7 +466,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateDate calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.updateDate(1, 999L)
             verify(transactionDao).updateDate(1, 999L)
         }
@@ -475,7 +475,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateExclusionStatus calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.updateExclusionStatus(1, true)
             verify(transactionDao).updateExclusionStatus(1, true)
         }
@@ -484,7 +484,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateTransactionType calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.updateTransactionType(1, "income")
             verify(transactionDao).updateTransactionType(1, "income")
         }
@@ -493,7 +493,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `getTotalExpensesSince calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             val startDate = 1000L
             repository.getTotalExpensesSince(startDate)
             verify(transactionDao).getTotalExpensesSince(startDate)
@@ -503,7 +503,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `searchMerchants calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             val query = "amzn"
             `when`(transactionDao.searchMerchants(query)).thenReturn(flowOf(emptyList()))
             repository.searchMerchants(query)
@@ -514,7 +514,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `deleteByIds calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             val ids = listOf(1, 2)
             repository.deleteByIds(ids)
             verify(transactionDao).deleteByIds(ids)
@@ -524,7 +524,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `getRecentManualTransactions calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             `when`(transactionDao.getRecentManualTransactions(5)).thenReturn(flowOf(emptyList()))
             repository.getRecentManualTransactions(5)
             verify(transactionDao).getRecentManualTransactions(5)
@@ -534,7 +534,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `addTagForDateRange calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.addTagForDateRange(1, 100L, 200L)
             verify(transactionDao).addTagForDateRange(1, 100L, 200L)
         }
@@ -543,7 +543,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `removeTagForDateRange calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.removeTagForDateRange(1, 100L, 200L)
             verify(transactionDao).removeTagForDateRange(1, 100L, 200L)
         }
@@ -552,7 +552,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `getTransactionsByTagId calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             `when`(transactionDao.getTransactionsByTagId(1)).thenReturn(flowOf(emptyList()))
             repository.getTransactionsByTagId(1)
             verify(transactionDao).getTransactionsByTagId(1)
@@ -562,7 +562,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `removeAllTransactionsForTag calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.removeAllTransactionsForTag(1)
             verify(transactionDao).removeAllTransactionsForTag(1)
         }
@@ -574,7 +574,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val year = 2025
             val month = 9 // September
@@ -621,7 +621,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange (Testing for September 2025)
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val year = 2025
             val month = 9 // September
@@ -665,7 +665,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange (Testing for September 2025, 30 days)
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val year = 2025
             val month = 9 // September
@@ -715,7 +715,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `getMonthlyConsistencyData returns NO_DATA before first transaction and for future days`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val year = 2025
             val month = 9 // September
@@ -811,7 +811,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(transactionDao.getAllTransactions()).thenReturn(flowOf(mockDetails))
             `when`(transactionDao.getRecentTransactionDetails()).thenReturn(flowOf(emptyList())) // Default for other prop
 
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize HERE
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize HERE
 
             // Act & Assert
             repository.allTransactions.test {
@@ -840,7 +840,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(transactionDao.getRecentTransactionDetails()).thenReturn(flowOf(mockDetails))
             `when`(transactionDao.getAllTransactions()).thenReturn(flowOf(emptyList())) // Default for other prop
 
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize HERE
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize HERE
 
             // Act & Assert
             repository.recentTransactions.test {
@@ -855,7 +855,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val mockSummary = FinancialSummary(1000.0, 500.0)
             `when`(transactionDao.getFinancialSummaryForRangeFlow(100L, 200L)).thenReturn(flowOf(mockSummary))
@@ -873,7 +873,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val mockSpending = listOf(CategorySpending("Food", 100.0, "red", "icon"))
             `when`(transactionDao.getSpendingByCategoryForMonth(100L, 200L, "keyword", 1, 2, "expense")).thenReturn(flowOf(mockSpending))
@@ -891,7 +891,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val mockTrends = listOf(MonthlyTrend("2025-10", 1000.0, 500.0))
             `when`(transactionDao.getMonthlyTrends(123L)).thenReturn(flowOf(mockTrends))
@@ -909,7 +909,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)) // Initialize
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)) // Initialize
 
             val mockSpending = listOf(MerchantSpendingSummary("Amazon", 100.0, 2))
             `when`(transactionDao.getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, "expense")).thenReturn(flowOf(mockSpending))
@@ -927,7 +927,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `dismissMerge calls DAO updateMergeDismissed`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
             repository.dismissMerge(1)
             verify(transactionDao).updateMergeDismissed(1, true)
         }
@@ -936,7 +936,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `mergeTransactions sums amounts, updates parent, appends notes, and deletes child`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
 
             val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
             val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense")
@@ -967,7 +967,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             setupDefaultPropertyMocks()
             val deletedSmsHashDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDaoMock)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDaoMock, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
 
             val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
             val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense", sourceSmsHash = "xyz123")
@@ -985,7 +985,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             setupDefaultPropertyMocks()
             val deletedSmsHashDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDaoMock)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDaoMock, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
 
             val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
             val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense", sourceSmsHash = null)
@@ -1002,7 +1002,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `mergeTransactions formats notes correctly when childSmsBody is provided`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
 
             val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
             val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense")
@@ -1025,7 +1025,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `linkReimbursement deducts income amount from expense amount`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
 
             val expenseTxn = Transaction(id = 1, description = "Expense", amount = 1500.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = "expense")
             val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = "income")
@@ -1043,7 +1043,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `linkReimbursement does not set expense amount below zero`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
 
             val expenseTxn = Transaction(id = 1, description = "Expense", amount = 300.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = "expense")
             val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = "income")
@@ -1061,7 +1061,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `unlinkReimbursement restores amount to expense`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java))
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java))
 
             val expenseTxn = Transaction(id = 1, description = "Expense", amount = 1000.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = "expense")
             val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = "income", parentReimbursementId = 1)
@@ -1073,5 +1073,303 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             verify(transactionDao).unlinkReimbursement(2)
             verify(transactionDao).updateAmount(1, 1500.0)
+        }
+
+    // --- NEW: Tests for Smart Transaction Unmerge (MergeRecord snapshot) ---
+
+    @Test
+    fun `mergeTransactions inserts MergeRecord snapshot with correct parent fields before mutation`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), mergeRecordDaoMock)
+
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
+            val childTxn = Transaction(id = 2, description = "Child", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense", sourceSmsHash = "hash42")
+
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
+
+            repository.mergeTransactions(1, 2)
+
+            val mergeCaptor = ArgumentCaptor.forClass(io.pm.finlight.data.db.entity.MergeRecord::class.java)
+            verify(mergeRecordDaoMock).insert(mergeCaptor.capture() ?: io.pm.finlight.data.db.entity.MergeRecord(parentTxnId = 0, originalParentAmount = 0.0, originalParentDate = 0L, originalParentNotes = null, childDescription = "", childAmount = 0.0, childDate = 0L, childAccountId = 0, childCategoryId = null, childTransactionType = "", childSource = "", childNotes = null, childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null, childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null))
+
+            val captured = mergeCaptor.value
+            assertEquals(1, captured.parentTxnId)
+            assertEquals(100.0, captured.originalParentAmount, 0.001)
+            assertEquals(1000L, captured.originalParentDate)
+            assertEquals("Parent note", captured.originalParentNotes)
+        }
+
+    @Test
+    fun `mergeTransactions inserts MergeRecord snapshot with correct child fields`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), mergeRecordDaoMock)
+
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")
+            val childTxn = Transaction(id = 2, description = "Swiggy", amount = 75.0, date = 3000L, accountId = 2, categoryId = 5, notes = "Lunch", transactionType = "expense", sourceSmsHash = "abc", smsSignature = "SBI", source = "sms")
+
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
+
+            repository.mergeTransactions(1, 2)
+
+            val mergeCaptor = ArgumentCaptor.forClass(io.pm.finlight.data.db.entity.MergeRecord::class.java)
+            verify(mergeRecordDaoMock).insert(mergeCaptor.capture() ?: io.pm.finlight.data.db.entity.MergeRecord(parentTxnId = 0, originalParentAmount = 0.0, originalParentDate = 0L, originalParentNotes = null, childDescription = "", childAmount = 0.0, childDate = 0L, childAccountId = 0, childCategoryId = null, childTransactionType = "", childSource = "", childNotes = null, childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null, childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null))
+
+            val captured = mergeCaptor.value
+            assertEquals("Swiggy", captured.childDescription)
+            assertEquals(75.0, captured.childAmount, 0.001)
+            assertEquals(3000L, captured.childDate)
+            assertEquals(2, captured.childAccountId)
+            assertEquals(5, captured.childCategoryId)
+            assertEquals("expense", captured.childTransactionType)
+            assertEquals("sms", captured.childSource)
+            assertEquals("Lunch", captured.childNotes)
+            assertEquals("abc", captured.childSourceSmsHash)
+            assertEquals("SBI", captured.childSmsSignature)
+        }
+
+    @Test
+    fun `unmergeTransactions restores parent amount and date from snapshot`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), mergeRecordDaoMock)
+
+            val record =
+                io.pm.finlight.data.db.entity.MergeRecord(
+                    id = 1,
+                    parentTxnId = 10,
+                    originalParentAmount = 500.0,
+                    originalParentDate = 99000L,
+                    originalParentNotes = "original note",
+                    childDescription = "Child",
+                    childAmount = 250.0,
+                    childDate = 100000L,
+                    childAccountId = 1,
+                    childCategoryId = 2,
+                    childTransactionType = "expense",
+                    childSource = "manual",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = null,
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null,
+                )
+            `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
+
+            repository.unmergeTransactions(10)
+
+            verify(transactionDao).updateAmount(10, 500.0)
+            verify(transactionDao).updateDate(10, 99000L)
+            verify(transactionDao).updateNotes(10, "original note")
+        }
+
+    @Test
+    fun `unmergeTransactions reinserts child transaction with correct fields`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), mergeRecordDaoMock)
+
+            val record =
+                io.pm.finlight.data.db.entity.MergeRecord(
+                    id = 5,
+                    parentTxnId = 10,
+                    originalParentAmount = 100.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Swiggy",
+                    childAmount = 200.0,
+                    childDate = 5000L,
+                    childAccountId = 3,
+                    childCategoryId = 7,
+                    childTransactionType = "expense",
+                    childSource = "sms",
+                    childNotes = "Dinner",
+                    childSourceSmsId = 12345L,
+                    childSourceSmsHash = "hashXYZ",
+                    childSmsSignature = "HDFC",
+                    childOriginalDescription = "SWIGGY",
+                    childOriginalAmount = 200.0,
+                    childCurrencyCode = null,
+                    childConversionRate = null,
+                )
+            `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
+            `when`(transactionDao.insert(anyObject())).thenReturn(99L)
+
+            repository.unmergeTransactions(10)
+
+            val txnCaptor = ArgumentCaptor.forClass(Transaction::class.java)
+            verify(transactionDao).insert(txnCaptor.capture() ?: Transaction(description = "", amount = 0.0, date = 0L, accountId = 0, categoryId = 0, transactionType = "", notes = null))
+
+            val inserted = txnCaptor.value
+            assertEquals("Swiggy", inserted.description)
+            assertEquals(200.0, inserted.amount, 0.001)
+            assertEquals(5000L, inserted.date)
+            assertEquals(3, inserted.accountId)
+            assertEquals(7, inserted.categoryId)
+            assertEquals("expense", inserted.transactionType)
+            assertEquals("sms", inserted.source)
+            assertEquals("Dinner", inserted.notes)
+            assertEquals(12345L, inserted.sourceSmsId)
+            assertEquals("hashXYZ", inserted.sourceSmsHash)
+            assertEquals(false, inserted.mergeDismissed)
+        }
+
+    @Test
+    fun `unmergeTransactions removes SMS hash from deny-list when present`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
+            val deletedSmsHashDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDaoMock, mergeRecordDaoMock)
+
+            val record =
+                io.pm.finlight.data.db.entity.MergeRecord(
+                    id = 3,
+                    parentTxnId = 10,
+                    originalParentAmount = 100.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child",
+                    childAmount = 50.0,
+                    childDate = 2000L,
+                    childAccountId = 1,
+                    childCategoryId = 1,
+                    childTransactionType = "expense",
+                    childSource = "sms",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = "smsHash99",
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null,
+                )
+            `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
+            `when`(transactionDao.insert(anyObject())).thenReturn(1L)
+
+            repository.unmergeTransactions(10)
+
+            verify(deletedSmsHashDaoMock).deleteByHash("smsHash99")
+        }
+
+    @Test
+    fun `unmergeTransactions does not remove SMS hash when child has no hash`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
+            val deletedSmsHashDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDaoMock, mergeRecordDaoMock)
+
+            val record =
+                io.pm.finlight.data.db.entity.MergeRecord(
+                    id = 3,
+                    parentTxnId = 10,
+                    originalParentAmount = 100.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child",
+                    childAmount = 50.0,
+                    childDate = 2000L,
+                    childAccountId = 1,
+                    childCategoryId = 1,
+                    childTransactionType = "expense",
+                    childSource = "manual",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = null,
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null,
+                )
+            `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
+            `when`(transactionDao.insert(anyObject())).thenReturn(1L)
+
+            repository.unmergeTransactions(10)
+
+            verify(deletedSmsHashDaoMock, org.mockito.Mockito.never()).deleteByHash(org.mockito.kotlin.any())
+        }
+
+    @Test
+    fun `unmergeTransactions deletes MergeRecord after successful unmerge`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), mergeRecordDaoMock)
+
+            val record =
+                io.pm.finlight.data.db.entity.MergeRecord(
+                    id = 42,
+                    parentTxnId = 10,
+                    originalParentAmount = 100.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child",
+                    childAmount = 50.0,
+                    childDate = 2000L,
+                    childAccountId = 1,
+                    childCategoryId = 1,
+                    childTransactionType = "expense",
+                    childSource = "manual",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = null,
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null,
+                )
+            `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
+            `when`(transactionDao.insert(anyObject())).thenReturn(1L)
+
+            repository.unmergeTransactions(10)
+
+            verify(mergeRecordDaoMock).deleteById(42)
+        }
+
+    @Test
+    fun `unmergeTransactions is no-op when no MergeRecord exists`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), mergeRecordDaoMock)
+
+            `when`(mergeRecordDaoMock.getForParentSync(99)).thenReturn(null)
+
+            repository.unmergeTransactions(99)
+
+            // No DAO mutations should be called
+            verify(transactionDao, org.mockito.Mockito.never()).updateAmount(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyDouble())
+            verify(transactionDao, org.mockito.Mockito.never()).insert(anyObject())
+            verify(mergeRecordDaoMock, org.mockito.Mockito.never()).deleteById(org.mockito.ArgumentMatchers.anyInt())
+        }
+
+    @Test
+    fun `observeMergeRecord delegates to MergeRecordDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java), mergeRecordDaoMock)
+
+            `when`(mergeRecordDaoMock.observeForParent(7)).thenReturn(flowOf(null))
+
+            repository.observeMergeRecord(7).test {
+                assertEquals(null, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+            verify(mergeRecordDaoMock).observeForParent(7)
         }
 }

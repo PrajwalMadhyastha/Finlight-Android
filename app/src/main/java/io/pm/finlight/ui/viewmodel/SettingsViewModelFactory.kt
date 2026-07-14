@@ -35,7 +35,7 @@ class SettingsViewModelFactory(
             val settingsRepository = SettingsRepository(application)
             val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
             val transactionRepository =
-                TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao())
+                TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao())
             val merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
             val accountRepository = AccountRepository(db)
             val categoryRepository = CategoryRepository(db.categoryDao())

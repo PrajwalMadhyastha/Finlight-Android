@@ -29,7 +29,8 @@ class MergeActionReceiver : BroadcastReceiver() {
                 db.transactionDao(),
                 SettingsRepository(context),
                 TagRepository(db.tagDao(), db.transactionDao()),
-                db.deletedSmsHashDao()
+                db.deletedSmsHashDao(),
+                db.mergeRecordDao()
             )
 
         CoroutineScope(Dispatchers.IO).launch {

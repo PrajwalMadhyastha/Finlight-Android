@@ -11,6 +11,7 @@ import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_43_44
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_44_45
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_45_46
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_47_48
+import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_50_51
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -421,6 +422,75 @@ class AppDatabaseMigrationTest {
             }
             assertTrue("Column 'parentReimbursementId' should exist in transactions table", found)
             cursor.close()
+            close()
+        }
+    }
+
+    /**
+     * Test MIGRATION_50_51: Creates the merge_records table for the Unmerge feature.
+     *
+     * Verifies that:
+     * 1. The merge_records table is created with the expected columns and correct nullability.
+     * 2. The index on parentTxnId is created.
+     */
+    @Test
+    fun migrate50To51_createsMergeRecordsTable() {
+        helper.createDatabase(testDbName, 50).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 51, true, MIGRATION_50_51).apply {
+            // Verify table exists with correct columns
+            val cursor = query("PRAGMA table_info(merge_records)")
+            val columnNames = mutableSetOf<String>()
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                val notNull = cursor.getInt(cursor.getColumnIndexOrThrow("notnull"))
+                columnNames.add(name)
+                when (name) {
+                    // NOT NULL columns
+                    "id", "parentTxnId", "mergedAt",
+                    "originalParentAmount", "originalParentDate",
+                    "childDescription", "childAmount", "childDate",
+                    "childAccountId", "childTransactionType", "childSource" ->
+                        assertEquals("Column '$name' should be NOT NULL", 1, notNull)
+                    // Nullable columns
+                    "originalParentNotes", "childCategoryId", "childNotes",
+                    "childSourceSmsId", "childSourceSmsHash", "childSmsSignature",
+                    "childOriginalDescription", "childOriginalAmount",
+                    "childCurrencyCode", "childConversionRate" ->
+                        assertEquals("Column '$name' should be nullable", 0, notNull)
+                }
+            }
+            cursor.close()
+
+            // Verify all expected columns are present
+            val expectedColumns =
+                setOf(
+                    "id", "parentTxnId", "mergedAt",
+                    "originalParentAmount", "originalParentDate", "originalParentNotes",
+                    "childDescription", "childAmount", "childDate", "childAccountId",
+                    "childCategoryId", "childTransactionType", "childSource", "childNotes",
+                    "childSourceSmsId", "childSourceSmsHash", "childSmsSignature",
+                    "childOriginalDescription", "childOriginalAmount",
+                    "childCurrencyCode", "childConversionRate",
+                )
+            assertEquals(
+                "merge_records table should have exactly the expected columns",
+                expectedColumns,
+                columnNames,
+            )
+
+            // Verify the index on parentTxnId was created
+            val indexCursor =
+                query(
+                    "SELECT name FROM sqlite_master WHERE type='index' AND name='index_merge_records_parentTxnId'"
+                )
+            assertTrue(
+                "Index 'index_merge_records_parentTxnId' should exist",
+                indexCursor.moveToFirst(),
+            )
+            indexCursor.close()
             close()
         }
     }

@@ -76,6 +76,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 settingsRepository = settingsRepository,
                 tagRepository = tagRepository,
                 deletedSmsHashDao = db.deletedSmsHashDao(),
+                mergeRecordDao = db.mergeRecordDao(),
             )
         accountRepository = AccountRepository(db)
         categoryRepository = CategoryRepository(db.categoryDao())

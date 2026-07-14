@@ -27,7 +27,7 @@ class CategoryViewModelFactory(private val application: Application) : ViewModel
             @Suppress("UNCHECKED_CAST")
             return CategoryViewModel(
                 categoryRepository = CategoryRepository(db.categoryDao()),
-                transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao()),
+                transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao()),
                 categoryDao = db.categoryDao(),
             ) as T
         }

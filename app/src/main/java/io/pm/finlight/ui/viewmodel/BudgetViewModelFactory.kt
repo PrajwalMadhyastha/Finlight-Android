@@ -31,7 +31,7 @@ class BudgetViewModelFactory(private val application: Application) : ViewModelPr
             val categoryRepository = CategoryRepository(db.categoryDao())
             // --- NEW: Add TransactionRepository dependency ---
             val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao())
+            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao())
 
             @Suppress("UNCHECKED_CAST")
             return BudgetViewModel(

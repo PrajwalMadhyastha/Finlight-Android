@@ -56,7 +56,7 @@ class SmsTransactionSaver(
         val accountAliasDao = db.accountAliasDao()
         val transactionDao = db.transactionDao()
         val tagRepository = TagRepository(db.tagDao(), transactionDao)
-        val transactionRepository = TransactionRepository(transactionDao, settingsRepository, tagRepository, db.deletedSmsHashDao())
+        val transactionRepository = TransactionRepository(transactionDao, settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao())
 
         val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
         val accountType = potentialTxn.potentialAccount?.accountType ?: "General"

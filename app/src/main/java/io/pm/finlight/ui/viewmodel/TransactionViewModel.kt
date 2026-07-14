@@ -1987,4 +1987,30 @@ class TransactionViewModel(
             _navigateBackEvent.send(Unit)
         }
     }
+
+    // ─── Unmerge ─────────────────────────────────────────────────────────────
+
+    /**
+     * Returns a [Flow] that emits the [MergeRecord] snapshot for [parentTxnId],
+     * or null if the transaction was never merged (or was already unmerged).
+     * The UI collects this to decide whether to show the "Unmerge" option.
+     */
+    fun observeMergeRecord(parentTxnId: Int) =
+        transactionRepository.observeMergeRecord(parentTxnId)
+
+    /**
+     * Fully reverses the most recent merge for [parentTxnId].
+     * On success, the parent is restored to its pre-merge state and the child
+     * transaction is re-inserted as a fresh row.
+     */
+    fun unmergeTransaction(parentTxnId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                transactionRepository.unmergeTransactions(parentTxnId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to unmerge transaction $parentTxnId", e)
+                _uiEvent.send("Failed to unmerge. Please try again.")
+            }
+        }
+    }
 }

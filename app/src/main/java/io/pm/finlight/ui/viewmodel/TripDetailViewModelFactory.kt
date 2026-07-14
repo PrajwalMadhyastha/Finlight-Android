@@ -26,7 +26,7 @@ class TripDetailViewModelFactory(
             val settingsRepository = SettingsRepository(application)
             val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
             val tripRepository = TripRepository(db.tripDao())
-            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao())
+            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao())
 
             @Suppress("UNCHECKED_CAST")
             return TripDetailViewModel(

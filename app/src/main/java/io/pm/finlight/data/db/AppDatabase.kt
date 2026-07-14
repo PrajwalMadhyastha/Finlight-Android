@@ -20,6 +20,7 @@ import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.db.entity.GoalContribution
 import io.pm.finlight.data.db.entity.GoalTransactionLink
+import io.pm.finlight.data.db.entity.MergeRecord
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.security.SecurityManager
 import io.pm.finlight.utils.CategoryIconHelper
@@ -53,8 +54,9 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         DeletedSmsHash::class,
         GoalTransactionLink::class,
         GoalContribution::class,
+        MergeRecord::class,
     ],
-    version = 50,
+    version = 51,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -97,6 +99,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun goalTransactionLinkDao(): GoalTransactionLinkDao
 
     abstract fun goalContributionDao(): GoalContributionDao
+
+    abstract fun mergeRecordDao(): MergeRecordDao
 
     companion object {
         @Volatile
@@ -799,6 +803,44 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 50→51: Smart Transaction Unmerge — add merge_records table ---
+        val MIGRATION_50_51 =
+            object : Migration(50, 51) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `merge_records` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `parentTxnId` INTEGER NOT NULL,
+                            `mergedAt` INTEGER NOT NULL,
+                            `originalParentAmount` REAL NOT NULL,
+                            `originalParentDate` INTEGER NOT NULL,
+                            `originalParentNotes` TEXT,
+                            `childDescription` TEXT NOT NULL,
+                            `childAmount` REAL NOT NULL,
+                            `childDate` INTEGER NOT NULL,
+                            `childAccountId` INTEGER NOT NULL,
+                            `childCategoryId` INTEGER,
+                            `childTransactionType` TEXT NOT NULL,
+                            `childSource` TEXT NOT NULL,
+                            `childNotes` TEXT,
+                            `childSourceSmsId` INTEGER,
+                            `childSourceSmsHash` TEXT,
+                            `childSmsSignature` TEXT,
+                            `childOriginalDescription` TEXT,
+                            `childOriginalAmount` REAL,
+                            `childCurrencyCode` TEXT,
+                            `childConversionRate` REAL,
+                            FOREIGN KEY(`parentTxnId`) REFERENCES `transactions`(`id`) ON DELETE CASCADE
+                        )
+                        """
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_merge_records_parentTxnId` ON `merge_records` (`parentTxnId`)"
+                    )
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -836,6 +878,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_47_48,
                             MIGRATION_48_49,
                             MIGRATION_49_50,
+                            MIGRATION_50_51,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

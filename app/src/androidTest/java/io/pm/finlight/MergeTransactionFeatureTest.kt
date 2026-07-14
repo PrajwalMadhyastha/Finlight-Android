@@ -111,4 +111,51 @@ class MergeTransactionFeatureTest {
 
         composeTestRule.onNodeWithText("Merge Suggestion").assertDoesNotExist()
     }
+
+    @Test
+    fun test_unmergeTransaction_fromDetailScreen() {
+        seedMergeableTransactions()
+
+        // Wait for dashboard to load and show merge suggestion
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText("Merge Suggestion").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 1. Merge them
+        composeTestRule.onNodeWithTag("dashboard_lazy_column").performScrollToNode(androidx.compose.ui.test.hasTestTag("merge_button"))
+        composeTestRule.onNodeWithTag("merge_button").performClick()
+
+        // Verify card disappears
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Merge Suggestion").fetchSemanticsNodes().isEmpty()
+        }
+
+        // 2. Open the merged transaction from the transactions tab
+        composeTestRule.onNodeWithText("Transactions").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("MergeTestMerchant").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeTestRule.onNode(hasText("MergeTestMerchant"), useUnmergedTree = true)
+            .onAncestors()
+            .filterToOne(hasClickAction())
+            .performClick()
+
+        // 3. Verify the unmerge card is visible and click "Unmerge"
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Merged Transaction"))
+        composeTestRule.onNodeWithText("Unmerge").performClick()
+
+        // 4. Verify confirmation dialog appears and confirm
+        composeTestRule.onNodeWithText("Unmerge Transactions?").assertIsDisplayed()
+        composeTestRule.onNode(hasText("Unmerge").and(hasAnyAncestor(isDialog()))).performClick()
+
+        // 5. Should navigate back to dashboard
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Dashboard").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
 }
