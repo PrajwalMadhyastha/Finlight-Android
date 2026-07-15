@@ -61,7 +61,6 @@ import kotlin.test.junit.JUnitAsserter.assertNotNull
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class TransactionRepositoryTest : BaseViewModelTest() {
-
     // ── Fields ───────────────────────────────────────────────────────────────
 
     @Mock
