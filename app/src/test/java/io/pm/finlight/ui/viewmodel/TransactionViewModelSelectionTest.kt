@@ -293,4 +293,20 @@ class TransactionViewModelSelectionTest : TransactionViewModelBaseSetup() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `updateAnchorDetailsInPlace delegates to repository correctly`() =
+        runTest {
+            val id = 1
+            val desc = "Updated Desc"
+            val catId = 2
+            val notes = "Updated Notes"
+
+            viewModel.updateAnchorDetailsInPlace(id, desc, catId, notes)
+            advanceUntilIdle()
+
+            verify(transactionRepository).updateDescription(eq(id), eq(desc))
+            verify(transactionRepository).updateCategoryId(eq(id), eq(catId))
+            verify(transactionRepository).updateNotes(eq(id), eq(notes))
+        }
 }

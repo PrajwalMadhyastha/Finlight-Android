@@ -124,4 +124,65 @@ class TransactionMergeUITest {
         // Or wait, is the amount updated? Yes.
         // But amount display may vary by locale, so just checking ManualMergeTest2 disappearance is good enough.
     }
+
+    @Test
+    fun manualMergeFlow_editAnchorDetails_updatesSuccessfully() {
+        seedMergeableTransactions()
+
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Transactions").performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("ManualMergeTest1").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Enter selection mode
+        composeTestRule.onNodeWithText("ManualMergeTest1").performTouchInput { longClick() }
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("1 Selected").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.waitForIdle()
+
+        Thread.sleep(1000)
+        composeTestRule.onNodeWithTag("transaction_item_checkbox_ManualMergeTest2").performTouchInput { click() }
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("2 Selected").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Open Merge Sheet
+        composeTestRule.onNodeWithContentDescription("Merge Transactions").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Review Merge").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Tap Edit Anchor Details
+        composeTestRule.onNodeWithText("Edit Anchor Details").performClick()
+
+        // Wait for inline edit view
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Save").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Edit Description (initial value is ManualMergeTest1). Use hasSetTextAction to disambiguate from the read-only row item.
+        composeTestRule.onNode(hasText("ManualMergeTest1") and hasSetTextAction()).performTextReplacement("EditedAnchor")
+
+        // Save
+        composeTestRule.onNodeWithText("Save").performClick()
+
+        // Wait for it to go back to Review Merge
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Confirm Merge").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Confirm Merge
+        composeTestRule.onNodeWithText("Confirm Merge").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("ManualMergeTest2").fetchSemanticsNodes().isEmpty()
+        }
+
+        // Verify EditedAnchor is visible
+        composeTestRule.onNodeWithText("EditedAnchor").assertExists()
+    }
 }

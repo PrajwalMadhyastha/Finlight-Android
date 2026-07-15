@@ -204,6 +204,12 @@ fun TransactionListScreen(
                 selectedTransactions = transactions.filter { it.transaction.id in selectedIds },
                 anchorTransactionId = anchorTransactionId,
                 onAnchorSelected = { viewModel.setAnchorTransaction(it) },
+                categories = allCategories,
+                onSaveAnchorDetails = { desc, catId, notes ->
+                    anchorTransactionId?.let { id ->
+                        viewModel.updateAnchorDetailsInPlace(id, desc, catId, notes)
+                    }
+                },
                 onConfirm = { viewModel.confirmManualMerge() },
                 onCancel = { viewModel.dismissReviewMergeSheet() },
             )

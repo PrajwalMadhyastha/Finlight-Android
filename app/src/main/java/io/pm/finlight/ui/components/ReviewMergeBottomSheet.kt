@@ -1,14 +1,14 @@
 package io.pm.finlight.ui.components
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -16,6 +16,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.pm.finlight.TransactionDetails
+import io.pm.finlight.Category
+import io.pm.finlight.Transaction
 import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
@@ -26,10 +28,32 @@ import io.pm.finlight.utils.FormatUtils
 fun ReviewMergeBottomSheet(
     selectedTransactions: List<TransactionDetails>,
     anchorTransactionId: Int?,
+    categories: List<Category>,
     onAnchorSelected: (Int) -> Unit,
+    onSaveAnchorDetails: (String, Int?, String) -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
+    var isEditingAnchor by remember { mutableStateOf(false) }
+
+    if (isEditingAnchor) {
+        val anchorTxn = selectedTransactions.find { it.transaction.id == anchorTransactionId }?.transaction
+        if (anchorTxn != null) {
+            EditAnchorView(
+                transaction = anchorTxn,
+                categories = categories,
+                onSave = { desc, catId, notes ->
+                    onSaveAnchorDetails(desc, catId, notes)
+                    isEditingAnchor = false
+                },
+                onCancel = { isEditingAnchor = false }
+            )
+        } else {
+            isEditingAnchor = false
+        }
+        return
+    }
+
     // Calculate net amount using signed arithmetic
     fun signedAmount(txn: TransactionDetails): Double =
         if (txn.transaction.transactionType == "income") txn.transaction.amount else -txn.transaction.amount
@@ -85,7 +109,7 @@ fun ReviewMergeBottomSheet(
             }
         }
 
-        Divider()
+        HorizontalDivider()
 
         Text(
             "Selected Transactions (${selectedTransactions.size})",
@@ -138,6 +162,14 @@ fun ReviewMergeBottomSheet(
             }
         }
 
+        OutlinedButton(
+            onClick = { isEditingAnchor = true },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = anchorTransactionId != null
+        ) {
+            Text("Edit Anchor Details")
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -154,6 +186,99 @@ fun ReviewMergeBottomSheet(
                 enabled = anchorTransactionId != null
             ) {
                 Text("Confirm Merge")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditAnchorView(
+    transaction: Transaction,
+    categories: List<Category>,
+    onSave: (String, Int?, String) -> Unit,
+    onCancel: () -> Unit
+) {
+    var description by remember { mutableStateOf(transaction.description) }
+    var notes by remember { mutableStateOf(transaction.notes ?: "") }
+    var selectedCategoryId by remember { mutableStateOf(transaction.categoryId) }
+
+    Column(
+        modifier =
+            Modifier
+                .padding(16.dp)
+                .navigationBarsPadding(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            "Edit Anchor Details",
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+
+        OutlinedTextField(
+            value = description,
+            onValueChange = { description = it },
+            label = { Text("Description") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        var expanded by remember { mutableStateOf(false) }
+        val selectedCat = categories.find { it.id == selectedCategoryId }
+
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            OutlinedTextField(
+                value = selectedCat?.name ?: "Select Category",
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Category") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth()
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                categories.forEach { cat ->
+                    DropdownMenuItem(
+                        text = { Text(cat.name) },
+                        onClick = {
+                            selectedCategoryId = cat.id
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        OutlinedTextField(
+            value = notes,
+            onValueChange = { notes = it },
+            label = { Text("Notes") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 3
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Cancel")
+            }
+            Button(
+                onClick = { onSave(description, selectedCategoryId, notes) },
+                modifier = Modifier.weight(1f),
+                enabled = description.isNotBlank()
+            ) {
+                Text("Save")
             }
         }
     }

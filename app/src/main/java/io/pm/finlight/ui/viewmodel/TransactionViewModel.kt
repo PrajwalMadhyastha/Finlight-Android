@@ -1599,6 +1599,17 @@ class TransactionViewModel(
         }
     }
 
+    fun updateAnchorDetailsInPlace(
+        id: Int,
+        description: String,
+        categoryId: Int?,
+        notes: String
+    ) = viewModelScope.launch {
+        transactionRepository.updateDescription(id, description)
+        transactionRepository.updateCategoryId(id, categoryId)
+        transactionRepository.updateNotes(id, notes)
+    }
+
     fun markAsReviewed(transactionId: Int) =
         viewModelScope.launch {
             try {
