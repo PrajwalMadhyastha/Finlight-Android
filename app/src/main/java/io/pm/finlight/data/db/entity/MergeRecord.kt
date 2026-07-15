@@ -15,6 +15,10 @@ import io.pm.finlight.Transaction
  *
  * The CASCADE delete on [parentTxnId] ensures that if the parent transaction is
  * ever deleted, this record is automatically cleaned up — no orphan rows possible.
+ *
+ * For N-to-1 manual merges, all child snapshots share the same [mergeGroupId]
+ * (a UUID generated at merge time). The [mergeType] field distinguishes automatic
+ * SMS-triggered merges ("AUTO") from user-initiated manual merges ("MANUAL").
  */
 @Entity(
     tableName = "merge_records",
@@ -26,7 +30,7 @@ import io.pm.finlight.Transaction
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("parentTxnId")],
+    indices = [Index("parentTxnId"), Index("mergeGroupId")],
 )
 data class MergeRecord(
     @PrimaryKey(autoGenerate = true)
@@ -35,6 +39,15 @@ data class MergeRecord(
     val parentTxnId: Int,
     /** Timestamp of when the merge was performed. */
     val mergedAt: Long = System.currentTimeMillis(),
+    /**
+     * Shared UUID for all child records created by a single manual merge operation.
+     * Empty string for legacy AUTO merges (which use the LIMIT 1 path).
+     */
+    val mergeGroupId: String = "",
+    /**
+     * "AUTO" for SMS-triggered automatic merges, "MANUAL" for user-initiated merges.
+     */
+    val mergeType: String = "AUTO",
     // ─── Parent snapshot ─────────────────────────────────────────────────────
     // The values the PARENT had immediately BEFORE the merge occurred.
     // Needed to restore the parent if the user requests an unmerge.

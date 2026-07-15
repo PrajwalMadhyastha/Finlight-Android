@@ -56,7 +56,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         GoalContribution::class,
         MergeRecord::class,
     ],
-    version = 51,
+    version = 52,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -841,6 +841,18 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 51→52: Manual Merge — add mergeGroupId and mergeType columns ---
+        val MIGRATION_51_52 =
+            object : Migration(51, 52) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `merge_records` ADD COLUMN `mergeGroupId` TEXT NOT NULL DEFAULT ''")
+                    db.execSQL("ALTER TABLE `merge_records` ADD COLUMN `mergeType` TEXT NOT NULL DEFAULT 'AUTO'")
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_merge_records_mergeGroupId` ON `merge_records` (`mergeGroupId`)"
+                    )
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -879,6 +891,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_48_49,
                             MIGRATION_49_50,
                             MIGRATION_50_51,
+                            MIGRATION_51_52,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

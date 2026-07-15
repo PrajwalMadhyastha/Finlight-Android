@@ -21,7 +21,7 @@ class ReportsViewModelFactory(private val application: Application) : ViewModelP
             val db = AppDatabase.getInstance(application)
             val settingsRepository = SettingsRepository(application)
             val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao())
+            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao(), db)
 
             @Suppress("UNCHECKED_CAST")
             return ReportsViewModel(

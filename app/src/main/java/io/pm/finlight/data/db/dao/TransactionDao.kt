@@ -933,6 +933,12 @@ interface TransactionDao {
     suspend fun getAllCrossRefs(): List<TransactionTagCrossRef>
 
     /**
+     * Retrieves all transactions synchronously, used for backup and integration testing.
+     */
+    @Query("SELECT * FROM transactions")
+    suspend fun getAllTransactionsSync(): List<Transaction>
+
+    /**
      * Deletes all transaction-tag cross-references, used during restore.
      */
     @Query("DELETE FROM transaction_tag_cross_ref")

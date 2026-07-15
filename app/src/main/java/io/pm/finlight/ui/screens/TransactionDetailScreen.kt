@@ -438,11 +438,12 @@ fun TransactionDetailScreen(
                         }
                     }
 
-                    // --- NEW: Unmerge card — shown only for transactions that were auto-merged ---
+                    // --- NEW: Unmerge card — shown only for transactions that were merged ---
                     if (mergeRecord != null) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 UnmergeSuggestionCard(
+                                    mergeRecord = mergeRecord!!,
                                     onUnmergeClick = { showUnmergeDialog = true },
                                 )
                             }
@@ -2389,11 +2390,22 @@ private fun ReviewBannerCard(
 
 /**
  * A contextual card shown on transactions that were created by the automatic
- * merge feature. Offers a single "Unmerge" action so the user can reverse the
+ * or manual merge feature. Offers a single "Unmerge" action so the user can reverse the
  * merge if it was done by mistake.
  */
 @Composable
-private fun UnmergeSuggestionCard(onUnmergeClick: () -> Unit) {
+private fun UnmergeSuggestionCard(
+    mergeRecord: io.pm.finlight.data.db.entity.MergeRecord,
+    onUnmergeClick: () -> Unit
+) {
+    val title = if (mergeRecord.mergeType == "MANUAL") "Manually Merged" else "Automatically Merged"
+    val subtitle =
+        if (mergeRecord.mergeType == "MANUAL") {
+            "This transaction contains manually merged items. Tap to separate them."
+        } else {
+            "This combines two duplicate charges. Tap to separate them."
+        }
+
     GlassPanel {
         Row(
             modifier =
@@ -2411,13 +2423,13 @@ private fun UnmergeSuggestionCard(onUnmergeClick: () -> Unit) {
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Merged Transaction",
+                    text = title,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    text = "This combines two charges. Tap to separate them.",
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

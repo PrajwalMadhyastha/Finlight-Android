@@ -24,7 +24,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
             val db = AppDatabase.getInstance(application)
             val settingsRepository = SettingsRepository(application)
             val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao())
+            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao(), db)
             val accountRepository = AccountRepository(db)
             val merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao())
 

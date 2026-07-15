@@ -494,4 +494,57 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    /**
+     * Test MIGRATION_51_52: Adds mergeGroupId and mergeType columns to merge_records table.
+     */
+    @Test
+    fun migrate51To52_addsMergeGroupColumnsToMergeRecords() {
+        helper.createDatabase(testDbName, 51).apply {
+            // Insert dummy data into merge_records (requires transactions to exist due to foreign key)
+            execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank')")
+            execSQL(
+                "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                    "VALUES (1, 'Parent', 100.0, 1000, 1, 'expense', 'AUTO', 0, 0, 0, 0, 'CONFIRMED')"
+            )
+            execSQL(
+                "INSERT INTO merge_records (parentTxnId, mergedAt, originalParentAmount, originalParentDate, " +
+                    "childDescription, childAmount, childDate, childAccountId, childTransactionType, childSource) " +
+                    "VALUES (1, 1000, 100.0, 1000, 'Child', 50.0, 1000, 1, 'expense', 'AUTO')"
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 52, true, AppDatabase.Companion.MIGRATION_51_52).apply {
+            val cursor = query("PRAGMA table_info(merge_records)")
+            val columnNames = mutableSetOf<String>()
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                columnNames.add(name)
+                val notNull = cursor.getInt(cursor.getColumnIndexOrThrow("notnull"))
+                val dfltValue = cursor.getString(cursor.getColumnIndexOrThrow("dflt_value"))
+
+                when (name) {
+                    "mergeGroupId" -> {
+                        assertEquals("Column 'mergeGroupId' should be NOT NULL", 1, notNull)
+                        assertEquals("''", dfltValue)
+                    }
+                    "mergeType" -> {
+                        assertEquals("Column 'mergeType' should be NOT NULL", 1, notNull)
+                        assertEquals("'AUTO'", dfltValue)
+                    }
+                }
+            }
+            cursor.close()
+
+            assertTrue("Column 'mergeGroupId' should exist", columnNames.contains("mergeGroupId"))
+            assertTrue("Column 'mergeType' should exist", columnNames.contains("mergeType"))
+
+            val indexCursor = query("SELECT name FROM sqlite_master WHERE type='index' AND name='index_merge_records_mergeGroupId'")
+            assertTrue("Index 'index_merge_records_mergeGroupId' should exist", indexCursor.moveToFirst())
+            indexCursor.close()
+
+            close()
+        }
+    }
 }

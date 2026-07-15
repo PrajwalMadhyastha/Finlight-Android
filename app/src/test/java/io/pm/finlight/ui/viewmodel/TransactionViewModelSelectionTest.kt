@@ -227,4 +227,70 @@ class TransactionViewModelSelectionTest : TransactionViewModelBaseSetup() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `canManualMerge returns true for mixed types if absolute total covers it`() =
+        runTest {
+            val t1 = Transaction(id = 1, amount = 100.0, date = 0L, accountId = 1, categoryId = 1, description = "Anchor", transactionType = "expense", notes = null)
+            val t2 = Transaction(id = 2, amount = 50.0, date = 0L, accountId = 1, categoryId = 1, description = "Child", transactionType = "expense", notes = null)
+            // Mock getTransactionDetailsForRange flow
+            whenever(transactionRepository.getTransactionDetailsForRange(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull())).thenReturn(
+                kotlinx.coroutines.flow.flowOf(
+                    listOf(
+                        io.pm.finlight.TransactionDetails(transaction = t1, images = emptyList(), accountName = null, categoryName = null, categoryIconKey = null, categoryColorKey = null, tagNames = null),
+                        io.pm.finlight.TransactionDetails(transaction = t2, images = emptyList(), accountName = null, categoryName = null, categoryIconKey = null, categoryColorKey = null, tagNames = null)
+                    )
+                )
+            )
+
+            // Re-initialize ViewModel so it picks up the mocked flow
+            initializeViewModel()
+
+            viewModel.canManualMerge.test {
+                // Initial state
+                assertFalse(awaitItem())
+
+                // Select t1 and t2
+                viewModel.toggleTransactionSelection(1)
+                viewModel.toggleTransactionSelection(2)
+
+                assertTrue(awaitItem())
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `confirmManualMerge delegates to repository and clears selection`() =
+        runTest {
+            val t1 = Transaction(id = 1, amount = 100.0, date = 0L, accountId = 1, categoryId = 1, description = "Anchor", transactionType = "expense", notes = null)
+            val t2 = Transaction(id = 2, amount = 50.0, date = 0L, accountId = 1, categoryId = 1, description = "Child", transactionType = "expense", notes = null)
+
+            whenever(transactionRepository.getTransactionDetailsForRange(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull())).thenReturn(
+                kotlinx.coroutines.flow.flowOf(
+                    listOf(
+                        io.pm.finlight.TransactionDetails(transaction = t1, images = emptyList(), accountName = null, categoryName = null, categoryIconKey = null, categoryColorKey = null, tagNames = null),
+                        io.pm.finlight.TransactionDetails(transaction = t2, images = emptyList(), accountName = null, categoryName = null, categoryIconKey = null, categoryColorKey = null, tagNames = null)
+                    )
+                )
+            )
+            initializeViewModel()
+
+            // Setup selections
+            viewModel.toggleTransactionSelection(1)
+            viewModel.toggleTransactionSelection(2)
+            viewModel.setAnchorTransaction(1)
+
+            // Mock repository call
+            whenever(transactionRepository.manualMergeTransactions(org.mockito.kotlin.any(), org.mockito.kotlin.any())).thenReturn(Unit)
+
+            viewModel.confirmManualMerge()
+
+            org.mockito.kotlin.verify(transactionRepository).manualMergeTransactions(1, listOf(2))
+
+            viewModel.selectedTransactionIds.test {
+                assertTrue(awaitItem().isEmpty())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

@@ -44,6 +44,28 @@ interface MergeRecordDao {
     @Query("DELETE FROM merge_records WHERE id = :id")
     suspend fun deleteById(id: Int)
 
+    // ─── Manual merge (N-to-1) support ──────────────────────────────────────
+
+    /**
+     * Returns ALL child snapshots belonging to the same manual merge group.
+     * Used to restore all N children during an unmerge of a manual merge.
+     */
+    @Query("SELECT * FROM merge_records WHERE mergeGroupId = :groupId ORDER BY mergedAt ASC")
+    suspend fun getAllForGroup(groupId: String): List<MergeRecord>
+
+    /**
+     * Deletes all records in a merge group after a successful unmerge.
+     */
+    @Query("DELETE FROM merge_records WHERE mergeGroupId = :groupId")
+    suspend fun deleteByGroupId(groupId: String)
+
+    /**
+     * Returns the [MergeRecord.mergeGroupId] for the most recent merge of a parent.
+     * Empty string means it was an AUTO merge (no group).
+     */
+    @Query("SELECT mergeGroupId FROM merge_records WHERE parentTxnId = :parentTxnId ORDER BY mergedAt DESC LIMIT 1")
+    suspend fun getGroupIdForParent(parentTxnId: Int): String?
+
     // ─── Backup / restore parity ────────────────────────────────────────────
 
     @Query("SELECT * FROM merge_records")

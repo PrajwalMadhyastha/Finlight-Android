@@ -146,7 +146,7 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Merged Transaction"))
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Automatically Merged"))
         composeTestRule.onNodeWithText("Unmerge").performClick()
 
         // 4. Verify confirmation dialog appears and confirm
@@ -156,6 +156,126 @@ class MergeTransactionFeatureTest {
         // 5. Should navigate back to dashboard
         composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule.onAllNodesWithText("Dashboard").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test
+    fun test_manualMerge_fromTransactionList_viaSelectionMode() {
+        // Transactions are already seeded by SeedDatabaseRule.
+        // We use the two known seeded expenses in the current month
+        // (Test Coffee: ₹150, Test Bus Fare: ₹50) both on ACCOUNT_WALLET_ID.
+
+        // Wait for app to load completely (Dashboard tab visible)
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText("Dashboard").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 1. Navigate to the Transactions tab
+        composeTestRule.onNodeWithText("Transactions").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText(TestDataSeeder.TXN_COFFEE_DESC).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 2. Long-press the first transaction to enter selection mode
+        composeTestRule.onNodeWithText(TestDataSeeder.TXN_COFFEE_DESC)
+            .performTouchInput { longClick() }
+
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("1 Selected").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 3. Tap the second transaction to add it to the selection
+        composeTestRule.waitForIdle()
+        Thread.sleep(1000)
+        composeTestRule.onNodeWithTag("transaction_item_checkbox_${TestDataSeeder.TXN_BUS_DESC}")
+            .performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("2 Selected").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 4. Tap the Merge icon in the TopAppBar action area
+        composeTestRule.onNodeWithContentDescription("Merge Transactions").performClick()
+
+        // 5. The Review Merge bottom sheet should appear
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Review Merge").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Review Merge").assertIsDisplayed()
+
+        // 6. The first listed transaction is pre-selected as anchor — confirm immediately
+        composeTestRule.onNodeWithText("Confirm Merge").performClick()
+
+        // 7. Selection mode should clear — the merged result appears in the list
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("2 Selected").fetchSemanticsNodes().isEmpty()
+        }
+
+        // Merged transaction keeps the anchor description (Coffee)
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText(TestDataSeeder.TXN_COFFEE_DESC).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test
+    fun test_manualUnmerge_fromDetailScreen_afterManualMerge() {
+        // Wait for app to load completely (Dashboard tab visible)
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText("Dashboard").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 1. Navigate to Transactions and enter selection mode
+        composeTestRule.onNodeWithText("Transactions").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText(TestDataSeeder.TXN_COFFEE_DESC).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeTestRule.onNodeWithText(TestDataSeeder.TXN_COFFEE_DESC).performTouchInput { longClick() }
+        composeTestRule.waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("1 Selected").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeTestRule.waitForIdle()
+        Thread.sleep(1000)
+        composeTestRule.onNodeWithTag("transaction_item_checkbox_${TestDataSeeder.TXN_BUS_DESC}").performClick()
+        composeTestRule.waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("2 Selected").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 2. Merge
+        composeTestRule.onNodeWithContentDescription("Merge Transactions").performClick()
+        composeTestRule.waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("Review Merge").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Confirm Merge").performClick()
+        composeTestRule.waitUntil(5000) {
+            composeTestRule.onAllNodesWithText("2 Selected").fetchSemanticsNodes().isEmpty()
+        }
+
+        // 3. Open the merged transaction's detail screen
+        composeTestRule.waitUntil(5000) {
+            composeTestRule.onAllNodesWithText(TestDataSeeder.TXN_COFFEE_DESC).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNode(hasText(TestDataSeeder.TXN_COFFEE_DESC), useUnmergedTree = true)
+            .onAncestors()
+            .filterToOne(hasClickAction())
+            .performClick()
+
+        // 4. Verify "Manually Merged" label and tap Unmerge
+        composeTestRule.waitUntil(5000) {
+            composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Manually Merged"))
+        composeTestRule.onNodeWithText("Unmerge").performClick()
+
+        // 5. Confirm the unmerge dialog
+        composeTestRule.onNodeWithText("Unmerge Transactions?").assertIsDisplayed()
+        composeTestRule.onNode(hasText("Unmerge").and(hasAnyAncestor(isDialog()))).performClick()
+
+        // 6. Should navigate back and both transactions reappear
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
         }
     }
 }
