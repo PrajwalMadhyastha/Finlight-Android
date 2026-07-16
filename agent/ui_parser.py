@@ -28,39 +28,65 @@ def get_interactable_elements(xml_content: str):
     root = ET.fromstring(xml_content)
     elements = []
     
-    # Iterate all nodes
-    for node in root.iter('node'):
-        # We only care if it has text, content-desc, or is clickable/focusable
-        text = node.get("text", "")
-        content_desc = node.get("content-desc", "")
-        resource_id = node.get("resource-id", "")
+    def process_node(node):
         clickable = node.get("clickable") == "true"
-        focusable = node.get("focusable") == "true"
         scrollable = node.get("scrollable") == "true"
         bounds_str = node.get("bounds", "")
         
-        # Determine if it's "interesting" to the LLM
-        is_interesting = (text or content_desc or clickable or scrollable)
+        if clickable:
+            text_parts = []
+            def gather_text(n):
+                t = n.get("text", "")
+                d = n.get("content-desc", "")
+                if t: text_parts.append(t)
+                if d and d not in text_parts: text_parts.append(d)
+                for child in n:
+                    gather_text(child)
+            
+            gather_text(node)
+            combined_text = " ".join(text_parts).strip()
+            
+            if bounds_str:
+                bounds = parse_bounds(bounds_str)
+                if bounds and bounds["width"] > 0 and bounds["height"] > 0:
+                    res_id = node.get("resource-id", "")
+                    el = {
+                        "text": combined_text if combined_text else None,
+                        "id": res_id.split("/")[-1] if "/" in res_id else (res_id if res_id else None),
+                        "clickable": True,
+                        "scrollable": scrollable,
+                        "center": [bounds["center_x"], bounds["center_y"]]
+                    }
+                    el = {k: v for k, v in el.items() if v is not None and v != ""}
+                    elements.append(el)
+            
+            # Since this node is clickable, its children's texts are merged here. 
+            # We don't process children as standalone interactive elements.
+            return
+
+        text = node.get("text", "")
+        content_desc = node.get("content-desc", "")
+        is_interesting = (text or content_desc or scrollable)
         
         if is_interesting and bounds_str:
             bounds = parse_bounds(bounds_str)
-            if bounds:
-                # If width or height is 0, skip
-                if bounds["width"] <= 0 or bounds["height"] <= 0:
-                    continue
-                    
+            if bounds and bounds["width"] > 0 and bounds["height"] > 0:
+                res_id = node.get("resource-id", "")
                 el = {
                     "text": text if text else None,
                     "desc": content_desc if content_desc else None,
-                    "id": resource_id.split("/")[-1] if "/" in resource_id else resource_id,
-                    "clickable": clickable,
+                    "id": res_id.split("/")[-1] if "/" in res_id else (res_id if res_id else None),
+                    "clickable": False,
                     "scrollable": scrollable,
                     "center": [bounds["center_x"], bounds["center_y"]]
                 }
-                # Clean up None values
                 el = {k: v for k, v in el.items() if v is not None and v != ""}
                 elements.append(el)
                 
+        for child in node:
+            process_node(child)
+
+    process_node(root)
     return elements
 
 def get_ui_json():

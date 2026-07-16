@@ -61,6 +61,8 @@ def generate_report(goal: str, result: dict, metadata: dict = None):
         app_map["Metadata"].update(metadata)
         
     # Remove deprecated keys that might be lingering from older app maps
+    app_map.pop("Features_Tested", None)
+    app_map.pop("Screens_Visited", None)
     if "Metadata" in app_map and "Execution_Time_Seconds" in app_map["Metadata"]:
         app_map["Metadata"].pop("Execution_Time_Seconds", None)
                 
@@ -79,17 +81,15 @@ def generate_report(goal: str, result: dict, metadata: dict = None):
             if "Features_Tested" in screen_data:
                 existing_features = app_map["Screens"][screen_name].setdefault("Features_Tested", [])
                 for feature in screen_data["Features_Tested"]:
-                    # Avoid duplicates by Name
-                    if not any(f.get("Name") == feature.get("Name") for f in existing_features):
-                        existing_features.append(feature)
+                    # Trust the LLM's semantic deduplication
+                    existing_features.append(feature)
                         
     if "New_Bugs" in diff and isinstance(diff["New_Bugs"], list):
         new_bugs_added = False
         for b in diff["New_Bugs"]:
-            exists = any(existing_bug.get("Description") == b.get("Description") for existing_bug in app_map.setdefault("Known_Bugs", []))
-            if not exists:
-                app_map["Known_Bugs"].append(b)
-                new_bugs_added = True
+            # Trust the LLM's semantic deduplication
+            app_map.setdefault("Known_Bugs", []).append(b)
+            new_bugs_added = True
         
         if new_bugs_added:
             with open("new_bugs_found.txt", "w") as f:
