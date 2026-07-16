@@ -11,6 +11,7 @@ import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_43_44
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_44_45
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_45_46
 import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_47_48
+import io.pm.finlight.data.db.AppDatabase.Companion.MIGRATION_50_51
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -421,6 +422,156 @@ class AppDatabaseMigrationTest {
             }
             assertTrue("Column 'parentReimbursementId' should exist in transactions table", found)
             cursor.close()
+            close()
+        }
+    }
+
+    /**
+     * Test MIGRATION_50_51: Creates the merge_records table for the Unmerge feature.
+     *
+     * Verifies that:
+     * 1. The merge_records table is created with the expected columns and correct nullability.
+     * 2. The index on parentTxnId is created.
+     */
+    @Test
+    fun migrate50To51_createsMergeRecordsTable() {
+        helper.createDatabase(testDbName, 50).apply {
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 51, true, MIGRATION_50_51).apply {
+            // Verify table exists with correct columns
+            val cursor = query("PRAGMA table_info(merge_records)")
+            val columnNames = mutableSetOf<String>()
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                val notNull = cursor.getInt(cursor.getColumnIndexOrThrow("notnull"))
+                columnNames.add(name)
+                when (name) {
+                    // NOT NULL columns
+                    "id", "parentTxnId", "mergedAt",
+                    "originalParentAmount", "originalParentDate",
+                    "childDescription", "childAmount", "childDate",
+                    "childAccountId", "childTransactionType", "childSource" ->
+                        assertEquals("Column '$name' should be NOT NULL", 1, notNull)
+                    // Nullable columns
+                    "originalParentNotes", "childCategoryId", "childNotes",
+                    "childSourceSmsId", "childSourceSmsHash", "childSmsSignature",
+                    "childOriginalDescription", "childOriginalAmount",
+                    "childCurrencyCode", "childConversionRate" ->
+                        assertEquals("Column '$name' should be nullable", 0, notNull)
+                }
+            }
+            cursor.close()
+
+            // Verify all expected columns are present
+            val expectedColumns =
+                setOf(
+                    "id", "parentTxnId", "mergedAt",
+                    "originalParentAmount", "originalParentDate", "originalParentNotes",
+                    "childDescription", "childAmount", "childDate", "childAccountId",
+                    "childCategoryId", "childTransactionType", "childSource", "childNotes",
+                    "childSourceSmsId", "childSourceSmsHash", "childSmsSignature",
+                    "childOriginalDescription", "childOriginalAmount",
+                    "childCurrencyCode", "childConversionRate",
+                )
+            assertEquals(
+                "merge_records table should have exactly the expected columns",
+                expectedColumns,
+                columnNames,
+            )
+
+            // Verify the index on parentTxnId was created
+            val indexCursor =
+                query(
+                    "SELECT name FROM sqlite_master WHERE type='index' AND name='index_merge_records_parentTxnId'"
+                )
+            assertTrue(
+                "Index 'index_merge_records_parentTxnId' should exist",
+                indexCursor.moveToFirst(),
+            )
+            indexCursor.close()
+            close()
+        }
+    }
+
+    /**
+     * Test MIGRATION_51_52: Adds mergeGroupId and mergeType columns to merge_records table.
+     */
+    @Test
+    fun migrate51To52_addsMergeGroupColumnsToMergeRecords() {
+        helper.createDatabase(testDbName, 51).apply {
+            // Insert dummy data into merge_records (requires transactions to exist due to foreign key)
+            execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank')")
+            execSQL(
+                "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                    "VALUES (1, 'Parent', 100.0, 1000, 1, 'expense', 'AUTO', 0, 0, 0, 0, 'CONFIRMED')"
+            )
+            execSQL(
+                "INSERT INTO merge_records (parentTxnId, mergedAt, originalParentAmount, originalParentDate, " +
+                    "childDescription, childAmount, childDate, childAccountId, childTransactionType, childSource) " +
+                    "VALUES (1, 1000, 100.0, 1000, 'Child', 50.0, 1000, 1, 'expense', 'AUTO')"
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 52, true, AppDatabase.Companion.MIGRATION_51_52).apply {
+            val cursor = query("PRAGMA table_info(merge_records)")
+            val columnNames = mutableSetOf<String>()
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                columnNames.add(name)
+                val notNull = cursor.getInt(cursor.getColumnIndexOrThrow("notnull"))
+                val dfltValue = cursor.getString(cursor.getColumnIndexOrThrow("dflt_value"))
+
+                when (name) {
+                    "mergeGroupId" -> {
+                        assertEquals("Column 'mergeGroupId' should be NOT NULL", 1, notNull)
+                        assertEquals("''", dfltValue)
+                    }
+                    "mergeType" -> {
+                        assertEquals("Column 'mergeType' should be NOT NULL", 1, notNull)
+                        assertEquals("'AUTO'", dfltValue)
+                    }
+                }
+            }
+            cursor.close()
+
+            assertTrue("Column 'mergeGroupId' should exist", columnNames.contains("mergeGroupId"))
+            assertTrue("Column 'mergeType' should exist", columnNames.contains("mergeType"))
+
+            val indexCursor = query("SELECT name FROM sqlite_master WHERE type='index' AND name='index_merge_records_mergeGroupId'")
+            assertTrue("Index 'index_merge_records_mergeGroupId' should exist", indexCursor.moveToFirst())
+            indexCursor.close()
+
+            close()
+        }
+    }
+
+    @Test
+    fun migrate52To53_addsLinkedTransferId() {
+        helper.createDatabase(testDbName, 52).apply {
+            execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank')")
+            execSQL(
+                "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                    "VALUES (1, 'Parent', 100.0, 1000, 1, 'expense', 'AUTO', 0, 0, 0, 0, 'CONFIRMED')"
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 53, true, AppDatabase.Companion.MIGRATION_52_53).apply {
+            val cursor = query("PRAGMA table_info(transactions)")
+            var hasColumn = false
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                if (name == "linkedTransferId") {
+                    hasColumn = true
+                    val notNull = cursor.getInt(cursor.getColumnIndexOrThrow("notnull"))
+                    assertEquals("Column 'linkedTransferId' should be nullable", 0, notNull)
+                }
+            }
+            cursor.close()
+            assertTrue("Column 'linkedTransferId' should exist", hasColumn)
             close()
         }
     }

@@ -410,6 +410,13 @@ fun MainAppScreen(shortcutAction: String? = null) {
                             }
                         },
                         actions = {
+                            val canManualMerge by transactionViewModel.canManualMerge.collectAsState()
+                            if (canManualMerge) {
+                                IconButton(onClick = { transactionViewModel.openReviewMergeSheet() }) {
+                                    Icon(Icons.Default.Merge, contentDescription = "Merge Transactions")
+                                }
+                            }
+
                             // --- NEW: Link Repayment action (visible only when 1 expense + 1+ incomes selected) ---
                             val canLinkAsReimbursement by transactionViewModel.canLinkAsReimbursement.collectAsState()
                             if (canLinkAsReimbursement) {

@@ -92,7 +92,7 @@ fun TransactionItem(
                 Checkbox(
                     checked = isSelected,
                     onCheckedChange = { onToggleSelection() },
-                    modifier = Modifier.padding(end = 16.dp),
+                    modifier = Modifier.padding(end = 16.dp).testTag("transaction_item_checkbox_${transactionDetails.transaction.description}"),
                 )
             }
 

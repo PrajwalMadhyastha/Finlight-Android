@@ -91,15 +91,12 @@ class AccountManagementTests {
      * Test editing an existing account's name and verifying the update.
      */
     @Test
-    fun test_editAccount_updatesName() {
+    fun test_editAccount_updatesNameAndCreatesAlias() {
         navigateToAccountList()
 
         val updatedAccountName = "Updated Bank ${UUID.randomUUID().toString().take(5)}"
 
         // Click Edit Account button for the seeded "Test Bank" account
-        // We do NOT use useUnmergedTree = true here because in the default merged tree,
-        // the parent GlassPanel merges the child text node's text "Test Bank",
-        // so the IconButton matches hasAnyAncestor(hasText("Test Bank")).
         composeTestRule.onNode(
             hasContentDescription("Edit Account") and hasAnyAncestor(hasText(TestDataSeeder.ACCOUNT_BANK_NAME)),
         ).performClick()
@@ -125,6 +122,15 @@ class AccountManagementTests {
         // Verify updated account exists and original does not
         composeTestRule.onNodeWithText(updatedAccountName).assertExists()
         composeTestRule.onNodeWithText(TestDataSeeder.ACCOUNT_BANK_NAME).assertDoesNotExist()
+
+        // Verify that an AccountAlias was created for the old name in the database
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+        val db = io.pm.finlight.data.db.AppDatabase.getInstance(context)
+        kotlinx.coroutines.runBlocking {
+            val alias = db.accountAliasDao().findByAlias(TestDataSeeder.ACCOUNT_BANK_NAME)
+            assert(alias != null) { "AccountAlias should be created for the old name" }
+            assert(alias?.aliasName == TestDataSeeder.ACCOUNT_BANK_NAME)
+        }
     }
 
     /**

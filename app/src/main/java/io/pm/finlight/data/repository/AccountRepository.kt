@@ -28,7 +28,16 @@ class AccountRepository(private val db: AppDatabase) {
     }
 
     suspend fun update(account: Account) {
-        accountDao.update(account)
+        db.withTransaction {
+            // Check if the account name is being changed
+            val oldAccount = accountDao.getAccountByIdBlocking(account.id)
+            if (oldAccount != null && oldAccount.name != account.name) {
+                // Name changed: create an alias from the old name to this account
+                val alias = AccountAlias(aliasName = oldAccount.name, destinationAccountId = account.id)
+                db.accountAliasDao().insertAll(listOf(alias))
+            }
+            accountDao.update(account)
+        }
     }
 
     suspend fun delete(account: Account) {
