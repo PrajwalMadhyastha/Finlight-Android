@@ -187,6 +187,10 @@ fun TransactionDetailScreen(
     val showReimbursementPicker by viewModel.showReimbursementPicker.collectAsState()
     val candidateReimbursements by viewModel.candidateReimbursements.collectAsState()
 
+    // --- NEW: Unmerge feature state ---
+    val mergeRecord by viewModel.observeMergeRecord(transactionId).collectAsState(initial = null)
+    var showUnmergeDialog by remember { mutableStateOf(false) }
+
     // Observe ViewModel-driven navigation events (e.g. after canonical nudge resolves).
     LaunchedEffect(Unit) {
         viewModel.navigateBackEvent.collect { navigateBack() }
@@ -434,6 +438,18 @@ fun TransactionDetailScreen(
                         }
                     }
 
+                    // --- NEW: Unmerge card — shown only for transactions that were merged ---
+                    if (mergeRecord != null) {
+                        item {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                UnmergeSuggestionCard(
+                                    mergeRecord = mergeRecord!!,
+                                    onUnmergeClick = { showUnmergeDialog = true },
+                                )
+                            }
+                        }
+                    }
+
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                             TransactionPropertiesCard(
@@ -668,6 +684,46 @@ fun TransactionDetailScreen(
                             viewModel.deleteTransaction(details.transaction)
                             showDeleteDialog = false
                             navigateBack()
+                        },
+                    )
+                }
+
+                // --- NEW: Unmerge confirmation dialog ---
+                if (showUnmergeDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showUnmergeDialog = false },
+                        containerColor = popupContainerColor,
+                        icon = {
+                            Icon(
+                                Icons.AutoMirrored.Filled.MergeType,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        },
+                        title = { Text("Unmerge Transactions?") },
+                        text = {
+                            Text(
+                                "This will split the transaction back into two separate entries.\n\n" +
+                                    "⚠\uFE0F Any edits made to this transaction after the merge will be lost." +
+                                    "The original amounts, date, and notes will be restored.",
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showUnmergeDialog = false
+                                    viewModel.unmergeTransaction(transactionId)
+                                    navigateBack()
+                                },
+                            ) {
+                                Text("Unmerge", color = MaterialTheme.colorScheme.primary)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showUnmergeDialog = false }) {
+                                Text("Cancel")
+                            }
                         },
                     )
                 }
@@ -2327,6 +2383,59 @@ private fun ReviewBannerCard(
                 modifier = Modifier.align(Alignment.End),
             ) {
                 Text("Mark as Reviewed")
+            }
+        }
+    }
+}
+
+/**
+ * A contextual card shown on transactions that were created by the automatic
+ * or manual merge feature. Offers a single "Unmerge" action so the user can reverse the
+ * merge if it was done by mistake.
+ */
+@Composable
+private fun UnmergeSuggestionCard(
+    mergeRecord: io.pm.finlight.data.db.entity.MergeRecord,
+    onUnmergeClick: () -> Unit
+) {
+    val title = if (mergeRecord.mergeType == "MANUAL") "Manually Merged" else "Automatically Merged"
+    val subtitle =
+        if (mergeRecord.mergeType == "MANUAL") {
+            "This transaction contains manually merged items. Tap to separate them."
+        } else {
+            "This combines two duplicate charges. Tap to separate them."
+        }
+
+    GlassPanel {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.MergeType,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = onUnmergeClick) {
+                Text("Unmerge")
             }
         }
     }

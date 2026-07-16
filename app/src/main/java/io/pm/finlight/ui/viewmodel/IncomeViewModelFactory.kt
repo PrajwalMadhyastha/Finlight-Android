@@ -20,7 +20,7 @@ class IncomeViewModelFactory(private val application: Application) : ViewModelPr
             val db = AppDatabase.getInstance(application)
             val settingsRepository = SettingsRepository(application)
             val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao())
+            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao(), db)
             val accountRepository = AccountRepository(db)
             val categoryRepository = CategoryRepository(db.categoryDao())
 

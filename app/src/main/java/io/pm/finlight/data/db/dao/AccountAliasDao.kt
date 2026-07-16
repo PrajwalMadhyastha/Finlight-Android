@@ -20,6 +20,9 @@ interface AccountAliasDao {
     @Query("SELECT * FROM account_aliases WHERE aliasName = :aliasName COLLATE NOCASE")
     suspend fun findByAlias(aliasName: String): AccountAlias?
 
+    @Query("SELECT * FROM account_aliases WHERE destinationAccountId = :accountId")
+    suspend fun getAliasesForAccount(accountId: Int): List<AccountAlias>
+
     /**
      * Retrieves all account aliases for backup purposes.
      */

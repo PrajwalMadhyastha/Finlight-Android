@@ -75,4 +75,6 @@ data class Transaction(
     // When set, this income transaction's amount has already been deducted from the
     // parent expense, and this income is marked isExcluded = true.
     val parentReimbursementId: Int? = null,
+    // --- NEW: Links two transactions that represent a self-transfer between accounts ---
+    val linkedTransferId: Int? = null,
 )

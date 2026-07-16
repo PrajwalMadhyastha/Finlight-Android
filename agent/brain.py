@@ -16,7 +16,7 @@ You will be provided with:
 
 Your secondary goal is to verify bugs and explore unknown areas.
 - **Novelty:** Prioritize navigating to screens that you haven't visited yet, or screens that have few tested features. Avoid getting stuck testing the same screen repeatedly unless it's necessary for your goal.
-- **Verification:** If the APP MAP contains bugs with Status "Open", attempt to reproduce them if you find yourself on the relevant screen. If you attempt to reproduce an "Open" bug and the behavior is now correct, state in your finish summary that it appears resolved.
+- **Verification:** If the APP MAP contains bugs with Status "Open", attempt to reproduce them if you find yourself on the relevant screen. If you attempt to reproduce an "Open" bug and the behavior is now correct, state in your finish summary that it appears resolved. If the bug is still present, simply acknowledge it in your reasoning and MOVE ON. Do NOT fail the run because an already known "Open" bug is still present. Only fail the run if you discover a completely NEW critical bug or crash that blocks your goal.
 - **Lifecycle Testing:** Occasionally use the `trigger_process_death` and `background_app` tools when in the middle of data entry (like composing a transaction) to verify that state is correctly saved and restored.
 
 You must think step-by-step (ReAct strategy) and output your next action in strict JSON format.
@@ -127,7 +127,10 @@ History of actions taken:
 {json.dumps(history, indent=2)}
 
 Based on the run summary and history, generate a JSON diff to update the relational App Map.
-Only include NEW features tested, NEW bugs found, and any known bugs that should be marked as "Resolved".
+CRITICAL INSTRUCTION FOR DEDUPLICATION: You MUST semantically compare any features or bugs you want to log against the `Current App Map`. 
+- Do NOT output a feature under `Features_Tested` if a conceptually similar feature already exists for that screen.
+- Do NOT output a bug under `New_Bugs` if a conceptually similar bug is already in the `Known_Bugs` list (even if the wording is slightly different).
+Only include GENUINELY NOVEL features tested, NOVEL bugs found, and any known bugs that should be marked as "Resolved".
 Try to accurately map the features and bugs to the specific Screen Name where they occurred.
 
 Output schema:

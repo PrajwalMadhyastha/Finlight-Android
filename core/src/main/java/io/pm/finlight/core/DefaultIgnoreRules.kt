@@ -100,6 +100,7 @@ val DEFAULT_IGNORE_PHRASES = listOf(
     "processed visa application",
     "get refund of",
     "get paid for order",
+    "wa.link",
     "SHARES OF.*TOWARDS SCHEME",
     "Voluntary Contribution.*credited to PRAN",
     "registered in Cash Equity",

@@ -18,4 +18,12 @@ interface DeletedSmsHashDao {
     /** Returns the full set of deleted hashes for use as a deny-list. */
     @Query("SELECT smsHash FROM deleted_sms_hashes")
     suspend fun getAllHashes(): List<String>
+
+    /**
+     * Removes a specific hash from the deny-list.
+     * Called during unmerge so the child's source SMS is no longer treated as
+     * "deleted" and will not be blocked from future re-processing.
+     */
+    @Query("DELETE FROM deleted_sms_hashes WHERE smsHash = :hash")
+    suspend fun deleteByHash(hash: String)
 }

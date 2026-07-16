@@ -56,7 +56,7 @@ class SmsTransactionSaver(
         val accountAliasDao = db.accountAliasDao()
         val transactionDao = db.transactionDao()
         val tagRepository = TagRepository(db.tagDao(), transactionDao)
-        val transactionRepository = TransactionRepository(transactionDao, settingsRepository, tagRepository, db.deletedSmsHashDao())
+        val transactionRepository = TransactionRepository(transactionDao, settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao(), db)
 
         val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
         val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
@@ -134,6 +134,12 @@ class SmsTransactionSaver(
             }
 
         // The repository handles travel-mode tag injection automatically.
-        return transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
+        val newId = transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
+
+        // --- NEW: Attempt to detect and link self-transfers ---
+        val savedTransaction = transactionToSave.copy(id = newId.toInt())
+        transactionRepository.detectAndLinkSelfTransfer(savedTransaction)
+
+        return newId
     }
 }

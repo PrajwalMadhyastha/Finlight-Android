@@ -285,6 +285,9 @@ class TransactionCrudTests {
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
         }
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText(description).fetchSemanticsNodes().isEmpty()
+        }
         composeTestRule.onNodeWithText(description).assertDoesNotExist()
     }
 

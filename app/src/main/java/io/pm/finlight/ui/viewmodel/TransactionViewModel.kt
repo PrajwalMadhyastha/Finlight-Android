@@ -150,6 +150,44 @@ class TransactionViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     }
 
+    // --- NEW: Manual Merge — validation state for the Merge action button ───
+
+    /**
+     * Emits a human-readable explanation of why the Merge action is disabled,
+     * or null when it is valid. Observed by the UI to show a Snackbar.
+     */
+    private val _mergeValidationError = MutableStateFlow<String?>(null)
+    val mergeValidationError: StateFlow<String?> = _mergeValidationError.asStateFlow()
+
+    /**
+     * True when the selection is a valid candidate for manual merging:
+     *  - At least 2 transactions selected.
+     *  - All from the same account.
+     *  - No split transactions in the selection.
+     *  - No PENDING/SKIPPED draft transactions in the selection.
+     */
+    val canManualMerge: StateFlow<Boolean> by lazy {
+        combine(_selectedTransactionIds, transactionsForSelectedMonth) { ids, txns ->
+            if (ids.size < 2) return@combine false
+            val selected = txns.filter { it.transaction.id in ids }
+            val hasSplit = selected.any { it.transaction.isSplit }
+            val hasPending = selected.any { it.transaction.status == "PENDING" || it.transaction.status == "SKIPPED" }
+            val uniqueAccounts = selected.map { it.transaction.accountId }.toSet()
+            !hasSplit && !hasPending && uniqueAccounts.size == 1
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    }
+
+    /** Shown when the user taps Merge — displays the review sheet before committing. */
+    private val _showReviewMergeSheet = MutableStateFlow(false)
+    val showReviewMergeSheet: StateFlow<Boolean> = _showReviewMergeSheet.asStateFlow()
+
+    /**
+     * The ID of the anchor transaction chosen in the review sheet.
+     * Defaults to the transaction with the largest amount when the sheet opens.
+     */
+    private val _anchorTransactionId = MutableStateFlow<Int?>(null)
+    val anchorTransactionId: StateFlow<Int?> = _anchorTransactionId.asStateFlow()
+
     private val _showShareSheet = MutableStateFlow(false)
     val showShareSheet: StateFlow<Boolean> = _showShareSheet.asStateFlow()
 
@@ -569,6 +607,60 @@ class TransactionViewModel(
     fun unlinkReimbursement(incomeId: Int) {
         viewModelScope.launch {
             transactionRepository.unlinkReimbursement(incomeId)
+        }
+    }
+
+    // --- NEW: Manual Merge Actions ---
+
+    fun openReviewMergeSheet() {
+        val ids = _selectedTransactionIds.value
+        if (ids.size < 2) return
+
+        viewModelScope.launch {
+            val allTxns = transactionsForSelectedMonth.value
+            val selected = allTxns.filter { it.transaction.id in ids }
+
+            // Default anchor is the one with the largest absolute amount
+            val largestTxn = selected.maxByOrNull { it.transaction.amount }
+            if (largestTxn != null) {
+                _anchorTransactionId.value = largestTxn.transaction.id
+            }
+
+            _showReviewMergeSheet.value = true
+        }
+    }
+
+    fun dismissReviewMergeSheet() {
+        _showReviewMergeSheet.value = false
+        _anchorTransactionId.value = null
+    }
+
+    fun setAnchorTransaction(transactionId: Int) {
+        if (_selectedTransactionIds.value.contains(transactionId)) {
+            _anchorTransactionId.value = transactionId
+        }
+    }
+
+    fun confirmManualMerge() {
+        viewModelScope.launch {
+            val anchorId = _anchorTransactionId.value
+            val selectedIds = _selectedTransactionIds.value
+
+            if (anchorId == null || selectedIds.size < 2 || !selectedIds.contains(anchorId)) {
+                _uiEvent.send("Invalid merge configuration.")
+                return@launch
+            }
+
+            val childIds = selectedIds.filter { it != anchorId }
+
+            try {
+                transactionRepository.manualMergeTransactions(anchorId, childIds)
+                _uiEvent.send("Successfully merged ${selectedIds.size} transactions.")
+                dismissReviewMergeSheet()
+                clearSelectionMode()
+            } catch (e: Exception) {
+                _uiEvent.send("Failed to merge transactions.")
+            }
         }
     }
 
@@ -1507,6 +1599,17 @@ class TransactionViewModel(
         }
     }
 
+    fun updateAnchorDetailsInPlace(
+        id: Int,
+        description: String,
+        categoryId: Int?,
+        notes: String
+    ) = viewModelScope.launch {
+        transactionRepository.updateDescription(id, description)
+        transactionRepository.updateCategoryId(id, categoryId)
+        transactionRepository.updateNotes(id, notes)
+    }
+
     fun markAsReviewed(transactionId: Int) =
         viewModelScope.launch {
             try {
@@ -1985,6 +2088,32 @@ class TransactionViewModel(
         viewModelScope.launch {
             _canonicalNudgeState.value = null
             _navigateBackEvent.send(Unit)
+        }
+    }
+
+    // ─── Unmerge ─────────────────────────────────────────────────────────────
+
+    /**
+     * Returns a [Flow] that emits the [MergeRecord] snapshot for [parentTxnId],
+     * or null if the transaction was never merged (or was already unmerged).
+     * The UI collects this to decide whether to show the "Unmerge" option.
+     */
+    fun observeMergeRecord(parentTxnId: Int) =
+        transactionRepository.observeMergeRecord(parentTxnId)
+
+    /**
+     * Fully reverses the most recent merge for [parentTxnId].
+     * On success, the parent is restored to its pre-merge state and the child
+     * transaction is re-inserted as a fresh row.
+     */
+    fun unmergeTransaction(parentTxnId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                transactionRepository.unmergeTransactions(parentTxnId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to unmerge transaction $parentTxnId", e)
+                _uiEvent.send("Failed to unmerge. Please try again.")
+            }
         }
     }
 }

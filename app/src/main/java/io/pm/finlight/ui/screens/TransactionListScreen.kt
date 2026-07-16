@@ -44,6 +44,7 @@ import io.pm.finlight.ui.components.AuroraProgressBar
 import io.pm.finlight.ui.components.FilterBottomSheet
 import io.pm.finlight.ui.components.PrivacyAwareText
 import io.pm.finlight.ui.components.ShareSnapshotSheet
+import io.pm.finlight.ui.components.ReviewMergeBottomSheet
 import io.pm.finlight.ui.components.TransactionList
 import io.pm.finlight.ui.components.pagerTabIndicatorOffset
 import io.pm.finlight.ui.theme.PopupSurfaceDark
@@ -184,6 +185,33 @@ fun TransactionListScreen(
                 onCategoryChange = viewModel::updateFilterCategory,
                 onTransactionTypeChange = viewModel::updateFilterTransactionType,
                 onClearFilters = viewModel::clearFilters,
+            )
+        }
+    }
+
+    val showReviewMergeSheet by viewModel.showReviewMergeSheet.collectAsState()
+    val anchorTransactionId by viewModel.anchorTransactionId.collectAsState()
+
+    if (showReviewMergeSheet) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.dismissReviewMergeSheet() },
+            sheetState = sheetState,
+            containerColor = if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight,
+            windowInsets = WindowInsets(0),
+        ) {
+            ReviewMergeBottomSheet(
+                selectedTransactions = transactions.filter { it.transaction.id in selectedIds },
+                anchorTransactionId = anchorTransactionId,
+                onAnchorSelected = { viewModel.setAnchorTransaction(it) },
+                categories = allCategories,
+                onSaveAnchorDetails = { desc, catId, notes ->
+                    anchorTransactionId?.let { id ->
+                        viewModel.updateAnchorDetailsInPlace(id, desc, catId, notes)
+                    }
+                },
+                onConfirm = { viewModel.confirmManualMerge() },
+                onCancel = { viewModel.dismissReviewMergeSheet() },
             )
         }
     }

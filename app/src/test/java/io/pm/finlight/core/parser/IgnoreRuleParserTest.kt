@@ -2302,4 +2302,42 @@ class IgnoreRuleParserTest : BaseSmsParserTest() {
                 )
             assertNull("Should ignore future credit notifications", result)
         }
+
+    @Test
+    fun `test ignores promotional real estate message with wa link`() =
+        runBlocking {
+            setupTest(
+                ignoreRules =
+                    listOf(
+                        IgnoreRule(
+                            pattern = "wa.link",
+                            isEnabled = true,
+                        ),
+                    ),
+            )
+            val smsBody =
+                """
+                EOI LIVE
+                BRIGADE-GRANADA
+                Whitefield-Hoskote Rd
+                Nr.Kadugodi-Metro/ITPL
+                40+Acre/80%-Greens
+                XXL-2/3/4BHK,frm-1.45Cr
+                Info
+                https://wa.link/brigade-authorised
+                """.trimIndent()
+            val mockSms = SmsMessage(id = 9624L, sender = "AD-BRIGDE", body = smsBody, date = System.currentTimeMillis())
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+            assertNull("Should ignore promotional messages containing wa.link", result)
+        }
 }
