@@ -873,4 +873,91 @@ class TransactionRepository(
             mergeRecordDao.deleteById(record.id)
         }
     }
+
+    // ─── Self Transfer Detection ──────────────────────────────────────────
+
+    /**
+     * Automatically detects if a newly inserted transaction is part of a self-transfer
+     * between two user accounts, based on a two-tiered logic:
+     * 1. Strict Time (<= 5 mins): Matches exactly on Amount.
+     * 2. Loose Time (<= 6 hours): Matches on Amount AND Account Alias/Name text.
+     */
+    suspend fun detectAndLinkSelfTransfer(newTxn: Transaction) {
+        if (newTxn.sourceSmsId == null || newTxn.linkedTransferId != null || newTxn.isExcluded || newTxn.isSplit) return
+
+        // 6-hour window
+        val windowMs = 6 * 60 * 60 * 1000L
+        val startTime = newTxn.date - windowMs
+        val endTime = newTxn.date + windowMs
+
+        val candidates =
+            transactionDao.findPotentialTransfers(
+                amount = newTxn.amount,
+                accountId = newTxn.accountId,
+                transactionType = newTxn.transactionType,
+                startTime = startTime,
+                endTime = endTime
+            )
+
+        for (candidate in candidates) {
+            val timeDiff = kotlin.math.abs(candidate.date - newTxn.date)
+            var isMatch = false
+
+            // Tier 2: Strict Time (<= 5 minutes)
+            if (timeDiff <= 5 * 60 * 1000L) {
+                isMatch = true
+            } else {
+                // Tier 1: Text Validation
+                val newTxnAliases = db.accountAliasDao().getAliasesForAccount(newTxn.accountId)
+                val candidateAliases = db.accountAliasDao().getAliasesForAccount(candidate.accountId)
+
+                val newTxnDesc = newTxn.originalDescription?.lowercase(Locale.ROOT) ?: ""
+                val candidateDesc = candidate.originalDescription?.lowercase(Locale.ROOT) ?: ""
+
+                // Extract digits from alias and check, or use token overlap
+                val candidateAliasMatches =
+                    candidateAliases.any { alias ->
+                        val digits = alias.aliasName.filter { it.isDigit() }
+                        (digits.isNotEmpty() && newTxnDesc.contains(digits)) ||
+                            io.pm.finlight.core.utils.StringSimilarity.calculateTokenOverlapScore(alias.aliasName, newTxnDesc) > 0.6
+                    }
+
+                val newTxnAliasMatches =
+                    newTxnAliases.any { alias ->
+                        val digits = alias.aliasName.filter { it.isDigit() }
+                        (digits.isNotEmpty() && candidateDesc.contains(digits)) ||
+                            io.pm.finlight.core.utils.StringSimilarity.calculateTokenOverlapScore(alias.aliasName, candidateDesc) > 0.6
+                    }
+
+                val newTxnAccount = db.accountDao().getAccountByIdBlocking(newTxn.accountId)
+                val candidateAccount = db.accountDao().getAccountByIdBlocking(candidate.accountId)
+
+                val candidateBankNameMatches =
+                    candidateAccount?.name?.let {
+                        io.pm.finlight.core.utils.StringSimilarity.calculateTokenOverlapScore(it, newTxnDesc) > 0.6
+                    } == true
+                val newTxnBankNameMatches =
+                    newTxnAccount?.name?.let {
+                        io.pm.finlight.core.utils.StringSimilarity.calculateTokenOverlapScore(it, candidateDesc) > 0.6
+                    } == true
+
+                // Extra check for keywords we discussed
+                val containsKeywords1 = newTxnDesc.contains("neft") || newTxnDesc.contains("imps") || newTxnDesc.contains("transfer")
+                val containsKeywords2 = candidateDesc.contains("neft") || candidateDesc.contains("imps") || candidateDesc.contains("transfer")
+
+                if (candidateAliasMatches || newTxnAliasMatches || candidateBankNameMatches || newTxnBankNameMatches || (containsKeywords1 && containsKeywords2)) {
+                    isMatch = true
+                }
+            }
+
+            if (isMatch) {
+                // Link them atomically
+                db.withTransaction {
+                    transactionDao.updateTransferLinkStatus(newTxn.id, candidate.id, true)
+                    transactionDao.updateTransferLinkStatus(candidate.id, newTxn.id, true)
+                }
+                break // Only link the first match
+            }
+        }
+    }
 }

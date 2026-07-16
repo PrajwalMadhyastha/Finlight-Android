@@ -547,4 +547,32 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    @Test
+    fun migrate52To53_addsLinkedTransferId() {
+        helper.createDatabase(testDbName, 52).apply {
+            execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank')")
+            execSQL(
+                "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                    "VALUES (1, 'Parent', 100.0, 1000, 1, 'expense', 'AUTO', 0, 0, 0, 0, 'CONFIRMED')"
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(testDbName, 53, true, AppDatabase.Companion.MIGRATION_52_53).apply {
+            val cursor = query("PRAGMA table_info(transactions)")
+            var hasColumn = false
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                if (name == "linkedTransferId") {
+                    hasColumn = true
+                    val notNull = cursor.getInt(cursor.getColumnIndexOrThrow("notnull"))
+                    assertEquals("Column 'linkedTransferId' should be nullable", 0, notNull)
+                }
+            }
+            cursor.close()
+            assertTrue("Column 'linkedTransferId' should exist", hasColumn)
+            close()
+        }
+    }
 }

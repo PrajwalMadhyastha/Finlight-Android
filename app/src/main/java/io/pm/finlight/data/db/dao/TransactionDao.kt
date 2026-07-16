@@ -475,7 +475,7 @@ interface TransactionDao {
             UNION ALL
             SELECT
                 P.id, P.description, S.categoryId, S.amount, P.date, P.accountId, S.notes, P.transactionType, P.sourceSmsId, P.sourceSmsHash, P.source,
-                P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit, P.needsReview, P.status, P.recurringRuleId, P.mergeDismissed, P.parentReimbursementId
+                P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit, P.needsReview, P.status, P.recurringRuleId, P.mergeDismissed, P.parentReimbursementId, P.linkedTransferId
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = 'income' AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0 AND P.status != 'PENDING' AND P.status != 'SKIPPED'
               AND (:accountId IS NULL OR P.accountId = :accountId)
@@ -1371,6 +1371,32 @@ interface TransactionDao {
         timeWindowStart: Long,
         newTxnId: Int
     ): Transaction?
+
+    @Query(
+        """
+        SELECT * FROM transactions 
+        WHERE amount = :amount 
+        AND accountId != :accountId 
+        AND transactionType != :transactionType
+        AND date BETWEEN :startTime AND :endTime
+        AND linkedTransferId IS NULL
+        AND isExcluded = 0
+        """
+    )
+    suspend fun findPotentialTransfers(
+        amount: Double,
+        accountId: Int,
+        transactionType: String,
+        startTime: Long,
+        endTime: Long
+    ): List<Transaction>
+
+    @Query("UPDATE transactions SET linkedTransferId = :linkedId, isExcluded = :isExcluded WHERE id = :id")
+    suspend fun updateTransferLinkStatus(
+        id: Int,
+        linkedId: Int?,
+        isExcluded: Boolean
+    )
 
     @Query("UPDATE transactions SET mergeDismissed = :dismissed WHERE id = :id")
     suspend fun updateMergeDismissed(

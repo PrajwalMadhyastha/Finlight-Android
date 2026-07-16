@@ -134,6 +134,12 @@ class SmsTransactionSaver(
             }
 
         // The repository handles travel-mode tag injection automatically.
-        return transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
+        val newId = transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
+
+        // --- NEW: Attempt to detect and link self-transfers ---
+        val savedTransaction = transactionToSave.copy(id = newId.toInt())
+        transactionRepository.detectAndLinkSelfTransfer(savedTransaction)
+
+        return newId
     }
 }

@@ -56,7 +56,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         GoalContribution::class,
         MergeRecord::class,
     ],
-    version = 52,
+    version = 53,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -798,7 +798,8 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_49_50 =
             object : Migration(49, 50) {
                 override fun migrate(db: SupportSQLiteDatabase) {
-                    db.execSQL("ALTER TABLE `transactions` ADD COLUMN `parentReimbursementId` INTEGER DEFAULT NULL")
+                    // From reimbursement tracking feature
+                    db.execSQL("ALTER TABLE `transactions` ADD COLUMN `parentReimbursementId` INTEGER")
                     db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_parentReimbursementId` ON `transactions` (`parentReimbursementId`)")
                 }
             }
@@ -853,6 +854,14 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 52→53: Self Transfer Detection ---
+        val MIGRATION_52_53 =
+            object : Migration(52, 53) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `transactions` ADD COLUMN `linkedTransferId` INTEGER")
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -892,6 +901,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_49_50,
                             MIGRATION_50_51,
                             MIGRATION_51_52,
+                            MIGRATION_52_53,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

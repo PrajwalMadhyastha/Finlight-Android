@@ -81,6 +81,12 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     @Mock
     private lateinit var db: AppDatabase
 
+    @Mock
+    private lateinit var accountDao: io.pm.finlight.data.db.dao.AccountDao
+
+    @Mock
+    private lateinit var accountAliasDao: io.pm.finlight.data.db.dao.AccountAliasDao
+
     private lateinit var repository: TransactionRepository
 
     // Use a fixed "today" for all tests to make them deterministic
@@ -124,6 +130,10 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         super.setup()
         // Initialize with default mock behaviors
         `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
+
+        // Mock DB dependencies
+        `when`(db.accountDao()).thenReturn(accountDao)
+        `when`(db.accountAliasDao()).thenReturn(accountAliasDao)
 
         // Mock withTransaction
         mockkStatic("androidx.room.RoomDatabaseKt")
@@ -1476,5 +1486,116 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
             verify(mergeRecordDaoMock).observeForParent(7)
+        }
+
+    @Test
+    fun `detectAndLinkSelfTransfer strict time match links transactions`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val newTxn = Transaction(id = 1, description = "Withdrawal", amount = 100.0, date = 1000L, accountId = 1, transactionType = "expense", sourceSmsId = 10, categoryId = null, notes = null)
+            val candidate = Transaction(id = 2, description = "Deposit", amount = 100.0, date = 1000L + 60 * 1000L, accountId = 2, transactionType = "income", sourceSmsId = 20, categoryId = null, notes = null)
+
+            // Return candidate
+            org.mockito.kotlin.whenever(
+                transactionDao.findPotentialTransfers(
+                    org.mockito.kotlin.eq(100.0),
+                    org.mockito.kotlin.eq(1),
+                    org.mockito.kotlin.eq("expense"),
+                    org.mockito.kotlin.any(),
+                    org.mockito.kotlin.any()
+                )
+            ).thenReturn(listOf(candidate))
+
+            repository.detectAndLinkSelfTransfer(newTxn)
+
+            verify(transactionDao).updateTransferLinkStatus(1, 2, true)
+            verify(transactionDao).updateTransferLinkStatus(2, 1, true)
+        }
+
+    @Test
+    fun `detectAndLinkSelfTransfer loose time match with alias match links transactions`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val newTxn = Transaction(id = 1, description = "Transfer", originalDescription = "Transfer to 1234", amount = 100.0, date = 1000L, accountId = 1, transactionType = "expense", sourceSmsId = 10, categoryId = null, notes = null)
+            // 2 hours difference (loose time)
+            val candidate = Transaction(id = 2, description = "Transfer", originalDescription = "Received from 9999", amount = 100.0, date = 1000L + 2 * 60 * 60 * 1000L, accountId = 2, transactionType = "income", sourceSmsId = 20, categoryId = null, notes = null)
+
+            org.mockito.kotlin.whenever(
+                transactionDao.findPotentialTransfers(
+                    org.mockito.kotlin.eq(100.0),
+                    org.mockito.kotlin.eq(1),
+                    org.mockito.kotlin.eq("expense"),
+                    org.mockito.kotlin.any(),
+                    org.mockito.kotlin.any()
+                )
+            ).thenReturn(listOf(candidate))
+
+            val alias = io.pm.finlight.data.db.entity.AccountAlias(aliasName = "HDFC-1234", destinationAccountId = 2)
+            org.mockito.kotlin.whenever(accountAliasDao.getAliasesForAccount(1)).thenReturn(emptyList())
+            org.mockito.kotlin.whenever(accountAliasDao.getAliasesForAccount(2)).thenReturn(listOf(alias))
+
+            org.mockito.kotlin.whenever(accountDao.getAccountByIdBlocking(1)).thenReturn(io.pm.finlight.Account(id = 1, name = "Account1", type = "bank"))
+            org.mockito.kotlin.whenever(accountDao.getAccountByIdBlocking(2)).thenReturn(io.pm.finlight.Account(id = 2, name = "Account2", type = "bank"))
+
+            repository.detectAndLinkSelfTransfer(newTxn)
+
+            verify(transactionDao).updateTransferLinkStatus(1, 2, true)
+            verify(transactionDao).updateTransferLinkStatus(2, 1, true)
+        }
+
+    @Test
+    fun `detectAndLinkSelfTransfer loose time match without text match does not link`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val newTxn = Transaction(id = 1, description = "Expense", originalDescription = "Some expense", amount = 100.0, date = 1000L, accountId = 1, transactionType = "expense", sourceSmsId = 10, categoryId = null, notes = null)
+            // 2 hours difference (loose time)
+            val candidate = Transaction(id = 2, description = "Income", originalDescription = "Some income", amount = 100.0, date = 1000L + 2 * 60 * 60 * 1000L, accountId = 2, transactionType = "income", sourceSmsId = 20, categoryId = null, notes = null)
+
+            org.mockito.kotlin.whenever(
+                transactionDao.findPotentialTransfers(
+                    org.mockito.kotlin.eq(100.0),
+                    org.mockito.kotlin.eq(1),
+                    org.mockito.kotlin.eq("expense"),
+                    org.mockito.kotlin.any(),
+                    org.mockito.kotlin.any()
+                )
+            ).thenReturn(listOf(candidate))
+
+            org.mockito.kotlin.whenever(accountAliasDao.getAliasesForAccount(1)).thenReturn(emptyList())
+            org.mockito.kotlin.whenever(accountAliasDao.getAliasesForAccount(2)).thenReturn(emptyList())
+
+            org.mockito.kotlin.whenever(accountDao.getAccountByIdBlocking(1)).thenReturn(io.pm.finlight.Account(id = 1, name = "Account1", type = "bank"))
+            org.mockito.kotlin.whenever(accountDao.getAccountByIdBlocking(2)).thenReturn(io.pm.finlight.Account(id = 2, name = "Account2", type = "bank"))
+
+            repository.detectAndLinkSelfTransfer(newTxn)
+
+            verify(transactionDao, org.mockito.Mockito.never()).updateTransferLinkStatus(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.any())
+        }
+
+    @Test
+    fun `detectAndLinkSelfTransfer skips if already linked or excluded`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val newTxnLinked = Transaction(id = 1, description = "A", amount = 100.0, date = 1000L, accountId = 1, transactionType = "expense", sourceSmsId = 10, linkedTransferId = 99, categoryId = null, notes = null)
+            val newTxnExcluded = Transaction(id = 2, description = "B", amount = 100.0, date = 1000L, accountId = 1, transactionType = "expense", sourceSmsId = 10, isExcluded = true, categoryId = null, notes = null)
+
+            repository.detectAndLinkSelfTransfer(newTxnLinked)
+            repository.detectAndLinkSelfTransfer(newTxnExcluded)
+
+            verify(transactionDao, org.mockito.Mockito.never()).findPotentialTransfers(
+                org.mockito.kotlin.any(),
+                org.mockito.kotlin.any(),
+                org.mockito.kotlin.any(),
+                org.mockito.kotlin.any(),
+                org.mockito.kotlin.any()
+            )
         }
 }
