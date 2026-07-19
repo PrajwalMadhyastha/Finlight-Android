@@ -48,10 +48,9 @@ class OnboardingViewModel(
     }
 
     fun onNameChanged(newName: String) {
-        val filteredName = newName.filter { it.isLetter() || it.isWhitespace() }
-        if (filteredName.length <= 50) {
-            _userName.value = filteredName
-            _isNameValid.value = filteredName.isNotBlank()
+        if (newName.length <= 50) {
+            _userName.value = newName
+            _isNameValid.value = newName.isNotBlank() && newName.all { it.isLetter() || it.isWhitespace() }
         }
     }
 
