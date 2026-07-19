@@ -292,9 +292,9 @@ fun AnnualSimulatorScreen(
                     )
                     OutlinedTextField(
                         value = amountStr,
-                        onValueChange = { tfv ->
-                            if (tfv.text.all { it.isDigit() }) {
-                                amountStr = tfv
+                        onValueChange = { str ->
+                            if (str.all { it.isDigit() }) {
+                                amountStr = str
                             }
                         },
                         label = { Text("Amount") },
