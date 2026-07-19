@@ -803,6 +803,27 @@ class TransactionRepository(
 
     // ─── Unmerge ────────────────────────────────────────────────────────────
 
+    private fun restoreTransactionFromMergeRecord(r: MergeRecord): Transaction {
+        return Transaction(
+            description = r.childDescription,
+            amount = r.childAmount,
+            date = r.childDate,
+            accountId = r.childAccountId,
+            categoryId = r.childCategoryId,
+            transactionType = r.childTransactionType,
+            source = r.childSource,
+            notes = r.childNotes,
+            sourceSmsId = r.childSourceSmsId,
+            sourceSmsHash = r.childSourceSmsHash,
+            smsSignature = r.childSmsSignature,
+            originalDescription = r.childOriginalDescription,
+            originalAmount = r.childOriginalAmount,
+            currencyCode = r.childCurrencyCode,
+            conversionRate = r.childConversionRate,
+            mergeDismissed = false,
+        )
+    }
+
     /**
      * Observes whether a merge snapshot exists for the given parent transaction.
      * The UI uses this to decide whether to show the "Unmerge" option.
@@ -843,25 +864,7 @@ class TransactionRepository(
 
                 // Re-insert each child
                 for (r in allRecords) {
-                    val restoredChild =
-                        Transaction(
-                            description = r.childDescription,
-                            amount = r.childAmount,
-                            date = r.childDate,
-                            accountId = r.childAccountId,
-                            categoryId = r.childCategoryId,
-                            transactionType = r.childTransactionType,
-                            source = r.childSource,
-                            notes = r.childNotes,
-                            sourceSmsId = r.childSourceSmsId,
-                            sourceSmsHash = r.childSourceSmsHash,
-                            smsSignature = r.childSmsSignature,
-                            originalDescription = r.childOriginalDescription,
-                            originalAmount = r.childOriginalAmount,
-                            currencyCode = r.childCurrencyCode,
-                            conversionRate = r.childConversionRate,
-                            mergeDismissed = false,
-                        )
+                    val restoredChild = restoreTransactionFromMergeRecord(r)
                     transactionDao.insert(restoredChild)
 
                     // Unblock the child's SMS so it can be re-scanned
@@ -889,25 +892,7 @@ class TransactionRepository(
 
                 // Re-insert each child
                 for (r in allAutoRecords) {
-                    val restoredChild =
-                        Transaction(
-                            description = r.childDescription,
-                            amount = r.childAmount,
-                            date = r.childDate,
-                            accountId = r.childAccountId,
-                            categoryId = r.childCategoryId,
-                            transactionType = r.childTransactionType,
-                            source = r.childSource,
-                            notes = r.childNotes,
-                            sourceSmsId = r.childSourceSmsId,
-                            sourceSmsHash = r.childSourceSmsHash,
-                            smsSignature = r.childSmsSignature,
-                            originalDescription = r.childOriginalDescription,
-                            originalAmount = r.childOriginalAmount,
-                            currencyCode = r.childCurrencyCode,
-                            conversionRate = r.childConversionRate,
-                            mergeDismissed = false,
-                        )
+                    val restoredChild = restoreTransactionFromMergeRecord(r)
                     transactionDao.insert(restoredChild)
 
                     r.childSourceSmsHash?.let { hash ->

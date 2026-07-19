@@ -47,3 +47,5 @@ ml_training/venv/
 ml_training/data/
 ml_training/output/
 ml_training/__pycache__/
+run_log*.txt
+issue*.md
