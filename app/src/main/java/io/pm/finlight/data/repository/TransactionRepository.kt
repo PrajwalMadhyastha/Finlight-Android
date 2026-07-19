@@ -612,26 +612,12 @@ class TransactionRepository(
 
         // ── Snapshot BEFORE any mutation so the merge is fully reversible ────
         mergeRecordDao.insert(
-            MergeRecord(
+            createMergeRecord(
                 parentTxnId = activeParentId,
                 originalParentAmount = finalParentTxn.amount,
                 originalParentDate = finalParentTxn.date,
                 originalParentNotes = finalParentTxn.notes,
-                childDescription = childTxn.description,
-                childAmount = childTxn.amount,
-                childDate = childTxn.date,
-                childAccountId = childTxn.accountId,
-                childCategoryId = childTxn.categoryId,
-                childTransactionType = childTxn.transactionType,
-                childSource = childTxn.source,
-                childNotes = childTxn.notes,
-                childSourceSmsId = childTxn.sourceSmsId,
-                childSourceSmsHash = childTxn.sourceSmsHash,
-                childSmsSignature = childTxn.smsSignature,
-                childOriginalDescription = childTxn.originalDescription,
-                childOriginalAmount = childTxn.originalAmount,
-                childCurrencyCode = childTxn.currencyCode,
-                childConversionRate = childTxn.conversionRate,
+                childTxn = childTxn,
                 mergeGroupId = "",
                 mergeType = "AUTO",
             )
@@ -680,6 +666,40 @@ class TransactionRepository(
     }
 
     // --- FEATURE: Manual Transaction Merge ---
+
+    private fun createMergeRecord(
+        parentTxnId: Int,
+        originalParentAmount: Double,
+        originalParentDate: Long,
+        originalParentNotes: String?,
+        childTxn: Transaction,
+        mergeGroupId: String,
+        mergeType: String
+    ): MergeRecord {
+        return MergeRecord(
+            parentTxnId = parentTxnId,
+            originalParentAmount = originalParentAmount,
+            originalParentDate = originalParentDate,
+            originalParentNotes = originalParentNotes,
+            childDescription = childTxn.description,
+            childAmount = childTxn.amount,
+            childDate = childTxn.date,
+            childAccountId = childTxn.accountId,
+            childCategoryId = childTxn.categoryId,
+            childTransactionType = childTxn.transactionType,
+            childSource = childTxn.source,
+            childNotes = childTxn.notes,
+            childSourceSmsId = childTxn.sourceSmsId,
+            childSourceSmsHash = childTxn.sourceSmsHash,
+            childSmsSignature = childTxn.smsSignature,
+            childOriginalDescription = childTxn.originalDescription,
+            childOriginalAmount = childTxn.originalAmount,
+            childCurrencyCode = childTxn.currencyCode,
+            childConversionRate = childTxn.conversionRate,
+            mergeGroupId = mergeGroupId,
+            mergeType = mergeType,
+        )
+    }
 
     /**
      * Merges [anchorTxnId] with all [childTxnIds] into a single transaction.
@@ -754,26 +774,12 @@ class TransactionRepository(
             // ── Persist one MergeRecord per child ──────────────────────────
             for (childTxn in childTxns) {
                 mergeRecordDao.insert(
-                    MergeRecord(
+                    createMergeRecord(
                         parentTxnId = anchorTxnId,
                         originalParentAmount = originalParentAmount,
                         originalParentDate = originalParentDate,
                         originalParentNotes = originalParentNotes,
-                        childDescription = childTxn.description,
-                        childAmount = childTxn.amount,
-                        childDate = childTxn.date,
-                        childAccountId = childTxn.accountId,
-                        childCategoryId = childTxn.categoryId,
-                        childTransactionType = childTxn.transactionType,
-                        childSource = childTxn.source,
-                        childNotes = childTxn.notes,
-                        childSourceSmsId = childTxn.sourceSmsId,
-                        childSourceSmsHash = childTxn.sourceSmsHash,
-                        childSmsSignature = childTxn.smsSignature,
-                        childOriginalDescription = childTxn.originalDescription,
-                        childOriginalAmount = childTxn.originalAmount,
-                        childCurrencyCode = childTxn.currencyCode,
-                        childConversionRate = childTxn.conversionRate,
+                        childTxn = childTxn,
                         mergeGroupId = groupId,
                         mergeType = "MANUAL",
                     )
