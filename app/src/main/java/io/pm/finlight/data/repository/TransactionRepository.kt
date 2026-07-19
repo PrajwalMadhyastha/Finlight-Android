@@ -584,18 +584,39 @@ class TransactionRepository(
         childSmsBody: String? = null,
         childSmsDate: Long? = null
     ) {
-        val parentTxn = transactionDao.getTransactionByIdSync(parentTxnId)
+        var activeParentId = parentTxnId
+        var parentTxn = transactionDao.getTransactionByIdSync(activeParentId)
         val childTxn = transactionDao.getTransactionByIdSync(childTxnId)
 
-        if (parentTxn == null || childTxn == null) return
+        if (childTxn == null) return
+
+        if (parentTxn == null) {
+            val timeWindowStart = childTxn.date - (3 * 60 * 60 * 1000L)
+            val newParent =
+                transactionDao.findRecentTransactionForMerge(
+                    merchant = childTxn.description,
+                    accountId = childTxn.accountId,
+                    transactionType = childTxn.transactionType,
+                    timeWindowStart = timeWindowStart,
+                    newTxnId = childTxnId,
+                )
+            if (newParent != null) {
+                activeParentId = newParent.id
+                parentTxn = newParent
+            } else {
+                return
+            }
+        }
+
+        val finalParentTxn = parentTxn ?: return
 
         // ── Snapshot BEFORE any mutation so the merge is fully reversible ────
         mergeRecordDao.insert(
             MergeRecord(
-                parentTxnId = parentTxnId,
-                originalParentAmount = parentTxn.amount,
-                originalParentDate = parentTxn.date,
-                originalParentNotes = parentTxn.notes,
+                parentTxnId = activeParentId,
+                originalParentAmount = finalParentTxn.amount,
+                originalParentDate = finalParentTxn.date,
+                originalParentNotes = finalParentTxn.notes,
                 childDescription = childTxn.description,
                 childAmount = childTxn.amount,
                 childDate = childTxn.date,
@@ -618,10 +639,10 @@ class TransactionRepository(
 
         transactionDao.updateMergeDismissed(childTxnId, true)
 
-        val newAmount = parentTxn.amount + childTxn.amount
-        val newDate = maxOf(parentTxn.date, childTxn.date)
+        val newAmount = finalParentTxn.amount + childTxn.amount
+        val newDate = maxOf(finalParentTxn.date, childTxn.date)
 
-        val existingNotes = parentTxn.notes ?: ""
+        val existingNotes = finalParentTxn.notes ?: ""
         val dateString =
             if (childSmsDate != null) {
                 java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(childSmsDate))
@@ -629,12 +650,16 @@ class TransactionRepository(
                 java.util.Date(childTxn.date).toString()
             }
 
-        val childNote =
+        var childNote =
             if (childSmsBody != null) {
                 "Merged on $dateString:\n$childSmsBody"
             } else {
                 "Merged Transaction: ${childTxn.amount} on $dateString"
             }
+
+        if (!childTxn.notes.isNullOrBlank()) {
+            childNote += "\n\n${childTxn.notes}"
+        }
 
         val newNotes =
             if (existingNotes.isBlank()) {
@@ -643,9 +668,9 @@ class TransactionRepository(
                 "$existingNotes\n\n$childNote"
             }
 
-        transactionDao.updateAmount(parentTxnId, newAmount)
-        transactionDao.updateDate(parentTxnId, newDate)
-        transactionDao.updateNotes(parentTxnId, newNotes)
+        transactionDao.updateAmount(activeParentId, newAmount)
+        transactionDao.updateDate(activeParentId, newDate)
+        transactionDao.updateNotes(activeParentId, newNotes)
 
         childTxn.sourceSmsHash?.let { hash ->
             deletedSmsHashDao.insert(DeletedSmsHash(smsHash = hash))
@@ -719,7 +744,10 @@ class TransactionRepository(
             for (childTxn in childTxns) {
                 val dateStr = sdf.format(java.util.Date(childTxn.date))
                 val sign = if (childTxn.transactionType == "income") "+" else "-"
-                val childNote = "[Merged] ${childTxn.description} ($sign₹${"%.2f".format(childTxn.amount)}) · $dateStr"
+                var childNote = "[Merged] ${childTxn.description} ($sign₹${"%.2f".format(childTxn.amount)}) · $dateStr"
+                if (!childTxn.notes.isNullOrBlank()) {
+                    childNote += "\n\n${childTxn.notes}"
+                }
                 notes = if (notes.isBlank()) childNote else "$notes\n\n$childNote"
             }
 
@@ -840,37 +868,49 @@ class TransactionRepository(
                 mergeRecordDao.deleteByGroupId(groupId)
             }
         } else {
-            // ── AUTO path: legacy 1-to-1 restore ─────────────────────────
-            transactionDao.updateAmount(parentTxnId, record.originalParentAmount)
-            transactionDao.updateDate(parentTxnId, record.originalParentDate)
-            transactionDao.updateNotes(parentTxnId, record.originalParentNotes)
+            // ── AUTO path (chained 1-to-1): restore ALL children for this parent ───────────
+            val allAutoRecords =
+                mergeRecordDao.getAllForParentSync(parentTxnId)
+                    .filter { it.mergeType == "AUTO" }
+            if (allAutoRecords.isEmpty()) return
 
-            val restoredChild =
-                Transaction(
-                    description = record.childDescription,
-                    amount = record.childAmount,
-                    date = record.childDate,
-                    accountId = record.childAccountId,
-                    categoryId = record.childCategoryId,
-                    transactionType = record.childTransactionType,
-                    source = record.childSource,
-                    notes = record.childNotes,
-                    sourceSmsId = record.childSourceSmsId,
-                    sourceSmsHash = record.childSourceSmsHash,
-                    smsSignature = record.childSmsSignature,
-                    originalDescription = record.childOriginalDescription,
-                    originalAmount = record.childOriginalAmount,
-                    currencyCode = record.childCurrencyCode,
-                    conversionRate = record.childConversionRate,
-                    mergeDismissed = false,
-                )
-            transactionDao.insert(restoredChild)
+            db.withTransaction {
+                // The VERY FIRST record (oldest) has the original parent state
+                val first = allAutoRecords.first()
+                transactionDao.updateAmount(parentTxnId, first.originalParentAmount)
+                transactionDao.updateDate(parentTxnId, first.originalParentDate)
+                transactionDao.updateNotes(parentTxnId, first.originalParentNotes)
 
-            record.childSourceSmsHash?.let { hash ->
-                deletedSmsHashDao.deleteByHash(hash)
+                // Re-insert each child
+                for (r in allAutoRecords) {
+                    val restoredChild =
+                        Transaction(
+                            description = r.childDescription,
+                            amount = r.childAmount,
+                            date = r.childDate,
+                            accountId = r.childAccountId,
+                            categoryId = r.childCategoryId,
+                            transactionType = r.childTransactionType,
+                            source = r.childSource,
+                            notes = r.childNotes,
+                            sourceSmsId = r.childSourceSmsId,
+                            sourceSmsHash = r.childSourceSmsHash,
+                            smsSignature = r.childSmsSignature,
+                            originalDescription = r.childOriginalDescription,
+                            originalAmount = r.childOriginalAmount,
+                            currencyCode = r.childCurrencyCode,
+                            conversionRate = r.childConversionRate,
+                            mergeDismissed = false,
+                        )
+                    transactionDao.insert(restoredChild)
+
+                    r.childSourceSmsHash?.let { hash ->
+                        deletedSmsHashDao.deleteByHash(hash)
+                    }
+
+                    mergeRecordDao.deleteById(r.id)
+                }
             }
-
-            mergeRecordDao.deleteById(record.id)
         }
     }
 

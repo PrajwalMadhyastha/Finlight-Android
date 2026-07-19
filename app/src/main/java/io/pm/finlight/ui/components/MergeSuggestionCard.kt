@@ -17,17 +17,17 @@ import androidx.compose.ui.platform.testTag
 
 @Composable
 fun MergeSuggestionCard(
-    suggestion: Pair<TransactionDetails, TransactionDetails>,
+    suggestion: Pair<TransactionDetails, List<TransactionDetails>>,
     onMerge: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val parent = suggestion.first.transaction
-    val child = suggestion.second.transaction
+    val children = suggestion.second.map { it.transaction }
 
     val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-    val parentAmount = currencyFormat.format(parent.amount)
-    val childAmount = currencyFormat.format(child.amount)
-    val totalAmount = currencyFormat.format(parent.amount + child.amount)
+
+    val childrenTotal = children.sumOf { it.amount }
+    val totalAmount = currencyFormat.format(parent.amount + childrenTotal)
     val merchant = parent.description
 
     GlassPanel(
@@ -66,8 +66,9 @@ fun MergeSuggestionCard(
                 }
             }
 
+            val countText = if (children.size == 1) "another charge" else "${children.size} similar charges"
             Text(
-                text = "We noticed another charge at $merchant for $childAmount.",
+                text = "We noticed $countText at $merchant.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

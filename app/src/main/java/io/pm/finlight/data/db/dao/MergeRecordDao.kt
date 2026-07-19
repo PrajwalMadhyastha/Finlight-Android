@@ -38,6 +38,13 @@ interface MergeRecordDao {
     suspend fun getForParentSync(parentTxnId: Int): MergeRecord?
 
     /**
+     * Returns ALL merge snapshots for a parent, ordered chronologically.
+     * Used to completely undo all AUTO merges for a parent.
+     */
+    @Query("SELECT * FROM merge_records WHERE parentTxnId = :parentTxnId ORDER BY mergedAt ASC")
+    suspend fun getAllForParentSync(parentTxnId: Int): List<MergeRecord>
+
+    /**
      * Deletes a specific merge record by its own primary key, called after a
      * successful unmerge to clean up the snapshot.
      */
