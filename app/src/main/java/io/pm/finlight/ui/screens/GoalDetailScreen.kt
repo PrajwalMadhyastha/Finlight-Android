@@ -331,7 +331,11 @@ fun GoalDetailScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = amount,
-                        onValueChange = { tfv -> amount = tfv.copy(text = tfv.text.filter { ch -> ch.isDigit() || ch == '.' }) },
+                        onValueChange = { tfv ->
+                            if (tfv.text.all { ch -> ch.isDigit() || ch == '.' }) {
+                                amount = tfv
+                            }
+                        },
                         label = { Text("Amount") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         leadingIcon = { Text("₹") },

@@ -179,11 +179,9 @@ fun CurrencyTravelScreen(
                     tripType = tripType, onTripTypeChange = { tripType = it },
                     selectedCurrency = selectedCurrency, onSelectCurrencyClick = { showTravelCurrencyPicker = true },
                     conversionRate = conversionRate.text, onConversionRateChange = { str ->
-                        conversionRate =
-                            TextFieldValue(
-                                str.filter { c -> c.isDigit() || c == '.' },
-                                TextRange(str.filter { c -> c.isDigit() || c == '.' }.length),
-                            )
+                        if (str.all { c -> c.isDigit() || c == '.' }) {
+                            conversionRate = TextFieldValue(str, TextRange(str.length))
+                        }
                     },
                     homeCurrencyCode = homeCurrencyCode,
                     startDate = startDate, onStartDateClick = { showStartDatePicker = true },

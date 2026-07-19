@@ -292,7 +292,11 @@ fun AnnualSimulatorScreen(
                     )
                     OutlinedTextField(
                         value = amountStr,
-                        onValueChange = { tfv -> amountStr = tfv.filter { it.isDigit() } },
+                        onValueChange = { tfv ->
+                            if (tfv.text.all { it.isDigit() }) {
+                                amountStr = tfv
+                            }
+                        },
                         label = { Text("Amount") },
                         leadingIcon = { Text("₹") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
