@@ -37,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -64,17 +63,14 @@ fun OnboardingScreen(
     // --- UPDATED: Page count reduced from 7 to 6 (Currency page removed) ---
     val pagerState = rememberPagerState { 6 }
     val scope = rememberCoroutineScope()
-    val keyboardController = LocalSoftwareKeyboardController.current
 
     BackHandler(enabled = pagerState.currentPage > 0) {
-        keyboardController?.hide()
         scope.launch {
             pagerState.scrollToPage(pagerState.currentPage - 1)
         }
     }
 
     val onNextClicked: (Int) -> Unit = { fromPage ->
-        keyboardController?.hide()
         scope.launch {
             // Ensure we move to the next page relative to the caller's page, escaping race conditions
             pagerState.scrollToPage(fromPage + 1)
