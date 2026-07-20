@@ -443,7 +443,15 @@ class DashboardViewModel(
 
             val newDescription =
                 if (alias != null) {
-                    if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
+                    // Only apply the alias if the current description matches the original description.
+                    // If it does not match, it means the user manually changed it to something else,
+                    // or it was already evaluated to something else.
+                    if (original != null && currentDesc.equals(original, ignoreCase = true)) {
+                        alias
+                    } else if (currentDesc.equals(alias, ignoreCase = true)) {
+                        alias
+                    } else if (original == null && currentDesc.equals(key, ignoreCase = true)) {
+                        // If there's no original description, and the current description is the key, apply alias.
                         alias
                     } else {
                         currentDesc
