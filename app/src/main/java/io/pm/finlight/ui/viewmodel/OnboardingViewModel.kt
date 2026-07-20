@@ -50,7 +50,7 @@ class OnboardingViewModel(
     fun onNameChanged(newName: String) {
         if (newName.length <= 50) {
             _userName.value = newName
-            _isNameValid.value = newName.all { it.isLetter() || it.isWhitespace() }
+            _isNameValid.value = newName.isNotBlank() && newName.all { it.isLetter() || it.isWhitespace() }
         }
     }
 

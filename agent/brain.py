@@ -131,6 +131,7 @@ CRITICAL INSTRUCTION FOR DEDUPLICATION: You MUST semantically compare any featur
 - Do NOT output a feature under `Features_Tested` if a conceptually similar feature already exists for that screen.
 - Do NOT output a bug under `New_Bugs` if a conceptually similar bug is already in the `Known_Bugs` list (even if the wording is slightly different).
 Only include GENUINELY NOVEL features tested, NOVEL bugs found, and any known bugs that should be marked as "Resolved".
+When marking a bug as "Resolved", you MUST use its EXACT `Id` from the Current App Map (e.g., "bug_001"). Do not use descriptions.
 Try to accurately map the features and bugs to the specific Screen Name where they occurred.
 
 Output schema:
@@ -145,7 +146,7 @@ Output schema:
   "New_Bugs": [
     {{"Id": "bug_XYZ", "Screen": "Screen Name", "Description": "Bug description", "Status": "Open"}}
   ],
-  "Resolved_Bugs": ["Description or ID of the previously Open bug that is now resolved"]
+  "Resolved_Bugs": ["EXACT 'Id' of the previously Open bug that is now resolved (e.g. 'bug_001')"]
 }}
 
 Return ONLY valid JSON. If there are no new items for a category, omit the key or return an empty dict/list.

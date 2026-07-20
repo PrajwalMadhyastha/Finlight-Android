@@ -66,14 +66,14 @@ fun OnboardingScreen(
 
     BackHandler(enabled = pagerState.currentPage > 0) {
         scope.launch {
-            pagerState.animateScrollToPage(pagerState.currentPage - 1)
+            pagerState.scrollToPage(pagerState.currentPage - 1)
         }
     }
 
     val onNextClicked: (Int) -> Unit = { fromPage ->
         scope.launch {
             // Ensure we move to the next page relative to the caller's page, escaping race conditions
-            pagerState.animateScrollToPage(fromPage + 1)
+            pagerState.scrollToPage(fromPage + 1)
         }
     }
 
@@ -129,6 +129,7 @@ fun OnboardingBottomBar(
                 Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
+                    .imePadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -154,7 +155,7 @@ fun OnboardingBottomBar(
                     enabled = isNextEnabled,
                 ) {
                     Text("Next")
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Page")
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                 }
             } else if (pagerState.currentPage == pagerState.pageCount - 1) {
                 Button(onClick = onFinishClicked) {

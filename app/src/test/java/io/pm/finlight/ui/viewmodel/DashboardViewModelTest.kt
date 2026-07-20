@@ -834,7 +834,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
                 advanceUntilIdle()
                 val suggestion = awaitItem()
                 assertEquals(1, suggestion?.first?.transaction?.id)
-                assertEquals(2, suggestion?.second?.transaction?.id)
+                assertEquals(2, suggestion?.second?.first()?.transaction?.id)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -862,38 +862,20 @@ class DashboardViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `executeMerge calls repository and fetches SMS if sourceSmsId is present`() =
+    fun `executeMerge calls repository manual merge`() =
         runTest {
-            val childTxn =
-                Transaction(
-                    id = 2,
-                    description = "Child",
-                    amount = 100.0,
-                    transactionType = "expense",
-                    date = 0L,
-                    accountId = 1,
-                    categoryId = 1,
-                    notes = null,
-                    originalDescription = "Child",
-                    sourceSmsId = 5
-                )
-            val sms = io.pm.finlight.SmsMessage(id = 5, sender = "Bank", body = "Test SMS body", date = 1000L)
-
-            `when`(transactionRepository.getTransactionSync(2)).thenReturn(childTxn)
-            `when`(smsRepository.getSmsDetailsById(5)).thenReturn(sms)
-
             initializeViewModel()
-            viewModel.executeMerge(1, 2)
+            viewModel.executeMerge(1, listOf(2))
             advanceUntilIdle()
 
-            verify(transactionRepository).mergeTransactions(1, 2, "Test SMS body", 1000L)
+            verify(transactionRepository).manualMergeTransactions(1, listOf(2))
         }
 
     @Test
     fun `dismissMergeSuggestion calls repository`() =
         runTest {
             initializeViewModel()
-            viewModel.dismissMergeSuggestion(2)
+            viewModel.dismissMergeSuggestion(listOf(2))
             advanceUntilIdle()
             verify(transactionRepository).dismissMerge(2)
         }

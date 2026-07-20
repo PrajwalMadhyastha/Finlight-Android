@@ -197,7 +197,11 @@ fun WhatIfSimulatorScreen(
                     )
                     OutlinedTextField(
                         value = amountStr,
-                        onValueChange = { tfv -> amountStr = tfv.filter { it.isDigit() } },
+                        onValueChange = { str ->
+                            if (str.all { it.isDigit() }) {
+                                amountStr = str
+                            }
+                        },
                         label = { Text("Amount") },
                         leadingIcon = { Text("₹") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
