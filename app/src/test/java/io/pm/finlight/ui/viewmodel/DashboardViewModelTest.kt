@@ -35,9 +35,9 @@ import kotlin.test.assertFalse
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class DashboardViewModelTest : BaseViewModelTest() {
+open class DashboardViewModelTest : BaseViewModelTest() {
     @Mock
-    private lateinit var transactionRepository: TransactionRepository
+    protected lateinit var transactionRepository: TransactionRepository
 
     @Mock
     private lateinit var accountRepository: AccountRepository
@@ -49,7 +49,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
     private lateinit var settingsRepository: SettingsRepository
 
     @Mock
-    private lateinit var merchantRenameRuleRepository: MerchantRenameRuleRepository
+    protected lateinit var merchantRenameRuleRepository: MerchantRenameRuleRepository
 
     @Mock
     private lateinit var recurringTransactionDao: RecurringTransactionDao
@@ -60,7 +60,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var smsRepository: SmsRepository
 
-    private lateinit var viewModel: DashboardViewModel
+    protected lateinit var viewModel: DashboardViewModel
 
     // --- List of possible messages from ViewModel for assertions ---
     private val goodPacingMessages =
@@ -162,7 +162,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
             )
     }
 
-    private fun initializeViewModel() {
+    protected fun initializeViewModel() {
         viewModel =
             DashboardViewModel(
                 transactionRepository = transactionRepository,

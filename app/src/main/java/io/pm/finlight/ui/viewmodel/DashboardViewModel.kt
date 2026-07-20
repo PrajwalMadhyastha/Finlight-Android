@@ -26,6 +26,7 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.utils.DateUtils
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
+import io.pm.finlight.utils.applyAliases
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -354,7 +355,7 @@ class DashboardViewModel(
         recentTransactions =
             transactionRepository.recentTransactions
                 .combine(merchantAliases) { transactions, aliases -> // NEW
-                    applyAliases(transactions, aliases) // NEW
+                    transactions.applyAliases(aliases) // NEW
                 }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -429,30 +430,6 @@ class DashboardViewModel(
                     started = SharingStarted.WhileSubscribed(5000),
                     initialValue = emptyList(),
                 )
-    }
-
-    private fun applyAliases(
-        transactions: List<TransactionDetails>,
-        aliases: Map<String, String>,
-    ): List<TransactionDetails> {
-        return transactions.map { details ->
-            val original = details.transaction.originalDescription
-            val currentDesc = details.transaction.description
-            val key = (original ?: currentDesc).lowercase(Locale.getDefault())
-            val alias = aliases[key]
-
-            val newDescription =
-                if (alias != null) {
-                    if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
-                        alias
-                    } else {
-                        currentDesc
-                    }
-                } else {
-                    currentDesc
-                }
-            details.copy(transaction = details.transaction.copy(description = newDescription))
-        }
     }
 
     fun dismissLastMonthSummaryCard() {
