@@ -283,6 +283,62 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
         }
 
     @Test
+    fun `updateTransactionDescription deletes rule when description matches original`() =
+        runTest {
+            // Arrange
+            val transactionId = 1
+            val originalDesc = "Food in Office"
+            val transaction =
+                Transaction(
+                    id = transactionId,
+                    description = "Badminton",
+                    amount = 100.0,
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    originalDescription = originalDesc
+                )
+            whenever(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(transaction))
+
+            // Act
+            viewModel.updateTransactionDescription(transactionId, "food in OFFICE") // Case-insensitive match
+            advanceUntilIdle()
+
+            // Assert
+            verify(merchantRenameRuleRepository).deleteByOriginalName(originalDesc)
+            verify(transactionRepository).updateDescription(transactionId, "food in OFFICE")
+        }
+
+    @Test
+    fun `updateTransactionDescription does not delete rule when description differs`() =
+        runTest {
+            // Arrange
+            val transactionId = 1
+            val originalDesc = "Food in Office"
+            val transaction =
+                Transaction(
+                    id = transactionId,
+                    description = "Badminton",
+                    amount = 100.0,
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    originalDescription = originalDesc
+                )
+            whenever(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(transaction))
+
+            // Act
+            viewModel.updateTransactionDescription(transactionId, "Another Name")
+            advanceUntilIdle()
+
+            // Assert
+            verify(merchantRenameRuleRepository, never()).deleteByOriginalName(anyString())
+            verify(transactionRepository).updateDescription(transactionId, "Another Name")
+        }
+
+    @Test
     fun `updateTransactionType calls repository successfully`() =
         runTest {
             // Arrange

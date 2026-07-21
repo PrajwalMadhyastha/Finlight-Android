@@ -173,5 +173,52 @@ class TransactionAliasFeatureTest {
         // Detail screen MUST show "Food in Office", and not mistakenly show "Badminton"
         composeTestRule.onNodeWithText("Food in Office").assertIsDisplayed()
         composeTestRule.onNodeWithText("Badminton").assertDoesNotExist()
+
+        // 6. Rename the RAM transaction back to RAM to verify rule deletion
+        composeTestRule.onNodeWithContentDescription("Back").performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Find the RAM transaction (now called Badminton) and click it
+        composeTestRule.onNode(hasText("Badminton"), useUnmergedTree = true)
+            .onAncestors().filterToOne(hasClickAction()).performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNode(hasText("Badminton") and hasClickAction()).performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty()
+        }
+        val searchInput3 = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()
+        searchInput3.performTextClearance()
+        searchInput3.performTextInput(originalDescription1) // "RAM"
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Save").performClick()
+
+        // Wait for sheet to close and detail screen to update
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText(originalDescription1).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithContentDescription("Back").performClick()
+
+        // Smart update sheet appears because we changed description back to RAM
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Apply Changes").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Apply Changes").performClick()
+
+        // Wait for list
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Assert that the global rule was deleted, so Badminton is completely gone, and all RAM transactions reverted
+        composeTestRule.onNodeWithText("Badminton").assertDoesNotExist()
+        composeTestRule.onAllNodesWithText(originalDescription1).fetchSemanticsNodes().isNotEmpty()
     }
 }
