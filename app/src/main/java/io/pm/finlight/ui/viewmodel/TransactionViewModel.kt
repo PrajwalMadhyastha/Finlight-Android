@@ -1442,6 +1442,12 @@ class TransactionViewModel(
                 // We do not automatically update global MerchantRenameRule here.
                 // Global rules should only be updated via performBatchUpdate when applying to all similar transactions.
 
+                if (transaction != null && transaction.originalDescription != null) {
+                    if (transaction.originalDescription.equals(newDescription, ignoreCase = true)) {
+                        merchantRenameRuleRepository.deleteByOriginalName(transaction.originalDescription)
+                    }
+                }
+
                 transactionRepository.updateDescription(id, newDescription)
             }
         } catch (e: Exception) {
