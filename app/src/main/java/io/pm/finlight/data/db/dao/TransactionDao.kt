@@ -1168,7 +1168,7 @@ interface TransactionDao {
     @Query(
         """
         SELECT * FROM transactions
-        WHERE (LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description))
+        WHERE LOWER(COALESCE(originalDescription, description)) = LOWER(:description)
         AND id != :excludeId
         AND isExcluded = 0 AND status != 'PENDING' AND status != 'SKIPPED'
         ORDER BY date DESC

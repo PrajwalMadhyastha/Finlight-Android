@@ -26,6 +26,7 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.utils.DateUtils
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
+import io.pm.finlight.utils.applyAliases
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -94,7 +95,7 @@ class DashboardViewModel(
     private val merchantAliases: StateFlow<Map<String, String>>
 
     // --- NEW: Smart Transaction Merge ---
-    val mergeSuggestion: StateFlow<Pair<TransactionDetails, TransactionDetails>?>
+    val mergeSuggestion: StateFlow<Pair<TransactionDetails, List<TransactionDetails>>?>
 
     init {
         userName =
@@ -354,16 +355,18 @@ class DashboardViewModel(
         recentTransactions =
             transactionRepository.recentTransactions
                 .combine(merchantAliases) { transactions, aliases -> // NEW
-                    applyAliases(transactions, aliases) // NEW
+                    transactions.applyAliases(aliases) // NEW
                 }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         mergeSuggestion =
-            recentTransactions.map { transactions ->
+            recentTransactions.map { transactionsDesc ->
+                val transactions = transactionsDesc.reversed()
                 for (i in 0 until transactions.size) {
                     val current = transactions[i]
                     if (current.transaction.mergeDismissed) continue
 
+                    val matches = mutableListOf<TransactionDetails>()
                     for (j in i + 1 until transactions.size) {
                         val potentialMatch = transactions[j]
                         if (potentialMatch.transaction.mergeDismissed) continue
@@ -372,11 +375,13 @@ class DashboardViewModel(
                             current.transaction.accountId == potentialMatch.transaction.accountId &&
                             current.transaction.transactionType == potentialMatch.transaction.transactionType
                         ) {
-
                             if (Math.abs(current.transaction.date - potentialMatch.transaction.date) <= 3 * 60 * 60 * 1000L) {
-                                return@map Pair(potentialMatch, current)
+                                matches.add(potentialMatch)
                             }
                         }
+                    }
+                    if (matches.isNotEmpty()) {
+                        return@map Pair(current, matches)
                     }
                 }
                 null
@@ -425,30 +430,6 @@ class DashboardViewModel(
                     started = SharingStarted.WhileSubscribed(5000),
                     initialValue = emptyList(),
                 )
-    }
-
-    private fun applyAliases(
-        transactions: List<TransactionDetails>,
-        aliases: Map<String, String>,
-    ): List<TransactionDetails> {
-        return transactions.map { details ->
-            val original = details.transaction.originalDescription
-            val currentDesc = details.transaction.description
-            val key = (original ?: currentDesc).lowercase(Locale.getDefault())
-            val alias = aliases[key]
-
-            val newDescription =
-                if (alias != null) {
-                    if (currentDesc.equals(original, ignoreCase = true) || currentDesc.equals(alias, ignoreCase = true)) {
-                        alias
-                    } else {
-                        currentDesc
-                    }
-                } else {
-                    currentDesc
-                }
-            details.copy(transaction = details.transaction.copy(description = newDescription))
-        }
     }
 
     fun dismissLastMonthSummaryCard() {
@@ -510,28 +491,20 @@ class DashboardViewModel(
     }
 
     // --- NEW: Smart Transaction Merge Actions ---
-    fun dismissMergeSuggestion(childTxnId: Int) {
+    fun dismissMergeSuggestion(childTxnIds: List<Int>) {
         viewModelScope.launch {
-            transactionRepository.dismissMerge(childTxnId)
+            childTxnIds.forEach { childTxnId ->
+                transactionRepository.dismissMerge(childTxnId)
+            }
         }
     }
 
     fun executeMerge(
         parentTxnId: Int,
-        childTxnId: Int
+        childTxnIds: List<Int>
     ) {
         viewModelScope.launch {
-            val childTxn = transactionRepository.getTransactionSync(childTxnId)
-            var childSmsBody: String? = null
-            var childSmsDate: Long? = null
-            if (childTxn?.sourceSmsId != null) {
-                val sms = smsRepository.getSmsDetailsById(childTxn.sourceSmsId)
-                if (sms != null) {
-                    childSmsBody = sms.body
-                    childSmsDate = sms.date
-                }
-            }
-            transactionRepository.mergeTransactions(parentTxnId, childTxnId, childSmsBody, childSmsDate)
+            transactionRepository.manualMergeTransactions(parentTxnId, childTxnIds)
         }
     }
 }

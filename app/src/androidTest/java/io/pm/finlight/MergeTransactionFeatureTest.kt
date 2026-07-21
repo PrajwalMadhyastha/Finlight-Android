@@ -146,16 +146,16 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Automatically Merged"))
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Manually Merged"))
         composeTestRule.onNodeWithText("Unmerge").performClick()
 
         // 4. Verify confirmation dialog appears and confirm
         composeTestRule.onNodeWithText("Unmerge Transactions?").assertIsDisplayed()
         composeTestRule.onNode(hasText("Unmerge").and(hasAnyAncestor(isDialog()))).performClick()
 
-        // 5. Should navigate back to dashboard
+        // 5. Should navigate back to the transaction list
         composeTestRule.waitUntil(timeoutMillis = 5000) {
-            composeTestRule.onAllNodesWithText("Dashboard").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
         }
     }
 

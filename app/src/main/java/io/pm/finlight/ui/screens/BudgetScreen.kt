@@ -552,7 +552,9 @@ fun EditOverallBudgetDialog(
             OutlinedTextField(
                 value = budgetInput,
                 onValueChange = { tfv ->
-                    budgetInput = tfv.copy(text = tfv.text.filter { char -> char.isDigit() })
+                    if (tfv.text.all { char -> char.isDigit() }) {
+                        budgetInput = tfv
+                    }
                 },
                 label = { Text("Total Monthly Budget Amount") },
                 leadingIcon = { Text("₹") },

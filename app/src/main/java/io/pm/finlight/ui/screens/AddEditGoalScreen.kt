@@ -109,7 +109,9 @@ fun AddEditGoalScreen(
                     OutlinedTextField(
                         value = targetAmount,
                         onValueChange = { tfv ->
-                            targetAmount = tfv.copy(text = tfv.text.filter { ch -> ch.isDigit() || ch == '.' })
+                            if (tfv.text.all { ch -> ch.isDigit() || ch == '.' }) {
+                                targetAmount = tfv
+                            }
                         },
                         label = { Text("Target Amount") },
                         singleLine = true,

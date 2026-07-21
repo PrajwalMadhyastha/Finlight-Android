@@ -157,6 +157,74 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         `when`(transactionDao.getRecentTransactionDetails()).thenReturn(flowOf(emptyList()))
     }
 
+    // ── Tests: Auto Merge ─────────────────────────────────────────────────────
+
+    @Test
+    fun `mergeTransactions with null parent auto-heals by finding recent transaction`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            // Parent is initially missing
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(null)
+
+            // Child is present
+            val childTxn = Transaction(id = 2, description = "Amazon", amount = 50.0, date = 2000L, accountId = 1, categoryId = 1, notes = "Child note", transactionType = "expense")
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
+
+            // Auto-heal finds new parent
+            val newParent = Transaction(id = 3, description = "Amazon", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
+            `when`(
+                transactionDao.findRecentTransactionForMerge(
+                    merchant = "Amazon",
+                    accountId = 1,
+                    transactionType = "expense",
+                    timeWindowStart = 2000L - (3 * 60 * 60 * 1000L),
+                    newTxnId = 2,
+                ),
+            ).thenReturn(newParent)
+
+            repository.mergeTransactions(parentTxnId = 1, childTxnId = 2, childSmsBody = "SMS body", childSmsDate = 3000L)
+
+            verify(transactionDao).updateAmount(3, 150.0) // 100 + 50
+
+            @Suppress("UNCHECKED_CAST")
+            val notesCaptor = ArgumentCaptor.forClass(String::class.java) as ArgumentCaptor<String>
+            verify(transactionDao).updateNotes(org.mockito.kotlin.eq(3), notesCaptor.capture())
+            val capturedNotes = notesCaptor.value
+
+            assertTrue(capturedNotes.contains("Parent note"))
+            assertTrue(capturedNotes.contains("Merged on"))
+            assertTrue(capturedNotes.contains("SMS body"))
+            assertTrue(capturedNotes.contains("Child note"))
+
+            verify(mergeRecordDao).insert(org.mockito.kotlin.any())
+        }
+
+    @Test
+    fun `mergeTransactions with valid parent preserves child notes`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val parentTxn = Transaction(id = 1, description = "Amazon", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
+
+            val childTxn = Transaction(id = 2, description = "Amazon", amount = 50.0, date = 2000L, accountId = 1, categoryId = 1, notes = "Child note", transactionType = "expense")
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
+
+            repository.mergeTransactions(parentTxnId = 1, childTxnId = 2, childSmsBody = null, childSmsDate = null)
+
+            @Suppress("UNCHECKED_CAST")
+            val notesCaptor = ArgumentCaptor.forClass(String::class.java) as ArgumentCaptor<String>
+            verify(transactionDao).updateNotes(org.mockito.kotlin.eq(1), notesCaptor.capture())
+            val capturedNotes = notesCaptor.value
+
+            assertTrue(capturedNotes.contains("Parent note"))
+            assertTrue(capturedNotes.contains("Merged Transaction:"))
+            assertTrue(capturedNotes.contains("Child note"))
+        }
+
     // ── Tests: Manual Merge ───────────────────────────────────────────────────
 
     @Test
@@ -1279,6 +1347,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childConversionRate = null,
                 )
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
+            `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
 
             repository.unmergeTransactions(10)
 
@@ -1318,6 +1387,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childConversionRate = null,
                 )
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
+            `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
             `when`(transactionDao.insert(anyObject())).thenReturn(99L)
 
             repository.unmergeTransactions(10)
@@ -1371,6 +1441,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childConversionRate = null,
                 )
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
+            `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
             repository.unmergeTransactions(10)
@@ -1410,6 +1481,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childConversionRate = null,
                 )
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
+            `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
             repository.unmergeTransactions(10)
@@ -1448,6 +1520,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childConversionRate = null,
                 )
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
+            `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
             repository.unmergeTransactions(10)

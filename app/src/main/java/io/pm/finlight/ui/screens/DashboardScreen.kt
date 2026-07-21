@@ -72,10 +72,12 @@ fun DashboardScreen(
                 MergeSuggestionCard(
                     suggestion = mergeSuggestion!!,
                     onMerge = {
-                        dashboardViewModel.executeMerge(mergeSuggestion!!.first.transaction.id, mergeSuggestion!!.second.transaction.id)
+                        val childIds = mergeSuggestion!!.second.map { it.transaction.id }
+                        dashboardViewModel.executeMerge(mergeSuggestion!!.first.transaction.id, childIds)
                     },
                     onDismiss = {
-                        dashboardViewModel.dismissMergeSuggestion(mergeSuggestion!!.second.transaction.id)
+                        val childIds = mergeSuggestion!!.second.map { it.transaction.id }
+                        dashboardViewModel.dismissMergeSuggestion(childIds)
                     }
                 )
             }

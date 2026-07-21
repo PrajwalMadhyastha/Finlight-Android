@@ -35,9 +35,9 @@ import kotlin.test.assertFalse
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class DashboardViewModelTest : BaseViewModelTest() {
+open class DashboardViewModelTest : BaseViewModelTest() {
     @Mock
-    private lateinit var transactionRepository: TransactionRepository
+    protected lateinit var transactionRepository: TransactionRepository
 
     @Mock
     private lateinit var accountRepository: AccountRepository
@@ -49,7 +49,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
     private lateinit var settingsRepository: SettingsRepository
 
     @Mock
-    private lateinit var merchantRenameRuleRepository: MerchantRenameRuleRepository
+    protected lateinit var merchantRenameRuleRepository: MerchantRenameRuleRepository
 
     @Mock
     private lateinit var recurringTransactionDao: RecurringTransactionDao
@@ -60,7 +60,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var smsRepository: SmsRepository
 
-    private lateinit var viewModel: DashboardViewModel
+    protected lateinit var viewModel: DashboardViewModel
 
     // --- List of possible messages from ViewModel for assertions ---
     private val goodPacingMessages =
@@ -162,7 +162,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
             )
     }
 
-    private fun initializeViewModel() {
+    protected fun initializeViewModel() {
         viewModel =
             DashboardViewModel(
                 transactionRepository = transactionRepository,
@@ -834,7 +834,7 @@ class DashboardViewModelTest : BaseViewModelTest() {
                 advanceUntilIdle()
                 val suggestion = awaitItem()
                 assertEquals(1, suggestion?.first?.transaction?.id)
-                assertEquals(2, suggestion?.second?.transaction?.id)
+                assertEquals(2, suggestion?.second?.first()?.transaction?.id)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -862,38 +862,20 @@ class DashboardViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `executeMerge calls repository and fetches SMS if sourceSmsId is present`() =
+    fun `executeMerge calls repository manual merge`() =
         runTest {
-            val childTxn =
-                Transaction(
-                    id = 2,
-                    description = "Child",
-                    amount = 100.0,
-                    transactionType = "expense",
-                    date = 0L,
-                    accountId = 1,
-                    categoryId = 1,
-                    notes = null,
-                    originalDescription = "Child",
-                    sourceSmsId = 5
-                )
-            val sms = io.pm.finlight.SmsMessage(id = 5, sender = "Bank", body = "Test SMS body", date = 1000L)
-
-            `when`(transactionRepository.getTransactionSync(2)).thenReturn(childTxn)
-            `when`(smsRepository.getSmsDetailsById(5)).thenReturn(sms)
-
             initializeViewModel()
-            viewModel.executeMerge(1, 2)
+            viewModel.executeMerge(1, listOf(2))
             advanceUntilIdle()
 
-            verify(transactionRepository).mergeTransactions(1, 2, "Test SMS body", 1000L)
+            verify(transactionRepository).manualMergeTransactions(1, listOf(2))
         }
 
     @Test
     fun `dismissMergeSuggestion calls repository`() =
         runTest {
             initializeViewModel()
-            viewModel.dismissMergeSuggestion(2)
+            viewModel.dismissMergeSuggestion(listOf(2))
             advanceUntilIdle()
             verify(transactionRepository).dismissMerge(2)
         }

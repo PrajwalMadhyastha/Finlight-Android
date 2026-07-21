@@ -1437,4 +1437,63 @@ class TransactionDaoTest {
             assertEquals(category1.id, predictions[2].categoryId)
             assertEquals(account1.id, predictions[2].accountId)
         }
+
+    @Test
+    fun `findSimilarTransactions matches coalesce of originalDescription and description`() =
+        runTest {
+            // Arrange
+            transactionDao.insert(
+                Transaction(
+                    id = 1,
+                    description = "Food in Office",
+                    originalDescription = "RAM",
+                    amount = 100.0,
+                    date = 1000,
+                    accountId = 1,
+                    categoryId = 1,
+                    transactionType = "expense",
+                    notes = null,
+                ),
+            )
+            transactionDao.insert(
+                Transaction(
+                    id = 2,
+                    // Manually renamed
+                    description = "Food in Office",
+                    originalDescription = "VIJAYALAKSH",
+                    amount = 200.0,
+                    date = 1000,
+                    accountId = 1,
+                    categoryId = 1,
+                    transactionType = "expense",
+                    notes = null,
+                ),
+            )
+            transactionDao.insert(
+                Transaction(
+                    id = 3,
+                    // originalDescription is null, description is RAM
+                    description = "RAM",
+                    originalDescription = null,
+                    amount = 150.0,
+                    date = 1000,
+                    accountId = 1,
+                    categoryId = 1,
+                    transactionType = "expense",
+                    notes = null,
+                ),
+            )
+
+            // Act
+            val similarToRam = transactionDao.findSimilarTransactions("RAM", excludeId = 0)
+
+            // Assert
+            assertEquals(2, similarToRam.size)
+            assertTrue(similarToRam.any { it.id == 1 }) // matches originalDescription = RAM
+            assertTrue(similarToRam.any { it.id == 3 }) // matches coalesce(null, RAM) = RAM
+            // Should NOT include id=2 even though its current description is "Food in Office" (we aren't querying Food in Office here, but if we did...)
+
+            val similarToFoodInOffice = transactionDao.findSimilarTransactions("Food in Office", excludeId = 0)
+            assertEquals(0, similarToFoodInOffice.size) // No transaction has originalDescription "Food in Office"
+        }
 }
