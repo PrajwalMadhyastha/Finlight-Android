@@ -146,7 +146,7 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Manually Merged"))
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Merged Transactions"))
         composeTestRule.onNodeWithText("Unmerge").performClick()
 
         // 4. Verify confirmation dialog appears and confirm
@@ -266,7 +266,7 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
-            .performScrollToNode(hasText("Manually Merged"))
+            .performScrollToNode(hasText("Merged Transactions"))
         composeTestRule.onNodeWithText("Unmerge").performClick()
 
         // 5. Confirm the unmerge dialog
@@ -381,15 +381,14 @@ class MergeTransactionFeatureTest {
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
-            .performScrollToNode(hasText("Accounts"))
-        composeTestRule.onNodeWithText("Accounts").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Unmerge to reassign").assertIsDisplayed()
+            .performScrollToNode(hasText("Merged Transactions"))
+        composeTestRule.onNodeWithText("Merged Transactions").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Unmerge").assertIsDisplayed()
 
-        // Both account names should appear in the card
-        composeTestRule.onNodeWithText(TestDataSeeder.ACCOUNT_WALLET_NAME).assertIsDisplayed()
-        composeTestRule.onNodeWithText(TestDataSeeder.ACCOUNT_BANK_NAME).assertIsDisplayed()
+        // Child account name should appear in the card
+        composeTestRule.onNodeWithText(TestDataSeeder.ACCOUNT_BANK_NAME, substring = true).assertIsDisplayed()
 
-        // "anchor" label should appear
-        composeTestRule.onNodeWithText("anchor").assertIsDisplayed()
+        // "Anchor original amount" label should appear
+        composeTestRule.onNodeWithText("Anchor original amount").assertIsDisplayed()
     }
 }

@@ -10,7 +10,7 @@ import android.util.Log
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
-import io.pm.finlight.data.model.MergedAccountEntry
+import io.pm.finlight.data.model.MergedTransactionItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -845,26 +845,29 @@ class TransactionRepository(
      * Works for both MANUAL (N-to-1) and AUTO (chained 1-to-1) merges.
      * The UI uses this to render [MergedAccountsCard] when multiple accounts are involved.
      */
-    suspend fun getMergedAccountBreakdown(parentTxnId: Int): List<MergedAccountEntry> {
+    suspend fun getMergedTransactionBreakdown(parentTxnId: Int): List<MergedTransactionItem> {
         val records = mergeRecordDao.getAllForParentAnyType(parentTxnId)
         if (records.isEmpty()) return emptyList()
 
         val anchorTxn = transactionDao.getTransactionByIdSync(parentTxnId) ?: return emptyList()
         val anchorAccount = db.accountDao().getAccountByIdBlocking(anchorTxn.accountId)
 
-        val entries = mutableListOf<MergedAccountEntry>()
+        val entries = mutableListOf<MergedTransactionItem>()
 
         // Anchor entry — use the pre-merge snapshot amount so that each account's
         // contribution reflects what actually left/arrived at that account.
         // The oldest record (ASC order) holds the true original parent state.
-        val anchorOriginalAmount = records.first().originalParentAmount
+        val firstRecord = records.first()
+        val anchorOriginalAmount = firstRecord.originalParentAmount
         entries.add(
-            MergedAccountEntry(
+            MergedTransactionItem(
                 accountId = anchorTxn.accountId,
                 accountName = anchorAccount?.name ?: "Unknown",
                 amount = anchorOriginalAmount,
                 transactionType = anchorTxn.transactionType,
                 isAnchor = true,
+                description = anchorTxn.description,
+                date = firstRecord.originalParentDate
             )
         )
 
@@ -872,12 +875,14 @@ class TransactionRepository(
         for (r in records) {
             val childAccount = db.accountDao().getAccountByIdBlocking(r.childAccountId)
             entries.add(
-                MergedAccountEntry(
+                MergedTransactionItem(
                     accountId = r.childAccountId,
                     accountName = childAccount?.name ?: "Unknown",
                     amount = r.childAmount,
                     transactionType = r.childTransactionType,
                     isAnchor = false,
+                    description = r.childDescription,
+                    date = r.childDate
                 )
             )
         }

@@ -1674,7 +1674,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `getMergedAccountBreakdown returns mapped entries for cross-account merge`() =
+    fun `getMergedTransactionBreakdown returns mapped entries for cross-account merge`() =
         runTest {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
@@ -1712,7 +1712,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(accountDao.getAccountByIdBlocking(anchorAccountId)).thenReturn(Account(id = anchorAccountId, name = "Anchor Account", type = "Bank"))
             `when`(accountDao.getAccountByIdBlocking(childAccountId)).thenReturn(Account(id = childAccountId, name = "Child Account", type = "Bank"))
 
-            val breakdown = repository.getMergedAccountBreakdown(parentTxnId)
+            val breakdown = repository.getMergedTransactionBreakdown(parentTxnId)
 
             assertEquals(2, breakdown.size)
 
@@ -1722,6 +1722,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(500.0, anchorEntry.amount)
             assertEquals("expense", anchorEntry.transactionType)
             assertTrue(anchorEntry.isAnchor)
+            assertEquals("Anchor", anchorEntry.description)
+            assertEquals(1000L, anchorEntry.date)
 
             val childEntry = breakdown[1]
             assertEquals(childAccountId, childEntry.accountId)
@@ -1729,10 +1731,12 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(300.0, childEntry.amount)
             assertEquals("expense", childEntry.transactionType)
             assertEquals(false, childEntry.isAnchor)
+            assertEquals("Child", childEntry.description)
+            assertEquals(1000L, childEntry.date)
         }
 
     @Test
-    fun `getMergedAccountBreakdown returns empty list if no merge records`() =
+    fun `getMergedTransactionBreakdown returns empty list if no merge records`() =
         runTest {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
@@ -1740,7 +1744,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             val parentTxnId = 1
             `when`(mergeRecordDao.getAllForParentAnyType(parentTxnId)).thenReturn(emptyList())
 
-            val breakdown = repository.getMergedAccountBreakdown(parentTxnId)
+            val breakdown = repository.getMergedTransactionBreakdown(parentTxnId)
 
             assertTrue(breakdown.isEmpty())
         }

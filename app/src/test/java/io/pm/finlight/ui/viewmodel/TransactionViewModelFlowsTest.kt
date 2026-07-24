@@ -284,4 +284,52 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `mergedTransactionBreakdown emits data from repository when loaded`() =
+        runTest {
+            // Arrange
+            val breakdown =
+                listOf(
+                    io.pm.finlight.data.model.MergedTransactionItem(
+                        accountId = 1,
+                        accountName = "Test Account",
+                        amount = 100.0,
+                        transactionType = "expense",
+                        isAnchor = true,
+                        description = "Test Desc",
+                        date = 1000L
+                    )
+                )
+            val dummyTransaction = Transaction(
+                id = 1,
+                description = "Test Desc",
+                amount = 100.0,
+                date = 1000L,
+                accountId = 1,
+                transactionType = "expense",
+                categoryId = null,
+                notes = null
+            )
+            whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(dummyTransaction))
+            whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getReimbursementsForExpense(1)).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.getTransactionCountForMerchant(anyOrNull())).thenReturn(flowOf(0))
+            whenever(transactionRepository.getMergedTransactionBreakdown(1)).thenReturn(breakdown)
+            initializeViewModel()
+
+            // Act
+            viewModel.loadTransactionForDetailScreen(1)
+
+            // Assert
+            viewModel.mergedTransactionBreakdown.test {
+                advanceUntilIdle()
+                val result = expectMostRecentItem()
+                assertEquals(1, result.size)
+                assertEquals("Test Account", result.first().accountName)
+                assertEquals("Test Desc", result.first().description)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

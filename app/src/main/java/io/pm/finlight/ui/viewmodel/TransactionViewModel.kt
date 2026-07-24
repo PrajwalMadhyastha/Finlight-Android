@@ -17,7 +17,7 @@ import androidx.room.withTransaction
 import io.pm.finlight.core.utils.StringSimilarity
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
-import io.pm.finlight.data.model.MergedAccountEntry
+import io.pm.finlight.data.model.MergedTransactionItem
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
 import io.pm.finlight.utils.CategoryIconHelper
@@ -198,8 +198,8 @@ class TransactionViewModel(
      * Empty for transactions that have never been merged, or for same-account merges
      * where the UI falls back to the normal single-account [AccountCard].
      */
-    private val _mergedAccountBreakdown = MutableStateFlow<List<MergedAccountEntry>>(emptyList())
-    val mergedAccountBreakdown: StateFlow<List<MergedAccountEntry>> = _mergedAccountBreakdown.asStateFlow()
+    private val _mergedTransactionBreakdown = MutableStateFlow<List<io.pm.finlight.data.model.MergedTransactionItem>>(emptyList())
+    val mergedTransactionBreakdown: StateFlow<List<io.pm.finlight.data.model.MergedTransactionItem>> = _mergedTransactionBreakdown.asStateFlow()
 
     private val _showShareSheet = MutableStateFlow(false)
     val showShareSheet: StateFlow<Boolean> = _showShareSheet.asStateFlow()
@@ -597,8 +597,8 @@ class TransactionViewModel(
         // This is a one-shot suspend call — the detail screen never stays open across an
         // unmerge (navigation pops back), so a Flow is unnecessary.
         viewModelScope.launch(Dispatchers.IO) {
-            _mergedAccountBreakdown.value =
-                transactionRepository.getMergedAccountBreakdown(transactionId)
+            _mergedTransactionBreakdown.value =
+                transactionRepository.getMergedTransactionBreakdown(transactionId)
         }
     }
 

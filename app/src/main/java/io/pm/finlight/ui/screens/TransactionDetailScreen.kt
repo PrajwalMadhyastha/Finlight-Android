@@ -29,7 +29,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -84,10 +83,6 @@ import io.pm.finlight.R
 import io.pm.finlight.ui.components.*
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
-import io.pm.finlight.ui.theme.ExpenseRedDark
-import io.pm.finlight.ui.theme.ExpenseRedLight
-import io.pm.finlight.ui.theme.IncomeGreenDark
-import io.pm.finlight.ui.theme.IncomeGreenLight
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
@@ -95,7 +90,6 @@ import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.FormatUtils
-import io.pm.finlight.data.model.MergedAccountEntry
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -194,8 +188,7 @@ fun TransactionDetailScreen(
     val candidateReimbursements by viewModel.candidateReimbursements.collectAsState()
 
     // --- NEW: Unmerge feature state ---
-    val mergeRecord by viewModel.observeMergeRecord(transactionId).collectAsState(initial = null)
-    val mergedAccountBreakdown by viewModel.mergedAccountBreakdown.collectAsState()
+    val mergedTransactionBreakdown by viewModel.mergedTransactionBreakdown.collectAsState()
     var showUnmergeDialog by remember { mutableStateOf(false) }
 
     // Observe ViewModel-driven navigation events (e.g. after canonical nudge resolves).
@@ -445,12 +438,13 @@ fun TransactionDetailScreen(
                         }
                     }
 
-                    // --- NEW: Unmerge card — shown only for transactions that were merged ---
-                    if (mergeRecord != null) {
+                    // --- NEW: Merged Transactions card — shown only for transactions that were merged ---
+                    if (mergedTransactionBreakdown.size > 1) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                UnmergeSuggestionCard(
-                                    mergeRecord = mergeRecord!!,
+                                MergedTransactionsCard(
+                                    entries = mergedTransactionBreakdown,
+                                    currentAmount = details.transaction.amount,
                                     onUnmergeClick = { showUnmergeDialog = true },
                                 )
                             }
@@ -473,14 +467,12 @@ fun TransactionDetailScreen(
 
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            // If this is a cross-account merged transaction, show a read-only
-                            // multi-account breakdown. Otherwise show the normal editable card.
+                            // If this is a cross-account merged transaction, we don't show the editable AccountCard.
+                            // The MergedTransactionsCard already handles showing the account breakdown.
                             val isCrossAccountMerge =
-                                mergedAccountBreakdown
+                                mergedTransactionBreakdown
                                     .map { it.accountId }.toSet().size > 1
-                            if (isCrossAccountMerge) {
-                                MergedAccountsCard(entries = mergedAccountBreakdown)
-                            } else {
+                            if (!isCrossAccountMerge) {
                                 AccountCard(
                                     details = details,
                                     onAccountClick = { activeSheetContent = SheetContent.Account },
@@ -2399,147 +2391,6 @@ private fun ReviewBannerCard(
                 modifier = Modifier.align(Alignment.End),
             ) {
                 Text("Mark as Reviewed")
-            }
-        }
-    }
-}
-
-/**
- * A contextual card shown on transactions that were created by the automatic
- * or manual merge feature. Offers a single "Unmerge" action so the user can reverse the
- * merge if it was done by mistake.
- */
-@Composable
-private fun UnmergeSuggestionCard(
-    mergeRecord: io.pm.finlight.data.db.entity.MergeRecord,
-    onUnmergeClick: () -> Unit
-) {
-    val title = if (mergeRecord.mergeType == "MANUAL") "Manually Merged" else "Automatically Merged"
-    val subtitle =
-        if (mergeRecord.mergeType == "MANUAL") {
-            "This transaction contains manually merged items. Tap to separate them."
-        } else {
-            "This combines two duplicate charges. Tap to separate them."
-        }
-
-    GlassPanel {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.MergeType,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            TextButton(onClick = onUnmergeClick) {
-                Text("Unmerge")
-            }
-        }
-    }
-}
-
-/**
- * Shown on transactions that were merged across multiple accounts.
- * Lists each contributing account with its original pre-merge amount, replacing
- * the normal (editable) [AccountCard]. The card is intentionally read-only —
- * the user must unmerge first to reassign individual accounts.
- */
-@Composable
-private fun MergedAccountsCard(entries: List<MergedAccountEntry>) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
-    val isDark = isSystemInDarkTheme()
-    val incomeGreen = if (isDark) IncomeGreenDark else IncomeGreenLight
-    val expenseRed = if (isDark) ExpenseRedDark else ExpenseRedLight
-
-    GlassPanel {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-        ) {
-            // Section header row
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Accounts",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = "Unmerge to reassign",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                )
-            }
-
-            entries.forEachIndexed { index, entry ->
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Image(
-                        painter = painterResource(id = BankLogoHelper.getLogoForAccount(entry.accountName)),
-                        contentDescription = "${entry.accountName} logo",
-                        modifier = Modifier.size(36.dp),
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = entry.accountName,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (entry.isAnchor) {
-                            Text(
-                                text = "anchor",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                    val sign = if (entry.transactionType == "income") "+" else "−"
-                    Text(
-                        text = "$sign${currencyFormat.format(entry.amount)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (entry.transactionType == "income") incomeGreen else expenseRed,
-                    )
-                }
-                if (index < entries.lastIndex) {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                    )
-                }
             }
         }
     }
