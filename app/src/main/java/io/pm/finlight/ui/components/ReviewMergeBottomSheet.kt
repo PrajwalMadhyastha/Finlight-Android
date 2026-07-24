@@ -22,6 +22,8 @@ import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
 import io.pm.finlight.ui.theme.IncomeGreenLight
+import io.pm.finlight.ui.theme.PopupSurfaceDark
+import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.FormatUtils
 
 @Composable
@@ -241,7 +243,10 @@ fun EditAnchorView(
             )
             ExposedDropdownMenu(
                 expanded = expanded,
-                onDismissRequest = { expanded = false }
+                onDismissRequest = { expanded = false },
+                modifier = Modifier
+                    .background(if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight)
+                    .heightIn(max = 250.dp)
             ) {
                 categories.forEach { cat ->
                     DropdownMenuItem(
