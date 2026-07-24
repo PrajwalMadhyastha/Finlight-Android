@@ -17,6 +17,7 @@ import androidx.room.withTransaction
 import io.pm.finlight.core.utils.StringSimilarity
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.MergedAccountEntry
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
 import io.pm.finlight.utils.CategoryIconHelper
@@ -163,9 +164,12 @@ class TransactionViewModel(
     /**
      * True when the selection is a valid candidate for manual merging:
      *  - At least 2 transactions selected.
-     *  - All from the same account.
      *  - No split transactions in the selection.
      *  - No PENDING/SKIPPED draft transactions in the selection.
+     *
+     * Cross-account merges are now permitted. The anchor's account absorbs the
+     * total; the detail screen surfaces per-account contributions via
+     * [mergedAccountBreakdown] and [MergedAccountsCard].
      */
     val canManualMerge: StateFlow<Boolean> by lazy {
         combine(_selectedTransactionIds, transactionsForSelectedMonth) { ids, txns ->
@@ -173,8 +177,7 @@ class TransactionViewModel(
             val selected = txns.filter { it.transaction.id in ids }
             val hasSplit = selected.any { it.transaction.isSplit }
             val hasPending = selected.any { it.transaction.status == "PENDING" || it.transaction.status == "SKIPPED" }
-            val uniqueAccounts = selected.map { it.transaction.accountId }.toSet()
-            !hasSplit && !hasPending && uniqueAccounts.size == 1
+            !hasSplit && !hasPending
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     }
 
@@ -188,6 +191,15 @@ class TransactionViewModel(
      */
     private val _anchorTransactionId = MutableStateFlow<Int?>(null)
     val anchorTransactionId: StateFlow<Int?> = _anchorTransactionId.asStateFlow()
+
+    /**
+     * Per-account contribution breakdown for a merged transaction.
+     * Populated when [loadTransactionForDetailScreen] is called.
+     * Empty for transactions that have never been merged, or for same-account merges
+     * where the UI falls back to the normal single-account [AccountCard].
+     */
+    private val _mergedAccountBreakdown = MutableStateFlow<List<MergedAccountEntry>>(emptyList())
+    val mergedAccountBreakdown: StateFlow<List<MergedAccountEntry>> = _mergedAccountBreakdown.asStateFlow()
 
     private val _showShareSheet = MutableStateFlow(false)
     val showShareSheet: StateFlow<Boolean> = _showShareSheet.asStateFlow()
@@ -568,7 +580,7 @@ class TransactionViewModel(
                 loadOriginalSms(it.sourceSmsId)
                 loadVisitCount(it.originalDescription, it.description, it.transactionType)
 
-                // --- NEW: Load reimbursement-related data ---
+                // --- Reimbursement data ---
                 if (it.transactionType == "expense") {
                     transactionRepository.getReimbursementsForExpense(it.id).collect { reimbursements ->
                         _reimbursementsForCurrentExpense.value = reimbursements
@@ -579,6 +591,14 @@ class TransactionViewModel(
                     }
                 }
             }
+        }
+
+        // Load merged account breakdown separately so it doesn't block the reimbursement flow.
+        // This is a one-shot suspend call — the detail screen never stays open across an
+        // unmerge (navigation pops back), so a Flow is unnecessary.
+        viewModelScope.launch(Dispatchers.IO) {
+            _mergedAccountBreakdown.value =
+                transactionRepository.getMergedAccountBreakdown(transactionId)
         }
     }
 

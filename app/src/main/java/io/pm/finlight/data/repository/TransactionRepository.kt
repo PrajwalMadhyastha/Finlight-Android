@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.MergedAccountEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -831,6 +832,58 @@ class TransactionRepository(
      */
     fun observeMergeRecord(parentTxnId: Int): Flow<MergeRecord?> =
         mergeRecordDao.observeForParent(parentTxnId)
+
+    /**
+     * Builds the per-account contribution breakdown for a merged transaction.
+     * Returns an empty list if the transaction has no merge records.
+     *
+     * The list always contains:
+     *  - The anchor account entry: shows the anchor's original amount BEFORE the merge
+     *    (sourced from [MergeRecord.originalParentAmount] on the oldest record).
+     *  - One entry per child account: amount from [MergeRecord.childAmount].
+     *
+     * Works for both MANUAL (N-to-1) and AUTO (chained 1-to-1) merges.
+     * The UI uses this to render [MergedAccountsCard] when multiple accounts are involved.
+     */
+    suspend fun getMergedAccountBreakdown(parentTxnId: Int): List<MergedAccountEntry> {
+        val records = mergeRecordDao.getAllForParentAnyType(parentTxnId)
+        if (records.isEmpty()) return emptyList()
+
+        val anchorTxn = transactionDao.getTransactionByIdSync(parentTxnId) ?: return emptyList()
+        val anchorAccount = db.accountDao().getAccountByIdBlocking(anchorTxn.accountId)
+
+        val entries = mutableListOf<MergedAccountEntry>()
+
+        // Anchor entry — use the pre-merge snapshot amount so that each account's
+        // contribution reflects what actually left/arrived at that account.
+        // The oldest record (ASC order) holds the true original parent state.
+        val anchorOriginalAmount = records.first().originalParentAmount
+        entries.add(
+            MergedAccountEntry(
+                accountId = anchorTxn.accountId,
+                accountName = anchorAccount?.name ?: "Unknown",
+                amount = anchorOriginalAmount,
+                transactionType = anchorTxn.transactionType,
+                isAnchor = true,
+            )
+        )
+
+        // One entry per child — each record fully snapshots the child's account + amount.
+        for (r in records) {
+            val childAccount = db.accountDao().getAccountByIdBlocking(r.childAccountId)
+            entries.add(
+                MergedAccountEntry(
+                    accountId = r.childAccountId,
+                    accountName = childAccount?.name ?: "Unknown",
+                    amount = r.childAmount,
+                    transactionType = r.childTransactionType,
+                    isAnchor = false,
+                )
+            )
+        }
+
+        return entries
+    }
 
     /**
      * Fully reverses the most recent merge for [parentTxnId].

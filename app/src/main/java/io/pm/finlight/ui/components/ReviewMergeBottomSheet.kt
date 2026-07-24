@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -119,6 +121,35 @@ fun ReviewMergeBottomSheet(
             color = MaterialTheme.colorScheme.onSurface,
         )
 
+        // Cross-account info banner — shown when the selection spans multiple accounts.
+        val uniqueAccountNames = selectedTransactions.mapNotNull { it.accountName }.toSet()
+        if (uniqueAccountNames.size > 1) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f))
+                        .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AccountBalance,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text =
+                        "Merging across ${uniqueAccountNames.size} accounts. " +
+                            "The result will be recorded under the anchor's account.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+        }
+
         LazyColumn(
             modifier = Modifier.weight(1f, fill = false),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -148,6 +179,15 @@ fun ReviewMergeBottomSheet(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        if (!item.accountName.isNullOrBlank()) {
+                            Text(
+                                text = item.accountName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                         Text(
                             text = FormatUtils.displayDateFormatter.format(item.transaction.date),
                             style = MaterialTheme.typography.bodySmall,
@@ -244,9 +284,10 @@ fun EditAnchorView(
             ExposedDropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
-                modifier = Modifier
-                    .background(if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight)
-                    .heightIn(max = 250.dp)
+                modifier =
+                    Modifier
+                        .background(if (isSystemInDarkTheme()) PopupSurfaceDark else PopupSurfaceLight)
+                        .heightIn(max = 250.dp)
             ) {
                 categories.forEach { cat ->
                     DropdownMenuItem(

@@ -32,6 +32,7 @@ import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.DeletedSmsHashDao
 import io.pm.finlight.data.db.dao.MergeRecordDao
+import io.pm.finlight.data.db.entity.MergeRecord
 
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -1670,5 +1671,77 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                 org.mockito.kotlin.any(),
                 org.mockito.kotlin.any()
             )
+        }
+
+    @Test
+    fun `getMergedAccountBreakdown returns mapped entries for cross-account merge`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val parentTxnId = 1
+            val anchorAccountId = 101
+            val childAccountId = 102
+
+            val anchorTxn = Transaction(id = parentTxnId, description = "Anchor", amount = 800.0, date = 1000L, accountId = anchorAccountId, transactionType = "expense", notes = null, categoryId = null)
+            val mergeRecord =
+                MergeRecord(
+                    parentTxnId = parentTxnId,
+                    originalParentAmount = 500.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child",
+                    childAmount = 300.0,
+                    childDate = 1000L,
+                    childAccountId = childAccountId,
+                    childCategoryId = null,
+                    childTransactionType = "expense",
+                    childSource = "manual",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = null,
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null
+                )
+
+            `when`(mergeRecordDao.getAllForParentAnyType(parentTxnId)).thenReturn(listOf(mergeRecord))
+            `when`(transactionDao.getTransactionByIdSync(parentTxnId)).thenReturn(anchorTxn)
+            `when`(accountDao.getAccountByIdBlocking(anchorAccountId)).thenReturn(Account(id = anchorAccountId, name = "Anchor Account", type = "Bank"))
+            `when`(accountDao.getAccountByIdBlocking(childAccountId)).thenReturn(Account(id = childAccountId, name = "Child Account", type = "Bank"))
+
+            val breakdown = repository.getMergedAccountBreakdown(parentTxnId)
+
+            assertEquals(2, breakdown.size)
+
+            val anchorEntry = breakdown[0]
+            assertEquals(anchorAccountId, anchorEntry.accountId)
+            assertEquals("Anchor Account", anchorEntry.accountName)
+            assertEquals(500.0, anchorEntry.amount)
+            assertEquals("expense", anchorEntry.transactionType)
+            assertTrue(anchorEntry.isAnchor)
+
+            val childEntry = breakdown[1]
+            assertEquals(childAccountId, childEntry.accountId)
+            assertEquals("Child Account", childEntry.accountName)
+            assertEquals(300.0, childEntry.amount)
+            assertEquals("expense", childEntry.transactionType)
+            assertEquals(false, childEntry.isAnchor)
+        }
+
+    @Test
+    fun `getMergedAccountBreakdown returns empty list if no merge records`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val parentTxnId = 1
+            `when`(mergeRecordDao.getAllForParentAnyType(parentTxnId)).thenReturn(emptyList())
+
+            val breakdown = repository.getMergedAccountBreakdown(parentTxnId)
+
+            assertTrue(breakdown.isEmpty())
         }
 }

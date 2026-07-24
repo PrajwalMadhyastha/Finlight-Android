@@ -229,7 +229,7 @@ class TransactionViewModelSelectionTest : TransactionViewModelBaseSetup() {
         }
 
     @Test
-    fun `canManualMerge returns true for mixed types if absolute total covers it`() =
+    fun `canManualMerge returns true for same-account selection`() =
         runTest {
             val t1 = Transaction(id = 1, amount = 100.0, date = 0L, accountId = 1, categoryId = 1, description = "Anchor", transactionType = "expense", notes = null)
             val t2 = Transaction(id = 2, amount = 50.0, date = 0L, accountId = 1, categoryId = 1, description = "Child", transactionType = "expense", notes = null)
@@ -237,8 +237,8 @@ class TransactionViewModelSelectionTest : TransactionViewModelBaseSetup() {
             whenever(transactionRepository.getTransactionDetailsForRange(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull())).thenReturn(
                 kotlinx.coroutines.flow.flowOf(
                     listOf(
-                        io.pm.finlight.TransactionDetails(transaction = t1, images = emptyList(), accountName = null, categoryName = null, categoryIconKey = null, categoryColorKey = null, tagNames = null),
-                        io.pm.finlight.TransactionDetails(transaction = t2, images = emptyList(), accountName = null, categoryName = null, categoryIconKey = null, categoryColorKey = null, tagNames = null)
+                        io.pm.finlight.TransactionDetails(transaction = t1, images = emptyList(), accountName = "HDFC", categoryName = null, categoryIconKey = null, categoryColorKey = null, tagNames = null),
+                        io.pm.finlight.TransactionDetails(transaction = t2, images = emptyList(), accountName = "HDFC", categoryName = null, categoryIconKey = null, categoryColorKey = null, tagNames = null)
                     )
                 )
             )
@@ -255,6 +255,35 @@ class TransactionViewModelSelectionTest : TransactionViewModelBaseSetup() {
                 viewModel.toggleTransactionSelection(2)
 
                 assertTrue(awaitItem())
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `canManualMerge returns true for cross-account selection`() =
+        runTest {
+            // t1 and t2 are on DIFFERENT accounts — previously this was blocked.
+            val t1 = Transaction(id = 1, amount = 500.0, date = 0L, accountId = 1, categoryId = 1, description = "Anchor", transactionType = "expense", notes = null)
+            val t2 = Transaction(id = 2, amount = 300.0, date = 0L, accountId = 2, categoryId = 1, description = "Child", transactionType = "expense", notes = null)
+            whenever(transactionRepository.getTransactionDetailsForRange(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull())).thenReturn(
+                kotlinx.coroutines.flow.flowOf(
+                    listOf(
+                        io.pm.finlight.TransactionDetails(transaction = t1, images = emptyList(), accountName = "HDFC Savings", categoryName = null, categoryIconKey = null, categoryColorKey = null, tagNames = null),
+                        io.pm.finlight.TransactionDetails(transaction = t2, images = emptyList(), accountName = "SBI Current", categoryName = null, categoryIconKey = null, categoryColorKey = null, tagNames = null)
+                    )
+                )
+            )
+
+            initializeViewModel()
+
+            viewModel.canManualMerge.test {
+                assertFalse("Initial: nothing selected", awaitItem())
+
+                viewModel.toggleTransactionSelection(1)
+                viewModel.toggleTransactionSelection(2)
+
+                assertTrue("Cross-account merge should now be permitted", awaitItem())
 
                 cancelAndIgnoreRemainingEvents()
             }
