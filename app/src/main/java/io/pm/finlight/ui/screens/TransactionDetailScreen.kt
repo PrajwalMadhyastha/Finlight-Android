@@ -402,6 +402,44 @@ fun TransactionDetailScreen(
                         }
                     }
 
+                    item {
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            TransactionPropertiesCard(
+                                details = details,
+                                onTypeSelected = { newType ->
+                                    viewModel.updateTransactionType(details.transaction.id, newType)
+                                },
+                                onExcludeToggled = { newIsExcludedValue ->
+                                    viewModel.updateTransactionExclusion(details.transaction.id, newIsExcludedValue)
+                                },
+                            )
+                        }
+                    }
+
+                    item {
+                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            // For cross-account merged transactions, we show the AccountCard as read-only.
+                            val accountsInvolved = (mergedTransactionBreakdown.map { it.accountId } + reimbursements.mapNotNull { it.transaction.accountId }).toSet()
+                            val isMultiAccount = accountsInvolved.size > 1
+                            
+                            if (isMultiAccount) {
+                                MultiAccountBreakdownCard(
+                                    entries = mergedTransactionBreakdown,
+                                    reimbursements = reimbursements,
+                                    onCardClick = {
+                                        Toast.makeText(context, "Unmerge or unlink to reassign accounts.", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            } else {
+                                AccountCard(
+                                    details = details,
+                                    readOnly = false,
+                                    onAccountClick = { activeSheetContent = SheetContent.Account },
+                                )
+                            }
+                        }
+                    }
+
                     if (details.transaction.isSplit) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -442,36 +480,6 @@ fun TransactionDetailScreen(
                                     onUnlinkClick = {
                                         viewModel.unlinkReimbursement(transactionId)
                                     },
-                                )
-                            }
-                        }
-                    }
-
-                    item {
-                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            TransactionPropertiesCard(
-                                details = details,
-                                onTypeSelected = { newType ->
-                                    viewModel.updateTransactionType(details.transaction.id, newType)
-                                },
-                                onExcludeToggled = { newIsExcludedValue ->
-                                    viewModel.updateTransactionExclusion(details.transaction.id, newIsExcludedValue)
-                                },
-                            )
-                        }
-                    }
-
-                    item {
-                        Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            // If this is a cross-account merged transaction, we don't show the editable AccountCard.
-                            // The MergedTransactionsCard already handles showing the account breakdown.
-                            val isCrossAccountMerge =
-                                mergedTransactionBreakdown
-                                    .map { it.accountId }.toSet().size > 1
-                            if (!isCrossAccountMerge) {
-                                AccountCard(
-                                    details = details,
-                                    onAccountClick = { activeSheetContent = SheetContent.Account },
                                 )
                             }
                         }
@@ -1195,8 +1203,147 @@ private fun TransactionSpotlightHeader(
 }
 
 @Composable
+private fun MultiAccountBreakdownCard(
+    entries: List<io.pm.finlight.data.model.MergedTransactionItem>,
+    reimbursements: List<io.pm.finlight.TransactionDetails>,
+    onCardClick: () -> Unit
+) {
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val incomeGreen = if (isDark) io.pm.finlight.ui.theme.IncomeGreenDark else io.pm.finlight.ui.theme.IncomeGreenLight
+    val expenseRed = if (isDark) io.pm.finlight.ui.theme.ExpenseRedDark else io.pm.finlight.ui.theme.ExpenseRedLight
+
+    GlassPanel {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onCardClick)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            Text(
+                text = "Accounts",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+
+            val totalItems = entries.size + reimbursements.size
+            var currentIndex = 0
+
+            entries.forEach { entry ->
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Image(
+                        painter = painterResource(id = BankLogoHelper.getLogoForAccount(entry.accountName)),
+                        contentDescription = "${entry.accountName} logo",
+                        modifier = Modifier.size(36.dp),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = entry.accountName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (entry.isAnchor) {
+                            Text(
+                                text = "anchor",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        } else if (entries.size > 1) {
+                            Text(
+                                text = "merged",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondary,
+                            )
+                        }
+                    }
+                    val sign = if (entry.transactionType == "income") "+" else "−"
+                    val absAmount = kotlin.math.abs(entry.amount)
+                    Text(
+                        text = "$sign${currencyFormat.format(absAmount)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (entry.transactionType == "income") incomeGreen else expenseRed,
+                    )
+                }
+                currentIndex++
+                if (currentIndex < totalItems) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    )
+                }
+            }
+
+            reimbursements.forEach { detail ->
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Image(
+                        painter = painterResource(id = BankLogoHelper.getLogoForAccount(detail.accountName ?: "")),
+                        contentDescription = "${detail.accountName} logo",
+                        modifier = Modifier.size(36.dp),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = detail.accountName ?: "Unknown",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "repayment",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    val absAmount = kotlin.math.abs(detail.transaction.amount)
+                    Text(
+                        text = "+${currencyFormat.format(absAmount)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = incomeGreen,
+                    )
+                }
+                currentIndex++
+                if (currentIndex < totalItems) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    )
+                }
+            }
+            
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Unmerge or unlink to reassign accounts",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+            )
+        }
+    }
+}
+
+@Composable
 private fun AccountCard(
     details: TransactionDetails,
+    readOnly: Boolean = false,
     onAccountClick: () -> Unit,
 ) {
     GlassPanel {
@@ -1230,13 +1377,23 @@ private fun AccountCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (readOnly) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Unmerge to reassign",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    )
+                }
             }
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = "Edit Account",
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (!readOnly) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Edit Account",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
