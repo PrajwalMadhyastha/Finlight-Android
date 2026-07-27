@@ -56,7 +56,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         GoalContribution::class,
         MergeRecord::class,
     ],
-    version = 54,
+    version = 55,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -945,6 +945,37 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 54→55: Heal transactions whose originalDescription was incorrectly
+        //     saved as the post-rename display name instead of the true raw SMS name.
+        //     This happens because SmsParser.enrichTransaction overwrites merchantName with
+        //     the renamed value, and all savers were using merchantName for originalDescription.
+        //     We identify corrupted rows by checking if originalDescription matches a known
+        //     MerchantRenameRule's newName — that's a definitive sign it was saved wrong.
+        //     We restore the true raw name by using the rule's originalName. ---
+        val MIGRATION_54_55 =
+            object : Migration(54, 55) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        UPDATE transactions
+                        SET originalDescription = (
+                            SELECT r.originalName
+                            FROM merchant_rename_rules r
+                            WHERE LOWER(r.newName) = LOWER(transactions.originalDescription)
+                            ORDER BY r.originalName
+                            LIMIT 1
+                        )
+                        WHERE originalDescription IS NOT NULL
+                          AND EXISTS (
+                            SELECT 1 FROM merchant_rename_rules r
+                            WHERE LOWER(r.newName) = LOWER(transactions.originalDescription)
+                          )
+                        """
+                    )
+                    Log.i("Migration_54_55", "Healed originalDescription pollution for renamed merchant transactions.")
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -986,6 +1017,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_51_52,
                             MIGRATION_52_53,
                             MIGRATION_53_54,
+                            MIGRATION_54_55,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

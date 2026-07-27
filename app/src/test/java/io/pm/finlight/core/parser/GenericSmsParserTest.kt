@@ -780,4 +780,41 @@ class GenericSmsParserTest : BaseSmsParserTest() {
             assertEquals(1234.0, result?.transaction?.amount)
             assertEquals("Swiggy", result?.transaction?.merchantName)
         }
+
+    @Test
+    fun `test originalMerchantName preserves raw name when rename rule is applied`() =
+        runBlocking {
+            val renameRules =
+                listOf(
+                    io.pm.finlight.MerchantRenameRule(
+                        originalName = "STARBUCKS",
+                        newName = "Coffee"
+                    )
+                )
+            setupTest(renameRules = renameRules)
+            val smsBody = "You have spent MYR 55.50 at STARBUCKS."
+            val mockSms =
+                SmsMessage(
+                    id = 1L,
+                    sender = "AM-HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNotNull("Parser should return a result", result)
+            assertEquals("Coffee", result?.merchantName)
+            assertEquals("STARBUCKS", result?.originalMerchantName)
+        }
 }

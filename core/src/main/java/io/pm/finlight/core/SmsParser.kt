@@ -651,7 +651,11 @@ object SmsParser {
                 categoryId = finalCategoryId,
                 potentialAccount = finalAccount,
                 sourceSmsHash = smsHash,
-                smsSignature = smsSignature
+                smsSignature = smsSignature,
+                // FIX: Preserve the true raw SMS name (before rename rules) so that
+                // all savers can store it in Transaction.originalDescription correctly.
+                // originalMerchant is the value before any MerchantRenameRule was applied.
+                originalMerchantName = originalMerchant,
             ),
             newCategoryAlias,
             newRenameAlias

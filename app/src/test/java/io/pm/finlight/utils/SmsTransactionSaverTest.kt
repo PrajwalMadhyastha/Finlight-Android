@@ -221,11 +221,18 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             val captor = slot<Transaction>()
             coEvery { transactionDao.insert(capture(captor)) } returns 55L
 
-            saver.resolveAndSaveTransaction(makeTxn(), isForeign = true, travelSettings = travelSettings)
+            val potentialTxn = makeTxn().copy(
+                merchantName = "Coffee",
+                originalMerchantName = "STARBUCKS"
+            )
+
+            saver.resolveAndSaveTransaction(potentialTxn, isForeign = true, travelSettings = travelSettings)
 
             assert(captor.captured.amount == 8000.0) { "Expected 100 * 80 = 8000" }
             assert(captor.captured.originalAmount == 100.0)
             assert(captor.captured.currencyCode == "USD")
+            assert(captor.captured.description == "Coffee")
+            assert(captor.captured.originalDescription == "STARBUCKS")
         }
 
     @Test
@@ -239,5 +246,25 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             saver.resolveAndSaveTransaction(makeTxn(), source = "Auto-Recovered")
 
             assert(captor.captured.source == "Auto-Recovered")
+        }
+
+    @Test
+    fun `originalDescription uses originalMerchantName when present`() =
+        runTest {
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+            val captor = slot<Transaction>()
+            coEvery { transactionDao.insert(capture(captor)) } returns 99L
+
+            val potentialTxnWithRename =
+                makeTxn().copy(
+                    merchantName = "Coffee",
+                    originalMerchantName = "STARBUCKS"
+                )
+
+            saver.resolveAndSaveTransaction(potentialTxnWithRename)
+
+            assert(captor.captured.description == "Coffee")
+            assert(captor.captured.originalDescription == "STARBUCKS")
         }
 }

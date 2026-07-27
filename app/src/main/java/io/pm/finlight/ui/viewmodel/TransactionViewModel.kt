@@ -1706,7 +1706,8 @@ class TransactionViewModel(
                         }
                         Transaction(
                             description = description,
-                            originalDescription = potentialTxn.merchantName,
+                            // FIX: Use the raw pre-rename name for originalDescription.
+                            originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
                             categoryId = categoryId,
                             amount = potentialTxn.amount * (travelSettings.conversionRate ?: 1f),
                             date = potentialTxn.date,
@@ -1723,7 +1724,8 @@ class TransactionViewModel(
                     } else {
                         Transaction(
                             description = description,
-                            originalDescription = potentialTxn.merchantName,
+                            // FIX: Use the raw pre-rename name for originalDescription.
+                            originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
                             categoryId = categoryId,
                             amount = potentialTxn.amount,
                             date = potentialTxn.date,
@@ -1801,7 +1803,8 @@ class TransactionViewModel(
                 val transactionToSave =
                     Transaction(
                         description = potentialTxn.merchantName ?: "Unknown Merchant",
-                        originalDescription = potentialTxn.merchantName,
+                        // FIX: Use the raw pre-rename name for originalDescription.
+                        originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
                         categoryId = potentialTxn.categoryId,
                         amount = potentialTxn.amount,
                         date = potentialTxn.date,
