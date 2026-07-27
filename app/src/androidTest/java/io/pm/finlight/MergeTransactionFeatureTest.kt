@@ -386,6 +386,7 @@ class MergeTransactionFeatureTest {
         composeTestRule.onNodeWithText("Unmerge").assertIsDisplayed()
 
         // Child account name should appear in the card
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Accounts"))
         composeTestRule.onAllNodesWithText(TestDataSeeder.ACCOUNT_BANK_NAME, substring = true).onFirst().assertIsDisplayed()
 
         // "Anchor original amount" label should appear
