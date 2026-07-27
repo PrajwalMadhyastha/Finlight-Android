@@ -107,12 +107,17 @@ class ReimbursementFeatureTest {
         openTransactionDetail("Group Dinner Expense", "Debit transaction")
 
         // Verify the linked repayment is shown
-        composeTestRule.onNodeWithText("Repayments").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Alice Repayment", substring = true).performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Repayments"))
+        composeTestRule.onNodeWithText("Repayments").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Alice Repayment", substring = true))
+        composeTestRule.onNodeWithText("Alice Repayment", substring = true).assertIsDisplayed()
 
         // Verify Net Cost calculation: 1500 - 500 = 1000
-        composeTestRule.onNodeWithText("Net cost", substring = true, ignoreCase = true)
-            .performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Net cost", substring = true, ignoreCase = true))
+        composeTestRule.onNodeWithText("Net cost", substring = true, ignoreCase = true).assertIsDisplayed()
     }
 
     // -----------------------------------------------------------------------
@@ -134,16 +139,19 @@ class ReimbursementFeatureTest {
         openTransactionDetail("Alice Repayment", "Credit transaction")
 
         // The card header
-        composeTestRule.onNodeWithText("Linked as repayment", substring = true, ignoreCase = true)
-            .performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Linked as repayment", substring = true, ignoreCase = true))
+        composeTestRule.onNodeWithText("Linked as repayment", substring = true, ignoreCase = true).assertIsDisplayed()
 
         // The parent expense description is shown in the tappable row
-        composeTestRule.onNodeWithText("Group Dinner Expense", substring = true, ignoreCase = true)
-            .performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Group Dinner Expense", substring = true, ignoreCase = true))
+        composeTestRule.onNodeWithText("Group Dinner Expense", substring = true, ignoreCase = true).assertIsDisplayed()
 
         // The Unlink button is present
-        composeTestRule.onNodeWithText("Unlink", ignoreCase = true)
-            .performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Unlink", ignoreCase = true))
+        composeTestRule.onNodeWithText("Unlink", ignoreCase = true).assertIsDisplayed()
     }
 
     // -----------------------------------------------------------------------
@@ -163,8 +171,9 @@ class ReimbursementFeatureTest {
         openTransactionDetail("Alice Repayment", "Credit transaction")
 
         // Scroll to and tap the Unlink button
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Unlink", ignoreCase = true))
         composeTestRule.onNodeWithText("Unlink", ignoreCase = true)
-            .performScrollTo()
             .performClick()
 
         // Confirmation dialog should appear
@@ -185,8 +194,9 @@ class ReimbursementFeatureTest {
         composeTestRule.waitUntil(timeoutMillis = 3_000) {
             composeTestRule.onAllNodesWithText("Unlink Repayment?").fetchSemanticsNodes().isEmpty()
         }
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Linked as repayment", substring = true, ignoreCase = true))
         composeTestRule.onNodeWithText("Linked as repayment", substring = true, ignoreCase = true)
-            .performScrollTo()
             .assertIsDisplayed()
 
         // --- Confirm flow: badge should disappear after unlink ---
@@ -222,8 +232,9 @@ class ReimbursementFeatureTest {
         openTransactionDetail("Alice Repayment", "Credit transaction")
 
         // Scroll to and tap the expense row (tapping the description text)
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Group Dinner Expense", substring = true, ignoreCase = true))
         composeTestRule.onNodeWithText("Group Dinner Expense", substring = true, ignoreCase = true)
-            .performScrollTo()
             .performClick()
 
         // Should land on the expense detail screen
@@ -234,8 +245,9 @@ class ReimbursementFeatureTest {
         composeTestRule.onNodeWithText("Debit transaction", ignoreCase = true).assertIsDisplayed()
 
         // And the expense repayment card should be present confirming we're on the right screen
-        composeTestRule.onNodeWithText("Repayments", ignoreCase = true)
-            .performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Repayments", ignoreCase = true))
+        composeTestRule.onNodeWithText("Repayments", ignoreCase = true).assertIsDisplayed()
     }
 
     @Test
