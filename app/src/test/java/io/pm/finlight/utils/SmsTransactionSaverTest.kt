@@ -221,10 +221,11 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             val captor = slot<Transaction>()
             coEvery { transactionDao.insert(capture(captor)) } returns 55L
 
-            val potentialTxn = makeTxn().copy(
-                merchantName = "Coffee",
-                originalMerchantName = "STARBUCKS"
-            )
+            val potentialTxn =
+                makeTxn().copy(
+                    merchantName = "Coffee",
+                    originalMerchantName = "STARBUCKS"
+                )
 
             saver.resolveAndSaveTransaction(potentialTxn, isForeign = true, travelSettings = travelSettings)
 
