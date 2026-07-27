@@ -421,7 +421,7 @@ fun TransactionDetailScreen(
                             // For cross-account merged transactions, we show the AccountCard as read-only.
                             val accountsInvolved = (mergedTransactionBreakdown.map { it.accountId } + reimbursements.mapNotNull { it.transaction.accountId }).toSet()
                             val isMultiAccount = accountsInvolved.size > 1
-                            
+
                             if (isMultiAccount) {
                                 MultiAccountBreakdownCard(
                                     entries = mergedTransactionBreakdown,
@@ -1215,10 +1215,11 @@ private fun MultiAccountBreakdownCard(
 
     GlassPanel {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onCardClick)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onCardClick)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             Text(
@@ -1329,7 +1330,7 @@ private fun MultiAccountBreakdownCard(
                     )
                 }
             }
-            
+
             Spacer(Modifier.height(8.dp))
             Text(
                 text = "Unmerge or unlink to reassign accounts",
