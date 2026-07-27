@@ -56,7 +56,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         GoalContribution::class,
         MergeRecord::class,
     ],
-    version = 53,
+    version = 54,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -862,6 +862,89 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 53→54: Heal transactions corrupted by old coerceAtLeast(0.0) or unmerge logic ---
+        val MIGRATION_53_54 =
+            object : Migration(53, 54) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    val cursor = db.query("SELECT id, amount, originalAmount, transactionType FROM transactions")
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getInt(0)
+                        val currentAmount = cursor.getDouble(1)
+                        val hasOriginal = !cursor.isNull(2)
+                        val originalAmount = if (hasOriginal) cursor.getDouble(2) else null
+                        val type = cursor.getString(3) ?: "expense"
+
+                        // Calculate sum of reimbursements
+                        var sumReimbursements = 0.0
+                        val rCursor = db.query("SELECT amount FROM transactions WHERE parentReimbursementId = ?", arrayOf(id))
+                        while (rCursor.moveToNext()) {
+                            sumReimbursements += rCursor.getDouble(0)
+                        }
+                        rCursor.close()
+
+                        // Calculate sum of merged children and check for MergeRecords
+                        var hasMergeRecords = false
+                        var sumChildren = 0.0
+                        var mergeBaseAmount = 0.0
+
+                        val mCursor = db.query("SELECT originalParentAmount, childAmount, childTransactionType FROM merge_records WHERE parentTxnId = ? ORDER BY id ASC", arrayOf(id))
+                        var isFirst = true
+                        while (mCursor.moveToNext()) {
+                            hasMergeRecords = true
+                            if (isFirst) {
+                                mergeBaseAmount = mCursor.getDouble(0)
+                                isFirst = false
+                            }
+                            val childAmount = mCursor.getDouble(1)
+                            val childType = mCursor.getString(2)
+                            val signedChild = if (childType == "income") childAmount else -childAmount
+                            sumChildren += signedChild
+                        }
+                        mCursor.close()
+
+                        // Fast path: no reimbursements and no merge records means this
+                        // transaction cannot have been corrupted by the old bugs. Skip it.
+                        if (sumReimbursements == 0.0 && !hasMergeRecords) continue
+
+                        val baseAmount =
+                            if (hasMergeRecords) {
+                                mergeBaseAmount
+                            } else if (hasOriginal && sumReimbursements > 0.0 && (currentAmount == 0.0 || Math.abs(currentAmount - originalAmount!!) < 0.001)) {
+                                originalAmount!!
+                            } else {
+                                // Either it has no reimbursements/merges (safe), or it was manually
+                                // edited by the user (currentAmount != originalAmount), or we don't have
+                                // an original amount to heal it with. In all these cases, we leave it untouched.
+                                null
+                            }
+
+                        if (baseAmount != null) {
+                            val signedBase = if (type == "income") baseAmount else -baseAmount
+                            val netSigned = signedBase + sumChildren
+                            val finalSigned = netSigned + sumReimbursements
+
+                            val finalType =
+                                if (sumReimbursements > 0) {
+                                    "expense"
+                                } else if (finalSigned > 0) {
+                                    "income"
+                                } else if (finalSigned < 0) {
+                                    "expense"
+                                } else {
+                                    type
+                                }
+
+                            val finalAmount = if (finalType == "expense") -finalSigned else finalSigned
+
+                            if (Math.abs(finalAmount - currentAmount) > 0.001) {
+                                db.execSQL("UPDATE transactions SET amount = ?, transactionType = ? WHERE id = ?", arrayOf(finalAmount, finalType, id))
+                            }
+                        }
+                    }
+                    cursor.close()
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -902,6 +985,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_50_51,
                             MIGRATION_51_52,
                             MIGRATION_52_53,
+                            MIGRATION_53_54,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

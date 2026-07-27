@@ -136,6 +136,11 @@ class TransactionRepository(
         amount: Double,
     ) = transactionDao.updateAmount(id, amount)
 
+    suspend fun updateManualAmountEdit(
+        id: Int,
+        amount: Double,
+    ) = transactionDao.updateManualAmountEdit(id, amount)
+
     suspend fun updateNotes(
         id: Int,
         notes: String?,
@@ -546,7 +551,7 @@ class TransactionRepository(
         val incomeTxn = transactionDao.getTransactionByIdSync(incomeId) ?: return
         val expenseTxn = transactionDao.getTransactionByIdSync(expenseId) ?: return
         transactionDao.linkReimbursement(incomeId, expenseId)
-        val newExpenseAmount = (expenseTxn.amount - incomeTxn.amount).coerceAtLeast(0.0)
+        val newExpenseAmount = expenseTxn.amount - incomeTxn.amount
         transactionDao.updateAmount(expenseId, newExpenseAmount)
     }
 
@@ -739,8 +744,17 @@ class TransactionRepository(
 
             val anchorSigned = signedAmount(anchorTxn)
             val netSigned = anchorSigned + childTxns.sumOf { signedAmount(it) }
-            val finalAmount = kotlin.math.abs(netSigned)
-            val finalType = if (netSigned >= 0.0) "income" else "expense"
+            val hasReimbursements = transactionDao.getReimbursementsCountSync(anchorTxnId) > 0
+
+            val finalType = if (hasReimbursements) {
+                "expense"
+            } else if (netSigned >= 0.0) {
+                "income"
+            } else {
+                "expense"
+            }
+
+            val finalAmount = if (finalType == "expense") -netSigned else netSigned
 
             // ── Compute most-recent date ──────────────────────────────────
             val finalDate = (childTxns.map { it.date } + anchorTxn.date).max()
@@ -914,9 +928,40 @@ class TransactionRepository(
             if (allRecords.isEmpty()) return
 
             db.withTransaction {
+                val currentParent = transactionDao.getTransactionByIdSync(parentTxnId) ?: return@withTransaction
+
+                fun signedAmount(
+                    type: String,
+                    amount: Double
+                ): Double =
+                    if (type == "income") amount else -amount
+
+                val currentSigned = signedAmount(currentParent.transactionType, currentParent.amount)
+                val childrenSigned = allRecords.sumOf { signedAmount(it.childTransactionType, it.childAmount) }
+                val newSigned = currentSigned - childrenSigned
+                val hasReimbursements = transactionDao.getReimbursementsCountSync(parentTxnId) > 0
+
+                val finalType =
+                    if (hasReimbursements) {
+                        "expense"
+                    } else if (newSigned > 0.0) {
+                        "income"
+                    } else if (newSigned < 0.0) {
+                        "expense"
+                    } else {
+                        currentParent.transactionType
+                    }
+
+                // If finalType is "expense", the signed amount is negative, so we negate it to get the mathematical amount.
+                // This preserves any negative balance if the transaction was over-repaid.
+                val finalAmount = if (finalType == "expense") -newSigned else newSigned
+
                 // Restore parent to its pre-merge state (all records share the same parent snapshot)
                 val first = allRecords.first()
-                transactionDao.updateAmount(parentTxnId, first.originalParentAmount)
+                transactionDao.updateAmount(parentTxnId, finalAmount)
+                if (currentParent.transactionType != finalType) {
+                    transactionDao.updateTransactionType(parentTxnId, finalType)
+                }
                 transactionDao.updateDate(parentTxnId, first.originalParentDate)
                 transactionDao.updateNotes(parentTxnId, first.originalParentNotes)
 
@@ -942,9 +987,15 @@ class TransactionRepository(
             if (allAutoRecords.isEmpty()) return
 
             db.withTransaction {
+                val currentParent = transactionDao.getTransactionByIdSync(parentTxnId) ?: return@withTransaction
+
+                // AUTO merges just sum the absolute amounts.
+                val totalMergedAmount = allAutoRecords.sumOf { it.childAmount }
+                val newAmount = currentParent.amount - totalMergedAmount
+
                 // The VERY FIRST record (oldest) has the original parent state
                 val first = allAutoRecords.first()
-                transactionDao.updateAmount(parentTxnId, first.originalParentAmount)
+                transactionDao.updateAmount(parentTxnId, newAmount)
                 transactionDao.updateDate(parentTxnId, first.originalParentDate)
                 transactionDao.updateNotes(parentTxnId, first.originalParentNotes)
 

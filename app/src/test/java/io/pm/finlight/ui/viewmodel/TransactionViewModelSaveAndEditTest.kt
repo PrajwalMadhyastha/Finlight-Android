@@ -54,7 +54,9 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
 
             // ASSERT
             assertNull(viewModel.showCategoryNudge.value)
-            verify(transactionRepository).insertTransactionWithTagsAndImages(any(), any(), any())
+            val transactionCaptor = argumentCaptor<Transaction>()
+            verify(transactionRepository).insertTransactionWithTagsAndImages(transactionCaptor.capture(), any(), any())
+            assertEquals(100.0, transactionCaptor.firstValue.originalAmount)
             assertEquals(expectedId, capturedId)
         }
 
@@ -126,6 +128,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             assertEquals(newCategoryId, savedTransaction.categoryId)
             assertEquals("With friends", savedTransaction.notes)
             assertEquals(12345L, savedTransaction.date)
+            assertEquals(250.0, savedTransaction.originalAmount)
             assertEquals(expectedId, capturedId)
             assertNull(viewModel.showCategoryNudge.value) // Nudge should be cleared
         }

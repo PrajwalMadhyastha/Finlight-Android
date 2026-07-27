@@ -1,5 +1,6 @@
 package io.pm.finlight.ui.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -76,6 +77,9 @@ fun ReviewMergeBottomSheet(
     Column(
         modifier =
             Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f) // Prevents ModalBottomSheet from dismissing due to height shrinkage
+                .animateContentSize()
                 .padding(16.dp)
                 .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -248,6 +252,8 @@ fun EditAnchorView(
     Column(
         modifier =
             Modifier
+                .fillMaxWidth()
+                .animateContentSize()
                 .padding(16.dp)
                 .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)

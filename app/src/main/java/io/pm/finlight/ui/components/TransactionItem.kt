@@ -196,18 +196,21 @@ fun TransactionItem(
                 )
             }
 
-            val isIncome = transactionDetails.transaction.transactionType == "income"
+            val isMathematicallyIncome = transactionDetails.transaction.transactionType == "income"
+            val isVisuallyIncome = isMathematicallyIncome || (!isMathematicallyIncome && transactionDetails.transaction.amount < 0)
+            val displayAmount = kotlin.math.abs(transactionDetails.transaction.amount)
+
             val amountColor =
                 if (isSystemInDarkTheme()) {
-                    if (isIncome) IncomeGreenDark else ExpenseRedDark
+                    if (isVisuallyIncome) IncomeGreenDark else ExpenseRedDark
                 } else {
-                    if (isIncome) IncomeGreenLight else ExpenseRedLight
+                    if (isVisuallyIncome) IncomeGreenLight else ExpenseRedLight
                 }.copy(alpha = contentAlpha)
-            val icon = if (isIncome) Icons.Default.SouthWest else Icons.Default.NorthEast
+            val icon = if (isVisuallyIncome) Icons.Default.SouthWest else Icons.Default.NorthEast
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "₹${"%.2f".format(transactionDetails.transaction.amount)}",
+                    text = "₹${"%.2f".format(displayAmount)}",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = amountColor,

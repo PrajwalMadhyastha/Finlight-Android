@@ -115,14 +115,114 @@ class TransactionMergeUITest {
         composeTestRule.onNodeWithText("Confirm Merge").assertExists()
         composeTestRule.onNodeWithText("Confirm Merge").performClick()
 
-        // The sheet should dismiss and "ManualMergeTest2" should disappear from list
+        // The sheet should dismiss        // 6. ManualMergeTest2 should no longer exist in the merged list.
         composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule.onAllNodesWithText("ManualMergeTest2").fetchSemanticsNodes().isEmpty()
         }
+    }
 
-        // ManualMergeTest1 should now have the combined amount of 150.0
-        // Or wait, is the amount updated? Yes.
-        // But amount display may vary by locale, so just checking ManualMergeTest2 disappearance is good enough.
+    @Test
+    fun unmerge_withReimbursement_preservesReimbursementMath() {
+        val appDatabase = AppDatabase.getInstance(composeTestRule.activity.applicationContext)
+        runBlocking {
+            appDatabase.transactionDao().deleteAll()
+            val now = System.currentTimeMillis()
+            val parentId = 1
+            // Merged expense (Anchor 100 + Child 50)
+            appDatabase.transactionDao().insert(
+                Transaction(
+                    id = parentId,
+                    description = "Merged Expense",
+                    amount = 150.0,
+                    categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
+                    accountId = TestDataSeeder.ACCOUNT_BANK_ID,
+                    date = now,
+                    transactionType = "expense",
+                    notes = "Merged notes"
+                )
+            )
+            appDatabase.mergeRecordDao().insert(
+                io.pm.finlight.data.db.entity.MergeRecord(
+                    parentTxnId = parentId,
+                    mergedAt = now,
+                    mergeGroupId = "group-1",
+                    mergeType = "MANUAL",
+                    originalParentAmount = 100.0,
+                    originalParentDate = now,
+                    originalParentNotes = "",
+                    childDescription = "Child Expense",
+                    childAmount = 50.0,
+                    childDate = now,
+                    childAccountId = TestDataSeeder.ACCOUNT_BANK_ID,
+                    childCategoryId = TestDataSeeder.CATEGORY_FOOD_ID,
+                    childTransactionType = "expense",
+                    childSource = "MANUAL",
+                    childNotes = "",
+                    childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
+                    childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
+                )
+            )
+            // Linked Reimbursement
+            appDatabase.transactionDao().insert(
+                Transaction(
+                    id = 2,
+                    description = "Linked Income",
+                    amount = 200.0,
+                    categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
+                    accountId = TestDataSeeder.ACCOUNT_BANK_ID,
+                    date = now,
+                    transactionType = "income",
+                    notes = "",
+                    parentReimbursementId = parentId
+                )
+            )
+            // Adjust parent's amount to reflect linked reimbursement (150 - 200 = -50)
+            appDatabase.transactionDao().updateAmount(parentId, -50.0)
+        }
+
+        // Wait for dashboard to load and navigate to Transactions tab
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Transactions").performClick()
+
+        // Open Merged Expense
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Merged Expense").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNode(androidx.compose.ui.test.hasText("Merged Expense"), useUnmergedTree = true)
+            .onAncestors()
+            .filterToOne(androidx.compose.ui.test.hasClickAction())
+            .performClick()
+
+        // It should show amount 50.00 (absolute value of -50.0)
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("50.00", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Unmerge
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(androidx.compose.ui.test.hasText("Related Activity").or(androidx.compose.ui.test.hasText("Merged Transactions")))
+        composeTestRule.onNodeWithText("Unmerge").performClick()
+
+        composeTestRule.onNodeWithText("Unmerge Transactions?").assertIsDisplayed()
+        composeTestRule.onNode(androidx.compose.ui.test.hasText("Unmerge").and(androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.isDialog()))).performClick()
+
+        // Should return to transaction list
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Open Merged Expense again
+        composeTestRule.onNode(androidx.compose.ui.test.hasText("Merged Expense"), useUnmergedTree = true)
+            .onAncestors()
+            .filterToOne(androidx.compose.ui.test.hasClickAction())
+            .performClick()
+
+        // After unmerge, parent was 100. Reimbursement was 200. Net is 100 - 200 = -100. Absolute is 100.
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("100.00", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onAllNodesWithText("100.00", substring = true).onFirst().assertIsDisplayed()
     }
 
     @Test
@@ -165,8 +265,11 @@ class TransactionMergeUITest {
             composeTestRule.onAllNodesWithText("Save").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Edit Description (initial value is ManualMergeTest1). Use hasSetTextAction to disambiguate from the read-only row item.
+        // Edit Description
         composeTestRule.onNode(hasText("ManualMergeTest1") and hasSetTextAction()).performTextReplacement("EditedAnchor")
+        
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
 
         // Save
         composeTestRule.onNodeWithText("Save").performClick()

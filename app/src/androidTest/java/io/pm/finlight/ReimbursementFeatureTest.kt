@@ -108,7 +108,7 @@ class ReimbursementFeatureTest {
 
         // Verify the linked repayment is shown
         composeTestRule.onNodeWithText("Repayments").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Alice Repayment").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Alice Repayment", substring = true).performScrollTo().assertIsDisplayed()
 
         // Verify Net Cost calculation: 1500 - 500 = 1000
         composeTestRule.onNodeWithText("Net cost", substring = true, ignoreCase = true)
@@ -236,5 +236,57 @@ class ReimbursementFeatureTest {
         // And the expense repayment card should be present confirming we're on the right screen
         composeTestRule.onNodeWithText("Repayments", ignoreCase = true)
             .performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun testOverRepaymentFlipsUIToIncome() {
+        val appDatabase = AppDatabase.getInstance(composeTestRule.activity.applicationContext)
+        runBlocking {
+            appDatabase.transactionDao().deleteAll()
+
+            val now = System.currentTimeMillis()
+            val expenseId = 9001
+            appDatabase.transactionDao().insert(
+                Transaction(
+                    id = expenseId,
+                    description = "Over-repaid Expense",
+                    // Over-repaid by 500
+                    amount = -500.0,
+                    categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
+                    accountId = TestDataSeeder.ACCOUNT_BANK_ID,
+                    date = now,
+                    transactionType = "expense",
+                    notes = ""
+                )
+            )
+        }
+
+        openTransactionsTab()
+
+        // Wait for the transaction to appear and navigate into it directly.
+        // We avoid matching on the top-bar title ("Debit transaction") because the visual type
+        // for over-repaid expenses may differ from the DB type. Instead we use the description.
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithText("Over-repaid Expense").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNode(androidx.compose.ui.test.hasText("Over-repaid Expense"), useUnmergedTree = true)
+            .onAncestors()
+            .filterToOne(androidx.compose.ui.test.hasClickAction())
+            .performClick()
+
+        // Wait for the detail screen to load (top bar uses DB type, so "Debit transaction" is correct
+        // for an expense regardless of amount sign — this is verified here for safety).
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithText("Debit transaction", ignoreCase = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify the dynamic UI shows the positive absolute amount (|−500| = 500.00)
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithText("500.00", substring = true)
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("500.00", substring = true).assertIsDisplayed()
+
     }
 }

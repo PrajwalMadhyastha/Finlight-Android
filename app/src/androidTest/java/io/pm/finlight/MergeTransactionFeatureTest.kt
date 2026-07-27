@@ -146,7 +146,7 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Merged Transactions"))
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(androidx.compose.ui.test.hasText("Related Activity").or(androidx.compose.ui.test.hasText("Merged Transactions")))
         composeTestRule.onNodeWithText("Unmerge").performClick()
 
         // 4. Verify confirmation dialog appears and confirm
@@ -266,7 +266,7 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
-            .performScrollToNode(hasText("Merged Transactions"))
+            .performScrollToNode(hasText("Related Activity").or(hasText("Merged Transactions")))
         composeTestRule.onNodeWithText("Unmerge").performClick()
 
         // 5. Confirm the unmerge dialog
@@ -381,8 +381,8 @@ class MergeTransactionFeatureTest {
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
-            .performScrollToNode(hasText("Merged Transactions"))
-        composeTestRule.onNodeWithText("Merged Transactions").assertIsDisplayed()
+            .performScrollToNode(hasText("Related Activity").or(hasText("Merged Transactions")))
+        composeTestRule.onNode(hasText("Related Activity").or(hasText("Merged Transactions"))).assertIsDisplayed()
         composeTestRule.onNodeWithText("Unmerge").assertIsDisplayed()
 
         // Child account name should appear in the card

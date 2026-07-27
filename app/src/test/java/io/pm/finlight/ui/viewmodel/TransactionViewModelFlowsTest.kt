@@ -301,16 +301,17 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
                         date = 1000L
                     )
                 )
-            val dummyTransaction = Transaction(
-                id = 1,
-                description = "Test Desc",
-                amount = 100.0,
-                date = 1000L,
-                accountId = 1,
-                transactionType = "expense",
-                categoryId = null,
-                notes = null
-            )
+            val dummyTransaction =
+                Transaction(
+                    id = 1,
+                    description = "Test Desc",
+                    amount = 100.0,
+                    date = 1000L,
+                    accountId = 1,
+                    transactionType = "expense",
+                    categoryId = null,
+                    notes = null
+                )
             whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(dummyTransaction))
             whenever(transactionRepository.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))

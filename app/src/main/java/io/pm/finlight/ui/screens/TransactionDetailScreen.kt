@@ -391,7 +391,9 @@ fun TransactionDetailScreen(
                         }
                     }
 
-                    if (details.transaction.originalAmount != null) {
+                    if (details.transaction.originalAmount != null && 
+                        details.transaction.currencyCode != null && 
+                        details.transaction.conversionRate != null) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 CurrencyConversionInfoCard(transaction = details.transaction)
@@ -407,22 +409,28 @@ fun TransactionDetailScreen(
                         }
                     }
 
-                    // --- NEW: Reimbursement card for expense transactions ---
-                    if (details.transaction.transactionType == "expense") {
+                    // --- NEW: Unified Related Activity Card (Handles both reimbursements and merged transactions) ---
+                    val hasReimbursements = details.transaction.transactionType == "expense"
+                    val hasMerged = mergedTransactionBreakdown.size > 1
+                    if (hasReimbursements || hasMerged) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                ReimbursementCard(
-                                    currentExpenseAmount = details.transaction.amount,
+                                UnifiedRelatedActivityCard(
+                                    currentAmount = details.transaction.amount,
+                                    isExpense = details.transaction.transactionType == "expense",
                                     reimbursements = reimbursements,
+                                    mergedEntries = mergedTransactionBreakdown,
                                     onLinkClick = { viewModel.openReimbursementPicker(transactionId) },
                                     onUnlinkClick = { incomeId -> viewModel.unlinkReimbursement(incomeId) },
+                                    onUnmergeClick = { showUnmergeDialog = true }
                                 )
                             }
                         }
                     }
 
                     // --- NEW: Badge for income transactions that are linked as a repayment ---
-                    if (details.transaction.transactionType == "income" && linkedExpense != null) {
+                    val isMathematicallyIncome = details.transaction.transactionType == "income"
+                    if (isMathematicallyIncome && linkedExpense != null) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 LinkedAsReimbursementBadge(
@@ -433,19 +441,6 @@ fun TransactionDetailScreen(
                                     onUnlinkClick = {
                                         viewModel.unlinkReimbursement(transactionId)
                                     },
-                                )
-                            }
-                        }
-                    }
-
-                    // --- NEW: Merged Transactions card — shown only for transactions that were merged ---
-                    if (mergedTransactionBreakdown.size > 1) {
-                        item {
-                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                MergedTransactionsCard(
-                                    entries = mergedTransactionBreakdown,
-                                    currentAmount = details.transaction.amount,
-                                    onUnmergeClick = { showUnmergeDialog = true },
                                 )
                             }
                         }
@@ -792,11 +787,19 @@ private fun TransactionPropertiesCard(
                     .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            val isMathematicallyIncome = details.transaction.transactionType == "income"
+            // An expense with a negative amount is "over-repaid". It renders visually as income
+            // but its DB type remains "expense". We lock the toggle in this state to prevent the
+            // user from accidentally changing the type when the toggle shows the "wrong" side.
+            val isOverRepaid = !isMathematicallyIncome && details.transaction.amount < 0
+            val isVisuallyIncome = isMathematicallyIncome || isOverRepaid
+            val displayType = if (isVisuallyIncome) "income" else "expense"
+
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 TransactionTypeToggle(
-                    selectedType = details.transaction.transactionType,
+                    selectedType = displayType,
                     onTypeSelected = onTypeSelected,
-                    enabled = !details.transaction.isSplit,
+                    enabled = !details.transaction.isSplit && !isOverRepaid,
                 )
             }
 
@@ -928,18 +931,23 @@ private fun CurrencyConversionInfoCard(transaction: Transaction) {
             ) {
                 Text("Original Amount:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    "${foreignCurrencySymbol}${numberFormat.format(transaction.originalAmount)}",
-                    fontWeight = FontWeight.SemiBold,
+                    "$foreignCurrencySymbol${numberFormat.format(transaction.originalAmount ?: 0.0)}",
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
                 )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Conversion Rate:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    "1 ${transaction.currencyCode} = $homeCurrencySymbol${numberFormat.format(transaction.conversionRate)}",
+                    "Exchange Rate",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "1 ${transaction.currencyCode} = $homeCurrencySymbol${numberFormat.format(transaction.conversionRate ?: 0.0)}",
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -1015,7 +1023,7 @@ private fun TransactionSpotlightHeader(
     val dateFormatter = remember { FormatUtils.fullDateTimeFormatter }
 
     val animatedAmount by animateFloatAsState(
-        targetValue = details.transaction.amount.toFloat(),
+        targetValue = kotlin.math.abs(details.transaction.amount).toFloat(),
         animationSpec = tween(1500, easing = EaseOutCubic),
         label = "AmountAnimation",
     )

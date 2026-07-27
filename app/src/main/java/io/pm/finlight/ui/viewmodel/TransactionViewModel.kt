@@ -1128,6 +1128,7 @@ class TransactionViewModel(
                     sourceSmsId = null,
                     sourceSmsHash = null,
                     source = "Manual Entry",
+                    originalAmount = enteredAmount,
                 )
             }
 
@@ -1533,7 +1534,7 @@ class TransactionViewModel(
                 return@launch
             }
             if (it > 0) {
-                transactionRepository.updateAmount(id, it)
+                transactionRepository.updateManualAmountEdit(id, it)
             }
         }
     }

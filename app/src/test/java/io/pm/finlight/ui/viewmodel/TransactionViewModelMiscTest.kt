@@ -33,7 +33,7 @@ class TransactionViewModelMiscTest : TransactionViewModelBaseSetup() {
             advanceUntilIdle()
 
             // Assert
-            verify(transactionRepository).updateAmount(transactionId, newAmountDouble)
+            verify(transactionRepository).updateManualAmountEdit(transactionId, newAmountDouble)
         }
 
     @Test
