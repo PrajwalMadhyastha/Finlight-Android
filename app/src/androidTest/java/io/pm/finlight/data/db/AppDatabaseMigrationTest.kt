@@ -649,7 +649,7 @@ class AppDatabaseMigrationTest {
         org.junit.Assert.assertEquals(50.0, cursorC.getDouble(0), 0.001)
         org.junit.Assert.assertEquals("expense", cursorC.getString(1))
         cursorC.close()
-        
+
         // Verify Scenario D
         val cursorD = migratedDb.query("SELECT amount, transactionType FROM transactions WHERE id = 6")
         org.junit.Assert.assertTrue(cursorD.moveToFirst())
@@ -658,4 +658,3 @@ class AppDatabaseMigrationTest {
         cursorD.close()
     }
 }
-

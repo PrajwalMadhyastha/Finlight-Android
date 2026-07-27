@@ -511,7 +511,6 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
     // ── Tests: Core Insert / Update / Delete ──────────────────────────────────
 
-
     @Test
     fun `insertTransactionWithTags without travel mode saves transaction and initial tags`() =
         runTest {

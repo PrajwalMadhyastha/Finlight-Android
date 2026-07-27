@@ -267,7 +267,7 @@ class TransactionMergeUITest {
 
         // Edit Description
         composeTestRule.onNode(hasText("ManualMergeTest1") and hasSetTextAction()).performTextReplacement("EditedAnchor")
-        
+
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         composeTestRule.waitForIdle()
 

@@ -391,9 +391,10 @@ fun TransactionDetailScreen(
                         }
                     }
 
-                    if (details.transaction.originalAmount != null && 
-                        details.transaction.currencyCode != null && 
-                        details.transaction.conversionRate != null) {
+                    if (details.transaction.originalAmount != null &&
+                        details.transaction.currencyCode != null &&
+                        details.transaction.conversionRate != null
+                    ) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 CurrencyConversionInfoCard(transaction = details.transaction)

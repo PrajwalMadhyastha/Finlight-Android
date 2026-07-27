@@ -287,6 +287,5 @@ class ReimbursementFeatureTest {
                 .fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithText("500.00", substring = true).assertIsDisplayed()
-
     }
 }

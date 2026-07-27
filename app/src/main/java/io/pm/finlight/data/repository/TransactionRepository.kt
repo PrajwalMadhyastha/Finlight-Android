@@ -746,13 +746,14 @@ class TransactionRepository(
             val netSigned = anchorSigned + childTxns.sumOf { signedAmount(it) }
             val hasReimbursements = transactionDao.getReimbursementsCountSync(anchorTxnId) > 0
 
-            val finalType = if (hasReimbursements) {
-                "expense"
-            } else if (netSigned >= 0.0) {
-                "income"
-            } else {
-                "expense"
-            }
+            val finalType =
+                if (hasReimbursements) {
+                    "expense"
+                } else if (netSigned >= 0.0) {
+                    "income"
+                } else {
+                    "expense"
+                }
 
             val finalAmount = if (finalType == "expense") -netSigned else netSigned
 
