@@ -64,7 +64,7 @@ object SmsParser {
     private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
     // --- FIX: Added 'Txn' and 'Dr'/'Dr.' to the list of expense keywords ---
     val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|Txn|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr|Dr\\.|Dr with|debit of|debit)\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
-    val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
+    val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|refunded by|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
 
     private val ACCOUNT_PATTERNS =
         listOf(
@@ -146,6 +146,7 @@ object SmsParser {
             "towards\\s+(.+?)(?: UMRN:)".toRegex(RegexOption.IGNORE_CASE),
             "at\\s+(.*?)\\s+\\(UPI Ref No".toRegex(RegexOption.IGNORE_CASE),
             "^([A-Z0-9*\\s]+) refund of".toRegex(RegexOption.IGNORE_CASE),
+            "(?:refunded by)\\s+([A-Za-z0-9\\s.&'-]+?)(?:\\s+on\\s+|&|$)".toRegex(RegexOption.IGNORE_CASE),
             // --- FIX: Increased specificity and priority of this ICICI pattern ---
             ";\\s*([A-Za-z0-9\\s.&'-]+?)\\s+credited\\.".toRegex(RegexOption.IGNORE_CASE),
             "towards\\s+(.+?)(?:\\. UPI Ref| for Autopay)".toRegex(RegexOption.IGNORE_CASE),

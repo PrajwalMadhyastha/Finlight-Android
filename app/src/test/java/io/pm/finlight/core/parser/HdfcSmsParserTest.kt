@@ -705,4 +705,33 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
 
             assertNull("Parser should ignore this expiration alert", result)
         }
+    @Test
+    fun `test parses HDFC refunded by UPI message`() =
+        runBlocking {
+            setupTest()
+            val smsBody = "Alert! Rs. 123 refunded by UPI-District Dining on 12/JAN/2012 & adjusted against HDFC Bank Credit Card 1234 View updated balance here: https://1.hdfc.bank.in/HDFCBK/s/e8aL7LjR"
+            val mockSms =
+                SmsMessage(
+                    id = 9020L,
+                    sender = "AM-HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNotNull("Parser should not ignore this valid transaction", result)
+            assertEquals(123.0, result?.amount)
+            assertEquals("income", result?.transactionType)
+            assertEquals("District Dining", result?.merchantName)
+        }
 }
