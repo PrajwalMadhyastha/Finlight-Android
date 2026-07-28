@@ -232,7 +232,11 @@ fun UnifiedRelatedActivityCard(
 
     val totalRepaid = reimbursements.sumOf { it.transaction.amount }
     val mergedChildren = mergedEntries.filter { !it.isAnchor }
-    val totalMerged = mergedChildren.sumOf { it.amount }
+    val totalMerged =
+        mergedChildren.sumOf { child ->
+            val isSameType = (isExpense && child.transactionType == "expense") || (!isExpense && child.transactionType == "income")
+            if (isSameType) child.amount else -child.amount
+        }
 
     val anchor = mergedEntries.firstOrNull { it.isAnchor }
     val originalAmount =
@@ -248,12 +252,14 @@ fun UnifiedRelatedActivityCard(
     if (hasMerged) {
         items.addAll(
             mergedChildren.map { child ->
+                val isSameType = (isExpense && child.transactionType == "expense") || (!isExpense && child.transactionType == "income")
+                val prefix = if (isSameType) "+ " else "- "
                 RelatedTransactionItem(
                     id = "merge_${child.hashCode()}",
                     title = "(Merged) ${child.description.ifBlank { "Unknown" }}",
                     subtitle = "${dateFormat.format(java.util.Date(child.date))} • ${child.accountName}",
                     amount = child.amount,
-                    amountPrefix = "+ ",
+                    amountPrefix = prefix,
                     amountColor = MaterialTheme.colorScheme.primary,
                     actionIcon = null,
                     actionContentDescription = null,
@@ -287,8 +293,8 @@ fun UnifiedRelatedActivityCard(
         modifiers.add(
             SummaryModifier(
                 label = "Total merged in",
-                amount = totalMerged,
-                prefix = "+ ",
+                amount = kotlin.math.abs(totalMerged),
+                prefix = if (totalMerged >= 0) "+ " else "- ",
                 color = MaterialTheme.colorScheme.primary
             )
         )
@@ -353,15 +359,29 @@ fun UnifiedRelatedActivityCard(
                         text = "Unmerge",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.clickable { onUnmergeClick() }
+                        modifier =
+                            Modifier
+                                .clickable { onUnmergeClick() }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
                     )
                 }
+
+                if (hasMerged && hasReimbursements) {
+                    VerticalDivider(
+                        modifier = Modifier.height(14.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                    )
+                }
+
                 if (hasReimbursements) {
                     Text(
                         text = "+ Link",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable { onLinkClick() }
+                        modifier =
+                            Modifier
+                                .clickable { onLinkClick() }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
                     )
                 }
             }

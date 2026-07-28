@@ -362,11 +362,15 @@ fun TransactionDetailScreen(
 
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            val hasReimbursements = reimbursements.isNotEmpty()
+                            val hasMerged = mergedTransactionBreakdown.size > 1
                             TransactionSpotlightHeader(
                                 details = details,
                                 displayDate = selectedDateTime.time,
                                 visitCount = visitCount,
                                 isSplit = details.transaction.isSplit,
+                                hasMerged = hasMerged,
+                                hasReimbursements = hasReimbursements,
                                 onDescriptionClick = {
                                     if (!details.transaction.isSplit) {
                                         activeSheetContent = SheetContent.Merchant
@@ -404,8 +408,12 @@ fun TransactionDetailScreen(
 
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                            val hasReimbursements = reimbursements.isNotEmpty()
+                            val hasMerged = mergedTransactionBreakdown.size > 1
                             TransactionPropertiesCard(
                                 details = details,
+                                hasMerged = hasMerged,
+                                hasReimbursements = hasReimbursements,
                                 onTypeSelected = { newType ->
                                     viewModel.updateTransactionType(details.transaction.id, newType)
                                 },
@@ -785,6 +793,8 @@ fun TransactionDetailScreen(
 @Composable
 private fun TransactionPropertiesCard(
     details: TransactionDetails,
+    hasMerged: Boolean = false,
+    hasReimbursements: Boolean = false,
     onTypeSelected: (String) -> Unit,
     onExcludeToggled: (Boolean) -> Unit,
 ) {
@@ -808,7 +818,7 @@ private fun TransactionPropertiesCard(
                 TransactionTypeToggle(
                     selectedType = displayType,
                     onTypeSelected = onTypeSelected,
-                    enabled = !details.transaction.isSplit && !isOverRepaid,
+                    enabled = !details.transaction.isSplit && !isOverRepaid && !hasMerged && !hasReimbursements,
                 )
             }
 
@@ -1012,6 +1022,8 @@ private fun TransactionSpotlightHeader(
     displayDate: Date,
     visitCount: Int,
     isSplit: Boolean,
+    hasMerged: Boolean = false,
+    hasReimbursements: Boolean = false,
     onDescriptionClick: () -> Unit,
     onAmountClick: () -> Unit,
     onCategoryClick: () -> Unit,
@@ -1129,16 +1141,18 @@ private fun TransactionSpotlightHeader(
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = onSplitClick,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f)),
-                ) {
-                    val icon = if (isSplit) Icons.Default.Edit else Icons.AutoMirrored.Filled.CallSplit
-                    val text = if (isSplit) "Edit Splits" else "Split Transaction"
-                    Icon(icon, contentDescription = text, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(text)
+                if (!hasMerged && !hasReimbursements) {
+                    OutlinedButton(
+                        onClick = onSplitClick,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.7f)),
+                    ) {
+                        val icon = if (isSplit) Icons.Default.Edit else Icons.AutoMirrored.Filled.CallSplit
+                        val text = if (isSplit) "Edit Splits" else "Split Transaction"
+                        Icon(icon, contentDescription = text, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(text)
+                    }
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
