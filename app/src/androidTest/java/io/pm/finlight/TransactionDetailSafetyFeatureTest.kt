@@ -12,7 +12,6 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class TransactionDetailSafetyFeatureTest {
-
     private val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @get:Rule
@@ -41,43 +40,43 @@ class TransactionDetailSafetyFeatureTest {
 
         // Long press first one to enter selection mode
         composeTestRule.onNodeWithText(TestDataSeeder.TXN_GROCERY_DESC).performTouchInput { longClick() }
-            
+
         // Tap second one's checkbox
         composeTestRule.onNodeWithTag("transaction_item_checkbox_${TestDataSeeder.TXN_COFFEE_DESC}").performTouchInput { click() }
-            
+
         // Click merge
         composeTestRule.onNodeWithContentDescription("Merge Transactions").performClick()
-        
+
         // Wait for it to be merged (Review merge sheet)
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithText("Confirm Merge").fetchSemanticsNodes().isNotEmpty()
         }
-        
+
         composeTestRule.onNodeWithText("Confirm Merge").performClick()
-        
+
         composeTestRule.waitUntil(timeoutMillis = 10000) {
             composeTestRule.onAllNodesWithText(TestDataSeeder.TXN_COFFEE_DESC).fetchSemanticsNodes().isEmpty()
         }
-        
+
         // Open the merged transaction
         composeTestRule.onNode(hasText(TestDataSeeder.TXN_GROCERY_DESC), useUnmergedTree = true)
             .onAncestors()
             .filterToOne(hasClickAction())
             .performClick()
-            
+
         composeTestRule.waitUntil(timeoutMillis = 8000) {
             composeTestRule.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().isNotEmpty()
         }
-        
+
         // 1. Verify "Split Transaction" button is completely hidden
         composeTestRule.onNodeWithText("Split Transaction").assertDoesNotExist()
-        
+
         // 2. Verify Unmerge is displayed (might need to scroll down).
         composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
             .performScrollToNode(hasText("Unmerge", ignoreCase = true))
-            
+
         composeTestRule.onNodeWithText("Unmerge", ignoreCase = true, useUnmergedTree = true).assertIsDisplayed()
-        
+
         // 3. Since we disabled the toggle, we can click it and verify that it doesn't change anything
         // "Income" or "Expense" label should remain unchanged if disabled.
     }
