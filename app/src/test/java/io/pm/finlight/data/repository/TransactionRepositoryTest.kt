@@ -32,6 +32,7 @@ import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.DeletedSmsHashDao
 import io.pm.finlight.data.db.dao.MergeRecordDao
+import io.pm.finlight.data.db.entity.MergeRecord
 
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -287,7 +288,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository.unmergeTransactions(1)
 
             // Verify anchor was restored
-            verify(transactionDao).updateAmount(1, 100.0)
+            verify(transactionDao).updateAmount(1, 80.0)
             verify(transactionDao).updateNotes(1, "Anchor note")
 
             // Verify child was inserted back
@@ -295,6 +296,217 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             // Verify record deleted
             verify(mergeRecordDao).deleteByGroupId("group-123")
+        }
+
+    @Test
+    fun `unmergeTransactions keeps expense type and allows negative amount if over-repaid with linked reimbursements`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val anchor = Transaction(id = 1, description = "Anchor", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note", transactionType = "expense")
+
+            val groupRecord =
+                io.pm.finlight.data.db.entity.MergeRecord(
+                    id = 10, parentTxnId = 1, mergedAt = 0L, mergeGroupId = "group-123", mergeType = "MANUAL",
+                    originalParentAmount = -100.0, originalParentDate = 1000L, originalParentNotes = "Anchor note",
+                    childDescription = "Child 1", childAmount = 200.0, childDate = 2000L, childAccountId = 1,
+                    childCategoryId = 2, childTransactionType = "expense", childSource = "MANUAL", childNotes = "Child note",
+                    childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
+                    childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
+                )
+
+            `when`(mergeRecordDao.getForParentSync(1)).thenReturn(groupRecord)
+            `when`(mergeRecordDao.getAllForGroup("group-123")).thenReturn(listOf(groupRecord))
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(anchor)
+            `when`(transactionDao.getReimbursementsCountSync(1)).thenReturn(1)
+
+            repository.unmergeTransactions(1)
+
+            verify(transactionDao).updateAmount(1, -100.0)
+            verify(transactionDao, org.mockito.kotlin.never()).updateTransactionType(org.mockito.kotlin.any(), org.mockito.kotlin.any())
+        }
+
+    @Test
+    fun `unmergeTransactions flips type to income if over-repaid and no linked reimbursements`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val anchor = Transaction(id = 1, description = "Anchor", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note", transactionType = "expense")
+
+            val groupRecord =
+                io.pm.finlight.data.db.entity.MergeRecord(
+                    id = 10, parentTxnId = 1, mergedAt = 0L, mergeGroupId = "group-123", mergeType = "MANUAL",
+                    originalParentAmount = -100.0, originalParentDate = 1000L, originalParentNotes = "Anchor note",
+                    childDescription = "Child 1", childAmount = 200.0, childDate = 2000L, childAccountId = 1,
+                    childCategoryId = 2, childTransactionType = "expense", childSource = "MANUAL", childNotes = "Child note",
+                    childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
+                    childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
+                )
+
+            `when`(mergeRecordDao.getForParentSync(1)).thenReturn(groupRecord)
+            `when`(mergeRecordDao.getAllForGroup("group-123")).thenReturn(listOf(groupRecord))
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(anchor)
+            `when`(transactionDao.getReimbursementsCountSync(1)).thenReturn(0) // No reimbursements!
+
+            repository.unmergeTransactions(1)
+
+            verify(transactionDao).updateAmount(1, 100.0) // Absolute amount
+            verify(transactionDao).updateTransactionType(1, "income") // Flipped to income
+        }
+
+    @Test
+    fun `unmergeTransactions happy path does not call updateTransactionType when type is unchanged`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val anchor = Transaction(id = 1, description = "Anchor", amount = 130.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note\nChild note", transactionType = "expense")
+
+            val groupRecord =
+                io.pm.finlight.data.db.entity.MergeRecord(
+                    id = 10, parentTxnId = 1, mergedAt = 0L, mergeGroupId = "group-123", mergeType = "MANUAL",
+                    originalParentAmount = 100.0, originalParentDate = 1000L, originalParentNotes = "Anchor note",
+                    childDescription = "Child 1", childAmount = 50.0, childDate = 2000L, childAccountId = 1,
+                    childCategoryId = 2, childTransactionType = "expense", childSource = "MANUAL", childNotes = "Child note",
+                    childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
+                    childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
+                )
+
+            `when`(mergeRecordDao.getForParentSync(1)).thenReturn(groupRecord)
+            `when`(mergeRecordDao.getAllForGroup("group-123")).thenReturn(listOf(groupRecord))
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(anchor)
+            // Explicit mock: 0 reimbursements, which is the expected state for a clean unmerge.
+            `when`(transactionDao.getReimbursementsCountSync(1)).thenReturn(0)
+
+            repository.unmergeTransactions(1)
+
+            // Relative arithmetic: 130 (merged expense) - 50 (child expense) = 80. Type unchanged.
+            verify(transactionDao).updateAmount(1, 80.0)
+            verify(transactionDao).updateNotes(1, "Anchor note")
+            verify(transactionDao).insert(org.mockito.kotlin.any())
+            verify(mergeRecordDao).deleteByGroupId("group-123")
+            // Type is still expense (newSigned=-80 < 0), so updateTransactionType should NOT be called.
+            verify(transactionDao, org.mockito.kotlin.never()).updateTransactionType(org.mockito.kotlin.any(), org.mockito.kotlin.any())
+        }
+
+    @Test
+    fun `autoUnmergeTransactions with reimbursement applied produces negative expense amount`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDaoMock, db)
+
+            // AUTO merge record: type not "MANUAL" so goes through AUTO path.
+            // Parent was originally 200. Child was 100. After merge: parent.amount = 300.
+            // Then a reimbursement of 350 was applied: parent.amount = 300 - 350 = -50.
+            // After unmerge: newAmount = -50 - 100 = -150. The expense is still over-repaid.
+            val record =
+                io.pm.finlight.data.db.entity.MergeRecord(
+                    id = 1,
+                    parentTxnId = 20,
+                    originalParentAmount = 200.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "SMS Child",
+                    childAmount = 100.0,
+                    childDate = 2000L,
+                    childAccountId = 1,
+                    childCategoryId = 1,
+                    childTransactionType = "expense",
+                    childSource = "AUTO",
+                    childNotes = null,
+                    childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
+                    childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null,
+                )
+            `when`(mergeRecordDaoMock.getForParentSync(20)).thenReturn(record)
+            `when`(mergeRecordDaoMock.getAllForParentSync(20)).thenReturn(listOf(record))
+
+            // Simulate: after merge + reimbursement, current parent amount is -50
+            val currentParent = Transaction(id = 20, description = "Parent", amount = -50.0, date = 2000L, accountId = 1, categoryId = 1, transactionType = "expense", notes = null)
+            `when`(transactionDao.getTransactionByIdSync(20)).thenReturn(currentParent)
+            `when`(transactionDao.insert(anyObject())).thenReturn(1L)
+
+            repository.unmergeTransactions(20)
+
+            // newAmount = -50 - 100 = -150. The expense remains "expense" type (over-repaid).
+            // The UI will display this as abs(-150) = 150 visually via isVisuallyIncome.
+            verify(transactionDao).updateAmount(20, -150.0)
+        }
+
+    @Test
+    fun `manualMergeTransactions with over-repaid anchor (negative amount) uses signed arithmetic correctly`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            // Anchor is over-repaid: expense type but amount is -50 (500 expense, 550 reimbursed)
+            val anchor = Transaction(id = 1, description = "Over-repaid Expense", amount = -50.0, date = 1000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")
+            // Child is a plain 200 expense
+            val child = Transaction(id = 2, description = "Extra Expense", amount = 200.0, date = 2000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")
+
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(anchor)
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(child)
+            `when`(transactionDao.getTagsForTransactionSimple(1)).thenReturn(emptyList())
+            `when`(transactionDao.getTagsForTransactionSimple(2)).thenReturn(emptyList())
+
+            repository.manualMergeTransactions(anchor.id, listOf(child.id))
+
+            // anchor (expense, -50): signedAmount = -(-50) = +50 (the function negates for expenses)
+            // child  (expense, 200): signedAmount = -(200) = -200
+            // netSigned = 50 + (-200) = -150 → finalType="expense", finalAmount = abs(-150) = 150
+            verify(transactionDao).updateAmount(1, 150.0)
+            // The anchor was already "expense" and finalType is "expense" → the guard prevents
+            // a redundant updateTransactionType call.
+            verify(transactionDao, org.mockito.kotlin.never()).updateTransactionType(org.mockito.kotlin.any(), org.mockito.kotlin.any())
+        }
+
+    @Test
+    fun `manualMergeTransactions with over-repaid anchor and small child keeps expense type`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            // Anchor is over-repaid: expense type but amount is -50
+            val anchor = Transaction(id = 1, description = "Over-repaid Expense", amount = -50.0, date = 1000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")
+            // Child is a small 10 expense
+            val child = Transaction(id = 2, description = "Small Expense", amount = 10.0, date = 2000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")
+
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(anchor)
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(child)
+            `when`(transactionDao.getTagsForTransactionSimple(1)).thenReturn(emptyList())
+            `when`(transactionDao.getTagsForTransactionSimple(2)).thenReturn(emptyList())
+            `when`(transactionDao.getReimbursementsCountSync(1)).thenReturn(1) // Has reimbursements
+
+            repository.manualMergeTransactions(anchor.id, listOf(child.id))
+
+            // anchorSigned = +50
+            // childSigned = -10
+            // netSigned = +40
+            // Because it has reimbursements, it should stay expense.
+            // finalAmount = -netSigned = -40.0
+            verify(transactionDao).updateAmount(1, -40.0)
+            verify(transactionDao, org.mockito.kotlin.never()).updateTransactionType(org.mockito.kotlin.any(), org.mockito.kotlin.any())
+        }
+
+    @Test
+    fun `unlinkReimbursement on over-repaid (negative) expense correctly restores amount`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            // Income of 150 was linked to expense of 100 → expense.amount = 100 - 150 = -50 (over-repaid)
+            val incomeTxn = Transaction(id = 2, description = "Income", amount = 150.0, date = 2000L, accountId = 1, categoryId = 1, transactionType = "income", notes = null, parentReimbursementId = 1)
+            val expenseTxn = Transaction(id = 1, description = "Expense", amount = -50.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = "expense", notes = null)
+
+            `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(incomeTxn)
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(expenseTxn)
+
+            repository.unlinkReimbursement(incomeId = 2)
+
+            // After unlink, expense amount should be restored: -50 + 150 = 100
+            verify(transactionDao).updateAmount(1, 100.0)
         }
 
     // ── Tests: Core Insert / Update / Delete ──────────────────────────────────
@@ -1223,7 +1435,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `linkReimbursement does not set expense amount below zero`() =
+    fun `linkReimbursement allows expense amount to drop below zero`() =
         runTest {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
@@ -1237,7 +1449,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository.linkReimbursement(incomeId = 2, expenseId = 1)
 
             verify(transactionDao).linkReimbursement(2, 1)
-            verify(transactionDao).updateAmount(1, 0.0) // coerceAtLeast(0.0)
+            verify(transactionDao).updateAmount(1, -200.0)
         }
 
     @Test
@@ -1349,6 +1561,9 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
             `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
 
+            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = "expense", notes = null)
+            `when`(transactionDao.getTransactionByIdSync(10)).thenReturn(anchor)
+
             repository.unmergeTransactions(10)
 
             verify(transactionDao).updateAmount(10, 500.0)
@@ -1388,6 +1603,9 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                 )
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
             `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
+
+            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = "expense", notes = null)
+            `when`(transactionDao.getTransactionByIdSync(10)).thenReturn(anchor)
             `when`(transactionDao.insert(anyObject())).thenReturn(99L)
 
             repository.unmergeTransactions(10)
@@ -1442,6 +1660,9 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                 )
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
             `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
+
+            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = "expense", notes = null)
+            `when`(transactionDao.getTransactionByIdSync(10)).thenReturn(anchor)
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
             repository.unmergeTransactions(10)
@@ -1482,6 +1703,9 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                 )
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
             `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
+
+            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = "expense", notes = null)
+            `when`(transactionDao.getTransactionByIdSync(10)).thenReturn(anchor)
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
             repository.unmergeTransactions(10)
@@ -1521,6 +1745,9 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                 )
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
             `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
+
+            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = "expense", notes = null)
+            `when`(transactionDao.getTransactionByIdSync(10)).thenReturn(anchor)
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
             repository.unmergeTransactions(10)
@@ -1670,5 +1897,81 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                 org.mockito.kotlin.any(),
                 org.mockito.kotlin.any()
             )
+        }
+
+    @Test
+    fun `getMergedTransactionBreakdown returns mapped entries for cross-account merge`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val parentTxnId = 1
+            val anchorAccountId = 101
+            val childAccountId = 102
+
+            val anchorTxn = Transaction(id = parentTxnId, description = "Anchor", amount = 800.0, date = 1000L, accountId = anchorAccountId, transactionType = "expense", notes = null, categoryId = null)
+            val mergeRecord =
+                MergeRecord(
+                    parentTxnId = parentTxnId,
+                    originalParentAmount = 500.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child",
+                    childAmount = 300.0,
+                    childDate = 1000L,
+                    childAccountId = childAccountId,
+                    childCategoryId = null,
+                    childTransactionType = "expense",
+                    childSource = "manual",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = null,
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null
+                )
+
+            `when`(mergeRecordDao.getAllForParentAnyType(parentTxnId)).thenReturn(listOf(mergeRecord))
+            `when`(transactionDao.getTransactionByIdSync(parentTxnId)).thenReturn(anchorTxn)
+            `when`(accountDao.getAccountByIdBlocking(anchorAccountId)).thenReturn(Account(id = anchorAccountId, name = "Anchor Account", type = "Bank"))
+            `when`(accountDao.getAccountByIdBlocking(childAccountId)).thenReturn(Account(id = childAccountId, name = "Child Account", type = "Bank"))
+
+            val breakdown = repository.getMergedTransactionBreakdown(parentTxnId)
+
+            assertEquals(2, breakdown.size)
+
+            val anchorEntry = breakdown[0]
+            assertEquals(anchorAccountId, anchorEntry.accountId)
+            assertEquals("Anchor Account", anchorEntry.accountName)
+            assertEquals(500.0, anchorEntry.amount)
+            assertEquals("expense", anchorEntry.transactionType)
+            assertTrue(anchorEntry.isAnchor)
+            assertEquals("Anchor", anchorEntry.description)
+            assertEquals(1000L, anchorEntry.date)
+
+            val childEntry = breakdown[1]
+            assertEquals(childAccountId, childEntry.accountId)
+            assertEquals("Child Account", childEntry.accountName)
+            assertEquals(300.0, childEntry.amount)
+            assertEquals("expense", childEntry.transactionType)
+            assertEquals(false, childEntry.isAnchor)
+            assertEquals("Child", childEntry.description)
+            assertEquals(1000L, childEntry.date)
+        }
+
+    @Test
+    fun `getMergedTransactionBreakdown returns empty list if no merge records`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val parentTxnId = 1
+            `when`(mergeRecordDao.getAllForParentAnyType(parentTxnId)).thenReturn(emptyList())
+
+            val breakdown = repository.getMergedTransactionBreakdown(parentTxnId)
+
+            assertTrue(breakdown.isEmpty())
         }
 }

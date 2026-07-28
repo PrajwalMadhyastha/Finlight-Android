@@ -293,6 +293,9 @@ interface TransactionDao {
     )
     fun getReimbursementsForExpense(expenseId: Int): Flow<List<TransactionDetails>>
 
+    @androidx.room.Query("SELECT COUNT(*) FROM transactions WHERE parentReimbursementId = :expenseId")
+    fun getReimbursementsCountSync(expenseId: Int): Int
+
     /**
      * Returns the expense transaction that a given income is linked to as a reimbursement.
      * Used to show a badge on the income transaction's detail screen.
@@ -669,6 +672,12 @@ interface TransactionDao {
 
     @Query("UPDATE transactions SET amount = :amount WHERE id = :id")
     suspend fun updateAmount(
+        id: Int,
+        amount: Double,
+    )
+
+    @Query("UPDATE transactions SET amount = :amount, originalAmount = :amount WHERE id = :id")
+    suspend fun updateManualAmountEdit(
         id: Int,
         amount: Double,
     )
@@ -1168,7 +1177,8 @@ interface TransactionDao {
     @Query(
         """
         SELECT * FROM transactions
-        WHERE LOWER(COALESCE(originalDescription, description)) = LOWER(:description)
+        WHERE LOWER(originalDescription) = LOWER(:description)
+        AND originalDescription IS NOT NULL
         AND id != :excludeId
         AND isExcluded = 0 AND status != 'PENDING' AND status != 'SKIPPED'
         ORDER BY date DESC

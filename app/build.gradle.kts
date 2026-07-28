@@ -170,7 +170,7 @@ kover {
 }
 android {
     namespace = "io.pm.finlight"
-    compileSdk = 35
+    compileSdk = 36
 
     signingConfigs {
         create("release") {
@@ -184,7 +184,7 @@ android {
     defaultConfig {
         applicationId = "io.pm.finlight"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode = generateVersionCode()
         versionName = "${versionProperties["VERSION_MAJOR"]}.${versionProperties["VERSION_MINOR"]}.${versionProperties["VERSION_PATCH"]}"
         testInstrumentationRunner = "io.pm.finlight.FinlightTestRunner"

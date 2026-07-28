@@ -73,6 +73,19 @@ interface MergeRecordDao {
     @Query("SELECT mergeGroupId FROM merge_records WHERE parentTxnId = :parentTxnId ORDER BY mergedAt DESC LIMIT 1")
     suspend fun getGroupIdForParent(parentTxnId: Int): String?
 
+    // ─── Account breakdown for detail screen ────────────────────────────────
+
+    /**
+     * Returns ALL merge records for a parent transaction regardless of [MergeRecord.mergeType].
+     * Used by [TransactionRepository.getMergedAccountBreakdown] to reconstruct the per-account
+     * contribution list shown in [MergedAccountsCard] on the detail screen.
+     *
+     * Unlike [getAllForParentSync] (which the repository filters to AUTO only), this query
+     * covers both AUTO and MANUAL merges in a single call.
+     */
+    @Query("SELECT * FROM merge_records WHERE parentTxnId = :parentTxnId ORDER BY mergedAt ASC")
+    suspend fun getAllForParentAnyType(parentTxnId: Int): List<MergeRecord>
+
     // ─── Backup / restore parity ────────────────────────────────────────────
 
     @Query("SELECT * FROM merge_records")

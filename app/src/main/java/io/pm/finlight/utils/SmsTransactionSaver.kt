@@ -99,7 +99,10 @@ class SmsTransactionSaver(
             if (isForeign && travelSettings != null) {
                 Transaction(
                     description = potentialTxn.merchantName ?: "Unknown Merchant",
-                    originalDescription = potentialTxn.merchantName,
+                    // FIX: Use the raw pre-rename name for originalDescription.
+                    // originalMerchantName holds the SMS name before any MerchantRenameRule
+                    // was applied. If null, no rename happened so merchantName is already raw.
+                    originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
                     amount = potentialTxn.amount * conversionRate,
                     originalAmount = potentialTxn.amount,
                     currencyCode = travelSettings.currencyCode,
@@ -118,7 +121,8 @@ class SmsTransactionSaver(
             } else {
                 Transaction(
                     description = potentialTxn.merchantName ?: "Unknown Merchant",
-                    originalDescription = potentialTxn.merchantName,
+                    // FIX: Use the raw pre-rename name for originalDescription.
+                    originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
                     amount = potentialTxn.amount,
                     date = potentialTxn.date,
                     accountId = finalAccountId,

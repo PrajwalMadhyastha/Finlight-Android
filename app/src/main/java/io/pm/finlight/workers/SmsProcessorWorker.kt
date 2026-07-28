@@ -241,7 +241,8 @@ class SmsProcessorWorker(
                     Transaction(
                         id = newTransactionId.toInt(),
                         description = potentialTxn.merchantName ?: "Unknown Merchant",
-                        originalDescription = potentialTxn.merchantName,
+                        // FIX: Use the raw pre-rename name for originalDescription.
+                        originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
                         amount = potentialTxn.amount,
                         date = potentialTxn.date,
                         // placeholder, not used in the notification

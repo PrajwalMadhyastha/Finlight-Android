@@ -188,7 +188,7 @@ fun TransactionDetailScreen(
     val candidateReimbursements by viewModel.candidateReimbursements.collectAsState()
 
     // --- NEW: Unmerge feature state ---
-    val mergeRecord by viewModel.observeMergeRecord(transactionId).collectAsState(initial = null)
+    val mergedTransactionBreakdown by viewModel.mergedTransactionBreakdown.collectAsState()
     var showUnmergeDialog by remember { mutableStateOf(false) }
 
     // Observe ViewModel-driven navigation events (e.g. after canonical nudge resolves).
@@ -391,61 +391,13 @@ fun TransactionDetailScreen(
                         }
                     }
 
-                    if (details.transaction.originalAmount != null) {
+                    if (details.transaction.originalAmount != null &&
+                        details.transaction.currencyCode != null &&
+                        details.transaction.conversionRate != null
+                    ) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 CurrencyConversionInfoCard(transaction = details.transaction)
-                            }
-                        }
-                    }
-
-                    if (details.transaction.isSplit) {
-                        item {
-                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                SplitSummaryCard(splits = splits)
-                            }
-                        }
-                    }
-
-                    // --- NEW: Reimbursement card for expense transactions ---
-                    if (details.transaction.transactionType == "expense") {
-                        item {
-                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                ReimbursementCard(
-                                    currentExpenseAmount = details.transaction.amount,
-                                    reimbursements = reimbursements,
-                                    onLinkClick = { viewModel.openReimbursementPicker(transactionId) },
-                                    onUnlinkClick = { incomeId -> viewModel.unlinkReimbursement(incomeId) },
-                                )
-                            }
-                        }
-                    }
-
-                    // --- NEW: Badge for income transactions that are linked as a repayment ---
-                    if (details.transaction.transactionType == "income" && linkedExpense != null) {
-                        item {
-                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                LinkedAsReimbursementBadge(
-                                    linkedExpense = linkedExpense!!,
-                                    onNavigateToExpense = {
-                                        navController.navigate("transaction_detail/${linkedExpense!!.transaction.id}")
-                                    },
-                                    onUnlinkClick = {
-                                        viewModel.unlinkReimbursement(transactionId)
-                                    },
-                                )
-                            }
-                        }
-                    }
-
-                    // --- NEW: Unmerge card — shown only for transactions that were merged ---
-                    if (mergeRecord != null) {
-                        item {
-                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                UnmergeSuggestionCard(
-                                    mergeRecord = mergeRecord!!,
-                                    onUnmergeClick = { showUnmergeDialog = true },
-                                )
                             }
                         }
                     }
@@ -466,10 +418,70 @@ fun TransactionDetailScreen(
 
                     item {
                         Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                            AccountCard(
-                                details = details,
-                                onAccountClick = { activeSheetContent = SheetContent.Account },
-                            )
+                            // For cross-account merged transactions, we show the AccountCard as read-only.
+                            val accountsInvolved = (mergedTransactionBreakdown.map { it.accountId } + reimbursements.mapNotNull { it.transaction.accountId }).toSet()
+                            val isMultiAccount = accountsInvolved.size > 1
+
+                            if (isMultiAccount) {
+                                MultiAccountBreakdownCard(
+                                    entries = mergedTransactionBreakdown,
+                                    reimbursements = reimbursements,
+                                    onCardClick = {
+                                        Toast.makeText(context, "Unmerge or unlink to reassign accounts.", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            } else {
+                                AccountCard(
+                                    details = details,
+                                    readOnly = false,
+                                    onAccountClick = { activeSheetContent = SheetContent.Account },
+                                )
+                            }
+                        }
+                    }
+
+                    if (details.transaction.isSplit) {
+                        item {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                SplitSummaryCard(splits = splits)
+                            }
+                        }
+                    }
+
+                    // --- NEW: Unified Related Activity Card (Handles both reimbursements and merged transactions) ---
+                    val hasReimbursements = details.transaction.transactionType == "expense"
+                    val hasMerged = mergedTransactionBreakdown.size > 1
+                    if (hasReimbursements || hasMerged) {
+                        item {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                UnifiedRelatedActivityCard(
+                                    currentAmount = details.transaction.amount,
+                                    isExpense = details.transaction.transactionType == "expense",
+                                    reimbursements = reimbursements,
+                                    mergedEntries = mergedTransactionBreakdown,
+                                    onLinkClick = { viewModel.openReimbursementPicker(transactionId) },
+                                    onUnlinkClick = { incomeId -> viewModel.unlinkReimbursement(incomeId) },
+                                    onUnmergeClick = { showUnmergeDialog = true }
+                                )
+                            }
+                        }
+                    }
+
+                    // --- NEW: Badge for income transactions that are linked as a repayment ---
+                    val isMathematicallyIncome = details.transaction.transactionType == "income"
+                    if (isMathematicallyIncome && linkedExpense != null) {
+                        item {
+                            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                LinkedAsReimbursementBadge(
+                                    linkedExpense = linkedExpense!!,
+                                    onNavigateToExpense = {
+                                        navController.navigate("transaction_detail/${linkedExpense!!.transaction.id}")
+                                    },
+                                    onUnlinkClick = {
+                                        viewModel.unlinkReimbursement(transactionId)
+                                    },
+                                )
+                            }
                         }
                     }
 
@@ -784,11 +796,19 @@ private fun TransactionPropertiesCard(
                     .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            val isMathematicallyIncome = details.transaction.transactionType == "income"
+            // An expense with a negative amount is "over-repaid". It renders visually as income
+            // but its DB type remains "expense". We lock the toggle in this state to prevent the
+            // user from accidentally changing the type when the toggle shows the "wrong" side.
+            val isOverRepaid = !isMathematicallyIncome && details.transaction.amount < 0
+            val isVisuallyIncome = isMathematicallyIncome || isOverRepaid
+            val displayType = if (isVisuallyIncome) "income" else "expense"
+
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 TransactionTypeToggle(
-                    selectedType = details.transaction.transactionType,
+                    selectedType = displayType,
                     onTypeSelected = onTypeSelected,
-                    enabled = !details.transaction.isSplit,
+                    enabled = !details.transaction.isSplit && !isOverRepaid,
                 )
             }
 
@@ -920,18 +940,23 @@ private fun CurrencyConversionInfoCard(transaction: Transaction) {
             ) {
                 Text("Original Amount:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    "${foreignCurrencySymbol}${numberFormat.format(transaction.originalAmount)}",
-                    fontWeight = FontWeight.SemiBold,
+                    "$foreignCurrencySymbol${numberFormat.format(transaction.originalAmount ?: 0.0)}",
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
                 )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Conversion Rate:", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    "1 ${transaction.currencyCode} = $homeCurrencySymbol${numberFormat.format(transaction.conversionRate)}",
+                    "Exchange Rate",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "1 ${transaction.currencyCode} = $homeCurrencySymbol${numberFormat.format(transaction.conversionRate ?: 0.0)}",
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -1007,7 +1032,7 @@ private fun TransactionSpotlightHeader(
     val dateFormatter = remember { FormatUtils.fullDateTimeFormatter }
 
     val animatedAmount by animateFloatAsState(
-        targetValue = details.transaction.amount.toFloat(),
+        targetValue = kotlin.math.abs(details.transaction.amount).toFloat(),
         animationSpec = tween(1500, easing = EaseOutCubic),
         label = "AmountAnimation",
     )
@@ -1178,8 +1203,148 @@ private fun TransactionSpotlightHeader(
 }
 
 @Composable
+private fun MultiAccountBreakdownCard(
+    entries: List<io.pm.finlight.data.model.MergedTransactionItem>,
+    reimbursements: List<io.pm.finlight.TransactionDetails>,
+    onCardClick: () -> Unit
+) {
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val incomeGreen = if (isDark) io.pm.finlight.ui.theme.IncomeGreenDark else io.pm.finlight.ui.theme.IncomeGreenLight
+    val expenseRed = if (isDark) io.pm.finlight.ui.theme.ExpenseRedDark else io.pm.finlight.ui.theme.ExpenseRedLight
+
+    GlassPanel {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onCardClick)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            Text(
+                text = "Accounts",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+
+            val totalItems = entries.size + reimbursements.size
+            var currentIndex = 0
+
+            entries.forEach { entry ->
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Image(
+                        painter = painterResource(id = BankLogoHelper.getLogoForAccount(entry.accountName)),
+                        contentDescription = "${entry.accountName} logo",
+                        modifier = Modifier.size(36.dp),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = entry.accountName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (entry.isAnchor) {
+                            Text(
+                                text = "anchor",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        } else if (entries.size > 1) {
+                            Text(
+                                text = "merged",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondary,
+                            )
+                        }
+                    }
+                    val sign = if (entry.transactionType == "income") "+" else "−"
+                    val absAmount = kotlin.math.abs(entry.amount)
+                    Text(
+                        text = "$sign${currencyFormat.format(absAmount)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (entry.transactionType == "income") incomeGreen else expenseRed,
+                    )
+                }
+                currentIndex++
+                if (currentIndex < totalItems) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    )
+                }
+            }
+
+            reimbursements.forEach { detail ->
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Image(
+                        painter = painterResource(id = BankLogoHelper.getLogoForAccount(detail.accountName ?: "")),
+                        contentDescription = "${detail.accountName} logo",
+                        modifier = Modifier.size(36.dp),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = detail.accountName ?: "Unknown",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "repayment",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    val absAmount = kotlin.math.abs(detail.transaction.amount)
+                    Text(
+                        text = "+${currencyFormat.format(absAmount)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = incomeGreen,
+                    )
+                }
+                currentIndex++
+                if (currentIndex < totalItems) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Unmerge or unlink to reassign accounts",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+            )
+        }
+    }
+}
+
+@Composable
 private fun AccountCard(
     details: TransactionDetails,
+    readOnly: Boolean = false,
     onAccountClick: () -> Unit,
 ) {
     GlassPanel {
@@ -1213,13 +1378,23 @@ private fun AccountCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (readOnly) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Unmerge to reassign",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    )
+                }
             }
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = "Edit Account",
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (!readOnly) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Edit Account",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -2383,59 +2558,6 @@ private fun ReviewBannerCard(
                 modifier = Modifier.align(Alignment.End),
             ) {
                 Text("Mark as Reviewed")
-            }
-        }
-    }
-}
-
-/**
- * A contextual card shown on transactions that were created by the automatic
- * or manual merge feature. Offers a single "Unmerge" action so the user can reverse the
- * merge if it was done by mistake.
- */
-@Composable
-private fun UnmergeSuggestionCard(
-    mergeRecord: io.pm.finlight.data.db.entity.MergeRecord,
-    onUnmergeClick: () -> Unit
-) {
-    val title = if (mergeRecord.mergeType == "MANUAL") "Manually Merged" else "Automatically Merged"
-    val subtitle =
-        if (mergeRecord.mergeType == "MANUAL") {
-            "This transaction contains manually merged items. Tap to separate them."
-        } else {
-            "This combines two duplicate charges. Tap to separate them."
-        }
-
-    GlassPanel {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.MergeType,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            TextButton(onClick = onUnmergeClick) {
-                Text("Unmerge")
             }
         }
     }

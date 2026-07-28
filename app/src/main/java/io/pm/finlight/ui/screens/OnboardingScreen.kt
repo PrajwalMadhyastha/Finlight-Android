@@ -569,6 +569,10 @@ fun SmsPermissionPage(onPermissionResult: () -> Unit) {
         }) {
             Text("Enable SMS Scanning")
         }
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onPermissionResult) {
+            Text("Not Now")
+        }
     }
 }
 
@@ -627,6 +631,10 @@ fun NotificationPermissionPage(onPermissionResult: () -> Unit) {
                     "Continue"
                 }
             Text(buttonText)
+        }
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onPermissionResult) {
+            Text("Not Now")
         }
         Spacer(Modifier.height(16.dp))
     }

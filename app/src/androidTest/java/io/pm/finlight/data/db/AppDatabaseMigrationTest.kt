@@ -575,4 +575,161 @@ class AppDatabaseMigrationTest {
             close()
         }
     }
+
+    @Test
+    fun migrate53To54_healsCorruptedTransactionAmounts() {
+        val db = helper.createDatabase(testDbName, 53)
+
+        // Insert a dummy account
+        db.execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Cash', 'Cash')")
+
+        // Scenario A: A transaction clamped to 0.0 with a reimbursement
+        // True original amount = 100, Reimbursement = 150. True math = -50.
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, originalAmount, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (1, 'Test Expense', 0.0, 1000, 1, 'expense', 100.0, 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+        // Insert reimbursement
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, parentReimbursementId, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (2, 'Test Income', 150.0, 1000, 1, 'income', 1, 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+
+        // Scenario B: An unmerged transaction (amount reset to base, but forgot reimbursements)
+        // Base = 200. Reimbursement = 100. Unmerge reset it to 200. True math = 200 - 100 = 100.
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, originalAmount, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (3, 'Test Unmerged', 200.0, 1000, 1, 'expense', 200.0, 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+        // Reimbursement
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, parentReimbursementId, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (4, 'Test Income 2', 100.0, 1000, 1, 'income', 3, 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+
+        // Scenario C: A transaction that is perfectly fine (should not be touched)
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, originalAmount, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (5, 'Perfect', 50.0, 1000, 1, 'expense', 50.0, 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+
+        // Scenario D: A transaction that was manually edited
+        // Original = 100, User edited to 150. Reimbursement = 20. Current Amount = 130.
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, originalAmount, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (6, 'Test Edited', 130.0, 1000, 1, 'expense', 100.0, 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+        // Reimbursement
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, parentReimbursementId, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (7, 'Test Income 3', 20.0, 1000, 1, 'income', 6, 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+
+        db.close()
+
+        val migratedDb = helper.runMigrationsAndValidate(testDbName, 54, true, AppDatabase.MIGRATION_53_54)
+
+        // Verify Scenario A
+        val cursorA = migratedDb.query("SELECT amount, transactionType FROM transactions WHERE id = 1")
+        org.junit.Assert.assertTrue(cursorA.moveToFirst())
+        org.junit.Assert.assertEquals(-50.0, cursorA.getDouble(0), 0.001)
+        org.junit.Assert.assertEquals("expense", cursorA.getString(1))
+        cursorA.close()
+
+        // Verify Scenario B
+        val cursorB = migratedDb.query("SELECT amount, transactionType FROM transactions WHERE id = 3")
+        org.junit.Assert.assertTrue(cursorB.moveToFirst())
+        org.junit.Assert.assertEquals(100.0, cursorB.getDouble(0), 0.001)
+        org.junit.Assert.assertEquals("expense", cursorB.getString(1))
+        cursorB.close()
+
+        // Verify Scenario C
+        val cursorC = migratedDb.query("SELECT amount, transactionType FROM transactions WHERE id = 5")
+        org.junit.Assert.assertTrue(cursorC.moveToFirst())
+        org.junit.Assert.assertEquals(50.0, cursorC.getDouble(0), 0.001)
+        org.junit.Assert.assertEquals("expense", cursorC.getString(1))
+        cursorC.close()
+
+        // Verify Scenario D
+        val cursorD = migratedDb.query("SELECT amount, transactionType FROM transactions WHERE id = 6")
+        org.junit.Assert.assertTrue(cursorD.moveToFirst())
+        org.junit.Assert.assertEquals(130.0, cursorD.getDouble(0), 0.001)
+        org.junit.Assert.assertEquals("expense", cursorD.getString(1))
+        cursorD.close()
+    }
+
+    @Test
+    fun migrate54To55_heals_original_description() {
+        val db = helper.createDatabase(testDbName, 54)
+
+        // Setup initial state for v54
+        db.execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank Account')")
+
+        // Insert a rename rule: STARBUCKS -> Coffee
+        db.execSQL("INSERT INTO merchant_rename_rules (originalName, newName) VALUES ('STARBUCKS', 'Coffee')")
+
+        // 1. Corrupted transaction: originalDescription is saved as the newName ('Coffee')
+        db.execSQL(
+            "INSERT INTO transactions (id, description, originalDescription, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (1, 'Coffee', 'Coffee', 50.0, 1000, 1, 'expense', 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+
+        // 2. Correct transaction: originalDescription is correct ('STARBUCKS')
+        db.execSQL(
+            "INSERT INTO transactions (id, description, originalDescription, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (2, 'Coffee', 'STARBUCKS', 60.0, 1000, 1, 'expense', 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+
+        // 3. Unrelated transaction
+        db.execSQL(
+            "INSERT INTO transactions (id, description, originalDescription, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (3, 'Food', 'Food', 20.0, 1000, 1, 'expense', 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+
+        // 4. Null originalDescription transaction (e.g. pre-dating the column)
+        db.execSQL(
+            "INSERT INTO transactions (id, description, originalDescription, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (4, 'Old Txn', NULL, 10.0, 1000, 1, 'expense', 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+
+        // 5. Case-insensitive corrupted transaction
+        db.execSQL(
+            "INSERT INTO transactions (id, description, originalDescription, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (5, 'COFFEE', 'COFFEE', 15.0, 1000, 1, 'expense', 'manual', 0, 0, 0, 0, 'cleared')"
+        )
+
+        db.close()
+
+        val migratedDb = helper.runMigrationsAndValidate(testDbName, 55, true, AppDatabase.MIGRATION_54_55)
+
+        // Verify transaction 1: 'Coffee' should be healed to 'STARBUCKS'
+        val cursor1 = migratedDb.query("SELECT originalDescription FROM transactions WHERE id = 1")
+        org.junit.Assert.assertTrue(cursor1.moveToFirst())
+        org.junit.Assert.assertEquals("STARBUCKS", cursor1.getString(0))
+        cursor1.close()
+
+        // Verify transaction 2: 'STARBUCKS' should remain untouched
+        val cursor2 = migratedDb.query("SELECT originalDescription FROM transactions WHERE id = 2")
+        org.junit.Assert.assertTrue(cursor2.moveToFirst())
+        org.junit.Assert.assertEquals("STARBUCKS", cursor2.getString(0))
+        cursor2.close()
+
+        // Verify transaction 3: 'Food' should remain untouched
+        val cursor3 = migratedDb.query("SELECT originalDescription FROM transactions WHERE id = 3")
+        org.junit.Assert.assertTrue(cursor3.moveToFirst())
+        org.junit.Assert.assertEquals("Food", cursor3.getString(0))
+        cursor3.close()
+
+        // Verify transaction 4: NULL should remain untouched
+        val cursor4 = migratedDb.query("SELECT originalDescription FROM transactions WHERE id = 4")
+        org.junit.Assert.assertTrue(cursor4.moveToFirst())
+        org.junit.Assert.assertTrue(cursor4.isNull(0))
+        cursor4.close()
+
+        // Verify transaction 5: 'COFFEE' should be healed to 'STARBUCKS' (case-insensitive)
+        val cursor5 = migratedDb.query("SELECT originalDescription FROM transactions WHERE id = 5")
+        org.junit.Assert.assertTrue(cursor5.moveToFirst())
+        org.junit.Assert.assertEquals("STARBUCKS", cursor5.getString(0))
+        cursor5.close()
+    }
 }

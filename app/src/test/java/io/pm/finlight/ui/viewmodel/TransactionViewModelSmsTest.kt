@@ -27,7 +27,7 @@ class TransactionViewModelSmsTest : TransactionViewModelBaseSetup() {
         runTest {
             // ARRANGE
             val potentialTxn =
-                PotentialTransaction(1L, "Test", 100.0, "expense", "Test Merchant", "Msg", PotentialAccount("New Account", "Bank"), "hash")
+                PotentialTransaction(1L, "Test", 100.0, "expense", "Test Merchant", "Msg", PotentialAccount("New Account", "Bank"), "hash", originalMerchantName = "Raw Test")
             val transactionCaptor = argumentCaptor<Transaction>()
             whenever(db.accountDao().findByName("New Account")).thenReturn(null).thenReturn(Account(1, "New Account", "Bank"))
             whenever(accountRepository.insert(any())).thenReturn(1L)
@@ -42,6 +42,35 @@ class TransactionViewModelSmsTest : TransactionViewModelBaseSetup() {
             verify(accountRepository).insert(any())
             verify(transactionRepository).insertTransactionWithTags(transactionCaptor.capture(), eq(emptySet()))
             assertEquals("Test Merchant", transactionCaptor.firstValue.description)
+            assertEquals("Raw Test", transactionCaptor.firstValue.originalDescription)
+        }
+
+    @Test
+    fun `approveSmsTransaction saves foreign transaction correctly`() =
+        runTest {
+            // ARRANGE
+            val potentialTxn =
+                PotentialTransaction(1L, "Test", 100.0, "expense", "Test Merchant", "Msg", PotentialAccount("New Account", "Bank"), "hash", originalMerchantName = "Raw Foreign")
+            val transactionCaptor = argumentCaptor<Transaction>()
+            whenever(db.accountDao().findByName("New Account")).thenReturn(Account(1, "New Account", "Bank"))
+            val travelSettings =
+                TravelModeSettings(
+                    isEnabled = true, tripName = "Trip", tripType = TripType.INTERNATIONAL,
+                    startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "EUR", conversionRate = 90f
+                )
+            whenever(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(travelSettings))
+            whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
+
+            // ACT
+            val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), true)
+            advanceUntilIdle()
+
+            // ASSERT
+            assertTrue(result)
+            verify(transactionRepository).insertTransactionWithTags(transactionCaptor.capture(), eq(emptySet()))
+            assertEquals("Test Merchant", transactionCaptor.firstValue.description)
+            assertEquals("Raw Foreign", transactionCaptor.firstValue.originalDescription)
+            assertEquals(9000.0, transactionCaptor.firstValue.amount, 0.01)
         }
 
     @Test
@@ -49,7 +78,7 @@ class TransactionViewModelSmsTest : TransactionViewModelBaseSetup() {
         runTest {
             // ARRANGE
             val potentialTxn =
-                PotentialTransaction(1L, "Test", 100.0, "expense", "Auto Merchant", "Msg", PotentialAccount("Cash", "Wallet"), "hash", 1)
+                PotentialTransaction(1L, "Test", 100.0, "expense", "Auto Merchant", "Msg", PotentialAccount("Cash", "Wallet"), "hash", 1, originalMerchantName = "Raw Auto")
             val transactionCaptor = argumentCaptor<Transaction>()
             whenever(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             whenever(accountDao.findByName("Cash")).thenReturn(Account(1, "Cash", "Wallet"))
@@ -63,6 +92,7 @@ class TransactionViewModelSmsTest : TransactionViewModelBaseSetup() {
             assertTrue(result)
             verify(transactionRepository).insertTransactionWithTags(transactionCaptor.capture(), eq(emptySet()))
             assertEquals("Auto Merchant", transactionCaptor.firstValue.description)
+            assertEquals("Raw Auto", transactionCaptor.firstValue.originalDescription)
             assertEquals(1, transactionCaptor.firstValue.categoryId)
         }
 
