@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.MergedTransactionItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -134,6 +135,11 @@ class TransactionRepository(
         id: Int,
         amount: Double,
     ) = transactionDao.updateAmount(id, amount)
+
+    suspend fun updateManualAmountEdit(
+        id: Int,
+        amount: Double,
+    ) = transactionDao.updateManualAmountEdit(id, amount)
 
     suspend fun updateNotes(
         id: Int,
@@ -545,7 +551,7 @@ class TransactionRepository(
         val incomeTxn = transactionDao.getTransactionByIdSync(incomeId) ?: return
         val expenseTxn = transactionDao.getTransactionByIdSync(expenseId) ?: return
         transactionDao.linkReimbursement(incomeId, expenseId)
-        val newExpenseAmount = (expenseTxn.amount - incomeTxn.amount).coerceAtLeast(0.0)
+        val newExpenseAmount = expenseTxn.amount - incomeTxn.amount
         transactionDao.updateAmount(expenseId, newExpenseAmount)
     }
 
@@ -738,8 +744,18 @@ class TransactionRepository(
 
             val anchorSigned = signedAmount(anchorTxn)
             val netSigned = anchorSigned + childTxns.sumOf { signedAmount(it) }
-            val finalAmount = kotlin.math.abs(netSigned)
-            val finalType = if (netSigned >= 0.0) "income" else "expense"
+            val hasReimbursements = transactionDao.getReimbursementsCountSync(anchorTxnId) > 0
+
+            val finalType =
+                if (hasReimbursements) {
+                    "expense"
+                } else if (netSigned >= 0.0) {
+                    "income"
+                } else {
+                    "expense"
+                }
+
+            val finalAmount = if (finalType == "expense") -netSigned else netSigned
 
             // ── Compute most-recent date ──────────────────────────────────
             val finalDate = (childTxns.map { it.date } + anchorTxn.date).max()
@@ -833,6 +849,63 @@ class TransactionRepository(
         mergeRecordDao.observeForParent(parentTxnId)
 
     /**
+     * Builds the per-account contribution breakdown for a merged transaction.
+     * Returns an empty list if the transaction has no merge records.
+     *
+     * The list always contains:
+     *  - The anchor account entry: shows the anchor's original amount BEFORE the merge
+     *    (sourced from [MergeRecord.originalParentAmount] on the oldest record).
+     *  - One entry per child account: amount from [MergeRecord.childAmount].
+     *
+     * Works for both MANUAL (N-to-1) and AUTO (chained 1-to-1) merges.
+     * The UI uses this to render [MergedAccountsCard] when multiple accounts are involved.
+     */
+    suspend fun getMergedTransactionBreakdown(parentTxnId: Int): List<MergedTransactionItem> {
+        val records = mergeRecordDao.getAllForParentAnyType(parentTxnId)
+        if (records.isEmpty()) return emptyList()
+
+        val anchorTxn = transactionDao.getTransactionByIdSync(parentTxnId) ?: return emptyList()
+        val anchorAccount = db.accountDao().getAccountByIdBlocking(anchorTxn.accountId)
+
+        val entries = mutableListOf<MergedTransactionItem>()
+
+        // Anchor entry — use the pre-merge snapshot amount so that each account's
+        // contribution reflects what actually left/arrived at that account.
+        // The oldest record (ASC order) holds the true original parent state.
+        val firstRecord = records.first()
+        val anchorOriginalAmount = firstRecord.originalParentAmount
+        entries.add(
+            MergedTransactionItem(
+                accountId = anchorTxn.accountId,
+                accountName = anchorAccount?.name ?: "Unknown",
+                amount = anchorOriginalAmount,
+                transactionType = anchorTxn.transactionType,
+                isAnchor = true,
+                description = anchorTxn.description,
+                date = firstRecord.originalParentDate
+            )
+        )
+
+        // One entry per child — each record fully snapshots the child's account + amount.
+        for (r in records) {
+            val childAccount = db.accountDao().getAccountByIdBlocking(r.childAccountId)
+            entries.add(
+                MergedTransactionItem(
+                    accountId = r.childAccountId,
+                    accountName = childAccount?.name ?: "Unknown",
+                    amount = r.childAmount,
+                    transactionType = r.childTransactionType,
+                    isAnchor = false,
+                    description = r.childDescription,
+                    date = r.childDate
+                )
+            )
+        }
+
+        return entries
+    }
+
+    /**
      * Fully reverses the most recent merge for [parentTxnId].
      *
      * For AUTO merges (legacy 1-to-1): restores parent + re-inserts the single child.
@@ -856,9 +929,40 @@ class TransactionRepository(
             if (allRecords.isEmpty()) return
 
             db.withTransaction {
+                val currentParent = transactionDao.getTransactionByIdSync(parentTxnId) ?: return@withTransaction
+
+                fun signedAmount(
+                    type: String,
+                    amount: Double
+                ): Double =
+                    if (type == "income") amount else -amount
+
+                val currentSigned = signedAmount(currentParent.transactionType, currentParent.amount)
+                val childrenSigned = allRecords.sumOf { signedAmount(it.childTransactionType, it.childAmount) }
+                val newSigned = currentSigned - childrenSigned
+                val hasReimbursements = transactionDao.getReimbursementsCountSync(parentTxnId) > 0
+
+                val finalType =
+                    if (hasReimbursements) {
+                        "expense"
+                    } else if (newSigned > 0.0) {
+                        "income"
+                    } else if (newSigned < 0.0) {
+                        "expense"
+                    } else {
+                        currentParent.transactionType
+                    }
+
+                // If finalType is "expense", the signed amount is negative, so we negate it to get the mathematical amount.
+                // This preserves any negative balance if the transaction was over-repaid.
+                val finalAmount = if (finalType == "expense") -newSigned else newSigned
+
                 // Restore parent to its pre-merge state (all records share the same parent snapshot)
                 val first = allRecords.first()
-                transactionDao.updateAmount(parentTxnId, first.originalParentAmount)
+                transactionDao.updateAmount(parentTxnId, finalAmount)
+                if (currentParent.transactionType != finalType) {
+                    transactionDao.updateTransactionType(parentTxnId, finalType)
+                }
                 transactionDao.updateDate(parentTxnId, first.originalParentDate)
                 transactionDao.updateNotes(parentTxnId, first.originalParentNotes)
 
@@ -884,9 +988,15 @@ class TransactionRepository(
             if (allAutoRecords.isEmpty()) return
 
             db.withTransaction {
+                val currentParent = transactionDao.getTransactionByIdSync(parentTxnId) ?: return@withTransaction
+
+                // AUTO merges just sum the absolute amounts.
+                val totalMergedAmount = allAutoRecords.sumOf { it.childAmount }
+                val newAmount = currentParent.amount - totalMergedAmount
+
                 // The VERY FIRST record (oldest) has the original parent state
                 val first = allAutoRecords.first()
-                transactionDao.updateAmount(parentTxnId, first.originalParentAmount)
+                transactionDao.updateAmount(parentTxnId, newAmount)
                 transactionDao.updateDate(parentTxnId, first.originalParentDate)
                 transactionDao.updateNotes(parentTxnId, first.originalParentNotes)
 

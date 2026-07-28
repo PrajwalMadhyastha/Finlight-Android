@@ -101,14 +101,14 @@ class OnboardingFlowTests {
         composeTestRule.onNodeWithText("Next").performClick() // to SMS permission
 
         composeTestRule.waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("Enable SMS Scanning").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Not Now").fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onNodeWithText("Enable SMS Scanning").performClick() // grants permission via rule and advances
+        composeTestRule.onAllNodesWithText("Not Now").onFirst().performScrollTo().performClick() // advances to Notification page
 
         composeTestRule.waitUntil(5000) {
-            composeTestRule.onAllNodesWithText("Next").fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Stay Updated").fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onNodeWithText("Next").performClick() // to Completion
+        composeTestRule.onAllNodesWithText("Not Now").onLast().performScrollTo().performClick() // advances to Completion
 
         composeTestRule.waitUntil(5000) {
             composeTestRule.onAllNodesWithText("Finish Setup").fetchSemanticsNodes().isNotEmpty()

@@ -6,7 +6,12 @@ package io.pm.finlight
  *
  * @param amount The monetary value of the transaction.
  * @param transactionType The type of transaction, either 'expense' or 'income'.
- * @param merchantName The name of the merchant, if it can be determined.
+ * @param merchantName The name of the merchant, if it can be determined. This may have been
+ *        renamed by a [MerchantRenameRule] and is the display name.
+ * @param originalMerchantName The raw merchant name extracted from the SMS, BEFORE any
+ *        [MerchantRenameRule] is applied. This is what should be stored in
+ *        [Transaction.originalDescription]. Always populated by SmsParser.enrichTransaction.
+ *        Use this - not merchantName - as Transaction.originalDescription.
  * @param originalMessage The original SMS body, for reference and debugging.
  * @param potentialAccount Holds the parsed account name and type, if found.
  * @param categoryId The ID of a learned category, if a mapping exists for the merchant.
@@ -33,4 +38,10 @@ data class PotentialTransaction(
     val needsReview: Boolean = false,
     /** Human-readable reason why this transaction was flagged for review. */
     val suspicionReason: String? = null,
+    /**
+     * The raw merchant name from the SMS BEFORE any rename rule was applied.
+     * Always populated by [SmsParser.enrichTransaction].
+     * Use this — not [merchantName] — as [Transaction.originalDescription].
+     */
+    val originalMerchantName: String? = null,
 )

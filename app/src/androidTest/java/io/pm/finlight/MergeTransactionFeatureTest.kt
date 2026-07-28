@@ -146,7 +146,7 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Manually Merged"))
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(androidx.compose.ui.test.hasText("Related Activity").or(androidx.compose.ui.test.hasText("Merged Transactions")))
         composeTestRule.onNodeWithText("Unmerge").performClick()
 
         // 4. Verify confirmation dialog appears and confirm
@@ -266,7 +266,7 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
-            .performScrollToNode(hasText("Manually Merged"))
+            .performScrollToNode(hasText("Related Activity").or(hasText("Merged Transactions")))
         composeTestRule.onNodeWithText("Unmerge").performClick()
 
         // 5. Confirm the unmerge dialog
@@ -277,5 +277,120 @@ class MergeTransactionFeatureTest {
         composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    /**
+     * Seeds one transaction on ACCOUNT_WALLET_ID and another on ACCOUNT_BANK_ID,
+     * then returns the description of the one on the wallet (used as the anchor
+     * since it has a higher amount and will be selected first).
+     */
+    private fun seedCrossAccountMergeableTransactions(): Pair<String, String> {
+        val anchorDesc = "CrossAccAnchor"
+        val childDesc = "CrossAccChild"
+        val appDatabase = AppDatabase.getInstance(composeTestRule.activity.applicationContext)
+        runBlocking {
+            val now = System.currentTimeMillis()
+            appDatabase.transactionDao().insert(
+                Transaction(
+                    description = anchorDesc,
+                    amount = 500.0,
+                    categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
+                    accountId = TestDataSeeder.ACCOUNT_WALLET_ID,
+                    date = now - 1000L,
+                    transactionType = "expense",
+                    notes = null,
+                    mergeDismissed = false,
+                )
+            )
+            appDatabase.transactionDao().insert(
+                Transaction(
+                    description = childDesc,
+                    amount = 300.0,
+                    categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
+                    accountId = TestDataSeeder.ACCOUNT_BANK_ID,
+                    date = now,
+                    transactionType = "expense",
+                    notes = null,
+                    mergeDismissed = false,
+                )
+            )
+        }
+        return Pair(anchorDesc, childDesc)
+    }
+
+    @Test
+    fun test_crossAccountMerge_showsBannerAndMultiAccountCard() {
+        val (anchorDesc, childDesc) = seedCrossAccountMergeableTransactions()
+
+        // Wait for app to load
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText("Dashboard").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 1. Navigate to Transactions
+        composeTestRule.onNodeWithText("Transactions").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText(anchorDesc).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 2. Long-press the anchor transaction to enter selection mode
+        composeTestRule.onNodeWithText(anchorDesc).performTouchInput { longClick() }
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("1 Selected").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 3. Tap the child transaction (different account) to add it to the selection
+        composeTestRule.waitForIdle()
+        Thread.sleep(1000)
+        composeTestRule.onNodeWithTag("transaction_item_checkbox_$childDesc").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("2 Selected").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 4. Tap the Merge icon — should be visible (cross-account guard removed)
+        composeTestRule.onNodeWithContentDescription("Merge Transactions").performClick()
+
+        // 5. Review Merge sheet appears
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Review Merge").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 6. Cross-account info banner must be visible in the sheet
+        composeTestRule.onNodeWithText("Merging across 2 accounts. The result will be recorded under the anchor's account.")
+            .assertIsDisplayed()
+
+        // 7. Confirm the merge
+        composeTestRule.onNodeWithText("Confirm Merge").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("2 Selected").fetchSemanticsNodes().isEmpty()
+        }
+
+        // 8. Open the merged transaction's detail screen
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText(anchorDesc).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNode(hasText(anchorDesc), useUnmergedTree = true)
+            .onAncestors()
+            .filterToOne(hasClickAction())
+            .performClick()
+
+        // 9. The detail screen should show "Accounts" (plural) section with both account names
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithTag("transaction_detail_lazy_column").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Related Activity").or(hasText("Merged Transactions")))
+        composeTestRule.onNode(hasText("Related Activity").or(hasText("Merged Transactions"))).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Unmerge").assertIsDisplayed()
+
+        // "Anchor original amount" label should appear
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Anchor original amount"))
+        composeTestRule.onNodeWithText("Anchor original amount").assertIsDisplayed()
+
+        // Child account name should appear in the card
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column").performScrollToNode(hasText("Accounts"))
+        composeTestRule.onNodeWithText(TestDataSeeder.ACCOUNT_BANK_NAME).assertIsDisplayed()
     }
 }
