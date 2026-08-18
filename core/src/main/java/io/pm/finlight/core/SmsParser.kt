@@ -448,7 +448,7 @@ object SmsParser {
                     }
 
                     // -------------------------------------------------------------------
-                    // AMOUNT SANITY CHECKS: Options D, C, A (applied in priority order)
+                    // AMOUNT SANITY CHECKS: Options D, A (applied in priority order)
                     // -------------------------------------------------------------------
                     var needsReview = false
                     var suspicionReason: String? = null
@@ -459,23 +459,6 @@ object SmsParser {
                         needsReview = true
                         suspicionReason = "NER model uncertainty: AMOUNT confidence was ${"%.0f".format(nerAmountConf * 100)}% (threshold ${"%.0f".format(NER_CONFIDENCE_THRESHOLD * 100)}%)."
                         System.err.println("[SmsParser][Suspicious] Low NER confidence for AMOUNT ($nerAmountConf). SMS: ${sms.body.take(80)}")
-                    }
-
-                    // Option C: AMOUNT > BALANCE extracted from the same SMS
-                    if (!needsReview) {
-                        val nerBalanceStr = nerEntities?.get("BALANCE")?.value
-                        if (nerBalanceStr != null) {
-                            val balanceNumeric = nerBalanceStr
-                                .replace(Regex("^(rs|inr|₹)[.:\\s]*", RegexOption.IGNORE_CASE), "")
-                                .replace(",", "")
-                                .trim()
-                                .toDoubleOrNull()
-                            if (balanceNumeric != null && amount > balanceNumeric) {
-                                needsReview = true
-                                suspicionReason = "Amount (₹$amount) exceeds available balance (₹$balanceNumeric) reported in the same SMS."
-                                System.err.println("[SmsParser][Suspicious] Amount $amount > balance $balanceNumeric. SMS: ${sms.body.take(80)}")
-                            }
-                        }
                     }
 
                     // Option A: Hard upper-bound threshold (₹1,00,000 by default)
