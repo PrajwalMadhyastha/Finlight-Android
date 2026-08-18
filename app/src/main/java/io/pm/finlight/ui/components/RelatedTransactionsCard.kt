@@ -232,13 +232,15 @@ fun UnifiedRelatedActivityCard(
 
     val totalRepaid = reimbursements.sumOf { it.transaction.amount }
     val mergedChildren = mergedEntries.filter { !it.isAnchor }
+    val anchor = mergedEntries.firstOrNull { it.isAnchor }
+    val anchorIsExpense = anchor?.let { it.transactionType == "expense" } ?: isExpense
+
     val totalMerged =
         mergedChildren.sumOf { child ->
-            val isSameType = (isExpense && child.transactionType == "expense") || (!isExpense && child.transactionType == "income")
+            val isSameType = (anchorIsExpense && child.transactionType == "expense") || (!anchorIsExpense && child.transactionType == "income")
             if (isSameType) child.amount else -child.amount
         }
 
-    val anchor = mergedEntries.firstOrNull { it.isAnchor }
     val originalAmount =
         if (hasMerged) {
             anchor?.amount ?: (currentAmount + totalRepaid - totalMerged)
@@ -252,7 +254,7 @@ fun UnifiedRelatedActivityCard(
     if (hasMerged) {
         items.addAll(
             mergedChildren.map { child ->
-                val isSameType = (isExpense && child.transactionType == "expense") || (!isExpense && child.transactionType == "income")
+                val isSameType = (anchorIsExpense && child.transactionType == "expense") || (!anchorIsExpense && child.transactionType == "income")
                 val prefix = if (isSameType) "+ " else "- "
                 RelatedTransactionItem(
                     id = "merge_${child.hashCode()}",
@@ -263,9 +265,9 @@ fun UnifiedRelatedActivityCard(
                     amountColor = MaterialTheme.colorScheme.primary,
                     actionIcon = null,
                     actionContentDescription = null,
-                    onActionClick = null
+                    onActionClick = null,
                 )
-            }
+            },
         )
     }
 

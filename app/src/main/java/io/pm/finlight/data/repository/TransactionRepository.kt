@@ -869,6 +869,25 @@ class TransactionRepository(
 
         val entries = mutableListOf<MergedTransactionItem>()
 
+        fun signedAmount(
+            type: String,
+            amount: Double,
+        ): Double =
+            if (type == "income") amount else -amount
+
+        val currentSigned = signedAmount(anchorTxn.transactionType, anchorTxn.amount)
+        val childrenSigned = records.sumOf { signedAmount(it.childTransactionType, it.childAmount) }
+        val anchorSigned = currentSigned - childrenSigned
+
+        val anchorOriginalType =
+            if (anchorSigned > 0.0) {
+                "income"
+            } else if (anchorSigned < 0.0) {
+                "expense"
+            } else {
+                anchorTxn.transactionType
+            }
+
         // Anchor entry — use the pre-merge snapshot amount so that each account's
         // contribution reflects what actually left/arrived at that account.
         // The oldest record (ASC order) holds the true original parent state.
@@ -879,11 +898,11 @@ class TransactionRepository(
                 accountId = anchorTxn.accountId,
                 accountName = anchorAccount?.name ?: "Unknown",
                 amount = anchorOriginalAmount,
-                transactionType = anchorTxn.transactionType,
+                transactionType = anchorOriginalType,
                 isAnchor = true,
                 description = anchorTxn.description,
-                date = firstRecord.originalParentDate
-            )
+                date = firstRecord.originalParentDate,
+            ),
         )
 
         // One entry per child — each record fully snapshots the child's account + amount.
