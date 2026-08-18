@@ -78,7 +78,7 @@ object HelpContentRegistry {
             """
                         Your data's security and portability are managed here.
 
-                        - **App Lock:** Secure the app with your device's biometrics (fingerprint/face).
+                        - **App Lock:** Secure the app with your device's biometrics (fingerprint/face) or screen lock (PIN/pattern/password).
                         - **Automatic Daily Backup:** Your data is automatically backed up to your personal Google Drive. This backs up a compressed snapshot, not the live database.
                         - **Create Backup Now:** Manually create a new snapshot and request a backup. This is useful before moving to a new device.
                         - **Import/Export:** Create a full local backup (JSON) or a spreadsheet-friendly version of your transactions (CSV).

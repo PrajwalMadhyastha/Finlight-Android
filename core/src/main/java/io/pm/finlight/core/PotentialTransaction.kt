@@ -34,7 +34,7 @@ data class PotentialTransaction(
     val isForeignCurrency: Boolean? = null,
     val detectedCurrencyCode: String? = null,
     val date: Long = System.currentTimeMillis(),
-    /** True when the amount parser flagged this as potentially incorrect (see Option A/C/D). */
+    /** True when the amount parser flagged this as potentially incorrect (see Option A/D). */
     val needsReview: Boolean = false,
     /** Human-readable reason why this transaction was flagged for review. */
     val suspicionReason: String? = null,

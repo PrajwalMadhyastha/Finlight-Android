@@ -160,8 +160,8 @@ class SettingsInteractionTests {
         appLockToggle.performScrollTo().assertIsDisplayed()
 
         // Find the toggle (Switch) next to it, or just click the row if it handles it
-        // The help text says "Use biometrics to secure the app" so we can check that too
-        composeTestRule.onNodeWithText("Use biometrics to secure the app").assertIsDisplayed()
+        // The help text says "Use biometrics or screen lock (PIN, pattern, password) to secure the app" so we can check that too
+        composeTestRule.onNodeWithText("Use biometrics or screen lock (PIN, pattern, password) to secure the app").assertIsDisplayed()
 
         // Since we cannot interact with the system BiometricPrompt in Compose tests,
         // we'll just check that the setting is present and interactable.

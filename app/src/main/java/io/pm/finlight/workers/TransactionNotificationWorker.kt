@@ -65,7 +65,7 @@ class TransactionNotificationWorker(
                 val visitCount =
                     if (details.transaction.transactionType != "income") {
                         transactionDao.getTransactionCountForMerchantSuspend(
-                            details.transaction.originalDescription ?: details.transaction.description,
+                            details.transaction.description,
                         )
                     } else {
                         0

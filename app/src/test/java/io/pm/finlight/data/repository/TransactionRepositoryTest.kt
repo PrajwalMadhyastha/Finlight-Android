@@ -1962,6 +1962,65 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `getMergedTransactionBreakdown restores anchor original expense type when merged with income child`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val parentTxnId = 1
+            val anchorAccountId = 101
+            val childAccountId = 102
+
+            // Parent mutated to income 0.0 because -2000 expense + 2000 income = 0.0
+            val anchorTxn = Transaction(id = parentTxnId, description = "Anchor", amount = 0.0, date = 1000L, accountId = anchorAccountId, transactionType = "income", notes = null, categoryId = null)
+            val mergeRecord =
+                MergeRecord(
+                    parentTxnId = parentTxnId,
+                    originalParentAmount = 2000.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child Income",
+                    childAmount = 2000.0,
+                    childDate = 1000L,
+                    childAccountId = childAccountId,
+                    childCategoryId = null,
+                    childTransactionType = "income",
+                    childSource = "manual",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = null,
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null,
+                )
+
+            `when`(mergeRecordDao.getAllForParentAnyType(parentTxnId)).thenReturn(listOf(mergeRecord))
+            `when`(transactionDao.getTransactionByIdSync(parentTxnId)).thenReturn(anchorTxn)
+            `when`(accountDao.getAccountByIdBlocking(anchorAccountId)).thenReturn(Account(id = anchorAccountId, name = "HDFC Millenia CC", type = "Bank"))
+            `when`(accountDao.getAccountByIdBlocking(childAccountId)).thenReturn(Account(id = childAccountId, name = "HDFC SB AC", type = "Bank"))
+
+            val breakdown = repository.getMergedTransactionBreakdown(parentTxnId)
+
+            assertEquals(2, breakdown.size)
+
+            val anchorEntry = breakdown[0]
+            assertEquals(anchorAccountId, anchorEntry.accountId)
+            assertEquals("HDFC Millenia CC", anchorEntry.accountName)
+            assertEquals(2000.0, anchorEntry.amount)
+            assertEquals("expense", anchorEntry.transactionType) // Correctly restored to expense!
+            assertTrue(anchorEntry.isAnchor)
+
+            val childEntry = breakdown[1]
+            assertEquals(childAccountId, childEntry.accountId)
+            assertEquals("HDFC SB AC", childEntry.accountName)
+            assertEquals(2000.0, childEntry.amount)
+            assertEquals("income", childEntry.transactionType)
+            assertEquals(false, childEntry.isAnchor)
+        }
+
+    @Test
     fun `getMergedTransactionBreakdown returns empty list if no merge records`() =
         runTest {
             setupDefaultPropertyMocks()
