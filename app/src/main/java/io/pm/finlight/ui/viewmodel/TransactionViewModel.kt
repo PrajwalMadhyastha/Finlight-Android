@@ -578,7 +578,7 @@ class TransactionViewModel(
                 loadTagsForTransaction(it.id)
                 loadImagesForTransaction(it.id)
                 loadOriginalSms(it.sourceSmsId)
-                loadVisitCount(it.originalDescription, it.description, it.transactionType)
+                loadVisitCount(it.description)
 
                 // --- Reimbursement data ---
                 if (it.transactionType == "expense") {
@@ -935,15 +935,10 @@ class TransactionViewModel(
     }
 
     private fun loadVisitCount(
-        originalDescription: String?,
-        currentDescription: String,
-        transactionType: String,
+        description: String,
     ) {
-        // Use the raw SMS description (originalDescription) so renamed merchants still
-        // get an accurate count — mirrors the notification worker's logic.
-        val descriptionToQuery = originalDescription ?: currentDescription
         viewModelScope.launch {
-            transactionRepository.getTransactionCountForMerchant(descriptionToQuery).collect { count ->
+            transactionRepository.getTransactionCountForMerchant(description).collect { count ->
                 _visitCount.value = count
             }
         }
