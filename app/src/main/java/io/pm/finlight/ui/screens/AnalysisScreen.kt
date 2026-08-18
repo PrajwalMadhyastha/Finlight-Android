@@ -27,7 +27,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
@@ -60,6 +62,10 @@ import io.pm.finlight.ui.viewmodel.AnalysisViewModel
 import io.pm.finlight.ui.viewmodel.AnalysisViewModelFactory
 import java.net.URLEncoder
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.*
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -136,6 +142,8 @@ fun AnalysisScreen(navController: NavController) {
             TimePeriodFilter(
                 modifier = Modifier.weight(1f),
                 selectedPeriod = uiState.selectedTimePeriod,
+                customStartDate = uiState.customStartDate,
+                customEndDate = uiState.customEndDate,
                 onPeriodSelected = { viewModel.selectTimePeriod(it) },
                 onCustomRangeClick = { showDateRangePicker = true },
             )
@@ -274,10 +282,30 @@ fun AnalysisScreen(navController: NavController) {
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            viewModel.setCustomDateRange(
-                                dateRangePickerState.selectedStartDateMillis,
-                                dateRangePickerState.selectedEndDateMillis,
-                            )
+                            val startMillis = dateRangePickerState.selectedStartDateMillis
+                            val endMillis = dateRangePickerState.selectedEndDateMillis
+                            if (startMillis != null && endMillis != null) {
+                                val localStartDate =
+                                    Instant.ofEpochMilli(startMillis)
+                                        .atZone(ZoneOffset.UTC)
+                                        .toLocalDate()
+                                val startOfDay =
+                                    localStartDate.atStartOfDay(ZoneId.systemDefault())
+                                        .toInstant()
+                                        .toEpochMilli()
+
+                                val localEndDate =
+                                    Instant.ofEpochMilli(endMillis)
+                                        .atZone(ZoneOffset.UTC)
+                                        .toLocalDate()
+                                val endOfDay =
+                                    localEndDate.atTime(23, 59, 59, 999_000_000)
+                                        .atZone(ZoneId.systemDefault())
+                                        .toInstant()
+                                        .toEpochMilli()
+
+                                viewModel.setCustomDateRange(startOfDay, endOfDay)
+                            }
                             showDateRangePicker = false
                         },
                         enabled = dateRangePickerState.selectedEndDateMillis != null,
@@ -294,6 +322,7 @@ fun AnalysisScreen(navController: NavController) {
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
         ModalBottomSheet(
             onDismissRequest = { viewModel.onFilterSheetToggled(false) },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = popupContainerColor,
         ) {
             FilterSheetContent(
@@ -314,9 +343,21 @@ fun AnalysisScreen(navController: NavController) {
 private fun TimePeriodFilter(
     modifier: Modifier = Modifier,
     selectedPeriod: AnalysisTimePeriod,
+    customStartDate: Long? = null,
+    customEndDate: Long? = null,
     onPeriodSelected: (AnalysisTimePeriod) -> Unit,
     onCustomRangeClick: () -> Unit,
 ) {
+    val customLabel =
+        remember(selectedPeriod, customStartDate, customEndDate) {
+            if (selectedPeriod == AnalysisTimePeriod.CUSTOM && customStartDate != null && customEndDate != null) {
+                val formatter = SimpleDateFormat("dd MMM", Locale.getDefault())
+                "${formatter.format(Date(customStartDate))} - ${formatter.format(Date(customEndDate))}"
+            } else {
+                "Custom"
+            }
+        }
+
     LazyRow(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -338,7 +379,7 @@ private fun TimePeriodFilter(
             FilterChip(
                 selected = selectedPeriod == AnalysisTimePeriod.CUSTOM,
                 onClick = onCustomRangeClick,
-                label = { Text("Custom") },
+                label = { Text(customLabel) },
                 leadingIcon = { Icon(Icons.Default.EditCalendar, "Custom Range", Modifier.size(FilterChipDefaults.IconSize)) },
             )
         }
@@ -442,7 +483,10 @@ private fun FilterSheetContent(
     Column(
         modifier =
             Modifier
-                .padding(16.dp)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(top = 8.dp, bottom = 32.dp)
                 .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
