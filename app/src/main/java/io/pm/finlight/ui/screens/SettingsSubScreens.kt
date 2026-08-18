@@ -19,6 +19,7 @@ import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.biometric.BiometricManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -576,10 +577,31 @@ fun DataSettingsScreen(
                 Column {
                     SettingsToggleItem(
                         title = "Enable App Lock",
-                        subtitle = "Use biometrics to secure the app",
+                        subtitle = "Use biometrics or screen lock (PIN, pattern, password) to secure the app",
                         icon = Icons.Default.Fingerprint,
                         checked = isAppLockEnabled,
-                        onCheckedChange = { settingsViewModel.setAppLockEnabled(it) },
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                val authenticators =
+                                    BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                                        BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                                val canAuthenticate = BiometricManager.from(context).canAuthenticate(authenticators)
+                                if (canAuthenticate == BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED ||
+                                    canAuthenticate == BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE
+                                ) {
+                                    Toast.makeText(
+                                        context,
+                                        "Please set up a screen lock (PIN, pattern, password) or biometrics in device settings first.",
+                                        Toast.LENGTH_LONG,
+                                    ).show()
+                                } else {
+                                    settingsViewModel.setAppLockEnabled(true)
+                                }
+                            } else {
+                                settingsViewModel.setAppLockEnabled(false)
+                            }
+                        },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsToggleItem(

@@ -20,6 +20,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -228,10 +229,14 @@ fun LockScreen(onUnlock: () -> Unit) {
 
     val promptInfo =
         remember {
+            val authenticators =
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
             BiometricPrompt.PromptInfo.Builder()
                 .setTitle("App Locked")
-                .setSubtitle("Authenticate to access your finances")
-                .setNegativeButtonText("Cancel")
+                .setSubtitle("Unlock using biometrics, PIN, pattern, or password")
+                .setAllowedAuthenticators(authenticators)
                 .build()
         }
 
@@ -251,7 +256,10 @@ fun LockScreen(onUnlock: () -> Unit) {
                         errString: CharSequence,
                     ) {
                         super.onAuthenticationError(errorCode, errString)
-                        if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON && errorCode != BiometricPrompt.ERROR_USER_CANCELED) {
+                        if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
+                            errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
+                            errorCode != BiometricPrompt.ERROR_CANCELED
+                        ) {
                             Toast.makeText(context, "Authentication error: $errString", Toast.LENGTH_SHORT).show()
                         }
                     }

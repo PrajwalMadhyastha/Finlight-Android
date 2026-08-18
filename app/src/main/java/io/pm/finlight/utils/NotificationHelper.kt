@@ -814,7 +814,7 @@ object NotificationHelper {
      * The transaction has already been saved (with [Transaction.needsReview] = true) so no data
      * is lost. The notification invites the user to tap and verify the amount on the edit screen.
      *
-     * Triggered by Options A (large amount), C (amount > balance), or D (low NER confidence).
+     * Triggered by Options A (large amount) or D (low NER confidence).
      */
     fun showSuspiciousAmountNotification(
         context: Context,

@@ -180,8 +180,7 @@ class AccountManagementTests {
 
         // Click on the "Test Bank" card item to open detail screen
         composeTestRule.onNode(
-            hasClickAction() and hasAnyDescendant(hasText(TestDataSeeder.ACCOUNT_BANK_NAME)),
-            useUnmergedTree = true,
+            hasClickAction() and hasText(TestDataSeeder.ACCOUNT_BANK_NAME),
         ).performClick()
 
         // Wait for AccountDetailScreen to load
@@ -206,8 +205,7 @@ class AccountManagementTests {
 
         // Click on the "Test Wallet" card item to open detail screen
         composeTestRule.onNode(
-            hasClickAction() and hasAnyDescendant(hasText(TestDataSeeder.ACCOUNT_WALLET_NAME)),
-            useUnmergedTree = true,
+            hasClickAction() and hasText(TestDataSeeder.ACCOUNT_WALLET_NAME),
         ).performClick()
 
         // Wait for AccountDetailScreen to load
@@ -229,8 +227,7 @@ class AccountManagementTests {
 
         // Click on the "Test Bank" card item to open detail screen
         composeTestRule.onNode(
-            hasClickAction() and hasAnyDescendant(hasText(TestDataSeeder.ACCOUNT_BANK_NAME)),
-            useUnmergedTree = true,
+            hasClickAction() and hasText(TestDataSeeder.ACCOUNT_BANK_NAME),
         ).performClick()
 
         // Wait for AccountDetailScreen to load
@@ -254,8 +251,7 @@ class AccountManagementTests {
 
         // Click on the "Test Wallet" card item to open detail screen
         composeTestRule.onNode(
-            hasClickAction() and hasAnyDescendant(hasText(TestDataSeeder.ACCOUNT_WALLET_NAME)),
-            useUnmergedTree = true,
+            hasClickAction() and hasText(TestDataSeeder.ACCOUNT_WALLET_NAME),
         ).performClick()
 
         // Wait for AccountDetailScreen to load

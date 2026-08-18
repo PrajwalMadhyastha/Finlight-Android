@@ -50,7 +50,7 @@ class SmsParserSuspiciousLogicTest : BaseSmsParserTest() {
         }
 
     @Test
-    fun `Option C - amount exceeding available balance flags transaction for review`() =
+    fun `Amount exceeding remaining balance does not flag transaction for review`() =
         runBlocking {
             setupTest()
             val sms =
@@ -65,7 +65,7 @@ class SmsParserSuspiciousLogicTest : BaseSmsParserTest() {
                 mapOf(
                     "AMOUNT" to NerEntity("500.00", 0.95f),
                     "MERCHANT" to NerEntity("DAKSHIN CAFE", 0.90f),
-                    // Balance is less than Amount
+                    // Remaining balance reported is less than Amount (normal in banking debits)
                     "BALANCE" to NerEntity("100.00", 0.95f),
                 )
 
@@ -83,9 +83,47 @@ class SmsParserSuspiciousLogicTest : BaseSmsParserTest() {
                 )
 
             assertNotNull("Should parse successfully", transaction)
-            assertTrue("Transaction should be flagged for review due to amount > balance", transaction!!.needsReview)
-            assertTrue(transaction.suspicionReason?.contains("exceeds available balance") == true)
+            assertFalse("Transaction should NOT be flagged for review when amount > remaining balance", transaction!!.needsReview)
+            assertNull(transaction.suspicionReason)
             assertEquals(500.0, transaction.amount, 0.001)
+        }
+
+    @Test
+    fun `Toll Paid SMS with remaining wallet balance lower than amount does not flag for review`() =
+        runBlocking {
+            setupTest()
+            val sms =
+                SmsMessage(
+                    id = 20,
+                    sender = "HDFCBK",
+                    body = "Toll Paid! Rs.100 for KA11MB1113 At Omalur Toll Plaza On 2026-08-16 19:32:36 Wallet Bal: Rs.45.00 Not you? Visit https://1.hdfc.bank.in/HDFCBK/jf/5dc66c74 HDFC Bank",
+                    date = System.currentTimeMillis(),
+                )
+
+            val nerEntities =
+                mapOf(
+                    "AMOUNT" to NerEntity("100", 0.95f),
+                    "MERCHANT" to NerEntity("Omalur Toll Plaza", 0.90f),
+                    "BALANCE" to NerEntity("45.00", 0.95f),
+                )
+
+            val transaction =
+                SmsParser.parse(
+                    sms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                    nerEntities = nerEntities,
+                )
+
+            assertNotNull("Should parse successfully", transaction)
+            assertFalse("Toll transaction should NOT be flagged for review", transaction!!.needsReview)
+            assertNull(transaction.suspicionReason)
+            assertEquals(100.0, transaction.amount, 0.001)
         }
 
     @Test

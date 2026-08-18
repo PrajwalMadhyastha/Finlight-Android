@@ -14,28 +14,28 @@ import org.mockito.kotlin.verify
 import org.mockito.Mockito.`when` as whenever
 
 /**
- * Unit tests for the visit count fix applied to [TransactionViewModel].
+ * Unit tests for the visit count logic applied to [TransactionViewModel].
  *
- * Covers four scenarios:
- *  1. When originalDescription is non-null, it is preferred over currentDescription
- *     for the merchant count query (mirrors the notification worker's behaviour).
- *  2. When originalDescription is null, currentDescription is used as the fallback.
+ * Covers scenarios:
+ *  1. When a transaction is renamed, currentDescription is queried so that all transactions
+ *     under the same renamed merchant are consolidated into a cumulative visit count.
+ *  2. When originalDescription is null, currentDescription is used as expected.
  *  3. Income transactions are NOT excluded — count is loaded so the UI can show
  *     "N credits" instead of suppressing the chip entirely.
  *  4. visitCount state is correctly populated from the repository value.
  */
 class TransactionViewModelVisitCountTest : TransactionViewModelBaseSetup() {
     // ---------------------------------------------------------------------------
-    // UT-1: originalDescription takes precedence over currentDescription
+    // UT-1: currentDescription is used so renamed merchants consolidate visit count
     // ---------------------------------------------------------------------------
 
     @Test
-    fun `loadTransactionForDetailScreen expense uses originalDescription for visit count query`() =
+    fun `loadTransactionForDetailScreen expense uses currentDescription for visit count query`() =
         runTest {
-            // ARRANGE — expense with both original and current descriptions
+            // ARRANGE — expense with both original (raw SMS) and current (renamed) descriptions
             val txnId = 42
             val originalDesc = "SWIGGY INDIA" // raw SMS text
-            val currentDesc = "Swiggy" // user-renamed alias
+            val currentDesc = "Food in office" // user-renamed / rule-renamed merchant
 
             val expenseTxn =
                 Transaction(
@@ -64,21 +64,21 @@ class TransactionViewModelVisitCountTest : TransactionViewModelBaseSetup() {
             viewModel.loadTransactionForDetailScreen(txnId)
             advanceUntilIdle()
 
-            // ASSERT — the query must use originalDescription, not the alias
+            // ASSERT — the query must use currentDescription to consolidate all visits
             verify(transactionRepository).getTransactionCountForMerchant(captor.capture())
             assertEquals(
-                "Visit count query should use originalDescription when present",
-                originalDesc,
+                "Visit count query should use currentDescription to consolidate renamed merchants",
+                currentDesc,
                 captor.firstValue,
             )
         }
 
     // ---------------------------------------------------------------------------
-    // UT-2: Falls back to currentDescription when originalDescription is null
+    // UT-2: Uses currentDescription when originalDescription is null
     // ---------------------------------------------------------------------------
 
     @Test
-    fun `loadTransactionForDetailScreen expense falls back to currentDescription when originalDescription is null`() =
+    fun `loadTransactionForDetailScreen expense uses currentDescription when originalDescription is null`() =
         runTest {
             // ARRANGE — manually-entered expense has no originalDescription
             val txnId = 43
@@ -112,10 +112,10 @@ class TransactionViewModelVisitCountTest : TransactionViewModelBaseSetup() {
             viewModel.loadTransactionForDetailScreen(txnId)
             advanceUntilIdle()
 
-            // ASSERT — falls back to currentDescription
+            // ASSERT — uses currentDescription
             verify(transactionRepository).getTransactionCountForMerchant(captor.capture())
             assertEquals(
-                "Visit count query should fall back to currentDescription when originalDescription is null",
+                "Visit count query should use currentDescription",
                 currentDesc,
                 captor.firstValue,
             )
