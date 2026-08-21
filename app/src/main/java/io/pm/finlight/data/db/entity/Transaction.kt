@@ -50,7 +50,7 @@ data class Transaction(
     val date: Long,
     val accountId: Int,
     val notes: String?,
-    val transactionType: String = "expense",
+    val transactionType: TransactionType = TransactionType.EXPENSE,
     val sourceSmsId: Long? = null,
     val sourceSmsHash: String? = null,
     val source: String = "Manual Entry",
@@ -65,8 +65,8 @@ data class Transaction(
     // --- NEW: Flag for amounts that failed sanity checks and need user review ---
     val needsReview: Boolean = false,
     // --- NEW: Transaction lifecycle status for recurring draft support ---
-    // Values: "CONFIRMED" (normal), "PENDING" (draft awaiting user confirm), "SKIPPED" (user skipped a cycle)
-    val status: String = "CONFIRMED",
+    // Values: CONFIRMED (normal), PENDING (draft awaiting user confirm), SKIPPED (user skipped a cycle)
+    val status: TransactionStatus = TransactionStatus.CONFIRMED,
     // --- NEW: Links a PENDING draft back to its originating recurring rule ---
     val recurringRuleId: Int? = null,
     // --- NEW: Flag to track if the user dismissed a merge prompt for this transaction ---

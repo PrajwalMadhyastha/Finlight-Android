@@ -346,7 +346,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
         runTest {
             // Arrange
             val transactionId = 1
-            val newType = "income"
+            val newType = TransactionType.INCOME
             // No exception mocked, so the suspend function will just return (simulating success)
 
             // Act
@@ -366,9 +366,9 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
         runTest {
             // Arrange
             val transactionId = 1
-            val newType = "income"
+            val newType = TransactionType.INCOME
             val errorMessage = "DB Error"
-            whenever(transactionRepository.updateTransactionType(anyInt(), anyString())).thenThrow(RuntimeException(errorMessage))
+            whenever(transactionRepository.updateTransactionType(anyInt(), org.mockito.kotlin.any())).thenThrow(RuntimeException(errorMessage))
 
             // Act & Assert
             viewModel.uiEvent.test {
@@ -673,7 +673,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
                     // "Food"
                     categoryId = 10,
                     source = "Manual Entry",
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 )
             val mockDetails =
@@ -868,7 +868,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
                     accountId = 1,
                     categoryId = 10,
                     source = "Manual Entry",
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 )
             val mockDetails =

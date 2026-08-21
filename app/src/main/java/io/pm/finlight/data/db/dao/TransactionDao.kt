@@ -95,7 +95,7 @@ interface TransactionDao {
         filterCategoryId: Int?,
         searchQuery: String?,
         includeExcluded: Boolean,
-        transactionType: String?,
+        transactionType: TransactionType?,
     ): Flow<List<SpendingAnalysisItem>>
 
     @Query(
@@ -135,7 +135,7 @@ interface TransactionDao {
         filterTagId: Int?,
         searchQuery: String?,
         includeExcluded: Boolean,
-        transactionType: String?,
+        transactionType: TransactionType?,
     ): Flow<List<SpendingAnalysisItem>>
 
     // =============================================================================
@@ -183,7 +183,7 @@ interface TransactionDao {
         filterMerchantName: String?,
         searchQuery: String?,
         includeExcluded: Boolean,
-        transactionType: String?,
+        transactionType: TransactionType?,
     ): Flow<List<SpendingAnalysisItem>>
 
     @androidx.room.Transaction
@@ -439,7 +439,7 @@ interface TransactionDao {
     @Query("UPDATE transactions SET transactionType = :transactionType WHERE id = :id")
     suspend fun updateTransactionType(
         id: Int,
-        transactionType: String,
+        transactionType: TransactionType,
     )
 
     @androidx.room.Transaction
@@ -564,7 +564,7 @@ interface TransactionDao {
         keyword: String?,
         accountId: Int?,
         categoryId: Int?,
-        transactionType: String?,
+        transactionType: TransactionType?,
     ): Flow<List<MerchantSpendingSummary>>
 
     @androidx.room.Transaction
@@ -850,7 +850,7 @@ interface TransactionDao {
         keyword: String?,
         accountId: Int?,
         categoryId: Int?,
-        transactionType: String?,
+        transactionType: TransactionType?,
     ): Flow<List<CategorySpending>>
 
     @Query(
@@ -1153,7 +1153,7 @@ interface TransactionDao {
         minAmount: Double,
         maxAmount: Double,
         smsDate: Long,
-        transactionType: String,
+        transactionType: TransactionType,
     ): List<Transaction>
 
     @Query(
@@ -1239,7 +1239,7 @@ interface TransactionDao {
         keyword: String,
         accountId: Int?,
         categoryId: Int?,
-        transactionType: String?,
+        transactionType: TransactionType?,
         startDate: Long?,
         endDate: Long?,
         // --- NEW: Add tagId parameter
@@ -1377,7 +1377,7 @@ interface TransactionDao {
     suspend fun findRecentTransactionForMerge(
         merchant: String,
         accountId: Int,
-        transactionType: String,
+        transactionType: TransactionType,
         timeWindowStart: Long,
         newTxnId: Int
     ): Transaction?
@@ -1396,7 +1396,7 @@ interface TransactionDao {
     suspend fun findPotentialTransfers(
         amount: Double,
         accountId: Int,
-        transactionType: String,
+        transactionType: TransactionType,
         startTime: Long,
         endTime: Long
     ): List<Transaction>

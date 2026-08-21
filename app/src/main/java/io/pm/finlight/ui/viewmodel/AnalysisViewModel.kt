@@ -152,10 +152,10 @@ class AnalysisViewModel(
             .debounce(300) // Debounce search input
             .flatMapLatest { inputs ->
                 val (start, end) = calculateDateRange(inputs.period, inputs.dateRange.first, inputs.dateRange.second)
-                val typeStr =
+                val typeEnum =
                     when (inputs.transactionType) {
-                        AnalysisTransactionType.EXPENSE -> "expense"
-                        AnalysisTransactionType.INCOME -> "income"
+                        AnalysisTransactionType.EXPENSE -> TransactionType.EXPENSE
+                        AnalysisTransactionType.INCOME -> TransactionType.INCOME
                         AnalysisTransactionType.ALL -> null
                     }
                 when (inputs.dimension) {
@@ -169,7 +169,7 @@ class AnalysisViewModel(
                             inputs.filterCat?.id,
                             inputs.searchQuery,
                             inputs.includeExcluded,
-                            typeStr,
+                            typeEnum,
                         )
                     AnalysisDimension.TAG ->
                         transactionDao.getSpendingAnalysisByTag(
@@ -180,7 +180,7 @@ class AnalysisViewModel(
                             inputs.filterTag?.id,
                             inputs.searchQuery,
                             inputs.includeExcluded,
-                            typeStr,
+                            typeEnum,
                         )
                     AnalysisDimension.MERCHANT ->
                         transactionDao.getSpendingAnalysisByMerchant(
@@ -191,7 +191,7 @@ class AnalysisViewModel(
                             inputs.filterMerchant,
                             inputs.searchQuery,
                             inputs.includeExcluded,
-                            typeStr,
+                            typeEnum,
                         )
                 }
             }

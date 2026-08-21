@@ -32,6 +32,7 @@ import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionNotificationWorker
+import io.pm.finlight.TransactionType
 import io.pm.finlight.TripType
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ml.MlModelFactory
@@ -249,7 +250,7 @@ class SmsProcessorWorker(
                         accountId = 0,
                         categoryId = potentialTxn.categoryId,
                         notes = "",
-                        transactionType = potentialTxn.transactionType,
+                        transactionType = TransactionType.fromString(potentialTxn.transactionType),
                         sourceSmsId = potentialTxn.sourceSmsId,
                         sourceSmsHash = potentialTxn.sourceSmsHash,
                     )

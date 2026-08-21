@@ -203,10 +203,10 @@ object NotificationHelper {
                 .setSummaryText(details.categoryName ?: "Uncategorized")
 
         val totalLabel =
-            if (details.transaction.transactionType == "income") "income this month" else "spent this month"
+            if (details.transaction.transactionType == TransactionType.INCOME) "income this month" else "spent this month"
         inboxStyle.addLine("${currencyFormat.format(monthlyTotal)} $totalLabel")
 
-        if (visitCount > 0 && details.transaction.transactionType != "income") {
+        if (visitCount > 0 && details.transaction.transactionType != TransactionType.INCOME) {
             val visitText =
                 when (visitCount) {
                     1 -> "This is your first visit here."
@@ -788,7 +788,7 @@ object NotificationHelper {
                 )
             }
 
-        val typeText = transaction.transactionType.replaceFirstChar { it.uppercase() }
+        val typeText = transaction.transactionType.name.lowercase().replaceFirstChar { it.uppercase() }
         val bigText =
             "$typeText of ₹${"%.2f".format(transaction.amount)} from ${transaction.description} detected. Tap to review and categorize."
 

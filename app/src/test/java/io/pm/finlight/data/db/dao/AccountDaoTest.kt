@@ -6,6 +6,7 @@ import app.cash.turbine.test
 import io.pm.finlight.Account
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionType
 import io.pm.finlight.TransactionDao
 import io.pm.finlight.util.DatabaseTestRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -63,7 +64,7 @@ class AccountDaoTest {
                 Transaction(
                     description = "Salary",
                     amount = 5000.0,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     date = System.currentTimeMillis(),
                     accountId = 1,
                     categoryId = null,
@@ -74,7 +75,7 @@ class AccountDaoTest {
                 Transaction(
                     description = "Rent",
                     amount = 1000.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = System.currentTimeMillis(),
                     accountId = 1,
                     categoryId = null,
@@ -86,7 +87,7 @@ class AccountDaoTest {
                 Transaction(
                     description = "Excluded",
                     amount = 500.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = System.currentTimeMillis(),
                     accountId = 1,
                     categoryId = null,
@@ -100,7 +101,7 @@ class AccountDaoTest {
                 Transaction(
                     description = "Shopping",
                     amount = 200.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = System.currentTimeMillis(),
                     accountId = 2,
                     categoryId = null,

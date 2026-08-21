@@ -94,7 +94,7 @@ class TransactionDaoTest {
                     description = "Coffee",
                     amount = 100.0,
                     date = todayStart + 1000,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
@@ -107,7 +107,7 @@ class TransactionDaoTest {
                     description = "Lunch",
                     amount = 200.0,
                     date = todayStart + 2000,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
@@ -120,7 +120,7 @@ class TransactionDaoTest {
                     description = "Excluded",
                     amount = 50.0,
                     date = todayStart + 3000,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
@@ -134,7 +134,7 @@ class TransactionDaoTest {
                     description = "Salary",
                     amount = 1000.0,
                     date = todayStart + 4000,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     accountId = 1,
                     categoryId = 3,
                     notes = null,
@@ -147,7 +147,7 @@ class TransactionDaoTest {
                     description = "Yesterday",
                     amount = 75.0,
                     date = yesterday,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
@@ -161,7 +161,7 @@ class TransactionDaoTest {
                         description = "Split",
                         amount = 700.0,
                         date = todayStart + 5000,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         accountId = 1,
                         categoryId = null,
                         notes = null,
@@ -418,10 +418,10 @@ class TransactionDaoTest {
                         accountId = 1,
                         categoryId = 1,
                         notes = null,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                     ),
                 ).toInt()
-            val newType = "income"
+            val newType = TransactionType.INCOME
             transactionDao.updateTransactionType(id, newType)
             transactionDao.getTransactionById(id).test {
                 assertEquals(newType, awaitItem()?.transactionType)
@@ -479,7 +479,7 @@ class TransactionDaoTest {
                     date = System.currentTimeMillis(),
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -491,7 +491,7 @@ class TransactionDaoTest {
                     date = System.currentTimeMillis(),
                     accountId = 1,
                     categoryId = 3,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     notes = null,
                 ),
             )
@@ -503,16 +503,16 @@ class TransactionDaoTest {
                     date = System.currentTimeMillis(),
                     accountId = 1,
                     categoryId = 3,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     notes = null,
                 ),
             )
 
             // Act & Assert
-            transactionDao.searchTransactions(keyword = "", null, categoryId = 3, transactionType = "income", null, null, null).test {
+            transactionDao.searchTransactions(keyword = "", null, categoryId = 3, transactionType = TransactionType.INCOME, null, null, null).test {
                 val results = awaitItem()
                 assertEquals(2, results.size)
-                assertTrue(results.all { it.transaction.transactionType == "income" && it.transaction.categoryId == 3 })
+                assertTrue(results.all { it.transaction.transactionType == TransactionType.INCOME && it.transaction.categoryId == 3 })
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -803,7 +803,7 @@ class TransactionDaoTest {
                     description = "Salary",
                     amount = 50000.0,
                     date = now - TimeUnit.DAYS.toMillis(1),
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     accountId = 1,
                     categoryId = 3,
                     notes = null,
@@ -814,7 +814,7 @@ class TransactionDaoTest {
                     description = "Rent",
                     amount = 15000.0,
                     date = now - TimeUnit.DAYS.toMillis(2),
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
@@ -825,7 +825,7 @@ class TransactionDaoTest {
                     description = "Groceries",
                     amount = 3500.0,
                     date = now - TimeUnit.DAYS.toMillis(3),
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
@@ -836,7 +836,7 @@ class TransactionDaoTest {
                     description = "Excluded Expense",
                     amount = 1000.0,
                     date = now - TimeUnit.DAYS.toMillis(4),
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
@@ -865,7 +865,7 @@ class TransactionDaoTest {
                     description = "Flight",
                     amount = 8000.0,
                     date = now,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 2,
                     notes = null,
@@ -876,7 +876,7 @@ class TransactionDaoTest {
                     description = "Lunch",
                     amount = 500.0,
                     date = now,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
@@ -887,7 +887,7 @@ class TransactionDaoTest {
                     description = "Hotel",
                     amount = 4000.0,
                     date = now,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 2,
                     notes = null,
@@ -898,7 +898,7 @@ class TransactionDaoTest {
                     description = "Salary",
                     amount = 50000.0,
                     date = now,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     accountId = 1,
                     categoryId = 3,
                     notes = null,
@@ -906,7 +906,7 @@ class TransactionDaoTest {
             ) // Should be ignored
 
             // Act & Assert
-            transactionDao.getSpendingByCategoryForMonth(startDate, now, null, null, null, "expense").test {
+            transactionDao.getSpendingByCategoryForMonth(startDate, now, null, null, null, TransactionType.EXPENSE).test {
                 val spendingList = awaitItem()
                 assertEquals(2, spendingList.size)
 
@@ -935,7 +935,7 @@ class TransactionDaoTest {
                     description = "Day 1 Spend",
                     amount = 100.0,
                     date = startDate + 1000,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
@@ -946,7 +946,7 @@ class TransactionDaoTest {
                     description = "Day 2 Spend",
                     amount = 150.0,
                     date = startDate + TimeUnit.DAYS.toMillis(1),
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
@@ -957,7 +957,7 @@ class TransactionDaoTest {
                     description = "Day 3 Spend",
                     amount = 50.0,
                     date = endDate - 1000,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
@@ -990,7 +990,7 @@ class TransactionDaoTest {
                     date = transactionTime,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -1001,7 +1001,7 @@ class TransactionDaoTest {
                     date = transactionTime,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -1012,7 +1012,7 @@ class TransactionDaoTest {
                     date = transactionTime,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -1024,14 +1024,14 @@ class TransactionDaoTest {
                     date = transactionTime,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
 
             // Act & Assert
             // --- FIX: Add the missing includeExcluded parameter ---
-            transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, false, "expense").test {
+            transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, false, TransactionType.EXPENSE).test {
                 val results = awaitItem()
 
                 // Assert: There should be only two groups: one for all "Amazon" variations and one for "Flipkart".
@@ -1077,7 +1077,7 @@ class TransactionDaoTest {
                     date = transactionTime,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                     isExcluded = false,
                 ),
@@ -1089,14 +1089,14 @@ class TransactionDaoTest {
                     date = transactionTime,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                     isExcluded = true,
                 ),
             )
 
             // Act 1: Call with includeExcluded = false (default behavior)
-            transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, false, "expense").test {
+            transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, false, TransactionType.EXPENSE).test {
                 val results = awaitItem()
                 val amazonItem = results.find { it.dimensionId == "amazon" }
                 assertNotNull(amazonItem)
@@ -1106,7 +1106,7 @@ class TransactionDaoTest {
             }
 
             // Act 2: Call with includeExcluded = true (new behavior)
-            transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, true, "expense").test {
+            transactionDao.getSpendingAnalysisByMerchant(startTime, endTime, null, null, null, null, true, TransactionType.EXPENSE).test {
                 val results = awaitItem()
                 val amazonItem = results.find { it.dimensionId == "amazon" }
                 assertNotNull(amazonItem)
@@ -1133,7 +1133,7 @@ class TransactionDaoTest {
                     date = transactionTime,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                     isExcluded = false,
                 ),
@@ -1145,14 +1145,14 @@ class TransactionDaoTest {
                     date = transactionTime,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                     isExcluded = true,
                 ),
             )
 
             // Act 1: Call with includeExcluded = false
-            transactionDao.getSpendingAnalysisByCategory(startTime, endTime, null, null, null, null, false, "expense").test {
+            transactionDao.getSpendingAnalysisByCategory(startTime, endTime, null, null, null, null, false, TransactionType.EXPENSE).test {
                 val results = awaitItem()
                 val foodItem = results.find { it.dimensionId == category1.id.toString() }
                 assertNotNull(foodItem)
@@ -1162,7 +1162,7 @@ class TransactionDaoTest {
             }
 
             // Act 2: Call with includeExcluded = true
-            transactionDao.getSpendingAnalysisByCategory(startTime, endTime, null, null, null, null, true, "expense").test {
+            transactionDao.getSpendingAnalysisByCategory(startTime, endTime, null, null, null, null, true, TransactionType.EXPENSE).test {
                 val results = awaitItem()
                 val foodItem = results.find { it.dimensionId == category1.id.toString() }
                 assertNotNull(foodItem)
@@ -1190,7 +1190,7 @@ class TransactionDaoTest {
                         date = transactionTime,
                         accountId = 1,
                         categoryId = 1,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         notes = null,
                         isExcluded = false,
                     ),
@@ -1203,7 +1203,7 @@ class TransactionDaoTest {
                         date = transactionTime,
                         accountId = 1,
                         categoryId = 1,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         notes = null,
                         isExcluded = true,
                     ),
@@ -1216,7 +1216,7 @@ class TransactionDaoTest {
             )
 
             // Act 1: Call with includeExcluded = false
-            transactionDao.getSpendingAnalysisByTag(startTime, endTime, null, null, null, null, false, "expense").test {
+            transactionDao.getSpendingAnalysisByTag(startTime, endTime, null, null, null, null, false, TransactionType.EXPENSE).test {
                 val results = awaitItem()
                 val workTagItem = results.find { it.dimensionId == tag1.id.toString() }
                 assertNotNull(workTagItem)
@@ -1226,7 +1226,7 @@ class TransactionDaoTest {
             }
 
             // Act 2: Call with includeExcluded = true
-            transactionDao.getSpendingAnalysisByTag(startTime, endTime, null, null, null, null, true, "expense").test {
+            transactionDao.getSpendingAnalysisByTag(startTime, endTime, null, null, null, null, true, TransactionType.EXPENSE).test {
                 val results = awaitItem()
                 val workTagItem = results.find { it.dimensionId == tag1.id.toString() }
                 assertNotNull(workTagItem)
@@ -1249,10 +1249,10 @@ class TransactionDaoTest {
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                 )
             transactionDao.insert(transaction)
-            val newType = "income"
+            val newType = TransactionType.INCOME
 
             // Act
             transactionDao.updateTransactionType(1, newType)
@@ -1280,7 +1280,7 @@ class TransactionDaoTest {
                     accountId = 1,
                     categoryId = 1,
                     source = "Manual Entry",
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = "Old entry",
                 ),
             )
@@ -1296,7 +1296,7 @@ class TransactionDaoTest {
                     accountId = 1,
                     categoryId = 1,
                     source = "Manual Entry",
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = "New entry",
                 ),
             )
@@ -1312,7 +1312,7 @@ class TransactionDaoTest {
                     categoryId = 1,
                     // <-- Should be filtered out
                     source = "Auto-Captured",
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                     // Explicitly add an SMS ID so it's ignored
                     sourceSmsId = 12345L,
@@ -1329,7 +1329,7 @@ class TransactionDaoTest {
                     accountId = 1,
                     categoryId = 1,
                     source = "Manual Entry",
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -1363,7 +1363,7 @@ class TransactionDaoTest {
                     date = transactionTime - 1000,
                     accountId = account1.id,
                     categoryId = category1.id,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -1376,7 +1376,7 @@ class TransactionDaoTest {
                     date = transactionTime,
                     accountId = account2.id,
                     categoryId = category1.id,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -1389,7 +1389,7 @@ class TransactionDaoTest {
                     date = transactionTime + 1000,
                     accountId = account1.id,
                     categoryId = category2.id,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -1402,7 +1402,7 @@ class TransactionDaoTest {
                     date = transactionTime - 500,
                     accountId = account1.id,
                     categoryId = category1.id,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -1451,7 +1451,7 @@ class TransactionDaoTest {
                     date = 1000,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -1465,7 +1465,7 @@ class TransactionDaoTest {
                     date = 1000,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -1479,7 +1479,7 @@ class TransactionDaoTest {
                     date = 1000,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -1492,7 +1492,7 @@ class TransactionDaoTest {
                     date = 1000,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )

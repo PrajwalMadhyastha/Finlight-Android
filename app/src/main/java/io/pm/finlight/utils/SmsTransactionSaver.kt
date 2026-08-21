@@ -15,6 +15,7 @@ import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TagRepository
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionRepository
+import io.pm.finlight.TransactionType
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.data.db.AppDatabase
 
@@ -111,7 +112,7 @@ class SmsTransactionSaver(
                     accountId = finalAccountId,
                     categoryId = potentialTxn.categoryId,
                     notes = "",
-                    transactionType = potentialTxn.transactionType,
+                    transactionType = TransactionType.fromString(potentialTxn.transactionType),
                     sourceSmsId = potentialTxn.sourceSmsId,
                     sourceSmsHash = potentialTxn.sourceSmsHash,
                     source = source,
@@ -128,7 +129,7 @@ class SmsTransactionSaver(
                     accountId = finalAccountId,
                     categoryId = potentialTxn.categoryId,
                     notes = "",
-                    transactionType = potentialTxn.transactionType,
+                    transactionType = TransactionType.fromString(potentialTxn.transactionType),
                     sourceSmsId = potentialTxn.sourceSmsId,
                     sourceSmsHash = potentialTxn.sourceSmsHash,
                     source = source,

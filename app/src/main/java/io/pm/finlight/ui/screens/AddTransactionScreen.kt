@@ -361,7 +361,7 @@ fun AddTransactionScreen(
                         recentTransactions = recentManualTransactions,
                         onQuickFillSelected = { txn ->
                             viewModel.onQuickFillSelected(txn)
-                            transactionType = txn.transaction.transactionType
+                            transactionType = txn.transaction.transactionType.name.lowercase()
                         },
                         onViewAllClick = { activeSheet = ComposerSheet.History },
                     )
@@ -549,7 +549,7 @@ fun AddTransactionScreen(
                         transactions = historyManualTransactions,
                         onTransactionSelected = { txn ->
                             viewModel.onQuickFillSelected(txn)
-                            transactionType = txn.transaction.transactionType
+                            transactionType = txn.transaction.transactionType.name.lowercase()
                             activeSheet = null
                         },
                     )

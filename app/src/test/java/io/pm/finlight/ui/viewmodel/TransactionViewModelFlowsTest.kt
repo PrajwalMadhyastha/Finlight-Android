@@ -308,7 +308,7 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
                     amount = 100.0,
                     date = 1000L,
                     accountId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     categoryId = null,
                     notes = null
                 )

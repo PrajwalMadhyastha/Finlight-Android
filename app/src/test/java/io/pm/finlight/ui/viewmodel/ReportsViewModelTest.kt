@@ -46,7 +46,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
         // Setup default mocks for initialization
         `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
         `when`(
-            transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any(), eq("expense")),
+            transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any(), eq(TransactionType.EXPENSE)),
         ).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
@@ -90,7 +90,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
             val topCategory = spendingList.first()
 
             `when`(
-                transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any(), eq("expense")),
+                transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any(), eq(TransactionType.EXPENSE)),
             ).thenReturn(flowOf(spendingList))
             `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(trends))
             `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
@@ -260,7 +260,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
             var summaryCallCount = 0
 
             `when`(
-                transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any(), eq("expense")),
+                transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any(), eq(TransactionType.EXPENSE)),
             ).thenReturn(flowOf(spendingList))
             `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(trends))
 

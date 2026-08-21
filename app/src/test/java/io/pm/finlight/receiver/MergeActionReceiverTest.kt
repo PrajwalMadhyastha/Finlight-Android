@@ -18,6 +18,7 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.TransactionDao
 import io.pm.finlight.TransactionRepository
+import io.pm.finlight.TransactionType
 import io.pm.finlight.SmsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -109,7 +110,7 @@ class MergeActionReceiverTest {
                     id = 2,
                     description = "Child",
                     amount = 100.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = 0L,
                     accountId = 1,
                     categoryId = 1,

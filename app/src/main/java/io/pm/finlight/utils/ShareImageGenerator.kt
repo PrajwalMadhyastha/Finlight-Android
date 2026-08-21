@@ -40,6 +40,7 @@ import androidx.core.content.FileProvider
 import io.pm.finlight.BuildConfig
 import io.pm.finlight.Tag
 import io.pm.finlight.TransactionDetails
+import io.pm.finlight.TransactionType
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.theme.PersonalFinanceAppTheme
 import java.io.File
@@ -159,7 +160,7 @@ private fun TransactionSnapshotContent(
 ) {
     val totalAmount =
         transactionsWithData.sumOf {
-            if (it.details.transaction.transactionType == "income") it.details.transaction.amount else -it.details.transaction.amount
+            if (it.details.transaction.transactionType == TransactionType.INCOME) it.details.transaction.amount else -it.details.transaction.amount
         }
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     val dateFormat = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }

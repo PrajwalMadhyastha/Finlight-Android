@@ -84,7 +84,7 @@ class SearchViewModel(
                             ) {
                                 null
                             } else {
-                                state.transactionType.lowercase()
+                                TransactionType.fromStringOrNull(state.transactionType)
                             },
                         startDate = state.startDate,
                         endDate = state.endDate,

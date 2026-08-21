@@ -69,7 +69,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
             val transactionId = 1
             val details =
                 TransactionDetails(
-                    Transaction(id = transactionId, description = "Test", amount = 100.0, transactionType = "expense", date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null, originalDescription = "Test"),
+                    Transaction(id = transactionId, description = "Test", amount = 100.0, transactionType = TransactionType.EXPENSE, date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null, originalDescription = "Test"),
                     emptyList(),
                     "Account",
                     "Category",
@@ -177,7 +177,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
             val transactionId = 2
             val details =
                 TransactionDetails(
-                    Transaction(id = transactionId, description = "Salary", amount = 5000.0, transactionType = "income", date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null, originalDescription = null),
+                    Transaction(id = transactionId, description = "Salary", amount = 5000.0, transactionType = TransactionType.INCOME, date = System.currentTimeMillis(), accountId = 1, categoryId = 1, notes = null, originalDescription = null),
                     emptyList(),
                     "Account",
                     "Category",

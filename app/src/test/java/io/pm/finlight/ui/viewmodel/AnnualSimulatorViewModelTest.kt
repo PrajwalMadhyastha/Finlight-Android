@@ -3,6 +3,7 @@ package io.pm.finlight.ui.viewmodel
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TransactionRepository
+import io.pm.finlight.TransactionType
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -95,7 +96,7 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
         runTest {
             val incomeTxn =
                 io.pm.finlight.TransactionDetails(
-                    transaction = io.pm.finlight.Transaction(id = 1, description = "Salary", amount = 5000.0, transactionType = "income", date = 100L, accountId = 1, categoryId = null, notes = null),
+                    transaction = io.pm.finlight.Transaction(id = 1, description = "Salary", amount = 5000.0, transactionType = TransactionType.INCOME, date = 100L, accountId = 1, categoryId = null, notes = null),
                     images = emptyList(),
                     accountName = "Bank",
                     categoryName = "Salary",

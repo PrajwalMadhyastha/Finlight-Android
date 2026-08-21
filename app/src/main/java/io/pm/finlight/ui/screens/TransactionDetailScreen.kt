@@ -244,8 +244,8 @@ fun TransactionDetailScreen(
     } else {
         val title =
             when (details.transaction.transactionType) {
-                "expense" -> "Debit transaction"
-                "income" -> "Credit transaction"
+                TransactionType.EXPENSE -> "Debit transaction"
+                TransactionType.INCOME -> "Credit transaction"
                 else -> "Transaction Details"
             }
         var selectedDateTime by remember(details) {
@@ -415,7 +415,7 @@ fun TransactionDetailScreen(
                                 hasMerged = hasMerged,
                                 hasReimbursements = hasReimbursements,
                                 onTypeSelected = { newType ->
-                                    viewModel.updateTransactionType(details.transaction.id, newType)
+                                    viewModel.updateTransactionType(details.transaction.id, TransactionType.fromString(newType))
                                 },
                                 onExcludeToggled = { newIsExcludedValue ->
                                     viewModel.updateTransactionExclusion(details.transaction.id, newIsExcludedValue)
@@ -457,14 +457,14 @@ fun TransactionDetailScreen(
                     }
 
                     // --- NEW: Unified Related Activity Card (Handles both reimbursements and merged transactions) ---
-                    val hasReimbursements = details.transaction.transactionType == "expense"
+                    val hasReimbursements = details.transaction.transactionType == TransactionType.EXPENSE
                     val hasMerged = mergedTransactionBreakdown.size > 1
                     if (hasReimbursements || hasMerged) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 UnifiedRelatedActivityCard(
                                     currentAmount = details.transaction.amount,
-                                    isExpense = details.transaction.transactionType == "expense",
+                                    isExpense = details.transaction.transactionType == TransactionType.EXPENSE,
                                     reimbursements = reimbursements,
                                     mergedEntries = mergedTransactionBreakdown,
                                     onLinkClick = { viewModel.openReimbursementPicker(transactionId) },
@@ -476,7 +476,7 @@ fun TransactionDetailScreen(
                     }
 
                     // --- NEW: Badge for income transactions that are linked as a repayment ---
-                    val isMathematicallyIncome = details.transaction.transactionType == "income"
+                    val isMathematicallyIncome = details.transaction.transactionType == TransactionType.INCOME
                     if (isMathematicallyIncome && linkedExpense != null) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -530,7 +530,7 @@ fun TransactionDetailScreen(
                                                     sourceSmsId = smsMessage.id,
                                                     smsSender = smsMessage.sender,
                                                     amount = details.transaction.amount,
-                                                    transactionType = details.transaction.transactionType,
+                                                    transactionType = details.transaction.transactionType.name.lowercase(),
                                                     merchantName = details.transaction.description,
                                                     originalMessage = smsMessage.body,
                                                     sourceSmsHash = details.transaction.sourceSmsHash,
@@ -806,7 +806,7 @@ private fun TransactionPropertiesCard(
                     .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            val isMathematicallyIncome = details.transaction.transactionType == "income"
+            val isMathematicallyIncome = details.transaction.transactionType == TransactionType.INCOME
             // An expense with a negative amount is "over-repaid". It renders visually as income
             // but its DB type remains "expense". We lock the toggle in this state to prevent the
             // user from accidentally changing the type when the toggle shows the "wrong" side.
@@ -1191,7 +1191,7 @@ private fun TransactionSpotlightHeader(
 
             if (visitCount > 1) {
                 val chipLabel =
-                    if (details.transaction.transactionType == "income") {
+                    if (details.transaction.transactionType == TransactionType.INCOME) {
                         "$visitCount credits"
                     } else {
                         "$visitCount visits"

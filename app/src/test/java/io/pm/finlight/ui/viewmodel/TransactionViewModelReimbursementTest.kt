@@ -1,8 +1,9 @@
 package io.pm.finlight.ui.viewmodel
 
 import app.cash.turbine.test
-import io.pm.finlight.TransactionDetails
 import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionDetails
+import io.pm.finlight.TransactionType
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -22,17 +23,17 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
         runTest {
             val expenseTxn =
                 TransactionDetails(
-                    transaction = Transaction(id = 1, description = "Expense", amount = 1000.0, date = 0L, accountId = 1, categoryId = 1, transactionType = "expense", notes = ""),
+                    transaction = Transaction(id = 1, description = "Expense", amount = 1000.0, date = 0L, accountId = 1, categoryId = 1, transactionType = TransactionType.EXPENSE, notes = ""),
                     accountName = "Test", categoryName = "Test", categoryIconKey = "Test", categoryColorKey = "Test", tagNames = "", images = emptyList()
                 )
             val incomeTxn1 =
                 TransactionDetails(
-                    transaction = Transaction(id = 2, description = "Income 1", amount = 500.0, date = 0L, accountId = 1, categoryId = 1, transactionType = "income", notes = ""),
+                    transaction = Transaction(id = 2, description = "Income 1", amount = 500.0, date = 0L, accountId = 1, categoryId = 1, transactionType = TransactionType.INCOME, notes = ""),
                     accountName = "Test", categoryName = "Test", categoryIconKey = "Test", categoryColorKey = "Test", tagNames = "", images = emptyList()
                 )
             val incomeTxn2 =
                 TransactionDetails(
-                    transaction = Transaction(id = 3, description = "Income 2", amount = 500.0, date = 0L, accountId = 1, categoryId = 1, transactionType = "income", notes = ""),
+                    transaction = Transaction(id = 3, description = "Income 2", amount = 500.0, date = 0L, accountId = 1, categoryId = 1, transactionType = TransactionType.INCOME, notes = ""),
                     accountName = "Test", categoryName = "Test", categoryIconKey = "Test", categoryColorKey = "Test", tagNames = "", images = emptyList()
                 )
 
@@ -75,12 +76,12 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
         runTest {
             val expenseTxn =
                 TransactionDetails(
-                    transaction = Transaction(id = 1, description = "Expense", amount = 1000.0, date = 0L, accountId = 1, categoryId = 1, transactionType = "expense", notes = ""),
+                    transaction = Transaction(id = 1, description = "Expense", amount = 1000.0, date = 0L, accountId = 1, categoryId = 1, transactionType = TransactionType.EXPENSE, notes = ""),
                     accountName = "Test", categoryName = "Test", categoryIconKey = "Test", categoryColorKey = "Test", tagNames = "", images = emptyList()
                 )
             val incomeTxn =
                 TransactionDetails(
-                    transaction = Transaction(id = 2, description = "Income", amount = 500.0, date = 0L, accountId = 1, categoryId = 1, transactionType = "income", notes = ""),
+                    transaction = Transaction(id = 2, description = "Income", amount = 500.0, date = 0L, accountId = 1, categoryId = 1, transactionType = TransactionType.INCOME, notes = ""),
                     accountName = "Test", categoryName = "Test", categoryIconKey = "Test", categoryColorKey = "Test", tagNames = "", images = emptyList()
                 )
 
@@ -112,7 +113,7 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
             val candidates =
                 listOf(
                     TransactionDetails(
-                        transaction = Transaction(id = 2, description = "Income", amount = 500.0, date = 0L, accountId = 1, categoryId = 1, transactionType = "income", notes = ""),
+                        transaction = Transaction(id = 2, description = "Income", amount = 500.0, date = 0L, accountId = 1, categoryId = 1, transactionType = TransactionType.INCOME, notes = ""),
                         accountName = "Test", categoryName = "Test", categoryIconKey = "Test", categoryColorKey = "Test", tagNames = "", images = emptyList()
                     )
                 )
@@ -173,7 +174,7 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
                     date = 0L,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     notes = "",
                     parentReimbursementId = parentExpenseId,
                 )
@@ -188,7 +189,7 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
                             date = 0L,
                             accountId = 1,
                             categoryId = 1,
-                            transactionType = "expense",
+                            transactionType = TransactionType.EXPENSE,
                             notes = "",
                         ),
                     accountName = "HDFC Savings",
@@ -236,7 +237,7 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
                     date = 0L,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     notes = "",
                     parentReimbursementId = null,
                 )

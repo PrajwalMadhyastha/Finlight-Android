@@ -96,13 +96,13 @@ class AnalysisViewModelTest : BaseViewModelTest() {
 
         // --- NEW: Add generic mocks for INCOME and ALL transaction types ---
         `when`(
-            transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), any(), any(), any(), any(), anyBoolean(), eq("income")),
+            transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), any(), any(), any(), any(), anyBoolean(), eq(TransactionType.INCOME)),
         ).thenReturn(flowOf(emptyList()))
         `when`(
             transactionDao.getSpendingAnalysisByCategory(anyLong(), anyLong(), any(), any(), any(), any(), anyBoolean(), isNull()),
         ).thenReturn(flowOf(emptyList()))
         `when`(
-            transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), any(), any(), any(), any(), anyBoolean(), eq("income")),
+            transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), any(), any(), any(), any(), anyBoolean(), eq(TransactionType.INCOME)),
         ).thenReturn(flowOf(emptyList()))
         `when`(
             transactionDao.getSpendingAnalysisByTag(anyLong(), anyLong(), any(), any(), any(), any(), anyBoolean(), isNull()),
@@ -711,7 +711,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
                     isNull(),
                     isNull(),
                     eq(false),
-                    eq("income"),
+                    eq(TransactionType.INCOME),
                 ),
             ).thenReturn(flowOf(incomeItems))
 
@@ -729,7 +729,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             }
             verify(
                 transactionDao,
-            ).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(false), eq("income"))
+            ).getSpendingAnalysisByCategory(anyLong(), anyLong(), isNull(), isNull(), isNull(), isNull(), eq(false), eq(TransactionType.INCOME))
         }
 
     @Test

@@ -24,6 +24,7 @@ import io.pm.finlight.MainApplication
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionType
 import io.pm.finlight.RecurringTransaction
 import io.pm.finlight.RecurringPattern
 import io.pm.finlight.TransactionDetails
@@ -130,7 +131,7 @@ class NotificationHelperTest : BaseViewModelTest() {
         val transactionId = 123
         val details =
             TransactionDetails(
-                transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
+                transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = TransactionType.EXPENSE, date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
                 images = emptyList(),
                 accountName = "Test Account",
                 categoryName = "Food",
@@ -337,7 +338,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                 id = 101,
                 description = "Uber Ride",
                 amount = 150.0,
-                transactionType = "expense",
+                transactionType = TransactionType.EXPENSE,
                 date = System.currentTimeMillis(),
                 accountId = 1,
                 categoryId = 1,
@@ -370,7 +371,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                 id = 202,
                 description = "Salary",
                 amount = 50000.0,
-                transactionType = "income",
+                transactionType = TransactionType.INCOME,
                 date = System.currentTimeMillis(),
                 accountId = 1,
                 categoryId = 1,
@@ -416,7 +417,7 @@ class NotificationHelperTest : BaseViewModelTest() {
         val transactionId = 123
         val baseDetails =
             TransactionDetails(
-                transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
+                transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = TransactionType.EXPENSE, date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
                 images = emptyList(),
                 accountName = "Test Account",
                 categoryName = "Food",
@@ -460,7 +461,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                         id = transactionId,
                         description = "Salary",
                         amount = 50000.0,
-                        transactionType = "income",
+                        transactionType = TransactionType.INCOME,
                         date = 0L,
                         accountId = 1,
                         categoryId = 1,
@@ -494,7 +495,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                         id = transactionId,
                         description = "Test Coffee",
                         amount = 4.56,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         date = 0L,
                         accountId = 1,
                         categoryId = 1,
@@ -563,7 +564,7 @@ class NotificationHelperTest : BaseViewModelTest() {
         val transactionId = 123
         val details =
             TransactionDetails(
-                transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
+                transaction = Transaction(id = transactionId, description = "Test Coffee", amount = 4.56, transactionType = TransactionType.EXPENSE, date = 0L, accountId = 1, categoryId = 1, notes = null, originalDescription = "Test Coffee"),
                 images = emptyList(),
                 accountName = "Test Account",
                 categoryName = "Food",
@@ -592,7 +593,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                         id = transactionId,
                         description = "Misc",
                         amount = 1.0,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         date = 0L,
                         accountId = 1,
                         categoryId = 1,
@@ -625,7 +626,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                         id = transactionId,
                         description = "Misc",
                         amount = 1.0,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         date = 0L,
                         accountId = 1,
                         categoryId = 1,
@@ -690,7 +691,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                             id = transactionId,
                             description = "Icon Test",
                             amount = 1.0,
-                            transactionType = "expense",
+                            transactionType = TransactionType.EXPENSE,
                             date = 0L,
                             accountId = 1,
                             categoryId = 1,
@@ -719,7 +720,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                 id = 505,
                 description = "Old SDK Test",
                 amount = 10.0,
-                transactionType = "expense",
+                transactionType = TransactionType.EXPENSE,
                 date = System.currentTimeMillis(),
                 accountId = 1,
                 categoryId = 1,
@@ -810,7 +811,7 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showSuspiciousAmountNotification_buildsCorrectly`() {
         // Arrange
-        val transaction = Transaction(id = 305, description = "Unknown Merchant", amount = 50000.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null)
+        val transaction = Transaction(id = 305, description = "Unknown Merchant", amount = 50000.0, transactionType = TransactionType.EXPENSE, date = 0L, accountId = 1, categoryId = 1, notes = null)
         val expectedUri = "app://finlight.pm.io/transaction_detail/305"
         val reason = "Amount is unusually high"
 
@@ -832,7 +833,7 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showSuspiciousAmountNotification_whenPermissionDenied_doesNotPost`() {
         shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
-        val transaction = Transaction(id = 306, description = "Test", amount = 100.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null)
+        val transaction = Transaction(id = 306, description = "Test", amount = 100.0, transactionType = TransactionType.EXPENSE, date = 0L, accountId = 1, categoryId = 1, notes = null)
         NotificationHelper.showSuspiciousAmountNotification(context, transaction, "reason")
         val notification = shadowNotificationManager.getNotification(306)
         assertTrue(notification == null)
@@ -944,6 +945,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                 id = 42,
                 description = "Swiggy",
                 amount = 250.0,
+                transactionType = TransactionType.EXPENSE,
                 date = 0L,
                 accountId = 1,
                 categoryId = null,
@@ -971,6 +973,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                 id = 43,
                 description = "Test",
                 amount = 100.0,
+                transactionType = TransactionType.EXPENSE,
                 date = 0L,
                 accountId = 1,
                 categoryId = null,
@@ -994,11 +997,11 @@ class NotificationHelperTest : BaseViewModelTest() {
                 id = 55,
                 description = "Amazon",
                 amount = 999.0,
+                transactionType = TransactionType.EXPENSE,
                 date = 0L,
                 accountId = 1,
                 categoryId = null,
                 notes = null,
-                transactionType = "expense",
             )
 
         // Act
@@ -1022,6 +1025,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                 id = 56,
                 description = "Zomato",
                 amount = 300.0,
+                transactionType = TransactionType.EXPENSE,
                 date = 0L,
                 accountId = 1,
                 categoryId = null,
@@ -1038,8 +1042,8 @@ class NotificationHelperTest : BaseViewModelTest() {
     // --- NEW: Smart Transaction Merge Notification Tests ---
     @Test
     fun `showMergeTransactionNotification_buildsCorrectly`() {
-        val childTxn = Transaction(id = 10, description = "Amazon", amount = 50.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null)
-        val parentTxn = Transaction(id = 9, description = "Amazon", amount = 100.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null)
+        val childTxn = Transaction(id = 10, description = "Amazon", amount = 50.0, transactionType = TransactionType.EXPENSE, date = 0L, accountId = 1, categoryId = 1, notes = null)
+        val parentTxn = Transaction(id = 9, description = "Amazon", amount = 100.0, transactionType = TransactionType.EXPENSE, date = 0L, accountId = 1, categoryId = 1, notes = null)
 
         NotificationHelper.showMergeTransactionNotification(context, childTxn, parentTxn)
 

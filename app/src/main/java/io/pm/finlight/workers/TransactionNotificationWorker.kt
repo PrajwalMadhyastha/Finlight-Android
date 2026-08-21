@@ -59,11 +59,11 @@ class TransactionNotificationWorker(
                         add(Calendar.DAY_OF_MONTH, -1)
                     }.timeInMillis
                 val summary = transactionDao.getFinancialSummaryForRange(monthStart, monthEnd)
-                val monthlyTotal = if (details.transaction.transactionType == "income") summary?.totalIncome else summary?.totalExpenses
+                val monthlyTotal = if (details.transaction.transactionType == TransactionType.INCOME) summary?.totalIncome else summary?.totalExpenses
 
                 // 3. Get visit count
                 val visitCount =
-                    if (details.transaction.transactionType != "income") {
+                    if (details.transaction.transactionType != TransactionType.INCOME) {
                         transactionDao.getTransactionCountForMerchantSuspend(
                             details.transaction.description,
                         )

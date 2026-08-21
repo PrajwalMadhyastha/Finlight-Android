@@ -838,7 +838,7 @@ class SettingsViewModel(
             date = date,
             description = description,
             amount = amount,
-            transactionType = type,
+            transactionType = TransactionType.fromString(type),
             categoryId = category?.id,
             accountId = account.id,
             notes = notes,

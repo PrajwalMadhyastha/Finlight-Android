@@ -105,7 +105,7 @@ class TransactionRepository(
         keyword: String?,
         accountId: Int?,
         categoryId: Int?,
-        transactionType: String?,
+        transactionType: TransactionType?,
     ): Flow<List<MerchantSpendingSummary>> {
         return transactionDao.getSpendingByMerchantForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
     }
@@ -169,7 +169,7 @@ class TransactionRepository(
     // --- NEW: Function to update transaction type ---
     suspend fun updateTransactionType(
         id: Int,
-        transactionType: String,
+        transactionType: TransactionType,
     ) {
         transactionDao.updateTransactionType(id, transactionType)
     }
@@ -227,7 +227,7 @@ class TransactionRepository(
         keyword: String?,
         accountId: Int?,
         categoryId: Int?,
-        transactionType: String?,
+        transactionType: TransactionType?,
     ): Flow<List<CategorySpending>> {
         return transactionDao.getSpendingByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
     }
@@ -573,7 +573,7 @@ class TransactionRepository(
     suspend fun findRecentTransactionForMerge(
         merchant: String,
         accountId: Int,
-        transactionType: String,
+        transactionType: TransactionType,
         timeWindowStart: Long,
         newTxnId: Int
     ): Transaction? {
@@ -692,7 +692,7 @@ class TransactionRepository(
             childDate = childTxn.date,
             childAccountId = childTxn.accountId,
             childCategoryId = childTxn.categoryId,
-            childTransactionType = childTxn.transactionType,
+            childTransactionType = childTxn.transactionType.name.lowercase(),
             childSource = childTxn.source,
             childNotes = childTxn.notes,
             childSourceSmsId = childTxn.sourceSmsId,
@@ -740,7 +740,7 @@ class TransactionRepository(
 
             // ── Compute net amount using signed arithmetic ─────────────────
             fun signedAmount(txn: Transaction): Double =
-                if (txn.transactionType == "income") txn.amount else -txn.amount
+                if (txn.transactionType == TransactionType.INCOME) txn.amount else -txn.amount
 
             val anchorSigned = signedAmount(anchorTxn)
             val netSigned = anchorSigned + childTxns.sumOf { signedAmount(it) }
@@ -748,14 +748,14 @@ class TransactionRepository(
 
             val finalType =
                 if (hasReimbursements) {
-                    "expense"
+                    TransactionType.EXPENSE
                 } else if (netSigned >= 0.0) {
-                    "income"
+                    TransactionType.INCOME
                 } else {
-                    "expense"
+                    TransactionType.EXPENSE
                 }
 
-            val finalAmount = if (finalType == "expense") -netSigned else netSigned
+            val finalAmount = if (finalType == TransactionType.EXPENSE) -netSigned else netSigned
 
             // ── Compute most-recent date ──────────────────────────────────
             val finalDate = (childTxns.map { it.date } + anchorTxn.date).max()
@@ -779,7 +779,7 @@ class TransactionRepository(
             var notes = anchorTxn.notes ?: ""
             for (childTxn in childTxns) {
                 val dateStr = sdf.format(java.util.Date(childTxn.date))
-                val sign = if (childTxn.transactionType == "income") "+" else "-"
+                val sign = if (childTxn.transactionType == TransactionType.INCOME) "+" else "-"
                 var childNote = "[Merged] ${childTxn.description} ($sign₹${"%.2f".format(childTxn.amount)}) · $dateStr"
                 if (!childTxn.notes.isNullOrBlank()) {
                     childNote += "\n\n${childTxn.notes}"
@@ -826,7 +826,7 @@ class TransactionRepository(
             date = r.childDate,
             accountId = r.childAccountId,
             categoryId = r.childCategoryId,
-            transactionType = r.childTransactionType,
+            transactionType = TransactionType.fromString(r.childTransactionType),
             source = r.childSource,
             notes = r.childNotes,
             sourceSmsId = r.childSourceSmsId,
@@ -870,20 +870,20 @@ class TransactionRepository(
         val entries = mutableListOf<MergedTransactionItem>()
 
         fun signedAmount(
-            type: String,
+            type: TransactionType,
             amount: Double,
         ): Double =
-            if (type == "income") amount else -amount
+            if (type == TransactionType.INCOME) amount else -amount
 
         val currentSigned = signedAmount(anchorTxn.transactionType, anchorTxn.amount)
-        val childrenSigned = records.sumOf { signedAmount(it.childTransactionType, it.childAmount) }
+        val childrenSigned = records.sumOf { signedAmount(TransactionType.fromString(it.childTransactionType), it.childAmount) }
         val anchorSigned = currentSigned - childrenSigned
 
         val anchorOriginalType =
             if (anchorSigned > 0.0) {
-                "income"
+                TransactionType.INCOME
             } else if (anchorSigned < 0.0) {
-                "expense"
+                TransactionType.EXPENSE
             } else {
                 anchorTxn.transactionType
             }
@@ -898,7 +898,7 @@ class TransactionRepository(
                 accountId = anchorTxn.accountId,
                 accountName = anchorAccount?.name ?: "Unknown",
                 amount = anchorOriginalAmount,
-                transactionType = anchorOriginalType,
+                transactionType = anchorOriginalType.name.lowercase(),
                 isAnchor = true,
                 description = anchorTxn.description,
                 date = firstRecord.originalParentDate,
@@ -951,30 +951,30 @@ class TransactionRepository(
                 val currentParent = transactionDao.getTransactionByIdSync(parentTxnId) ?: return@withTransaction
 
                 fun signedAmount(
-                    type: String,
+                    type: TransactionType,
                     amount: Double
                 ): Double =
-                    if (type == "income") amount else -amount
+                    if (type == TransactionType.INCOME) amount else -amount
 
                 val currentSigned = signedAmount(currentParent.transactionType, currentParent.amount)
-                val childrenSigned = allRecords.sumOf { signedAmount(it.childTransactionType, it.childAmount) }
+                val childrenSigned = allRecords.sumOf { signedAmount(TransactionType.fromString(it.childTransactionType), it.childAmount) }
                 val newSigned = currentSigned - childrenSigned
                 val hasReimbursements = transactionDao.getReimbursementsCountSync(parentTxnId) > 0
 
                 val finalType =
                     if (hasReimbursements) {
-                        "expense"
+                        TransactionType.EXPENSE
                     } else if (newSigned > 0.0) {
-                        "income"
+                        TransactionType.INCOME
                     } else if (newSigned < 0.0) {
-                        "expense"
+                        TransactionType.EXPENSE
                     } else {
                         currentParent.transactionType
                     }
 
                 // If finalType is "expense", the signed amount is negative, so we negate it to get the mathematical amount.
                 // This preserves any negative balance if the transaction was over-repaid.
-                val finalAmount = if (finalType == "expense") -newSigned else newSigned
+                val finalAmount = if (finalType == TransactionType.EXPENSE) -newSigned else newSigned
 
                 // Restore parent to its pre-merge state (all records share the same parent snapshot)
                 val first = allRecords.first()

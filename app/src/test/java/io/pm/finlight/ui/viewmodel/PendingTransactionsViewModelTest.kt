@@ -10,6 +10,8 @@ import io.mockk.unmockkAll
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.PendingTransactionsViewModel
 import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionType
+import io.pm.finlight.TransactionStatus
 import io.pm.finlight.RecurringTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.RecurringTransactionDao
@@ -56,7 +58,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
     fun `pendingTransactions emits from dao`() =
         runTest {
             // Arrange
-            val pendingTxn = Transaction(id = 1, description = "Test", amount = 100.0, transactionType = "expense", date = 0L, accountId = 1, categoryId = 1, notes = null, status = "PENDING")
+            val pendingTxn = Transaction(id = 1, description = "Test", amount = 100.0, transactionType = TransactionType.EXPENSE, date = 0L, accountId = 1, categoryId = 1, notes = null, status = TransactionStatus.PENDING)
             val flow = MutableStateFlow(listOf(pendingTxn))
             every { transactionDao.getPendingTransactions() } returns flow
 

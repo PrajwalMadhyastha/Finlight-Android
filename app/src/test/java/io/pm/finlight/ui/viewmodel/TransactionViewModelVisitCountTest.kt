@@ -2,6 +2,7 @@ package io.pm.finlight.ui.viewmodel
 
 import app.cash.turbine.test
 import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionType
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -46,7 +47,7 @@ class TransactionViewModelVisitCountTest : TransactionViewModelBaseSetup() {
                     date = 0L,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 )
 
@@ -94,7 +95,7 @@ class TransactionViewModelVisitCountTest : TransactionViewModelBaseSetup() {
                     date = 0L,
                     accountId = 1,
                     categoryId = 2,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 )
 
@@ -143,7 +144,7 @@ class TransactionViewModelVisitCountTest : TransactionViewModelBaseSetup() {
                     date = 0L,
                     accountId = 2,
                     categoryId = null,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     notes = null,
                     parentReimbursementId = null,
                 )
@@ -193,7 +194,7 @@ class TransactionViewModelVisitCountTest : TransactionViewModelBaseSetup() {
                     date = 0L,
                     accountId = 1,
                     categoryId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 )
 
