@@ -52,6 +52,7 @@ class SearchViewModel(
     private val initialDateMillis: Long?,
     private val initialQuery: String?,
 ) : ViewModel() {
+    @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
         transactionDao: TransactionDao,
         accountDao: AccountDao,

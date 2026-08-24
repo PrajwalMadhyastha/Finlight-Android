@@ -41,6 +41,7 @@ class TransactionRepository(
     private val mergeRecordDao: MergeRecordDao,
     private val db: AppDatabase,
 ) {
+    @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
         transactionDao: TransactionDao,
         settingsRepository: SettingsRepository,

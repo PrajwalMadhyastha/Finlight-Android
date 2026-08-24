@@ -43,6 +43,7 @@ class TimePeriodReportViewModel(
     initialDateMillis: Long?,
     showPreviousMonth: Boolean,
 ) : ViewModel() {
+    @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
         transactionDao: TransactionDao,
         transactionRepository: TransactionRepository,

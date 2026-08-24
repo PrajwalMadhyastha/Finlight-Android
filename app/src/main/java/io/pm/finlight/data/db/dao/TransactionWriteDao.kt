@@ -11,7 +11,6 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
-import io.pm.finlight.Tag
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionImage
 import io.pm.finlight.TransactionTagCrossRef
@@ -129,74 +128,6 @@ interface TransactionWriteDao {
 
     @Query("DELETE FROM transaction_tag_cross_ref")
     suspend fun deleteAllCrossRefs()
-
-    suspend fun updateTagsForTransaction(
-        transactionId: Int,
-        tags: Set<Tag>,
-    ) {
-        clearTagsForTransaction(transactionId)
-        if (tags.isNotEmpty()) {
-            val crossRefs =
-                tags.map { tag ->
-                    TransactionTagCrossRef(transactionId = transactionId, tagId = tag.id)
-                }
-            addTagsToTransaction(crossRefs)
-        }
-    }
-
-    suspend fun insertTransactionWithTags(
-        transaction: Transaction,
-        tags: Set<Tag>,
-    ): Long {
-        val transactionId = insert(transaction)
-        if (tags.isNotEmpty()) {
-            val crossRefs =
-                tags.map { tag ->
-                    TransactionTagCrossRef(transactionId = transactionId.toInt(), tagId = tag.id)
-                }
-            addTagsToTransaction(crossRefs)
-        }
-        return transactionId
-    }
-
-    suspend fun updateTransactionWithTags(
-        transaction: Transaction,
-        tags: Set<Tag>,
-    ) {
-        update(transaction)
-        clearTagsForTransaction(transaction.id)
-        if (tags.isNotEmpty()) {
-            val crossRefs =
-                tags.map { tag ->
-                    TransactionTagCrossRef(transactionId = transaction.id, tagId = tag.id)
-                }
-            addTagsToTransaction(crossRefs)
-        }
-    }
-
-    suspend fun insertTransactionWithTagsAndImages(
-        transaction: Transaction,
-        tags: Set<Tag>,
-        imagePaths: List<String>,
-    ): Long {
-        val newTransactionId = insert(transaction)
-        if (tags.isNotEmpty()) {
-            val crossRefs =
-                tags.map { tag ->
-                    TransactionTagCrossRef(transactionId = newTransactionId.toInt(), tagId = tag.id)
-                }
-            addTagsToTransaction(crossRefs)
-        }
-        imagePaths.forEach { path ->
-            val imageEntity =
-                TransactionImage(
-                    transactionId = newTransactionId.toInt(),
-                    imageUri = path,
-                )
-            insertImage(imageEntity)
-        }
-        return newTransactionId
-    }
 
     @Query("UPDATE transactions SET sourceSmsHash = :smsHash WHERE id = :transactionId")
     suspend fun setSmsHash(

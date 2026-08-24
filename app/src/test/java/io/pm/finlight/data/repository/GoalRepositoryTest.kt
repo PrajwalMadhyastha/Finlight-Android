@@ -7,9 +7,9 @@ import io.pm.finlight.Goal
 import io.pm.finlight.GoalDao
 import io.pm.finlight.GoalRepository
 import io.pm.finlight.TestApplication
-import io.pm.finlight.TransactionDao
 import io.pm.finlight.data.db.dao.GoalTransactionLinkDao
 import io.pm.finlight.data.db.dao.GoalContributionDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.db.entity.GoalContribution
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -33,7 +33,7 @@ class GoalRepositoryTest : BaseViewModelTest() {
     private lateinit var linkDao: GoalTransactionLinkDao
 
     @Mock
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
 
     @Mock
     private lateinit var contributionDao: GoalContributionDao
@@ -43,7 +43,7 @@ class GoalRepositoryTest : BaseViewModelTest() {
     @Before
     override fun setup() {
         super.setup()
-        repository = GoalRepository(goalDao, linkDao, transactionDao, contributionDao)
+        repository = GoalRepository(goalDao, linkDao, transactionQueryDao, contributionDao)
     }
 
     @Test
@@ -113,7 +113,7 @@ class GoalRepositoryTest : BaseViewModelTest() {
     @Test
     fun `getRecentTransactions calls TransactionDao`() {
         repository.getRecentTransactions(0L, 100L)
-        verify(transactionDao).getAllTransactionsForRange(0L, 100L)
+        verify(transactionQueryDao).getAllTransactionsForRange(0L, 100L)
     }
 
     @Test

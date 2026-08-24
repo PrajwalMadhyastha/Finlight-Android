@@ -15,6 +15,7 @@ import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -94,5 +95,18 @@ class TransactionReimbursementDaoTest {
             reimbursementDao.unlinkReimbursement(incomeId = incomeId)
             val unlinkedAfter = reimbursementDao.getLinkedExpenseForReimbursement(incomeId).first()
             assertNull(unlinkedAfter)
+        }
+
+    @Test
+    fun testReimbursementsWhenNoneExist() =
+        runTest {
+            val reimbursements = reimbursementDao.getReimbursementsForExpense(999).first()
+            assertTrue(reimbursements.isEmpty())
+
+            val count = reimbursementDao.getReimbursementsCountSync(999)
+            assertEquals(0, count)
+
+            val linked = reimbursementDao.getLinkedExpenseForReimbursement(999).first()
+            assertNull(linked)
         }
 }

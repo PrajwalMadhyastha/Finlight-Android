@@ -3,6 +3,7 @@ package io.pm.finlight.data.repository
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.*
+import io.pm.finlight.data.db.dao.TransactionQueryDao
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -24,14 +25,14 @@ class TagRepositoryTest : BaseViewModelTest() {
     private lateinit var tagDao: TagDao
 
     @Mock
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
 
     private lateinit var repository: TagRepository
 
     @Before
     override fun setup() {
         super.setup()
-        repository = TagRepository(tagDao, transactionDao)
+        repository = TagRepository(tagDao, transactionQueryDao)
     }
 
     @Test
@@ -67,7 +68,7 @@ class TagRepositoryTest : BaseViewModelTest() {
     @Test
     fun `isTagInUse returns true when count is greater than zero`() =
         runTest {
-            `when`(transactionDao.countTransactionsForTag(1)).thenReturn(5)
+            `when`(transactionQueryDao.countTransactionsForTag(1)).thenReturn(5)
             val result = repository.isTagInUse(1)
             assertTrue(result)
         }
@@ -75,7 +76,7 @@ class TagRepositoryTest : BaseViewModelTest() {
     @Test
     fun `isTagInUse returns false when count is zero`() =
         runTest {
-            `when`(transactionDao.countTransactionsForTag(1)).thenReturn(0)
+            `when`(transactionQueryDao.countTransactionsForTag(1)).thenReturn(0)
             val result = repository.isTagInUse(1)
             assertFalse(result)
         }

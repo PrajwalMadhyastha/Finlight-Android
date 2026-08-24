@@ -21,6 +21,7 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -39,7 +40,7 @@ import java.util.Calendar
 class WeeklySummaryWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
 
     @Before
     override fun setup() {
@@ -48,16 +49,12 @@ class WeeklySummaryWorkerTest : BaseViewModelTest() {
 
         // Create mocks with MockK
         db = mockk()
-        transactionDao = mockk()
+        transactionAnalyticsDao = mockk()
 
         // Mock the static AppDatabase to return our mock db instance
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionDao() } returns transactionDao
-        every { db.transactionQueryDao() } returns transactionDao
-        every { db.transactionWriteDao() } returns transactionDao
-        every { db.transactionAnalyticsDao() } returns transactionDao
-        every { db.transactionReimbursementDao() } returns transactionDao
+        every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
 
         // Initialize WorkManager for testing
         val config =
@@ -84,8 +81,8 @@ class WeeklySummaryWorkerTest : BaseViewModelTest() {
     fun `doWork calls DAO with correct date ranges`() =
         runTest {
             // Arrange
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns null
-            coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns null
+            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
             val worker = TestListenableWorkerBuilder<WeeklySummaryWorker>(context).build()
 
@@ -130,9 +127,9 @@ class WeeklySummaryWorkerTest : BaseViewModelTest() {
             // Assert
             // Verify the DAO was called with the *exact* calculated timestamps
             coVerifyOrder {
-                transactionDao.getFinancialSummaryForRange(eq(thisWeekStart), eq(thisWeekEnd))
-                transactionDao.getFinancialSummaryForRange(eq(lastWeekStart), eq(lastWeekEnd))
-                transactionDao.getTopSpendingCategoriesForRange(eq(thisWeekStart), eq(thisWeekEnd))
+                transactionAnalyticsDao.getFinancialSummaryForRange(eq(thisWeekStart), eq(thisWeekEnd))
+                transactionAnalyticsDao.getFinancialSummaryForRange(eq(lastWeekStart), eq(lastWeekEnd))
+                transactionAnalyticsDao.getTopSpendingCategoriesForRange(eq(thisWeekStart), eq(thisWeekEnd))
             }
         }
 
@@ -144,8 +141,8 @@ class WeeklySummaryWorkerTest : BaseViewModelTest() {
             val lastWeekSummary = FinancialSummary(0.0, 200.0)
             val topCategories = listOf(CategorySpending("Travel", 150.0, "blue", "icon"))
 
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns thisWeekSummary andThen lastWeekSummary
-            coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns topCategories
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns thisWeekSummary andThen lastWeekSummary
+            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns topCategories
 
             val worker = TestListenableWorkerBuilder<WeeklySummaryWorker>(context).build()
 
@@ -177,7 +174,7 @@ class WeeklySummaryWorkerTest : BaseViewModelTest() {
     fun `doWork returns retry on failure`() =
         runTest {
             // Arrange
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB Error")
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB Error")
 
             val worker = TestListenableWorkerBuilder<WeeklySummaryWorker>(context).build()
 

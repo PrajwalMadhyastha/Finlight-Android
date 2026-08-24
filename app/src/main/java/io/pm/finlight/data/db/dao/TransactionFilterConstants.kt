@@ -2,6 +2,11 @@
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/TransactionFilterConstants.kt
 // REASON: REFACTOR (Domain DAO Decomposition - Issue #237) - Extracted shared
 // SQL filter constants used across Transaction domain DAOs.
+//
+// NOTE: These constants interpolate TransactionStatus and TransactionType DB
+// string values at classload time. If database string representations of
+// TransactionStatus or TransactionType change, these SQL constants must be
+// reviewed and regression-tested.
 // =================================================================================
 package io.pm.finlight.data.db.dao
 

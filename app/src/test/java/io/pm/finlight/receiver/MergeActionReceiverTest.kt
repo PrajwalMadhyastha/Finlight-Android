@@ -16,7 +16,10 @@ import io.mockk.verify
 import androidx.core.app.NotificationManagerCompat
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.TransactionDao
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.data.db.dao.TransactionReimbursementDao
+import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionType
 import io.pm.finlight.SmsRepository
@@ -34,7 +37,10 @@ import org.robolectric.annotation.Config
 class MergeActionReceiverTest {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionWriteDao: TransactionWriteDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
+    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+    private lateinit var transactionReimbursementDao: TransactionReimbursementDao
     private lateinit var transactionRepository: TransactionRepository
     private lateinit var receiver: MergeActionReceiver
     private lateinit var mockNotificationManager: NotificationManagerCompat
@@ -43,16 +49,18 @@ class MergeActionReceiverTest {
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
         db = mockk<AppDatabase>(relaxed = true)
-        transactionDao = mockk<TransactionDao>(relaxed = true)
+        transactionWriteDao = mockk<TransactionWriteDao>(relaxed = true)
+        transactionQueryDao = mockk<TransactionQueryDao>(relaxed = true)
+        transactionAnalyticsDao = mockk<TransactionAnalyticsDao>(relaxed = true)
+        transactionReimbursementDao = mockk<TransactionReimbursementDao>(relaxed = true)
         transactionRepository = mockk<TransactionRepository>(relaxed = true)
 
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionDao() } returns transactionDao
-        every { db.transactionQueryDao() } returns transactionDao
-        every { db.transactionWriteDao() } returns transactionDao
-        every { db.transactionAnalyticsDao() } returns transactionDao
-        every { db.transactionReimbursementDao() } returns transactionDao
+        every { db.transactionQueryDao() } returns transactionQueryDao
+        every { db.transactionWriteDao() } returns transactionWriteDao
+        every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
+        every { db.transactionReimbursementDao() } returns transactionReimbursementDao
         // Normally we'd use koin, but we inject or mockk constructor if needed
         // For receiver which instantiates repository, we need to mockkConstructor
         io.mockk.mockkConstructor(TransactionRepository::class)

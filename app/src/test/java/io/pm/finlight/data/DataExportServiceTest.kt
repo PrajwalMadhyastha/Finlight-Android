@@ -40,7 +40,10 @@ class DataExportServiceTest : BaseViewModelTest() {
     private lateinit var db: AppDatabase
 
     // Mock all DAOs
-    private val transactionDao: TransactionDao = mockk(relaxed = true)
+    private val transactionQueryDao: TransactionQueryDao = mockk(relaxed = true)
+    private val transactionWriteDao: TransactionWriteDao = mockk(relaxed = true)
+    private val transactionAnalyticsDao: TransactionAnalyticsDao = mockk(relaxed = true)
+    private val transactionReimbursementDao: TransactionReimbursementDao = mockk(relaxed = true)
     private val accountDao: AccountDao = mockk(relaxed = true)
     private val categoryDao: CategoryDao = mockk(relaxed = true)
     private val budgetDao: BudgetDao = mockk(relaxed = true)
@@ -69,11 +72,10 @@ class DataExportServiceTest : BaseViewModelTest() {
         every { AppDatabase.getInstance(any()) } returns db
 
         // Link the DAOs to the mocked db instance
-        every { db.transactionDao() } returns transactionDao
-        every { db.transactionQueryDao() } returns transactionDao
-        every { db.transactionWriteDao() } returns transactionDao
-        every { db.transactionAnalyticsDao() } returns transactionDao
-        every { db.transactionReimbursementDao() } returns transactionDao
+        every { db.transactionQueryDao() } returns transactionQueryDao
+        every { db.transactionWriteDao() } returns transactionWriteDao
+        every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
+        every { db.transactionReimbursementDao() } returns transactionReimbursementDao
         every { db.accountDao() } returns accountDao
         every { db.categoryDao() } returns categoryDao
         every { db.budgetDao() } returns budgetDao
@@ -101,7 +103,7 @@ class DataExportServiceTest : BaseViewModelTest() {
     private fun setupMockData() {
         // Setup DAOs to return some mock data
         coEvery {
-            transactionDao.getAllTransactionsSimple()
+            transactionQueryDao.getAllTransactionsSimple()
         } returns flowOf(listOf(Transaction(id = 1, description = "Test Tx", amount = 100.0, date = 1L, accountId = 1, categoryId = 1, notes = null)))
         coEvery { accountDao.getAllAccounts() } returns flowOf(listOf(Account(id = 1, name = "Test Acc", type = "Bank")))
         coEvery { categoryDao.getAllCategories() } returns flowOf(listOf(Category(id = 1, name = "Test Cat", iconKey = "icon", colorKey = "color")))
@@ -124,7 +126,7 @@ class DataExportServiceTest : BaseViewModelTest() {
             smsParseTemplateDao.getAllTemplates()
         } returns listOf(SmsParseTemplate(templateSignature = "sig", correctedMerchantName = "merchant", originalSmsBody = "body", originalMerchantStartIndex = 0, originalMerchantEndIndex = 1, originalAmountStartIndex = 2, originalAmountEndIndex = 3))
         coEvery { tagDao.getAllTagsList() } returns listOf(Tag(id = 1, name = "Test Tag"))
-        coEvery { transactionDao.getAllCrossRefs() } returns listOf(TransactionTagCrossRef(transactionId = 1, tagId = 1))
+        coEvery { transactionQueryDao.getAllCrossRefs() } returns listOf(TransactionTagCrossRef(transactionId = 1, tagId = 1))
         coEvery {
             goalDao.getAll()
         } returns listOf(Goal(id = 1, name = "Test Goal", targetAmount = 1000.0, savedAmount = 100.0, targetDate = null, accountId = 1))
@@ -240,7 +242,7 @@ class DataExportServiceTest : BaseViewModelTest() {
 
             // 3. Mock the clear and insert calls (relaxed mocks will accept any args)
             coJustRun { splitTransactionDao.deleteAll() }
-            coJustRun { transactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
             coJustRun { tagDao.deleteAll() }
             coJustRun { accountDao.deleteAll() }
             coJustRun { categoryDao.deleteAll() }
@@ -263,8 +265,8 @@ class DataExportServiceTest : BaseViewModelTest() {
             coJustRun { accountDao.insertAll(any()) }
             coJustRun { categoryDao.insertAll(any()) }
             coJustRun { tagDao.insertAll(any()) }
-            coJustRun { transactionDao.insertAll(any()) }
-            coJustRun { transactionDao.addTagsToTransaction(any()) }
+            coJustRun { transactionWriteDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.addTagsToTransaction(any()) }
 
             // Act
             val success = DataExportService.restoreFromBackupSnapshot(context)
@@ -276,7 +278,7 @@ class DataExportServiceTest : BaseViewModelTest() {
             // Verify that the import logic was actually called
             coVerifyOrder {
                 splitTransactionDao.deleteAll()
-                transactionDao.deleteAll()
+                transactionWriteDao.deleteAll()
                 tagDao.deleteAll()
                 accountDao.deleteAll()
                 categoryDao.deleteAll()
@@ -297,8 +299,8 @@ class DataExportServiceTest : BaseViewModelTest() {
             coVerify { accountDao.insertAll(backupData.accounts) }
             coVerify { categoryDao.insertAll(backupData.categories) }
             coVerify { tagDao.insertAll(backupData.tags) }
-            coVerify { transactionDao.insertAll(backupData.transactions) }
-            coVerify { transactionDao.addTagsToTransaction(backupData.transactionTagCrossRefs) }
+            coVerify { transactionWriteDao.insertAll(backupData.transactions) }
+            coVerify { transactionWriteDao.addTagsToTransaction(backupData.transactionTagCrossRefs) }
         }
 
     @Test
@@ -336,7 +338,7 @@ class DataExportServiceTest : BaseViewModelTest() {
             }
 
             coJustRun { splitTransactionDao.deleteAll() }
-            coJustRun { transactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
             coJustRun { tagDao.deleteAll() }
             coJustRun { accountDao.deleteAll() }
             coJustRun { categoryDao.deleteAll() }
@@ -417,8 +419,8 @@ class DataExportServiceTest : BaseViewModelTest() {
                 )
             val tags = listOf(Tag(id = tagId, name = "Work"))
 
-            coEvery { transactionDao.getAllTransactions() } returns flowOf(listOf(details))
-            coEvery { transactionDao.getTagsForTransactionSimple(txId) } returns tags
+            coEvery { transactionQueryDao.getAllTransactions() } returns flowOf(listOf(details))
+            coEvery { transactionQueryDao.getTagsForTransactionSimple(txId) } returns tags
             // No need to mock splitTransactionDao as isSplit is false
 
             // Act
@@ -494,8 +496,8 @@ class DataExportServiceTest : BaseViewModelTest() {
                 )
 
             // 4. Mock DAO calls
-            coEvery { transactionDao.getAllTransactions() } returns flowOf(listOf(parentDetails))
-            coEvery { transactionDao.getTagsForTransactionSimple(parentTxId) } returns tags
+            coEvery { transactionQueryDao.getAllTransactions() } returns flowOf(listOf(parentDetails))
+            coEvery { transactionQueryDao.getTagsForTransactionSimple(parentTxId) } returns tags
             coEvery { splitTransactionDao.getSplitsForParentSimple(parentTxId) } returns splitDetails
 
             // Act

@@ -256,12 +256,6 @@ interface TransactionQueryDao {
     @Query("SELECT * FROM transaction_tag_cross_ref")
     suspend fun getAllCrossRefs(): List<TransactionTagCrossRef>
 
-    /**
-     * Retrieves all transactions synchronously, used for backup and integration testing.
-     */
-    @Query("SELECT * FROM transactions")
-    suspend fun getAllTransactionsSync(): List<Transaction>
-
     @Query(
         """
         SELECT * FROM transactions
@@ -289,15 +283,6 @@ interface TransactionQueryDao {
     """,
     )
     fun getTransactionCountForMerchant(description: String): Flow<Int>
-
-    @Query(
-        """
-        SELECT COUNT(*) FROM transactions
-        WHERE (LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description))
-        AND isExcluded = 0 AND $SQL_STATUS_ACTIVE
-    """,
-    )
-    suspend fun getTransactionCountForMerchantSuspend(description: String): Int
 
     @Query(
         """

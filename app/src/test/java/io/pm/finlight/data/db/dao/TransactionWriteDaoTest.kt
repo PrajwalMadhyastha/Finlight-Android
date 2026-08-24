@@ -255,4 +255,46 @@ class TransactionWriteDaoTest {
             val afterDelete = queryDao.getAllTransactionsSimple().first().size
             assertEquals(0, afterDelete)
         }
+
+    @Test
+    fun testUpdateNotesAndExclusionAndType() =
+        runTest {
+            val txn =
+                Transaction(
+                    description = "Test Txn",
+                    amount = 50.0,
+                    date = System.currentTimeMillis(),
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    source = "Manual"
+                )
+            val id = writeDao.insert(txn).toInt()
+
+            writeDao.updateNotes(id, "Updated note")
+            writeDao.updateExclusionStatus(id, true)
+            writeDao.updateTransactionType(id, TransactionType.INCOME)
+            writeDao.clearReviewFlag(id)
+
+            val updated = queryDao.getTransactionById(id).first()
+            assertNotNull(updated)
+            assertEquals("Updated note", updated.notes)
+            assertEquals(true, updated.isExcluded)
+            assertEquals(TransactionType.INCOME, updated.transactionType)
+            assertEquals(false, updated.needsReview)
+        }
+
+    @Test
+    fun testDeleteByIds() =
+        runTest {
+            val id1 = writeDao.insert(Transaction(description = "1", amount = 1.0, date = 1000L, transactionType = TransactionType.EXPENSE, accountId = 1, categoryId = 1, notes = null, source = "Manual")).toInt()
+            val id2 = writeDao.insert(Transaction(description = "2", amount = 2.0, date = 2000L, transactionType = TransactionType.EXPENSE, accountId = 1, categoryId = 1, notes = null, source = "Manual")).toInt()
+            val id3 = writeDao.insert(Transaction(description = "3", amount = 3.0, date = 3000L, transactionType = TransactionType.EXPENSE, accountId = 1, categoryId = 1, notes = null, source = "Manual")).toInt()
+
+            writeDao.deleteByIds(listOf(id1, id3))
+            val remaining = queryDao.getAllTransactionsSimple().first()
+            assertEquals(1, remaining.size)
+            assertEquals(id2, remaining.first().id)
+        }
 }

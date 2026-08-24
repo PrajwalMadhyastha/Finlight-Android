@@ -133,9 +133,6 @@ class TransactionQueryDaoTest {
 
             val countFlow = queryDao.getTransactionCountForMerchant("Starbucks").first()
             assertEquals(2, countFlow)
-
-            val countSuspend = queryDao.getTransactionCountForMerchantSuspend("Starbucks")
-            assertEquals(2, countSuspend)
         }
 
     @Test

@@ -10,6 +10,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionWriteDao
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -29,7 +30,7 @@ import java.util.Calendar
 class GoalSurplusWorkerTest {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionWriteDao: TransactionWriteDao
     private lateinit var goalDao: GoalDao
 
     @Before
@@ -42,7 +43,7 @@ class GoalSurplusWorkerTest {
                 .allowMainThreadQueries()
                 .build()
 
-        transactionDao = db.transactionDao()
+        transactionWriteDao = db.transactionWriteDao()
         goalDao = db.goalDao()
 
         mockkObject(AppDatabase.Companion)
@@ -81,10 +82,10 @@ class GoalSurplusWorkerTest {
             calDate.add(Calendar.MONTH, -1)
             val txDate = calDate.timeInMillis
 
-            transactionDao.insert(
+            transactionWriteDao.insert(
                 Transaction(accountId = 1, categoryId = 1, amount = 5000.0, date = txDate, notes = "", description = "Salary", transactionType = TransactionType.INCOME)
             )
-            transactionDao.insert(
+            transactionWriteDao.insert(
                 Transaction(accountId = 1, categoryId = 2, amount = 2000.0, date = txDate, notes = "", description = "Food", transactionType = TransactionType.EXPENSE)
             )
 
@@ -152,7 +153,7 @@ class GoalSurplusWorkerTest {
             calDate.add(Calendar.MONTH, -1)
             val txDate = calDate.timeInMillis
 
-            transactionDao.insert(
+            transactionWriteDao.insert(
                 Transaction(accountId = 1, categoryId = 1, amount = 1500.0, date = txDate, notes = "", description = "Food", transactionType = TransactionType.EXPENSE)
             )
 
@@ -185,7 +186,7 @@ class GoalSurplusWorkerTest {
             calDate.add(Calendar.MONTH, -1)
             val txDate = calDate.timeInMillis
 
-            transactionDao.insert(
+            transactionWriteDao.insert(
                 Transaction(accountId = 1, categoryId = 1, amount = 5000.0, date = txDate, notes = "", description = "Salary", transactionType = TransactionType.INCOME)
             )
 

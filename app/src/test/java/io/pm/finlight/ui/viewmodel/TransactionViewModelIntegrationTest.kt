@@ -12,6 +12,7 @@ import io.pm.finlight.*
 import io.pm.finlight.core.*
 import io.pm.finlight.data.db.AppDatabase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -382,7 +383,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
             assertEquals("Anchor notes must be restored", "original-note", restoredAnchor.notes)
 
             // Assert: both children re-inserted with correct descriptions
-            val allTxns = db.transactionQueryDao().getAllTransactionsSync()
+            val allTxns = db.transactionQueryDao().getAllTransactionsSimple().first()
             val childDescs = allTxns.map { it.description }
             assertTrue("Child A must be re-inserted", childDescs.contains("Child A"))
             assertTrue("Child B must be re-inserted", childDescs.contains("Child B"))

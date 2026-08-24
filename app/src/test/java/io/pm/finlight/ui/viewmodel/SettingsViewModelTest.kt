@@ -83,7 +83,13 @@ class SettingsViewModelTest : BaseViewModelTest() {
     private lateinit var transactionRunner: TransactionRunner
 
     // Mocks for all DAOs called by DataExportService and ViewModel
-    @Mock private lateinit var transactionDao: TransactionDao
+    @Mock private lateinit var transactionQueryDao: TransactionQueryDao
+
+    @Mock private lateinit var transactionWriteDao: TransactionWriteDao
+
+    @Mock private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+
+    @Mock private lateinit var transactionReimbursementDao: TransactionReimbursementDao
 
     @Mock private lateinit var accountDao: AccountDao
 
@@ -157,11 +163,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
         coEvery { ReminderManager.cancelMonthlySummary(any()) } just runs
 
         // Stub the db mock to return all the mocked DAOs
-        `when`(db.transactionDao()).thenReturn(transactionDao)
-        `when`(db.transactionQueryDao()).thenReturn(transactionDao)
-        `when`(db.transactionWriteDao()).thenReturn(transactionDao)
-        `when`(db.transactionAnalyticsDao()).thenReturn(transactionDao)
-        `when`(db.transactionReimbursementDao()).thenReturn(transactionDao)
+        `when`(db.transactionQueryDao()).thenReturn(transactionQueryDao)
+        `when`(db.transactionWriteDao()).thenReturn(transactionWriteDao)
+        `when`(db.transactionAnalyticsDao()).thenReturn(transactionAnalyticsDao)
+        `when`(db.transactionReimbursementDao()).thenReturn(transactionReimbursementDao)
         `when`(db.accountDao()).thenReturn(accountDao)
         `when`(db.categoryDao()).thenReturn(categoryDao)
         `when`(db.budgetDao()).thenReturn(budgetDao)
@@ -197,7 +202,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         // REMOVED withTransaction mock to let it run naturally with the mocked executor.
 
         runTest {
-            `when`(transactionDao.getAllTransactionsSimple()).thenReturn(flowOf(emptyList()))
+            `when`(transactionQueryDao.getAllTransactionsSimple()).thenReturn(flowOf(emptyList()))
             `when`(accountDao.getAllAccounts()).thenReturn(flowOf(emptyList()))
             `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
             `when`(budgetDao.getAllBudgets()).thenReturn(flowOf(emptyList()))
@@ -209,7 +214,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(ignoreRuleDao.getAllList()).thenReturn(emptyList())
             `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
             `when`(tagDao.getAllTagsList()).thenReturn(emptyList())
-            `when`(transactionDao.getAllCrossRefs()).thenReturn(emptyList())
+            `when`(transactionQueryDao.getAllCrossRefs()).thenReturn(emptyList())
             `when`(goalDao.getAll()).thenReturn(emptyList())
             `when`(tripDao.getAll()).thenReturn(emptyList())
             `when`(accountAliasDao.getAll()).thenReturn(emptyList())
@@ -1340,7 +1345,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             // Arrange
             `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull()))
                 .thenReturn(listOf(SmsMessage(1, "BANK", "Test", 1L)))
-            `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
             `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))

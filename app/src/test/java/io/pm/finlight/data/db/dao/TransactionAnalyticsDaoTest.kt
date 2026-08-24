@@ -119,4 +119,93 @@ class TransactionAnalyticsDaoTest {
             assertEquals(1, details.size)
             assertEquals("Snack", details.first().transaction.description)
         }
+
+    @Test
+    fun testSpendingAnalysisEmptyRange() =
+        runTest {
+            val analysis =
+                analyticsDao.getSpendingAnalysisByCategory(
+                    startDate = 50000L,
+                    endDate = 60000L,
+                    filterTagId = null,
+                    filterMerchantName = null,
+                    filterCategoryId = null,
+                    searchQuery = null,
+                    includeExcluded = false,
+                    transactionType = TransactionType.EXPENSE,
+                ).first()
+
+            assertTrue(analysis.isEmpty())
+        }
+
+    @Test
+    fun testSpendingAnalysisByTagAndMerchant() =
+        runTest {
+            val t1 = Transaction(description = "Resort", amount = 500.0, date = 5000L, transactionType = TransactionType.EXPENSE, accountId = 1, categoryId = 1, notes = null, source = "Manual")
+            val id = writeDao.insert(t1).toInt()
+            writeDao.addTagsToTransaction(listOf(TransactionTagCrossRef(id, 1)))
+
+            val byTag =
+                analyticsDao.getSpendingAnalysisByTag(
+                    startDate = 1000L,
+                    endDate = 10000L,
+                    filterCategoryId = null,
+                    filterMerchantName = null,
+                    filterTagId = null,
+                    searchQuery = null,
+                    includeExcluded = false,
+                    transactionType = TransactionType.EXPENSE,
+                ).first()
+            assertEquals(1, byTag.size)
+            assertEquals("Vacation", byTag.first().dimensionName)
+            assertEquals(500.0, byTag.first().totalAmount)
+
+            val byMerchant =
+                analyticsDao.getSpendingAnalysisByMerchant(
+                    startDate = 1000L,
+                    endDate = 10000L,
+                    filterCategoryId = null,
+                    filterMerchantName = null,
+                    filterTagId = null,
+                    searchQuery = null,
+                    includeExcluded = false,
+                    transactionType = TransactionType.EXPENSE,
+                ).first()
+            assertEquals(1, byMerchant.size)
+            assertEquals("Resort", byMerchant.first().dimensionName)
+            assertEquals(500.0, byMerchant.first().totalAmount)
+        }
+
+    @Test
+    fun testTrendsForRange() =
+        runTest {
+            val t1 = Transaction(description = "Groceries", amount = 100.0, date = 5000L, transactionType = TransactionType.EXPENSE, accountId = 1, categoryId = 1, notes = null, source = "Manual")
+            val t2 = Transaction(description = "Salary", amount = 2000.0, date = 5000L, transactionType = TransactionType.INCOME, accountId = 1, categoryId = 2, notes = null, source = "Manual")
+            writeDao.insert(t1)
+            writeDao.insert(t2)
+
+            val dailyTrends = analyticsDao.getDailyTrends(1000L, 10000L).first()
+            assertEquals(1, dailyTrends.size)
+            assertEquals(100.0, dailyTrends.first().totalExpenses)
+            assertEquals(2000.0, dailyTrends.first().totalIncome)
+
+            val weeklyTrends = analyticsDao.getWeeklyTrends(1000L, 10000L).first()
+            assertEquals(1, weeklyTrends.size)
+
+            val monthlyTrends = analyticsDao.getMonthlyTrends(1000L).first()
+            assertEquals(1, monthlyTrends.size)
+        }
+
+    @Test
+    fun testTotalExpensesSinceAndExpenseMerchants() =
+        runTest {
+            val t1 = Transaction(description = "Uber", amount = 45.0, date = 5000L, transactionType = TransactionType.EXPENSE, accountId = 1, categoryId = 1, notes = null, source = "Manual")
+            writeDao.insert(t1)
+
+            val total = analyticsDao.getTotalExpensesSince(1000L)
+            assertEquals(45.0, total)
+
+            val merchants = analyticsDao.getAllExpenseMerchants().first()
+            assertEquals(listOf("Uber"), merchants)
+        }
 }

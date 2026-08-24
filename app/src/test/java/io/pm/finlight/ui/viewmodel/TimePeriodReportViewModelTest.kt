@@ -4,6 +4,8 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.model.TimePeriod
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -26,7 +28,10 @@ import java.util.Calendar
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class TimePeriodReportViewModelTest : BaseViewModelTest() {
     @Mock
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
+
+    @Mock
+    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
 
     @Mock
     private lateinit var settingsRepository: SettingsRepository
@@ -38,18 +43,18 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     override fun setup() {
         super.setup()
         // Setup default mocks that apply to most tests in this file
-        `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+        `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
 
         runTest {
-            `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenReturn(null)
-            `when`(transactionDao.getTopSpendingCategoriesForRange(anyLong(), anyLong())).thenReturn(emptyList())
+            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenReturn(null)
+            `when`(transactionAnalyticsDao.getTopSpendingCategoriesForRange(anyLong(), anyLong())).thenReturn(emptyList())
             `when`(settingsRepository.getOverallBudgetForMonthBlocking(anyInt(), anyInt())).thenReturn(0f)
         }
 
-        `when`(transactionDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-        `when`(transactionDao.getWeeklyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-        `when`(transactionDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
-        `when`(transactionDao.getFirstTransactionDate()).thenReturn(flowOf(0L))
+        `when`(transactionAnalyticsDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+        `when`(transactionAnalyticsDao.getWeeklyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+        `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+        `when`(transactionQueryDao.getFirstTransactionDate()).thenReturn(flowOf(0L))
 
         // --- NEW: Mock the new repository dependency ---
         `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
@@ -120,12 +125,15 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                         null,
                     ),
                 )
-            `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
+            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
             // ACT
             // --- FIX: Pass transactionRepository ---
             val viewModel =
-                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false)
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false
+                )
             advanceUntilIdle()
 
             // ASSERT
@@ -141,7 +149,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // Arrange
             // --- FIX: Pass transactionRepository ---
             val viewModel =
-                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false)
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false
+                )
             val initialMonth = viewModel.selectedDate.first().get(Calendar.MONTH)
 
             // Act
@@ -160,7 +171,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // Arrange
             // --- FIX: Pass transactionRepository ---
             val viewModel =
-                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false)
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false
+                )
             val initialYear = viewModel.selectedDate.first().get(Calendar.YEAR)
 
             // Act
@@ -178,12 +192,15 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // Arrange
             val currentSummary = FinancialSummary(0.0, 150.0)
             val previousSummary = FinancialSummary(0.0, 100.0)
-            `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong()))
+            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong()))
                 .thenReturn(currentSummary) // First call for current
                 .thenReturn(previousSummary) // Second call for previous
             // --- FIX: Pass transactionRepository ---
             val viewModel =
-                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false)
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false
+                )
             advanceUntilIdle()
 
             // Assert
@@ -200,10 +217,14 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // Arrange
             val currentSummary = FinancialSummary(0.0, 150.0)
             val previousSummary = FinancialSummary(0.0, 0.0)
-            `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong()))
+            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong()))
                 .thenReturn(currentSummary)
                 .thenReturn(previousSummary)
-            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false)
+            val viewModel =
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false
+                )
             advanceUntilIdle()
 
             // Assert
@@ -219,10 +240,14 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val currentSummary = FinancialSummary(0.0, 150.0)
-            `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong()))
+            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong()))
                 .thenReturn(currentSummary)
                 .thenReturn(null)
-            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false)
+            val viewModel =
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false
+                )
             advanceUntilIdle()
 
             // Assert
@@ -244,7 +269,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // Act
             // --- FIX: Pass transactionRepository ---
             val viewModel =
-                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, true)
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, true
+                )
             advanceUntilIdle()
 
             // Assert
@@ -283,13 +311,14 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                 mockData.add(CalendarDayStatus(date, status, amount, safeToSpend))
             }
             `when`(transactionRepository.getMonthlyConsistencyData(year, month)).thenReturn(flowOf(mockData))
-            `when`(transactionDao.getFirstTransactionDate()).thenReturn(flowOf(firstDayOfMonth)) // Mock this for legacy code paths
+            `when`(transactionQueryDao.getFirstTransactionDate()).thenReturn(flowOf(firstDayOfMonth)) // Mock this for legacy code paths
 
             // Act
             // --- FIX: Pass transactionRepository ---
             val viewModel =
                 TimePeriodReportViewModel(
-                    transactionDao,
+                    transactionQueryDao,
+                    transactionAnalyticsDao,
                     transactionRepository,
                     settingsRepository,
                     TimePeriod.MONTHLY,
@@ -329,12 +358,15 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     io.pm.finlight.WeeklyTrend("2025-40", 500.0, 1000.0),
                     io.pm.finlight.WeeklyTrend("2025-41", 750.0, 1500.0),
                 )
-            `when`(transactionDao.getWeeklyTrends(anyLong(), anyLong())).thenReturn(flowOf(weeklyTrends))
+            `when`(transactionAnalyticsDao.getWeeklyTrends(anyLong(), anyLong())).thenReturn(flowOf(weeklyTrends))
 
             // Act
             // --- FIX: Pass transactionRepository ---
             val viewModel =
-                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false)
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false
+                )
             advanceUntilIdle()
 
             // Assert
@@ -356,11 +388,14 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     io.pm.finlight.DailyTrend("2025-10-08", 100.0, 50.0),
                     io.pm.finlight.DailyTrend("2025-10-09", 200.0, 100.0),
                 )
-            `when`(transactionDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(dailyTrends))
+            `when`(transactionAnalyticsDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(dailyTrends))
 
             // Act
             val viewModel =
-                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.DAILY, null, false)
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.DAILY, null, false
+                )
             advanceUntilIdle()
 
             // Assert
@@ -382,11 +417,14 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     io.pm.finlight.MonthlyTrend("2025-09", 1000.0, 500.0),
                     io.pm.finlight.MonthlyTrend("2025-10", 2000.0, 1000.0),
                 )
-            `when`(transactionDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(monthlyTrends))
+            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(monthlyTrends))
 
             // Act
             val viewModel =
-                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false)
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false
+                )
             advanceUntilIdle()
 
             // Assert
@@ -403,12 +441,15 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     fun `chartData returns null when DAO returns empty data`() =
         runTest {
             // Arrange
-            `when`(transactionDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+            `when`(transactionAnalyticsDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
 
             // Act
             // --- FIX: Pass transactionRepository ---
             val viewModel =
-                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.DAILY, null, false)
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.DAILY, null, false
+                )
             advanceUntilIdle()
 
             // Assert
@@ -431,7 +472,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // --- FIX: Pass transactionRepository ---
             val viewModel =
                 TimePeriodReportViewModel(
-                    transactionDao,
+                    transactionQueryDao,
+                    transactionAnalyticsDao,
                     transactionRepository,
                     settingsRepository,
                     TimePeriod.MONTHLY,
@@ -469,7 +511,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             var previousStartCaptured = 0L
             var previousEndCaptured = 0L
 
-            `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
+            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
                 val start = invocation.getArgument<Long>(0)
                 val end = invocation.getArgument<Long>(1)
 
@@ -487,12 +529,13 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             }
 
             // Mock getMonthlyTrends for chart data generation
-            `when`(transactionDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
 
             // Act
             val viewModel =
                 TimePeriodReportViewModel(
-                    transactionDao,
+                    transactionQueryDao,
+                    transactionAnalyticsDao,
                     transactionRepository,
                     settingsRepository,
                     TimePeriod.MONTHLY,
@@ -579,7 +622,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             var previousStartCaptured = 0L
             var previousEndCaptured = 0L
 
-            `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
+            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
                 val start = invocation.getArgument<Long>(0)
                 val end = invocation.getArgument<Long>(1)
 
@@ -595,12 +638,13 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             }
 
             // Mock getMonthlyTrends for chart data generation
-            `when`(transactionDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
 
             // Act
             val viewModel =
                 TimePeriodReportViewModel(
-                    transactionDao,
+                    transactionQueryDao,
+                    transactionAnalyticsDao,
                     transactionRepository,
                     settingsRepository,
                     TimePeriod.YEARLY,
@@ -676,7 +720,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             var previousEndCaptured = 0L
             var callCount = 0
 
-            `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
+            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
                 val start = invocation.getArgument<Long>(0)
                 val end = invocation.getArgument<Long>(1)
 
@@ -693,7 +737,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // Act
             val viewModel =
                 TimePeriodReportViewModel(
-                    transactionDao,
+                    transactionQueryDao,
+                    transactionAnalyticsDao,
                     transactionRepository,
                     settingsRepository,
                     TimePeriod.MONTHLY,
@@ -729,13 +774,16 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             val currentSummary = FinancialSummary(0.0, 150.0)
             val previousSummary = FinancialSummary(0.0, 100.0)
 
-            `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong()))
+            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong()))
                 .thenReturn(currentSummary)
                 .thenReturn(previousSummary)
 
             // Act
             val viewModel =
-                TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.DAILY, null, false)
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.DAILY, null, false
+                )
             advanceUntilIdle()
 
             // Assert - Daily reports should still work as before
@@ -762,7 +810,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             var previousEndCaptured = 0L
             var callCount = 0
 
-            `when`(transactionDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
+            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
                 val end = invocation.getArgument<Long>(1)
 
                 callCount++
@@ -777,7 +825,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // Act
             val viewModel =
                 TimePeriodReportViewModel(
-                    transactionDao,
+                    transactionQueryDao,
+                    transactionAnalyticsDao,
                     transactionRepository,
                     settingsRepository,
                     TimePeriod.YEARLY,
@@ -816,10 +865,14 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = TransactionType.INCOME, description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
                     TransactionDetails(Transaction(id = 2, amount = 50.0, transactionType = TransactionType.EXPENSE, description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
                 )
-            `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
+            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
             // Act
-            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false)
+            val viewModel =
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false
+                )
             advanceUntilIdle()
 
             // Assert
@@ -854,10 +907,14 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     TransactionDetails(Transaction(id = 3, amount = 50.0, transactionType = TransactionType.EXPENSE, description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
                     TransactionDetails(Transaction(id = 4, amount = 75.0, transactionType = TransactionType.EXPENSE, description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
                 )
-            `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
+            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
             // Act
-            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false)
+            val viewModel =
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false
+                )
             advanceUntilIdle()
 
             // Assert
@@ -893,10 +950,14 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     TransactionDetails(Transaction(id = 5, amount = 75.0, transactionType = TransactionType.EXPENSE, description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
                     TransactionDetails(Transaction(id = 6, amount = 150.0, transactionType = TransactionType.EXPENSE, description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
                 )
-            `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
+            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
             // Act
-            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false)
+            val viewModel =
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false
+                )
             advanceUntilIdle()
 
             // Assert
@@ -916,7 +977,11 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     fun `toggleIncomeExclusion calls repository toggle`() =
         runTest {
             // Arrange
-            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false)
+            val viewModel =
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false
+                )
 
             // Act
             viewModel.toggleIncomeExclusion("2025-05")
@@ -929,7 +994,11 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     fun `toggleExpenseExclusion calls repository toggle`() =
         runTest {
             // Arrange
-            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false)
+            val viewModel =
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false
+                )
 
             // Act
             viewModel.toggleExpenseExclusion("2025-05")
@@ -966,8 +1035,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     ),
                 )
 
-            `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(txns))
-            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false)
+            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(txns))
+            val viewModel = TimePeriodReportViewModel(transactionQueryDao, transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false)
             advanceUntilIdle()
 
             viewModel.yearlyMonthlyBreakdown.test {
@@ -1015,8 +1084,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     ),
                 )
 
-            `when`(transactionDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(txns))
-            val viewModel = TimePeriodReportViewModel(transactionDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false)
+            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(txns))
+            val viewModel = TimePeriodReportViewModel(transactionQueryDao, transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false)
             advanceUntilIdle()
 
             viewModel.totalIncome.test {

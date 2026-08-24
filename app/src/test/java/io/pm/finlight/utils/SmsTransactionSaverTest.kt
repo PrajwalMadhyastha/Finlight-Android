@@ -32,7 +32,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
     private lateinit var db: AppDatabase
     private lateinit var accountDao: AccountDao
     private lateinit var accountAliasDao: AccountAliasDao
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionWriteDao: TransactionWriteDao
     private lateinit var tagDao: TagDao
     private lateinit var merchantRenameRuleDao: MerchantRenameRuleDao
     private lateinit var merchantCategoryMappingDao: MerchantCategoryMappingDao
@@ -46,7 +46,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
         db = mockk(relaxed = true)
         accountDao = mockk(relaxed = true)
         accountAliasDao = mockk(relaxed = true)
-        transactionDao =
+        transactionWriteDao =
             mockk(relaxed = true) {
                 coEvery { insert(any()) } returns 1L
                 coEvery { addTagsToTransaction(any()) } just runs
@@ -57,11 +57,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
 
         every { db.accountDao() } returns accountDao
         every { db.accountAliasDao() } returns accountAliasDao
-        every { db.transactionDao() } returns transactionDao
-        every { db.transactionQueryDao() } returns transactionDao
-        every { db.transactionWriteDao() } returns transactionDao
-        every { db.transactionAnalyticsDao() } returns transactionDao
-        every { db.transactionReimbursementDao() } returns transactionDao
+        every { db.transactionWriteDao() } returns transactionWriteDao
         every { db.tagDao() } returns tagDao
         every { db.merchantRenameRuleDao() } returns merchantRenameRuleDao
         every { db.merchantCategoryMappingDao() } returns merchantCategoryMappingDao
@@ -103,7 +99,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             val id = saver.resolveAndSaveTransaction(makeTxn())
 
             assertNotNull(id)
-            coVerify { transactionDao.insert(match { it.accountId == 42 }) }
+            coVerify { transactionWriteDao.insert(match { it.accountId == 42 }) }
         }
 
     // -------------------------------------------------------------------------
@@ -119,7 +115,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             val id = saver.resolveAndSaveTransaction(makeTxn())
 
             assertNotNull(id)
-            coVerify { transactionDao.insert(match { it.accountId == 7 }) }
+            coVerify { transactionWriteDao.insert(match { it.accountId == 7 }) }
             // No insert should happen since account already existed
             coVerify(exactly = 0) { accountDao.insert(any()) }
         }
@@ -136,7 +132,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
 
             assertNotNull(id)
             coVerify { accountDao.insert(any()) }
-            coVerify { transactionDao.insert(match { it.accountId == 15 }) }
+            coVerify { transactionWriteDao.insert(match { it.accountId == 15 }) }
         }
 
     @Test
@@ -160,7 +156,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             // Transaction must still be saved — NOT dropped
             assertNotNull(id)
             coVerify(exactly = 2) { accountDao.findByName(any()) } // first check + fallback
-            coVerify { transactionDao.insert(match { it.accountId == 22 }) }
+            coVerify { transactionWriteDao.insert(match { it.accountId == 22 }) }
         }
 
     @Test
@@ -175,7 +171,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             val id = saver.resolveAndSaveTransaction(makeTxn())
 
             assertNull(id)
-            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
         }
 
     @Test
@@ -202,7 +198,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             coEvery { accountAliasDao.findByAlias(any()) } returns null
             coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
             val captor = slot<Transaction>()
-            coEvery { transactionDao.insert(capture(captor)) } returns 99L
+            coEvery { transactionWriteDao.insert(capture(captor)) } returns 99L
 
             saver.resolveAndSaveTransaction(makeTxn())
 
@@ -223,7 +219,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
                     startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "USD", conversionRate = 80f
                 )
             val captor = slot<Transaction>()
-            coEvery { transactionDao.insert(capture(captor)) } returns 55L
+            coEvery { transactionWriteDao.insert(capture(captor)) } returns 55L
 
             val potentialTxn =
                 makeTxn().copy(
@@ -246,7 +242,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             coEvery { accountAliasDao.findByAlias(any()) } returns null
             coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
             val captor = slot<Transaction>()
-            coEvery { transactionDao.insert(capture(captor)) } returns 1L
+            coEvery { transactionWriteDao.insert(capture(captor)) } returns 1L
 
             saver.resolveAndSaveTransaction(makeTxn(), source = "Auto-Recovered")
 
@@ -259,7 +255,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             coEvery { accountAliasDao.findByAlias(any()) } returns null
             coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
             val captor = slot<Transaction>()
-            coEvery { transactionDao.insert(capture(captor)) } returns 99L
+            coEvery { transactionWriteDao.insert(capture(captor)) } returns 99L
 
             val potentialTxnWithRename =
                 makeTxn().copy(
@@ -280,7 +276,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             coEvery { accountAliasDao.findByAlias(any()) } returns null
             coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
             val captor = slot<Transaction>()
-            coEvery { transactionDao.insert(capture(captor)) } returns 101L
+            coEvery { transactionWriteDao.insert(capture(captor)) } returns 101L
 
             val incomeTxn = makeTxn().copy(transactionType = "income", merchantName = "Salary")
             saver.resolveAndSaveTransaction(incomeTxn)
