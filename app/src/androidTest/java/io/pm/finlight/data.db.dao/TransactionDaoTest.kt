@@ -6,6 +6,7 @@ import io.pm.finlight.Category
 import io.pm.finlight.CategoryDao
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDao
+import io.pm.finlight.TransactionType
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -115,7 +116,7 @@ class TransactionDaoTest : BaseDaoTest() {
                 Transaction(
                     description = "Lunch",
                     amount = 100.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = today,
                     accountId = 1,
                     categoryId = 1,
@@ -128,7 +129,7 @@ class TransactionDaoTest : BaseDaoTest() {
                 Transaction(
                     description = "Bus",
                     amount = 50.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = today,
                     accountId = 1,
                     categoryId = 2,
@@ -141,7 +142,7 @@ class TransactionDaoTest : BaseDaoTest() {
                 Transaction(
                     description = "Refund",
                     amount = 500.0,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     date = today,
                     accountId = 1,
                     categoryId = null,
@@ -155,7 +156,7 @@ class TransactionDaoTest : BaseDaoTest() {
                 Transaction(
                     description = "Old",
                     amount = 1000.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = lastMonth,
                     accountId = 1,
                     categoryId = 1,
@@ -185,7 +186,7 @@ class TransactionDaoTest : BaseDaoTest() {
                 Transaction(
                     description = "Food 1",
                     amount = 10.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = today,
                     accountId = 1,
                     categoryId = 1,
@@ -196,7 +197,7 @@ class TransactionDaoTest : BaseDaoTest() {
                 Transaction(
                     description = "Food 2",
                     amount = 20.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = today,
                     accountId = 1,
                     categoryId = 1,
@@ -207,7 +208,7 @@ class TransactionDaoTest : BaseDaoTest() {
                 Transaction(
                     description = "Taxi",
                     amount = 50.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = today,
                     accountId = 1,
                     categoryId = 2,

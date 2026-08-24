@@ -44,7 +44,7 @@ class NeedsReviewFeatureTest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = System.currentTimeMillis() - 60_000L,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     needsReview = true,
                     notes = null,
                 ),

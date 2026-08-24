@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.Account
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDao
+import io.pm.finlight.TransactionType
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -65,7 +66,7 @@ class AccountDaoTest : BaseDaoTest() {
                 Transaction(
                     description = "Salary",
                     amount = 5000.0,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     date = System.currentTimeMillis(),
                     accountId = accountId,
                     categoryId = null,
@@ -77,7 +78,7 @@ class AccountDaoTest : BaseDaoTest() {
                 Transaction(
                     description = "Rent",
                     amount = 1000.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = System.currentTimeMillis(),
                     accountId = accountId,
                     categoryId = null,
@@ -91,7 +92,7 @@ class AccountDaoTest : BaseDaoTest() {
                 Transaction(
                     description = "Hidden Gift",
                     amount = 500.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = System.currentTimeMillis(),
                     accountId = accountId,
                     categoryId = null,

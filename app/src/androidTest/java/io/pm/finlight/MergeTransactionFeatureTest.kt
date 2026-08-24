@@ -44,7 +44,7 @@ class MergeTransactionFeatureTest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = now - 1000L,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                     mergeDismissed = false
                 ),
@@ -57,7 +57,7 @@ class MergeTransactionFeatureTest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = now,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                     mergeDismissed = false
                 ),
@@ -297,7 +297,7 @@ class MergeTransactionFeatureTest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_WALLET_ID,
                     date = now - 1000L,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                     mergeDismissed = false,
                 )
@@ -309,7 +309,7 @@ class MergeTransactionFeatureTest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = now,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                     mergeDismissed = false,
                 )
