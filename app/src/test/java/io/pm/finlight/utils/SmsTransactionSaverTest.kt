@@ -267,5 +267,21 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
 
             assert(captor.captured.description == "Coffee")
             assert(captor.captured.originalDescription == "STARBUCKS")
+            assert(captor.captured.transactionType == TransactionType.EXPENSE)
+        }
+
+    @Test
+    fun `saves income transaction with TransactionType INCOME`() =
+        runTest {
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+            val captor = slot<Transaction>()
+            coEvery { transactionDao.insert(capture(captor)) } returns 101L
+
+            val incomeTxn = makeTxn().copy(transactionType = "income", merchantName = "Salary")
+            saver.resolveAndSaveTransaction(incomeTxn)
+
+            assert(captor.captured.transactionType == TransactionType.INCOME)
+            assert(captor.captured.amount == 100.0)
         }
 }

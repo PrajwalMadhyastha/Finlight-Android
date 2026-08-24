@@ -24,4 +24,7 @@ dependencies {
     // Add a dependency on Room's common library, which contains the annotations.
     // Using 'api' makes these annotations visible to the 'app' module's compiler.
     api("androidx.room:room-common:2.6.1")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation(kotlin("test"))
 }
