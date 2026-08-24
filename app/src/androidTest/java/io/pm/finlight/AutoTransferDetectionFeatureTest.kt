@@ -108,8 +108,8 @@ class AutoTransferDetectionFeatureTest {
             val allTxns = db.transactionDao().getAllTransactionsSimple().first()
             assert(allTxns.size == 2) { "Both transactions should be saved" }
 
-            val savedExpense = allTxns.find { it.transactionType == "expense" }!!
-            val savedIncome = allTxns.find { it.transactionType == "income" }!!
+            val savedExpense = allTxns.find { it.transactionType == TransactionType.EXPENSE }!!
+            val savedIncome = allTxns.find { it.transactionType == TransactionType.INCOME }!!
 
             assert(savedExpense.linkedTransferId == savedIncome.id) { "Expense should link to Income" }
             assert(savedIncome.linkedTransferId == savedExpense.id) { "Income should link to Expense" }

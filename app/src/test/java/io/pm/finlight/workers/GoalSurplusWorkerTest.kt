@@ -82,10 +82,10 @@ class GoalSurplusWorkerTest {
             val txDate = calDate.timeInMillis
 
             transactionDao.insert(
-                Transaction(accountId = 1, categoryId = 1, amount = 5000.0, date = txDate, notes = "", description = "Salary", transactionType = "income")
+                Transaction(accountId = 1, categoryId = 1, amount = 5000.0, date = txDate, notes = "", description = "Salary", transactionType = TransactionType.INCOME)
             )
             transactionDao.insert(
-                Transaction(accountId = 1, categoryId = 2, amount = 2000.0, date = txDate, notes = "", description = "Food", transactionType = "expense")
+                Transaction(accountId = 1, categoryId = 2, amount = 2000.0, date = txDate, notes = "", description = "Food", transactionType = TransactionType.EXPENSE)
             )
 
             val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
@@ -153,7 +153,7 @@ class GoalSurplusWorkerTest {
             val txDate = calDate.timeInMillis
 
             transactionDao.insert(
-                Transaction(accountId = 1, categoryId = 1, amount = 1500.0, date = txDate, notes = "", description = "Food", transactionType = "expense")
+                Transaction(accountId = 1, categoryId = 1, amount = 1500.0, date = txDate, notes = "", description = "Food", transactionType = TransactionType.EXPENSE)
             )
 
             val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
@@ -186,7 +186,7 @@ class GoalSurplusWorkerTest {
             val txDate = calDate.timeInMillis
 
             transactionDao.insert(
-                Transaction(accountId = 1, categoryId = 1, amount = 5000.0, date = txDate, notes = "", description = "Salary", transactionType = "income")
+                Transaction(accountId = 1, categoryId = 1, amount = 5000.0, date = txDate, notes = "", description = "Salary", transactionType = TransactionType.INCOME)
             )
 
             // DO NOT insert any active goals

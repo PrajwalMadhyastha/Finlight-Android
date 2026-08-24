@@ -4,6 +4,8 @@
 androidx.annotation:annotation:1.3.0=apiDependenciesMetadata,compileClasspath,implementationDependenciesMetadata,runtimeClasspath,testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
 androidx.room:room-common:2.6.1=apiDependenciesMetadata,compileClasspath,implementationDependenciesMetadata,runtimeClasspath,testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
 io.github.java-diff-utils:java-diff-utils:4.12=kotlinInternalAbiValidation
+junit:junit:4.13.2=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.hamcrest:hamcrest-core:1.3=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
 org.jetbrains.kotlin:abi-tools-api:2.2.10=kotlinInternalAbiValidation
 org.jetbrains.kotlin:abi-tools:2.2.10=kotlinInternalAbiValidation
 org.jetbrains.kotlin:kotlin-build-tools-api:2.2.10=kotlinBuildToolsApiClasspath
@@ -27,6 +29,8 @@ org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22=apiDependenciesMetadata,compileCl
 org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22=apiDependenciesMetadata,compileClasspath,implementationDependenciesMetadata,runtimeClasspath,testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
 org.jetbrains.kotlin:kotlin-stdlib:1.8.22=apiDependenciesMetadata
 org.jetbrains.kotlin:kotlin-stdlib:2.2.10=compileClasspath,implementationDependenciesMetadata,kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinCompilerPluginClasspathMain,kotlinCompilerPluginClasspathTest,kotlinInternalAbiValidation,kotlinKlibCommonizerClasspath,runtimeClasspath,testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
+org.jetbrains.kotlin:kotlin-test-junit:2.2.10=testCompileClasspath,testRuntimeClasspath
+org.jetbrains.kotlin:kotlin-test:2.2.10=testCompileClasspath,testImplementationDependenciesMetadata,testRuntimeClasspath
 org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.8.0=kotlinBuildToolsApiClasspath,kotlinCompilerClasspath,kotlinInternalAbiValidation,kotlinKlibCommonizerClasspath
 org.jetbrains.kotlinx:kotlinx-serialization-bom:1.6.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.6.3=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath

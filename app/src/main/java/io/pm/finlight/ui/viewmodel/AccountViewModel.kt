@@ -20,6 +20,7 @@ import io.pm.finlight.AccountWithBalance
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionRepository
+import io.pm.finlight.TransactionType
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -209,7 +210,7 @@ class AccountViewModel(
 
     fun getAccountBalance(accountId: Int): Flow<Long> {
         return transactionRepository.getTransactionsForAccount(accountId).map { transactions ->
-            transactions.sumOf { if (it.transactionType == "income") it.amount else -it.amount }.roundToLong()
+            transactions.sumOf { if (it.transactionType == TransactionType.INCOME) it.amount else -it.amount }.roundToLong()
         }
     }
 

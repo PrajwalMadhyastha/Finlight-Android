@@ -819,8 +819,8 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     fun `mergeSuggestion identifies valid mergeable transactions`() =
         runTest {
             val now = System.currentTimeMillis()
-            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = now - 3600000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = false)
-            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = now, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = false)
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = now - 3600000L, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE, mergeDismissed = false)
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = now, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE, mergeDismissed = false)
 
             val parentDetails = TransactionDetails(parentTxn, emptyList(), "Account", "Category", null, null, null)
             val childDetails = TransactionDetails(childTxn, emptyList(), "Account", "Category", null, null, null)
@@ -843,8 +843,8 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     fun `mergeSuggestion ignores dismissed transactions`() =
         runTest {
             val now = System.currentTimeMillis()
-            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = now - 3600000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = true)
-            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = now, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = false)
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = now - 3600000L, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE, mergeDismissed = true)
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = now, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE, mergeDismissed = false)
 
             val parentDetails = TransactionDetails(parentTxn, emptyList(), "Account", "Category", null, null, null)
             val childDetails = TransactionDetails(childTxn, emptyList(), "Account", "Category", null, null, null)

@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionType
 
 /**
  * Snapshots the pre-merge state of the parent transaction and the full child
@@ -61,7 +62,7 @@ data class MergeRecord(
     val childDate: Long,
     val childAccountId: Int,
     val childCategoryId: Int?,
-    val childTransactionType: String,
+    val childTransactionType: TransactionType = TransactionType.EXPENSE,
     val childSource: String,
     val childNotes: String?,
     val childSourceSmsId: Long?,

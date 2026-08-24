@@ -25,7 +25,6 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.util.Calendar
 
-@org.junit.Ignore("Temporarily disabled (Issue #105)")
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
@@ -155,7 +154,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
         runTest {
             val now = System.currentTimeMillis()
             val rule = RecurringTransaction(id = 1, description = "Draft Exists", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, lastRunDate = null, accountId = 1, categoryId = 1)
-            val draft = Transaction(id = 100, description = "Draft", amount = 10.0, transactionType = "expense", date = now, accountId = 1, categoryId = 1, notes = null, status = "PENDING")
+            val draft = Transaction(id = 100, description = "Draft", amount = 10.0, transactionType = TransactionType.EXPENSE, date = now, accountId = 1, categoryId = 1, notes = null, status = TransactionStatus.PENDING)
 
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
             coEvery { db.transactionDao().getPendingTransactionForRule(1) } returns draft
@@ -184,7 +183,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
             coVerify(exactly = 1) { recurringTransactionDao.updateLastRunDate(1, any()) }
             verify(exactly = 1) { NotificationHelper.showAutoApprovedPaymentNotification(any(), any()) }
 
-            assertEquals("CONFIRMED", capturedTxn.captured.status)
+            assertEquals(TransactionStatus.CONFIRMED, capturedTxn.captured.status)
             assertEquals("Auto Approve", capturedTxn.captured.description)
         }
 

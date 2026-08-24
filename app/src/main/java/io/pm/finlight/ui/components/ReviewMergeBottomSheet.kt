@@ -18,9 +18,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import io.pm.finlight.TransactionDetails
 import io.pm.finlight.Category
 import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionDetails
+import io.pm.finlight.TransactionType
 import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
@@ -61,7 +62,7 @@ fun ReviewMergeBottomSheet(
 
     // Calculate net amount using signed arithmetic
     fun signedAmount(txn: TransactionDetails): Double =
-        if (txn.transaction.transactionType == "income") txn.transaction.amount else -txn.transaction.amount
+        if (txn.transaction.transactionType == TransactionType.INCOME) txn.transaction.amount else -txn.transaction.amount
 
     val netSigned = selectedTransactions.sumOf { signedAmount(it) }
     val finalAmount = kotlin.math.abs(netSigned)
@@ -202,7 +203,7 @@ fun ReviewMergeBottomSheet(
                         text = FormatUtils.currencyFormatter.format(item.transaction.amount),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
-                        color = if (item.transaction.transactionType == "income") incomeGreen else expenseRed
+                        color = if (item.transaction.transactionType == TransactionType.INCOME) incomeGreen else expenseRed
                     )
                 }
             }

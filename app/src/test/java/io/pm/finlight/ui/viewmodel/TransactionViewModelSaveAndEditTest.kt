@@ -346,7 +346,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
         runTest {
             // Arrange
             val transactionId = 1
-            val newType = "income"
+            val newType = TransactionType.INCOME
             // No exception mocked, so the suspend function will just return (simulating success)
 
             // Act
@@ -366,9 +366,9 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
         runTest {
             // Arrange
             val transactionId = 1
-            val newType = "income"
+            val newType = TransactionType.INCOME
             val errorMessage = "DB Error"
-            whenever(transactionRepository.updateTransactionType(anyInt(), anyString())).thenThrow(RuntimeException(errorMessage))
+            whenever(transactionRepository.updateTransactionType(anyInt(), org.mockito.kotlin.any())).thenThrow(RuntimeException(errorMessage))
 
             // Act & Assert
             viewModel.uiEvent.test {
@@ -673,7 +673,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
                     // "Food"
                     categoryId = 10,
                     source = "Manual Entry",
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 )
             val mockDetails =
@@ -868,7 +868,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
                     accountId = 1,
                     categoryId = 10,
                     source = "Manual Entry",
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 )
             val mockDetails =
@@ -1106,5 +1106,69 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             // color key must have been replaced (anything other than "gray_light")
             assertTrue("Color should have been resolved", captor.firstValue.colorKey != defaultColorKey)
             assertEquals(createdCategory, callbackResult)
+        }
+
+    @Test
+    fun `onSaveTapped with TransactionType enum saves directly with correct enum value`() =
+        runTest {
+            val accountId = 1
+            var capturedId: Long? = null
+            whenever(transactionRepository.insertTransactionWithTagsAndImages(any(), any(), any())).thenReturn(99L)
+
+            viewModel.onSaveTapped(
+                description = "",
+                amountStr = "250.0",
+                accountId = accountId,
+                categoryId = null,
+                notes = "Test notes",
+                date = 0L,
+                transactionType = TransactionType.INCOME,
+                imageUris = emptyList(),
+            ) { capturedId = it }
+            advanceUntilIdle()
+
+            val transactionCaptor = argumentCaptor<Transaction>()
+            verify(transactionRepository).insertTransactionWithTagsAndImages(transactionCaptor.capture(), any(), any())
+            assertEquals(TransactionType.INCOME, transactionCaptor.firstValue.transactionType)
+            assertEquals(250.0, transactionCaptor.firstValue.amount, 0.0)
+            assertEquals(99L, capturedId)
+        }
+
+    @Test
+    fun `approveSmsTransaction converts PotentialTransaction string type to TransactionType enum`() =
+        runTest {
+            val potential =
+                PotentialTransaction(
+                    sourceSmsId = 123L,
+                    smsSender = "BANK",
+                    amount = 500.0,
+                    transactionType = "income",
+                    merchantName = "Salary",
+                    originalMessage = "Received 500",
+                    date = 1000L,
+                    potentialAccount = PotentialAccount("HDFC", "Bank"),
+                )
+
+            val existingAccount = Account(1, "HDFC", "Bank")
+            whenever(db.accountDao().findByName("HDFC")).thenReturn(existingAccount)
+            whenever(accountRepository.allAccounts).thenReturn(flowOf(listOf(existingAccount)))
+            whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(10L)
+
+            val success =
+                viewModel.approveSmsTransaction(
+                    potentialTxn = potential,
+                    description = "Salary",
+                    categoryId = 1,
+                    notes = "Approved",
+                    tags = emptySet(),
+                    isForeign = false,
+                )
+            advanceUntilIdle()
+
+            assertTrue(success)
+            val transactionCaptor = argumentCaptor<Transaction>()
+            verify(transactionRepository).insertTransactionWithTags(transactionCaptor.capture(), any())
+            assertEquals(TransactionType.INCOME, transactionCaptor.firstValue.transactionType)
+            assertEquals("Salary", transactionCaptor.firstValue.description)
         }
 }

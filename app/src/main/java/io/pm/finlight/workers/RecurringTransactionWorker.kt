@@ -75,13 +75,13 @@ class RecurringTransactionWorker(
                                 Transaction(
                                     description = rule.description,
                                     amount = rule.amount,
-                                    transactionType = rule.transactionType,
+                                    transactionType = TransactionType.fromString(rule.transactionType),
                                     date = now,
                                     accountId = rule.accountId,
                                     categoryId = rule.categoryId,
                                     notes = "Auto-approved by recurring rule",
                                     source = "Recurring Rule",
-                                    status = "CONFIRMED",
+                                    status = TransactionStatus.CONFIRMED,
                                     recurringRuleId = rule.id,
                                 )
                             transactionDao.insert(confirmedTxn)
@@ -94,13 +94,13 @@ class RecurringTransactionWorker(
                                 Transaction(
                                     description = rule.description,
                                     amount = rule.amount,
-                                    transactionType = rule.transactionType,
+                                    transactionType = TransactionType.fromString(rule.transactionType),
                                     date = now,
                                     accountId = rule.accountId,
                                     categoryId = rule.categoryId,
                                     notes = "",
                                     source = "Recurring Rule (Pending)",
-                                    status = "PENDING",
+                                    status = TransactionStatus.PENDING,
                                     recurringRuleId = rule.id,
                                 )
                             val newDraftId = transactionDao.insert(draftTxn)

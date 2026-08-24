@@ -87,9 +87,9 @@ class TimePeriodReportViewModel(
             transactions.forEach { txn ->
                 val monthKey = sdf.format(Date(txn.transaction.date))
                 val current = breakdownMap[monthKey] ?: Pair(0.0, 0.0)
-                if (txn.transaction.transactionType == "income" && !txn.transaction.isExcluded) {
+                if (txn.transaction.transactionType == TransactionType.INCOME && !txn.transaction.isExcluded) {
                     breakdownMap[monthKey] = current.copy(first = current.first + txn.transaction.amount)
-                } else if (txn.transaction.transactionType == "expense" && !txn.transaction.isExcluded) {
+                } else if (txn.transaction.transactionType == TransactionType.EXPENSE && !txn.transaction.isExcluded) {
                     breakdownMap[monthKey] = current.copy(second = current.second + txn.transaction.amount)
                 }
             }
@@ -115,7 +115,7 @@ class TimePeriodReportViewModel(
                 breakdowns.filter { !it.isIncomeExcluded }.sumOf { it.income }.roundToLong()
             } else {
                 transactions
-                    .filter { it.transaction.transactionType == "income" && !it.transaction.isExcluded }
+                    .filter { it.transaction.transactionType == TransactionType.INCOME && !it.transaction.isExcluded }
                     .sumOf { it.transaction.amount }.roundToLong()
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
@@ -126,7 +126,7 @@ class TimePeriodReportViewModel(
                 breakdowns.filter { !it.isExpenseExcluded }.sumOf { it.expenses }.roundToLong()
             } else {
                 transactions
-                    .filter { it.transaction.transactionType == "expense" && !it.transaction.isExcluded }
+                    .filter { it.transaction.transactionType == TransactionType.EXPENSE && !it.transaction.isExcluded }
                     .sumOf { it.transaction.amount }.roundToLong()
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)

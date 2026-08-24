@@ -59,8 +59,8 @@ class RecurringTransactionScreenTest {
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     notes = null,
-                    transactionType = "expense",
-                    status = "PENDING",
+                    transactionType = TransactionType.EXPENSE,
+                    status = TransactionStatus.PENDING,
                     recurringRuleId = ruleId
                 )
             )

@@ -363,7 +363,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     fun `auto-link variable bill without anomaly`() =
         runTest {
             val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
-            val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1100.0, transactionType = "expense", date = 100L, accountId = 1, categoryId = 1, notes = null)
+            val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1100.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
 
             coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
             coEvery { recurringDao.getRuleBySmsSenderId("BESCOM") } returns rule
@@ -382,7 +382,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     fun `auto-link variable bill with anomaly triggers notification`() =
         runTest {
             val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
-            val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1500.0, transactionType = "expense", date = 100L, accountId = 1, categoryId = 1, notes = null)
+            val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1500.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
 
             coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
             coEvery { recurringDao.getRuleBySmsSenderId("BESCOM") } returns rule
@@ -400,8 +400,8 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     @Test
     fun `auto-link fixed bill by finding matching pending draft`() =
         runTest {
-            val savedTxn = Transaction(id = 10, description = "Netflix", amount = 149.0, transactionType = "expense", date = 100L, accountId = 1, categoryId = 1, notes = null)
-            val draft = Transaction(id = 20, description = "Netflix", amount = 149.0, transactionType = "expense", date = 99L, accountId = 1, categoryId = 1, notes = null, status = "PENDING", recurringRuleId = 7)
+            val savedTxn = Transaction(id = 10, description = "Netflix", amount = 149.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
+            val draft = Transaction(id = 20, description = "Netflix", amount = 149.0, transactionType = TransactionType.EXPENSE, date = 99L, accountId = 1, categoryId = 1, notes = null, status = TransactionStatus.PENDING, recurringRuleId = 7)
 
             coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
             coEvery { recurringDao.getRuleBySmsSenderId(any()) } returns null
@@ -420,8 +420,8 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     @Test
     fun `auto-detects mergeable transaction and triggers notification`() =
         runTest {
-            val savedTxn = Transaction(id = 10, description = "Amazon", amount = 100.0, transactionType = "expense", date = 100L, accountId = 1, categoryId = 1, notes = null)
-            val recentTxn = Transaction(id = 9, description = "Amazon", amount = 50.0, transactionType = "expense", date = 50L, accountId = 1, categoryId = 1, notes = null)
+            val savedTxn = Transaction(id = 10, description = "Amazon", amount = 100.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
+            val recentTxn = Transaction(id = 9, description = "Amazon", amount = 50.0, transactionType = TransactionType.EXPENSE, date = 50L, accountId = 1, categoryId = 1, notes = null)
 
             coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
             coEvery { transactionDao.findRecentTransactionForMerge(any(), any(), any(), any(), any()) } returns recentTxn

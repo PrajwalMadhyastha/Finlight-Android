@@ -397,7 +397,7 @@ class DataExportServiceTest : BaseViewModelTest() {
                     notes = "Work expense",
                     // This is a regular transaction
                     isSplit = false,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     isExcluded = false,
                 )
             val details =
@@ -456,7 +456,7 @@ class DataExportServiceTest : BaseViewModelTest() {
 
             // 1. Parent Transaction Details
             val parentTransaction =
-                Transaction(id = parentTxId, description = "Market Visit", amount = 150.0, date = transactionTime, accountId = 1, categoryId = null, notes = "Parent Note", isSplit = true, transactionType = "expense", isExcluded = false)
+                Transaction(id = parentTxId, description = "Market Visit", amount = 150.0, date = transactionTime, accountId = 1, categoryId = null, notes = "Parent Note", isSplit = true, transactionType = TransactionType.EXPENSE, isExcluded = false)
             val parentDetails =
                 TransactionDetails(
                     transaction = parentTransaction,

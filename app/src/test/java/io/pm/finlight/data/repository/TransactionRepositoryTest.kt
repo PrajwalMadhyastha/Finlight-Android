@@ -170,16 +170,16 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(null)
 
             // Child is present
-            val childTxn = Transaction(id = 2, description = "Amazon", amount = 50.0, date = 2000L, accountId = 1, categoryId = 1, notes = "Child note", transactionType = "expense")
+            val childTxn = Transaction(id = 2, description = "Amazon", amount = 50.0, date = 2000L, accountId = 1, categoryId = 1, notes = "Child note", transactionType = TransactionType.EXPENSE)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
 
             // Auto-heal finds new parent
-            val newParent = Transaction(id = 3, description = "Amazon", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
+            val newParent = Transaction(id = 3, description = "Amazon", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = TransactionType.EXPENSE)
             `when`(
                 transactionDao.findRecentTransactionForMerge(
                     merchant = "Amazon",
                     accountId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     timeWindowStart = 2000L - (3 * 60 * 60 * 1000L),
                     newTxnId = 2,
                 ),
@@ -208,10 +208,10 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val parentTxn = Transaction(id = 1, description = "Amazon", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
+            val parentTxn = Transaction(id = 1, description = "Amazon", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = TransactionType.EXPENSE)
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
 
-            val childTxn = Transaction(id = 2, description = "Amazon", amount = 50.0, date = 2000L, accountId = 1, categoryId = 1, notes = "Child note", transactionType = "expense")
+            val childTxn = Transaction(id = 2, description = "Amazon", amount = 50.0, date = 2000L, accountId = 1, categoryId = 1, notes = "Child note", transactionType = TransactionType.EXPENSE)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
 
             repository.mergeTransactions(parentTxnId = 1, childTxnId = 2, childSmsBody = null, childSmsDate = null)
@@ -234,9 +234,9 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val anchor = Transaction(id = 1, description = "Anchor", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note", transactionType = "expense")
-            val child1 = Transaction(id = 2, description = "Child 1", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense")
-            val child2 = Transaction(id = 3, description = "Child 2", amount = -20.0, date = 3000L, accountId = 1, categoryId = 3, notes = null, transactionType = "income")
+            val anchor = Transaction(id = 1, description = "Anchor", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note", transactionType = TransactionType.EXPENSE)
+            val child1 = Transaction(id = 2, description = "Child 1", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = TransactionType.EXPENSE)
+            val child2 = Transaction(id = 3, description = "Child 2", amount = -20.0, date = 3000L, accountId = 1, categoryId = 3, notes = null, transactionType = TransactionType.INCOME)
 
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(anchor)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(child1)
@@ -267,7 +267,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val anchor = Transaction(id = 1, description = "Anchor", amount = 130.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note\nChild note", transactionType = "expense")
+            val anchor = Transaction(id = 1, description = "Anchor", amount = 130.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note\nChild note", transactionType = TransactionType.EXPENSE)
 
             // The merge record exists for the anchor
             val groupRecord =
@@ -275,7 +275,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     id = 10, parentTxnId = 1, mergedAt = 0L, mergeGroupId = "group-123", mergeType = "MANUAL",
                     originalParentAmount = 100.0, originalParentDate = 1000L, originalParentNotes = "Anchor note",
                     childDescription = "Child 1", childAmount = 50.0, childDate = 2000L, childAccountId = 1,
-                    childCategoryId = 2, childTransactionType = "expense", childSource = "MANUAL", childNotes = "Child note",
+                    childCategoryId = 2, childTransactionType = TransactionType.EXPENSE, childSource = "MANUAL", childNotes = "Child note",
                     childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
                     childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
                 )
@@ -304,14 +304,14 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val anchor = Transaction(id = 1, description = "Anchor", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note", transactionType = "expense")
+            val anchor = Transaction(id = 1, description = "Anchor", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note", transactionType = TransactionType.EXPENSE)
 
             val groupRecord =
                 io.pm.finlight.data.db.entity.MergeRecord(
                     id = 10, parentTxnId = 1, mergedAt = 0L, mergeGroupId = "group-123", mergeType = "MANUAL",
                     originalParentAmount = -100.0, originalParentDate = 1000L, originalParentNotes = "Anchor note",
                     childDescription = "Child 1", childAmount = 200.0, childDate = 2000L, childAccountId = 1,
-                    childCategoryId = 2, childTransactionType = "expense", childSource = "MANUAL", childNotes = "Child note",
+                    childCategoryId = 2, childTransactionType = TransactionType.EXPENSE, childSource = "MANUAL", childNotes = "Child note",
                     childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
                     childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
                 )
@@ -333,14 +333,14 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val anchor = Transaction(id = 1, description = "Anchor", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note", transactionType = "expense")
+            val anchor = Transaction(id = 1, description = "Anchor", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note", transactionType = TransactionType.EXPENSE)
 
             val groupRecord =
                 io.pm.finlight.data.db.entity.MergeRecord(
                     id = 10, parentTxnId = 1, mergedAt = 0L, mergeGroupId = "group-123", mergeType = "MANUAL",
                     originalParentAmount = -100.0, originalParentDate = 1000L, originalParentNotes = "Anchor note",
                     childDescription = "Child 1", childAmount = 200.0, childDate = 2000L, childAccountId = 1,
-                    childCategoryId = 2, childTransactionType = "expense", childSource = "MANUAL", childNotes = "Child note",
+                    childCategoryId = 2, childTransactionType = TransactionType.EXPENSE, childSource = "MANUAL", childNotes = "Child note",
                     childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
                     childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
                 )
@@ -353,7 +353,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository.unmergeTransactions(1)
 
             verify(transactionDao).updateAmount(1, 100.0) // Absolute amount
-            verify(transactionDao).updateTransactionType(1, "income") // Flipped to income
+            verify(transactionDao).updateTransactionType(1, TransactionType.INCOME) // Flipped to income
         }
 
     @Test
@@ -362,14 +362,14 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val anchor = Transaction(id = 1, description = "Anchor", amount = 130.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note\nChild note", transactionType = "expense")
+            val anchor = Transaction(id = 1, description = "Anchor", amount = 130.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Anchor note\nChild note", transactionType = TransactionType.EXPENSE)
 
             val groupRecord =
                 io.pm.finlight.data.db.entity.MergeRecord(
                     id = 10, parentTxnId = 1, mergedAt = 0L, mergeGroupId = "group-123", mergeType = "MANUAL",
                     originalParentAmount = 100.0, originalParentDate = 1000L, originalParentNotes = "Anchor note",
                     childDescription = "Child 1", childAmount = 50.0, childDate = 2000L, childAccountId = 1,
-                    childCategoryId = 2, childTransactionType = "expense", childSource = "MANUAL", childNotes = "Child note",
+                    childCategoryId = 2, childTransactionType = TransactionType.EXPENSE, childSource = "MANUAL", childNotes = "Child note",
                     childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
                     childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
                 )
@@ -414,7 +414,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 2000L,
                     childAccountId = 1,
                     childCategoryId = 1,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "AUTO",
                     childNotes = null,
                     childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
@@ -424,7 +424,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(mergeRecordDaoMock.getAllForParentSync(20)).thenReturn(listOf(record))
 
             // Simulate: after merge + reimbursement, current parent amount is -50
-            val currentParent = Transaction(id = 20, description = "Parent", amount = -50.0, date = 2000L, accountId = 1, categoryId = 1, transactionType = "expense", notes = null)
+            val currentParent = Transaction(id = 20, description = "Parent", amount = -50.0, date = 2000L, accountId = 1, categoryId = 1, transactionType = TransactionType.EXPENSE, notes = null)
             `when`(transactionDao.getTransactionByIdSync(20)).thenReturn(currentParent)
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
@@ -442,9 +442,9 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
             // Anchor is over-repaid: expense type but amount is -50 (500 expense, 550 reimbursed)
-            val anchor = Transaction(id = 1, description = "Over-repaid Expense", amount = -50.0, date = 1000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")
+            val anchor = Transaction(id = 1, description = "Over-repaid Expense", amount = -50.0, date = 1000L, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE)
             // Child is a plain 200 expense
-            val child = Transaction(id = 2, description = "Extra Expense", amount = 200.0, date = 2000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")
+            val child = Transaction(id = 2, description = "Extra Expense", amount = 200.0, date = 2000L, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE)
 
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(anchor)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(child)
@@ -469,9 +469,9 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
             // Anchor is over-repaid: expense type but amount is -50
-            val anchor = Transaction(id = 1, description = "Over-repaid Expense", amount = -50.0, date = 1000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")
+            val anchor = Transaction(id = 1, description = "Over-repaid Expense", amount = -50.0, date = 1000L, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE)
             // Child is a small 10 expense
-            val child = Transaction(id = 2, description = "Small Expense", amount = 10.0, date = 2000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")
+            val child = Transaction(id = 2, description = "Small Expense", amount = 10.0, date = 2000L, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE)
 
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(anchor)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(child)
@@ -497,8 +497,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
             // Income of 150 was linked to expense of 100 → expense.amount = 100 - 150 = -50 (over-repaid)
-            val incomeTxn = Transaction(id = 2, description = "Income", amount = 150.0, date = 2000L, accountId = 1, categoryId = 1, transactionType = "income", notes = null, parentReimbursementId = 1)
-            val expenseTxn = Transaction(id = 1, description = "Expense", amount = -50.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = "expense", notes = null)
+            val incomeTxn = Transaction(id = 2, description = "Income", amount = 150.0, date = 2000L, accountId = 1, categoryId = 1, transactionType = TransactionType.INCOME, notes = null, parentReimbursementId = 1)
+            val expenseTxn = Transaction(id = 1, description = "Expense", amount = -50.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = TransactionType.EXPENSE, notes = null)
 
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(incomeTxn)
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(expenseTxn)
@@ -880,8 +880,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
-            repository.updateTransactionType(1, "income")
-            verify(transactionDao).updateTransactionType(1, "income")
+            repository.updateTransactionType(1, TransactionType.INCOME)
+            verify(transactionDao).updateTransactionType(1, TransactionType.INCOME)
         }
 
     @Test
@@ -1271,14 +1271,14 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
 
             val mockSpending = listOf(CategorySpending("Food", 100.0, "red", "icon"))
-            `when`(transactionDao.getSpendingByCategoryForMonth(100L, 200L, "keyword", 1, 2, "expense")).thenReturn(flowOf(mockSpending))
+            `when`(transactionDao.getSpendingByCategoryForMonth(100L, 200L, "keyword", 1, 2, TransactionType.EXPENSE)).thenReturn(flowOf(mockSpending))
 
             // Act & Assert
-            repository.getSpendingByCategoryForMonth(100L, 200L, "keyword", 1, 2, "expense").test {
+            repository.getSpendingByCategoryForMonth(100L, 200L, "keyword", 1, 2, TransactionType.EXPENSE).test {
                 assertEquals(mockSpending, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            verify(transactionDao).getSpendingByCategoryForMonth(100L, 200L, "keyword", 1, 2, "expense")
+            verify(transactionDao).getSpendingByCategoryForMonth(100L, 200L, "keyword", 1, 2, TransactionType.EXPENSE)
         }
 
     @Test
@@ -1307,14 +1307,14 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
 
             val mockSpending = listOf(MerchantSpendingSummary("Amazon", 100.0, 2))
-            `when`(transactionDao.getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, "expense")).thenReturn(flowOf(mockSpending))
+            `when`(transactionDao.getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, TransactionType.EXPENSE)).thenReturn(flowOf(mockSpending))
 
             // Act & Assert
-            repository.getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, "expense").test {
+            repository.getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, TransactionType.EXPENSE).test {
                 assertEquals(mockSpending, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            verify(transactionDao).getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, "expense")
+            verify(transactionDao).getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, TransactionType.EXPENSE)
         }
 
     // --- NEW: Tests for Smart Transaction Merge ---
@@ -1333,8 +1333,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
-            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense")
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = TransactionType.EXPENSE)
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = TransactionType.EXPENSE)
 
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
@@ -1364,8 +1364,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             val deletedSmsHashDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDaoMock, mergeRecordDao, db)
 
-            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
-            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense", sourceSmsHash = "xyz123")
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = TransactionType.EXPENSE)
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = TransactionType.EXPENSE, sourceSmsHash = "xyz123")
 
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
@@ -1382,8 +1382,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             val deletedSmsHashDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.DeletedSmsHashDao::class.java)
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDaoMock, mergeRecordDao, db)
 
-            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
-            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense", sourceSmsHash = null)
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = TransactionType.EXPENSE)
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = TransactionType.EXPENSE, sourceSmsHash = null)
 
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
@@ -1399,8 +1399,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
-            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense")
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = TransactionType.EXPENSE)
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = TransactionType.EXPENSE)
 
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
@@ -1422,8 +1422,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val expenseTxn = Transaction(id = 1, description = "Expense", amount = 1500.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = "expense")
-            val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = "income")
+            val expenseTxn = Transaction(id = 1, description = "Expense", amount = 1500.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = TransactionType.EXPENSE)
+            val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = TransactionType.INCOME)
 
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(incomeTxn)
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(expenseTxn)
@@ -1440,8 +1440,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val expenseTxn = Transaction(id = 1, description = "Expense", amount = 300.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = "expense")
-            val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = "income")
+            val expenseTxn = Transaction(id = 1, description = "Expense", amount = 300.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = TransactionType.EXPENSE)
+            val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = TransactionType.INCOME)
 
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(incomeTxn)
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(expenseTxn)
@@ -1458,8 +1458,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val expenseTxn = Transaction(id = 1, description = "Expense", amount = 1000.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = "expense")
-            val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = "income", parentReimbursementId = 1)
+            val expenseTxn = Transaction(id = 1, description = "Expense", amount = 1000.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = TransactionType.EXPENSE)
+            val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = TransactionType.INCOME, parentReimbursementId = 1)
 
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(incomeTxn)
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(expenseTxn)
@@ -1479,8 +1479,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDaoMock, db)
 
-            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = "expense")
-            val childTxn = Transaction(id = 2, description = "Child", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = "expense", sourceSmsHash = "hash42")
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = "Parent note", transactionType = TransactionType.EXPENSE)
+            val childTxn = Transaction(id = 2, description = "Child", amount = 50.0, date = 2000L, accountId = 1, categoryId = 2, notes = "Child note", transactionType = TransactionType.EXPENSE, sourceSmsHash = "hash42")
 
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
@@ -1488,7 +1488,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository.mergeTransactions(1, 2)
 
             val mergeCaptor = ArgumentCaptor.forClass(io.pm.finlight.data.db.entity.MergeRecord::class.java)
-            verify(mergeRecordDaoMock).insert(mergeCaptor.capture() ?: io.pm.finlight.data.db.entity.MergeRecord(parentTxnId = 0, originalParentAmount = 0.0, originalParentDate = 0L, originalParentNotes = null, childDescription = "", childAmount = 0.0, childDate = 0L, childAccountId = 0, childCategoryId = null, childTransactionType = "", childSource = "", childNotes = null, childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null, childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null))
+            verify(mergeRecordDaoMock).insert(mergeCaptor.capture() ?: io.pm.finlight.data.db.entity.MergeRecord(parentTxnId = 0, originalParentAmount = 0.0, originalParentDate = 0L, originalParentNotes = null, childDescription = "", childAmount = 0.0, childDate = 0L, childAccountId = 0, childCategoryId = null, childTransactionType = TransactionType.EXPENSE, childSource = "", childNotes = null, childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null, childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null))
 
             val captured = mergeCaptor.value
             assertEquals(1, captured.parentTxnId)
@@ -1504,8 +1504,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             val mergeRecordDaoMock = org.mockito.Mockito.mock(io.pm.finlight.data.db.dao.MergeRecordDao::class.java)
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDaoMock, db)
 
-            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense")
-            val childTxn = Transaction(id = 2, description = "Swiggy", amount = 75.0, date = 3000L, accountId = 2, categoryId = 5, notes = "Lunch", transactionType = "expense", sourceSmsHash = "abc", smsSignature = "SBI", source = "sms")
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE)
+            val childTxn = Transaction(id = 2, description = "Swiggy", amount = 75.0, date = 3000L, accountId = 2, categoryId = 5, notes = "Lunch", transactionType = TransactionType.EXPENSE, sourceSmsHash = "abc", smsSignature = "SBI", source = "sms")
 
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(childTxn)
@@ -1513,7 +1513,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository.mergeTransactions(1, 2)
 
             val mergeCaptor = ArgumentCaptor.forClass(io.pm.finlight.data.db.entity.MergeRecord::class.java)
-            verify(mergeRecordDaoMock).insert(mergeCaptor.capture() ?: io.pm.finlight.data.db.entity.MergeRecord(parentTxnId = 0, originalParentAmount = 0.0, originalParentDate = 0L, originalParentNotes = null, childDescription = "", childAmount = 0.0, childDate = 0L, childAccountId = 0, childCategoryId = null, childTransactionType = "", childSource = "", childNotes = null, childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null, childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null))
+            verify(mergeRecordDaoMock).insert(mergeCaptor.capture() ?: io.pm.finlight.data.db.entity.MergeRecord(parentTxnId = 0, originalParentAmount = 0.0, originalParentDate = 0L, originalParentNotes = null, childDescription = "", childAmount = 0.0, childDate = 0L, childAccountId = 0, childCategoryId = null, childTransactionType = TransactionType.EXPENSE, childSource = "", childNotes = null, childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null, childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null))
 
             val captured = mergeCaptor.value
             assertEquals("Swiggy", captured.childDescription)
@@ -1521,7 +1521,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(3000L, captured.childDate)
             assertEquals(2, captured.childAccountId)
             assertEquals(5, captured.childCategoryId)
-            assertEquals("expense", captured.childTransactionType)
+            assertEquals(TransactionType.EXPENSE, captured.childTransactionType)
             assertEquals("sms", captured.childSource)
             assertEquals("Lunch", captured.childNotes)
             assertEquals("abc", captured.childSourceSmsHash)
@@ -1547,7 +1547,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 100000L,
                     childAccountId = 1,
                     childCategoryId = 2,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "manual",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -1561,7 +1561,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
             `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
 
-            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = "expense", notes = null)
+            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = TransactionType.EXPENSE, notes = null)
             `when`(transactionDao.getTransactionByIdSync(10)).thenReturn(anchor)
 
             repository.unmergeTransactions(10)
@@ -1590,7 +1590,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 5000L,
                     childAccountId = 3,
                     childCategoryId = 7,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "sms",
                     childNotes = "Dinner",
                     childSourceSmsId = 12345L,
@@ -1604,14 +1604,14 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
             `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
 
-            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = "expense", notes = null)
+            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = TransactionType.EXPENSE, notes = null)
             `when`(transactionDao.getTransactionByIdSync(10)).thenReturn(anchor)
             `when`(transactionDao.insert(anyObject())).thenReturn(99L)
 
             repository.unmergeTransactions(10)
 
             val txnCaptor = ArgumentCaptor.forClass(Transaction::class.java)
-            verify(transactionDao).insert(txnCaptor.capture() ?: Transaction(description = "", amount = 0.0, date = 0L, accountId = 0, categoryId = 0, transactionType = "", notes = null))
+            verify(transactionDao).insert(txnCaptor.capture() ?: Transaction(description = "", amount = 0.0, date = 0L, accountId = 0, categoryId = 0, transactionType = TransactionType.EXPENSE, notes = null))
 
             val inserted = txnCaptor.value
             assertEquals("Swiggy", inserted.description)
@@ -1619,7 +1619,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(5000L, inserted.date)
             assertEquals(3, inserted.accountId)
             assertEquals(7, inserted.categoryId)
-            assertEquals("expense", inserted.transactionType)
+            assertEquals(TransactionType.EXPENSE, inserted.transactionType)
             assertEquals("sms", inserted.source)
             assertEquals("Dinner", inserted.notes)
             assertEquals(12345L, inserted.sourceSmsId)
@@ -1647,7 +1647,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 2000L,
                     childAccountId = 1,
                     childCategoryId = 1,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "sms",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -1661,7 +1661,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
             `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
 
-            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = "expense", notes = null)
+            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = TransactionType.EXPENSE, notes = null)
             `when`(transactionDao.getTransactionByIdSync(10)).thenReturn(anchor)
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
@@ -1690,7 +1690,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 2000L,
                     childAccountId = 1,
                     childCategoryId = 1,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "manual",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -1704,7 +1704,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
             `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
 
-            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = "expense", notes = null)
+            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = TransactionType.EXPENSE, notes = null)
             `when`(transactionDao.getTransactionByIdSync(10)).thenReturn(anchor)
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
@@ -1732,7 +1732,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 2000L,
                     childAccountId = 1,
                     childCategoryId = 1,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "manual",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -1746,7 +1746,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(mergeRecordDaoMock.getForParentSync(10)).thenReturn(record)
             `when`(mergeRecordDaoMock.getAllForParentSync(10)).thenReturn(listOf(record))
 
-            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = "expense", notes = null)
+            val anchor = Transaction(id = 10, description = "Anchor", amount = 750.0, date = 100000L, accountId = 1, categoryId = 2, transactionType = TransactionType.EXPENSE, notes = null)
             `when`(transactionDao.getTransactionByIdSync(10)).thenReturn(anchor)
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
@@ -1794,15 +1794,15 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val newTxn = Transaction(id = 1, description = "Withdrawal", amount = 100.0, date = 1000L, accountId = 1, transactionType = "expense", sourceSmsId = 10, categoryId = null, notes = null)
-            val candidate = Transaction(id = 2, description = "Deposit", amount = 100.0, date = 1000L + 60 * 1000L, accountId = 2, transactionType = "income", sourceSmsId = 20, categoryId = null, notes = null)
+            val newTxn = Transaction(id = 1, description = "Withdrawal", amount = 100.0, date = 1000L, accountId = 1, transactionType = TransactionType.EXPENSE, sourceSmsId = 10, categoryId = null, notes = null)
+            val candidate = Transaction(id = 2, description = "Deposit", amount = 100.0, date = 1000L + 60 * 1000L, accountId = 2, transactionType = TransactionType.INCOME, sourceSmsId = 20, categoryId = null, notes = null)
 
             // Return candidate
             org.mockito.kotlin.whenever(
                 transactionDao.findPotentialTransfers(
                     org.mockito.kotlin.eq(100.0),
                     org.mockito.kotlin.eq(1),
-                    org.mockito.kotlin.eq("expense"),
+                    org.mockito.kotlin.eq(TransactionType.EXPENSE),
                     org.mockito.kotlin.any(),
                     org.mockito.kotlin.any()
                 )
@@ -1820,15 +1820,15 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val newTxn = Transaction(id = 1, description = "Transfer", originalDescription = "Transfer to 1234", amount = 100.0, date = 1000L, accountId = 1, transactionType = "expense", sourceSmsId = 10, categoryId = null, notes = null)
+            val newTxn = Transaction(id = 1, description = "Transfer", originalDescription = "Transfer to 1234", amount = 100.0, date = 1000L, accountId = 1, transactionType = TransactionType.EXPENSE, sourceSmsId = 10, categoryId = null, notes = null)
             // 2 hours difference (loose time)
-            val candidate = Transaction(id = 2, description = "Transfer", originalDescription = "Received from 9999", amount = 100.0, date = 1000L + 2 * 60 * 60 * 1000L, accountId = 2, transactionType = "income", sourceSmsId = 20, categoryId = null, notes = null)
+            val candidate = Transaction(id = 2, description = "Transfer", originalDescription = "Received from 9999", amount = 100.0, date = 1000L + 2 * 60 * 60 * 1000L, accountId = 2, transactionType = TransactionType.INCOME, sourceSmsId = 20, categoryId = null, notes = null)
 
             org.mockito.kotlin.whenever(
                 transactionDao.findPotentialTransfers(
                     org.mockito.kotlin.eq(100.0),
                     org.mockito.kotlin.eq(1),
-                    org.mockito.kotlin.eq("expense"),
+                    org.mockito.kotlin.eq(TransactionType.EXPENSE),
                     org.mockito.kotlin.any(),
                     org.mockito.kotlin.any()
                 )
@@ -1853,15 +1853,15 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val newTxn = Transaction(id = 1, description = "Expense", originalDescription = "Some expense", amount = 100.0, date = 1000L, accountId = 1, transactionType = "expense", sourceSmsId = 10, categoryId = null, notes = null)
+            val newTxn = Transaction(id = 1, description = "Expense", originalDescription = "Some expense", amount = 100.0, date = 1000L, accountId = 1, transactionType = TransactionType.EXPENSE, sourceSmsId = 10, categoryId = null, notes = null)
             // 2 hours difference (loose time)
-            val candidate = Transaction(id = 2, description = "Income", originalDescription = "Some income", amount = 100.0, date = 1000L + 2 * 60 * 60 * 1000L, accountId = 2, transactionType = "income", sourceSmsId = 20, categoryId = null, notes = null)
+            val candidate = Transaction(id = 2, description = "Income", originalDescription = "Some income", amount = 100.0, date = 1000L + 2 * 60 * 60 * 1000L, accountId = 2, transactionType = TransactionType.INCOME, sourceSmsId = 20, categoryId = null, notes = null)
 
             org.mockito.kotlin.whenever(
                 transactionDao.findPotentialTransfers(
                     org.mockito.kotlin.eq(100.0),
                     org.mockito.kotlin.eq(1),
-                    org.mockito.kotlin.eq("expense"),
+                    org.mockito.kotlin.eq(TransactionType.EXPENSE),
                     org.mockito.kotlin.any(),
                     org.mockito.kotlin.any()
                 )
@@ -1884,8 +1884,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
 
-            val newTxnLinked = Transaction(id = 1, description = "A", amount = 100.0, date = 1000L, accountId = 1, transactionType = "expense", sourceSmsId = 10, linkedTransferId = 99, categoryId = null, notes = null)
-            val newTxnExcluded = Transaction(id = 2, description = "B", amount = 100.0, date = 1000L, accountId = 1, transactionType = "expense", sourceSmsId = 10, isExcluded = true, categoryId = null, notes = null)
+            val newTxnLinked = Transaction(id = 1, description = "A", amount = 100.0, date = 1000L, accountId = 1, transactionType = TransactionType.EXPENSE, sourceSmsId = 10, linkedTransferId = 99, categoryId = null, notes = null)
+            val newTxnExcluded = Transaction(id = 2, description = "B", amount = 100.0, date = 1000L, accountId = 1, transactionType = TransactionType.EXPENSE, sourceSmsId = 10, isExcluded = true, categoryId = null, notes = null)
 
             repository.detectAndLinkSelfTransfer(newTxnLinked)
             repository.detectAndLinkSelfTransfer(newTxnExcluded)
@@ -1909,7 +1909,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             val anchorAccountId = 101
             val childAccountId = 102
 
-            val anchorTxn = Transaction(id = parentTxnId, description = "Anchor", amount = 800.0, date = 1000L, accountId = anchorAccountId, transactionType = "expense", notes = null, categoryId = null)
+            val anchorTxn = Transaction(id = parentTxnId, description = "Anchor", amount = 800.0, date = 1000L, accountId = anchorAccountId, transactionType = TransactionType.EXPENSE, notes = null, categoryId = null)
             val mergeRecord =
                 MergeRecord(
                     parentTxnId = parentTxnId,
@@ -1921,7 +1921,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 1000L,
                     childAccountId = childAccountId,
                     childCategoryId = null,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "manual",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -1946,7 +1946,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(anchorAccountId, anchorEntry.accountId)
             assertEquals("Anchor Account", anchorEntry.accountName)
             assertEquals(500.0, anchorEntry.amount)
-            assertEquals("expense", anchorEntry.transactionType)
+            assertEquals(TransactionType.EXPENSE, anchorEntry.transactionType)
             assertTrue(anchorEntry.isAnchor)
             assertEquals("Anchor", anchorEntry.description)
             assertEquals(1000L, anchorEntry.date)
@@ -1955,7 +1955,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(childAccountId, childEntry.accountId)
             assertEquals("Child Account", childEntry.accountName)
             assertEquals(300.0, childEntry.amount)
-            assertEquals("expense", childEntry.transactionType)
+            assertEquals(TransactionType.EXPENSE, childEntry.transactionType)
             assertEquals(false, childEntry.isAnchor)
             assertEquals("Child", childEntry.description)
             assertEquals(1000L, childEntry.date)
@@ -1972,7 +1972,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             val childAccountId = 102
 
             // Parent mutated to income 0.0 because -2000 expense + 2000 income = 0.0
-            val anchorTxn = Transaction(id = parentTxnId, description = "Anchor", amount = 0.0, date = 1000L, accountId = anchorAccountId, transactionType = "income", notes = null, categoryId = null)
+            val anchorTxn = Transaction(id = parentTxnId, description = "Anchor", amount = 0.0, date = 1000L, accountId = anchorAccountId, transactionType = TransactionType.INCOME, notes = null, categoryId = null)
             val mergeRecord =
                 MergeRecord(
                     parentTxnId = parentTxnId,
@@ -1984,7 +1984,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 1000L,
                     childAccountId = childAccountId,
                     childCategoryId = null,
-                    childTransactionType = "income",
+                    childTransactionType = TransactionType.INCOME,
                     childSource = "manual",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -2009,14 +2009,14 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(anchorAccountId, anchorEntry.accountId)
             assertEquals("HDFC Millenia CC", anchorEntry.accountName)
             assertEquals(2000.0, anchorEntry.amount)
-            assertEquals("expense", anchorEntry.transactionType) // Correctly restored to expense!
+            assertEquals(TransactionType.EXPENSE, anchorEntry.transactionType) // Correctly restored to expense!
             assertTrue(anchorEntry.isAnchor)
 
             val childEntry = breakdown[1]
             assertEquals(childAccountId, childEntry.accountId)
             assertEquals("HDFC SB AC", childEntry.accountName)
             assertEquals(2000.0, childEntry.amount)
-            assertEquals("income", childEntry.transactionType)
+            assertEquals(TransactionType.INCOME, childEntry.transactionType)
             assertEquals(false, childEntry.isAnchor)
         }
 
@@ -2032,5 +2032,56 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             val breakdown = repository.getMergedTransactionBreakdown(parentTxnId)
 
             assertTrue(breakdown.isEmpty())
+        }
+
+    @Test
+    fun `getMergedTransactionBreakdown preserves parent type when anchorSigned is zero`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val parentTxnId = 1
+            val anchorAccountId = 101
+            val anchorTxn = Transaction(id = parentTxnId, description = "Anchor", amount = 0.0, date = 1000L, accountId = anchorAccountId, transactionType = TransactionType.TRANSFER, notes = null, categoryId = null)
+            val mergeRecord =
+                MergeRecord(
+                    parentTxnId = parentTxnId,
+                    originalParentAmount = 0.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child",
+                    childAmount = 0.0,
+                    childDate = 1000L,
+                    childAccountId = anchorAccountId,
+                    childCategoryId = null,
+                    childTransactionType = TransactionType.EXPENSE,
+                    childSource = "manual",
+                    childNotes = null,
+                    childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
+                    childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null,
+                )
+
+            `when`(mergeRecordDao.getAllForParentAnyType(parentTxnId)).thenReturn(listOf(mergeRecord))
+            `when`(transactionDao.getTransactionByIdSync(parentTxnId)).thenReturn(anchorTxn)
+            `when`(accountDao.getAccountByIdBlocking(anchorAccountId)).thenReturn(Account(id = anchorAccountId, name = "Account", type = "Bank"))
+
+            val breakdown = repository.getMergedTransactionBreakdown(parentTxnId)
+
+            assertEquals(2, breakdown.size)
+            assertEquals(TransactionType.TRANSFER, breakdown[0].transactionType)
+        }
+
+    @Test
+    fun `findRecentTransactionForMerge delegates to DAO with TransactionType`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val expected = Transaction(id = 1, description = "Uber", amount = 200.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = TransactionType.EXPENSE, notes = null)
+            `when`(transactionDao.findRecentTransactionForMerge("Uber", 1, TransactionType.EXPENSE, 500L, 2)).thenReturn(expected)
+
+            val result = repository.findRecentTransactionForMerge("Uber", 1, TransactionType.EXPENSE, 500L, 2)
+
+            assertEquals(expected, result)
         }
 }

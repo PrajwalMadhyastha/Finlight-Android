@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import io.pm.finlight.TransactionDetails
+import io.pm.finlight.TransactionType
 import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
@@ -196,7 +197,7 @@ fun TransactionItem(
                 )
             }
 
-            val isMathematicallyIncome = transactionDetails.transaction.transactionType == "income"
+            val isMathematicallyIncome = transactionDetails.transaction.transactionType == TransactionType.INCOME
             val isVisuallyIncome = isMathematicallyIncome || (!isMathematicallyIncome && transactionDetails.transaction.amount < 0)
             val displayAmount = kotlin.math.abs(transactionDetails.transaction.amount)
 
@@ -218,7 +219,7 @@ fun TransactionItem(
                 Spacer(modifier = Modifier.width(4.dp))
                 Icon(
                     imageVector = icon,
-                    contentDescription = transactionDetails.transaction.transactionType,
+                    contentDescription = transactionDetails.transaction.transactionType.name.lowercase(),
                     tint = amountColor,
                     modifier = Modifier.size(20.dp),
                 )

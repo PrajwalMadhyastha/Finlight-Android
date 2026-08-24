@@ -70,7 +70,7 @@ data class ManualTransactionData(
     val accountId: Int,
     val notes: String?,
     val date: Long,
-    val transactionType: String,
+    val transactionType: TransactionType,
     val imageUris: List<Uri>,
     val tags: Set<Tag>,
 )
@@ -146,8 +146,8 @@ class TransactionViewModel(
         combine(_selectedTransactionIds, transactionsForSelectedMonth) { ids, txns ->
             if (ids.size < 2) return@combine false
             val selected = txns.filter { it.transaction.id in ids }
-            val expenseCount = selected.count { it.transaction.transactionType == "expense" }
-            val incomeCount = selected.count { it.transaction.transactionType == "income" }
+            val expenseCount = selected.count { it.transaction.transactionType == TransactionType.EXPENSE }
+            val incomeCount = selected.count { it.transaction.transactionType == TransactionType.INCOME }
             expenseCount == 1 && incomeCount >= 1
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     }
@@ -176,7 +176,7 @@ class TransactionViewModel(
             if (ids.size < 2) return@combine false
             val selected = txns.filter { it.transaction.id in ids }
             val hasSplit = selected.any { it.transaction.isSplit }
-            val hasPending = selected.any { it.transaction.status == "PENDING" || it.transaction.status == "SKIPPED" }
+            val hasPending = selected.any { it.transaction.status == TransactionStatus.PENDING || it.transaction.status == TransactionStatus.SKIPPED }
             !hasSplit && !hasPending
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     }
@@ -465,10 +465,10 @@ class TransactionViewModel(
                         set(Calendar.MINUTE, 59)
                         set(Calendar.SECOND, 59)
                     }.timeInMillis
-                val typeStr =
+                val typeEnum =
                     when (filters.transactionType) {
-                        AnalysisTransactionType.EXPENSE -> "expense"
-                        AnalysisTransactionType.INCOME -> "income"
+                        AnalysisTransactionType.EXPENSE -> TransactionType.EXPENSE
+                        AnalysisTransactionType.INCOME -> TransactionType.INCOME
                         AnalysisTransactionType.ALL -> null
                     }
                 transactionRepository.getSpendingByCategoryForMonth(
@@ -476,7 +476,7 @@ class TransactionViewModel(
                     filters.keyword.takeIf {
                         it.isNotBlank()
                     },
-                    filters.account?.id, filters.category?.id, typeStr,
+                    filters.account?.id, filters.category?.id, typeEnum,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -498,10 +498,10 @@ class TransactionViewModel(
                         set(Calendar.MINUTE, 59)
                         set(Calendar.SECOND, 59)
                     }.timeInMillis
-                val typeStr =
+                val typeEnum =
                     when (filters.transactionType) {
-                        AnalysisTransactionType.EXPENSE -> "expense"
-                        AnalysisTransactionType.INCOME -> "income"
+                        AnalysisTransactionType.EXPENSE -> TransactionType.EXPENSE
+                        AnalysisTransactionType.INCOME -> TransactionType.INCOME
                         AnalysisTransactionType.ALL -> null
                     }
                 transactionRepository.getSpendingByMerchantForMonth(
@@ -509,7 +509,7 @@ class TransactionViewModel(
                     filters.keyword.takeIf {
                         it.isNotBlank()
                     },
-                    filters.account?.id, filters.category?.id, typeStr,
+                    filters.account?.id, filters.category?.id, typeEnum,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -581,11 +581,11 @@ class TransactionViewModel(
                 loadVisitCount(it.description)
 
                 // --- Reimbursement data ---
-                if (it.transactionType == "expense") {
+                if (it.transactionType == TransactionType.EXPENSE) {
                     transactionRepository.getReimbursementsForExpense(it.id).collect { reimbursements ->
                         _reimbursementsForCurrentExpense.value = reimbursements
                     }
-                } else if (it.transactionType == "income" && it.parentReimbursementId != null) {
+                } else if (it.transactionType == TransactionType.INCOME && it.parentReimbursementId != null) {
                     transactionRepository.getLinkedExpenseForReimbursement(it.id).collect { expense ->
                         _linkedExpenseForCurrentIncome.value = expense
                     }
@@ -694,8 +694,8 @@ class TransactionViewModel(
         viewModelScope.launch {
             val allTxns = transactionsForSelectedMonth.value
             val selected = allTxns.filter { it.transaction.id in _selectedTransactionIds.value }
-            val expenses = selected.filter { it.transaction.transactionType == "expense" }
-            val incomes = selected.filter { it.transaction.transactionType == "income" }
+            val expenses = selected.filter { it.transaction.transactionType == TransactionType.EXPENSE }
+            val incomes = selected.filter { it.transaction.transactionType == TransactionType.INCOME }
             if (expenses.size != 1 || incomes.isEmpty()) {
                 _uiEvent.send("Select exactly 1 expense and 1 or more income transactions.")
                 return@launch
@@ -1014,7 +1014,7 @@ class TransactionViewModel(
         categoryId: Int?,
         notes: String?,
         date: Long,
-        transactionType: String,
+        transactionType: TransactionType,
         imageUris: List<Uri>,
         onSaveComplete: (Long?) -> Unit,
     ) {
@@ -1058,6 +1058,30 @@ class TransactionViewModel(
                 }
             }
         }
+    }
+
+    fun onSaveTapped(
+        description: String,
+        amountStr: String,
+        accountId: Int?,
+        categoryId: Int?,
+        notes: String?,
+        date: Long,
+        transactionType: String,
+        imageUris: List<Uri>,
+        onSaveComplete: (Long?) -> Unit,
+    ) {
+        onSaveTapped(
+            description = description,
+            amountStr = amountStr,
+            accountId = accountId,
+            categoryId = categoryId,
+            notes = notes,
+            date = date,
+            transactionType = TransactionType.fromString(transactionType),
+            imageUris = imageUris,
+            onSaveComplete = onSaveComplete,
+        )
     }
 
     fun saveWithSelectedCategory(
@@ -1585,7 +1609,7 @@ class TransactionViewModel(
     // --- NEW: Function to update transaction type ---
     fun updateTransactionType(
         id: Int,
-        transactionType: String,
+        transactionType: TransactionType,
     ) = viewModelScope.launch {
         try {
             transactionRepository.updateTransactionType(id, transactionType)
@@ -1708,7 +1732,7 @@ class TransactionViewModel(
                             date = potentialTxn.date,
                             accountId = account.id,
                             notes = notes,
-                            transactionType = potentialTxn.transactionType,
+                            transactionType = TransactionType.fromString(potentialTxn.transactionType),
                             sourceSmsId = potentialTxn.sourceSmsId,
                             sourceSmsHash = potentialTxn.sourceSmsHash,
                             source = "Imported",
@@ -1726,7 +1750,7 @@ class TransactionViewModel(
                             date = potentialTxn.date,
                             accountId = account.id,
                             notes = notes,
-                            transactionType = potentialTxn.transactionType,
+                            transactionType = TransactionType.fromString(potentialTxn.transactionType),
                             sourceSmsId = potentialTxn.sourceSmsId,
                             sourceSmsHash = potentialTxn.sourceSmsHash,
                             source = "Imported",
@@ -1805,7 +1829,7 @@ class TransactionViewModel(
                         date = potentialTxn.date,
                         accountId = finalAccountId,
                         notes = null,
-                        transactionType = potentialTxn.transactionType,
+                        transactionType = TransactionType.fromString(potentialTxn.transactionType),
                         sourceSmsId = potentialTxn.sourceSmsId,
                         sourceSmsHash = potentialTxn.sourceSmsHash,
                         source = source,

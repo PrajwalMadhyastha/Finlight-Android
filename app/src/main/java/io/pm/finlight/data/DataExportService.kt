@@ -238,7 +238,7 @@ object DataExportService {
                     val date = dateFormat.format(Date(transaction.date))
                     val description = escapeCsvField(transaction.description)
                     val amount = transaction.amount.toString()
-                    val type = transaction.transactionType
+                    val type = transaction.transactionType.name.lowercase()
                     val account = escapeCsvField(details.accountName ?: "N/A")
                     val notes = escapeCsvField(transaction.notes ?: "")
                     val isExcluded = transaction.isExcluded.toString()
