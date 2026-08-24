@@ -27,7 +27,7 @@ class MonthlySummaryWorker(
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
-                val transactionDao = AppDatabase.getInstance(context).transactionDao()
+                val transactionAnalyticsDao = AppDatabase.getInstance(context).transactionAnalyticsDao()
 
                 // --- Date range for LAST MONTH ---
                 val lastMonthCalendar = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
@@ -71,13 +71,13 @@ class MonthlySummaryWorker(
                         set(Calendar.MILLISECOND, 0) // --- FIX
                     }.timeInMillis
 
-                val lastMonthSummary = transactionDao.getFinancialSummaryForRange(lastMonthStart, lastMonthEnd)
+                val lastMonthSummary = transactionAnalyticsDao.getFinancialSummaryForRange(lastMonthStart, lastMonthEnd)
                 val lastMonthExpenses = lastMonthSummary?.totalExpenses ?: 0.0
 
-                val prevMonthSummary = transactionDao.getFinancialSummaryForRange(prevMonthStart, prevMonthEnd)
+                val prevMonthSummary = transactionAnalyticsDao.getFinancialSummaryForRange(prevMonthStart, prevMonthEnd)
                 val prevMonthExpenses = prevMonthSummary?.totalExpenses ?: 0.0
 
-                val topCategories = transactionDao.getTopSpendingCategoriesForRange(lastMonthStart, lastMonthEnd)
+                val topCategories = transactionAnalyticsDao.getTopSpendingCategoriesForRange(lastMonthStart, lastMonthEnd)
 
                 val percentageChange =
                     if (prevMonthExpenses > 0) {

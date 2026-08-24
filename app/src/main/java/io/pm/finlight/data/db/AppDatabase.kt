@@ -64,6 +64,14 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
 
+    abstract fun transactionWriteDao(): TransactionWriteDao
+
+    abstract fun transactionQueryDao(): TransactionQueryDao
+
+    abstract fun transactionAnalyticsDao(): TransactionAnalyticsDao
+
+    abstract fun transactionReimbursementDao(): TransactionReimbursementDao
+
     abstract fun accountDao(): AccountDao
 
     abstract fun categoryDao(): CategoryDao

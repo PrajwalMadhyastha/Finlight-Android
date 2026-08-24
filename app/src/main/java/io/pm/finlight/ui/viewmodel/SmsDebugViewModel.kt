@@ -179,7 +179,7 @@ class SmsDebugViewModel(
             val newResults = mutableListOf<SmsDebugResult>()
             val transactionsToImport = mutableListOf<PotentialTransaction>()
 
-            val existingSmsHashes = db.transactionDao().getAllSmsHashes().first().toSet()
+            val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toSet()
 
             for (sms in recentSms) {
                 // --- REMOVED: withContext(Dispatchers.IO) to make ViewModel more testable ---

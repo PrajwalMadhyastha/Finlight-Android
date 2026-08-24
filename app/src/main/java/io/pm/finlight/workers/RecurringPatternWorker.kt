@@ -23,7 +23,7 @@ class RecurringPatternWorker(
     private val context: Context,
     workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
-    private val transactionDao = AppDatabase.getInstance(context).transactionDao()
+    private val transactionQueryDao = AppDatabase.getInstance(context).transactionQueryDao()
     private val patternDao = AppDatabase.getInstance(context).recurringPatternDao()
     private val recurringTransactionDao = AppDatabase.getInstance(context).recurringTransactionDao()
 
@@ -56,7 +56,7 @@ class RecurringPatternWorker(
 
                 // 1. Fetch recent transactions that have an SMS signature.
                 val recentTransactions =
-                    transactionDao.getTransactionsWithSignatureSince(
+                    transactionQueryDao.getTransactionsWithSignatureSince(
                         System.currentTimeMillis() - TimeUnit.DAYS.toMillis(ANALYSIS_WINDOW_DAYS),
                     )
 
@@ -107,7 +107,7 @@ class RecurringPatternWorker(
     }
 
     private suspend fun analyzeAndCreateRuleIfNeeded(pattern: RecurringPattern) {
-        val transactions = transactionDao.getTransactionsBySignature(pattern.smsSignature)
+        val transactions = transactionQueryDao.getTransactionsBySignature(pattern.smsSignature)
         if (transactions.size < MIN_OCCURRENCES_FOR_PATTERN) return
 
         val timestamps = transactions.map { it.date }.sorted()

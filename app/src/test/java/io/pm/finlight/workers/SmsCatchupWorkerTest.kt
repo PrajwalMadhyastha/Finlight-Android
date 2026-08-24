@@ -84,6 +84,10 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
         every { db.transactionDao() } returns transactionDao
+        every { db.transactionQueryDao() } returns transactionDao
+        every { db.transactionWriteDao() } returns transactionDao
+        every { db.transactionAnalyticsDao() } returns transactionDao
+        every { db.transactionReimbursementDao() } returns transactionDao
         every { db.merchantMappingDao() } returns merchantMappingDao
         every { db.customSmsRuleDao() } returns customSmsRuleDao
         every { db.ignoreRuleDao() } returns ignoreRuleDao

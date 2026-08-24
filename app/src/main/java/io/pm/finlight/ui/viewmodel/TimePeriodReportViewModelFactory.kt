@@ -26,16 +26,25 @@ class TimePeriodReportViewModelFactory(
             val db = AppDatabase.getInstance(application)
             // --- NEW: Instantiate all repositories ---
             val settingsRepository = SettingsRepository(application)
-            val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao(), db)
+            val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
+            val transactionRepository =
+                TransactionRepository(
+                    transactionWriteDao = db.transactionWriteDao(),
+                    transactionQueryDao = db.transactionQueryDao(),
+                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                    transactionReimbursementDao = db.transactionReimbursementDao(),
+                    settingsRepository = settingsRepository,
+                    tagRepository = tagRepository,
+                    deletedSmsHashDao = db.deletedSmsHashDao(),
+                    mergeRecordDao = db.mergeRecordDao(),
+                    db = db,
+                )
 
             @Suppress("UNCHECKED_CAST")
             return TimePeriodReportViewModel(
-                // --- UPDATED: Pass repositories instead of DAOs ---
-                // Still needed for charts/insights
-                transactionDao = db.transactionDao(),
+                transactionQueryDao = db.transactionQueryDao(),
+                transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 transactionRepository = transactionRepository,
-                // --- NEW: Added ---
                 settingsRepository = settingsRepository,
                 timePeriod = timePeriod,
                 initialDateMillis = initialDateMillis,

@@ -17,7 +17,7 @@ class TagViewModelFactory(private val application: Application) : ViewModelProvi
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TagViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
-            val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+            val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
             val tripRepository = TripRepository(db.tripDao())
             @Suppress("UNCHECKED_CAST")
             return TagViewModel(application, tagRepository, tripRepository) as T

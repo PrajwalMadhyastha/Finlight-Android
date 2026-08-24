@@ -110,7 +110,7 @@ object DataExportService {
 
                 val backupData =
                     AppDataBackup(
-                        transactions = db.transactionDao().getAllTransactionsSimple().first(),
+                        transactions = db.transactionQueryDao().getAllTransactionsSimple().first(),
                         accounts = db.accountDao().getAllAccounts().first(),
                         categories = db.categoryDao().getAllCategories().first(),
                         budgets = db.budgetDao().getAllBudgets().first(),
@@ -124,7 +124,7 @@ object DataExportService {
                         smsParseTemplates = db.smsParseTemplateDao().getAllTemplates(),
                         // --- Phase 2: Export Remaining App Intelligence ---
                         tags = db.tagDao().getAllTagsList(),
-                        transactionTagCrossRefs = db.transactionDao().getAllCrossRefs(),
+                        transactionTagCrossRefs = db.transactionQueryDao().getAllCrossRefs(),
                         goals = db.goalDao().getAll(),
                         goalTransactionLinks = db.goalTransactionLinkDao().getAll(),
                         trips = db.tripDao().getAll(),
@@ -148,12 +148,15 @@ object DataExportService {
         return withContext(Dispatchers.IO) {
             try {
                 val jsonString =
-                    context.contentResolver.openInputStream(uri)?.bufferedReader()
-                        .use { it?.readText() }
-                if (jsonString == null) {
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        inputStream.bufferedReader().use { it.readText() }
+                    }
+
+                if (jsonString.isNullOrBlank()) {
                     Log.e("DataExportService", "Failed to read JSON from URI.")
                     return@withContext false
                 }
+
                 importDataFromJsonString(context, jsonString)
             } catch (e: Exception) {
                 Log.e("DataExportService", "Error importing from JSON URI", e)
@@ -166,57 +169,59 @@ object DataExportService {
         context: Context,
         jsonString: String,
     ): Boolean {
-        return try {
-            val backupData = json.decodeFromString<AppDataBackup>(jsonString)
-            val db = AppDatabase.getInstance(context)
+        return withContext(Dispatchers.IO) {
+            try {
+                val backupData = json.decodeFromString<AppDataBackup>(jsonString)
+                val db = AppDatabase.getInstance(context)
 
-            // Clear all data in the correct order (respecting foreign keys)
-            db.splitTransactionDao().deleteAll()
-            db.transactionDao().deleteAll() // Deletes transactions and their tag cross-refs via cascade
-            db.tagDao().deleteAll() // Must be after transactions
-            db.accountDao().deleteAll()
-            db.categoryDao().deleteAll()
-            db.budgetDao().deleteAll()
-            db.merchantMappingDao().deleteAll()
-            db.goalDao().deleteAll()
-            db.goalTransactionLinkDao().deleteAll()
-            db.tripDao().deleteAll()
-            db.accountAliasDao().deleteAll()
-            // --- Phase 1: Clear Core Parsing Intelligence Tables ---
-            db.customSmsRuleDao().deleteAll()
-            db.merchantRenameRuleDao().deleteAll()
-            db.merchantCategoryMappingDao().deleteAll()
-            db.ignoreRuleDao().deleteAll()
-            db.smsParseTemplateDao().deleteAll()
-            // --- Phase 3: Clear App-Learned Recurring Patterns ---
-            db.recurringPatternDao().deleteAll()
+                // Clear all data in the correct order (respecting foreign keys)
+                db.splitTransactionDao().deleteAll()
+                db.transactionWriteDao().deleteAll() // Deletes transactions and their tag cross-refs via cascade
+                db.tagDao().deleteAll() // Must be after transactions
+                db.accountDao().deleteAll()
+                db.categoryDao().deleteAll()
+                db.budgetDao().deleteAll()
+                db.merchantMappingDao().deleteAll()
+                db.goalDao().deleteAll()
+                db.goalTransactionLinkDao().deleteAll()
+                db.tripDao().deleteAll()
+                db.accountAliasDao().deleteAll()
+                // --- Phase 1: Clear Core Parsing Intelligence Tables ---
+                db.customSmsRuleDao().deleteAll()
+                db.merchantRenameRuleDao().deleteAll()
+                db.merchantCategoryMappingDao().deleteAll()
+                db.ignoreRuleDao().deleteAll()
+                db.smsParseTemplateDao().deleteAll()
+                // --- Phase 3: Clear App-Learned Recurring Patterns ---
+                db.recurringPatternDao().deleteAll()
 
-            // Insert new data
-            db.accountDao().insertAll(backupData.accounts)
-            db.categoryDao().insertAll(backupData.categories)
-            db.budgetDao().insertAll(backupData.budgets)
-            db.merchantMappingDao().insertAll(backupData.merchantMappings)
-            db.tagDao().insertAll(backupData.tags)
-            db.goalDao().insertAll(backupData.goals)
-            db.goalTransactionLinkDao().insertAll(backupData.goalTransactionLinks)
-            db.tripDao().insertAll(backupData.trips)
-            db.accountAliasDao().insertAll(backupData.accountAliases)
-            db.transactionDao().insertAll(backupData.transactions)
-            db.splitTransactionDao().insertAll(backupData.splitTransactions)
-            db.transactionDao().addTagsToTransaction(backupData.transactionTagCrossRefs)
+                // Insert new data
+                db.accountDao().insertAll(backupData.accounts)
+                db.categoryDao().insertAll(backupData.categories)
+                db.budgetDao().insertAll(backupData.budgets)
+                db.merchantMappingDao().insertAll(backupData.merchantMappings)
+                db.tagDao().insertAll(backupData.tags)
+                db.goalDao().insertAll(backupData.goals)
+                db.goalTransactionLinkDao().insertAll(backupData.goalTransactionLinks)
+                db.tripDao().insertAll(backupData.trips)
+                db.accountAliasDao().insertAll(backupData.accountAliases)
+                db.transactionWriteDao().insertAll(backupData.transactions)
+                db.splitTransactionDao().insertAll(backupData.splitTransactions)
+                db.transactionWriteDao().addTagsToTransaction(backupData.transactionTagCrossRefs)
 
-            // --- Phase 1: Insert Core Parsing Intelligence Data ---
-            db.customSmsRuleDao().insertAll(backupData.customSmsRules)
-            db.merchantRenameRuleDao().insertAll(backupData.merchantRenameRules)
-            db.merchantCategoryMappingDao().insertAll(backupData.merchantCategoryMappings)
-            db.ignoreRuleDao().insertAll(backupData.ignoreRules)
-            db.smsParseTemplateDao().insertAll(backupData.smsParseTemplates)
-            // --- Phase 3: Insert App-Learned Recurring Patterns ---
-            backupData.recurringPatterns.forEach { db.recurringPatternDao().insert(it) }
-            true
-        } catch (e: Exception) {
-            Log.e("DataExportService", "Error processing JSON string during import", e)
-            false
+                // --- Phase 1: Insert Core Parsing Intelligence Data ---
+                db.customSmsRuleDao().insertAll(backupData.customSmsRules)
+                db.merchantRenameRuleDao().insertAll(backupData.merchantRenameRules)
+                db.merchantCategoryMappingDao().insertAll(backupData.merchantCategoryMappings)
+                db.ignoreRuleDao().insertAll(backupData.ignoreRules)
+                db.smsParseTemplateDao().insertAll(backupData.smsParseTemplates)
+                // --- Phase 3: Insert App-Learned Recurring Patterns ---
+                backupData.recurringPatterns.forEach { db.recurringPatternDao().insert(it) }
+                true
+            } catch (e: Exception) {
+                Log.e("DataExportService", "Error processing JSON string during import", e)
+                false
+            }
         }
     }
 
@@ -224,9 +229,9 @@ object DataExportService {
         return withContext(Dispatchers.IO) {
             try {
                 val db = AppDatabase.getInstance(context)
-                val transactionDao = db.transactionDao()
+                val transactionQueryDao = db.transactionQueryDao()
                 val splitTransactionDao = db.splitTransactionDao()
-                val transactions = transactionDao.getAllTransactions().first()
+                val transactions = transactionQueryDao.getAllTransactions().first()
                 val csvBuilder = StringBuilder()
 
                 csvBuilder.append(getCsvTemplateString())
@@ -242,7 +247,7 @@ object DataExportService {
                     val account = escapeCsvField(details.accountName ?: "N/A")
                     val notes = escapeCsvField(transaction.notes ?: "")
                     val isExcluded = transaction.isExcluded.toString()
-                    val tags = transactionDao.getTagsForTransactionSimple(transaction.id)
+                    val tags = transactionQueryDao.getTagsForTransactionSimple(transaction.id)
                     val tagsString = tags.joinToString("|") { it.name }
                     val escapedTags = escapeCsvField(tagsString)
 

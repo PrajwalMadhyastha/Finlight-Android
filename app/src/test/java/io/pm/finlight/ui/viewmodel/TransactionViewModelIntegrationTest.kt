@@ -70,14 +70,18 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
         every { settingsRepository.getOverallBudgetForMonth(any(), any()) } returns flowOf(0f)
 
         // 3. Initialize Real Repositories with DB DAOs
-        tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+        tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
         transactionRepository =
             TransactionRepository(
-                transactionDao = db.transactionDao(),
+                transactionWriteDao = db.transactionWriteDao(),
+                transactionQueryDao = db.transactionQueryDao(),
+                transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                transactionReimbursementDao = db.transactionReimbursementDao(),
                 settingsRepository = settingsRepository,
                 tagRepository = tagRepository,
                 deletedSmsHashDao = db.deletedSmsHashDao(),
-                mergeRecordDao = db.mergeRecordDao(), db = db,
+                mergeRecordDao = db.mergeRecordDao(),
+                db = db,
             )
         accountRepository = AccountRepository(db)
         categoryRepository = CategoryRepository(db.categoryDao())
@@ -378,7 +382,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
             assertEquals("Anchor notes must be restored", "original-note", restoredAnchor.notes)
 
             // Assert: both children re-inserted with correct descriptions
-            val allTxns = db.transactionDao().getAllTransactionsSync()
+            val allTxns = db.transactionQueryDao().getAllTransactionsSync()
             val childDescs = allTxns.map { it.description }
             assertTrue("Child A must be re-inserted", childDescs.contains("Child A"))
             assertTrue("Child B must be re-inserted", childDescs.contains("Child B"))

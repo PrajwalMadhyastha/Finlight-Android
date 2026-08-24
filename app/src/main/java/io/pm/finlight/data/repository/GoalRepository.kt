@@ -8,6 +8,7 @@ package io.pm.finlight
 
 import io.pm.finlight.data.db.dao.GoalTransactionLinkDao
 import io.pm.finlight.data.db.dao.GoalContributionDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.db.entity.GoalTransactionLink
 import io.pm.finlight.data.db.entity.GoalContribution
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +16,7 @@ import kotlinx.coroutines.flow.Flow
 class GoalRepository(
     private val goalDao: GoalDao,
     private val linkDao: GoalTransactionLinkDao,
-    private val transactionDao: TransactionDao,
+    private val transactionQueryDao: TransactionQueryDao,
     private val contributionDao: GoalContributionDao,
 ) {
     fun getAllGoalsWithAccountName(): Flow<List<GoalWithAccountName>> = goalDao.getAllGoalsWithAccountName()
@@ -33,10 +34,7 @@ class GoalRepository(
         startTime: Long,
         endTime: Long
     ): Flow<List<Transaction>> {
-        // We will fetch Transaction from getAllTransactionsSimple() which returns Flow<List<Transaction>>
-        // But getAllTransactionsSimple() doesn't take range. Wait.
-        // Let's just use getAllTransactionsForRange and map it? Wait, getAllTransactionsForRange returns Flow<List<Transaction>>?
-        return transactionDao.getAllTransactionsForRange(startTime, endTime)
+        return transactionQueryDao.getAllTransactionsForRange(startTime, endTime)
     }
 
     suspend fun insert(goal: Goal) {

@@ -49,6 +49,10 @@ class MergeActionReceiverTest {
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
         every { db.transactionDao() } returns transactionDao
+        every { db.transactionQueryDao() } returns transactionDao
+        every { db.transactionWriteDao() } returns transactionDao
+        every { db.transactionAnalyticsDao() } returns transactionDao
+        every { db.transactionReimbursementDao() } returns transactionDao
         // Normally we'd use koin, but we inject or mockk constructor if needed
         // For receiver which instantiates repository, we need to mockkConstructor
         io.mockk.mockkConstructor(TransactionRepository::class)

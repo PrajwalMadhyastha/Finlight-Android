@@ -54,6 +54,10 @@ class WeeklySummaryWorkerTest : BaseViewModelTest() {
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
         every { db.transactionDao() } returns transactionDao
+        every { db.transactionQueryDao() } returns transactionDao
+        every { db.transactionWriteDao() } returns transactionDao
+        every { db.transactionAnalyticsDao() } returns transactionDao
+        every { db.transactionReimbursementDao() } returns transactionDao
 
         // Initialize WorkManager for testing
         val config =

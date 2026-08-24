@@ -49,7 +49,8 @@ class RecurringTransactionWorker(
 
                 val db = AppDatabase.getInstance(context)
                 val recurringDao = db.recurringTransactionDao()
-                val transactionDao = db.transactionDao()
+                val transactionQueryDao = db.transactionQueryDao()
+                val transactionWriteDao = db.transactionWriteDao()
 
                 val allRules = recurringDao.getAllRulesList()
                 val now = System.currentTimeMillis()
@@ -63,7 +64,7 @@ class RecurringTransactionWorker(
 
                     if (isDue(rule)) {
                         // --- Guard 2: Idempotency — skip if a PENDING draft already exists ---
-                        val existingDraft = transactionDao.getPendingTransactionForRule(rule.id)
+                        val existingDraft = transactionQueryDao.getPendingTransactionForRule(rule.id)
                         if (existingDraft != null) {
                             Log.d(tag, "Rule '${rule.description}' already has a pending draft (id=${existingDraft.id}). Skipping.")
                             return@forEach
@@ -84,7 +85,7 @@ class RecurringTransactionWorker(
                                     status = TransactionStatus.CONFIRMED,
                                     recurringRuleId = rule.id,
                                 )
-                            transactionDao.insert(confirmedTxn)
+                            transactionWriteDao.insert(confirmedTxn)
                             recurringDao.updateLastRunDate(rule.id, now)
                             Log.i(tag, "Auto-approved recurring payment: '${rule.description}'")
                             NotificationHelper.showAutoApprovedPaymentNotification(context, rule)
@@ -103,7 +104,7 @@ class RecurringTransactionWorker(
                                     status = TransactionStatus.PENDING,
                                     recurringRuleId = rule.id,
                                 )
-                            val newDraftId = transactionDao.insert(draftTxn)
+                            val newDraftId = transactionWriteDao.insert(draftTxn)
                             Log.i(tag, "Created PENDING draft (id=$newDraftId) for rule '${rule.description}'")
                             NotificationHelper.showRecurringTransactionDueNotification(context, rule, newDraftId.toInt())
                         }

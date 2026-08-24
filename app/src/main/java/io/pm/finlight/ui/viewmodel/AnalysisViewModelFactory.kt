@@ -17,7 +17,7 @@ class AnalysisViewModelFactory(private val application: Application) : ViewModel
             val db = AppDatabase.getInstance(application)
             @Suppress("UNCHECKED_CAST")
             return AnalysisViewModel(
-                transactionDao = db.transactionDao(),
+                transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 categoryDao = db.categoryDao(),
                 tagDao = db.tagDao(),
             ) as T

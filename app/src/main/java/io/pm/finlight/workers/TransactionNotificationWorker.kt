@@ -36,10 +36,11 @@ class TransactionNotificationWorker(
         return withContext(Dispatchers.IO) {
             try {
                 val db = AppDatabase.getInstance(context)
-                val transactionDao = db.transactionDao()
+                val transactionQueryDao = db.transactionQueryDao()
+                val transactionAnalyticsDao = db.transactionAnalyticsDao()
 
                 // 1. Fetch full transaction details
-                val details = transactionDao.getTransactionDetailsById(transactionId).firstOrNull()
+                val details = transactionQueryDao.getTransactionDetailsById(transactionId).firstOrNull()
                 if (details == null) {
                     Log.e("TransactionNotificationWorker", "TransactionDetails not found for id: $transactionId")
                     return@withContext Result.failure()
@@ -58,13 +59,13 @@ class TransactionNotificationWorker(
                         set(Calendar.DAY_OF_MONTH, 1)
                         add(Calendar.DAY_OF_MONTH, -1)
                     }.timeInMillis
-                val summary = transactionDao.getFinancialSummaryForRange(monthStart, monthEnd)
+                val summary = transactionAnalyticsDao.getFinancialSummaryForRange(monthStart, monthEnd)
                 val monthlyTotal = if (details.transaction.transactionType == TransactionType.INCOME) summary?.totalIncome else summary?.totalExpenses
 
                 // 3. Get visit count
                 val visitCount =
                     if (details.transaction.transactionType != TransactionType.INCOME) {
-                        transactionDao.getTransactionCountForMerchantSuspend(
+                        transactionQueryDao.getTransactionCountForMerchantSuspend(
                             details.transaction.description,
                         )
                     } else {

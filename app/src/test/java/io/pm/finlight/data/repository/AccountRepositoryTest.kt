@@ -62,6 +62,7 @@ class AccountRepositoryTest : BaseViewModelTest() {
         `when`(db.accountDao()).thenReturn(accountDao)
         `when`(db.goalDao()).thenReturn(goalDao)
         `when`(db.transactionDao()).thenReturn(transactionDao)
+        `when`(db.transactionWriteDao()).thenReturn(transactionDao)
         `when`(db.accountAliasDao()).thenReturn(accountAliasDao)
 
         // Mock the underlying components that `withTransaction` uses.

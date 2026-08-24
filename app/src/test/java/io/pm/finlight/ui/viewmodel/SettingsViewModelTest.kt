@@ -158,6 +158,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
         // Stub the db mock to return all the mocked DAOs
         `when`(db.transactionDao()).thenReturn(transactionDao)
+        `when`(db.transactionQueryDao()).thenReturn(transactionDao)
+        `when`(db.transactionWriteDao()).thenReturn(transactionDao)
+        `when`(db.transactionAnalyticsDao()).thenReturn(transactionDao)
+        `when`(db.transactionReimbursementDao()).thenReturn(transactionDao)
         `when`(db.accountDao()).thenReturn(accountDao)
         `when`(db.categoryDao()).thenReturn(categoryDao)
         `when`(db.budgetDao()).thenReturn(budgetDao)

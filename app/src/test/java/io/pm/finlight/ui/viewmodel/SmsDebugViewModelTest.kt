@@ -79,6 +79,10 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         `when`(db.merchantCategoryMappingDao()).thenReturn(merchantCategoryMappingDao)
         `when`(db.smsParseTemplateDao()).thenReturn(smsParseTemplateDao)
         `when`(db.transactionDao()).thenReturn(transactionDao)
+        `when`(db.transactionQueryDao()).thenReturn(transactionDao)
+        `when`(db.transactionWriteDao()).thenReturn(transactionDao)
+        `when`(db.transactionAnalyticsDao()).thenReturn(transactionDao)
+        `when`(db.transactionReimbursementDao()).thenReturn(transactionDao)
 
         `when`(application.applicationContext).thenReturn(application)
     }

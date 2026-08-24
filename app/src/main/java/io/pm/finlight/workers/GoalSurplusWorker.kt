@@ -62,8 +62,8 @@ class GoalSurplusWorker(
         cal.add(Calendar.MILLISECOND, -1)
         val endTime = cal.timeInMillis
 
-        val transactionDao = db.transactionDao()
-        val expenses = transactionDao.getFinancialSummaryForRangeFlow(startTime, endTime).firstOrNull()?.totalExpenses ?: 0.0
+        val transactionAnalyticsDao = db.transactionAnalyticsDao()
+        val expenses = transactionAnalyticsDao.getFinancialSummaryForRangeFlow(startTime, endTime).firstOrNull()?.totalExpenses ?: 0.0
 
         val surplus = budget.toDouble() - expenses
         Log.d(logTag, "Previous month budget: $budget, expenses: $expenses, surplus: $surplus")

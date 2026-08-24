@@ -11,6 +11,8 @@ package io.pm.finlight
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.dao.AccountDao
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -41,7 +43,8 @@ data class SearchUiState(
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class SearchViewModel(
-    private val transactionDao: TransactionDao,
+    private val transactionQueryDao: TransactionQueryDao,
+    private val transactionAnalyticsDao: TransactionAnalyticsDao,
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
     private val tagDao: TagDao,
@@ -49,6 +52,25 @@ class SearchViewModel(
     private val initialDateMillis: Long?,
     private val initialQuery: String?,
 ) : ViewModel() {
+    constructor(
+        transactionDao: TransactionDao,
+        accountDao: AccountDao,
+        categoryDao: CategoryDao,
+        tagDao: TagDao,
+        initialCategoryId: Int?,
+        initialDateMillis: Long?,
+        initialQuery: String?,
+    ) : this(
+        transactionQueryDao = transactionDao,
+        transactionAnalyticsDao = transactionDao,
+        accountDao = accountDao,
+        categoryDao = categoryDao,
+        tagDao = tagDao,
+        initialCategoryId = initialCategoryId,
+        initialDateMillis = initialDateMillis,
+        initialQuery = initialQuery,
+    )
+
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
@@ -71,7 +93,7 @@ class SearchViewModel(
                 _uiState.update { it.copy(hasSearched = shouldSearch) }
 
                 if (shouldSearch) {
-                    transactionDao.searchTransactions(
+                    transactionQueryDao.searchTransactions(
                         keyword = state.keyword,
                         accountId = state.selectedAccount?.id,
                         categoryId = state.selectedCategory?.id,
@@ -157,7 +179,7 @@ class SearchViewModel(
             }
 
             viewModelScope.launch {
-                transactionDao.getFinancialSummaryForRangeFlow(start, end).collect { summary ->
+                transactionAnalyticsDao.getFinancialSummaryForRangeFlow(start, end).collect { summary ->
                     _daySummary.value = summary
                 }
             }

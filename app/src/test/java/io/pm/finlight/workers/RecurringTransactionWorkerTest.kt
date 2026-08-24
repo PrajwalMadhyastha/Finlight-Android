@@ -53,6 +53,10 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
         every { AppDatabase.getInstance(any()) } returns db
         every { db.recurringTransactionDao() } returns recurringTransactionDao
         every { db.transactionDao() } returns transactionDao
+        every { db.transactionQueryDao() } returns transactionDao
+        every { db.transactionWriteDao() } returns transactionDao
+        every { db.transactionAnalyticsDao() } returns transactionDao
+        every { db.transactionReimbursementDao() } returns transactionDao
         coEvery { transactionDao.insert(any<Transaction>()) } returns 101L
         coEvery { transactionDao.getPendingTransactionForRule(any()) } returns null
 
@@ -157,7 +161,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
             val draft = Transaction(id = 100, description = "Draft", amount = 10.0, transactionType = TransactionType.EXPENSE, date = now, accountId = 1, categoryId = 1, notes = null, status = TransactionStatus.PENDING)
 
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
-            coEvery { db.transactionDao().getPendingTransactionForRule(1) } returns draft
+            coEvery { transactionDao.getPendingTransactionForRule(1) } returns draft
 
             val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
             worker.doWork()

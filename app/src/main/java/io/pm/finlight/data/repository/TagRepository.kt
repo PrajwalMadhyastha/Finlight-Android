@@ -4,9 +4,9 @@
 // underlying DAO method. This is required by the refactored TagViewModel to check
 // for existing tags before creating a new one, ensuring all data access goes
 // through the repository layer.
-// =================================================================================
 package io.pm.finlight
 
+import io.pm.finlight.data.db.dao.TransactionQueryDao
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.Flow
  */
 class TagRepository(
     private val tagDao: TagDao,
-    private val transactionDao: TransactionDao,
+    private val transactionQueryDao: TransactionQueryDao,
 ) {
     val allTags: Flow<List<Tag>> = tagDao.getAllTags()
 
@@ -32,7 +32,7 @@ class TagRepository(
     }
 
     suspend fun isTagInUse(tagId: Int): Boolean {
-        return transactionDao.countTransactionsForTag(tagId) > 0
+        return transactionQueryDao.countTransactionsForTag(tagId) > 0
     }
 
     /**

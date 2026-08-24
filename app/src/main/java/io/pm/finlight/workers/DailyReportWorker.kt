@@ -34,7 +34,7 @@ class DailyReportWorker(
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
-                val transactionDao = AppDatabase.getInstance(context).transactionDao()
+                val transactionAnalyticsDao = AppDatabase.getInstance(context).transactionAnalyticsDao()
 
                 // --- Define Date Ranges ---
                 val now = Calendar.getInstance()
@@ -67,13 +67,13 @@ class DailyReportWorker(
 
                 // --- Fetch Data ---
                 // --- UPDATED: Use the new rolling 24-hour window ---
-                val reportSummary = transactionDao.getFinancialSummaryForRange(reportStartTime, reportEndTime)
+                val reportSummary = transactionAnalyticsDao.getFinancialSummaryForRange(reportStartTime, reportEndTime)
                 val yesterdayExpenses = reportSummary?.totalExpenses ?: 0.0
 
-                val weeklyAverage = transactionDao.getAverageDailySpendingForRange(sevenDaysAgoStart, sevenDaysAgoEnd) ?: 0.0
+                val weeklyAverage = transactionAnalyticsDao.getAverageDailySpendingForRange(sevenDaysAgoStart, sevenDaysAgoEnd) ?: 0.0
 
                 // --- UPDATED: Use the new rolling 24-hour window ---
-                val topCategories = transactionDao.getTopSpendingCategoriesForRange(reportStartTime, reportEndTime)
+                val topCategories = transactionAnalyticsDao.getTopSpendingCategoriesForRange(reportStartTime, reportEndTime)
 
                 // --- Apply Contextual Logic ---
                 val title =

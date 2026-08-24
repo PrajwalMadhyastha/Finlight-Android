@@ -812,7 +812,7 @@ class TransactionViewModel(
                 if (idsToDelete.isNotEmpty()) {
                     // Record all SMS hashes for the to-be-deleted transactions so
                     // SmsCatchupWorker never re-creates them.
-                    val hashes = db.transactionDao().getSmsHashesByIds(idsToDelete)
+                    val hashes = db.transactionQueryDao().getSmsHashesByIds(idsToDelete)
                     hashes.forEach { hash ->
                         db.deletedSmsHashDao().insert(
                             io.pm.finlight.data.db.entity.DeletedSmsHash(hash),
@@ -902,7 +902,7 @@ class TransactionViewModel(
                 val conversionRate = parentTxn.conversionRate ?: 1.0
 
                 db.withTransaction {
-                    db.transactionDao().markAsSplit(parentTransactionId, true)
+                    db.transactionWriteDao().markAsSplit(parentTransactionId, true)
                     db.splitTransactionDao().deleteSplitsForParent(parentTransactionId)
 
                     val newSplits =
@@ -1870,7 +1870,7 @@ class TransactionViewModel(
                     ).firstOrNull()?.splitTransaction?.categoryId
                 db.splitTransactionDao().deleteSplitsForParent(transaction.id)
                 val originalDescription = transaction.originalDescription ?: transaction.description
-                db.transactionDao().unmarkAsSplit(transaction.id, originalDescription, firstSplitCategory)
+                db.transactionWriteDao().unmarkAsSplit(transaction.id, originalDescription, firstSplitCategory)
             }
         }
     }
