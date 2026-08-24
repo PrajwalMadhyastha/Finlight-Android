@@ -438,6 +438,38 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `chartData generates correctly for YEARLY period`() =
+        runTest {
+            val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+            val mockTrends =
+                listOf(
+                    MonthlyTrend("$currentYear-01", 1000.0, 500.0),
+                    MonthlyTrend("$currentYear-02", 1200.0, 600.0),
+                )
+            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockTrends))
+
+            val viewModel =
+                TimePeriodReportViewModel(
+                    transactionQueryDao,
+                    transactionAnalyticsDao,
+                    transactionRepository,
+                    settingsRepository,
+                    TimePeriod.YEARLY,
+                    null,
+                    false
+                )
+            advanceUntilIdle()
+
+            viewModel.chartData.test {
+                val chartPair = awaitItem()
+                assertNotNull(chartPair)
+                assertEquals(24, chartPair!!.first.entryCount) // 12 months x 2 datasets
+                assertEquals(12, chartPair.second.size) // 12 month labels
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `chartData returns null when DAO returns empty data`() =
         runTest {
             // Arrange
@@ -1097,5 +1129,30 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                 assertEquals(1500L, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun `legacy constructor initializes TimePeriodReportViewModel properly`() =
+        runTest {
+            val legacyDao = mock(TransactionDao::class.java)
+            `when`(legacyDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+            `when`(legacyDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenReturn(null)
+            `when`(legacyDao.getTopSpendingCategoriesForRange(anyLong(), anyLong())).thenReturn(emptyList())
+            `when`(legacyDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+            `when`(legacyDao.getWeeklyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+            `when`(legacyDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+            `when`(legacyDao.getFirstTransactionDate()).thenReturn(flowOf(0L))
+
+            val vm =
+                TimePeriodReportViewModel(
+                    legacyDao,
+                    transactionRepository,
+                    settingsRepository,
+                    TimePeriod.MONTHLY,
+                    1000L,
+                    false
+                )
+            assertNotNull(vm)
         }
 }

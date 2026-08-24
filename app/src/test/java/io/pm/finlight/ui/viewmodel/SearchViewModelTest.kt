@@ -412,4 +412,26 @@ class SearchViewModelTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun `legacy constructor initializes SearchViewModel properly`() =
+        runTest {
+            val legacyDao = mock(TransactionDao::class.java)
+            `when`(legacyDao.searchTransactions(anyString(), any(), any(), any(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+            `when`(legacyDao.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
+
+            val vm =
+                SearchViewModel(
+                    legacyDao,
+                    accountDao,
+                    categoryDao,
+                    tagDao,
+                    1,
+                    1000L,
+                    "query"
+                )
+            assertNotNull(vm)
+            assertEquals("query", vm.uiState.value.keyword)
+        }
 }

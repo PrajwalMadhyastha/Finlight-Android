@@ -202,4 +202,26 @@ class GoalSurplusWorkerTest {
             // Since no goals exist, no notification is sent.
             assertTrue("No notification should be sent when no active goals exist", notifications.isEmpty())
         }
+
+    @Test
+    fun testDoWork_noTransactionsInPreviousMonth() =
+        runTest {
+            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
+
+            val cal = Calendar.getInstance()
+            cal.add(Calendar.MONTH, -1)
+            val prevYear = cal.get(Calendar.YEAR)
+            val prevMonth = String.format("%02d", cal.get(Calendar.MONTH) + 1)
+            prefs.edit().putFloat("overall_budget_${prevYear}_$prevMonth", 1000f).apply()
+
+            // Insert account and goal, but zero transactions
+            db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))
+            goalDao.insert(Goal(id = 1, name = "Trip", targetAmount = 5000.0, savedAmount = 100.0, targetDate = System.currentTimeMillis() + 100000000L, accountId = 1))
+
+            val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+        }
 }

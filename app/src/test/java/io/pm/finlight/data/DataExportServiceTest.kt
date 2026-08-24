@@ -532,4 +532,123 @@ class DataExportServiceTest : BaseViewModelTest() {
             assertEquals(11, childRow2.size)
             assertEquals("", childRow2[10]) // Tags column should be present but empty
         }
+
+    @Test
+    fun `importDataFromJson successfully parses and imports backup from URI`() =
+        runTest {
+            val backupData =
+                AppDataBackup(
+                    transactions =
+                        listOf(
+                            Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = null)
+                        ),
+                    accounts = listOf(Account(id = 1, name = "Bank", type = "Savings")),
+                    categories = listOf(Category(id = 1, name = "Food", iconKey = "food", colorKey = "red")),
+                    tags = emptyList(),
+                    transactionTagCrossRefs = emptyList(),
+                    budgets = emptyList(),
+                    merchantMappings = emptyList(),
+                )
+            val jsonString = Json.encodeToString(AppDataBackup.serializer(), backupData)
+
+            val tempFile = File(context.cacheDir, "test_import.json")
+            tempFile.writeText(jsonString)
+            val uri = android.net.Uri.fromFile(tempFile)
+
+            coJustRun { splitTransactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
+            coJustRun { tagDao.deleteAll() }
+            coJustRun { accountDao.deleteAll() }
+            coJustRun { categoryDao.deleteAll() }
+            coJustRun { budgetDao.deleteAll() }
+            coJustRun { merchantMappingDao.deleteAll() }
+            coJustRun { goalDao.deleteAll() }
+            coJustRun { goalTransactionLinkDao.deleteAll() }
+            coJustRun { tripDao.deleteAll() }
+            coJustRun { accountAliasDao.deleteAll() }
+            coJustRun { customSmsRuleDao.deleteAll() }
+            coJustRun { merchantRenameRuleDao.deleteAll() }
+            coJustRun { merchantCategoryMappingDao.deleteAll() }
+            coJustRun { ignoreRuleDao.deleteAll() }
+            coJustRun { smsParseTemplateDao.deleteAll() }
+            coJustRun { recurringPatternDao.deleteAll() }
+
+            coJustRun { accountDao.insertAll(any()) }
+            coJustRun { categoryDao.insertAll(any()) }
+            coJustRun { budgetDao.insertAll(any()) }
+            coJustRun { merchantMappingDao.insertAll(any()) }
+            coJustRun { tagDao.insertAll(any()) }
+            coJustRun { goalDao.insertAll(any()) }
+            coJustRun { goalTransactionLinkDao.insertAll(any()) }
+            coJustRun { tripDao.insertAll(any()) }
+            coJustRun { accountAliasDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.insertAll(any()) }
+            coJustRun { splitTransactionDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.addTagsToTransaction(any()) }
+            coJustRun { customSmsRuleDao.insertAll(any()) }
+            coJustRun { merchantRenameRuleDao.insertAll(any()) }
+            coJustRun { merchantCategoryMappingDao.insertAll(any()) }
+            coJustRun { ignoreRuleDao.insertAll(any()) }
+            coJustRun { smsParseTemplateDao.insertAll(any()) }
+
+            val result = DataExportService.importDataFromJson(context, uri)
+            assertTrue("importDataFromJson should succeed with valid JSON file", result)
+            tempFile.delete()
+        }
+
+    @Test
+    fun `importDataFromJson returns false when file is empty or blank`() =
+        runTest {
+            val tempFile = File(context.cacheDir, "empty_import.json")
+            tempFile.writeText("   ")
+            val uri = android.net.Uri.fromFile(tempFile)
+
+            val result = DataExportService.importDataFromJson(context, uri)
+            assertFalse("importDataFromJson should return false for blank JSON", result)
+            tempFile.delete()
+        }
+
+    @Test
+    fun `importDataFromJson returns false when URI cannot be opened`() =
+        runTest {
+            val uri = android.net.Uri.parse("content://invalid/path/does_not_exist.json")
+            val result = DataExportService.importDataFromJson(context, uri)
+            assertFalse("importDataFromJson should return false for invalid content URI", result)
+        }
+
+    @Test
+    fun `exportToCsvString handles transactions with null account notes and tags`() =
+        runTest {
+            val transaction =
+                Transaction(
+                    id = 10,
+                    description = "Simple",
+                    amount = 20.0,
+                    date = 1000L,
+                    transactionType = TransactionType.INCOME,
+                    accountId = 1,
+                    categoryId = null,
+                    notes = null,
+                    isExcluded = true
+                )
+            val details =
+                TransactionDetails(
+                    transaction = transaction,
+                    images = emptyList(),
+                    accountName = null,
+                    categoryName = null,
+                    categoryColorKey = null,
+                    categoryIconKey = null,
+                    tagNames = null
+                )
+
+            coEvery { transactionQueryDao.getAllTransactions() } returns flowOf(listOf(details))
+            coEvery { transactionQueryDao.getTagsForTransactionSimple(10) } returns emptyList()
+
+            val csv = DataExportService.exportToCsvString(context)
+            assertNotNull(csv)
+            assertTrue(csv!!.contains("N/A"))
+            assertTrue(csv.contains("income"))
+            assertTrue(csv.contains("true"))
+        }
 }
