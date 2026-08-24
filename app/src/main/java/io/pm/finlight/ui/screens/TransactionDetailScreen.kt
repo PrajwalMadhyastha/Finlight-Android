@@ -415,7 +415,7 @@ fun TransactionDetailScreen(
                                 hasMerged = hasMerged,
                                 hasReimbursements = hasReimbursements,
                                 onTypeSelected = { newType ->
-                                    viewModel.updateTransactionType(details.transaction.id, TransactionType.fromString(newType))
+                                    viewModel.updateTransactionType(details.transaction.id, newType)
                                 },
                                 onExcludeToggled = { newIsExcludedValue ->
                                     viewModel.updateTransactionExclusion(details.transaction.id, newIsExcludedValue)
@@ -795,7 +795,7 @@ private fun TransactionPropertiesCard(
     details: TransactionDetails,
     hasMerged: Boolean = false,
     hasReimbursements: Boolean = false,
-    onTypeSelected: (String) -> Unit,
+    onTypeSelected: (TransactionType) -> Unit,
     onExcludeToggled: (Boolean) -> Unit,
 ) {
     GlassPanel {
@@ -812,7 +812,7 @@ private fun TransactionPropertiesCard(
             // user from accidentally changing the type when the toggle shows the "wrong" side.
             val isOverRepaid = !isMathematicallyIncome && details.transaction.amount < 0
             val isVisuallyIncome = isMathematicallyIncome || isOverRepaid
-            val displayType = if (isVisuallyIncome) "income" else "expense"
+            val displayType = if (isVisuallyIncome) TransactionType.INCOME else TransactionType.EXPENSE
 
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 TransactionTypeToggle(
@@ -1283,13 +1283,13 @@ private fun MultiAccountBreakdownCard(
                             )
                         }
                     }
-                    val sign = if (entry.transactionType == "income") "+" else "−"
+                    val sign = if (entry.transactionType == TransactionType.INCOME) "+" else "−"
                     val absAmount = kotlin.math.abs(entry.amount)
                     Text(
                         text = "$sign${currencyFormat.format(absAmount)}",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (entry.transactionType == "income") incomeGreen else expenseRed,
+                        color = if (entry.transactionType == TransactionType.INCOME) incomeGreen else expenseRed,
                     )
                 }
                 currentIndex++

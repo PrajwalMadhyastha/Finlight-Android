@@ -13,6 +13,7 @@ package io.pm.finlight.ui.screens
 
 import android.net.Uri
 import android.widget.Toast
+import io.pm.finlight.TransactionType
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -121,7 +122,7 @@ fun AddTransactionScreen(
     val selectedAccount by viewModel.addTransactionAccount.collectAsState()
 
     // --- Local State for UI Logic ---
-    var transactionType by remember { mutableStateOf(initialTransactionType ?: "expense") }
+    var transactionType by remember { mutableStateOf(initialTransactionType?.let { TransactionType.fromStringOrNull(it) } ?: TransactionType.EXPENSE) }
     var notes by remember { mutableStateOf("") }
     var attachedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
@@ -149,7 +150,7 @@ fun AddTransactionScreen(
 
     val handleSaveComplete: (Long?) -> Unit = { savedTxnId ->
         val amtDouble = amount.toDoubleOrNull() ?: 0.0
-        if (transactionType.equals("income", ignoreCase = true) &&
+        if (transactionType == TransactionType.INCOME &&
             amtDouble >= goalIncomeThreshold &&
             activeGoals.isNotEmpty() &&
             savedTxnId != null
@@ -206,7 +207,7 @@ fun AddTransactionScreen(
                 }
                 viewModel.onAddTransactionDescriptionChanged(initialDataMap["Description"] ?: "")
                 viewModel.onAddTransactionAmountChanged((initialDataMap["Amount"] ?: "").replace(".0", ""))
-                transactionType = initialDataMap["Type"]?.lowercase() ?: "expense"
+                transactionType = initialDataMap["Type"]?.let { TransactionType.fromStringOrNull(it) } ?: TransactionType.EXPENSE
                 val categoryName = initialDataMap["Category"] ?: ""
                 val accountName = initialDataMap["Account"] ?: ""
                 notes = initialDataMap["Notes"] ?: ""
@@ -361,7 +362,7 @@ fun AddTransactionScreen(
                         recentTransactions = recentManualTransactions,
                         onQuickFillSelected = { txn ->
                             viewModel.onQuickFillSelected(txn)
-                            transactionType = txn.transaction.transactionType.name.lowercase()
+                            transactionType = txn.transaction.transactionType
                         },
                         onViewAllClick = { activeSheet = ComposerSheet.History },
                     )
@@ -549,7 +550,7 @@ fun AddTransactionScreen(
                         transactions = historyManualTransactions,
                         onTransactionSelected = { txn ->
                             viewModel.onQuickFillSelected(txn)
-                            transactionType = txn.transaction.transactionType.name.lowercase()
+                            transactionType = txn.transaction.transactionType
                             activeSheet = null
                         },
                     )
@@ -1411,8 +1412,8 @@ fun TextInputSheet(
 
 @Composable
 fun TransactionTypeToggle(
-    selectedType: String,
-    onTypeSelected: (String) -> Unit,
+    selectedType: TransactionType,
+    onTypeSelected: (TransactionType) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
@@ -1434,11 +1435,11 @@ fun TransactionTypeToggle(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val expenseSelected = selectedType == "expense"
-        val incomeSelected = selectedType == "income"
+        val expenseSelected = selectedType == TransactionType.EXPENSE
+        val incomeSelected = selectedType == TransactionType.INCOME
 
         Button(
-            onClick = { onTypeSelected("expense") },
+            onClick = { onTypeSelected(TransactionType.EXPENSE) },
             enabled = enabled,
             modifier =
                 Modifier
@@ -1465,7 +1466,7 @@ fun TransactionTypeToggle(
         }
 
         Button(
-            onClick = { onTypeSelected("income") },
+            onClick = { onTypeSelected(TransactionType.INCOME) },
             enabled = enabled,
             modifier =
                 Modifier
@@ -1491,4 +1492,19 @@ fun TransactionTypeToggle(
             Text("Income", fontWeight = FontWeight.Bold)
         }
     }
+}
+
+@Composable
+fun TransactionTypeToggle(
+    selectedType: String,
+    onTypeSelected: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    TransactionTypeToggle(
+        selectedType = TransactionType.fromStringOrNull(selectedType) ?: TransactionType.EXPENSE,
+        onTypeSelected = { onTypeSelected(it.name.lowercase()) },
+        modifier = modifier,
+        enabled = enabled,
+    )
 }

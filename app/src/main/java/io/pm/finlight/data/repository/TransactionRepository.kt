@@ -692,7 +692,7 @@ class TransactionRepository(
             childDate = childTxn.date,
             childAccountId = childTxn.accountId,
             childCategoryId = childTxn.categoryId,
-            childTransactionType = childTxn.transactionType.name.lowercase(),
+            childTransactionType = childTxn.transactionType,
             childSource = childTxn.source,
             childNotes = childTxn.notes,
             childSourceSmsId = childTxn.sourceSmsId,
@@ -826,7 +826,7 @@ class TransactionRepository(
             date = r.childDate,
             accountId = r.childAccountId,
             categoryId = r.childCategoryId,
-            transactionType = TransactionType.fromString(r.childTransactionType),
+            transactionType = r.childTransactionType,
             source = r.childSource,
             notes = r.childNotes,
             sourceSmsId = r.childSourceSmsId,
@@ -876,7 +876,7 @@ class TransactionRepository(
             if (type == TransactionType.INCOME) amount else -amount
 
         val currentSigned = signedAmount(anchorTxn.transactionType, anchorTxn.amount)
-        val childrenSigned = records.sumOf { signedAmount(TransactionType.fromString(it.childTransactionType), it.childAmount) }
+        val childrenSigned = records.sumOf { signedAmount(it.childTransactionType, it.childAmount) }
         val anchorSigned = currentSigned - childrenSigned
 
         val anchorOriginalType =
@@ -898,7 +898,7 @@ class TransactionRepository(
                 accountId = anchorTxn.accountId,
                 accountName = anchorAccount?.name ?: "Unknown",
                 amount = anchorOriginalAmount,
-                transactionType = anchorOriginalType.name.lowercase(),
+                transactionType = anchorOriginalType,
                 isAnchor = true,
                 description = anchorTxn.description,
                 date = firstRecord.originalParentDate,
@@ -957,7 +957,7 @@ class TransactionRepository(
                     if (type == TransactionType.INCOME) amount else -amount
 
                 val currentSigned = signedAmount(currentParent.transactionType, currentParent.amount)
-                val childrenSigned = allRecords.sumOf { signedAmount(TransactionType.fromString(it.childTransactionType), it.childAmount) }
+                val childrenSigned = allRecords.sumOf { signedAmount(it.childTransactionType, it.childAmount) }
                 val newSigned = currentSigned - childrenSigned
                 val hasReimbursements = transactionDao.getReimbursementsCountSync(parentTxnId) > 0
 

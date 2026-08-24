@@ -70,7 +70,7 @@ data class ManualTransactionData(
     val accountId: Int,
     val notes: String?,
     val date: Long,
-    val transactionType: String,
+    val transactionType: TransactionType,
     val imageUris: List<Uri>,
     val tags: Set<Tag>,
 )
@@ -1014,7 +1014,7 @@ class TransactionViewModel(
         categoryId: Int?,
         notes: String?,
         date: Long,
-        transactionType: String,
+        transactionType: TransactionType,
         imageUris: List<Uri>,
         onSaveComplete: (Long?) -> Unit,
     ) {
@@ -1060,6 +1060,30 @@ class TransactionViewModel(
         }
     }
 
+    fun onSaveTapped(
+        description: String,
+        amountStr: String,
+        accountId: Int?,
+        categoryId: Int?,
+        notes: String?,
+        date: Long,
+        transactionType: String,
+        imageUris: List<Uri>,
+        onSaveComplete: (Long?) -> Unit,
+    ) {
+        onSaveTapped(
+            description = description,
+            amountStr = amountStr,
+            accountId = accountId,
+            categoryId = categoryId,
+            notes = notes,
+            date = date,
+            transactionType = TransactionType.fromString(transactionType),
+            imageUris = imageUris,
+            onSaveComplete = onSaveComplete,
+        )
+    }
+
     fun saveWithSelectedCategory(
         categoryId: Int?,
         onComplete: (Long?) -> Unit,
@@ -1100,7 +1124,7 @@ class TransactionViewModel(
                     date = data.date,
                     accountId = data.accountId,
                     notes = data.notes,
-                    transactionType = TransactionType.fromString(data.transactionType),
+                    transactionType = data.transactionType,
                     isExcluded = false,
                     sourceSmsId = null,
                     sourceSmsHash = null,
@@ -1118,7 +1142,7 @@ class TransactionViewModel(
                     date = data.date,
                     accountId = data.accountId,
                     notes = data.notes,
-                    transactionType = TransactionType.fromString(data.transactionType),
+                    transactionType = data.transactionType,
                     isExcluded = false,
                     sourceSmsId = null,
                     sourceSmsHash = null,

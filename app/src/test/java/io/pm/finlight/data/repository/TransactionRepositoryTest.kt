@@ -275,7 +275,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     id = 10, parentTxnId = 1, mergedAt = 0L, mergeGroupId = "group-123", mergeType = "MANUAL",
                     originalParentAmount = 100.0, originalParentDate = 1000L, originalParentNotes = "Anchor note",
                     childDescription = "Child 1", childAmount = 50.0, childDate = 2000L, childAccountId = 1,
-                    childCategoryId = 2, childTransactionType = "expense", childSource = "MANUAL", childNotes = "Child note",
+                    childCategoryId = 2, childTransactionType = TransactionType.EXPENSE, childSource = "MANUAL", childNotes = "Child note",
                     childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
                     childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
                 )
@@ -311,7 +311,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     id = 10, parentTxnId = 1, mergedAt = 0L, mergeGroupId = "group-123", mergeType = "MANUAL",
                     originalParentAmount = -100.0, originalParentDate = 1000L, originalParentNotes = "Anchor note",
                     childDescription = "Child 1", childAmount = 200.0, childDate = 2000L, childAccountId = 1,
-                    childCategoryId = 2, childTransactionType = "expense", childSource = "MANUAL", childNotes = "Child note",
+                    childCategoryId = 2, childTransactionType = TransactionType.EXPENSE, childSource = "MANUAL", childNotes = "Child note",
                     childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
                     childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
                 )
@@ -340,7 +340,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     id = 10, parentTxnId = 1, mergedAt = 0L, mergeGroupId = "group-123", mergeType = "MANUAL",
                     originalParentAmount = -100.0, originalParentDate = 1000L, originalParentNotes = "Anchor note",
                     childDescription = "Child 1", childAmount = 200.0, childDate = 2000L, childAccountId = 1,
-                    childCategoryId = 2, childTransactionType = "expense", childSource = "MANUAL", childNotes = "Child note",
+                    childCategoryId = 2, childTransactionType = TransactionType.EXPENSE, childSource = "MANUAL", childNotes = "Child note",
                     childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
                     childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
                 )
@@ -369,7 +369,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     id = 10, parentTxnId = 1, mergedAt = 0L, mergeGroupId = "group-123", mergeType = "MANUAL",
                     originalParentAmount = 100.0, originalParentDate = 1000L, originalParentNotes = "Anchor note",
                     childDescription = "Child 1", childAmount = 50.0, childDate = 2000L, childAccountId = 1,
-                    childCategoryId = 2, childTransactionType = "expense", childSource = "MANUAL", childNotes = "Child note",
+                    childCategoryId = 2, childTransactionType = TransactionType.EXPENSE, childSource = "MANUAL", childNotes = "Child note",
                     childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
                     childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null
                 )
@@ -414,7 +414,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 2000L,
                     childAccountId = 1,
                     childCategoryId = 1,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "AUTO",
                     childNotes = null,
                     childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
@@ -1488,7 +1488,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository.mergeTransactions(1, 2)
 
             val mergeCaptor = ArgumentCaptor.forClass(io.pm.finlight.data.db.entity.MergeRecord::class.java)
-            verify(mergeRecordDaoMock).insert(mergeCaptor.capture() ?: io.pm.finlight.data.db.entity.MergeRecord(parentTxnId = 0, originalParentAmount = 0.0, originalParentDate = 0L, originalParentNotes = null, childDescription = "", childAmount = 0.0, childDate = 0L, childAccountId = 0, childCategoryId = null, childTransactionType = "", childSource = "", childNotes = null, childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null, childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null))
+            verify(mergeRecordDaoMock).insert(mergeCaptor.capture() ?: io.pm.finlight.data.db.entity.MergeRecord(parentTxnId = 0, originalParentAmount = 0.0, originalParentDate = 0L, originalParentNotes = null, childDescription = "", childAmount = 0.0, childDate = 0L, childAccountId = 0, childCategoryId = null, childTransactionType = TransactionType.EXPENSE, childSource = "", childNotes = null, childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null, childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null))
 
             val captured = mergeCaptor.value
             assertEquals(1, captured.parentTxnId)
@@ -1513,7 +1513,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository.mergeTransactions(1, 2)
 
             val mergeCaptor = ArgumentCaptor.forClass(io.pm.finlight.data.db.entity.MergeRecord::class.java)
-            verify(mergeRecordDaoMock).insert(mergeCaptor.capture() ?: io.pm.finlight.data.db.entity.MergeRecord(parentTxnId = 0, originalParentAmount = 0.0, originalParentDate = 0L, originalParentNotes = null, childDescription = "", childAmount = 0.0, childDate = 0L, childAccountId = 0, childCategoryId = null, childTransactionType = "", childSource = "", childNotes = null, childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null, childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null))
+            verify(mergeRecordDaoMock).insert(mergeCaptor.capture() ?: io.pm.finlight.data.db.entity.MergeRecord(parentTxnId = 0, originalParentAmount = 0.0, originalParentDate = 0L, originalParentNotes = null, childDescription = "", childAmount = 0.0, childDate = 0L, childAccountId = 0, childCategoryId = null, childTransactionType = TransactionType.EXPENSE, childSource = "", childNotes = null, childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null, childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null))
 
             val captured = mergeCaptor.value
             assertEquals("Swiggy", captured.childDescription)
@@ -1521,7 +1521,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(3000L, captured.childDate)
             assertEquals(2, captured.childAccountId)
             assertEquals(5, captured.childCategoryId)
-            assertEquals("expense", captured.childTransactionType)
+            assertEquals(TransactionType.EXPENSE, captured.childTransactionType)
             assertEquals("sms", captured.childSource)
             assertEquals("Lunch", captured.childNotes)
             assertEquals("abc", captured.childSourceSmsHash)
@@ -1547,7 +1547,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 100000L,
                     childAccountId = 1,
                     childCategoryId = 2,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "manual",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -1590,7 +1590,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 5000L,
                     childAccountId = 3,
                     childCategoryId = 7,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "sms",
                     childNotes = "Dinner",
                     childSourceSmsId = 12345L,
@@ -1647,7 +1647,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 2000L,
                     childAccountId = 1,
                     childCategoryId = 1,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "sms",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -1690,7 +1690,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 2000L,
                     childAccountId = 1,
                     childCategoryId = 1,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "manual",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -1732,7 +1732,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 2000L,
                     childAccountId = 1,
                     childCategoryId = 1,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "manual",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -1921,7 +1921,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 1000L,
                     childAccountId = childAccountId,
                     childCategoryId = null,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "manual",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -1946,7 +1946,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(anchorAccountId, anchorEntry.accountId)
             assertEquals("Anchor Account", anchorEntry.accountName)
             assertEquals(500.0, anchorEntry.amount)
-            assertEquals("expense", anchorEntry.transactionType)
+            assertEquals(TransactionType.EXPENSE, anchorEntry.transactionType)
             assertTrue(anchorEntry.isAnchor)
             assertEquals("Anchor", anchorEntry.description)
             assertEquals(1000L, anchorEntry.date)
@@ -1955,7 +1955,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(childAccountId, childEntry.accountId)
             assertEquals("Child Account", childEntry.accountName)
             assertEquals(300.0, childEntry.amount)
-            assertEquals("expense", childEntry.transactionType)
+            assertEquals(TransactionType.EXPENSE, childEntry.transactionType)
             assertEquals(false, childEntry.isAnchor)
             assertEquals("Child", childEntry.description)
             assertEquals(1000L, childEntry.date)
@@ -1984,7 +1984,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     childDate = 1000L,
                     childAccountId = childAccountId,
                     childCategoryId = null,
-                    childTransactionType = "income",
+                    childTransactionType = TransactionType.INCOME,
                     childSource = "manual",
                     childNotes = null,
                     childSourceSmsId = null,
@@ -2009,14 +2009,14 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(anchorAccountId, anchorEntry.accountId)
             assertEquals("HDFC Millenia CC", anchorEntry.accountName)
             assertEquals(2000.0, anchorEntry.amount)
-            assertEquals("expense", anchorEntry.transactionType) // Correctly restored to expense!
+            assertEquals(TransactionType.EXPENSE, anchorEntry.transactionType) // Correctly restored to expense!
             assertTrue(anchorEntry.isAnchor)
 
             val childEntry = breakdown[1]
             assertEquals(childAccountId, childEntry.accountId)
             assertEquals("HDFC SB AC", childEntry.accountName)
             assertEquals(2000.0, childEntry.amount)
-            assertEquals("income", childEntry.transactionType)
+            assertEquals(TransactionType.INCOME, childEntry.transactionType)
             assertEquals(false, childEntry.isAnchor)
         }
 

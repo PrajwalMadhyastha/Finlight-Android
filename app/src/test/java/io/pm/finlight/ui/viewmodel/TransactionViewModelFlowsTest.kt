@@ -295,7 +295,7 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
                         accountId = 1,
                         accountName = "Test Account",
                         amount = 100.0,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         isAnchor = true,
                         description = "Test Desc",
                         date = 1000L

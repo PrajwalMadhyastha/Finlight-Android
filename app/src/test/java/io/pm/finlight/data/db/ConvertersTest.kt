@@ -79,4 +79,33 @@ class ConvertersTest {
             TransactionStatus.fromString("invalid")
         }
     }
+
+    @Test
+    fun `toTransactionType throws IllegalArgumentException on invalid input`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            converters.toTransactionType("invalid_type")
+        }
+    }
+
+    @Test
+    fun `toTransactionStatus throws IllegalArgumentException on invalid input`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            converters.toTransactionStatus("invalid_status")
+        }
+    }
+
+    @Test
+    fun `converter roundtrips preserve enum values perfectly`() {
+        TransactionType.values().forEach { type ->
+            val serialized = converters.fromTransactionType(type)
+            val deserialized = converters.toTransactionType(serialized)
+            assertEquals(type, deserialized)
+        }
+
+        TransactionStatus.values().forEach { status ->
+            val serialized = converters.fromTransactionStatus(status)
+            val deserialized = converters.toTransactionStatus(serialized)
+            assertEquals(status, deserialized)
+        }
+    }
 }

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.Payments
+import io.pm.finlight.TransactionType
 
 data class RelatedTransactionItem(
     val id: Any,
@@ -233,11 +234,11 @@ fun UnifiedRelatedActivityCard(
     val totalRepaid = reimbursements.sumOf { it.transaction.amount }
     val mergedChildren = mergedEntries.filter { !it.isAnchor }
     val anchor = mergedEntries.firstOrNull { it.isAnchor }
-    val anchorIsExpense = anchor?.let { it.transactionType == "expense" } ?: isExpense
+    val anchorIsExpense = anchor?.let { it.transactionType == TransactionType.EXPENSE } ?: isExpense
 
     val totalMerged =
         mergedChildren.sumOf { child ->
-            val isSameType = (anchorIsExpense && child.transactionType == "expense") || (!anchorIsExpense && child.transactionType == "income")
+            val isSameType = (anchorIsExpense && child.transactionType == TransactionType.EXPENSE) || (!anchorIsExpense && child.transactionType == TransactionType.INCOME)
             if (isSameType) child.amount else -child.amount
         }
 
@@ -254,7 +255,7 @@ fun UnifiedRelatedActivityCard(
     if (hasMerged) {
         items.addAll(
             mergedChildren.map { child ->
-                val isSameType = (anchorIsExpense && child.transactionType == "expense") || (!anchorIsExpense && child.transactionType == "income")
+                val isSameType = (anchorIsExpense && child.transactionType == TransactionType.EXPENSE) || (!anchorIsExpense && child.transactionType == TransactionType.INCOME)
                 val prefix = if (isSameType) "+ " else "- "
                 RelatedTransactionItem(
                     id = "merge_${child.hashCode()}",
