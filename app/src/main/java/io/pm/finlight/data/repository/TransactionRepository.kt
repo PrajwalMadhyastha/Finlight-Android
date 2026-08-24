@@ -23,37 +23,64 @@ import kotlin.math.roundToLong
 
 import io.pm.finlight.data.db.dao.DeletedSmsHashDao
 import io.pm.finlight.data.db.dao.MergeRecordDao
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.data.db.dao.TransactionReimbursementDao
+import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.db.entity.MergeRecord
 
 class TransactionRepository(
-    private val transactionDao: TransactionDao,
+    private val transactionWriteDao: TransactionWriteDao,
+    private val transactionQueryDao: TransactionQueryDao,
+    private val transactionAnalyticsDao: TransactionAnalyticsDao,
+    private val transactionReimbursementDao: TransactionReimbursementDao,
     private val settingsRepository: SettingsRepository,
     private val tagRepository: TagRepository,
     private val deletedSmsHashDao: DeletedSmsHashDao,
     private val mergeRecordDao: MergeRecordDao,
     private val db: AppDatabase,
 ) {
+    @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
+    constructor(
+        transactionDao: TransactionDao,
+        settingsRepository: SettingsRepository,
+        tagRepository: TagRepository,
+        deletedSmsHashDao: DeletedSmsHashDao,
+        mergeRecordDao: MergeRecordDao,
+        db: AppDatabase,
+    ) : this(
+        transactionWriteDao = transactionDao,
+        transactionQueryDao = transactionDao,
+        transactionAnalyticsDao = transactionDao,
+        transactionReimbursementDao = transactionDao,
+        settingsRepository = settingsRepository,
+        tagRepository = tagRepository,
+        deletedSmsHashDao = deletedSmsHashDao,
+        mergeRecordDao = mergeRecordDao,
+        db = db,
+    )
+
     // --- NEW: Function for Spending Velocity feature ---
     suspend fun getTotalExpensesSince(startDate: Long): Double {
-        return transactionDao.getTotalExpensesSince(startDate) ?: 0.0
+        return transactionAnalyticsDao.getTotalExpensesSince(startDate) ?: 0.0
     }
 
     // --- NEW: Function to search for merchant predictions ---
     fun searchMerchants(query: String): Flow<List<MerchantPrediction>> {
-        return transactionDao.searchMerchants(query)
+        return transactionQueryDao.searchMerchants(query)
     }
 
     suspend fun deleteByIds(transactionIds: List<Int>) {
-        transactionDao.deleteByIds(transactionIds)
+        transactionWriteDao.deleteByIds(transactionIds)
     }
 
     fun getTransactionWithSplits(transactionId: Int): Flow<TransactionWithSplits?> {
-        return transactionDao.getTransactionWithSplits(transactionId)
+        return transactionQueryDao.getTransactionWithSplits(transactionId)
     }
 
     val allTransactions: Flow<List<TransactionDetails>> =
-        transactionDao.getAllTransactions()
+        transactionQueryDao.getAllTransactions()
             .onEach { transactions ->
                 Log.d(
                     "TransactionFlowDebug",
@@ -62,21 +89,21 @@ class TransactionRepository(
             }
 
     fun getFirstTransactionDate(): Flow<Long?> {
-        return transactionDao.getFirstTransactionDate()
+        return transactionQueryDao.getFirstTransactionDate()
     }
 
     fun getFinancialSummaryForRangeFlow(
         startDate: Long,
         endDate: Long,
     ): Flow<FinancialSummary?> {
-        return transactionDao.getFinancialSummaryForRangeFlow(startDate, endDate)
+        return transactionAnalyticsDao.getFinancialSummaryForRangeFlow(startDate, endDate)
     }
 
     fun getTopSpendingCategoriesForRangeFlow(
         startDate: Long,
         endDate: Long,
     ): Flow<CategorySpending?> {
-        return transactionDao.getTopSpendingCategoriesForRangeFlow(startDate, endDate)
+        return transactionAnalyticsDao.getTopSpendingCategoriesForRangeFlow(startDate, endDate)
     }
 
     fun getIncomeTransactionsForRange(
@@ -86,7 +113,7 @@ class TransactionRepository(
         accountId: Int?,
         categoryId: Int?,
     ): Flow<List<TransactionDetails>> {
-        return transactionDao.getIncomeTransactionsForRange(startDate, endDate, keyword, accountId, categoryId)
+        return transactionQueryDao.getIncomeTransactionsForRange(startDate, endDate, keyword, accountId, categoryId)
     }
 
     fun getIncomeByCategoryForMonth(
@@ -96,7 +123,7 @@ class TransactionRepository(
         accountId: Int?,
         categoryId: Int?,
     ): Flow<List<CategorySpending>> {
-        return transactionDao.getIncomeByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId)
+        return transactionAnalyticsDao.getIncomeByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId)
     }
 
     fun getSpendingByMerchantForMonth(
@@ -107,7 +134,7 @@ class TransactionRepository(
         categoryId: Int?,
         transactionType: TransactionType?,
     ): Flow<List<MerchantSpendingSummary>> {
-        return transactionDao.getSpendingByMerchantForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
+        return transactionAnalyticsDao.getSpendingByMerchantForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
     }
 
     suspend fun addImageToTransaction(
@@ -115,81 +142,81 @@ class TransactionRepository(
         imageUri: String,
     ) {
         val transactionImage = TransactionImage(transactionId = transactionId, imageUri = imageUri)
-        transactionDao.insertImage(transactionImage)
+        transactionWriteDao.insertImage(transactionImage)
     }
 
     suspend fun deleteImage(transactionImage: TransactionImage) {
-        transactionDao.deleteImage(transactionImage)
+        transactionWriteDao.deleteImage(transactionImage)
     }
 
     fun getImagesForTransaction(transactionId: Int): Flow<List<TransactionImage>> {
-        return transactionDao.getImagesForTransaction(transactionId)
+        return transactionQueryDao.getImagesForTransaction(transactionId)
     }
 
     suspend fun updateDescription(
         id: Int,
         description: String,
-    ) = transactionDao.updateDescription(id, description)
+    ) = transactionWriteDao.updateDescription(id, description)
 
     suspend fun updateAmount(
         id: Int,
         amount: Double,
-    ) = transactionDao.updateAmount(id, amount)
+    ) = transactionWriteDao.updateAmount(id, amount)
 
     suspend fun updateManualAmountEdit(
         id: Int,
         amount: Double,
-    ) = transactionDao.updateManualAmountEdit(id, amount)
+    ) = transactionWriteDao.updateManualAmountEdit(id, amount)
 
     suspend fun updateNotes(
         id: Int,
         notes: String?,
-    ) = transactionDao.updateNotes(id, notes)
+    ) = transactionWriteDao.updateNotes(id, notes)
 
     suspend fun updateCategoryId(
         id: Int,
         categoryId: Int?,
-    ) = transactionDao.updateCategoryId(id, categoryId)
+    ) = transactionWriteDao.updateCategoryId(id, categoryId)
 
     suspend fun updateAccountId(
         id: Int,
         accountId: Int,
-    ) = transactionDao.updateAccountId(id, accountId)
+    ) = transactionWriteDao.updateAccountId(id, accountId)
 
     suspend fun updateDate(
         id: Int,
         date: Long,
-    ) = transactionDao.updateDate(id, date)
+    ) = transactionWriteDao.updateDate(id, date)
 
     suspend fun updateExclusionStatus(
         id: Int,
         isExcluded: Boolean,
-    ) = transactionDao.updateExclusionStatus(id, isExcluded)
+    ) = transactionWriteDao.updateExclusionStatus(id, isExcluded)
 
     // --- NEW: Function to update transaction type ---
     suspend fun updateTransactionType(
         id: Int,
         transactionType: TransactionType,
     ) {
-        transactionDao.updateTransactionType(id, transactionType)
+        transactionWriteDao.updateTransactionType(id, transactionType)
     }
 
     suspend fun clearReviewFlag(id: Int) {
-        transactionDao.clearReviewFlag(id)
+        transactionWriteDao.clearReviewFlag(id)
     }
 
     fun getTransactionDetailsById(id: Int): Flow<TransactionDetails?> {
-        return transactionDao.getTransactionDetailsById(id)
+        return transactionQueryDao.getTransactionDetailsById(id)
     }
 
-    val recentTransactions: Flow<List<TransactionDetails>> = transactionDao.getRecentTransactionDetails()
+    val recentTransactions: Flow<List<TransactionDetails>> = transactionQueryDao.getRecentTransactionDetails()
 
     fun getAllSmsHashes(): Flow<List<String>> {
-        return transactionDao.getAllSmsHashes()
+        return transactionQueryDao.getAllSmsHashes()
     }
 
     fun getTransactionsForAccountDetails(accountId: Int): Flow<List<TransactionDetails>> {
-        return transactionDao.getTransactionsForAccountDetails(accountId)
+        return transactionQueryDao.getTransactionsForAccountDetails(accountId)
     }
 
     fun getTransactionDetailsForRange(
@@ -199,26 +226,26 @@ class TransactionRepository(
         accountId: Int?,
         categoryId: Int?,
     ): Flow<List<TransactionDetails>> {
-        return transactionDao.getTransactionDetailsForRange(startDate, endDate, keyword, accountId, categoryId)
+        return transactionQueryDao.getTransactionDetailsForRange(startDate, endDate, keyword, accountId, categoryId)
     }
 
     fun getAllTransactionsForRange(
         startDate: Long,
         endDate: Long,
     ): Flow<List<Transaction>> {
-        return transactionDao.getAllTransactionsForRange(startDate, endDate)
+        return transactionQueryDao.getAllTransactionsForRange(startDate, endDate)
     }
 
     fun getTransactionById(id: Int): Flow<Transaction?> {
-        return transactionDao.getTransactionById(id)
+        return transactionQueryDao.getTransactionById(id)
     }
 
     suspend fun getTransactionSync(id: Int): Transaction? {
-        return transactionDao.getTransactionByIdSync(id)
+        return transactionQueryDao.getTransactionByIdSync(id)
     }
 
     fun getTransactionsForAccount(accountId: Int): Flow<List<Transaction>> {
-        return transactionDao.getTransactionsForAccount(accountId)
+        return transactionQueryDao.getTransactionsForAccount(accountId)
     }
 
     fun getSpendingByCategoryForMonth(
@@ -229,36 +256,36 @@ class TransactionRepository(
         categoryId: Int?,
         transactionType: TransactionType?,
     ): Flow<List<CategorySpending>> {
-        return transactionDao.getSpendingByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
+        return transactionAnalyticsDao.getSpendingByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
     }
 
     fun getMonthlyTrends(startDate: Long): Flow<List<MonthlyTrend>> {
-        return transactionDao.getMonthlyTrends(startDate)
+        return transactionAnalyticsDao.getMonthlyTrends(startDate)
     }
 
     suspend fun countTransactionsForCategory(categoryId: Int): Int {
-        return transactionDao.countTransactionsForCategory(categoryId)
+        return transactionQueryDao.countTransactionsForCategory(categoryId)
     }
 
     fun getTagsForTransaction(transactionId: Int): Flow<List<Tag>> {
-        return transactionDao.getTagsForTransaction(transactionId)
+        return transactionQueryDao.getTagsForTransaction(transactionId)
     }
 
     suspend fun getTagsForTransactionSimple(transactionId: Int): List<Tag> {
-        return transactionDao.getTagsForTransactionSimple(transactionId)
+        return transactionQueryDao.getTagsForTransactionSimple(transactionId)
     }
 
     suspend fun updateTagsForTransaction(
         transactionId: Int,
         tags: Set<Tag>,
     ) {
-        transactionDao.clearTagsForTransaction(transactionId)
+        transactionWriteDao.clearTagsForTransaction(transactionId)
         if (tags.isNotEmpty()) {
             val crossRefs =
                 tags.map { tag ->
                     TransactionTagCrossRef(transactionId = transactionId, tagId = tag.id)
                 }
-            transactionDao.addTagsToTransaction(crossRefs)
+            transactionWriteDao.addTagsToTransaction(crossRefs)
         }
     }
 
@@ -280,13 +307,13 @@ class TransactionRepository(
         tags: Set<Tag>,
     ): Long {
         val finalTags = getFinalTagsForTransaction(transaction, tags)
-        val transactionId = transactionDao.insert(transaction)
+        val transactionId = transactionWriteDao.insert(transaction)
         if (finalTags.isNotEmpty()) {
             val crossRefs =
                 finalTags.map { tag ->
                     TransactionTagCrossRef(transactionId = transactionId.toInt(), tagId = tag.id)
                 }
-            transactionDao.addTagsToTransaction(crossRefs)
+            transactionWriteDao.addTagsToTransaction(crossRefs)
         }
         return transactionId
     }
@@ -296,14 +323,14 @@ class TransactionRepository(
         tags: Set<Tag>,
     ) {
         val finalTags = getFinalTagsForTransaction(transaction, tags)
-        transactionDao.update(transaction)
-        transactionDao.clearTagsForTransaction(transaction.id)
+        transactionWriteDao.update(transaction)
+        transactionWriteDao.clearTagsForTransaction(transaction.id)
         if (finalTags.isNotEmpty()) {
             val crossRefs =
                 finalTags.map { tag ->
                     TransactionTagCrossRef(transactionId = transaction.id, tagId = tag.id)
                 }
-            transactionDao.addTagsToTransaction(crossRefs)
+            transactionWriteDao.addTagsToTransaction(crossRefs)
         }
     }
 
@@ -313,13 +340,13 @@ class TransactionRepository(
         imagePaths: List<String>,
     ): Long {
         val finalTags = getFinalTagsForTransaction(transaction, tags)
-        val newTransactionId = transactionDao.insert(transaction)
+        val newTransactionId = transactionWriteDao.insert(transaction)
         if (finalTags.isNotEmpty()) {
             val crossRefs =
                 finalTags.map { tag ->
                     TransactionTagCrossRef(transactionId = newTransactionId.toInt(), tagId = tag.id)
                 }
-            transactionDao.addTagsToTransaction(crossRefs)
+            transactionWriteDao.addTagsToTransaction(crossRefs)
         }
         imagePaths.forEach { path ->
             val imageEntity =
@@ -327,59 +354,59 @@ class TransactionRepository(
                     transactionId = newTransactionId.toInt(),
                     imageUri = path,
                 )
-            transactionDao.insertImage(imageEntity)
+            transactionWriteDao.insertImage(imageEntity)
         }
         return newTransactionId
     }
 
     suspend fun delete(transaction: Transaction) {
-        transactionDao.delete(transaction)
+        transactionWriteDao.delete(transaction)
     }
 
     suspend fun setSmsHash(
         transactionId: Int,
         smsHash: String,
     ) {
-        transactionDao.setSmsHash(transactionId, smsHash)
+        transactionWriteDao.setSmsHash(transactionId, smsHash)
     }
 
     fun getTransactionCountForMerchant(description: String): Flow<Int> {
-        return transactionDao.getTransactionCountForMerchant(description)
+        return transactionQueryDao.getTransactionCountForMerchant(description)
     }
 
     suspend fun findSimilarTransactions(
         description: String,
         excludeId: Int,
     ): List<Transaction> {
-        return transactionDao.findSimilarTransactions(description, excludeId)
+        return transactionQueryDao.findSimilarTransactions(description, excludeId)
     }
 
     /** Returns all distinct [Transaction.originalDescription] values for cross-account nudge scanning. */
-    suspend fun getDistinctOriginalDescriptions(): List<String> = transactionDao.getDistinctOriginalDescriptions()
+    suspend fun getDistinctOriginalDescriptions(): List<String> = transactionQueryDao.getDistinctOriginalDescriptions()
 
     /** Returns IDs of all transactions sharing the given [originalDesc] (case-insensitive). */
     suspend fun getTransactionIdsByOriginalDescription(originalDesc: String): List<Int> =
-        transactionDao.getTransactionIdsByOriginalDescription(originalDesc)
+        transactionQueryDao.getTransactionIdsByOriginalDescription(originalDesc)
 
     suspend fun updateCategoryForIds(
         ids: List<Int>,
         categoryId: Int,
     ) {
-        transactionDao.updateCategoryForIds(ids, categoryId)
+        transactionWriteDao.updateCategoryForIds(ids, categoryId)
     }
 
     suspend fun updateDescriptionForIds(
         ids: List<Int>,
         newDescription: String,
     ) {
-        transactionDao.updateDescriptionForIds(ids, newDescription)
+        transactionWriteDao.updateDescriptionForIds(ids, newDescription)
     }
 
     fun getDailySpendingForDateRange(
         startDate: Long,
         endDate: Long,
     ): Flow<List<DailyTotal>> {
-        return transactionDao.getDailySpendingForDateRange(startDate, endDate)
+        return transactionAnalyticsDao.getDailySpendingForDateRange(startDate, endDate)
     }
 
     // --- NEW: Functions for retrospective tagging ---
@@ -388,7 +415,7 @@ class TransactionRepository(
         startDate: Long,
         endDate: Long,
     ) {
-        transactionDao.addTagForDateRange(tagId, startDate, endDate)
+        transactionWriteDao.addTagForDateRange(tagId, startDate, endDate)
     }
 
     suspend fun removeTagForDateRange(
@@ -396,17 +423,17 @@ class TransactionRepository(
         startDate: Long,
         endDate: Long,
     ) {
-        transactionDao.removeTagForDateRange(tagId, startDate, endDate)
+        transactionWriteDao.removeTagForDateRange(tagId, startDate, endDate)
     }
 
     // --- NEW: Get all transactions for a specific tag ---
     fun getTransactionsByTagId(tagId: Int): Flow<List<TransactionDetails>> {
-        return transactionDao.getTransactionsByTagId(tagId)
+        return transactionQueryDao.getTransactionsByTagId(tagId)
     }
 
     // --- NEW: Expose the function to remove all tags ---
     suspend fun removeAllTransactionsForTag(tagId: Int) {
-        transactionDao.removeAllTransactionsForTag(tagId)
+        transactionWriteDao.removeAllTransactionsForTag(tagId)
     }
 
     // --- NEW: Centralized "Monthly-First" Consistency Logic ---
@@ -455,8 +482,8 @@ class TransactionRepository(
         // --- UPDATED: The budget flow is now nullable (Flow<Float?>) ---
         return combine(
             settingsRepository.getOverallBudgetForMonth(year, month),
-            transactionDao.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
-            transactionDao.getFirstTransactionDate(),
+            transactionAnalyticsDao.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
+            transactionQueryDao.getFirstTransactionDate(),
         ) { budget: Float?, dailyTotals: List<DailyTotal>, firstTransactionDate: Long? ->
             val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
             val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
@@ -524,19 +551,19 @@ class TransactionRepository(
 
     // --- NEW: Expose the quick fill query ---
     fun getRecentManualTransactions(limit: Int): Flow<List<TransactionDetails>> {
-        return transactionDao.getRecentManualTransactions(limit)
+        return transactionQueryDao.getRecentManualTransactions(limit)
     }
 
     // --- NEW: Reimbursement / Offset Feature ---
 
     fun getReimbursementsForExpense(expenseId: Int): Flow<List<TransactionDetails>> =
-        transactionDao.getReimbursementsForExpense(expenseId)
+        transactionReimbursementDao.getReimbursementsForExpense(expenseId)
 
     fun getCandidateReimbursements(excludeExpenseId: Int): Flow<List<TransactionDetails>> =
-        transactionDao.getCandidateReimbursements(excludeExpenseId)
+        transactionReimbursementDao.getCandidateReimbursements(excludeExpenseId)
 
     fun getLinkedExpenseForReimbursement(incomeId: Int): Flow<TransactionDetails?> =
-        transactionDao.getLinkedExpenseForReimbursement(incomeId)
+        transactionReimbursementDao.getLinkedExpenseForReimbursement(incomeId)
 
     /**
      * Links [incomeId] as a reimbursement for [expenseId]:
@@ -548,11 +575,11 @@ class TransactionRepository(
         incomeId: Int,
         expenseId: Int
     ) {
-        val incomeTxn = transactionDao.getTransactionByIdSync(incomeId) ?: return
-        val expenseTxn = transactionDao.getTransactionByIdSync(expenseId) ?: return
-        transactionDao.linkReimbursement(incomeId, expenseId)
+        val incomeTxn = transactionQueryDao.getTransactionByIdSync(incomeId) ?: return
+        val expenseTxn = transactionQueryDao.getTransactionByIdSync(expenseId) ?: return
+        transactionReimbursementDao.linkReimbursement(incomeId, expenseId)
         val newExpenseAmount = expenseTxn.amount - incomeTxn.amount
-        transactionDao.updateAmount(expenseId, newExpenseAmount)
+        transactionWriteDao.updateAmount(expenseId, newExpenseAmount)
     }
 
     /**
@@ -561,12 +588,12 @@ class TransactionRepository(
      * - Adds the income amount back onto the parent expense.
      */
     suspend fun unlinkReimbursement(incomeId: Int) {
-        val incomeTxn = transactionDao.getTransactionByIdSync(incomeId) ?: return
+        val incomeTxn = transactionQueryDao.getTransactionByIdSync(incomeId) ?: return
         val parentId = incomeTxn.parentReimbursementId ?: return
-        val expenseTxn = transactionDao.getTransactionByIdSync(parentId) ?: return
-        transactionDao.unlinkReimbursement(incomeId)
+        val expenseTxn = transactionQueryDao.getTransactionByIdSync(parentId) ?: return
+        transactionReimbursementDao.unlinkReimbursement(incomeId)
         val restoredExpenseAmount = expenseTxn.amount + incomeTxn.amount
-        transactionDao.updateAmount(parentId, restoredExpenseAmount)
+        transactionWriteDao.updateAmount(parentId, restoredExpenseAmount)
     }
 
     // --- NEW: Smart Transaction Merge ---
@@ -577,11 +604,11 @@ class TransactionRepository(
         timeWindowStart: Long,
         newTxnId: Int
     ): Transaction? {
-        return transactionDao.findRecentTransactionForMerge(merchant, accountId, transactionType, timeWindowStart, newTxnId)
+        return transactionQueryDao.findRecentTransactionForMerge(merchant, accountId, transactionType, timeWindowStart, newTxnId)
     }
 
     suspend fun dismissMerge(id: Int) {
-        transactionDao.updateMergeDismissed(id, true)
+        transactionWriteDao.updateMergeDismissed(id, true)
     }
 
     suspend fun mergeTransactions(
@@ -591,15 +618,15 @@ class TransactionRepository(
         childSmsDate: Long? = null
     ) {
         var activeParentId = parentTxnId
-        var parentTxn = transactionDao.getTransactionByIdSync(activeParentId)
-        val childTxn = transactionDao.getTransactionByIdSync(childTxnId)
+        var parentTxn = transactionQueryDao.getTransactionByIdSync(activeParentId)
+        val childTxn = transactionQueryDao.getTransactionByIdSync(childTxnId)
 
         if (childTxn == null) return
 
         if (parentTxn == null) {
             val timeWindowStart = childTxn.date - (3 * 60 * 60 * 1000L)
             val newParent =
-                transactionDao.findRecentTransactionForMerge(
+                transactionQueryDao.findRecentTransactionForMerge(
                     merchant = childTxn.description,
                     accountId = childTxn.accountId,
                     transactionType = childTxn.transactionType,
@@ -629,7 +656,7 @@ class TransactionRepository(
             )
         )
 
-        transactionDao.updateMergeDismissed(childTxnId, true)
+        transactionWriteDao.updateMergeDismissed(childTxnId, true)
 
         val newAmount = finalParentTxn.amount + childTxn.amount
         val newDate = maxOf(finalParentTxn.date, childTxn.date)
@@ -660,15 +687,15 @@ class TransactionRepository(
                 "$existingNotes\n\n$childNote"
             }
 
-        transactionDao.updateAmount(activeParentId, newAmount)
-        transactionDao.updateDate(activeParentId, newDate)
-        transactionDao.updateNotes(activeParentId, newNotes)
+        transactionWriteDao.updateAmount(activeParentId, newAmount)
+        transactionWriteDao.updateDate(activeParentId, newDate)
+        transactionWriteDao.updateNotes(activeParentId, newNotes)
 
         childTxn.sourceSmsHash?.let { hash ->
             deletedSmsHashDao.insert(DeletedSmsHash(smsHash = hash))
         }
 
-        transactionDao.delete(childTxn)
+        transactionWriteDao.delete(childTxn)
     }
 
     // --- FEATURE: Manual Transaction Merge ---
@@ -726,8 +753,8 @@ class TransactionRepository(
         childTxnIds: List<Int>,
     ) {
         db.withTransaction {
-            val anchorTxn = transactionDao.getTransactionByIdSync(anchorTxnId) ?: return@withTransaction
-            val childTxns = childTxnIds.mapNotNull { transactionDao.getTransactionByIdSync(it) }
+            val anchorTxn = transactionQueryDao.getTransactionByIdSync(anchorTxnId) ?: return@withTransaction
+            val childTxns = childTxnIds.mapNotNull { transactionQueryDao.getTransactionByIdSync(it) }
             if (childTxns.isEmpty()) return@withTransaction
 
             val groupId = java.util.UUID.randomUUID().toString()
@@ -744,7 +771,7 @@ class TransactionRepository(
 
             val anchorSigned = signedAmount(anchorTxn)
             val netSigned = anchorSigned + childTxns.sumOf { signedAmount(it) }
-            val hasReimbursements = transactionDao.getReimbursementsCountSync(anchorTxnId) > 0
+            val hasReimbursements = transactionReimbursementDao.getReimbursementsCountSync(anchorTxnId) > 0
 
             val finalType =
                 if (hasReimbursements) {
@@ -761,14 +788,14 @@ class TransactionRepository(
             val finalDate = (childTxns.map { it.date } + anchorTxn.date).max()
 
             // ── Union all tags ──────────────────────────────────────────────
-            val anchorTags = transactionDao.getTagsForTransactionSimple(anchorTxnId).map { it.id }.toMutableSet()
+            val anchorTags = transactionQueryDao.getTagsForTransactionSimple(anchorTxnId).map { it.id }.toMutableSet()
             for (childTxn in childTxns) {
-                val childTagIds = transactionDao.getTagsForTransactionSimple(childTxn.id).map { it.id }
+                val childTagIds = transactionQueryDao.getTagsForTransactionSimple(childTxn.id).map { it.id }
                 anchorTags.addAll(childTagIds)
             }
-            transactionDao.clearTagsForTransaction(anchorTxnId)
+            transactionWriteDao.clearTagsForTransaction(anchorTxnId)
             if (anchorTags.isNotEmpty()) {
-                transactionDao.addTagsToTransaction(
+                transactionWriteDao.addTagsToTransaction(
                     anchorTags.map { tagId -> TransactionTagCrossRef(transactionId = anchorTxnId, tagId = tagId) }
                 )
             }
@@ -804,15 +831,15 @@ class TransactionRepository(
                 childTxn.sourceSmsHash?.let { hash ->
                     deletedSmsHashDao.insert(DeletedSmsHash(smsHash = hash))
                 }
-                transactionDao.delete(childTxn)
+                transactionWriteDao.delete(childTxn)
             }
 
             // ── Update the anchor ──────────────────────────────────────────
-            transactionDao.updateAmount(anchorTxnId, finalAmount)
-            transactionDao.updateDate(anchorTxnId, finalDate)
-            transactionDao.updateNotes(anchorTxnId, notes)
+            transactionWriteDao.updateAmount(anchorTxnId, finalAmount)
+            transactionWriteDao.updateDate(anchorTxnId, finalDate)
+            transactionWriteDao.updateNotes(anchorTxnId, notes)
             if (anchorTxn.transactionType != finalType) {
-                transactionDao.updateTransactionType(anchorTxnId, finalType)
+                transactionWriteDao.updateTransactionType(anchorTxnId, finalType)
             }
         }
     }
@@ -864,7 +891,7 @@ class TransactionRepository(
         val records = mergeRecordDao.getAllForParentAnyType(parentTxnId)
         if (records.isEmpty()) return emptyList()
 
-        val anchorTxn = transactionDao.getTransactionByIdSync(parentTxnId) ?: return emptyList()
+        val anchorTxn = transactionQueryDao.getTransactionByIdSync(parentTxnId) ?: return emptyList()
         val anchorAccount = db.accountDao().getAccountByIdBlocking(anchorTxn.accountId)
 
         val entries = mutableListOf<MergedTransactionItem>()
@@ -948,7 +975,7 @@ class TransactionRepository(
             if (allRecords.isEmpty()) return
 
             db.withTransaction {
-                val currentParent = transactionDao.getTransactionByIdSync(parentTxnId) ?: return@withTransaction
+                val currentParent = transactionQueryDao.getTransactionByIdSync(parentTxnId) ?: return@withTransaction
 
                 fun signedAmount(
                     type: TransactionType,
@@ -959,7 +986,7 @@ class TransactionRepository(
                 val currentSigned = signedAmount(currentParent.transactionType, currentParent.amount)
                 val childrenSigned = allRecords.sumOf { signedAmount(it.childTransactionType, it.childAmount) }
                 val newSigned = currentSigned - childrenSigned
-                val hasReimbursements = transactionDao.getReimbursementsCountSync(parentTxnId) > 0
+                val hasReimbursements = transactionReimbursementDao.getReimbursementsCountSync(parentTxnId) > 0
 
                 val finalType =
                     if (hasReimbursements) {
@@ -978,17 +1005,17 @@ class TransactionRepository(
 
                 // Restore parent to its pre-merge state (all records share the same parent snapshot)
                 val first = allRecords.first()
-                transactionDao.updateAmount(parentTxnId, finalAmount)
+                transactionWriteDao.updateAmount(parentTxnId, finalAmount)
                 if (currentParent.transactionType != finalType) {
-                    transactionDao.updateTransactionType(parentTxnId, finalType)
+                    transactionWriteDao.updateTransactionType(parentTxnId, finalType)
                 }
-                transactionDao.updateDate(parentTxnId, first.originalParentDate)
-                transactionDao.updateNotes(parentTxnId, first.originalParentNotes)
+                transactionWriteDao.updateDate(parentTxnId, first.originalParentDate)
+                transactionWriteDao.updateNotes(parentTxnId, first.originalParentNotes)
 
                 // Re-insert each child
                 for (r in allRecords) {
                     val restoredChild = restoreTransactionFromMergeRecord(r)
-                    transactionDao.insert(restoredChild)
+                    transactionWriteDao.insert(restoredChild)
 
                     // Unblock the child's SMS so it can be re-scanned
                     r.childSourceSmsHash?.let { hash ->
@@ -1007,7 +1034,7 @@ class TransactionRepository(
             if (allAutoRecords.isEmpty()) return
 
             db.withTransaction {
-                val currentParent = transactionDao.getTransactionByIdSync(parentTxnId) ?: return@withTransaction
+                val currentParent = transactionQueryDao.getTransactionByIdSync(parentTxnId) ?: return@withTransaction
 
                 // AUTO merges just sum the absolute amounts.
                 val totalMergedAmount = allAutoRecords.sumOf { it.childAmount }
@@ -1015,14 +1042,14 @@ class TransactionRepository(
 
                 // The VERY FIRST record (oldest) has the original parent state
                 val first = allAutoRecords.first()
-                transactionDao.updateAmount(parentTxnId, newAmount)
-                transactionDao.updateDate(parentTxnId, first.originalParentDate)
-                transactionDao.updateNotes(parentTxnId, first.originalParentNotes)
+                transactionWriteDao.updateAmount(parentTxnId, newAmount)
+                transactionWriteDao.updateDate(parentTxnId, first.originalParentDate)
+                transactionWriteDao.updateNotes(parentTxnId, first.originalParentNotes)
 
                 // Re-insert each child
                 for (r in allAutoRecords) {
                     val restoredChild = restoreTransactionFromMergeRecord(r)
-                    transactionDao.insert(restoredChild)
+                    transactionWriteDao.insert(restoredChild)
 
                     r.childSourceSmsHash?.let { hash ->
                         deletedSmsHashDao.deleteByHash(hash)
@@ -1051,7 +1078,7 @@ class TransactionRepository(
         val endTime = newTxn.date + windowMs
 
         val candidates =
-            transactionDao.findPotentialTransfers(
+            transactionQueryDao.findPotentialTransfers(
                 amount = newTxn.amount,
                 accountId = newTxn.accountId,
                 transactionType = newTxn.transactionType,
@@ -1113,8 +1140,8 @@ class TransactionRepository(
             if (isMatch) {
                 // Link them atomically
                 db.withTransaction {
-                    transactionDao.updateTransferLinkStatus(newTxn.id, candidate.id, true)
-                    transactionDao.updateTransferLinkStatus(candidate.id, newTxn.id, true)
+                    transactionWriteDao.updateTransferLinkStatus(newTxn.id, candidate.id, true)
+                    transactionWriteDao.updateTransferLinkStatus(candidate.id, newTxn.id, true)
                 }
                 break // Only link the first match
             }

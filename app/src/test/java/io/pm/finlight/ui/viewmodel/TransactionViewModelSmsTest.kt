@@ -230,7 +230,7 @@ class TransactionViewModelSmsTest : TransactionViewModelBaseSetup() {
             advanceUntilIdle()
 
             // Stub: both selected transactions have SMS hashes
-            whenever(transactionDao.getSmsHashesByIds(any())).thenReturn(listOf(hash1, hash2))
+            whenever(transactionQueryDao.getSmsHashesByIds(any())).thenReturn(listOf(hash1, hash2))
 
             // Act
             viewModel.onConfirmDeleteSelection()

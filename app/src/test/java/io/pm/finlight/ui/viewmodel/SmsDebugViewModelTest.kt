@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -64,7 +65,13 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
     @Mock private lateinit var smsParseTemplateDao: SmsParseTemplateDao
 
-    @Mock private lateinit var transactionDao: TransactionDao
+    @Mock private lateinit var transactionQueryDao: TransactionQueryDao
+
+    @Mock private lateinit var transactionWriteDao: TransactionWriteDao
+
+    @Mock private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+
+    @Mock private lateinit var transactionReimbursementDao: TransactionReimbursementDao
 
     private lateinit var viewModel: SmsDebugViewModel
 
@@ -78,7 +85,10 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         `when`(db.ignoreRuleDao()).thenReturn(ignoreRuleDao)
         `when`(db.merchantCategoryMappingDao()).thenReturn(merchantCategoryMappingDao)
         `when`(db.smsParseTemplateDao()).thenReturn(smsParseTemplateDao)
-        `when`(db.transactionDao()).thenReturn(transactionDao)
+        `when`(db.transactionQueryDao()).thenReturn(transactionQueryDao)
+        `when`(db.transactionWriteDao()).thenReturn(transactionWriteDao)
+        `when`(db.transactionAnalyticsDao()).thenReturn(transactionAnalyticsDao)
+        `when`(db.transactionReimbursementDao()).thenReturn(transactionReimbursementDao)
 
         `when`(application.applicationContext).thenReturn(application)
     }
@@ -91,7 +101,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             `when`(smsParseTemplateDao.getAllTemplates()).thenAnswer { emptyList<SmsParseTemplate>() }
             // --- FIX: Add missing mock for getTemplatesBySignature to prevent NPE ---
             `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenAnswer { emptyList<SmsParseTemplate>() }
-            `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
             `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyObject())).thenAnswer { null }
         }
 
@@ -241,7 +251,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             // Mocks for the INITIAL scan (no custom rules)
             `when`(smsRepository.fetchAllSms(any())).thenReturn(listOf(sms1))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
-            `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
             `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer { invocation ->
                 capturedTxn = invocation.getArgument(0)

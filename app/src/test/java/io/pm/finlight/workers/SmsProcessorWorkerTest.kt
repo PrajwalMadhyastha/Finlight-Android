@@ -42,7 +42,8 @@ import android.Manifest
 class SmsProcessorWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
+    private lateinit var transactionWriteDao: TransactionWriteDao
     private lateinit var merchantMappingDao: MerchantMappingDao
     private lateinit var customSmsRuleDao: CustomSmsRuleDao
     private lateinit var ignoreRuleDao: IgnoreRuleDao
@@ -83,11 +84,12 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
 
         db = mockk(relaxed = true)
-        transactionDao =
+        transactionWriteDao =
             mockk(relaxed = true) {
                 coEvery { insert(any()) } returns 1L
                 coEvery { addTagsToTransaction(any()) } just runs
             }
+        transactionQueryDao = mockk(relaxed = true)
         merchantMappingDao = mockk(relaxed = true)
         customSmsRuleDao = mockk(relaxed = true)
         ignoreRuleDao = mockk(relaxed = true)
@@ -101,7 +103,8 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionDao() } returns transactionDao
+        every { db.transactionQueryDao() } returns transactionQueryDao
+        every { db.transactionWriteDao() } returns transactionWriteDao
         every { db.merchantMappingDao() } returns merchantMappingDao
         every { db.customSmsRuleDao() } returns customSmsRuleDao
         every { db.ignoreRuleDao() } returns ignoreRuleDao
@@ -114,7 +117,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         every { db.recurringTransactionDao() } returns recurringDao
 
         coEvery { merchantMappingDao.getAllMappings() } returns flowOf(emptyList())
-        coEvery { transactionDao.getAllSmsHashes() } returns flowOf(emptyList())
+        coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
         coEvery { customSmsRuleDao.getAllRules() } returns flowOf(emptyList())
         coEvery { ignoreRuleDao.getEnabledRules() } returns emptyList()
         coEvery { merchantRenameRuleDao.getAllRules() } returns flowOf(emptyList())
@@ -198,7 +201,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val result = worker.doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
         }
 
     @Test
@@ -217,14 +220,14 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val result = worker.doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 1) { transactionDao.insert(any()) }
+            coVerify(exactly = 1) { transactionWriteDao.insert(any()) }
         }
 
     @Test
     fun `already seen hash is skipped without saving`() =
         runTest {
             val existingHash = "existinghash"
-            coEvery { transactionDao.getAllSmsHashes() } returns flowOf(listOf(existingHash))
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(listOf(existingHash))
 
             val txn =
                 PotentialTransaction(
@@ -238,7 +241,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val result = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy").doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
         }
 
     @Test
@@ -250,7 +253,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val result = buildWorker("PROMO", "Your OTP is 1234").doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
         }
 
     @Test
@@ -269,7 +272,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
             assertEquals(ListenableWorker.Result.success(), result)
             verify(exactly = 0) { mockClassifier.classify(any()) }
-            coVerify(exactly = 1) { transactionDao.insert(any()) }
+            coVerify(exactly = 1) { transactionWriteDao.insert(any()) }
         }
 
     @Test
@@ -318,7 +321,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             buildWorker("AM-HDFCBK", "Spent 100 USD at Starbucks").doWork()
 
             val captor = slot<Transaction>()
-            coVerify { transactionDao.insert(capture(captor)) }
+            coVerify { transactionWriteDao.insert(capture(captor)) }
             assertEquals("USD", captor.captured.currencyCode)
         }
 
@@ -365,7 +368,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
             val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1100.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
 
-            coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
+            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn
             coEvery { recurringDao.getRuleBySmsSenderId("BESCOM") } returns rule
 
             val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "BESCOM", amount = 1100.0, transactionType = "expense", merchantName = "Electricity", originalMessage = "Bill", sourceSmsHash = "hash200")
@@ -373,7 +376,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
             buildWorker("BESCOM", "Bill").doWork()
 
-            coVerify { transactionDao.updateRecurringRuleId(10, 5) }
+            coVerify { transactionWriteDao.updateRecurringRuleId(10, 5) }
             coVerify { recurringDao.updateLastRunDate(5, 100L) }
             verify(exactly = 0) { NotificationHelper.showVariableBillAnomalyNotification(any(), any(), any(), any()) }
         }
@@ -384,7 +387,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
             val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1500.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
 
-            coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
+            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn
             coEvery { recurringDao.getRuleBySmsSenderId("BESCOM") } returns rule
 
             val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "BESCOM", amount = 1500.0, transactionType = "expense", merchantName = "Electricity", originalMessage = "Bill", sourceSmsHash = "hash201")
@@ -392,7 +395,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
             buildWorker("BESCOM", "Bill").doWork()
 
-            coVerify { transactionDao.updateRecurringRuleId(10, 5) }
+            coVerify { transactionWriteDao.updateRecurringRuleId(10, 5) }
             coVerify { recurringDao.updateLastRunDate(5, 100L) }
             verify(exactly = 1) { NotificationHelper.showVariableBillAnomalyNotification(context, rule, 1500.0, 1000.0) }
         }
@@ -403,16 +406,16 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val savedTxn = Transaction(id = 10, description = "Netflix", amount = 149.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
             val draft = Transaction(id = 20, description = "Netflix", amount = 149.0, transactionType = TransactionType.EXPENSE, date = 99L, accountId = 1, categoryId = 1, notes = null, status = TransactionStatus.PENDING, recurringRuleId = 7)
 
-            coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
+            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn
             coEvery { recurringDao.getRuleBySmsSenderId(any()) } returns null
-            coEvery { transactionDao.getPendingTransactionsSync() } returns listOf(draft)
+            coEvery { transactionQueryDao.getPendingTransactionsSync() } returns listOf(draft)
 
             val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "NETFLIX", amount = 149.0, transactionType = "expense", merchantName = "Netflix", originalMessage = "Sub", sourceSmsHash = "hash202")
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
             buildWorker("NETFLIX", "Sub").doWork()
 
-            coVerify { transactionDao.updateRecurringRuleId(10, 7) }
+            coVerify { transactionWriteDao.updateRecurringRuleId(10, 7) }
             coVerify { recurringDao.updateLastRunDate(7, 100L) }
         }
 
@@ -423,8 +426,8 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val savedTxn = Transaction(id = 10, description = "Amazon", amount = 100.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
             val recentTxn = Transaction(id = 9, description = "Amazon", amount = 50.0, transactionType = TransactionType.EXPENSE, date = 50L, accountId = 1, categoryId = 1, notes = null)
 
-            coEvery { transactionDao.getTransactionByIdSync(any()) } returns savedTxn
-            coEvery { transactionDao.findRecentTransactionForMerge(any(), any(), any(), any(), any()) } returns recentTxn
+            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn
+            coEvery { transactionQueryDao.findRecentTransactionForMerge(any(), any(), any(), any(), any()) } returns recentTxn
             every { NotificationHelper.showMergeTransactionNotification(any(), any(), any()) } just runs
 
             val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "AMZ", amount = 100.0, transactionType = "expense", merchantName = "Amazon", originalMessage = "Bill", sourceSmsHash = "hash300")

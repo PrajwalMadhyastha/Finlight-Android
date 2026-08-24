@@ -26,12 +26,15 @@ class MergeActionReceiver : BroadcastReceiver() {
         val db = AppDatabase.getInstance(context)
         val transactionRepository =
             TransactionRepository(
-                db.transactionDao(),
-                SettingsRepository(context),
-                TagRepository(db.tagDao(), db.transactionDao()),
-                db.deletedSmsHashDao(),
-                db.mergeRecordDao(),
-                db,
+                transactionWriteDao = db.transactionWriteDao(),
+                transactionQueryDao = db.transactionQueryDao(),
+                transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                transactionReimbursementDao = db.transactionReimbursementDao(),
+                settingsRepository = SettingsRepository(context),
+                tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao()),
+                deletedSmsHashDao = db.deletedSmsHashDao(),
+                mergeRecordDao = db.mergeRecordDao(),
+                db = db,
             )
 
         CoroutineScope(Dispatchers.IO).launch {

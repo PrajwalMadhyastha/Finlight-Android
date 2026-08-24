@@ -29,7 +29,7 @@ class WeeklySummaryWorker(
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
-                val transactionDao = AppDatabase.getInstance(context).transactionDao()
+                val transactionAnalyticsDao = AppDatabase.getInstance(context).transactionAnalyticsDao()
 
                 // Date range for LAST 7 DAYS
                 val thisWeekEnd =
@@ -66,13 +66,13 @@ class WeeklySummaryWorker(
                         set(Calendar.MILLISECOND, 0)
                     }.timeInMillis
 
-                val thisWeekSummary = transactionDao.getFinancialSummaryForRange(thisWeekStart, thisWeekEnd)
+                val thisWeekSummary = transactionAnalyticsDao.getFinancialSummaryForRange(thisWeekStart, thisWeekEnd)
                 val thisWeekExpenses = thisWeekSummary?.totalExpenses ?: 0.0
 
-                val lastWeekSummary = transactionDao.getFinancialSummaryForRange(lastWeekStart, lastWeekEnd)
+                val lastWeekSummary = transactionAnalyticsDao.getFinancialSummaryForRange(lastWeekStart, lastWeekEnd)
                 val lastWeekExpenses = lastWeekSummary?.totalExpenses ?: 0.0
 
-                val topCategories = transactionDao.getTopSpendingCategoriesForRange(thisWeekStart, thisWeekEnd)
+                val topCategories = transactionAnalyticsDao.getTopSpendingCategoriesForRange(thisWeekStart, thisWeekEnd)
 
                 val percentageChange =
                     if (lastWeekExpenses > 0) {

@@ -57,7 +57,7 @@ class SmsCatchupWorker(
         }
 
         // Load current hashes once — this is our duplicate guard.
-        val existingSmsHashes = db.transactionDao().getAllSmsHashes().first().toSet()
+        val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toSet()
 
         // Load deleted hashes — transactions the user intentionally removed should
         // never be re-created by this worker, even if their SMS reappears in the inbox.

@@ -69,7 +69,7 @@ class SmsProcessorWorker(
 
         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
-        val existingSmsHashes = db.transactionDao().getAllSmsHashes().first().toSet()
+        val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toSet()
         // Permanently skipped hashes (user deliberately deleted these transactions).
         val deletedHashes = db.deletedSmsHashDao().getAllHashes().toSet()
 
@@ -176,14 +176,15 @@ class SmsProcessorWorker(
 
         // --- NEW: Recurring transaction auto-linking ---
         val recurringDao = db.recurringTransactionDao()
-        val transactionDao = db.transactionDao()
-        val savedTxn = transactionDao.getTransactionByIdSync(newTransactionId.toInt())
+        val transactionQueryDao = db.transactionQueryDao()
+        val transactionWriteDao = db.transactionWriteDao()
+        val savedTxn = transactionQueryDao.getTransactionByIdSync(newTransactionId.toInt())
 
         if (savedTxn != null) {
             // --- NEW: Smart Transaction Merge Check ---
             val timeWindowStart = savedTxn.date - (3 * 60 * 60 * 1000L) // 3 hours ago
             val recentTxn =
-                transactionDao.findRecentTransactionForMerge(
+                transactionQueryDao.findRecentTransactionForMerge(
                     merchant = savedTxn.description,
                     accountId = savedTxn.accountId,
                     transactionType = savedTxn.transactionType,
@@ -200,7 +201,7 @@ class SmsProcessorWorker(
                 // It's a variable bill match
                 val isAnomaly = Math.abs(savedTxn.amount - senderRule.amount) > senderRule.amount * 0.3
 
-                transactionDao.updateRecurringRuleId(savedTxn.id, senderRule.id)
+                transactionWriteDao.updateRecurringRuleId(savedTxn.id, senderRule.id)
                 recurringDao.updateLastRunDate(senderRule.id, savedTxn.date)
 
                 if (isAnomaly) {
@@ -208,7 +209,7 @@ class SmsProcessorWorker(
                 }
             } else {
                 // Check if pending drafts exist
-                val pendingDrafts = transactionDao.getPendingTransactionsSync()
+                val pendingDrafts = transactionQueryDao.getPendingTransactionsSync()
                 val match =
                     pendingDrafts.find {
                         it.description == savedTxn.description &&
@@ -218,9 +219,9 @@ class SmsProcessorWorker(
 
                 if (match != null) {
                     // Auto-link fixed bill
-                    transactionDao.delete(match)
+                    transactionWriteDao.delete(match)
                     match.recurringRuleId?.let { ruleId ->
-                        transactionDao.updateRecurringRuleId(savedTxn.id, ruleId)
+                        transactionWriteDao.updateRecurringRuleId(savedTxn.id, ruleId)
                         recurringDao.updateLastRunDate(ruleId, savedTxn.date)
                     }
                 }

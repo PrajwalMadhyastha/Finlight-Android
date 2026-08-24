@@ -14,6 +14,8 @@ import androidx.work.workDataOf
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.utils.NotificationHelper
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -31,7 +33,8 @@ import org.robolectric.annotation.Config
 class TransactionNotificationWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
+    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
 
     @Before
     override fun setup() {
@@ -39,11 +42,13 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
         context = ApplicationProvider.getApplicationContext()
 
         db = mockk()
-        transactionDao = mockk()
+        transactionQueryDao = mockk()
+        transactionAnalyticsDao = mockk()
 
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionDao() } returns transactionDao
+        every { db.transactionQueryDao() } returns transactionQueryDao
+        every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
 
         val config =
             Configuration.Builder()
@@ -80,9 +85,9 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
             val summary = FinancialSummary(0.0, 1500.0)
             val visitCount = 5
 
-            coEvery { transactionDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns summary
-            coEvery { transactionDao.getTransactionCountForMerchantSuspend("Test") } returns visitCount
+            coEvery { transactionQueryDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns summary
+            every { transactionQueryDao.getTransactionCountForMerchant("Test") } returns flowOf(visitCount)
 
             val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to transactionId)
             val worker =
@@ -116,7 +121,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
     fun `doWork returns failure for invalid transactionId`() =
         runTest {
             // Arrange
-            coEvery { transactionDao.getTransactionDetailsById(any()) } returns flowOf(null)
+            coEvery { transactionQueryDao.getTransactionDetailsById(any()) } returns flowOf(null)
 
             val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to -1)
             val worker =
@@ -136,7 +141,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val transactionId = 999
-            coEvery { transactionDao.getTransactionDetailsById(transactionId) } returns flowOf(null)
+            coEvery { transactionQueryDao.getTransactionDetailsById(transactionId) } returns flowOf(null)
 
             val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to transactionId)
             val worker =
@@ -156,7 +161,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val transactionId = 1
-            coEvery { transactionDao.getTransactionDetailsById(transactionId) } throws RuntimeException("DB Error")
+            coEvery { transactionQueryDao.getTransactionDetailsById(transactionId) } throws RuntimeException("DB Error")
             val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to transactionId)
             val worker =
                 TestListenableWorkerBuilder<TransactionNotificationWorker>(context)
@@ -186,8 +191,8 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
                     null,
                 )
 
-            coEvery { transactionDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns null
+            coEvery { transactionQueryDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns null
 
             val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to transactionId)
             val worker =
@@ -231,8 +236,8 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
                 )
             val summary = FinancialSummary(totalIncome = 50000.0, totalExpenses = 12000.0)
 
-            coEvery { transactionDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns summary
+            coEvery { transactionQueryDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns summary
 
             val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to transactionId)
             val worker =
@@ -274,9 +279,9 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
                 )
             val summary = FinancialSummary(totalIncome = 10000.0, totalExpenses = 5000.0)
 
-            coEvery { transactionDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns summary
-            coEvery { transactionDao.getTransactionCountForMerchantSuspend("Transfer") } returns 3
+            coEvery { transactionQueryDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns summary
+            every { transactionQueryDao.getTransactionCountForMerchant("Transfer") } returns flowOf(3)
 
             val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to transactionId)
             val worker =

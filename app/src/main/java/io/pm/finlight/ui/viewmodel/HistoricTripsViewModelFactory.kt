@@ -23,9 +23,20 @@ class HistoricTripsViewModelFactory(
         if (modelClass.isAssignableFrom(HistoricTripsViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = SettingsRepository(application)
-            val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+            val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
             val tripRepository = TripRepository(db.tripDao())
-            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao(), db)
+            val transactionRepository =
+                TransactionRepository(
+                    transactionWriteDao = db.transactionWriteDao(),
+                    transactionQueryDao = db.transactionQueryDao(),
+                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                    transactionReimbursementDao = db.transactionReimbursementDao(),
+                    settingsRepository = settingsRepository,
+                    tagRepository = tagRepository,
+                    deletedSmsHashDao = db.deletedSmsHashDao(),
+                    mergeRecordDao = db.mergeRecordDao(),
+                    db = db,
+                )
 
             @Suppress("UNCHECKED_CAST")
             return HistoricTripsViewModel(

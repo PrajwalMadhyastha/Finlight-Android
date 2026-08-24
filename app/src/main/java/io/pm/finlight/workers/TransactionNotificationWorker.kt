@@ -13,6 +13,7 @@ import androidx.work.WorkerParameters
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.utils.NotificationHelper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 import java.util.Calendar
@@ -29,28 +30,28 @@ class TransactionNotificationWorker(
     override suspend fun doWork(): Result {
         val transactionId = inputData.getInt(KEY_TRANSACTION_ID, -1)
         if (transactionId == -1) {
-            Log.e("TransactionNotificationWorker", "Invalid transactionId received.")
+            Log.e("TransactionNotificationWorker", "Worker invoked without a valid transaction ID.")
             return Result.failure()
         }
 
         return withContext(Dispatchers.IO) {
             try {
                 val db = AppDatabase.getInstance(context)
-                val transactionDao = db.transactionDao()
+                val transactionQueryDao = db.transactionQueryDao()
+                val transactionAnalyticsDao = db.transactionAnalyticsDao()
 
-                // 1. Fetch full transaction details
-                val details = transactionDao.getTransactionDetailsById(transactionId).firstOrNull()
+                // 1. Fetch details
+                val details = transactionQueryDao.getTransactionDetailsById(transactionId).firstOrNull()
                 if (details == null) {
-                    Log.e("TransactionNotificationWorker", "TransactionDetails not found for id: $transactionId")
+                    Log.e("TransactionNotificationWorker", "Transaction details not found for id: $transactionId")
                     return@withContext Result.failure()
                 }
 
-                // 2. Calculate monthly totals
+                // 2. Fetch monthly totals
                 val calendar = Calendar.getInstance().apply { timeInMillis = details.transaction.date }
                 val monthStart =
                     (calendar.clone() as Calendar).apply {
                         set(Calendar.DAY_OF_MONTH, 1)
-                        set(Calendar.HOUR_OF_DAY, 0)
                     }.timeInMillis
                 val monthEnd =
                     (calendar.clone() as Calendar).apply {
@@ -58,15 +59,15 @@ class TransactionNotificationWorker(
                         set(Calendar.DAY_OF_MONTH, 1)
                         add(Calendar.DAY_OF_MONTH, -1)
                     }.timeInMillis
-                val summary = transactionDao.getFinancialSummaryForRange(monthStart, monthEnd)
+                val summary = transactionAnalyticsDao.getFinancialSummaryForRange(monthStart, monthEnd)
                 val monthlyTotal = if (details.transaction.transactionType == TransactionType.INCOME) summary?.totalIncome else summary?.totalExpenses
 
                 // 3. Get visit count
                 val visitCount =
                     if (details.transaction.transactionType != TransactionType.INCOME) {
-                        transactionDao.getTransactionCountForMerchantSuspend(
+                        transactionQueryDao.getTransactionCountForMerchant(
                             details.transaction.description,
-                        )
+                        ).first()
                     } else {
                         0
                     }

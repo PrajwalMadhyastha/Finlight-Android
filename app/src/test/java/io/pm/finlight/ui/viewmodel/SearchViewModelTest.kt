@@ -23,6 +23,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.AccountDao
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -43,7 +45,10 @@ import java.util.Locale
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class SearchViewModelTest : BaseViewModelTest() {
     @Mock
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
+
+    @Mock
+    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
 
     @Mock
     private lateinit var accountDao: AccountDao
@@ -64,9 +69,9 @@ class SearchViewModelTest : BaseViewModelTest() {
         `when`(accountDao.getAllAccounts()).thenReturn(flowOf(emptyList()))
         `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
         `when`(tagDao.getAllTags()).thenReturn(flowOf(emptyList()))
-        `when`(transactionDao.searchTransactions(anyString(), any(), any(), any(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+        `when`(transactionQueryDao.searchTransactions(anyString(), any(), any(), any(), any(), any(), any())).thenReturn(flowOf(emptyList()))
         // --- FIX: Add mock for the new dependency in the init block ---
-        `when`(transactionDao.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
+        `when`(transactionAnalyticsDao.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
     }
 
     private fun initializeViewModel(
@@ -77,7 +82,8 @@ class SearchViewModelTest : BaseViewModelTest() {
     ) {
         viewModel =
             SearchViewModel(
-                transactionDao,
+                transactionQueryDao,
+                transactionAnalyticsDao,
                 accountDao,
                 categoryDao,
                 tagDao,
@@ -149,8 +155,8 @@ class SearchViewModelTest : BaseViewModelTest() {
                         null,
                     ),
                 )
-            `when`(transactionDao.searchTransactions("Coffee", null, null, null, null, null, null)).thenReturn(flowOf(results1))
-            `when`(transactionDao.searchTransactions("Tea", null, null, null, null, null, null)).thenReturn(flowOf(results2))
+            `when`(transactionQueryDao.searchTransactions("Coffee", null, null, null, null, null, null)).thenReturn(flowOf(results1))
+            `when`(transactionQueryDao.searchTransactions("Tea", null, null, null, null, null, null)).thenReturn(flowOf(results2))
             initializeViewModel()
 
             viewModel.searchResults.test {
@@ -164,8 +170,8 @@ class SearchViewModelTest : BaseViewModelTest() {
 
                 // Assert
                 assertEquals(results2, awaitItem())
-                verify(transactionDao, never()).searchTransactions("Coffee", null, null, null, null, null, null)
-                verify(transactionDao).searchTransactions("Tea", null, null, null, null, null, null)
+                verify(transactionQueryDao, never()).searchTransactions("Coffee", null, null, null, null, null, null)
+                verify(transactionQueryDao).searchTransactions("Tea", null, null, null, null, null, null)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -393,17 +399,39 @@ class SearchViewModelTest : BaseViewModelTest() {
 
                 viewModel.onTypeChange("expense")
                 advanceTimeBy(350L)
-                verify(transactionDao).searchTransactions(anyString(), any(), any(), eq(TransactionType.EXPENSE), any(), any(), any())
+                verify(transactionQueryDao).searchTransactions(anyString(), any(), any(), eq(TransactionType.EXPENSE), any(), any(), any())
 
                 viewModel.onTypeChange("income")
                 advanceTimeBy(350L)
-                verify(transactionDao).searchTransactions(anyString(), any(), any(), eq(TransactionType.INCOME), any(), any(), any())
+                verify(transactionQueryDao).searchTransactions(anyString(), any(), any(), eq(TransactionType.INCOME), any(), any(), any())
 
                 viewModel.onTypeChange("All Types")
                 advanceTimeBy(350L)
-                verify(transactionDao, atLeastOnce()).searchTransactions(anyString(), any(), any(), isNull(), any(), any(), any())
+                verify(transactionQueryDao, atLeastOnce()).searchTransactions(anyString(), any(), any(), isNull(), any(), any(), any())
 
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun `legacy constructor initializes SearchViewModel properly`() =
+        runTest {
+            val legacyDao = mock(TransactionDao::class.java)
+            `when`(legacyDao.searchTransactions(anyString(), any(), any(), any(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+            `when`(legacyDao.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
+
+            val vm =
+                SearchViewModel(
+                    legacyDao,
+                    accountDao,
+                    categoryDao,
+                    tagDao,
+                    1,
+                    1000L,
+                    "query"
+                )
+            assertNotNull(vm)
+            assertEquals("query", vm.uiState.value.keyword)
         }
 }

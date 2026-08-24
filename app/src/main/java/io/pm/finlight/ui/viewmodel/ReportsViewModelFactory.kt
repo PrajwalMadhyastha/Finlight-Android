@@ -20,8 +20,19 @@ class ReportsViewModelFactory(private val application: Application) : ViewModelP
         if (modelClass.isAssignableFrom(ReportsViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = SettingsRepository(application)
-            val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao(), db)
+            val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
+            val transactionRepository =
+                TransactionRepository(
+                    transactionWriteDao = db.transactionWriteDao(),
+                    transactionQueryDao = db.transactionQueryDao(),
+                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                    transactionReimbursementDao = db.transactionReimbursementDao(),
+                    settingsRepository = settingsRepository,
+                    tagRepository = tagRepository,
+                    deletedSmsHashDao = db.deletedSmsHashDao(),
+                    mergeRecordDao = db.mergeRecordDao(),
+                    db = db,
+                )
 
             @Suppress("UNCHECKED_CAST")
             return ReportsViewModel(

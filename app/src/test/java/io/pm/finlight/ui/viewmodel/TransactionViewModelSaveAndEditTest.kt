@@ -496,7 +496,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
 
             // Assert
             coVerify { db.withTransaction<Unit>(any()) }
-            verify(transactionDao).markAsSplit(transactionId, true)
+            verify(transactionWriteDao).markAsSplit(transactionId, true)
             verify(splitTransactionDao).deleteSplitsForParent(transactionId)
             verify(splitTransactionDao).insertAll(listCaptor.capture())
 

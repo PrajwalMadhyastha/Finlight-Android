@@ -71,7 +71,7 @@ class AccountRepository(private val db: AppDatabase) {
             db.goalDao().reassignGoals(sourceAccountIds, destinationAccountId)
 
             // 2. Re-assign all transactions from source accounts to the destination account.
-            db.transactionDao().reassignTransactions(sourceAccountIds, destinationAccountId)
+            db.transactionWriteDao().reassignTransactions(sourceAccountIds, destinationAccountId)
 
             // 3. Delete the now-empty source accounts.
             db.accountDao().deleteByIds(sourceAccountIds)

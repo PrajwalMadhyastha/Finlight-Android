@@ -40,6 +40,7 @@ import app.cash.turbine.test
 import io.pm.finlight.*
 import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -2083,5 +2084,213 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             val result = repository.findRecentTransactionForMerge("Uber", 1, TransactionType.EXPENSE, 500L, 2)
 
             assertEquals(expected, result)
+        }
+
+    @Test
+    fun `delegated DAO query methods forward calls properly`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            `when`(transactionDao.getTransactionWithSplits(1)).thenReturn(flowOf(null))
+            `when`(transactionDao.getTopSpendingCategoriesForRangeFlow(1L, 2L)).thenReturn(flowOf(null))
+            `when`(transactionDao.getIncomeTransactionsForRange(1L, 2L, null, null, null)).thenReturn(flowOf(emptyList()))
+            `when`(transactionDao.getIncomeByCategoryForMonth(1L, 2L, null, null, null)).thenReturn(flowOf(emptyList()))
+            `when`(transactionDao.getSpendingByMerchantForMonth(1L, 2L, null, null, null, null)).thenReturn(flowOf(emptyList()))
+            `when`(transactionDao.getSpendingByCategoryForMonth(1L, 2L, null, null, null, null)).thenReturn(flowOf(emptyList()))
+            `when`(transactionDao.getMonthlyTrends(1L)).thenReturn(flowOf(emptyList()))
+            `when`(transactionDao.countTransactionsForCategory(1)).thenReturn(5)
+            `when`(transactionDao.getTagsForTransaction(1)).thenReturn(flowOf(emptyList()))
+            `when`(transactionDao.getTagsForTransactionSimple(1)).thenReturn(emptyList())
+            `when`(transactionDao.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
+            `when`(transactionDao.getTransactionDetailsById(1)).thenReturn(flowOf(null))
+            `when`(transactionDao.getTransactionsForAccountDetails(1)).thenReturn(flowOf(emptyList()))
+            `when`(transactionDao.getTransactionDetailsForRange(1L, 2L, null, null, null)).thenReturn(flowOf(emptyList()))
+            `when`(transactionDao.getAllTransactionsForRange(1L, 2L)).thenReturn(flowOf(emptyList()))
+            `when`(transactionDao.getTransactionById(1)).thenReturn(flowOf(null))
+            `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(null)
+            `when`(transactionDao.getTransactionsForAccount(1)).thenReturn(flowOf(emptyList()))
+            `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+
+            repository.getTransactionWithSplits(1).first()
+            repository.getTopSpendingCategoriesForRangeFlow(1L, 2L).first()
+            repository.getIncomeTransactionsForRange(1L, 2L, null, null, null).first()
+            repository.getIncomeByCategoryForMonth(1L, 2L, null, null, null).first()
+            repository.getSpendingByMerchantForMonth(1L, 2L, null, null, null, null).first()
+            repository.getSpendingByCategoryForMonth(1L, 2L, null, null, null, null).first()
+            repository.getMonthlyTrends(1L).first()
+            repository.countTransactionsForCategory(1)
+            repository.getTagsForTransaction(1).first()
+            repository.getTagsForTransactionSimple(1)
+            repository.getImagesForTransaction(1).first()
+            repository.getTransactionDetailsById(1).first()
+            repository.getTransactionsForAccountDetails(1).first()
+            repository.getTransactionDetailsForRange(1L, 2L, null, null, null).first()
+            repository.getAllTransactionsForRange(1L, 2L).first()
+            repository.getTransactionById(1).first()
+            repository.getTransactionSync(1)
+            repository.getTransactionsForAccount(1).first()
+            repository.getAllSmsHashes().first()
+
+            verify(transactionDao).getTransactionWithSplits(1)
+            verify(transactionDao).getTopSpendingCategoriesForRangeFlow(1L, 2L)
+            verify(transactionDao).getIncomeTransactionsForRange(1L, 2L, null, null, null)
+            verify(transactionDao).getIncomeByCategoryForMonth(1L, 2L, null, null, null)
+            verify(transactionDao).getSpendingByMerchantForMonth(1L, 2L, null, null, null, null)
+            verify(transactionDao).getSpendingByCategoryForMonth(1L, 2L, null, null, null, null)
+            verify(transactionDao, atLeastOnce()).getMonthlyTrends(1L)
+            verify(transactionDao).countTransactionsForCategory(1)
+            verify(transactionDao).getTagsForTransaction(1)
+            verify(transactionDao).getTagsForTransactionSimple(1)
+            verify(transactionDao).getImagesForTransaction(1)
+            verify(transactionDao).getTransactionDetailsById(1)
+            verify(transactionDao).getTransactionsForAccountDetails(1)
+            verify(transactionDao).getTransactionDetailsForRange(1L, 2L, null, null, null)
+            verify(transactionDao).getAllTransactionsForRange(1L, 2L)
+            verify(transactionDao).getTransactionById(1)
+            verify(transactionDao).getTransactionByIdSync(1)
+            verify(transactionDao).getTransactionsForAccount(1)
+            verify(transactionDao).getAllSmsHashes()
+        }
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun `legacy constructor initializes TransactionRepository properly`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val repo =
+                TransactionRepository(
+                    transactionDao,
+                    settingsRepository,
+                    tagRepository,
+                    deletedSmsHashDao,
+                    mergeRecordDao,
+                    db
+                )
+            assertNotNull(repo)
+        }
+
+    @Test
+    fun `getMergedTransactionBreakdown returns empty when no merge records exist`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            `when`(mergeRecordDao.getAllForParentAnyType(99)).thenReturn(emptyList())
+
+            val result = repository.getMergedTransactionBreakdown(99)
+            assertTrue(result.isEmpty())
+        }
+
+    @Test
+    fun `getMergedTransactionBreakdown returns empty when anchorTxn is null`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            val record =
+                MergeRecord(
+                    id = 1,
+                    parentTxnId = 99,
+                    mergeType = "MANUAL",
+                    mergeGroupId = "group1",
+                    originalParentAmount = 100.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child",
+                    childAmount = 50.0,
+                    childDate = 1000L,
+                    childAccountId = 1,
+                    childCategoryId = null,
+                    childTransactionType = TransactionType.EXPENSE,
+                    childSource = "manual",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = null,
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null
+                )
+            `when`(mergeRecordDao.getAllForParentAnyType(99)).thenReturn(listOf(record))
+            `when`(transactionDao.getTransactionByIdSync(99)).thenReturn(null)
+
+            val result = repository.getMergedTransactionBreakdown(99)
+            assertTrue(result.isEmpty())
+        }
+
+    @Test
+    fun `undoMerge when parent transaction is null exits cleanly`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            val record =
+                MergeRecord(
+                    id = 1,
+                    parentTxnId = 99,
+                    mergeType = "MANUAL",
+                    mergeGroupId = "group1",
+                    originalParentAmount = 100.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child",
+                    childAmount = 50.0,
+                    childDate = 1000L,
+                    childAccountId = 1,
+                    childCategoryId = null,
+                    childTransactionType = TransactionType.EXPENSE,
+                    childSource = "manual",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = "hash123",
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null
+                )
+            `when`(mergeRecordDao.getForParentSync(99)).thenReturn(record)
+            `when`(mergeRecordDao.getAllForGroup("group1")).thenReturn(listOf(record))
+            `when`(transactionDao.getTransactionByIdSync(99)).thenReturn(null)
+
+            repository.unmergeTransactions(99)
+            verify(transactionDao, never()).updateAmount(anyInt(), anyDouble())
+        }
+
+    @Test
+    fun `undoAutoMerge when parent transaction is null exits cleanly`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            val record =
+                MergeRecord(
+                    id = 1,
+                    parentTxnId = 99,
+                    mergeType = "AUTO",
+                    mergeGroupId = "",
+                    originalParentAmount = 100.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child",
+                    childAmount = 50.0,
+                    childDate = 1000L,
+                    childAccountId = 1,
+                    childCategoryId = null,
+                    childTransactionType = TransactionType.EXPENSE,
+                    childSource = "auto",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = null,
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null
+                )
+            `when`(mergeRecordDao.getForParentSync(99)).thenReturn(record)
+            `when`(mergeRecordDao.getAllForParentSync(99)).thenReturn(listOf(record))
+            `when`(transactionDao.getTransactionByIdSync(99)).thenReturn(null)
+
+            repository.unmergeTransactions(99)
+            verify(transactionDao, never()).updateAmount(anyInt(), anyDouble())
         }
 }

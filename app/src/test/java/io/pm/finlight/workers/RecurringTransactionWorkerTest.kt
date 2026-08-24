@@ -13,6 +13,8 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,7 +34,8 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
     private lateinit var recurringTransactionDao: RecurringTransactionDao
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
+    private lateinit var transactionWriteDao: TransactionWriteDao
 
     @Before
     override fun setup() {
@@ -49,12 +52,14 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
         recurringTransactionDao = mockk(relaxed = true)
 
         mockkObject(AppDatabase)
-        transactionDao = mockk<TransactionDao>(relaxed = true)
+        transactionQueryDao = mockk<TransactionQueryDao>(relaxed = true)
+        transactionWriteDao = mockk<TransactionWriteDao>(relaxed = true)
         every { AppDatabase.getInstance(any()) } returns db
         every { db.recurringTransactionDao() } returns recurringTransactionDao
-        every { db.transactionDao() } returns transactionDao
-        coEvery { transactionDao.insert(any<Transaction>()) } returns 101L
-        coEvery { transactionDao.getPendingTransactionForRule(any()) } returns null
+        every { db.transactionQueryDao() } returns transactionQueryDao
+        every { db.transactionWriteDao() } returns transactionWriteDao
+        coEvery { transactionWriteDao.insert(any<Transaction>()) } returns 101L
+        coEvery { transactionQueryDao.getPendingTransactionForRule(any()) } returns null
 
         val config =
             Configuration.Builder()
@@ -146,7 +151,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
 
             worker.doWork()
 
-            coVerify(exactly = 0) { transactionDao.insert(any<Transaction>()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any<Transaction>()) }
         }
 
     @Test
@@ -157,12 +162,12 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
             val draft = Transaction(id = 100, description = "Draft", amount = 10.0, transactionType = TransactionType.EXPENSE, date = now, accountId = 1, categoryId = 1, notes = null, status = TransactionStatus.PENDING)
 
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
-            coEvery { db.transactionDao().getPendingTransactionForRule(1) } returns draft
+            coEvery { transactionQueryDao.getPendingTransactionForRule(1) } returns draft
 
             val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
             worker.doWork()
 
-            coVerify(exactly = 0) { transactionDao.insert(any<Transaction>()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any<Transaction>()) }
         }
 
     @Test
@@ -173,13 +178,13 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
 
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
             val capturedTxn = slot<Transaction>()
-            coEvery { transactionDao.insert(capture(capturedTxn)) } returns 101L
+            coEvery { transactionWriteDao.insert(capture(capturedTxn)) } returns 101L
             every { NotificationHelper.showAutoApprovedPaymentNotification(any(), any()) } just runs
 
             val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
             worker.doWork()
 
-            coVerify(exactly = 1) { transactionDao.insert(any<Transaction>()) }
+            coVerify(exactly = 1) { transactionWriteDao.insert(any<Transaction>()) }
             coVerify(exactly = 1) { recurringTransactionDao.updateLastRunDate(1, any()) }
             verify(exactly = 1) { NotificationHelper.showAutoApprovedPaymentNotification(any(), any()) }
 

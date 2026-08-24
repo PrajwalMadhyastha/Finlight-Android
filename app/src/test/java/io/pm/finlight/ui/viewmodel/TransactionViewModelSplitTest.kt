@@ -43,7 +43,7 @@ class TransactionViewModelSplitTest : TransactionViewModelBaseSetup() {
 
             // ASSERT
             verify(splitTransactionDao).deleteSplitsForParent(1)
-            verify(transactionDao).unmarkAsSplit(1, "Original Desc", 1)
+            verify(transactionWriteDao).unmarkAsSplit(1, "Original Desc", 1)
 
             unmockkStatic("androidx.room.RoomDatabaseKt")
         }

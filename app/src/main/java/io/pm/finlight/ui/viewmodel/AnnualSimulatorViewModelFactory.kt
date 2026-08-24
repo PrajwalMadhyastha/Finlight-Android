@@ -13,8 +13,19 @@ class AnnualSimulatorViewModelFactory(private val application: Application) : Vi
         if (modelClass.isAssignableFrom(AnnualSimulatorViewModel::class.java)) {
             val database = AppDatabase.getInstance(application)
             val settingsRepository = SettingsRepository(application)
-            val tagRepository = TagRepository(database.tagDao(), database.transactionDao())
-            val transactionRepository = TransactionRepository(database.transactionDao(), settingsRepository, tagRepository, database.deletedSmsHashDao(), database.mergeRecordDao(), database)
+            val tagRepository = TagRepository(database.tagDao(), database.transactionQueryDao())
+            val transactionRepository =
+                TransactionRepository(
+                    transactionWriteDao = database.transactionWriteDao(),
+                    transactionQueryDao = database.transactionQueryDao(),
+                    transactionAnalyticsDao = database.transactionAnalyticsDao(),
+                    transactionReimbursementDao = database.transactionReimbursementDao(),
+                    settingsRepository = settingsRepository,
+                    tagRepository = tagRepository,
+                    deletedSmsHashDao = database.deletedSmsHashDao(),
+                    mergeRecordDao = database.mergeRecordDao(),
+                    db = database,
+                )
             @Suppress("UNCHECKED_CAST")
             return AnnualSimulatorViewModel(transactionRepository, settingsRepository) as T
         }

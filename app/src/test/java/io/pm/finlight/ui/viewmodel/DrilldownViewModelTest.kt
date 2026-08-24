@@ -15,8 +15,8 @@ import io.pm.finlight.DrilldownViewModel
 import io.pm.finlight.PeriodTotal
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
-import io.pm.finlight.TransactionDao
 import io.pm.finlight.TransactionDetails
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -48,7 +48,7 @@ class DrilldownViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
 
     @Mock
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
 
     private lateinit var viewModel: DrilldownViewModel
 
@@ -93,12 +93,12 @@ class DrilldownViewModelTest {
                     io.pm.finlight.MonthlyTrend("2025-02", 75.0, 150.0),
                 )
             `when`(
-                transactionDao.getTransactionsForCategoryName(anyString(), anyLong(), anyLong()),
+                transactionAnalyticsDao.getTransactionsForCategoryName(anyString(), anyLong(), anyLong()),
             ).thenReturn(flowOf(mockTransactionDetails))
-            `when`(transactionDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
+            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
 
             // Act
-            viewModel = DrilldownViewModel(transactionDao, DrilldownType.CATEGORY, categoryName, 1, 2025)
+            viewModel = DrilldownViewModel(transactionAnalyticsDao, DrilldownType.CATEGORY, categoryName, 1, 2025)
 
             // Assert
             viewModel.transactionsForMonth.test {
@@ -114,8 +114,8 @@ class DrilldownViewModelTest {
                 cancelAndIgnoreRemainingEvents()
             }
 
-            verify(transactionDao).getTransactionsForCategoryName(anyString(), anyLong(), anyLong())
-            verify(transactionDao).getMonthlyTrends(anyLong())
+            verify(transactionAnalyticsDao).getTransactionsForCategoryName(anyString(), anyLong(), anyLong())
+            verify(transactionAnalyticsDao).getMonthlyTrends(anyLong())
         }
 
     @Test
@@ -129,12 +129,12 @@ class DrilldownViewModelTest {
                     io.pm.finlight.MonthlyTrend("2025-02", 75.0, 150.0),
                 )
             `when`(
-                transactionDao.getTransactionsForMerchantName(anyString(), anyLong(), anyLong()),
+                transactionAnalyticsDao.getTransactionsForMerchantName(anyString(), anyLong(), anyLong()),
             ).thenReturn(flowOf(mockTransactionDetails))
-            `when`(transactionDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
+            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
 
             // Act
-            viewModel = DrilldownViewModel(transactionDao, DrilldownType.MERCHANT, merchantName, 1, 2025)
+            viewModel = DrilldownViewModel(transactionAnalyticsDao, DrilldownType.MERCHANT, merchantName, 1, 2025)
 
             // Assert
             viewModel.transactionsForMonth.test {
@@ -149,7 +149,7 @@ class DrilldownViewModelTest {
                 cancelAndIgnoreRemainingEvents()
             }
 
-            verify(transactionDao).getTransactionsForMerchantName(anyString(), anyLong(), anyLong())
-            verify(transactionDao).getMonthlyTrends(anyLong())
+            verify(transactionAnalyticsDao).getTransactionsForMerchantName(anyString(), anyLong(), anyLong())
+            verify(transactionAnalyticsDao).getMonthlyTrends(anyLong())
         }
 }

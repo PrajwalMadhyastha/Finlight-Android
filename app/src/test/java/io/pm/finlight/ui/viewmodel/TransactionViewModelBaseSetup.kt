@@ -64,7 +64,13 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
 
     @Mock protected lateinit var tagDao: TagDao
 
-    @Mock protected lateinit var transactionDao: TransactionDao
+    @Mock protected lateinit var transactionWriteDao: TransactionWriteDao
+
+    @Mock protected lateinit var transactionQueryDao: TransactionQueryDao
+
+    @Mock protected lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+
+    @Mock protected lateinit var transactionReimbursementDao: TransactionReimbursementDao
 
     @Mock protected lateinit var customSmsRuleDao: CustomSmsRuleDao
 
@@ -90,7 +96,10 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
         whenever(db.accountDao()).thenReturn(accountDao)
         whenever(db.categoryDao()).thenReturn(categoryDao)
         whenever(db.tagDao()).thenReturn(tagDao)
-        whenever(db.transactionDao()).thenReturn(transactionDao)
+        whenever(db.transactionQueryDao()).thenReturn(transactionQueryDao)
+        whenever(db.transactionWriteDao()).thenReturn(transactionWriteDao)
+        whenever(db.transactionAnalyticsDao()).thenReturn(transactionAnalyticsDao)
+        whenever(db.transactionReimbursementDao()).thenReturn(transactionReimbursementDao)
         whenever(db.customSmsRuleDao()).thenReturn(customSmsRuleDao)
         whenever(db.ignoreRuleDao()).thenReturn(ignoreRuleDao)
         whenever(db.merchantCategoryMappingDao()).thenReturn(merchantCategoryMappingDao)
@@ -132,7 +141,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
             whenever(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getRecentManualTransactions(anyInt())).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getReimbursementsForExpense(anyInt())).thenReturn(flowOf(emptyList()))
-            whenever(transactionDao.getSmsHashesByIds(any())).thenReturn(emptyList())
+            whenever(transactionQueryDao.getSmsHashesByIds(any())).thenReturn(emptyList())
         }
     }
 

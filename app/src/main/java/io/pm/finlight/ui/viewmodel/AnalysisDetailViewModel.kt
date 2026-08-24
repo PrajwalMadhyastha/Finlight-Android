@@ -10,9 +10,9 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.TransactionDao
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -28,14 +28,14 @@ class AnalysisDetailViewModelFactory(
         if (modelClass.isAssignableFrom(AnalysisDetailViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             @Suppress("UNCHECKED_CAST")
-            return AnalysisDetailViewModel(db.transactionDao(), dimension, dimensionId, startDate, endDate) as T
+            return AnalysisDetailViewModel(db.transactionAnalyticsDao(), dimension, dimensionId, startDate, endDate) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
 
 class AnalysisDetailViewModel(
-    transactionDao: TransactionDao,
+    transactionAnalyticsDao: TransactionAnalyticsDao,
     dimension: AnalysisDimension,
     dimensionId: String,
     startDate: Long,
@@ -46,9 +46,9 @@ class AnalysisDetailViewModel(
     init {
         val transactionFlow =
             when (dimension) {
-                AnalysisDimension.CATEGORY -> transactionDao.getTransactionsForCategoryInRange(dimensionId.toInt(), startDate, endDate)
-                AnalysisDimension.TAG -> transactionDao.getTransactionsForTagInRange(dimensionId.toInt(), startDate, endDate)
-                AnalysisDimension.MERCHANT -> transactionDao.getTransactionsForMerchantInRange(dimensionId, startDate, endDate)
+                AnalysisDimension.CATEGORY -> transactionAnalyticsDao.getTransactionsForCategoryInRange(dimensionId.toInt(), startDate, endDate)
+                AnalysisDimension.TAG -> transactionAnalyticsDao.getTransactionsForTagInRange(dimensionId.toInt(), startDate, endDate)
+                AnalysisDimension.MERCHANT -> transactionAnalyticsDao.getTransactionsForMerchantInRange(dimensionId, startDate, endDate)
             }
         transactions = transactionFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     }

@@ -25,6 +25,7 @@ package io.pm.finlight.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.model.SpendingAnalysisItem
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -90,7 +91,7 @@ private data class AnalysisInputs(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AnalysisViewModel(
-    private val transactionDao: TransactionDao,
+    private val transactionAnalyticsDao: TransactionAnalyticsDao,
     private val categoryDao: CategoryDao,
     private val tagDao: TagDao,
 ) : ViewModel() {
@@ -116,7 +117,7 @@ class AnalysisViewModel(
     // --- DATA: Flows for filter dropdowns ---
     private val allCategories = categoryDao.getAllCategories()
     private val allTags = tagDao.getAllTags()
-    private val allMerchants = transactionDao.getAllExpenseMerchants()
+    private val allMerchants = transactionAnalyticsDao.getAllExpenseMerchants()
 
     // --- REFACTORED LOGIC ---
 
@@ -129,16 +130,15 @@ class AnalysisViewModel(
             // --- ADDED ---
             _includeExcluded,
             _selectedTransactionType,
-        ) { args ->
-            @Suppress("UNCHECKED_CAST")
+        ) { args: Array<Any?> ->
             AnalysisInputs(
                 dimension = args[0] as AnalysisDimension,
                 period = args[1] as AnalysisTimePeriod,
                 dateRange = args[2] as Pair<Long?, Long?>,
-                filterCat = args[3] as? Category,
-                filterTag = args[4] as? Tag,
-                filterMerchant = args[5] as? String,
-                searchQuery = (args[6] as? String)?.takeIf { it.isNotBlank() },
+                filterCat = args[3] as Category?,
+                filterTag = args[4] as Tag?,
+                filterMerchant = args[5] as String?,
+                searchQuery = (args[6] as String).takeIf { it.isNotBlank() },
                 // --- ADDED ---
                 includeExcluded = args[7] as Boolean,
                 transactionType = args[8] as AnalysisTransactionType,
@@ -159,9 +159,8 @@ class AnalysisViewModel(
                         AnalysisTransactionType.ALL -> null
                     }
                 when (inputs.dimension) {
-                    // --- UPDATED: Pass includeExcluded to DAO methods ---
                     AnalysisDimension.CATEGORY ->
-                        transactionDao.getSpendingAnalysisByCategory(
+                        transactionAnalyticsDao.getSpendingAnalysisByCategory(
                             start,
                             end,
                             inputs.filterTag?.id,
@@ -172,7 +171,7 @@ class AnalysisViewModel(
                             typeEnum,
                         )
                     AnalysisDimension.TAG ->
-                        transactionDao.getSpendingAnalysisByTag(
+                        transactionAnalyticsDao.getSpendingAnalysisByTag(
                             start,
                             end,
                             inputs.filterCat?.id,
@@ -183,7 +182,7 @@ class AnalysisViewModel(
                             typeEnum,
                         )
                     AnalysisDimension.MERCHANT ->
-                        transactionDao.getSpendingAnalysisByMerchant(
+                        transactionAnalyticsDao.getSpendingAnalysisByMerchant(
                             start,
                             end,
                             inputs.filterCat?.id,
