@@ -476,12 +476,13 @@ class NotificationHelperTest : BaseViewModelTest() {
             )
 
         // Act
-        NotificationHelper.showRichTransactionNotification(context, details, 50000.0, 0)
+        NotificationHelper.showRichTransactionNotification(context, details, 50000.0, 3)
 
         // Assert
         val notification = shadowNotificationManager.getNotification(transactionId)
         val inboxLines = notification.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
         assertTrue(inboxLines!![0].toString().contains("income this month"))
+        assertEquals(1, inboxLines.size) // No visit count line for income even if visitCount > 0
     }
 
     @Test
@@ -1060,5 +1061,46 @@ class NotificationHelperTest : BaseViewModelTest() {
         assertNotNull("Content intent should be set", contentPI)
         val contentIntent = shadowOf(contentPI).savedIntent
         assertEquals("app://finlight.pm.io/transaction_detail/10", contentIntent.data.toString())
+    }
+
+    @Test
+    fun `showTransactionNotification_buildsAndPostsCorrectlyForExpenseAndIncome`() {
+        val expenseTxn = Transaction(id = 501, description = "Mystery Merchant", amount = 120.0, transactionType = TransactionType.EXPENSE, date = 0L, accountId = 1, categoryId = 1, notes = null)
+        NotificationHelper.showTransactionNotification(context, expenseTxn)
+
+        val expenseNotification = shadowNotificationManager.getNotification(501)
+        assertNotNull(expenseNotification)
+        assertEquals("New Transaction Found", expenseNotification.extras.getString(Notification.EXTRA_TITLE))
+        assertTrue(expenseNotification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString().contains("Expense of ₹120.00 from Mystery Merchant detected"))
+
+        val incomeTxn = Transaction(id = 502, description = "Mystery Payer", amount = 2500.0, transactionType = TransactionType.INCOME, date = 0L, accountId = 1, categoryId = 1, notes = null)
+        NotificationHelper.showTransactionNotification(context, incomeTxn)
+
+        val incomeNotification = shadowNotificationManager.getNotification(502)
+        assertNotNull(incomeNotification)
+        assertEquals("New Transaction Found", incomeNotification.extras.getString(Notification.EXTRA_TITLE))
+        assertTrue(incomeNotification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString().contains("Income of ₹2500.00 from Mystery Payer detected"))
+    }
+
+    @Test
+    fun `showRichTransactionNotification_withTransferType`() {
+        val details =
+            TransactionDetails(
+                Transaction(id = 601, description = "Transfer to Wallet", amount = 500.0, transactionType = TransactionType.TRANSFER, date = 0L, accountId = 1, categoryId = 1, notes = null),
+                emptyList(),
+                "Bank",
+                "Transfer",
+                "icon",
+                "color",
+                null,
+            )
+        NotificationHelper.showRichTransactionNotification(context, details, 1500.0, 1)
+
+        val notification = shadowNotificationManager.getNotification(601)
+        assertNotNull(notification)
+        val lines = notification.extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+        assertNotNull(lines)
+        assertTrue(lines!!.any { it.contains("spent this month") })
+        assertTrue(lines.any { it.contains("first visit here") })
     }
 }

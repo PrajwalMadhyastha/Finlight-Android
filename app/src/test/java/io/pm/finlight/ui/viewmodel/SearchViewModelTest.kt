@@ -381,4 +381,29 @@ class SearchViewModelTest : BaseViewModelTest() {
             assertEquals("", state.keyword)
             assertFalse("isDrilldown should be false by default", state.isDrilldown)
         }
+
+    @Test
+    fun `onTypeChange with specific types triggers search with correct TransactionType enum`() =
+        runTest {
+            initializeViewModel()
+            advanceUntilIdle()
+
+            viewModel.searchResults.test {
+                awaitItem() // initial empty
+
+                viewModel.onTypeChange("expense")
+                advanceTimeBy(350L)
+                verify(transactionDao).searchTransactions(anyString(), any(), any(), eq(TransactionType.EXPENSE), any(), any(), any())
+
+                viewModel.onTypeChange("income")
+                advanceTimeBy(350L)
+                verify(transactionDao).searchTransactions(anyString(), any(), any(), eq(TransactionType.INCOME), any(), any(), any())
+
+                viewModel.onTypeChange("All Types")
+                advanceTimeBy(350L)
+                verify(transactionDao, atLeastOnce()).searchTransactions(anyString(), any(), any(), isNull(), any(), any(), any())
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

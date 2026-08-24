@@ -2033,4 +2033,55 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             assertTrue(breakdown.isEmpty())
         }
+
+    @Test
+    fun `getMergedTransactionBreakdown preserves parent type when anchorSigned is zero`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val parentTxnId = 1
+            val anchorAccountId = 101
+            val anchorTxn = Transaction(id = parentTxnId, description = "Anchor", amount = 0.0, date = 1000L, accountId = anchorAccountId, transactionType = TransactionType.TRANSFER, notes = null, categoryId = null)
+            val mergeRecord =
+                MergeRecord(
+                    parentTxnId = parentTxnId,
+                    originalParentAmount = 0.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child",
+                    childAmount = 0.0,
+                    childDate = 1000L,
+                    childAccountId = anchorAccountId,
+                    childCategoryId = null,
+                    childTransactionType = TransactionType.EXPENSE,
+                    childSource = "manual",
+                    childNotes = null,
+                    childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
+                    childOriginalDescription = null, childOriginalAmount = null, childCurrencyCode = null, childConversionRate = null,
+                )
+
+            `when`(mergeRecordDao.getAllForParentAnyType(parentTxnId)).thenReturn(listOf(mergeRecord))
+            `when`(transactionDao.getTransactionByIdSync(parentTxnId)).thenReturn(anchorTxn)
+            `when`(accountDao.getAccountByIdBlocking(anchorAccountId)).thenReturn(Account(id = anchorAccountId, name = "Account", type = "Bank"))
+
+            val breakdown = repository.getMergedTransactionBreakdown(parentTxnId)
+
+            assertEquals(2, breakdown.size)
+            assertEquals(TransactionType.TRANSFER, breakdown[0].transactionType)
+        }
+
+    @Test
+    fun `findRecentTransactionForMerge delegates to DAO with TransactionType`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+
+            val expected = Transaction(id = 1, description = "Uber", amount = 200.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = TransactionType.EXPENSE, notes = null)
+            `when`(transactionDao.findRecentTransactionForMerge("Uber", 1, TransactionType.EXPENSE, 500L, 2)).thenReturn(expected)
+
+            val result = repository.findRecentTransactionForMerge("Uber", 1, TransactionType.EXPENSE, 500L, 2)
+
+            assertEquals(expected, result)
+        }
 }

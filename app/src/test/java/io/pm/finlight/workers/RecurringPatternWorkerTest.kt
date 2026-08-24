@@ -25,7 +25,6 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.util.concurrent.TimeUnit
 
-@org.junit.Ignore("Temporarily disabled (Issue #105)")
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
@@ -78,6 +77,40 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
     }
 
     @Test
+    fun `doWork inserts new pattern when signed transaction is processed`() =
+        runTest {
+            val signature = "new_pattern_sig"
+            val now = System.currentTimeMillis()
+            val txn =
+                Transaction(
+                    id = 10,
+                    smsSignature = signature,
+                    date = now,
+                    description = "Spotify",
+                    amount = 119.0,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 2,
+                    notes = null,
+                )
+
+            coEvery { transactionDao.getTransactionsWithSignatureSince(any()) } returns listOf(txn)
+            coEvery { patternDao.getPatternBySignature(signature) } returns null
+            val patternCaptor = slot<RecurringPattern>()
+            coEvery { patternDao.insert(capture(patternCaptor)) } just runs
+            coEvery { patternDao.getAllPatterns() } returns emptyList()
+
+            val worker = TestListenableWorkerBuilder<RecurringPatternWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            assertEquals("expense", patternCaptor.captured.transactionType)
+            assertEquals("Spotify", patternCaptor.captured.description)
+            assertEquals(119.0, patternCaptor.captured.amount, 0.0)
+            assertEquals(1, patternCaptor.captured.occurrences)
+        }
+
+    @Test
     fun `doWork correctly detects monthly pattern and notifies user`() =
         runTest {
             // Arrange
@@ -125,7 +158,6 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
             coEvery { patternDao.deleteBySignature(signature) } just runs
 
             val worker = TestListenableWorkerBuilder<RecurringPatternWorker>(context).build()
-            val ruleCaptor = slot<RecurringTransaction>()
 
             // Act
             val result = worker.doWork()
