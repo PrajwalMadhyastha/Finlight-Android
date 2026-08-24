@@ -19,6 +19,10 @@ const val SQL_T_STATUS_ACTIVE = "T.status != '${TransactionStatus.DB_PENDING}' A
 const val SQL_P_STATUS_ACTIVE = "P.status != '${TransactionStatus.DB_PENDING}' AND P.status != '${TransactionStatus.DB_SKIPPED}'"
 const val SQL_T1_STATUS_ACTIVE = "T1.status != '${TransactionStatus.DB_PENDING}' AND T1.status != '${TransactionStatus.DB_SKIPPED}'"
 
+const val SQL_STATUS_PENDING = "'${TransactionStatus.DB_PENDING}'"
+const val SQL_STATUS_CONFIRMED = "'${TransactionStatus.DB_CONFIRMED}'"
+const val SQL_STATUS_SKIPPED = "'${TransactionStatus.DB_SKIPPED}'"
+
 const val SQL_EXPENSE = "'${TransactionType.DB_EXPENSE}'"
 const val SQL_INCOME = "'${TransactionType.DB_INCOME}'"
 const val SQL_TRANSFER = "'${TransactionType.DB_TRANSFER}'"
@@ -352,7 +356,7 @@ interface TransactionDao {
         FROM transactions AS T
         LEFT JOIN accounts AS A ON T.accountId = A.id
         LEFT JOIN categories AS C ON T.categoryId = C.id
-        WHERE T.transactionType = 'income'
+        WHERE T.transactionType = $SQL_INCOME
           AND T.parentReimbursementId IS NULL
           AND T.id != :excludeExpenseId
         ORDER BY T.date DESC
@@ -1350,22 +1354,22 @@ interface TransactionDao {
     // --- NEW: Recurring draft lifecycle queries ---
 
     /** Returns all PENDING draft transactions, ordered by date. */
-    @Query("SELECT * FROM transactions WHERE status = 'PENDING' ORDER BY date ASC")
+    @Query("SELECT * FROM transactions WHERE status = $SQL_STATUS_PENDING ORDER BY date ASC")
     fun getPendingTransactions(): Flow<List<Transaction>>
 
-    @Query("SELECT * FROM transactions WHERE status = 'PENDING' ORDER BY date ASC")
+    @Query("SELECT * FROM transactions WHERE status = $SQL_STATUS_PENDING ORDER BY date ASC")
     suspend fun getPendingTransactionsSync(): List<Transaction>
 
     /** Checks if a specific recurring rule already has an unconfirmed draft waiting. */
-    @Query("SELECT * FROM transactions WHERE status = 'PENDING' AND recurringRuleId = :ruleId LIMIT 1")
+    @Query("SELECT * FROM transactions WHERE status = $SQL_STATUS_PENDING AND recurringRuleId = :ruleId LIMIT 1")
     suspend fun getPendingTransactionForRule(ruleId: Int): Transaction?
 
     /** Confirms a PENDING draft — sets status to CONFIRMED. */
-    @Query("UPDATE transactions SET status = 'CONFIRMED' WHERE id = :id")
+    @Query("UPDATE transactions SET status = $SQL_STATUS_CONFIRMED WHERE id = :id")
     suspend fun confirmTransaction(id: Int)
 
     /** Skips a pending draft — sets status to SKIPPED. */
-    @Query("UPDATE transactions SET status = 'SKIPPED' WHERE id = :id")
+    @Query("UPDATE transactions SET status = $SQL_STATUS_SKIPPED WHERE id = :id")
     suspend fun skipTransaction(id: Int)
 
     @Query("UPDATE transactions SET recurringRuleId = :ruleId WHERE id = :id")

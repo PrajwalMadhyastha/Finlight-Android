@@ -11,9 +11,7 @@ package io.pm.finlight.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -46,7 +44,6 @@ import io.pm.finlight.ui.components.CategorySelectionGrid
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.InlineTextToolbarActionBar
 import io.pm.finlight.ui.components.rememberInlineTextToolbar
-import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
@@ -157,7 +154,7 @@ fun PotentialTransactionItem(
 ) {
     Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(2.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
-            val amountColor = if (transaction.transactionType == "expense") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            val amountColor = if (TransactionType.fromStringOrNull(transaction.transactionType) == TransactionType.EXPENSE) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -220,7 +217,9 @@ fun ApproveTransactionScreen(
         mutableStateOf(TextFieldValue(potentialTxn.merchantName ?: "", TextRange((potentialTxn.merchantName ?: "").length)))
     }
     var notes by remember { mutableStateOf(TextFieldValue("")) }
-    var selectedTransactionType by remember(potentialTxn.transactionType) { mutableStateOf(potentialTxn.transactionType) }
+    var selectedTransactionType by remember(potentialTxn.transactionType) {
+        mutableStateOf(TransactionType.fromStringOrNull(potentialTxn.transactionType) ?: TransactionType.EXPENSE)
+    }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -314,48 +313,10 @@ fun ApproveTransactionScreen(
                 }
             }
             item {
-                val glassFillColor = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.04f)
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(CircleShape)
-                            .background(glassFillColor)
-                            .border(1.dp, GlassPanelBorder, CircleShape)
-                            .padding(4.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Button(
-                        onClick = { selectedTransactionType = "expense" },
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                        shape = CircleShape,
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = if (selectedTransactionType == "expense") MaterialTheme.colorScheme.primary else Color.Transparent,
-                                contentColor = if (selectedTransactionType == "expense") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                            ),
-                        elevation = null,
-                    ) { Text("Expense", fontWeight = FontWeight.Bold) }
-
-                    Button(
-                        onClick = { selectedTransactionType = "income" },
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                        shape = CircleShape,
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = if (selectedTransactionType == "income") MaterialTheme.colorScheme.primary else Color.Transparent,
-                                contentColor = if (selectedTransactionType == "income") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                            ),
-                        elevation = null,
-                    ) { Text("Income", fontWeight = FontWeight.Bold) }
-                }
+                TransactionTypeToggle(
+                    selectedType = selectedTransactionType,
+                    onTypeSelected = { selectedTransactionType = it },
+                )
             }
 
             item {
@@ -423,7 +384,7 @@ fun ApproveTransactionScreen(
                             scope.launch {
                                 val success =
                                     transactionViewModel.approveSmsTransaction(
-                                        potentialTxn = potentialTxn,
+                                        potentialTxn = potentialTxn.copy(transactionType = selectedTransactionType.dbValue),
                                         description = description.text,
                                         categoryId = selectedCategory?.id,
                                         notes = notes.text.takeIf { it.isNotBlank() },
