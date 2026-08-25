@@ -72,7 +72,7 @@ class RecurringPatternWorker(
                                 smsSignature = signature,
                                 description = transaction.description,
                                 amount = transaction.amount,
-                                transactionType = transaction.transactionType.name.lowercase(),
+                                transactionType = transaction.transactionType,
                                 accountId = transaction.accountId,
                                 categoryId = transaction.categoryId,
                                 occurrences = 1,

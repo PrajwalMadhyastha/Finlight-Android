@@ -89,15 +89,15 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
             val tomorrow = now + 86400000
 
             val dueRule =
-                RecurringTransaction(id = 1, description = "Due", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, lastRunDate = yesterday, accountId = 1, categoryId = null)
+                RecurringTransaction(id = 1, description = "Due", amount = 10.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Daily", startDate = 0L, lastRunDate = yesterday, accountId = 1, categoryId = null)
             val notDueRule =
-                RecurringTransaction(id = 2, description = "Not Due", amount = 20.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, lastRunDate = now, accountId = 1, categoryId = null)
+                RecurringTransaction(id = 2, description = "Not Due", amount = 20.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Daily", startDate = 0L, lastRunDate = now, accountId = 1, categoryId = null)
             val futureRule =
                 RecurringTransaction(
                     id = 3,
                     description = "Future",
                     amount = 30.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Daily",
                     startDate = tomorrow,
                     accountId = 1,
@@ -144,7 +144,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
         runTest {
             val now = System.currentTimeMillis()
             val past = now - 86400000
-            val rule = RecurringTransaction(id = 1, description = "Expired", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, endDate = past, lastRunDate = null, accountId = 1, categoryId = 1)
+            val rule = RecurringTransaction(id = 1, description = "Expired", amount = 10.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Daily", startDate = 0L, endDate = past, lastRunDate = null, accountId = 1, categoryId = 1)
 
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
             val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
@@ -158,7 +158,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
     fun `doWork skips rule if pending draft already exists`() =
         runTest {
             val now = System.currentTimeMillis()
-            val rule = RecurringTransaction(id = 1, description = "Draft Exists", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, lastRunDate = null, accountId = 1, categoryId = 1)
+            val rule = RecurringTransaction(id = 1, description = "Draft Exists", amount = 10.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Daily", startDate = 0L, lastRunDate = null, accountId = 1, categoryId = 1)
             val draft = Transaction(id = 100, description = "Draft", amount = 10.0, transactionType = TransactionType.EXPENSE, date = now, accountId = 1, categoryId = 1, notes = null, status = TransactionStatus.PENDING)
 
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
@@ -174,7 +174,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
     fun `doWork creates CONFIRMED transaction and updates lastRunDate if autoApprove is true`() =
         runTest {
             val now = System.currentTimeMillis()
-            val rule = RecurringTransaction(id = 1, description = "Auto Approve", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, lastRunDate = null, accountId = 1, categoryId = 1, autoApprove = true)
+            val rule = RecurringTransaction(id = 1, description = "Auto Approve", amount = 10.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Daily", startDate = 0L, lastRunDate = null, accountId = 1, categoryId = 1, autoApprove = true)
 
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
             val capturedTxn = slot<Transaction>()
@@ -189,6 +189,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
             verify(exactly = 1) { NotificationHelper.showAutoApprovedPaymentNotification(any(), any()) }
 
             assertEquals(TransactionStatus.CONFIRMED, capturedTxn.captured.status)
+            assertEquals(TransactionType.EXPENSE, capturedTxn.captured.transactionType)
             assertEquals("Auto Approve", capturedTxn.captured.description)
         }
 

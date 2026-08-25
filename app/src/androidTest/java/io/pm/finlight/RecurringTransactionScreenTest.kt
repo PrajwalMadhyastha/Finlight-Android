@@ -43,7 +43,7 @@ class RecurringTransactionScreenTest {
                     RecurringTransaction(
                         description = "Test Pending Rule",
                         amount = 150.0,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         recurrenceInterval = "Monthly",
                         startDate = System.currentTimeMillis(),
                         accountId = TestDataSeeder.ACCOUNT_BANK_ID,
@@ -95,7 +95,7 @@ class RecurringTransactionScreenTest {
                     smsSignature = "TEST_PATTERN",
                     description = "Test Suggestion",
                     amount = 199.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     occurrences = 3,

@@ -9,6 +9,7 @@
 // =================================================================================
 package io.pm.finlight.ui.screens
 
+import io.pm.finlight.TransactionType
 import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
@@ -188,7 +189,7 @@ fun LinkRecurringTransactionScreen(
 private fun DuePaymentDetailsCard(pt: PotentialTransaction) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     val amountColor =
-        if (pt.transactionType == "expense") {
+        if (TransactionType.fromStringOrNull(pt.transactionType) == TransactionType.EXPENSE) {
             MaterialTheme.colorScheme.error
         } else {
             MaterialTheme.colorScheme.primary

@@ -365,7 +365,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     @Test
     fun `auto-link variable bill without anomaly`() =
         runTest {
-            val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+            val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
             val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1100.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
 
             coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn
@@ -384,7 +384,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     @Test
     fun `auto-link variable bill with anomaly triggers notification`() =
         runTest {
-            val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+            val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
             val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1500.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
 
             coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn

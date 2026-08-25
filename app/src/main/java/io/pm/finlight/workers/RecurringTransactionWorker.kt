@@ -76,7 +76,7 @@ class RecurringTransactionWorker(
                                 Transaction(
                                     description = rule.description,
                                     amount = rule.amount,
-                                    transactionType = TransactionType.fromString(rule.transactionType),
+                                    transactionType = rule.transactionType,
                                     date = now,
                                     accountId = rule.accountId,
                                     categoryId = rule.categoryId,
@@ -95,7 +95,7 @@ class RecurringTransactionWorker(
                                 Transaction(
                                     description = rule.description,
                                     amount = rule.amount,
-                                    transactionType = TransactionType.fromString(rule.transactionType),
+                                    transactionType = rule.transactionType,
                                     date = now,
                                     accountId = rule.accountId,
                                     categoryId = rule.categoryId,

@@ -184,7 +184,7 @@ class NotificationHelperTest : BaseViewModelTest() {
             )
         val gson = Gson()
         val encodedJson = java.net.URLEncoder.encode(gson.toJson(potentialTxn), "UTF-8")
-        val rule = RecurringTransaction(1, "Amazon Prime", 1499.0, "expense", "Yearly", System.currentTimeMillis(), 1, 1, null)
+        val rule = RecurringTransaction(1, "Amazon Prime", 1499.0, TransactionType.EXPENSE, "Yearly", System.currentTimeMillis(), 1, 1, null)
         NotificationHelper.showRecurringTransactionDueNotification(context, rule, 101)
 
         val expectedUri = "app://finlight.pm.io/confirm_pending_transaction/101/${rule.id}"
@@ -250,7 +250,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                 id = 1,
                 description = "Netflix",
                 amount = 199.0,
-                transactionType = "expense",
+                transactionType = TransactionType.EXPENSE,
                 recurrenceInterval = "MONTHLY",
                 startDate = System.currentTimeMillis(),
                 accountId = 1,
@@ -259,7 +259,7 @@ class NotificationHelperTest : BaseViewModelTest() {
         val expectedUri = "app://finlight.pm.io/dashboard"
 
         // Act
-        NotificationHelper.showRecurringPatternDetectedNotification(context, RecurringPattern(smsSignature = "hash", description = "Spotify", amount = 10.0, transactionType = "expense", accountId = 1, categoryId = null, occurrences = 3, firstSeen = 0L, lastSeen = 0L))
+        NotificationHelper.showRecurringPatternDetectedNotification(context, RecurringPattern(smsSignature = "hash", description = "Spotify", amount = 10.0, transactionType = TransactionType.EXPENSE, accountId = 1, categoryId = null, occurrences = 3, firstSeen = 0L, lastSeen = 0L))
 
         // Assert
         val notification = shadowNotificationManager.getNotification("hash".hashCode())
@@ -761,7 +761,7 @@ class NotificationHelperTest : BaseViewModelTest() {
                 id = 8,
                 description = "Test",
                 amount = 1.0,
-                transactionType = "expense",
+                transactionType = TransactionType.EXPENSE,
                 recurrenceInterval = "DAILY",
                 startDate = 0L,
                 accountId = 1,
@@ -769,7 +769,7 @@ class NotificationHelperTest : BaseViewModelTest() {
             )
 
         // Act
-        NotificationHelper.showRecurringPatternDetectedNotification(context, RecurringPattern(smsSignature = "hash", description = "Spotify", amount = 10.0, transactionType = "expense", accountId = 1, categoryId = null, occurrences = 3, firstSeen = 0L, lastSeen = 0L))
+        NotificationHelper.showRecurringPatternDetectedNotification(context, RecurringPattern(smsSignature = "hash", description = "Spotify", amount = 10.0, transactionType = TransactionType.EXPENSE, accountId = 1, categoryId = null, occurrences = 3, firstSeen = 0L, lastSeen = 0L))
 
         // Assert
         val notification = shadowNotificationManager.getNotification("hash".hashCode())
@@ -779,7 +779,7 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showVariableBillAnomalyNotification_buildsCorrectly`() {
         // Arrange
-        val rule = RecurringTransaction(id = 201, description = "Electricity Bill", amount = 1500.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+        val rule = RecurringTransaction(id = 201, description = "Electricity Bill", amount = 1500.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
 
         // Act
         NotificationHelper.showVariableBillAnomalyNotification(context, rule, 2500.0, 1500.0)
@@ -795,7 +795,7 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showAutoApprovedPaymentNotification_buildsCorrectly`() {
         // Arrange
-        val rule = RecurringTransaction(id = 202, description = "Internet", amount = 999.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+        val rule = RecurringTransaction(id = 202, description = "Internet", amount = 999.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
 
         // Act
         NotificationHelper.showAutoApprovedPaymentNotification(context, rule)
@@ -843,7 +843,7 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showVariableBillAnomalyNotification_whenPermissionDenied_doesNotPost`() {
         shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
-        val rule = RecurringTransaction(id = 205, description = "Test", amount = 100.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+        val rule = RecurringTransaction(id = 205, description = "Test", amount = 100.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
         NotificationHelper.showVariableBillAnomalyNotification(context, rule, 150.0, 100.0)
         val notification = shadowNotificationManager.getNotification(205 + 5000)
         assertTrue(notification == null)
@@ -852,7 +852,7 @@ class NotificationHelperTest : BaseViewModelTest() {
     @Test
     fun `showAutoApprovedPaymentNotification_whenPermissionDenied_doesNotPost`() {
         shadowOf(context).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
-        val rule = RecurringTransaction(id = 206, description = "Test", amount = 100.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
+        val rule = RecurringTransaction(id = 206, description = "Test", amount = 100.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
         NotificationHelper.showAutoApprovedPaymentNotification(context, rule)
         val notificationId = "auto_${rule.id}".hashCode()
         val notification = shadowNotificationManager.getNotification(notificationId)

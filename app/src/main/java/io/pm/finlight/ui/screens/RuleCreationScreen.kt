@@ -265,15 +265,15 @@ fun RuleCreationScreen(
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         val selectedType = uiState.transactionType
                         SegmentedButton(
-                            selected = selectedType == "expense",
-                            onClick = { viewModel.onTransactionTypeChanged("expense") },
+                            selected = selectedType == TransactionType.EXPENSE,
+                            onClick = { viewModel.onTransactionTypeChanged(TransactionType.EXPENSE) },
                             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
                         ) {
                             Text("Expense")
                         }
                         SegmentedButton(
-                            selected = selectedType == "income",
-                            onClick = { viewModel.onTransactionTypeChanged("income") },
+                            selected = selectedType == TransactionType.INCOME,
+                            onClick = { viewModel.onTransactionTypeChanged(TransactionType.INCOME) },
                             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
                         ) {
                             Text("Income")

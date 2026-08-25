@@ -48,7 +48,7 @@ data class RuleCreationUiState(
     val merchantSelection: RuleSelection = RuleSelection(),
     val amountSelection: RuleSelection = RuleSelection(),
     val accountSelection: RuleSelection = RuleSelection(),
-    val transactionType: String? = null,
+    val transactionType: TransactionType? = null,
     val ruleIdToEdit: Int? = null,
     // --- FIX: Add fields to hold existing regex strings during an edit ---
     val merchantRegex: String? = null,
@@ -96,7 +96,7 @@ class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : Vi
                 amountSelection = amountSelection,
                 merchantSelection = merchantSelection,
                 accountSelection = accountSelection,
-                transactionType = potentialTxn.transactionType,
+                transactionType = TransactionType.fromStringOrNull(potentialTxn.transactionType),
             )
     }
 
@@ -110,7 +110,7 @@ class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : Vi
                     merchantSelection = RuleSelection(selectedText = rule.merchantNameExample ?: ""),
                     amountSelection = RuleSelection(selectedText = rule.amountExample ?: ""),
                     accountSelection = RuleSelection(selectedText = rule.accountNameExample ?: ""),
-                    transactionType = rule.transactionType,
+                    transactionType = TransactionType.fromStringOrNull(rule.transactionType),
                     ruleIdToEdit = rule.id,
                     // --- FIX: Store the existing regex strings in the state ---
                     merchantRegex = rule.merchantRegex,
@@ -137,7 +137,7 @@ class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : Vi
     }
 
     // --- NEW: Function to handle UI state change from the toggle ---
-    fun onTransactionTypeChanged(newType: String?) {
+    fun onTransactionTypeChanged(newType: TransactionType?) {
         _uiState.update { it.copy(transactionType = newType) }
     }
 
@@ -191,7 +191,7 @@ class RuleCreationViewModel(private val customSmsRuleDao: CustomSmsRuleDao) : Vi
                     accountNameExample = currentState.accountSelection.selectedText.takeIf { it.isNotBlank() },
                     priority = 10,
                     sourceSmsBody = fullSmsText,
-                    transactionType = currentState.transactionType,
+                    transactionType = currentState.transactionType?.dbValue,
                 )
 
             if (currentState.ruleIdToEdit != null) {

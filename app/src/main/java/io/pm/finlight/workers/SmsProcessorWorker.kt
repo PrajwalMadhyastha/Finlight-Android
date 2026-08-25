@@ -251,7 +251,7 @@ class SmsProcessorWorker(
                         accountId = 0,
                         categoryId = potentialTxn.categoryId,
                         notes = "",
-                        transactionType = TransactionType.fromString(potentialTxn.transactionType),
+                        transactionType = TransactionType.fromStringOrNull(potentialTxn.transactionType) ?: TransactionType.EXPENSE,
                         sourceSmsId = potentialTxn.sourceSmsId,
                         sourceSmsHash = potentialTxn.sourceSmsHash,
                     )

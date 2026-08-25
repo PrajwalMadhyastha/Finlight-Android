@@ -882,7 +882,7 @@ abstract class AppDatabase : RoomDatabase() {
                         val currentAmount = cursor.getDouble(1)
                         val hasOriginal = !cursor.isNull(2)
                         val originalAmount = if (hasOriginal) cursor.getDouble(2) else null
-                        val type = cursor.getString(3) ?: "expense"
+                        val type = cursor.getString(3) ?: TransactionType.DB_EXPENSE
 
                         // Calculate sum of reimbursements
                         var sumReimbursements = 0.0
@@ -907,7 +907,7 @@ abstract class AppDatabase : RoomDatabase() {
                             }
                             val childAmount = mCursor.getDouble(1)
                             val childType = mCursor.getString(2)
-                            val signedChild = if (childType == "income") childAmount else -childAmount
+                            val signedChild = if (childType == TransactionType.DB_INCOME) childAmount else -childAmount
                             sumChildren += signedChild
                         }
                         mCursor.close()
@@ -929,22 +929,22 @@ abstract class AppDatabase : RoomDatabase() {
                             }
 
                         if (baseAmount != null) {
-                            val signedBase = if (type == "income") baseAmount else -baseAmount
+                            val signedBase = if (type == TransactionType.DB_INCOME) baseAmount else -baseAmount
                             val netSigned = signedBase + sumChildren
                             val finalSigned = netSigned + sumReimbursements
 
                             val finalType =
                                 if (sumReimbursements > 0) {
-                                    "expense"
+                                    TransactionType.DB_EXPENSE
                                 } else if (finalSigned > 0) {
-                                    "income"
+                                    TransactionType.DB_INCOME
                                 } else if (finalSigned < 0) {
-                                    "expense"
+                                    TransactionType.DB_EXPENSE
                                 } else {
                                     type
                                 }
 
-                            val finalAmount = if (finalType == "expense") -finalSigned else finalSigned
+                            val finalAmount = if (finalType == TransactionType.DB_EXPENSE) -finalSigned else finalSigned
 
                             if (Math.abs(finalAmount - currentAmount) > 0.001) {
                                 db.execSQL("UPDATE transactions SET amount = ?, transactionType = ? WHERE id = ?", arrayOf(finalAmount, finalType, id))
