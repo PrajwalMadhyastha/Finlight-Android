@@ -32,6 +32,16 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                     db = db,
                 )
 
+            val mergeTransactionsUseCase =
+                io.pm.finlight.domain.usecase.MergeTransactionsUseCase(
+                    transactionQueryDao = db.transactionQueryDao(),
+                    transactionWriteDao = db.transactionWriteDao(),
+                    transactionReimbursementDao = db.transactionReimbursementDao(),
+                    mergeRecordDao = db.mergeRecordDao(),
+                    deletedSmsHashDao = db.deletedSmsHashDao(),
+                    db = db,
+                )
+
             @Suppress("UNCHECKED_CAST")
             return TransactionViewModel(
                 application = application,
@@ -47,6 +57,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                 merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao()),
                 splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao()),
                 smsParseTemplateDao = db.smsParseTemplateDao(),
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

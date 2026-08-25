@@ -39,6 +39,9 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     @Mock // --- NEW: Add mock for the new dependency ---
     private lateinit var transactionRepository: TransactionRepository
 
+    @Mock
+    private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+
     @Before
     override fun setup() {
         super.setup()
@@ -56,8 +59,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionQueryDao.getFirstTransactionDate()).thenReturn(flowOf(0L))
 
-        // --- NEW: Mock the new repository dependency ---
-        `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+        // --- NEW: Mock the new repository/usecase dependency ---
+        `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
         // --- FIX: Mock settingsRepository flows to avoid null upstream issue ---
         `when`(settingsRepository.getExcludedIncomeMonths()).thenReturn(flowOf(emptySet()))
@@ -310,11 +313,11 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     }
                 mockData.add(CalendarDayStatus(date, status, amount, safeToSpend))
             }
-            `when`(transactionRepository.getMonthlyConsistencyData(year, month)).thenReturn(flowOf(mockData))
+            `when`(getMonthlyConsistencyDataUseCase(year, month)).thenReturn(flowOf(mockData))
             `when`(transactionQueryDao.getFirstTransactionDate()).thenReturn(flowOf(firstDayOfMonth)) // Mock this for legacy code paths
 
             // Act
-            // --- FIX: Pass transactionRepository ---
+            // --- FIX: Pass transactionRepository and getMonthlyConsistencyDataUseCase ---
             val viewModel =
                 TimePeriodReportViewModel(
                     transactionQueryDao,
@@ -324,6 +327,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     TimePeriod.MONTHLY,
                     testCal.timeInMillis,
                     false,
+                    getMonthlyConsistencyDataUseCase,
                 )
             advanceUntilIdle()
 

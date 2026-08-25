@@ -310,12 +310,12 @@ class TransactionViewModelSelectionTest : TransactionViewModelBaseSetup() {
             viewModel.toggleTransactionSelection(2)
             viewModel.setAnchorTransaction(1)
 
-            // Mock repository call
-            whenever(transactionRepository.manualMergeTransactions(org.mockito.kotlin.any(), org.mockito.kotlin.any())).thenReturn(Unit)
+            // Mock use case call
+            whenever(mergeTransactionsUseCase.manualMerge(org.mockito.kotlin.any(), org.mockito.kotlin.any())).thenReturn(Unit)
 
             viewModel.confirmManualMerge()
 
-            org.mockito.kotlin.verify(transactionRepository).manualMergeTransactions(1, listOf(2))
+            org.mockito.kotlin.verify(mergeTransactionsUseCase).manualMerge(1, listOf(2))
 
             viewModel.selectedTransactionIds.test {
                 assertTrue(awaitItem().isEmpty())

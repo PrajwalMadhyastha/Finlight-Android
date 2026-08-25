@@ -38,6 +38,16 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                 )
             val accountRepository = AccountRepository(db)
             val merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao())
+            val getMonthlyConsistencyDataUseCase = io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase(settingsRepository, transactionRepository)
+            val mergeTransactionsUseCase =
+                io.pm.finlight.domain.usecase.MergeTransactionsUseCase(
+                    transactionQueryDao = db.transactionQueryDao(),
+                    transactionWriteDao = db.transactionWriteDao(),
+                    transactionReimbursementDao = db.transactionReimbursementDao(),
+                    mergeRecordDao = db.mergeRecordDao(),
+                    deletedSmsHashDao = db.deletedSmsHashDao(),
+                    db = db,
+                )
 
             @Suppress("UNCHECKED_CAST")
             return DashboardViewModel(
@@ -50,6 +60,8 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                 recurringTransactionDao = db.recurringTransactionDao(),
                 recurringPatternDao = db.recurringPatternDao(),
                 smsRepository = SmsRepository(application),
+                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
