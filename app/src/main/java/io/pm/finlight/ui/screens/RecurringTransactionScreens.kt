@@ -122,7 +122,7 @@ private fun RecurringTransactionItem(
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
     val amountColor =
-        if (rule.transactionType == "expense") {
+        if (rule.transactionType == TransactionType.EXPENSE) {
             MaterialTheme.colorScheme.error
         } else {
             MaterialTheme.colorScheme.primary

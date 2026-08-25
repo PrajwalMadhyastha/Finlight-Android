@@ -15,6 +15,7 @@
 // =================================================================================
 package io.pm.finlight.ui.screens
 
+import io.pm.finlight.TransactionType
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -69,7 +70,7 @@ fun AddRecurringTransactionScreen(
 
     var description by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
-    var transactionType by remember { mutableStateOf("expense") }
+    var transactionType by remember { mutableStateOf(TransactionType.EXPENSE) }
 
     val recurrenceIntervals = listOf("Daily", "Weekly", "Monthly", "Yearly")
     var selectedInterval by remember { mutableStateOf(recurrenceIntervals[2]) }

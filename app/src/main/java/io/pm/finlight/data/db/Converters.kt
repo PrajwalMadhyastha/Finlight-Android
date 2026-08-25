@@ -6,7 +6,7 @@ import io.pm.finlight.TransactionType
 
 class Converters {
     @TypeConverter
-    fun fromTransactionType(value: TransactionType): String = value.name.lowercase()
+    fun fromTransactionType(value: TransactionType): String = value.dbValue
 
     @TypeConverter
     fun toTransactionType(value: String): TransactionType =

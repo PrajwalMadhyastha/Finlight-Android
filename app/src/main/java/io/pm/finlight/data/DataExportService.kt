@@ -35,6 +35,7 @@ object DataExportService {
             prettyPrint = true
             isLenient = true
             ignoreUnknownKeys = true
+            coerceInputValues = true
         }
 
     suspend fun createBackupSnapshot(context: Context): Boolean {

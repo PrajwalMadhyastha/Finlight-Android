@@ -7,6 +7,7 @@ import io.pm.finlight.RecurringTransaction
 import io.pm.finlight.RecurringTransactionDao
 import io.pm.finlight.RecurringTransactionRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.TransactionType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -58,7 +59,7 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
                 RecurringTransaction(
                     description = "Netflix",
                     amount = 149.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Monthly",
                     startDate = 0L,
                     accountId = 1,
@@ -79,7 +80,7 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
                     id = 1,
                     description = "Netflix",
                     amount = 149.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Monthly",
                     startDate = 0L,
                     accountId = 1,
@@ -100,7 +101,7 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
                     id = 1,
                     description = "Netflix",
                     amount = 149.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Monthly",
                     startDate = 0L,
                     accountId = 1,

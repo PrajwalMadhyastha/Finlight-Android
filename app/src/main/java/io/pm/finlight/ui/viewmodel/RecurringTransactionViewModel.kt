@@ -43,7 +43,7 @@ class RecurringTransactionViewModel(
         ruleId: Int?,
         description: String,
         amount: Double,
-        transactionType: String,
+        transactionType: TransactionType = TransactionType.EXPENSE,
         recurrenceInterval: String,
         startDate: Long,
         accountId: Int,

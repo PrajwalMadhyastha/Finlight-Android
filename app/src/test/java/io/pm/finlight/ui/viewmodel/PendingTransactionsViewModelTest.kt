@@ -117,7 +117,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             every { transactionQueryDao.getPendingTransactions() } returns MutableStateFlow(emptyList())
-            val rule = RecurringTransaction(id = 2, description = "Test", amount = 100.0, transactionType = "expense", recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1, skipCount = 1)
+            val rule = RecurringTransaction(id = 2, description = "Test", amount = 100.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1, skipCount = 1)
             coEvery { recurringDao.getAllRulesList() } returns listOf(rule)
             viewModel = PendingTransactionsViewModel(application)
 

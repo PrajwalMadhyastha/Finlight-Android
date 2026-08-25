@@ -81,7 +81,7 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
                 assertEquals("123.45", state.amountSelection.selectedText)
                 assertEquals("Test Merchant", state.merchantSelection.selectedText)
                 assertEquals("xx9876", state.accountSelection.selectedText)
-                assertEquals("expense", state.transactionType)
+                assertEquals(TransactionType.EXPENSE, state.transactionType)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -255,11 +255,11 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
                 val initialState = awaitItem()
                 assertNull(initialState.transactionType)
 
-                viewModel.onTransactionTypeChanged("income")
-                assertEquals("income", awaitItem().transactionType)
+                viewModel.onTransactionTypeChanged(TransactionType.INCOME)
+                assertEquals(TransactionType.INCOME, awaitItem().transactionType)
 
-                viewModel.onTransactionTypeChanged("expense")
-                assertEquals("expense", awaitItem().transactionType)
+                viewModel.onTransactionTypeChanged(TransactionType.EXPENSE)
+                assertEquals(TransactionType.EXPENSE, awaitItem().transactionType)
 
                 viewModel.onTransactionTypeChanged(null)
                 assertNull(awaitItem().transactionType)
@@ -297,7 +297,7 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             // Assert
             viewModel.uiState.test {
                 val state = awaitItem()
-                assertEquals("income", state.transactionType)
+                assertEquals(TransactionType.INCOME, state.transactionType)
                 // --- Also assert regex fields are loaded ---
                 assertEquals("regex1", state.merchantRegex)
                 assertEquals("regex2", state.amountRegex)
@@ -318,7 +318,7 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             // Act
             viewModel.onMarkAsTrigger(triggerSelection)
             viewModel.onMarkAsMerchant(merchantSelection)
-            viewModel.onTransactionTypeChanged("income") // <-- Set the new type
+            viewModel.onTransactionTypeChanged(TransactionType.INCOME) // <-- Set the new type
             viewModel.saveRule(smsBody) { onCompleteCalled = true }
             advanceUntilIdle()
 
@@ -359,7 +359,7 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             viewModel.uiState.test { awaitItem() } // consume initial load
 
             // 2. Make *only* one change to the transaction type
-            viewModel.onTransactionTypeChanged("income")
+            viewModel.onTransactionTypeChanged(TransactionType.INCOME)
             advanceUntilIdle()
 
             // 3. Save the rule. No new selections were made, so all startIndexes are -1

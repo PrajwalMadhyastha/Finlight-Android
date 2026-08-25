@@ -77,7 +77,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             // Arrange
             val rules =
                 listOf(
-                    RecurringTransaction(1, "Netflix", 149.0, "expense", "Monthly", 0L, 1, 1, null),
+                    RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", 0L, 1, 1, null),
                 )
             initializeViewModel(rules)
 
@@ -93,7 +93,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val ruleId = 1
-            val rule = RecurringTransaction(ruleId, "Netflix", 149.0, "expense", "Monthly", 0L, 1, 1, null)
+            val rule = RecurringTransaction(ruleId, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", 0L, 1, 1, null)
             `when`(recurringTransactionRepository.getById(ruleId)).thenReturn(flowOf(rule))
             initializeViewModel()
 
@@ -111,7 +111,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             initializeViewModel()
 
             // Act
-            viewModel.saveRule(null, "Spotify", 129.0, "expense", "Monthly", 0L, 1, 1, null, true, true, 1000L, "SPOTIFY", 5)
+            viewModel.saveRule(null, "Spotify", 129.0, TransactionType.EXPENSE, "Monthly", 0L, 1, 1, null, true, true, 1000L, "SPOTIFY", 5)
             advanceUntilIdle()
 
             // Assert
@@ -135,7 +135,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             val ruleId = 10
 
             // Act
-            viewModel.saveRule(ruleId, "Updated Spotify", 199.0, "expense", "Monthly", 0L, 1, 1, null, false, false, null, null)
+            viewModel.saveRule(ruleId, "Updated Spotify", 199.0, TransactionType.EXPENSE, "Monthly", 0L, 1, 1, null, false, false, null, null)
             advanceUntilIdle()
 
             // Assert
@@ -152,7 +152,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             initializeViewModel()
-            val ruleToDelete = RecurringTransaction(1, "Old Subscription", 99.0, "expense", "Monthly", 0L, 1, 1, null)
+            val ruleToDelete = RecurringTransaction(1, "Old Subscription", 99.0, TransactionType.EXPENSE, "Monthly", 0L, 1, 1, null)
 
             // Act
             viewModel.deleteRule(ruleToDelete)
@@ -166,7 +166,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
     fun `dismissPatternSuggestion calls dao update with isDismissed true`() =
         runTest {
             // Arrange
-            val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, "expense", 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
+            val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, TransactionType.EXPENSE, 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
             initializeViewModel()
 
             // Act

@@ -105,7 +105,7 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
             val result = worker.doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            assertEquals("expense", patternCaptor.captured.transactionType)
+            assertEquals(TransactionType.EXPENSE, patternCaptor.captured.transactionType)
             assertEquals("Spotify", patternCaptor.captured.description)
             assertEquals(119.0, patternCaptor.captured.amount, 0.0)
             assertEquals(1, patternCaptor.captured.occurrences)
@@ -116,7 +116,7 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val signature = "monthly_sig"
-            val pattern = RecurringPattern(signature, "Netflix", 149.0, "expense", 1, 1, 4, 0L, 0L)
+            val pattern = RecurringPattern(signature, "Netflix", 149.0, TransactionType.EXPENSE, 1, 1, 4, 0L, 0L)
             val transactions =
                 listOf(
                     Transaction(

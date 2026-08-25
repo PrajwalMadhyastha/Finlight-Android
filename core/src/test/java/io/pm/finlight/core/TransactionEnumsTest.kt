@@ -109,4 +109,38 @@ class TransactionEnumsTest {
         assertEquals(TransactionStatus.PENDING, TransactionStatus.fromStringOrNull("pending"))
         assertEquals(TransactionStatus.SKIPPED, TransactionStatus.fromStringOrNull("skipped"))
     }
+
+    @Test
+    fun transactionType_serialization_backwardCompatibilityAndRoundTrip() {
+        // Upper case decoding
+        assertEquals(TransactionType.EXPENSE, kotlinx.serialization.json.Json.decodeFromString<TransactionType>("\"EXPENSE\""))
+        assertEquals(TransactionType.INCOME, kotlinx.serialization.json.Json.decodeFromString<TransactionType>("\"INCOME\""))
+        assertEquals(TransactionType.TRANSFER, kotlinx.serialization.json.Json.decodeFromString<TransactionType>("\"TRANSFER\""))
+
+        // Lower case legacy decoding
+        assertEquals(TransactionType.EXPENSE, kotlinx.serialization.json.Json.decodeFromString<TransactionType>("\"expense\""))
+        assertEquals(TransactionType.INCOME, kotlinx.serialization.json.Json.decodeFromString<TransactionType>("\"income\""))
+        assertEquals(TransactionType.TRANSFER, kotlinx.serialization.json.Json.decodeFromString<TransactionType>("\"transfer\""))
+
+        // Encoding
+        assertEquals("\"EXPENSE\"", kotlinx.serialization.json.Json.encodeToString(TransactionType.serializer(), TransactionType.EXPENSE))
+        assertEquals("\"INCOME\"", kotlinx.serialization.json.Json.encodeToString(TransactionType.serializer(), TransactionType.INCOME))
+        assertEquals("\"TRANSFER\"", kotlinx.serialization.json.Json.encodeToString(TransactionType.serializer(), TransactionType.TRANSFER))
+    }
+
+    @Test
+    fun transactionStatus_serialization_backwardCompatibilityAndRoundTrip() {
+        // Upper case decoding
+        assertEquals(TransactionStatus.CONFIRMED, kotlinx.serialization.json.Json.decodeFromString<TransactionStatus>("\"CONFIRMED\""))
+        assertEquals(TransactionStatus.PENDING, kotlinx.serialization.json.Json.decodeFromString<TransactionStatus>("\"PENDING\""))
+        assertEquals(TransactionStatus.SKIPPED, kotlinx.serialization.json.Json.decodeFromString<TransactionStatus>("\"SKIPPED\""))
+
+        // Lower case legacy decoding
+        assertEquals(TransactionStatus.CONFIRMED, kotlinx.serialization.json.Json.decodeFromString<TransactionStatus>("\"confirmed\""))
+        assertEquals(TransactionStatus.PENDING, kotlinx.serialization.json.Json.decodeFromString<TransactionStatus>("\"pending\""))
+        assertEquals(TransactionStatus.SKIPPED, kotlinx.serialization.json.Json.decodeFromString<TransactionStatus>("\"skipped\""))
+
+        // Encoding
+        assertEquals("\"CONFIRMED\"", kotlinx.serialization.json.Json.encodeToString(TransactionStatus.serializer(), TransactionStatus.CONFIRMED))
+    }
 }

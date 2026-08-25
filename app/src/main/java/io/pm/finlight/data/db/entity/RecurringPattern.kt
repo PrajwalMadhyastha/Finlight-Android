@@ -35,7 +35,7 @@ data class RecurringPattern(
     val smsSignature: String,
     val description: String,
     val amount: Double,
-    val transactionType: String,
+    val transactionType: TransactionType = TransactionType.EXPENSE,
     val accountId: Int,
     val categoryId: Int?,
     var occurrences: Int,

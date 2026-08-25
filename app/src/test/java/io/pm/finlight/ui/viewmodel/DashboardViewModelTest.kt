@@ -756,7 +756,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val now = System.currentTimeMillis()
-            val rule = RecurringTransaction(1, "Netflix", 149.0, "expense", "Monthly", now, 1, 1, null)
+            val rule = RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", now, 1, 1, null)
             `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(listOf(rule)))
             initializeViewModel()
 
@@ -777,11 +777,11 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             // Arrange
             val now = System.currentTimeMillis()
             // rule1 is due today + 10 days
-            val rule1 = RecurringTransaction(1, "Sub1", 10.0, "expense", "Monthly", now - 20L * 24 * 60 * 60 * 1000, 1, 1, null)
+            val rule1 = RecurringTransaction(1, "Sub1", 10.0, TransactionType.EXPENSE, "Monthly", now - 20L * 24 * 60 * 60 * 1000, 1, 1, null)
             // rule2 is due today + 40 days (should be filtered out)
-            val rule2 = RecurringTransaction(2, "Sub2", 20.0, "expense", "Monthly", now + 10L * 24 * 60 * 60 * 1000, 1, 1, null)
+            val rule2 = RecurringTransaction(2, "Sub2", 20.0, TransactionType.EXPENSE, "Monthly", now + 10L * 24 * 60 * 60 * 1000, 1, 1, null)
             // rule3 is due today + 5 days
-            val rule3 = RecurringTransaction(3, "Sub3", 30.0, "expense", "Monthly", now - 25L * 24 * 60 * 60 * 1000, 1, 1, null)
+            val rule3 = RecurringTransaction(3, "Sub3", 30.0, TransactionType.EXPENSE, "Monthly", now - 25L * 24 * 60 * 60 * 1000, 1, 1, null)
 
             `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(listOf(rule1, rule2, rule3)))
             initializeViewModel()
@@ -802,7 +802,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     fun `patternSuggestions flow receives data from dao`() =
         runTest {
             // Arrange
-            val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, "expense", 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
+            val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, TransactionType.EXPENSE, 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
             `when`(recurringPatternDao.getUnacknowledgedPatterns()).thenReturn(flowOf(listOf(pattern)))
             initializeViewModel()
 
