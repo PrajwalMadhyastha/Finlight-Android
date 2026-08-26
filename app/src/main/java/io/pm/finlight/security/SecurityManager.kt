@@ -147,11 +147,12 @@ open class SecurityManager(private val context: Context) {
      */
     private fun getEncryptedPassphrase(): Map<String, ByteArray>? {
         val file = getStorageFile()
-        val savedString = if (file.exists()) {
-            file.readText().trim()
-        } else {
-            migrateFromLegacySharedPreferences()
-        } ?: return null
+        val savedString =
+            if (file.exists()) {
+                file.readText().trim()
+            } else {
+                migrateFromLegacySharedPreferences()
+            } ?: return null
 
         val parts = savedString.split(",")
         if (parts.size != 2) return null

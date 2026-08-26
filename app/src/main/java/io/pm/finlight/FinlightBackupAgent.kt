@@ -67,9 +67,10 @@ class FinlightBackupAgent : BackupAgentHelper() {
 
         // 3. Trigger notification AFTER the backup is complete
         try {
-            val notificationsEnabled = runBlocking {
-                settingsRepository.getAutoBackupNotificationEnabled().first()
-            }
+            val notificationsEnabled =
+                runBlocking {
+                    settingsRepository.getAutoBackupNotificationEnabled().first()
+                }
             if (notificationsEnabled) {
                 NotificationHelper.showAutoBackupNotification(applicationContext, backupTime)
             }
@@ -90,4 +91,3 @@ class FinlightBackupAgent : BackupAgentHelper() {
         Log.d(TAG, "onRestore: Restore process finished.")
     }
 }
-

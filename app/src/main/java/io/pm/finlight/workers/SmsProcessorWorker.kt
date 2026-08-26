@@ -44,7 +44,6 @@ import io.pm.finlight.utils.SmsProviderHelper
 import io.pm.finlight.utils.SmsTransactionSaver
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import kotlinx.coroutines.flow.first
 import java.util.Date
 
 @Suppress("DEPRECATION")

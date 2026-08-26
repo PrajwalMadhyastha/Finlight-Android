@@ -121,4 +121,3 @@ class BackupWorkerTest : BaseViewModelTest() {
             verify(exactly = 0) { NotificationHelper.showAutoBackupNotification(any(), any()) }
         }
 }
-

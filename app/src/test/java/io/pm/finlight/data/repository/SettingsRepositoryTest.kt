@@ -560,4 +560,3 @@ class SettingsRepositoryTest : BaseViewModelTest() {
             assertEquals(12345, repository.getIgnoreRulesChecksum())
         }
 }
-

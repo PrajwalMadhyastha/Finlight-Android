@@ -70,5 +70,3 @@ class BootReceiverTest : BaseViewModelTest() {
             coVerify(exactly = 0) { ReminderManager.rescheduleAllWork(any()) }
         }
 }
-
-
