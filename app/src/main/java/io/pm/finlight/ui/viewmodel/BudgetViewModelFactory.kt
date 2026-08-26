@@ -39,8 +39,6 @@ class BudgetViewModelFactory(private val application: Application) : ViewModelPr
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     settingsRepository = settingsRepository,
                     tagRepository = tagRepository,
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
 

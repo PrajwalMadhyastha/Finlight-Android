@@ -234,4 +234,69 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `returns status correctly when firstTransactionDate is null`() =
+        runTest {
+            val year = 2025
+            val month = 9 // September
+            val budget = 3000f
+
+            `when`(settingsRepository.getOverallBudgetForMonth(year, month)).thenReturn(flowOf(budget))
+            `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
+            `when`(transactionRepository.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+
+            useCase(year, month).test {
+                val results = awaitItem()
+                assertEquals(30, results.size)
+                // All past days are treated as NO_SPEND since there is no lower bound date restriction
+                val day1 = results.find { it.date.date == 1 }
+                assertNotNull(day1)
+                assertEquals(SpendingStatus.NO_SPEND, day1.status)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `evaluates spending status on exact boundary and decimal rounding values`() =
+        runTest {
+            val year = 2025
+            val month = 9
+            val budget = 3000f // 30 days -> 100/day
+            val firstTxDate = getTimestamp(Calendar.SEPTEMBER, 1)
+
+            // Day 1 spent 99.4 (rounds to 99L <= 100 -> WITHIN_LIMIT)
+            // Day 2 spent 100.0 (exact match -> WITHIN_LIMIT)
+            // Day 3 spent 100.6 (rounds to 101L > 100 -> OVER_LIMIT)
+            val dailyTotals =
+                listOf(
+                    DailyTotal(getDateKey(year, month, 1), 99.4),
+                    DailyTotal(getDateKey(year, month, 2), 100.0),
+                    DailyTotal(getDateKey(year, month, 3), 100.6),
+                )
+
+            `when`(settingsRepository.getOverallBudgetForMonth(year, month)).thenReturn(flowOf(budget))
+            `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(firstTxDate))
+            `when`(transactionRepository.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(dailyTotals))
+
+            useCase(year, month).test {
+                val results = awaitItem()
+
+                val day1 = results.find { it.date.date == 1 }
+                val day2 = results.find { it.date.date == 2 }
+                val day3 = results.find { it.date.date == 3 }
+
+                assertEquals(SpendingStatus.WITHIN_LIMIT, day1?.status)
+                assertEquals(99L, day1?.amountSpent)
+
+                assertEquals(SpendingStatus.WITHIN_LIMIT, day2?.status)
+                assertEquals(100L, day2?.amountSpent)
+
+                assertEquals(SpendingStatus.OVER_LIMIT, day3?.status)
+                assertEquals(101L, day3?.amountSpent)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

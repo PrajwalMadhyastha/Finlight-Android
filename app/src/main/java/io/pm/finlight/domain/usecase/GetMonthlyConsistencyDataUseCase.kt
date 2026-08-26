@@ -1,6 +1,5 @@
 package io.pm.finlight.domain.usecase
 
-import android.util.Log
 import io.pm.finlight.CalendarDayStatus
 import io.pm.finlight.DailyTotal
 import io.pm.finlight.SettingsRepository
@@ -117,7 +116,6 @@ class GetMonthlyConsistencyDataUseCase(
                             amountSpentLong > safeToSpend -> SpendingStatus.OVER_LIMIT // Spent > budget (red)
                             else -> SpendingStatus.WITHIN_LIMIT // Spent <= budget (and not 0) (blue)
                         }
-                    Log.d("HeatmapDebug", "Date: $dateKey, Spent: $amountSpentLong, Threshold: $safeToSpend, Status: $status")
                     resultList.add(CalendarDayStatus(date, status, amountSpentLong, safeToSpend))
                     cumulativeSpending += amountSpent
                 }

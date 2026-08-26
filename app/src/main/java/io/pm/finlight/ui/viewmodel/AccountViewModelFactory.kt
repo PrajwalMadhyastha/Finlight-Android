@@ -30,8 +30,6 @@ class AccountViewModelFactory(private val application: Application) : ViewModelP
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     settingsRepository = settingsRepository,
                     tagRepository = tagRepository,
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
             val accountRepository = AccountRepository(db)

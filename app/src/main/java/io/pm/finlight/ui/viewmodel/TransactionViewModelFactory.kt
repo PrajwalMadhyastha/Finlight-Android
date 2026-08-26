@@ -27,8 +27,6 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     settingsRepository = settingsRepository,
                     tagRepository = tagRepository,
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
 

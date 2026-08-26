@@ -22,6 +22,7 @@ import io.pm.finlight.data.db.dao.TransactionReimbursementDao
 import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.db.entity.MergeRecord
+import io.pm.finlight.data.db.entity.MergeType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -98,15 +99,14 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
     @After
     override fun tearDown() {
         unmockkAll()
+        super.tearDown()
     }
 
-    // ── Tests: Auto Merge ─────────────────────────────────────────────────────
+    // ── Tests: AutoMerge ──────────────────────────────────────────────────────
 
     @Test
     fun `autoMerge with null parent auto-heals by finding recent transaction`() =
         runTest {
-            `when`(transactionQueryDao.getTransactionByIdSync(1)).thenReturn(null)
-
             val childTxn =
                 Transaction(
                     id = 2,
@@ -119,6 +119,7 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
                     transactionType = TransactionType.EXPENSE,
                     sourceSmsHash = "hash123",
                 )
+            `when`(transactionQueryDao.getTransactionByIdSync(1)).thenReturn(null)
             `when`(transactionQueryDao.getTransactionByIdSync(2)).thenReturn(childTxn)
 
             val newParent =
@@ -203,6 +204,50 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `autoMerge with blank parent notes uses child note directly`() =
+        runTest {
+            val parentTxn =
+                Transaction(
+                    id = 1,
+                    description = "Amazon",
+                    amount = 100.0,
+                    date = 1000L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    transactionType = TransactionType.EXPENSE,
+                )
+            `when`(transactionQueryDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
+
+            val childTxn =
+                Transaction(
+                    id = 2,
+                    description = "Amazon",
+                    amount = 50.0,
+                    date = 2000L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = "Child only note",
+                    transactionType = TransactionType.EXPENSE,
+                    sourceSmsHash = null,
+                )
+            `when`(transactionQueryDao.getTransactionByIdSync(2)).thenReturn(childTxn)
+
+            useCase.autoMerge(parentTxnId = 1, childTxnId = 2, childSmsBody = "SMS info", childSmsDate = 1500L)
+
+            @Suppress("UNCHECKED_CAST")
+            val notesCaptor = ArgumentCaptor.forClass(String::class.java) as ArgumentCaptor<String>
+            verify(transactionWriteDao).updateNotes(eq(1), notesCaptor.capture())
+            val capturedNotes = notesCaptor.value
+
+            assertTrue(capturedNotes.contains("Merged on"))
+            assertTrue(capturedNotes.contains("SMS info"))
+            assertTrue(capturedNotes.contains("Child only note"))
+            // Verify deletedSmsHashDao.insert is not called when sourceSmsHash is null
+            verify(deletedSmsHashDao, never()).insert(any())
+        }
+
+    @Test
     fun `autoMerge when neither parent nor recent transaction found returns early`() =
         runTest {
             val childTxn = Transaction(id = 2, description = "Amazon", amount = 50.0, date = 2000L, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE)
@@ -283,7 +328,7 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `manualMerge with anchor having reimbursements sets finalType to EXPENSE`() =
+    fun `manualMerge with anchor having reimbursements sets finalType to EXPENSE and positive amount`() =
         runTest {
             val anchor =
                 Transaction(
@@ -314,7 +359,46 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
 
             useCase.manualMerge(1, listOf(2))
 
-            verify(transactionWriteDao).updateAmount(1, -90.0)
+            // anchor(-10.0) + child(+100.0) = +90.0 netSigned.
+            // Reimbursements forces finalType = EXPENSE, amount must be positive 90.0
+            verify(transactionWriteDao).updateAmount(1, 90.0)
+        }
+
+    @Test
+    fun `manualMerge when netSigned positive without reimbursements sets finalType to INCOME`() =
+        runTest {
+            val anchor =
+                Transaction(
+                    id = 1,
+                    description = "Anchor Expense",
+                    amount = 20.0,
+                    date = 1000L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    transactionType = TransactionType.EXPENSE,
+                )
+            val child =
+                Transaction(
+                    id = 2,
+                    description = "Child Income",
+                    amount = 120.0,
+                    date = 2000L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    transactionType = TransactionType.INCOME,
+                )
+
+            `when`(transactionQueryDao.getTransactionByIdSync(1)).thenReturn(anchor)
+            `when`(transactionQueryDao.getTransactionByIdSync(2)).thenReturn(child)
+            `when`(transactionReimbursementDao.getReimbursementsCountSync(1)).thenReturn(0)
+
+            useCase.manualMerge(1, listOf(2))
+
+            // -20 + 120 = +100 -> finalType = INCOME, amount = 100.0
+            verify(transactionWriteDao).updateAmount(1, 100.0)
+            verify(transactionWriteDao).updateTransactionType(1, TransactionType.INCOME)
         }
 
     // ── Tests: Breakdown ──────────────────────────────────────────────────────
@@ -346,7 +430,7 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
                     childCurrencyCode = null,
                     childConversionRate = null,
                     mergeGroupId = "group1",
-                    mergeType = "MANUAL",
+                    mergeType = MergeType.MANUAL,
                 )
 
             `when`(mergeRecordDao.getAllForParentAnyType(1)).thenReturn(listOf(record))
@@ -370,6 +454,16 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
         }
 
     // ── Tests: Unmerge ────────────────────────────────────────────────────────
+
+    @Test
+    fun `unmerge returns early when getForParentSync returns null`() =
+        runTest {
+            `when`(mergeRecordDao.getForParentSync(999)).thenReturn(null)
+
+            useCase.unmerge(999)
+
+            verify(transactionWriteDao, never()).updateAmount(any(), any())
+        }
 
     @Test
     fun `unmerge for MANUAL groupId restores anchor and reinserts children`() =
@@ -397,7 +491,7 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
                     childCurrencyCode = null,
                     childConversionRate = null,
                     mergeGroupId = "group-123",
-                    mergeType = "MANUAL",
+                    mergeType = MergeType.MANUAL,
                 )
 
             val parentTxn = Transaction(id = 1, description = "Merged Parent", amount = 150.0, date = 2000L, accountId = 1, categoryId = 1, notes = "Merged notes", transactionType = TransactionType.EXPENSE)
@@ -414,6 +508,43 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
             verify(transactionWriteDao).insert(any())
             verify(deletedSmsHashDao).deleteByHash("hash1")
             verify(mergeRecordDao).deleteByGroupId("group-123")
+        }
+
+    @Test
+    fun `unmerge MANUAL returns early when allRecords is empty`() =
+        runTest {
+            val record =
+                MergeRecord(
+                    id = 1,
+                    parentTxnId = 1,
+                    originalParentAmount = 100.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child",
+                    childAmount = 50.0,
+                    childDate = 2000L,
+                    childAccountId = 1,
+                    childCategoryId = 1,
+                    childTransactionType = TransactionType.EXPENSE,
+                    childSource = "SMS",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = null,
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null,
+                    mergeGroupId = "group-empty",
+                    mergeType = MergeType.MANUAL,
+                )
+
+            `when`(mergeRecordDao.getForParentSync(1)).thenReturn(record)
+            `when`(mergeRecordDao.getAllForGroup("group-empty")).thenReturn(emptyList())
+
+            useCase.unmerge(1)
+
+            verify(transactionWriteDao, never()).updateAmount(any(), any())
         }
 
     @Test
@@ -442,7 +573,7 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
                     childCurrencyCode = null,
                     childConversionRate = null,
                     mergeGroupId = "",
-                    mergeType = "AUTO",
+                    mergeType = MergeType.AUTO,
                 )
 
             val parentTxn = Transaction(id = 1, description = "Parent", amount = 130.0, date = 2000L, accountId = 1, categoryId = 1, notes = "Merged notes", transactionType = TransactionType.EXPENSE)
@@ -459,6 +590,49 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
             verify(transactionWriteDao).insert(any())
             verify(deletedSmsHashDao).deleteByHash("hash2")
             verify(mergeRecordDao).deleteById(5)
+        }
+
+    @Test
+    fun `unmerge AUTO with INCOME parent restores parent amount and date`() =
+        runTest {
+            val record =
+                MergeRecord(
+                    id = 6,
+                    parentTxnId = 1,
+                    originalParentAmount = 200.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = "Salary",
+                    childDescription = "Child Bonus",
+                    childAmount = 50.0,
+                    childDate = 2000L,
+                    childAccountId = 1,
+                    childCategoryId = 1,
+                    childTransactionType = TransactionType.INCOME,
+                    childSource = "Manual",
+                    childNotes = null,
+                    childSourceSmsId = null,
+                    childSourceSmsHash = null,
+                    childSmsSignature = null,
+                    childOriginalDescription = null,
+                    childOriginalAmount = null,
+                    childCurrencyCode = null,
+                    childConversionRate = null,
+                    mergeGroupId = "",
+                    mergeType = MergeType.AUTO,
+                )
+
+            val parentTxn = Transaction(id = 1, description = "Salary", amount = 250.0, date = 2000L, accountId = 1, categoryId = 1, notes = "Merged notes", transactionType = TransactionType.INCOME)
+
+            `when`(mergeRecordDao.getForParentSync(1)).thenReturn(record)
+            `when`(mergeRecordDao.getAllForParentSync(1)).thenReturn(listOf(record))
+            `when`(transactionQueryDao.getTransactionByIdSync(1)).thenReturn(parentTxn)
+
+            useCase.unmerge(1)
+
+            verify(transactionWriteDao).updateAmount(1, 200.0)
+            verify(transactionWriteDao).updateDate(1, 1000L)
+            verify(transactionWriteDao).updateNotes(1, "Salary")
+            verify(mergeRecordDao).deleteById(6)
         }
 
     @Test
@@ -487,7 +661,7 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
                     childCurrencyCode = null,
                     childConversionRate = null,
                     mergeGroupId = "g1",
-                    mergeType = "MANUAL",
+                    mergeType = MergeType.MANUAL,
                 )
             `when`(mergeRecordDao.observeForParent(1)).thenReturn(flowOf(record))
 

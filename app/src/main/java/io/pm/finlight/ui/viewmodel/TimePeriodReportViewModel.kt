@@ -63,7 +63,6 @@ class TimePeriodReportViewModel(
         timePeriod = timePeriod,
         initialDateMillis = initialDateMillis,
         showPreviousMonth = showPreviousMonth,
-        getMonthlyConsistencyDataUseCase = GetMonthlyConsistencyDataUseCase(settingsRepository, transactionRepository),
     )
 
     private val _selectedDate =

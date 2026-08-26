@@ -13,6 +13,7 @@ import io.pm.finlight.data.db.dao.TransactionReimbursementDao
 import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.db.entity.MergeRecord
+import io.pm.finlight.data.db.entity.MergeType
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -69,7 +70,7 @@ class MergeTransactionsUseCase(
                 originalParentNotes = finalParentTxn.notes,
                 childTxn = childTxn,
                 mergeGroupId = "",
-                mergeType = "AUTO",
+                mergeType = MergeType.AUTO,
             ),
         )
 
@@ -172,7 +173,7 @@ class MergeTransactionsUseCase(
                     TransactionType.EXPENSE
                 }
 
-            val finalAmount = if (finalType == TransactionType.EXPENSE) -netSigned else netSigned
+            val finalAmount = kotlin.math.abs(netSigned)
             val finalDate = (childTxns.map { it.date } + anchorTxn.date).max()
 
             // Union all tags
@@ -210,7 +211,7 @@ class MergeTransactionsUseCase(
                         originalParentNotes = originalParentNotes,
                         childTxn = childTxn,
                         mergeGroupId = groupId,
-                        mergeType = "MANUAL",
+                        mergeType = MergeType.MANUAL,
                     ),
                 )
                 // Prevent SMS re-processing of merged children
@@ -304,7 +305,7 @@ class MergeTransactionsUseCase(
     suspend fun unmerge(parentTxnId: Int) {
         val record = mergeRecordDao.getForParentSync(parentTxnId) ?: return
 
-        if (record.mergeType == "MANUAL" && record.mergeGroupId.isNotBlank()) {
+        if (record.mergeType == MergeType.MANUAL && record.mergeGroupId.isNotBlank()) {
             // MANUAL path: restore all N children
             val groupId = record.mergeGroupId
             require(groupId.isNotBlank()) {
@@ -338,7 +339,7 @@ class MergeTransactionsUseCase(
                         currentParent.transactionType
                     }
 
-                val finalAmount = if (finalType == TransactionType.EXPENSE) -newSigned else newSigned
+                val finalAmount = kotlin.math.abs(newSigned)
 
                 val first = allRecords.first()
                 transactionWriteDao.updateAmount(parentTxnId, finalAmount)
@@ -363,7 +364,7 @@ class MergeTransactionsUseCase(
             // AUTO path (chained 1-to-1): restore ALL children for this parent
             val allAutoRecords =
                 mergeRecordDao.getAllForParentSync(parentTxnId)
-                    .filter { it.mergeType == "AUTO" }
+                    .filter { it.mergeType == MergeType.AUTO }
             if (allAutoRecords.isEmpty()) return
 
             db.withTransaction {
@@ -404,7 +405,7 @@ class MergeTransactionsUseCase(
         originalParentNotes: String?,
         childTxn: Transaction,
         mergeGroupId: String,
-        mergeType: String,
+        mergeType: MergeType,
     ): MergeRecord {
         return MergeRecord(
             parentTxnId = parentTxnId,

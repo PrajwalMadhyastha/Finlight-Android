@@ -11,6 +11,7 @@ import io.mockk.mockk
 import io.pm.finlight.*
 import io.pm.finlight.core.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.entity.MergeType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -81,8 +82,6 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 transactionReimbursementDao = db.transactionReimbursementDao(),
                 settingsRepository = settingsRepository,
                 tagRepository = tagRepository,
-                deletedSmsHashDao = db.deletedSmsHashDao(),
-                mergeRecordDao = db.mergeRecordDao(),
                 db = db,
             )
         accountRepository = AccountRepository(db)
@@ -310,7 +309,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
             val groupIds = records.map { it.mergeGroupId }.toSet()
             assertEquals("All records share one non-blank groupId", 1, groupIds.size)
             assertTrue("groupId must not be blank", groupIds.first().isNotBlank())
-            assertTrue("All records have mergeType=MANUAL", records.all { it.mergeType == "MANUAL" })
+            assertTrue("All records have mergeType=MANUAL", records.all { it.mergeType == MergeType.MANUAL })
 
             // Assert: child SMS hash recorded in deny-list
             val deletedHashes = db.deletedSmsHashDao().getAllHashes()

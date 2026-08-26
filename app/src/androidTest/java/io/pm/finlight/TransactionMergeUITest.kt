@@ -146,7 +146,7 @@ class TransactionMergeUITest {
                     parentTxnId = parentId,
                     mergedAt = now,
                     mergeGroupId = "group-1",
-                    mergeType = "MANUAL",
+                    mergeType = io.pm.finlight.data.db.entity.MergeType.MANUAL,
                     originalParentAmount = 100.0,
                     originalParentDate = now,
                     originalParentNotes = "",

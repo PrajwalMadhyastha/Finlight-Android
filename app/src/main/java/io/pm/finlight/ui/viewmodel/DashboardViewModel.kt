@@ -59,7 +59,7 @@ class DashboardViewModel(
     private val smsRepository: SmsRepository,
     private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
         GetMonthlyConsistencyDataUseCase(settingsRepository, transactionRepository),
-    private val mergeTransactionsUseCase: MergeTransactionsUseCase? = null,
+    private val mergeTransactionsUseCase: MergeTransactionsUseCase,
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
@@ -510,7 +510,7 @@ class DashboardViewModel(
         childTxnIds: List<Int>,
     ) {
         viewModelScope.launch {
-            mergeTransactionsUseCase?.manualMerge(parentTxnId, childTxnIds)
+            mergeTransactionsUseCase.manualMerge(parentTxnId, childTxnIds)
         }
     }
 }
