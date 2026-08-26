@@ -195,6 +195,27 @@ class SettingsViewModel(
             initialValue = 0L,
         )
 
+    val hasSeenOnboarding: StateFlow<Boolean?> =
+        settingsRepository.getHasSeenOnboarding().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null,
+        )
+
+    val isFirstLaunchComplete: Flow<Boolean> = settingsRepository.getIsFirstLaunchComplete()
+
+    fun setHasSeenOnboarding(hasSeen: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setHasSeenOnboarding(hasSeen)
+        }
+    }
+
+    fun setFirstLaunchComplete() {
+        viewModelScope.launch {
+            settingsRepository.setFirstLaunchComplete()
+        }
+    }
+
     init {
         smsScanStartDate =
             settingsRepository.getSmsScanStartDate()

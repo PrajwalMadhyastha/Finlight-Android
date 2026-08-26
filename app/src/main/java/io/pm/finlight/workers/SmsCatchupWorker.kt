@@ -21,12 +21,12 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.ParseResult
-import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
 import io.pm.finlight.SmsRepository
 import io.pm.finlight.TagRepository
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.utils.SmsProviderHelper
@@ -46,7 +46,7 @@ class SmsCatchupWorker(
         Log.d(tag, "Starting catch-up scan for missed SMS transactions...")
 
         val db = AppDatabase.getInstance(context)
-        val settingsRepository = SettingsRepository(context)
+        val settingsRepository = ServiceLocator.provideSettingsRepository(context)
         val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
         val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(settingsRepository, tagRepository)
         val saver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)

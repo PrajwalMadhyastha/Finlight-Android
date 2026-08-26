@@ -30,7 +30,7 @@ interface AccountDao {
         LEFT JOIN
             (SELECT
                 accountId,
-                SUM(CASE WHEN transactionType = 'income' THEN amount ELSE -amount END) as balance
+                SUM(CASE WHEN transactionType = $SQL_INCOME THEN amount ELSE -amount END) as balance
              FROM transactions
              WHERE isExcluded = 0 -- This is correct for a balance calculation
              GROUP BY accountId) AS TxSums

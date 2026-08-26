@@ -75,14 +75,14 @@ interface TripDao {
                 SELECT IFNULL(SUM(tx.amount), 0.0)
                 FROM transactions tx
                 JOIN transaction_tag_cross_ref ttcr ON tx.id = ttcr.transactionId
-                WHERE ttcr.tagId = t.tagId AND tx.isSplit = 0 AND tx.transactionType = 'expense' AND tx.isExcluded = 0
+                WHERE ttcr.tagId = t.tagId AND tx.isSplit = 0 AND tx.transactionType = $SQL_EXPENSE AND tx.isExcluded = 0
             ) + (
                 -- Split transactions
                 SELECT IFNULL(SUM(s.amount), 0.0)
                 FROM split_transactions s
                 JOIN transactions p ON s.parentTransactionId = p.id
                 JOIN transaction_tag_cross_ref ttcr ON p.id = ttcr.transactionId
-                WHERE ttcr.tagId = t.tagId AND p.transactionType = 'expense' AND p.isExcluded = 0
+                WHERE ttcr.tagId = t.tagId AND p.transactionType = $SQL_EXPENSE AND p.isExcluded = 0
             ) AS totalSpend,
             COUNT(DISTINCT tx_main.id) as transactionCount
         FROM trips t
@@ -110,13 +110,13 @@ interface TripDao {
                 SELECT IFNULL(SUM(tx.amount), 0.0)
                 FROM transactions tx
                 JOIN transaction_tag_cross_ref ttcr ON tx.id = ttcr.transactionId
-                WHERE ttcr.tagId = t.tagId AND tx.isSplit = 0 AND tx.transactionType = 'expense' AND tx.isExcluded = 0
+                WHERE ttcr.tagId = t.tagId AND tx.isSplit = 0 AND tx.transactionType = $SQL_EXPENSE AND tx.isExcluded = 0
             ) + (
                 SELECT IFNULL(SUM(s.amount), 0.0)
                 FROM split_transactions s
                 JOIN transactions p ON s.parentTransactionId = p.id
                 JOIN transaction_tag_cross_ref ttcr ON p.id = ttcr.transactionId
-                WHERE ttcr.tagId = t.tagId AND p.transactionType = 'expense' AND p.isExcluded = 0
+                WHERE ttcr.tagId = t.tagId AND p.transactionType = $SQL_EXPENSE AND p.isExcluded = 0
             ) AS totalSpend,
             COUNT(DISTINCT tx_main.id) as transactionCount
         FROM trips t

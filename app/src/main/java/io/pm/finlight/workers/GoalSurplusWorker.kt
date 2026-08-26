@@ -11,7 +11,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.SettingsRepository
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.Goal
 import io.pm.finlight.utils.NotificationHelper
 import kotlinx.coroutines.flow.first
@@ -26,7 +26,7 @@ class GoalSurplusWorker(
         val logTag = "GoalSurplusWorker"
         Log.d(logTag, "Starting GoalSurplusWorker")
 
-        val settingsRepository = SettingsRepository(applicationContext)
+        val settingsRepository = ServiceLocator.provideSettingsRepository(applicationContext)
 
         // 1. Check if feature is enabled
         val isNudgesEnabled = settingsRepository.getGoalNudgesEnabled().first()

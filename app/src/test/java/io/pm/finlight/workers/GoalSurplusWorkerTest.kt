@@ -35,7 +35,7 @@ class GoalSurplusWorkerTest {
     private lateinit var db: AppDatabase
     private lateinit var transactionWriteDao: TransactionWriteDao
     private lateinit var goalDao: GoalDao
-    private lateinit var settingsRepository: SettingsRepository
+    private lateinit var settingsRepository: ISettingsRepository
 
     @Before
     fun setup() {
@@ -43,7 +43,8 @@ class GoalSurplusWorkerTest {
         runBlocking {
             context.financeSettingsDataStore.edit { it.clear() }
         }
-        settingsRepository = SettingsRepository(context)
+        io.pm.finlight.di.ServiceLocator.reset()
+        settingsRepository = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
 
         // Use an unencrypted in-memory database!
         db =
@@ -61,6 +62,7 @@ class GoalSurplusWorkerTest {
     @After
     fun teardown() {
         db.close()
+        io.pm.finlight.di.ServiceLocator.reset()
         unmockkAll()
     }
 

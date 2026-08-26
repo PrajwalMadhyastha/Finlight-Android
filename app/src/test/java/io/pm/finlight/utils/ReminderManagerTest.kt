@@ -31,7 +31,7 @@ import java.util.Calendar
 class ReminderManagerTest : BaseViewModelTest() {
     private lateinit var context: Context
     private lateinit var workManager: WorkManager
-    private lateinit var settingsRepository: SettingsRepository
+    private lateinit var settingsRepository: io.pm.finlight.ISettingsRepository
 
     @Before
     override fun setup() {
@@ -40,7 +40,8 @@ class ReminderManagerTest : BaseViewModelTest() {
         runTest {
             context.financeSettingsDataStore.edit { it.clear() }
         }
-        settingsRepository = SettingsRepository(context)
+        io.pm.finlight.di.ServiceLocator.reset()
+        settingsRepository = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
 
         // Initialize WorkManager for testing
         val config =
@@ -57,6 +58,7 @@ class ReminderManagerTest : BaseViewModelTest() {
         super.tearDown()
         // Cancel all work after each test to ensure a clean state
         workManager.cancelAllWork()
+        io.pm.finlight.di.ServiceLocator.reset()
     }
 
     private fun assertWorkIsEnqueued(

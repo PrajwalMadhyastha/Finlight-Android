@@ -1,6 +1,5 @@
 package io.pm.finlight
 
-import android.content.Context
 import io.pm.finlight.ui.theme.AppTheme
 import kotlinx.coroutines.flow.Flow
 
@@ -37,19 +36,6 @@ class SettingsRepository(
     private val firstLaunchSettingsRepository: IFirstLaunchSettingsRepository,
     private val featureSettingsRepository: IFeatureSettingsRepository,
 ) : ISettingsRepository {
-    constructor(context: Context) : this(
-        appConfigRepository = AppConfigRepository(context),
-        dashboardSettingsRepository = DashboardSettingsRepository(context),
-        securitySettingsRepository = SecuritySettingsRepository(context),
-        budgetSettingsRepository = BudgetSettingsRepository(context),
-        backupSettingsRepository = BackupSettingsRepository(context),
-        notificationSettingsRepository = NotificationSettingsRepository(context),
-        smsRuleSettingsRepository = SmsRuleSettingsRepository(context),
-        travelSettingsRepository = TravelSettingsRepository(context),
-        firstLaunchSettingsRepository = FirstLaunchSettingsRepository(context),
-        featureSettingsRepository = FeatureSettingsRepository(context),
-    )
-
     // --- Recurring Transaction Settings ---
 
     override suspend fun saveRecurringTransactionsEnabled(isEnabled: Boolean) =

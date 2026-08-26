@@ -56,6 +56,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     private lateinit var mockClassifier: SmsClassifier
     private lateinit var mockNerExtractor: NerExtractor
     private lateinit var recurringDao: RecurringTransactionDao
+    private lateinit var mockSettingsRepo: ISettingsRepository
 
     private fun buildWorker(
         sender: String,
@@ -133,10 +134,11 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         coEvery { tagDao.findByName(any()) } returns null
         coEvery { tagDao.insert(any()) } returns 1L
 
-        mockkConstructor(SettingsRepository::class)
-        every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(null)
-        every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
-        every { anyConstructed<SettingsRepository>().getAutoCaptureNotificationEnabled() } returns flowOf(false)
+        mockSettingsRepo = mockk(relaxed = true)
+        every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(null)
+        every { mockSettingsRepo.getHomeCurrency() } returns flowOf("INR")
+        every { mockSettingsRepo.getAutoCaptureNotificationEnabled() } returns flowOf(false)
+        io.pm.finlight.di.ServiceLocator.setSettingsRepository(mockSettingsRepo)
 
         mockClassifier = mockk(relaxed = true)
         mockNerExtractor = mockk(relaxed = true)
@@ -161,6 +163,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
+        io.pm.finlight.di.ServiceLocator.reset()
         unmockkAll()
         super.tearDown()
     }
@@ -307,7 +310,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
                     isEnabled = true, tripName = "Trip", tripType = io.pm.finlight.TripType.INTERNATIONAL,
                     startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "USD", conversionRate = 80f
                 )
-            every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(travelSettings)
+            every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(travelSettings)
 
             val txn =
                 PotentialTransaction(
@@ -345,7 +348,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     @Test
     fun `auto-capture notification is enqueued when enabled`() =
         runTest {
-            every { anyConstructed<SettingsRepository>().getAutoCaptureNotificationEnabled() } returns flowOf(true)
+            every { mockSettingsRepo.getAutoCaptureNotificationEnabled() } returns flowOf(true)
             val txn =
                 PotentialTransaction(
                     sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 10.0,

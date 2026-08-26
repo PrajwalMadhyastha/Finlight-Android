@@ -22,6 +22,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +39,7 @@ class RecurringTransactionWorker(
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             try {
-                val settingsRepo = SettingsRepository(context)
+                val settingsRepo = ServiceLocator.provideSettingsRepository(context)
                 val isEnabled = settingsRepo.getRecurringTransactionsEnabled().first()
 
                 if (!isEnabled) {

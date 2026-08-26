@@ -27,7 +27,6 @@ import io.pm.finlight.MerchantCategoryMapping
 import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.MerchantRenameRule
 import io.pm.finlight.ParseResult
-import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
 import io.pm.finlight.TagRepository
@@ -37,6 +36,7 @@ import kotlinx.coroutines.flow.first
 import io.pm.finlight.TransactionType
 import io.pm.finlight.TripType
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.utils.NotificationHelper
@@ -67,7 +67,7 @@ class SmsProcessorWorker(
         val smsMessage = SmsMessage(id = date, sender = sender, body = body, date = date)
 
         val db = AppDatabase.getInstance(context)
-        val settingsRepository = SettingsRepository(context)
+        val settingsRepository = ServiceLocator.provideSettingsRepository(context)
         val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
         val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(settingsRepository, tagRepository)
         val saver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)

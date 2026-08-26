@@ -6,16 +6,16 @@ import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.BudgetRepository
 import io.pm.finlight.BudgetViewModel
 import io.pm.finlight.CategoryRepository
-import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 
 class BudgetViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(BudgetViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val budgetRepository = BudgetRepository(db.budgetDao())
-            val settingsRepository = SettingsRepository(application)
+            val settingsRepository = ServiceLocator.provideSettingsRepository(application)
             val categoryRepository = CategoryRepository(db.categoryDao())
             val transactionRepository =
                 TransactionRepository(

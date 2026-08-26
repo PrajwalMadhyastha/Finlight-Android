@@ -48,7 +48,8 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
         // Enable the recurring transaction feature for tests
         runBlocking {
             context.financeSettingsDataStore.edit { it.clear() }
-            val settingsRepo = SettingsRepository(context)
+            io.pm.finlight.di.ServiceLocator.reset()
+            val settingsRepo = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
             settingsRepo.saveRecurringTransactionsEnabled(true)
         }
 
@@ -80,6 +81,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
+        io.pm.finlight.di.ServiceLocator.reset()
         unmockkAll()
         super.tearDown()
     }
