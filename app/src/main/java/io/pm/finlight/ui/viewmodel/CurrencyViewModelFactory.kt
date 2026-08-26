@@ -1,8 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/CurrencyViewModelFactory.kt
-// REASON: NEW FILE - This factory provides all necessary repository dependencies
-// to the CurrencyViewModel, enabling constructor injection for better testability.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -26,8 +21,6 @@ class CurrencyViewModelFactory(private val application: Application) : ViewModel
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    settingsRepository = settingsRepository,
-                    tagRepository = tagRepository,
                     db = db,
                 )
             val tripRepository = TripRepository(db.tripDao())

@@ -320,14 +320,14 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // --- FIX: Pass transactionRepository and getMonthlyConsistencyDataUseCase ---
             val viewModel =
                 TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao,
-                    transactionRepository,
-                    settingsRepository,
-                    TimePeriod.MONTHLY,
-                    testCal.timeInMillis,
-                    false,
-                    getMonthlyConsistencyDataUseCase,
+                    transactionQueryDao = transactionQueryDao,
+                    transactionAnalyticsDao = transactionAnalyticsDao,
+                    transactionRepository = transactionRepository,
+                    settingsRepository = settingsRepository,
+                    timePeriod = TimePeriod.MONTHLY,
+                    initialDateMillis = testCal.timeInMillis,
+                    showPreviousMonth = false,
+                    getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
                 )
             advanceUntilIdle()
 

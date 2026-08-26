@@ -1,14 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/BudgetViewModelFactory.kt
-// REASON: NEW FILE - This factory handles the creation of BudgetViewModel for
-// the main application. It instantiates the necessary repositories and injects
-// them into the ViewModel's constructor, decoupling the ViewModel from direct
-// database initialization and enabling easier testing.
-//
-// REASON: REFACTOR (Dynamic Budget) - The factory is updated to inject the
-// `TransactionRepository`. This is now required by the `BudgetViewModel` to
-// fetch the `monthlySummaries` needed for the new month navigation header.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -18,7 +7,6 @@ import io.pm.finlight.BudgetRepository
 import io.pm.finlight.BudgetViewModel
 import io.pm.finlight.CategoryRepository
 import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
 
@@ -29,16 +17,12 @@ class BudgetViewModelFactory(private val application: Application) : ViewModelPr
             val budgetRepository = BudgetRepository(db.budgetDao())
             val settingsRepository = SettingsRepository(application)
             val categoryRepository = CategoryRepository(db.categoryDao())
-            // --- NEW: Add TransactionRepository dependency ---
-            val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
             val transactionRepository =
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    settingsRepository = settingsRepository,
-                    tagRepository = tagRepository,
                     db = db,
                 )
 
@@ -47,7 +31,6 @@ class BudgetViewModelFactory(private val application: Application) : ViewModelPr
                 budgetRepository,
                 settingsRepository,
                 categoryRepository,
-                // --- NEW: Pass repository to ViewModel ---
                 transactionRepository,
             ) as T
         }

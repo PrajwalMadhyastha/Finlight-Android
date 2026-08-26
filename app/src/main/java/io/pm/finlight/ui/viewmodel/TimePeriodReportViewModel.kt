@@ -15,6 +15,7 @@ import com.github.mikephil.charting.data.BarEntry
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,8 +23,6 @@ import kotlinx.coroutines.flow.*
 import java.util.*
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
-
-import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 
 data class MonthlyBreakdown(
     // yyyy-MM
@@ -45,7 +44,11 @@ class TimePeriodReportViewModel(
     initialDateMillis: Long?,
     showPreviousMonth: Boolean,
     private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
-        GetMonthlyConsistencyDataUseCase(settingsRepository, transactionRepository),
+        GetMonthlyConsistencyDataUseCase(
+            settingsRepository = settingsRepository,
+            transactionAnalyticsDao = transactionAnalyticsDao,
+            transactionQueryDao = transactionQueryDao,
+        ),
 ) : ViewModel() {
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(

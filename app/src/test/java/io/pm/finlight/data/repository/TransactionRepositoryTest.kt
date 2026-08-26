@@ -30,8 +30,6 @@ package io.pm.finlight.data.repository
 
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.DeletedSmsHashDao
-import io.pm.finlight.data.db.dao.MergeRecordDao
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
@@ -65,18 +63,6 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
     @Mock
     private lateinit var transactionDao: TransactionDao
-
-    @Mock
-    private lateinit var settingsRepository: SettingsRepository
-
-    @Mock
-    private lateinit var tagRepository: TagRepository
-
-    @Mock
-    private lateinit var deletedSmsHashDao: DeletedSmsHashDao
-
-    @Mock
-    private lateinit var mergeRecordDao: MergeRecordDao
 
     @Mock
     private lateinit var db: AppDatabase
@@ -128,8 +114,6 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     @Before
     override fun setup() {
         super.setup()
-        // Initialize with default mock behaviors
-        `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
 
         // Mock DB dependencies
         `when`(db.accountDao()).thenReturn(accountDao)
@@ -161,7 +145,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `unlinkReimbursement on over-repaid (negative) expense correctly restores amount`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
 
             // Income of 150 was linked to expense of 100 → expense.amount = 100 - 150 = -50 (over-repaid)
             val incomeTxn = Transaction(id = 2, description = "Income", amount = 150.0, date = 2000L, accountId = 1, categoryId = 1, transactionType = TransactionType.INCOME, notes = null, parentReimbursementId = 1)
@@ -183,7 +167,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
 
             val transaction =
                 Transaction(
@@ -217,27 +201,12 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `insertTransactionWithTags with active travel mode adds trip tag`() =
+    fun `insertTransactionWithTags adds given tags`() =
         runTest {
-            // Arrange
-            setupDefaultPropertyMocks() // Add default mocks for properties
-            val tripTag = Tag(id = 99, name = "US Trip")
-            val travelSettings =
-                TravelModeSettings(
-                    isEnabled = true,
-                    tripName = "US Trip",
-                    tripType = TripType.DOMESTIC,
-                    startDate = 0L,
-                    endDate = Long.MAX_VALUE,
-                    currencyCode = null,
-                    conversionRate = null,
-                )
-            `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(travelSettings))
-            `when`(tagRepository.findOrCreateTag("US Trip")).thenReturn(tripTag)
-
+            setupDefaultPropertyMocks()
             `when`(transactionDao.insert(anyObject())).thenReturn(1L)
 
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db)
 
             val transaction =
                 Transaction(
@@ -248,7 +217,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     categoryId = 1,
                     notes = null,
                 )
-            val initialTags = setOf(Tag(id = 1, name = "Work"))
+            val initialTags = setOf(Tag(id = 1, name = "Work"), Tag(id = 99, name = "Trip"))
 
             @Suppress("UNCHECKED_CAST")
             val crossRefCaptor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<TransactionTagCrossRef>>
@@ -257,60 +226,11 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository.insertTransactionWithTags(transaction, initialTags)
 
             // Assert
-            verify(tagRepository).findOrCreateTag("US Trip")
-            // --- FIX: Use captor.capture() with an elvis operator to avoid NPE ---
             verify(transactionDao).addTagsToTransaction(crossRefCaptor.capture() ?: emptyList())
             val capturedRefs = crossRefCaptor.value
-            assertEquals(2, capturedRefs.size) // Work tag + Trip tag
+            assertEquals(2, capturedRefs.size)
             assertTrue(capturedRefs.any { it.tagId == 1 })
             assertTrue(capturedRefs.any { it.tagId == 99 })
-        }
-
-    @Test
-    fun `insertTransactionWithTags with inactive travel mode does not add trip tag`() =
-        runTest {
-            // Arrange
-            setupDefaultPropertyMocks() // Add default mocks for properties
-            val travelSettings =
-                TravelModeSettings(
-                    isEnabled = false,
-                    tripName = "US Trip",
-                    tripType = TripType.DOMESTIC,
-                    startDate = 0L,
-                    endDate = Long.MAX_VALUE,
-                    currencyCode = null,
-                    conversionRate = null,
-                )
-            `when`(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(travelSettings))
-
-            `when`(transactionDao.insert(anyObject())).thenReturn(1L)
-
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
-
-            val transaction =
-                Transaction(
-                    description = "Test",
-                    amount = 100.0,
-                    date = System.currentTimeMillis(),
-                    accountId = 1,
-                    categoryId = 1,
-                    notes = null,
-                )
-            val initialTags = setOf(Tag(id = 1, name = "Work"))
-
-            @Suppress("UNCHECKED_CAST")
-            val crossRefCaptor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<TransactionTagCrossRef>>
-
-            // Act
-            repository.insertTransactionWithTags(transaction, initialTags)
-
-            // Assert
-            verify(tagRepository, never()).findOrCreateTag(anyString())
-            // --- FIX: Use captor.capture() with an elvis operator to avoid NPE ---
-            verify(transactionDao).addTagsToTransaction(crossRefCaptor.capture() ?: emptyList())
-            val capturedRefs = crossRefCaptor.value
-            assertEquals(1, capturedRefs.size) // Only Work tag
-            assertEquals(1, capturedRefs.first().tagId)
         }
 
     // --- NEW: Test for insertTransactionWithTagsAndImages ---
@@ -319,7 +239,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
 
             val transaction =
                 Transaction(
@@ -365,7 +285,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
 
             val transaction =
                 Transaction(
@@ -400,7 +320,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `delete calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
             val transaction =
                 Transaction(id = 1, description = "Test", amount = 1.0, date = 0L, accountId = 1, categoryId = 1, notes = null)
             repository.delete(transaction)
@@ -412,7 +332,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `setSmsHash calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
             val hash = "testhash"
             repository.setSmsHash(1, hash)
             verify(transactionDao).setSmsHash(1, hash)
@@ -423,7 +343,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `getTransactionCountForMerchant calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
             val desc = "Amazon"
             `when`(transactionDao.getTransactionCountForMerchant(desc)).thenReturn(flowOf(5))
             repository.getTransactionCountForMerchant(desc).test {
@@ -438,7 +358,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `findSimilarTransactions calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
             val desc = "Amazon"
             repository.findSimilarTransactions(desc, 1)
             verify(transactionDao).findSimilarTransactions(desc, 1)
@@ -449,7 +369,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateCategoryForIds calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
             val ids = listOf(1, 2)
             val categoryId = 5
             repository.updateCategoryForIds(ids, categoryId)
@@ -461,7 +381,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateDescriptionForIds calls DAO`() =
         runTest {
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
             val ids = listOf(1, 2)
             val newDesc = "New Description"
             repository.updateDescriptionForIds(ids, newDesc)
@@ -474,7 +394,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `clearReviewFlag calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.clearReviewFlag(1)
             verify(transactionDao).clearReviewFlag(1)
         }
@@ -483,7 +403,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateDescription calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.updateDescription(1, "New Desc")
             verify(transactionDao).updateDescription(1, "New Desc")
         }
@@ -492,7 +412,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateAmount calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.updateAmount(1, 123.45)
             verify(transactionDao).updateAmount(1, 123.45)
         }
@@ -501,7 +421,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateNotes calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.updateNotes(1, "New Note")
             verify(transactionDao).updateNotes(1, "New Note")
         }
@@ -510,7 +430,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateCategoryId calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.updateCategoryId(1, 5)
             verify(transactionDao).updateCategoryId(1, 5)
         }
@@ -519,7 +439,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateAccountId calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.updateAccountId(1, 2)
             verify(transactionDao).updateAccountId(1, 2)
         }
@@ -528,7 +448,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateDate calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.updateDate(1, 999L)
             verify(transactionDao).updateDate(1, 999L)
         }
@@ -537,7 +457,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateExclusionStatus calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.updateExclusionStatus(1, true)
             verify(transactionDao).updateExclusionStatus(1, true)
         }
@@ -546,7 +466,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `updateTransactionType calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.updateTransactionType(1, TransactionType.INCOME)
             verify(transactionDao).updateTransactionType(1, TransactionType.INCOME)
         }
@@ -555,7 +475,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `getTotalExpensesSince calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             val startDate = 1000L
             repository.getTotalExpensesSince(startDate)
             verify(transactionDao).getTotalExpensesSince(startDate)
@@ -565,7 +485,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `searchMerchants calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             val query = "amzn"
             `when`(transactionDao.searchMerchants(query)).thenReturn(flowOf(emptyList()))
             repository.searchMerchants(query)
@@ -576,7 +496,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `deleteByIds calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             val ids = listOf(1, 2)
             repository.deleteByIds(ids)
             verify(transactionDao).deleteByIds(ids)
@@ -586,7 +506,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `getRecentManualTransactions calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             `when`(transactionDao.getRecentManualTransactions(5)).thenReturn(flowOf(emptyList()))
             repository.getRecentManualTransactions(5)
             verify(transactionDao).getRecentManualTransactions(5)
@@ -596,7 +516,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `addTagForDateRange calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.addTagForDateRange(1, 100L, 200L)
             verify(transactionDao).addTagForDateRange(1, 100L, 200L)
         }
@@ -605,7 +525,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `removeTagForDateRange calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.removeTagForDateRange(1, 100L, 200L)
             verify(transactionDao).removeTagForDateRange(1, 100L, 200L)
         }
@@ -614,7 +534,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `getTransactionsByTagId calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             `when`(transactionDao.getTransactionsByTagId(1)).thenReturn(flowOf(emptyList()))
             repository.getTransactionsByTagId(1)
             verify(transactionDao).getTransactionsByTagId(1)
@@ -624,7 +544,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `removeAllTransactionsForTag calls DAO`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
             repository.removeAllTransactionsForTag(1)
             verify(transactionDao).removeAllTransactionsForTag(1)
         }
@@ -649,7 +569,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(transactionDao.getAllTransactions()).thenReturn(flowOf(mockDetails))
             `when`(transactionDao.getRecentTransactionDetails()).thenReturn(flowOf(emptyList())) // Default for other prop
 
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize HERE
+            repository = TransactionRepository(transactionDao, db) // Initialize HERE
 
             // Act & Assert
             repository.allTransactions.test {
@@ -678,7 +598,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             `when`(transactionDao.getRecentTransactionDetails()).thenReturn(flowOf(mockDetails))
             `when`(transactionDao.getAllTransactions()).thenReturn(flowOf(emptyList())) // Default for other prop
 
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize HERE
+            repository = TransactionRepository(transactionDao, db) // Initialize HERE
 
             // Act & Assert
             repository.recentTransactions.test {
@@ -693,7 +613,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
 
             val mockSummary = FinancialSummary(1000.0, 500.0)
             `when`(transactionDao.getFinancialSummaryForRangeFlow(100L, 200L)).thenReturn(flowOf(mockSummary))
@@ -711,7 +631,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
 
             val mockSpending = listOf(CategorySpending("Food", 100.0, "red", "icon"))
             `when`(transactionDao.getSpendingByCategoryForMonth(100L, 200L, "keyword", 1, 2, TransactionType.EXPENSE)).thenReturn(flowOf(mockSpending))
@@ -729,7 +649,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
 
             val mockTrends = listOf(MonthlyTrend("2025-10", 1000.0, 500.0))
             `when`(transactionDao.getMonthlyTrends(123L)).thenReturn(flowOf(mockTrends))
@@ -747,7 +667,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultPropertyMocks() // Add default mocks for properties
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db) // Initialize
+            repository = TransactionRepository(transactionDao, db) // Initialize
 
             val mockSpending = listOf(MerchantSpendingSummary("Amazon", 100.0, 2))
             `when`(transactionDao.getSpendingByMerchantForMonth(100L, 200L, "keyword", 1, 2, TransactionType.EXPENSE)).thenReturn(flowOf(mockSpending))
@@ -764,7 +684,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `linkReimbursement deducts income amount from expense amount`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
 
             val expenseTxn = Transaction(id = 1, description = "Expense", amount = 1500.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = TransactionType.EXPENSE)
             val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = TransactionType.INCOME)
@@ -782,7 +702,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `linkReimbursement allows expense amount to drop below zero`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
 
             val expenseTxn = Transaction(id = 1, description = "Expense", amount = 300.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = TransactionType.EXPENSE)
             val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = TransactionType.INCOME)
@@ -800,7 +720,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `unlinkReimbursement restores amount to expense`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
 
             val expenseTxn = Transaction(id = 1, description = "Expense", amount = 1000.0, date = 1000L, accountId = 1, categoryId = 1, notes = "", transactionType = TransactionType.EXPENSE)
             val incomeTxn = Transaction(id = 2, description = "Income", amount = 500.0, date = 2000L, accountId = 1, categoryId = 2, notes = "", transactionType = TransactionType.INCOME, parentReimbursementId = 1)
@@ -818,7 +738,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `detectAndLinkSelfTransfer strict time match links transactions`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
 
             val newTxn = Transaction(id = 1, description = "Withdrawal", amount = 100.0, date = 1000L, accountId = 1, transactionType = TransactionType.EXPENSE, sourceSmsId = 10, categoryId = null, notes = null)
             val candidate = Transaction(id = 2, description = "Deposit", amount = 100.0, date = 1000L + 60 * 1000L, accountId = 2, transactionType = TransactionType.INCOME, sourceSmsId = 20, categoryId = null, notes = null)
@@ -844,7 +764,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `detectAndLinkSelfTransfer loose time match with alias match links transactions`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
 
             val newTxn = Transaction(id = 1, description = "Transfer", originalDescription = "Transfer to 1234", amount = 100.0, date = 1000L, accountId = 1, transactionType = TransactionType.EXPENSE, sourceSmsId = 10, categoryId = null, notes = null)
             // 2 hours difference (loose time)
@@ -877,7 +797,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `detectAndLinkSelfTransfer loose time match without text match does not link`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
 
             val newTxn = Transaction(id = 1, description = "Expense", originalDescription = "Some expense", amount = 100.0, date = 1000L, accountId = 1, transactionType = TransactionType.EXPENSE, sourceSmsId = 10, categoryId = null, notes = null)
             // 2 hours difference (loose time)
@@ -908,7 +828,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `detectAndLinkSelfTransfer skips if already linked or excluded`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
 
             val newTxnLinked = Transaction(id = 1, description = "A", amount = 100.0, date = 1000L, accountId = 1, transactionType = TransactionType.EXPENSE, sourceSmsId = 10, linkedTransferId = 99, categoryId = null, notes = null)
             val newTxnExcluded = Transaction(id = 2, description = "B", amount = 100.0, date = 1000L, accountId = 1, transactionType = TransactionType.EXPENSE, sourceSmsId = 10, isExcluded = true, categoryId = null, notes = null)
@@ -929,7 +849,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `findRecentTransactionForMerge delegates to DAO with TransactionType`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
 
             val expected = Transaction(id = 1, description = "Uber", amount = 200.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = TransactionType.EXPENSE, notes = null)
             `when`(transactionDao.findRecentTransactionForMerge("Uber", 1, TransactionType.EXPENSE, 500L, 2)).thenReturn(expected)
@@ -943,7 +863,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     fun `delegated DAO query methods forward calls properly`() =
         runTest {
             setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, settingsRepository, tagRepository, deletedSmsHashDao, mergeRecordDao, db)
+            repository = TransactionRepository(transactionDao, db)
 
             `when`(transactionDao.getTransactionWithSplits(1)).thenReturn(flowOf(null))
             `when`(transactionDao.getTopSpendingCategoriesForRangeFlow(1L, 2L)).thenReturn(flowOf(null))
@@ -1014,11 +934,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             val repo =
                 TransactionRepository(
                     transactionDao,
-                    settingsRepository,
-                    tagRepository,
-                    deletedSmsHashDao,
-                    mergeRecordDao,
-                    db
+                    db,
                 )
             assertNotNull(repo)
         }

@@ -11,12 +11,8 @@ import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import java.util.Locale
-
-import io.pm.finlight.data.db.dao.DeletedSmsHashDao
-import io.pm.finlight.data.db.dao.MergeRecordDao
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.db.dao.TransactionReimbursementDao
@@ -27,46 +23,17 @@ class TransactionRepository(
     private val transactionQueryDao: TransactionQueryDao,
     private val transactionAnalyticsDao: TransactionAnalyticsDao,
     private val transactionReimbursementDao: TransactionReimbursementDao,
-    private val settingsRepository: SettingsRepository,
-    private val tagRepository: TagRepository,
     private val db: AppDatabase,
 ) {
-    @Deprecated("Use domain DAO constructor without deletedSmsHashDao/mergeRecordDao", level = DeprecationLevel.WARNING)
-    constructor(
-        transactionWriteDao: TransactionWriteDao,
-        transactionQueryDao: TransactionQueryDao,
-        transactionAnalyticsDao: TransactionAnalyticsDao,
-        transactionReimbursementDao: TransactionReimbursementDao,
-        settingsRepository: SettingsRepository,
-        tagRepository: TagRepository,
-        deletedSmsHashDao: DeletedSmsHashDao,
-        mergeRecordDao: MergeRecordDao,
-        db: AppDatabase,
-    ) : this(
-        transactionWriteDao = transactionWriteDao,
-        transactionQueryDao = transactionQueryDao,
-        transactionAnalyticsDao = transactionAnalyticsDao,
-        transactionReimbursementDao = transactionReimbursementDao,
-        settingsRepository = settingsRepository,
-        tagRepository = tagRepository,
-        db = db,
-    )
-
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
         transactionDao: TransactionDao,
-        settingsRepository: SettingsRepository,
-        tagRepository: TagRepository,
-        deletedSmsHashDao: DeletedSmsHashDao,
-        mergeRecordDao: MergeRecordDao,
         db: AppDatabase,
     ) : this(
         transactionWriteDao = transactionDao,
         transactionQueryDao = transactionDao,
         transactionAnalyticsDao = transactionDao,
         transactionReimbursementDao = transactionDao,
-        settingsRepository = settingsRepository,
-        tagRepository = tagRepository,
         db = db,
     )
 
@@ -298,28 +265,14 @@ class TransactionRepository(
         }
     }
 
-    private suspend fun getFinalTagsForTransaction(
-        transaction: Transaction,
-        initialTags: Set<Tag>,
-    ): Set<Tag> {
-        val finalTags = initialTags.toMutableSet()
-        val travelSettings = settingsRepository.getTravelModeSettings().first()
-        if (travelSettings?.isEnabled == true && transaction.date >= travelSettings.startDate && transaction.date <= travelSettings.endDate) {
-            val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
-            finalTags.add(tripTag)
-        }
-        return finalTags
-    }
-
     suspend fun insertTransactionWithTags(
         transaction: Transaction,
         tags: Set<Tag>,
     ): Long {
-        val finalTags = getFinalTagsForTransaction(transaction, tags)
         val transactionId = transactionWriteDao.insert(transaction)
-        if (finalTags.isNotEmpty()) {
+        if (tags.isNotEmpty()) {
             val crossRefs =
-                finalTags.map { tag ->
+                tags.map { tag ->
                     TransactionTagCrossRef(transactionId = transactionId.toInt(), tagId = tag.id)
                 }
             transactionWriteDao.addTagsToTransaction(crossRefs)
@@ -331,12 +284,11 @@ class TransactionRepository(
         transaction: Transaction,
         tags: Set<Tag>,
     ) {
-        val finalTags = getFinalTagsForTransaction(transaction, tags)
         transactionWriteDao.update(transaction)
         transactionWriteDao.clearTagsForTransaction(transaction.id)
-        if (finalTags.isNotEmpty()) {
+        if (tags.isNotEmpty()) {
             val crossRefs =
-                finalTags.map { tag ->
+                tags.map { tag ->
                     TransactionTagCrossRef(transactionId = transaction.id, tagId = tag.id)
                 }
             transactionWriteDao.addTagsToTransaction(crossRefs)
@@ -348,11 +300,10 @@ class TransactionRepository(
         tags: Set<Tag>,
         imagePaths: List<String>,
     ): Long {
-        val finalTags = getFinalTagsForTransaction(transaction, tags)
         val newTransactionId = transactionWriteDao.insert(transaction)
-        if (finalTags.isNotEmpty()) {
+        if (tags.isNotEmpty()) {
             val crossRefs =
-                finalTags.map { tag ->
+                tags.map { tag ->
                     TransactionTagCrossRef(transactionId = newTransactionId.toInt(), tagId = tag.id)
                 }
             transactionWriteDao.addTagsToTransaction(crossRefs)

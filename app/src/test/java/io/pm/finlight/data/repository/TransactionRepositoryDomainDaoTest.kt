@@ -5,8 +5,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.DeletedSmsHashDao
-import io.pm.finlight.data.db.dao.MergeRecordDao
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.db.dao.TransactionReimbursementDao
@@ -31,17 +29,12 @@ class TransactionRepositoryDomainDaoTest {
     private val queryDao: TransactionQueryDao = mockk(relaxed = true)
     private val analyticsDao: TransactionAnalyticsDao = mockk(relaxed = true)
     private val reimbursementDao: TransactionReimbursementDao = mockk(relaxed = true)
-    private val settingsRepository: SettingsRepository = mockk(relaxed = true)
-    private val tagRepository: TagRepository = mockk(relaxed = true)
-    private val deletedSmsHashDao: DeletedSmsHashDao = mockk(relaxed = true)
-    private val mergeRecordDao: MergeRecordDao = mockk(relaxed = true)
     private val db: AppDatabase = mockk(relaxed = true)
 
     private lateinit var repository: TransactionRepository
 
     @Before
     fun setup() {
-        coEvery { settingsRepository.getTravelModeSettings() } returns flowOf(null)
         every { queryDao.getAllTransactions() } returns flowOf(emptyList())
 
         repository =
@@ -50,8 +43,6 @@ class TransactionRepositoryDomainDaoTest {
                 transactionQueryDao = queryDao,
                 transactionAnalyticsDao = analyticsDao,
                 transactionReimbursementDao = reimbursementDao,
-                settingsRepository = settingsRepository,
-                tagRepository = tagRepository,
                 db = db,
             )
     }
@@ -74,7 +65,7 @@ class TransactionRepositoryDomainDaoTest {
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
-                    source = "Manual"
+                    source = "Manual",
                 )
             coEvery { writeDao.insert(any()) } returns 10L
 

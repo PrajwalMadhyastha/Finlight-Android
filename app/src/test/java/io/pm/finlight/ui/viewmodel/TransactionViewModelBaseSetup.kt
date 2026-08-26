@@ -148,6 +148,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
     }
 
     protected fun initializeViewModel() {
+        val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(settingsRepository, tagRepository)
         viewModel =
             TransactionViewModel(
                 application = applicationContext,
@@ -163,6 +164,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
                 merchantMappingRepository = merchantMappingRepository,
                 splitTransactionRepository = splitTransactionRepository,
                 smsParseTemplateDao = smsParseTemplateDao,
+                resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
             )
     }

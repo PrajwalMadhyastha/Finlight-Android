@@ -1,10 +1,13 @@
 package io.pm.finlight.domain.usecase
 
+import io.pm.finlight.BudgetSettingsRepository
 import io.pm.finlight.CalendarDayStatus
 import io.pm.finlight.DailyTotal
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SpendingStatus
-import io.pm.finlight.TransactionRepository
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -13,33 +16,48 @@ import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToLong
 
+/**
+ * UseCase to generate the consistency calendar/heatmap data for a single month.
+ * Combines monthly budget settings from [BudgetSettingsRepository] with
+ * daily spending totals from [TransactionAnalyticsDao] and first transaction date from [TransactionQueryDao].
+ */
 class GetMonthlyConsistencyDataUseCase(
-    private val settingsRepository: SettingsRepository,
-    private val transactionRepository: TransactionRepository,
+    private val budgetProvider: (year: Int, month: Int) -> Flow<Float?>,
+    private val transactionAnalyticsDao: TransactionAnalyticsDao,
+    private val transactionQueryDao: TransactionQueryDao,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    /**
-     * Helper to check if cal1 is on a day *before* cal2, ignoring time.
-     */
-    private fun isBeforeDay(
-        cal1: Calendar,
-        cal2: Calendar,
-    ): Boolean {
-        return cal1.get(Calendar.YEAR) < cal2.get(Calendar.YEAR) ||
-            (
-                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-                    cal1.get(Calendar.DAY_OF_YEAR) < cal2.get(Calendar.DAY_OF_YEAR)
-            )
-    }
+    constructor(
+        budgetSettingsRepository: BudgetSettingsRepository,
+        transactionAnalyticsDao: TransactionAnalyticsDao,
+        transactionQueryDao: TransactionQueryDao,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    ) : this(
+        budgetProvider = { year, month -> budgetSettingsRepository.getOverallBudgetForMonth(year, month) },
+        transactionAnalyticsDao = transactionAnalyticsDao,
+        transactionQueryDao = transactionQueryDao,
+        dispatcher = dispatcher,
+    )
+
+    constructor(
+        settingsRepository: SettingsRepository,
+        transactionAnalyticsDao: TransactionAnalyticsDao,
+        transactionQueryDao: TransactionQueryDao,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    ) : this(
+        budgetProvider = { year, month -> settingsRepository.getOverallBudgetForMonth(year, month) },
+        transactionAnalyticsDao = transactionAnalyticsDao,
+        transactionQueryDao = transactionQueryDao,
+        dispatcher = dispatcher,
+    )
 
     /**
-     * Generates the consistency data for a single month, based on that month's budget.
-     * This is the single source of truth for all heatmap/calendar logic.
+     * Generates consistency data for the given [year] and [month] (1-12).
      */
     operator fun invoke(
         year: Int,
         month: Int,
     ): Flow<List<CalendarDayStatus>> {
-        // Calculate start and end of the given month
         val monthStartCal =
             Calendar.getInstance().apply {
                 set(Calendar.YEAR, year)
@@ -57,11 +75,10 @@ class GetMonthlyConsistencyDataUseCase(
             }
         val daysInMonth = monthStartCal.getActualMaximum(Calendar.DAY_OF_MONTH)
 
-        // Combine the three flows: budget, daily spending, first transaction date
         return combine(
-            settingsRepository.getOverallBudgetForMonth(year, month),
-            transactionRepository.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
-            transactionRepository.getFirstTransactionDate(),
+            budgetProvider(year, month),
+            transactionAnalyticsDao.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
+            transactionQueryDao.getFirstTransactionDate(),
         ) { budget: Float?, dailyTotals: List<DailyTotal>, firstTransactionDate: Long? ->
             val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
             val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
@@ -79,7 +96,6 @@ class GetMonthlyConsistencyDataUseCase(
                     if (dayIterator.after(today) || (firstDataCal != null && isBeforeDay(dayIterator, firstDataCal))) {
                         resultList.add(CalendarDayStatus(date, SpendingStatus.NO_DATA, 0L, 0L))
                     } else {
-                        // Any past day with NO BUDGET is NO_DATA, even if there was no spending.
                         val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
                         val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
                         val status = SpendingStatus.NO_DATA
@@ -87,7 +103,7 @@ class GetMonthlyConsistencyDataUseCase(
                     }
                 }
             } else {
-                // CASE 2: A BUDGET IS SET (e.g., 0f or 145000f)
+                // CASE 2: A BUDGET IS SET (e.g., 0f or positive)
                 var cumulativeSpending = 0.0
                 val totalBudget = budget.toDouble()
 
@@ -110,17 +126,28 @@ class GetMonthlyConsistencyDataUseCase(
 
                     val status =
                         when {
-                            amountSpentLong == 0L && safeToSpend == 0L -> SpendingStatus.WITHIN_LIMIT // Met 0 budget (blue)
-                            amountSpentLong == 0L && safeToSpend > 0L -> SpendingStatus.NO_SPEND // No spend on a day with a budget (green)
-                            amountSpentLong > 0L && safeToSpend == 0L -> SpendingStatus.OVER_LIMIT // Spent > 0 on a 0 budget (red)
-                            amountSpentLong > safeToSpend -> SpendingStatus.OVER_LIMIT // Spent > budget (red)
-                            else -> SpendingStatus.WITHIN_LIMIT // Spent <= budget (and not 0) (blue)
+                            amountSpentLong == 0L && safeToSpend == 0L -> SpendingStatus.WITHIN_LIMIT
+                            amountSpentLong == 0L && safeToSpend > 0L -> SpendingStatus.NO_SPEND
+                            amountSpentLong > 0L && safeToSpend == 0L -> SpendingStatus.OVER_LIMIT
+                            amountSpentLong > safeToSpend -> SpendingStatus.OVER_LIMIT
+                            else -> SpendingStatus.WITHIN_LIMIT
                         }
                     resultList.add(CalendarDayStatus(date, status, amountSpentLong, safeToSpend))
                     cumulativeSpending += amountSpent
                 }
             }
             resultList
-        }.flowOn(Dispatchers.Default)
+        }.flowOn(dispatcher)
+    }
+
+    private fun isBeforeDay(
+        cal1: Calendar,
+        cal2: Calendar,
+    ): Boolean {
+        return cal1.get(Calendar.YEAR) < cal2.get(Calendar.YEAR) ||
+            (
+                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+                    cal1.get(Calendar.DAY_OF_YEAR) < cal2.get(Calendar.DAY_OF_YEAR)
+            )
     }
 }

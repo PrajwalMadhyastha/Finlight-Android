@@ -4,11 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.TransactionRepository
-import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TagRepository
 import io.pm.finlight.SmsRepository
+import io.pm.finlight.TransactionRepository
+import io.pm.finlight.data.db.AppDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -16,7 +14,7 @@ import kotlinx.coroutines.launch
 class MergeActionReceiver : BroadcastReceiver() {
     override fun onReceive(
         context: Context,
-        intent: Intent
+        intent: Intent,
     ) {
         val action = intent.action ?: return
         val parentTxnId = intent.getIntExtra("parentTxnId", -1)
@@ -30,8 +28,6 @@ class MergeActionReceiver : BroadcastReceiver() {
                 transactionQueryDao = db.transactionQueryDao(),
                 transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 transactionReimbursementDao = db.transactionReimbursementDao(),
-                settingsRepository = SettingsRepository(context),
-                tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao()),
                 db = db,
             )
         val mergeTransactionsUseCase =

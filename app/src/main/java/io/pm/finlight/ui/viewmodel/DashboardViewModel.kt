@@ -23,6 +23,7 @@ package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.DateUtils
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
@@ -35,7 +36,6 @@ import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToLong
 
-import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 
 data class ConsistencyStats(val goodDays: Int, val badDays: Int, val noSpendDays: Int, val noDataDays: Int)
@@ -56,9 +56,7 @@ class DashboardViewModel(
     private val timeProvider: TimeProvider,
     private val recurringTransactionDao: RecurringTransactionDao,
     private val recurringPatternDao: RecurringPatternDao,
-    private val smsRepository: SmsRepository,
-    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
-        GetMonthlyConsistencyDataUseCase(settingsRepository, transactionRepository),
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
     private val mergeTransactionsUseCase: MergeTransactionsUseCase,
 ) : ViewModel() {
     val userName: StateFlow<String>

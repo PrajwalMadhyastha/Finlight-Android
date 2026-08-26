@@ -58,6 +58,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
         every { db.accountDao() } returns accountDao
         every { db.accountAliasDao() } returns accountAliasDao
         every { db.transactionWriteDao() } returns transactionWriteDao
+        every { db.transactionQueryDao() } returns mockk(relaxed = true)
         every { db.tagDao() } returns tagDao
         every { db.merchantRenameRuleDao() } returns merchantRenameRuleDao
         every { db.merchantCategoryMappingDao() } returns merchantCategoryMappingDao
@@ -66,7 +67,9 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
         every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(null)
         every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
 
-        saver = SmsTransactionSaver(db, SettingsRepository(context))
+        val tagRepository = TagRepository(tagDao, db.transactionQueryDao())
+        val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(SettingsRepository(context), tagRepository)
+        saver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)
     }
 
     @After

@@ -1,12 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModelFactory.kt
-// REASON: REFACTOR (Testing) - The factory has been updated to instantiate all
-// necessary repository dependencies and inject them into the SettingsViewModel's
-// constructor, supporting the new dependency injection pattern.
-// REASON: FEATURE (SMS Import) - The factory now instantiates and injects the
-// SmsClassifier into the SettingsViewModel. This is a critical step to allow the
-// bulk importer to use the ML model for pre-filtering non-transactional messages.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -17,7 +8,6 @@ import io.pm.finlight.CategoryRepository
 import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsRepository
-import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.RoomTransactionRunner
@@ -33,15 +23,12 @@ class SettingsViewModelFactory(
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = SettingsRepository(application)
-            val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
             val transactionRepository =
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    settingsRepository = settingsRepository,
-                    tagRepository = tagRepository,
                     db = db,
                 )
             val merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())

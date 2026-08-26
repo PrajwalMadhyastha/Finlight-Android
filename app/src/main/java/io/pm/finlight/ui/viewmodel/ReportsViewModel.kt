@@ -17,6 +17,7 @@ import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.Dispatchers
@@ -26,8 +27,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
-
-import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 
 /**
  * Enum to manage the state of the view toggle on the reports screen.
@@ -41,9 +40,7 @@ enum class ReportViewType {
 class ReportsViewModel(
     private val transactionRepository: TransactionRepository,
     private val categoryDao: CategoryDao,
-    private val settingsRepository: SettingsRepository,
-    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
-        GetMonthlyConsistencyDataUseCase(settingsRepository, transactionRepository),
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
 ) : ViewModel() {
     val allCategories: StateFlow<List<Category>>
 

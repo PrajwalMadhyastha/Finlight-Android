@@ -58,9 +58,6 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     private lateinit var recurringPatternDao: RecurringPatternDao
 
     @Mock
-    private lateinit var smsRepository: SmsRepository
-
-    @Mock
     private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 
     @Mock
@@ -164,7 +161,6 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 timeProvider = timeProvider,
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
-                smsRepository = smsRepository,
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
             )
@@ -181,7 +177,6 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 timeProvider = timeProvider,
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
-                smsRepository = smsRepository,
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
             )

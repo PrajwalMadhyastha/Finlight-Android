@@ -1,10 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/LinkTransactionViewModelFactory.kt
-// REASON: REFACTOR (Testing) - The factory has been updated to instantiate all
-// necessary repository dependencies (TransactionRepository, RecurringTransactionDao)
-// and inject them into the LinkTransactionViewModel's constructor, supporting the new
-// dependency injection pattern required for unit testing.
-// =================================================================================
 package io.pm.finlight
 
 import android.app.Application
@@ -20,16 +13,12 @@ class LinkTransactionViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LinkTransactionViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
-            val settingsRepository = SettingsRepository(application)
-            val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
             val transactionRepository =
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    settingsRepository = settingsRepository,
-                    tagRepository = tagRepository,
                     db = db,
                 )
             val recurringTransactionDao = db.recurringTransactionDao()
