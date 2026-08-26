@@ -4,9 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.TransactionRepository
 import io.pm.finlight.SmsRepository
+import io.pm.finlight.TransactionRepository
+import io.pm.finlight.data.db.AppDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 class MergeActionReceiver : BroadcastReceiver() {
     override fun onReceive(
         context: Context,
-        intent: Intent
+        intent: Intent,
     ) {
         val action = intent.action ?: return
         val parentTxnId = intent.getIntExtra("parentTxnId", -1)
@@ -28,8 +28,15 @@ class MergeActionReceiver : BroadcastReceiver() {
                 transactionQueryDao = db.transactionQueryDao(),
                 transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 transactionReimbursementDao = db.transactionReimbursementDao(),
-                deletedSmsHashDao = db.deletedSmsHashDao(),
+                db = db,
+            )
+        val mergeTransactionsUseCase =
+            io.pm.finlight.domain.usecase.MergeTransactionsUseCase(
+                transactionQueryDao = db.transactionQueryDao(),
+                transactionWriteDao = db.transactionWriteDao(),
+                transactionReimbursementDao = db.transactionReimbursementDao(),
                 mergeRecordDao = db.mergeRecordDao(),
+                deletedSmsHashDao = db.deletedSmsHashDao(),
                 db = db,
             )
 
@@ -46,7 +53,7 @@ class MergeActionReceiver : BroadcastReceiver() {
                         childSmsDate = sms.date
                     }
                 }
-                transactionRepository.mergeTransactions(parentTxnId, childTxnId, childSmsBody, childSmsDate)
+                mergeTransactionsUseCase(parentTxnId, childTxnId, childSmsBody, childSmsDate)
             } else if (action == "ACTION_DISMISS" && childTxnId != -1) {
                 transactionRepository.dismissMerge(childTxnId)
             }

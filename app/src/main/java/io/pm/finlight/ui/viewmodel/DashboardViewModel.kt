@@ -36,6 +36,8 @@ import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToLong
 
+import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+
 data class ConsistencyStats(val goodDays: Int, val badDays: Int, val noSpendDays: Int, val noDataDays: Int)
 
 data class LastMonthSummary(
@@ -54,8 +56,8 @@ class DashboardViewModel(
     private val timeProvider: TimeProvider,
     private val recurringTransactionDao: RecurringTransactionDao,
     private val recurringPatternDao: RecurringPatternDao,
-    private val smsRepository: SmsRepository,
     private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
+    private val mergeTransactionsUseCase: MergeTransactionsUseCase,
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
@@ -503,10 +505,10 @@ class DashboardViewModel(
 
     fun executeMerge(
         parentTxnId: Int,
-        childTxnIds: List<Int>
+        childTxnIds: List<Int>,
     ) {
         viewModelScope.launch {
-            transactionRepository.manualMergeTransactions(parentTxnId, childTxnIds)
+            mergeTransactionsUseCase.manualMerge(parentTxnId, childTxnIds)
         }
     }
 }

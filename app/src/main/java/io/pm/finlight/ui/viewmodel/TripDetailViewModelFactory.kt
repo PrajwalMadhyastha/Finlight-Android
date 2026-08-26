@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/TripDetailViewModelFactory.kt
-// REASON: REFACTOR (Testing) - The factory has been updated to instantiate all
-// necessary repository dependencies and inject them into the TripDetailViewModel's
-// constructor, supporting the new dependency injection pattern.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -28,8 +22,6 @@ class TripDetailViewModelFactory(
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
 

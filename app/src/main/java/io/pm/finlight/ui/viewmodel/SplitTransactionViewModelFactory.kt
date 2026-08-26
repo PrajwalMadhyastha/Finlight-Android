@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SplitTransactionViewModelFactory.kt
-// REASON: REFACTOR (Testing) - The factory now instantiates and provides all
-// required repository dependencies to the SplitTransactionViewModel's constructor,
-// supporting the new dependency injection pattern.
-// =================================================================================
 package io.pm.finlight
 
 import android.app.Application
@@ -24,8 +18,6 @@ class SplitTransactionViewModelFactory(
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
             val categoryRepository = CategoryRepository(db.categoryDao())

@@ -1,11 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/IncomeViewModelFactory.kt
-// REASON: NEW FILE - This factory provides all necessary repository dependencies
-// to the IncomeViewModel, enabling constructor injection for better testability.
-//
-// REASON: MODIFIED - Injected SettingsRepository to allow the ViewModel to
-// observe the Privacy Mode state.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -25,8 +17,6 @@ class IncomeViewModelFactory(private val application: Application) : ViewModelPr
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
             val accountRepository = AccountRepository(db)
@@ -37,7 +27,6 @@ class IncomeViewModelFactory(private val application: Application) : ViewModelPr
                 transactionRepository,
                 accountRepository,
                 categoryRepository,
-                // --- NEW: Pass SettingsRepository
                 settingsRepository,
             ) as T
         }

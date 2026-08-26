@@ -1,10 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/CategoryViewModelFactory.kt
-// REASON: NEW FILE - This factory handles the creation of CategoryViewModel
-// for the main application. It instantiates all necessary repository dependencies
-// and injects them into the ViewModel's constructor. This supports the
-// dependency injection pattern required for unit testing.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -25,8 +18,6 @@ class CategoryViewModelFactory(private val application: Application) : ViewModel
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
 

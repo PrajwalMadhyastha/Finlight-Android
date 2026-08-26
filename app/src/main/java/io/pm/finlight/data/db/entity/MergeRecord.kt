@@ -7,9 +7,19 @@ import androidx.room.PrimaryKey
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionType
 
+enum class MergeType {
+    AUTO,
+    MANUAL;
+
+    companion object {
+        fun fromString(value: String): MergeType =
+            entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: AUTO
+    }
+}
+
 /**
  * Snapshots the pre-merge state of the parent transaction and the full child
- * transaction data at the moment [mergeTransactions] is called.
+ * transaction data at the moment [MergeTransactionsUseCase] is called.
  *
  * Purpose: Allow the user to fully reverse an accidental merge at any time by
  * restoring the parent to its original state and re-inserting the child.
@@ -48,7 +58,7 @@ data class MergeRecord(
     /**
      * "AUTO" for SMS-triggered automatic merges, "MANUAL" for user-initiated merges.
      */
-    val mergeType: String = "AUTO",
+    val mergeType: MergeType = MergeType.AUTO,
     // ─── Parent snapshot ─────────────────────────────────────────────────────
     // The values the PARENT had immediately BEFORE the merge occurred.
     // Needed to restore the parent if the user requests an unmerge.

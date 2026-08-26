@@ -4,6 +4,8 @@ import androidx.room.TypeConverter
 import io.pm.finlight.TransactionStatus
 import io.pm.finlight.TransactionType
 
+import io.pm.finlight.data.db.entity.MergeType
+
 class Converters {
     @TypeConverter
     fun fromTransactionType(value: TransactionType): String = value.dbValue
@@ -18,4 +20,11 @@ class Converters {
     @TypeConverter
     fun toTransactionStatus(value: String): TransactionStatus =
         TransactionStatus.fromString(value)
+
+    @TypeConverter
+    fun fromMergeType(value: MergeType): String = value.name
+
+    @TypeConverter
+    fun toMergeType(value: String): MergeType =
+        MergeType.fromString(value)
 }

@@ -317,7 +317,7 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
             whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getReimbursementsForExpense(1)).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getTransactionCountForMerchant(anyOrNull())).thenReturn(flowOf(0))
-            whenever(transactionRepository.getMergedTransactionBreakdown(1)).thenReturn(breakdown)
+            whenever(mergeTransactionsUseCase.getMergedTransactionBreakdown(1)).thenReturn(breakdown)
             initializeViewModel()
 
             // Act

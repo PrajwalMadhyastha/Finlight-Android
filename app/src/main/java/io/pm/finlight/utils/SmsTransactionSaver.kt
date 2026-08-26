@@ -60,8 +60,6 @@ class SmsTransactionSaver(
                 transactionQueryDao = db.transactionQueryDao(),
                 transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 transactionReimbursementDao = db.transactionReimbursementDao(),
-                deletedSmsHashDao = db.deletedSmsHashDao(),
-                mergeRecordDao = db.mergeRecordDao(),
                 db = db,
             )
 

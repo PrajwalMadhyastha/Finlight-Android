@@ -1,10 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/HistoricTripsViewModelFactory.kt
-// REASON: REFACTOR (Testing) - The factory has been updated to instantiate all
-// necessary repository dependencies (TripRepository, TransactionRepository) and
-// inject them into the HistoricTripsViewModel's constructor, supporting the new
-// dependency injection pattern required for unit testing.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -27,8 +20,6 @@ class HistoricTripsViewModelFactory(
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
 

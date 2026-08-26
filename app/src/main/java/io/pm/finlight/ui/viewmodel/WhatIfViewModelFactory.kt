@@ -17,8 +17,6 @@ class WhatIfViewModelFactory(private val application: Application) : ViewModelPr
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
 
@@ -26,7 +24,7 @@ class WhatIfViewModelFactory(private val application: Application) : ViewModelPr
             return WhatIfViewModel(
                 transactionRepository = transactionRepository,
                 settingsRepository = settingsRepository,
-                timeProvider = SystemTimeProvider()
+                timeProvider = SystemTimeProvider(),
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

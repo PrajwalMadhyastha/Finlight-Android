@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/ReportsViewModelFactory.kt
-// REASON: REFACTOR (Testing) - The factory has been updated to provide the
-// ReportsViewModel with its required repository and DAO dependencies, enabling
-// constructor injection for better testability.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -32,8 +26,6 @@ class ReportsViewModelFactory(private val application: Application) : ViewModelP
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
 

@@ -1,11 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/TimePeriodReportViewModelFactory.kt
-// REASON: REFACTOR (Consistency) - The factory now instantiates and injects the
-// `TransactionRepository` into the `TimePeriodReportViewModel`, replacing the
-// direct DAO/SettingsRepo injection. This aligns it with the app's standard
-// dependency injection pattern and provides access to the new centralized
-// consistency logic.
-// =================================================================================
 package io.pm.finlight
 
 import android.app.Application
@@ -19,13 +11,11 @@ class TimePeriodReportViewModelFactory(
     private val application: Application,
     private val timePeriod: TimePeriod,
     private val initialDateMillis: Long?,
-    // --- NEW: Add parameter
     private val showPreviousMonth: Boolean,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TimePeriodReportViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
-            // --- NEW: Instantiate all repositories ---
             val settingsRepository = SettingsRepository(application)
             val getMonthlyConsistencyDataUseCase =
                 GetMonthlyConsistencyDataUseCase(
@@ -39,8 +29,6 @@ class TimePeriodReportViewModelFactory(
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
 

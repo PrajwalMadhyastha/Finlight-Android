@@ -18,6 +18,7 @@ import io.pm.finlight.core.utils.StringSimilarity
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.data.model.MergedTransactionItem
+import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
@@ -117,6 +118,15 @@ class TransactionViewModel(
     private val splitTransactionRepository: SplitTransactionRepository,
     private val smsParseTemplateDao: SmsParseTemplateDao,
     private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
+    private val mergeTransactionsUseCase: MergeTransactionsUseCase =
+        MergeTransactionsUseCase(
+            transactionQueryDao = db.transactionQueryDao(),
+            transactionWriteDao = db.transactionWriteDao(),
+            transactionReimbursementDao = db.transactionReimbursementDao(),
+            mergeRecordDao = db.mergeRecordDao(),
+            deletedSmsHashDao = db.deletedSmsHashDao(),
+            db = db,
+        ),
 ) : AndroidViewModel(application) {
     private val context = application
 
@@ -600,7 +610,7 @@ class TransactionViewModel(
         // unmerge (navigation pops back), so a Flow is unnecessary.
         viewModelScope.launch(Dispatchers.IO) {
             _mergedTransactionBreakdown.value =
-                transactionRepository.getMergedTransactionBreakdown(transactionId)
+                mergeTransactionsUseCase.getMergedTransactionBreakdown(transactionId)
         }
     }
 
@@ -677,7 +687,7 @@ class TransactionViewModel(
             val childIds = selectedIds.filter { it != anchorId }
 
             try {
-                transactionRepository.manualMergeTransactions(anchorId, childIds)
+                mergeTransactionsUseCase.manualMerge(anchorId, childIds)
                 _uiEvent.send("Successfully merged ${selectedIds.size} transactions.")
                 dismissReviewMergeSheet()
                 clearSelectionMode()
@@ -2127,7 +2137,7 @@ class TransactionViewModel(
      * The UI collects this to decide whether to show the "Unmerge" option.
      */
     fun observeMergeRecord(parentTxnId: Int) =
-        transactionRepository.observeMergeRecord(parentTxnId)
+        mergeTransactionsUseCase.observeMergeRecord(parentTxnId)
 
     /**
      * Fully reverses the most recent merge for [parentTxnId].
@@ -2137,7 +2147,7 @@ class TransactionViewModel(
     fun unmergeTransaction(parentTxnId: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                transactionRepository.unmergeTransactions(parentTxnId)
+                mergeTransactionsUseCase.unmerge(parentTxnId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to unmerge transaction $parentTxnId", e)
                 _uiEvent.send("Failed to unmerge. Please try again.")

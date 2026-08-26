@@ -57,6 +57,8 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
 
     @Mock protected lateinit var smsParseTemplateDao: SmsParseTemplateDao
 
+    @Mock protected lateinit var mergeTransactionsUseCase: io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+
     // Mocks for DAOs used by the ViewModel and internal logic
     @Mock protected lateinit var accountDao: AccountDao
 
@@ -163,6 +165,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
                 splitTransactionRepository = splitTransactionRepository,
                 smsParseTemplateDao = smsParseTemplateDao,
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
             )
     }
 }

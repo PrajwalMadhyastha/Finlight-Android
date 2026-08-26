@@ -58,10 +58,10 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     private lateinit var recurringPatternDao: RecurringPatternDao
 
     @Mock
-    private lateinit var smsRepository: SmsRepository
+    private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 
     @Mock
-    private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+    private lateinit var mergeTransactionsUseCase: io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 
     protected lateinit var viewModel: DashboardViewModel
 
@@ -161,8 +161,8 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 timeProvider = timeProvider,
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
-                smsRepository = smsRepository,
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
             )
     }
 
@@ -177,8 +177,8 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 timeProvider = timeProvider,
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
-                smsRepository = smsRepository,
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
             )
     }
 
@@ -873,7 +873,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             viewModel.executeMerge(1, listOf(2))
             advanceUntilIdle()
 
-            verify(transactionRepository).manualMergeTransactions(1, listOf(2))
+            verify(mergeTransactionsUseCase).manualMerge(1, listOf(2))
         }
 
     @Test

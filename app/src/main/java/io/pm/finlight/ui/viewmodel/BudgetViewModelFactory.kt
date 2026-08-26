@@ -1,14 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/BudgetViewModelFactory.kt
-// REASON: NEW FILE - This factory handles the creation of BudgetViewModel for
-// the main application. It instantiates the necessary repositories and injects
-// them into the ViewModel's constructor, decoupling the ViewModel from direct
-// database initialization and enabling easier testing.
-//
-// REASON: REFACTOR (Dynamic Budget) - The factory is updated to inject the
-// `TransactionRepository`. This is now required by the `BudgetViewModel` to
-// fetch the `monthlySummaries` needed for the new month navigation header.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -34,8 +23,6 @@ class BudgetViewModelFactory(private val application: Application) : ViewModelPr
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
 
@@ -44,7 +31,6 @@ class BudgetViewModelFactory(private val application: Application) : ViewModelPr
                 budgetRepository,
                 settingsRepository,
                 categoryRepository,
-                // --- NEW: Pass repository to ViewModel ---
                 transactionRepository,
             ) as T
         }

@@ -59,7 +59,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionQueryDao.getFirstTransactionDate()).thenReturn(flowOf(0L))
 
-        // --- NEW: Mock the new repository dependency ---
+        // --- NEW: Mock the new repository/usecase dependency ---
         `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
         // --- FIX: Mock settingsRepository flows to avoid null upstream issue ---
@@ -317,7 +317,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             `when`(transactionQueryDao.getFirstTransactionDate()).thenReturn(flowOf(firstDayOfMonth)) // Mock this for legacy code paths
 
             // Act
-            // --- FIX: Pass transactionRepository ---
+            // --- FIX: Pass transactionRepository and getMonthlyConsistencyDataUseCase ---
             val viewModel =
                 TimePeriodReportViewModel(
                     transactionQueryDao = transactionQueryDao,

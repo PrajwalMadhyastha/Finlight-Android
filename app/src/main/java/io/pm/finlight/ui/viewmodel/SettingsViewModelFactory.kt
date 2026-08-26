@@ -1,12 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SettingsViewModelFactory.kt
-// REASON: REFACTOR (Testing) - The factory has been updated to instantiate all
-// necessary repository dependencies and inject them into the SettingsViewModel's
-// constructor, supporting the new dependency injection pattern.
-// REASON: FEATURE (SMS Import) - The factory now instantiates and injects the
-// SmsClassifier into the SettingsViewModel. This is a critical step to allow the
-// bulk importer to use the ML model for pre-filtering non-transactional messages.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -38,8 +29,6 @@ class SettingsViewModelFactory(
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
             val merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
