@@ -91,14 +91,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isAppLockEnabledBlocking works`() =
-        runTest {
-            assertEquals(false, repository.isAppLockEnabledBlocking())
-            repository.saveAppLockEnabled(true)
-            assertEquals(true, repository.isAppLockEnabledBlocking())
-        }
-
-    @Test
     fun `save and get home currency`() =
         runTest {
             val testCurrency = "USD"
@@ -343,8 +335,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(false, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            // Test blocking getter
-            assertEquals(false, repository.isUnknownTransactionPopupEnabledBlocking())
         }
 
     @Test
@@ -384,24 +374,30 @@ class SettingsRepositoryTest : BaseViewModelTest() {
     @Test
     fun `first launch flag is managed correctly in internal prefs`() =
         runTest {
-            // Initial state
-            assertFalse(repository.isFirstLaunchCompleteBlocking())
+            repository.getIsFirstLaunchComplete().test {
+                // Initial state
+                assertFalse(awaitItem())
 
-            // Set the flag
-            repository.setFirstLaunchComplete()
+                // Set the flag
+                repository.setFirstLaunchComplete()
 
-            // Verify
-            assertTrue(repository.isFirstLaunchCompleteBlocking())
+                // Verify
+                assertTrue(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 
     @Test
     fun `last month summary dismissal is stored and checked correctly`() =
         runTest {
-            assertFalse(repository.hasLastMonthSummaryBeenDismissed(), "Should not be dismissed initially")
+            repository.hasLastMonthSummaryBeenDismissed().test {
+                assertFalse(awaitItem(), "Should not be dismissed initially")
 
-            repository.setLastMonthSummaryDismissed()
+                repository.setLastMonthSummaryDismissed()
 
-            assertTrue(repository.hasLastMonthSummaryBeenDismissed(), "Should be dismissed after setting")
+                assertTrue(awaitItem(), "Should be dismissed after setting")
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 
     // --- Tests for Budget Carry-over Logic ---
@@ -413,7 +409,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                 assertNull(awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            assertNull(repository.getOverallBudgetForMonthBlocking(2025, 10))
         }
 
     @Test
@@ -426,7 +421,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(budget, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            assertEquals(budget, repository.getOverallBudgetForMonthBlocking(2025, 10))
         }
 
     @Test
@@ -441,7 +435,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(budget, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            assertEquals(budget, repository.getOverallBudgetForMonthBlocking(2025, 10))
         }
 
     @Test
@@ -456,7 +449,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(budget, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            assertEquals(budget, repository.getOverallBudgetForMonthBlocking(2025, 10))
         }
 
     @Test
@@ -474,7 +466,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(currentBudget, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            assertEquals(currentBudget, repository.getOverallBudgetForMonthBlocking(2025, 10))
         }
 
     @Test
@@ -527,14 +518,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isGoalNudgesEnabledBlocking works correctly`() =
-        runTest {
-            assertTrue(repository.isGoalNudgesEnabledBlocking()) // Default
-            repository.saveGoalNudgesEnabled(false)
-            assertFalse(repository.isGoalNudgesEnabledBlocking())
-        }
-
-    @Test
     fun `toggle and get excluded income months`() =
         runTest {
             repository.getExcludedIncomeMonths().test {
@@ -577,3 +560,4 @@ class SettingsRepositoryTest : BaseViewModelTest() {
             assertEquals(12345, repository.getIgnoreRulesChecksum())
         }
 }
+

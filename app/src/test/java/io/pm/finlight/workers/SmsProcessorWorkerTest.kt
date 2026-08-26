@@ -136,7 +136,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         mockkConstructor(SettingsRepository::class)
         every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(null)
         every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
-        every { anyConstructed<SettingsRepository>().isAutoCaptureNotificationEnabledBlocking() } returns false
+        every { anyConstructed<SettingsRepository>().getAutoCaptureNotificationEnabled() } returns flowOf(false)
 
         mockClassifier = mockk(relaxed = true)
         mockNerExtractor = mockk(relaxed = true)
@@ -345,7 +345,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     @Test
     fun `auto-capture notification is enqueued when enabled`() =
         runTest {
-            every { anyConstructed<SettingsRepository>().isAutoCaptureNotificationEnabledBlocking() } returns true
+            every { anyConstructed<SettingsRepository>().getAutoCaptureNotificationEnabled() } returns flowOf(true)
             val txn =
                 PotentialTransaction(
                     sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 10.0,

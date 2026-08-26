@@ -12,6 +12,7 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import java.io.File
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -27,15 +28,15 @@ open class SecurityManager(private val context: Context) {
     companion object {
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         internal const val KEY_ALIAS = "finlight_db_key" // Made internal for test access
-        private const val PREFS_NAME = "finlight_secure_prefs"
+        private const val LEGACY_PREFS_NAME = "finlight_secure_prefs"
         private const val PREF_ENCRYPTED_PASSPHRASE = "db_passphrase"
+        private const val SECURE_STORAGE_FILE = "finlight_secure.dat"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
     }
 
     internal open val keyStoreProvider: String = ANDROID_KEYSTORE
     internal open val protectionParameter: KeyStore.ProtectionParameter? = null
     private val keyStore: KeyStore by lazy { getKeyStore() }
-    private val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     /**
      * Retrieves the database passphrase. If it doesn't exist, it generates a new one.
@@ -126,21 +127,32 @@ open class SecurityManager(private val context: Context) {
         return cipher.doFinal(data)
     }
 
+    private fun getStorageFile(): File = File(context.filesDir, SECURE_STORAGE_FILE)
+
     /**
-     * Saves the encrypted passphrase and its IV to SharedPreferences.
+     * Saves the encrypted passphrase and its IV to a private file.
      */
     private fun saveEncryptedPassphrase(encryptedData: Map<String, ByteArray>) {
-        val dataBase64 = Base64.encodeToString(encryptedData["data"], Base64.DEFAULT)
-        val ivBase64 = Base64.encodeToString(encryptedData["iv"], Base64.DEFAULT)
-        sharedPrefs.edit().putString(PREF_ENCRYPTED_PASSPHRASE, "$dataBase64,$ivBase64").apply()
+        val dataBase64 = Base64.encodeToString(encryptedData["data"], Base64.NO_WRAP)
+        val ivBase64 = Base64.encodeToString(encryptedData["iv"], Base64.NO_WRAP)
+        val file = getStorageFile()
+        file.parentFile?.mkdirs()
+        file.writeText("$dataBase64,$ivBase64")
     }
 
     /**
-     * Retrieves the encrypted passphrase and IV from SharedPreferences.
+     * Retrieves the encrypted passphrase and IV from the private file,
+     * migrating from legacy SharedPreferences if needed.
      * @return A map containing the encrypted data and IV, or null if not found.
      */
     private fun getEncryptedPassphrase(): Map<String, ByteArray>? {
-        val savedString = sharedPrefs.getString(PREF_ENCRYPTED_PASSPHRASE, null) ?: return null
+        val file = getStorageFile()
+        val savedString = if (file.exists()) {
+            file.readText().trim()
+        } else {
+            migrateFromLegacySharedPreferences()
+        } ?: return null
+
         val parts = savedString.split(",")
         if (parts.size != 2) return null
         return try {
@@ -150,5 +162,15 @@ open class SecurityManager(private val context: Context) {
         } catch (e: IllegalArgumentException) {
             null
         }
+    }
+
+    private fun migrateFromLegacySharedPreferences(): String? {
+        val legacyPrefs = context.getSharedPreferences(LEGACY_PREFS_NAME, Context.MODE_PRIVATE)
+        val legacyData = legacyPrefs.getString(PREF_ENCRYPTED_PASSPHRASE, null) ?: return null
+        val file = getStorageFile()
+        file.parentFile?.mkdirs()
+        file.writeText(legacyData)
+        legacyPrefs.edit().clear().apply()
+        return legacyData
     }
 }

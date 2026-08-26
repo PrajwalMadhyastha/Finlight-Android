@@ -2,6 +2,7 @@ package io.pm.finlight
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -22,7 +23,8 @@ object TransactionTypeSerializer : KSerializer<TransactionType> {
 
     override fun deserialize(decoder: Decoder): TransactionType {
         val string = decoder.decodeString()
-        return TransactionType.fromStringOrNull(string) ?: TransactionType.EXPENSE
+        return TransactionType.fromStringOrNull(string)
+            ?: throw SerializationException("Unknown TransactionType: $string")
     }
 }
 
@@ -59,7 +61,8 @@ object TransactionStatusSerializer : KSerializer<TransactionStatus> {
 
     override fun deserialize(decoder: Decoder): TransactionStatus {
         val string = decoder.decodeString()
-        return TransactionStatus.fromStringOrNull(string) ?: TransactionStatus.CONFIRMED
+        return TransactionStatus.fromStringOrNull(string)
+            ?: throw SerializationException("Unknown TransactionStatus: $string")
     }
 }
 

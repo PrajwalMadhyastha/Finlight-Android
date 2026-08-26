@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import java.util.Calendar
 
@@ -62,13 +61,11 @@ class SmsRuleSettingsRepository(
         }
     }
 
-    fun getIgnoreRulesChecksum(): Int {
-        return runBlocking {
-            try {
-                dataStore.data.first()[KEY_IGNORE_RULES_CHECKSUM] ?: 0
-            } catch (e: Exception) {
-                0
-            }
+    suspend fun getIgnoreRulesChecksum(): Int {
+        return try {
+            dataStore.data.first()[KEY_IGNORE_RULES_CHECKSUM] ?: 0
+        } catch (e: Exception) {
+            0
         }
     }
 

@@ -52,7 +52,9 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
 
         // Mock SettingsRepository
         val mockBudgets = mapOf(1 to 1000f, 2 to 1000f, 3 to 1000f, 4 to 1000f, 5 to 1000f, 6 to 1000f)
-        `when`(settingsRepository.getOverallBudgetsForYear(2026)).thenReturn(mockBudgets)
+        runTest {
+            `when`(settingsRepository.getOverallBudgetsForYear(2026)).thenReturn(mockBudgets)
+        }
         `when`(settingsRepository.getSimulatorPrivacyModeEnabled()).thenReturn(flowOf(false))
 
         // Mock TransactionRepository

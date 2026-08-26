@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.cash.turbine.test
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.FirstLaunchSettingsRepository
 import io.pm.finlight.TestApplication
@@ -40,20 +41,27 @@ class FirstLaunchSettingsRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `hasSeenOnboarding and setHasSeenOnboarding work correctly`() =
+    fun `hasSeenOnboarding Flow and setHasSeenOnboarding work correctly`() =
         runTest {
-            assertFalse(repository.hasSeenOnboarding())
-            repository.setHasSeenOnboarding(true)
-            assertTrue(repository.hasSeenOnboarding())
-            repository.setHasSeenOnboarding(false)
-            assertFalse(repository.hasSeenOnboarding())
+            repository.getHasSeenOnboarding().test {
+                assertFalse(awaitItem())
+                repository.setHasSeenOnboarding(true)
+                assertTrue(awaitItem())
+                repository.setHasSeenOnboarding(false)
+                assertFalse(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 
     @Test
-    fun `isFirstLaunchCompleteBlocking and setFirstLaunchComplete work correctly`() =
+    fun `getIsFirstLaunchComplete and setFirstLaunchComplete work correctly`() =
         runTest {
-            assertFalse(repository.isFirstLaunchCompleteBlocking())
-            repository.setFirstLaunchComplete()
-            assertTrue(repository.isFirstLaunchCompleteBlocking())
+            repository.getIsFirstLaunchComplete().test {
+                assertFalse(awaitItem())
+                repository.setFirstLaunchComplete()
+                assertTrue(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 }
+

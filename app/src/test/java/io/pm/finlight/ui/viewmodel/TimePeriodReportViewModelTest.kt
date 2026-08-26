@@ -51,7 +51,6 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         runTest {
             `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenReturn(null)
             `when`(transactionAnalyticsDao.getTopSpendingCategoriesForRange(anyLong(), anyLong())).thenReturn(emptyList())
-            `when`(settingsRepository.getOverallBudgetForMonthBlocking(anyInt(), anyInt())).thenReturn(0f)
         }
 
         `when`(transactionAnalyticsDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))

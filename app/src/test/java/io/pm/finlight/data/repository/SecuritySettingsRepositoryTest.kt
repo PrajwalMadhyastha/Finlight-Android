@@ -48,14 +48,6 @@ class SecuritySettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isAppLockEnabledBlocking works`() =
-        runTest {
-            assertEquals(false, repository.isAppLockEnabledBlocking())
-            repository.saveAppLockEnabled(true)
-            assertEquals(true, repository.isAppLockEnabledBlocking())
-        }
-
-    @Test
     fun `save and get privacy mode enabled`() =
         runTest {
             repository.getPrivacyModeEnabled().test {

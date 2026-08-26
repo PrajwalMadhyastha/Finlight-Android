@@ -11,6 +11,7 @@ import io.pm.finlight.BudgetSettingsRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -39,16 +40,16 @@ class BudgetSettingsRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `save and get overall budget for specific month blocking`() =
+    fun `save and get overall budget for specific month`() =
         runTest {
             val year = 2026
             val month = 5
             val budget = 12000f
 
-            assertNull(repository.getOverallBudgetForMonthBlocking(year, month))
+            assertNull(repository.getOverallBudgetForMonth(year, month).first())
 
             repository.saveOverallBudgetForMonth(year, month, budget)
-            assertEquals(budget, repository.getOverallBudgetForMonthBlocking(year, month))
+            assertEquals(budget, repository.getOverallBudgetForMonth(year, month).first())
         }
 
     @Test
@@ -60,23 +61,23 @@ class BudgetSettingsRepositoryTest : BaseViewModelTest() {
             val budget = 15000f
 
             repository.saveOverallBudgetForCurrentMonth(budget)
-            assertEquals(budget, repository.getOverallBudgetForMonthBlocking(year, month))
+            assertEquals(budget, repository.getOverallBudgetForMonth(year, month).first())
         }
 
     @Test
-    fun `getOverallBudgetForMonthBlocking carries over budget from previous months within 12 months`() =
+    fun `getOverallBudgetForMonth carries over budget from previous months within 12 months`() =
         runTest {
             // Set budget for Jan 2026
             repository.saveOverallBudgetForMonth(2026, 1, 10000f)
 
             // Query April 2026 (should carry over 10000f)
-            assertEquals(10000f, repository.getOverallBudgetForMonthBlocking(2026, 4))
+            assertEquals(10000f, repository.getOverallBudgetForMonth(2026, 4).first())
 
             // Query Dec 2026 (11 months later, should carry over)
-            assertEquals(10000f, repository.getOverallBudgetForMonthBlocking(2026, 12))
+            assertEquals(10000f, repository.getOverallBudgetForMonth(2026, 12).first())
 
             // Query Feb 2027 (13 months later, beyond 12 month lookback, returns null)
-            assertNull(repository.getOverallBudgetForMonthBlocking(2027, 2))
+            assertNull(repository.getOverallBudgetForMonth(2027, 2).first())
         }
 
     @Test

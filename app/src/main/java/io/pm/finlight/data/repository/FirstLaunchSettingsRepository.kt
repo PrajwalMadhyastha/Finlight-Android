@@ -5,10 +5,14 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.data.internalSettingsDataStore
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import java.io.IOException
 
 class FirstLaunchSettingsRepository(
     private val dataStore: DataStore<Preferences>,
@@ -24,14 +28,19 @@ class FirstLaunchSettingsRepository(
         private val KEY_IS_FIRST_LAUNCH_COMPLETE = booleanPreferencesKey("is_first_launch_complete")
     }
 
-    fun hasSeenOnboarding(): Boolean {
-        return runBlocking {
-            try {
-                dataStore.data.first()[KEY_HAS_SEEN_ONBOARDING] ?: false
-            } catch (e: Exception) {
-                false
+    fun getHasSeenOnboarding(): Flow<Boolean> {
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
+                }
             }
-        }
+            .map { preferences ->
+                preferences[KEY_HAS_SEEN_ONBOARDING] ?: false
+            }
+            .distinctUntilChanged()
     }
 
     suspend fun setHasSeenOnboarding(hasSeen: Boolean) {
@@ -40,26 +49,25 @@ class FirstLaunchSettingsRepository(
         }
     }
 
-    /**
-     * Checks if the app has completed its first launch sequence.
-     * This is a blocking call and should only be used during app startup.
-     */
-    fun isFirstLaunchCompleteBlocking(): Boolean {
-        return runBlocking {
-            try {
-                internalDataStore.data.first()[KEY_IS_FIRST_LAUNCH_COMPLETE] ?: false
-            } catch (e: Exception) {
-                false
+    fun getIsFirstLaunchComplete(): Flow<Boolean> {
+        return internalDataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
+                }
             }
-        }
+            .map { preferences ->
+                preferences[KEY_IS_FIRST_LAUNCH_COMPLETE] ?: false
+            }
+            .distinctUntilChanged()
     }
 
-    /**
-     * Sets the flag indicating that the first launch sequence is complete.
-     */
     suspend fun setFirstLaunchComplete() {
         internalDataStore.edit { preferences ->
             preferences[KEY_IS_FIRST_LAUNCH_COMPLETE] = true
         }
     }
 }
+

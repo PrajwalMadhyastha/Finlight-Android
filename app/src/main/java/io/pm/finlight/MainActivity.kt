@@ -88,6 +88,7 @@ import io.pm.finlight.utils.CategoryIconHelper
 // REMOVED: import io.pm.finlight.ui.common.ForceSmallFonts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.net.URLDecoder
@@ -123,7 +124,6 @@ class MainActivity : AppCompatActivity() {
 //        )
 
         val settingsRepository = SettingsRepository(this)
-        val hasSeenOnboarding = settingsRepository.hasSeenOnboarding()
 
         setContent {
             val application = LocalContext.current.applicationContext as Application
@@ -133,13 +133,12 @@ class MainActivity : AppCompatActivity() {
                     factory = SettingsViewModelFactory(application, transactionViewModel),
                 )
             val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
+            val hasSeenOnboarding by settingsRepository.getHasSeenOnboarding().collectAsState(initial = null)
 
             // UPDATED: Using ForceAppScaling to handle both Text and Display scaling
             ForceAppScaling {
                 PersonalFinanceAppTheme(selectedTheme = selectedTheme) {
-                    var showOnboarding by remember { mutableStateOf(!hasSeenOnboarding) }
-
-                    if (showOnboarding) {
+                    if (hasSeenOnboarding == false) {
                         val onboardingViewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModelFactory(application))
                         OnboardingScreen(
                             viewModel = onboardingViewModel,
@@ -147,12 +146,10 @@ class MainActivity : AppCompatActivity() {
                                 lifecycleScope.launch {
                                     settingsRepository.setHasSeenOnboarding(true)
                                 }
-                                showOnboarding = false
                             },
                         )
-                    } else {
+                    } else if (hasSeenOnboarding == true) {
                         FinanceAppWithLockScreen(
-                            isInitiallyLocked = settingsRepository.isAppLockEnabledBlocking(),
                             shortcutAction = intent?.action,
                         )
                     }
@@ -170,14 +167,13 @@ class MainActivity : AppCompatActivity() {
 @SuppressLint("NewApi")
 @Composable
 fun FinanceAppWithLockScreen(
-    isInitiallyLocked: Boolean,
     shortcutAction: String? = null,
 ) {
     val context = LocalContext.current
     val settingsRepository = remember { SettingsRepository(context) }
 
-    var isLocked by remember { mutableStateOf(isInitiallyLocked) }
-    val appLockEnabled by settingsRepository.getAppLockEnabled().collectAsState(initial = isInitiallyLocked)
+    val appLockEnabled by settingsRepository.getAppLockEnabled().collectAsState(initial = null)
+    var isUnlocked by remember { mutableStateOf(false) }
 
     val permissionsToRequest =
         remember {
@@ -211,15 +207,9 @@ fun FinanceAppWithLockScreen(
         }
     }
 
-    LaunchedEffect(appLockEnabled) {
-        if (!appLockEnabled) {
-            isLocked = false
-        }
-    }
-
-    if (isLocked) {
-        LockScreen(onUnlock = { isLocked = false })
-    } else {
+    if (appLockEnabled == true && !isUnlocked) {
+        LockScreen(onUnlock = { isUnlocked = true })
+    } else if (appLockEnabled != null) {
         MainAppScreen(shortcutAction = shortcutAction)
     }
 }
@@ -1456,7 +1446,7 @@ fun SplashScreen(navController: NavHostController) {
     val settingsRepository = remember { SettingsRepository(context) }
 
     LaunchedEffect(key1 = true) {
-        val isFirstLaunch = !settingsRepository.isFirstLaunchCompleteBlocking()
+        val isFirstLaunch = !settingsRepository.getIsFirstLaunchComplete().first()
 
         if (isFirstLaunch) {
             statusText = "Checking for restored data..."

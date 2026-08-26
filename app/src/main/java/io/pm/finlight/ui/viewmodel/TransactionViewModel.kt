@@ -230,10 +230,7 @@ class TransactionViewModel(
             Pair(month, filters)
         }
 
-    val hasSeenOnboarding: Flow<Boolean> =
-        flow {
-            emit(settingsRepository.hasSeenOnboarding())
-        }
+    val hasSeenOnboarding: Flow<Boolean> = settingsRepository.getHasSeenOnboarding()
 
     val goalIncomeThreshold: StateFlow<Int> =
         settingsRepository.getGoalIncomeThreshold()

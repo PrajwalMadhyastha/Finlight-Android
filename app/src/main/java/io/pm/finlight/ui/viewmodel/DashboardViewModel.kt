@@ -445,17 +445,20 @@ class DashboardViewModel(
 
     private fun checkForLastMonthSummary() {
         val today = timeProvider.now()
-        if (today.get(Calendar.DAY_OF_MONTH) == 1 && !settingsRepository.hasLastMonthSummaryBeenDismissed()) {
-            _showLastMonthSummaryCard.value = true
+        if (today.get(Calendar.DAY_OF_MONTH) == 1) {
             viewModelScope.launch {
-                val (start, end) = DateUtils.getPreviousMonthDateRange()
-                transactionRepository.getFinancialSummaryForRangeFlow(start, end).collect { summary ->
-                    if (summary != null) {
-                        _lastMonthSummary.value =
-                            LastMonthSummary(
-                                totalIncome = summary.totalIncome,
-                                totalExpenses = summary.totalExpenses,
-                            )
+                val isDismissed = settingsRepository.hasLastMonthSummaryBeenDismissed().first()
+                if (!isDismissed) {
+                    _showLastMonthSummaryCard.value = true
+                    val (start, end) = DateUtils.getPreviousMonthDateRange()
+                    transactionRepository.getFinancialSummaryForRangeFlow(start, end).collect { summary ->
+                        if (summary != null) {
+                            _lastMonthSummary.value =
+                                LastMonthSummary(
+                                    totalIncome = summary.totalIncome,
+                                    totalExpenses = summary.totalExpenses,
+                                )
+                        }
                     }
                 }
             }

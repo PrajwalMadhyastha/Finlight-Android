@@ -208,7 +208,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val summary = FinancialSummary(1000.0, 500.0)
-            Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
+            Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(flowOf(false))
             Mockito.`when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
                 .thenReturn(flowOf(summary))
 
@@ -230,7 +230,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val summary = FinancialSummary(1000.0, 500.0)
-            Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
+            Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(flowOf(false))
             Mockito.`when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
                 .thenReturn(flowOf(summary))
 
@@ -522,7 +522,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             // Arrange - Force the time to be the 1st of the month
             val firstOfMonth = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1) }
             `when`(timeProvider.now()).thenReturn(firstOfMonth)
-            `when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
+            `when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(flowOf(false))
             `when`(
                 transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()),
             ).thenReturn(flowOf(FinancialSummary(1.0, 1.0)))

@@ -143,4 +143,24 @@ class TransactionEnumsTest {
         // Encoding
         assertEquals("\"CONFIRMED\"", kotlinx.serialization.json.Json.encodeToString(TransactionStatus.serializer(), TransactionStatus.CONFIRMED))
     }
+
+    @Test
+    fun transactionType_serialization_throwsOnInvalid() {
+        assertThrows(kotlinx.serialization.SerializationException::class.java) {
+            kotlinx.serialization.json.Json.decodeFromString<TransactionType>("\"INVALID_TYPE\"")
+        }
+        assertThrows(kotlinx.serialization.SerializationException::class.java) {
+            kotlinx.serialization.json.Json.decodeFromString<TransactionType>("\"\"")
+        }
+    }
+
+    @Test
+    fun transactionStatus_serialization_throwsOnInvalid() {
+        assertThrows(kotlinx.serialization.SerializationException::class.java) {
+            kotlinx.serialization.json.Json.decodeFromString<TransactionStatus>("\"INVALID_STATUS\"")
+        }
+        assertThrows(kotlinx.serialization.SerializationException::class.java) {
+            kotlinx.serialization.json.Json.decodeFromString<TransactionStatus>("\"\"")
+        }
+    }
 }

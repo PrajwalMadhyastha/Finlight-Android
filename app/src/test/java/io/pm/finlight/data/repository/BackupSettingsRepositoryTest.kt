@@ -72,14 +72,6 @@ class BackupSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isAutoBackupNotificationEnabledBlocking works`() =
-        runTest {
-            assertFalse(repository.isAutoBackupNotificationEnabledBlocking())
-            repository.saveAutoBackupNotificationEnabled(true)
-            assertTrue(repository.isAutoBackupNotificationEnabledBlocking())
-        }
-
-    @Test
     fun `save and get last backup timestamp`() =
         runTest {
             repository.getLastBackupTimestamp().test {

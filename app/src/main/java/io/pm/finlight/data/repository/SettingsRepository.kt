@@ -72,9 +72,6 @@ class SettingsRepository(
     fun getGoalNudgesEnabled(): Flow<Boolean> =
         featureSettingsRepository.getGoalNudgesEnabled()
 
-    fun isGoalNudgesEnabledBlocking(): Boolean =
-        featureSettingsRepository.isGoalNudgesEnabledBlocking()
-
     // --- Outlier Month Management Functions ---
 
     fun getExcludedIncomeMonths(): Flow<Set<String>> =
@@ -109,9 +106,6 @@ class SettingsRepository(
     fun getAutoBackupNotificationEnabled(): Flow<Boolean> =
         backupSettingsRepository.getAutoBackupNotificationEnabled()
 
-    fun isAutoBackupNotificationEnabledBlocking(): Boolean =
-        backupSettingsRepository.isAutoBackupNotificationEnabledBlocking()
-
     suspend fun saveLastBackupTimestamp(timestamp: Long) =
         backupSettingsRepository.saveLastBackupTimestamp(timestamp)
 
@@ -129,7 +123,7 @@ class SettingsRepository(
     suspend fun saveIgnoreRulesChecksum(checksum: Int) =
         smsRuleSettingsRepository.saveIgnoreRulesChecksum(checksum)
 
-    fun getIgnoreRulesChecksum(): Int =
+    suspend fun getIgnoreRulesChecksum(): Int =
         smsRuleSettingsRepository.getIgnoreRulesChecksum()
 
     fun getDismissedMergeSuggestions(): Flow<Set<String>> =
@@ -193,22 +187,16 @@ class SettingsRepository(
     fun getAutoCaptureNotificationEnabled(): Flow<Boolean> =
         notificationSettingsRepository.getAutoCaptureNotificationEnabled()
 
-    fun isAutoCaptureNotificationEnabledBlocking(): Boolean =
-        notificationSettingsRepository.isAutoCaptureNotificationEnabledBlocking()
-
     suspend fun saveUnknownTransactionPopupEnabled(isEnabled: Boolean) =
         notificationSettingsRepository.saveUnknownTransactionPopupEnabled(isEnabled)
 
     fun getUnknownTransactionPopupEnabled(): Flow<Boolean> =
         notificationSettingsRepository.getUnknownTransactionPopupEnabled()
 
-    fun isUnknownTransactionPopupEnabledBlocking(): Boolean =
-        notificationSettingsRepository.isUnknownTransactionPopupEnabledBlocking()
-
     suspend fun setLastMonthSummaryDismissed() =
         notificationSettingsRepository.setLastMonthSummaryDismissed()
 
-    fun hasLastMonthSummaryBeenDismissed(): Boolean =
+    fun hasLastMonthSummaryBeenDismissed(): Flow<Boolean> =
         notificationSettingsRepository.hasLastMonthSummaryBeenDismissed()
 
     // --- App Config (User, Theme, Currency) ---
@@ -256,13 +244,8 @@ class SettingsRepository(
         amount: Float,
     ) = budgetSettingsRepository.saveOverallBudgetForMonth(year, month, amount)
 
-    fun getOverallBudgetsForYear(year: Int): Map<Int, Float> =
+    suspend fun getOverallBudgetsForYear(year: Int): Map<Int, Float> =
         budgetSettingsRepository.getOverallBudgetsForYear(year)
-
-    fun getOverallBudgetForMonthBlocking(
-        year: Int,
-        month: Int,
-    ): Float? = budgetSettingsRepository.getOverallBudgetForMonthBlocking(year, month)
 
     fun getOverallBudgetForMonth(
         year: Int,
@@ -290,9 +273,6 @@ class SettingsRepository(
     fun getAppLockEnabled(): Flow<Boolean> =
         securitySettingsRepository.getAppLockEnabled()
 
-    fun isAppLockEnabledBlocking(): Boolean =
-        securitySettingsRepository.isAppLockEnabledBlocking()
-
     suspend fun savePrivacyModeEnabled(isEnabled: Boolean) =
         securitySettingsRepository.savePrivacyModeEnabled(isEnabled)
 
@@ -307,15 +287,16 @@ class SettingsRepository(
 
     // --- First Launch and Onboarding State ---
 
-    fun hasSeenOnboarding(): Boolean =
-        firstLaunchSettingsRepository.hasSeenOnboarding()
+    fun getHasSeenOnboarding(): Flow<Boolean> =
+        firstLaunchSettingsRepository.getHasSeenOnboarding()
 
     suspend fun setHasSeenOnboarding(hasSeen: Boolean) =
         firstLaunchSettingsRepository.setHasSeenOnboarding(hasSeen)
 
-    fun isFirstLaunchCompleteBlocking(): Boolean =
-        firstLaunchSettingsRepository.isFirstLaunchCompleteBlocking()
+    fun getIsFirstLaunchComplete(): Flow<Boolean> =
+        firstLaunchSettingsRepository.getIsFirstLaunchComplete()
 
     suspend fun setFirstLaunchComplete() =
         firstLaunchSettingsRepository.setFirstLaunchComplete()
 }
+

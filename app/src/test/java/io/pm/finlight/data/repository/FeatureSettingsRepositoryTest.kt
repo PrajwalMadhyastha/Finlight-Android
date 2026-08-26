@@ -72,14 +72,6 @@ class FeatureSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isGoalNudgesEnabledBlocking works`() =
-        runTest {
-            assertTrue(repository.isGoalNudgesEnabledBlocking())
-            repository.saveGoalNudgesEnabled(false)
-            assertFalse(repository.isGoalNudgesEnabledBlocking())
-        }
-
-    @Test
     fun `toggle and get excluded income months`() =
         runTest {
             repository.getExcludedIncomeMonths().test {

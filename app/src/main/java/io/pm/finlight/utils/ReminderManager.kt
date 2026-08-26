@@ -16,7 +16,6 @@ import io.pm.finlight.SettingsRepository
 import io.pm.finlight.WeeklySummaryWorker
 import io.pm.finlight.workers.SmsCatchupWorker
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -30,14 +29,14 @@ object ReminderManager {
     private const val SMS_CATCHUP_WORK_TAG = "sms_catchup_work"
     private const val GOAL_SURPLUS_WORK_TAG = "goal_surplus_work"
 
-    fun rescheduleAllWork(context: Context) {
+    suspend fun rescheduleAllWork(context: Context) {
         Log.d("ReminderManager", "Rescheduling all background work...")
         val settings = SettingsRepository(context)
 
-        val dailyReportEnabled = runBlocking { settings.getDailyReportEnabled().first() }
-        val weeklySummaryEnabled = runBlocking { settings.getWeeklySummaryEnabled().first() }
-        val monthlySummaryEnabled = runBlocking { settings.getMonthlySummaryEnabled().first() }
-        val autoBackupEnabled = runBlocking { settings.getAutoBackupEnabled().first() }
+        val dailyReportEnabled = settings.getDailyReportEnabled().first()
+        val weeklySummaryEnabled = settings.getWeeklySummaryEnabled().first()
+        val monthlySummaryEnabled = settings.getMonthlySummaryEnabled().first()
+        val autoBackupEnabled = settings.getAutoBackupEnabled().first()
 
         if (dailyReportEnabled) {
             scheduleDailyReport(context)
@@ -150,9 +149,9 @@ object ReminderManager {
         Log.d("ReminderManager", "Cancelled all recurring transaction workers.")
     }
 
-    fun scheduleDailyReport(context: Context) {
+    suspend fun scheduleDailyReport(context: Context) {
         val settings = SettingsRepository(context)
-        val (hour, minute) = runBlocking { settings.getDailyReportTime().first() }
+        val (hour, minute) = settings.getDailyReportTime().first()
 
         val now = Calendar.getInstance()
         val nextRun =
@@ -184,9 +183,9 @@ object ReminderManager {
         WorkManager.getInstance(context).cancelUniqueWork(DAILY_EXPENSE_REPORT_WORK_TAG)
     }
 
-    fun scheduleWeeklySummary(context: Context) {
+    suspend fun scheduleWeeklySummary(context: Context) {
         val settings = SettingsRepository(context)
-        val (dayOfWeek, hour, minute) = runBlocking { settings.getWeeklyReportTime().first() }
+        val (dayOfWeek, hour, minute) = settings.getWeeklyReportTime().first()
 
         val now = Calendar.getInstance()
         val nextRun =
@@ -223,9 +222,9 @@ object ReminderManager {
         WorkManager.getInstance(context).cancelUniqueWork(WEEKLY_SUMMARY_WORK_TAG)
     }
 
-    fun scheduleMonthlySummary(context: Context) {
+    suspend fun scheduleMonthlySummary(context: Context) {
         val settings = SettingsRepository(context)
-        val (dayOfMonth, hour, minute) = runBlocking { settings.getMonthlyReportTime().first() }
+        val (dayOfMonth, hour, minute) = settings.getMonthlyReportTime().first()
 
         val now = Calendar.getInstance()
         val nextRun =

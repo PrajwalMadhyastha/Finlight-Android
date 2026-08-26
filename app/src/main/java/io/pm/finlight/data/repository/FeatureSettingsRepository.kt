@@ -12,9 +12,7 @@ import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import java.io.IOException
 
 class FeatureSettingsRepository(
@@ -93,16 +91,6 @@ class FeatureSettingsRepository(
                 preferences[KEY_GOAL_NUDGES_ENABLED] ?: true
             }
             .distinctUntilChanged()
-    }
-
-    fun isGoalNudgesEnabledBlocking(): Boolean {
-        return runBlocking {
-            try {
-                dataStore.data.first()[KEY_GOAL_NUDGES_ENABLED] ?: true
-            } catch (e: Exception) {
-                true
-            }
-        }
     }
 
     fun getExcludedIncomeMonths(): Flow<Set<String>> = getSetFlow(KEY_EXCLUDED_INCOME_MONTHS)

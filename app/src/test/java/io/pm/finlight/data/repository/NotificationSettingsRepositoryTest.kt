@@ -117,37 +117,14 @@ class NotificationSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isAutoCaptureNotificationEnabledBlocking works`() =
+    fun `dismiss and check last month summary status`() =
         runTest {
-            assertTrue(repository.isAutoCaptureNotificationEnabledBlocking())
-            repository.saveAutoCaptureNotificationEnabled(false)
-            assertFalse(repository.isAutoCaptureNotificationEnabledBlocking())
-        }
-
-    @Test
-    fun `save and get unknown transaction popup enabled`() =
-        runTest {
-            repository.getUnknownTransactionPopupEnabled().test {
-                assertTrue(awaitItem()) // Default
-                repository.saveUnknownTransactionPopupEnabled(false)
+            repository.hasLastMonthSummaryBeenDismissed().test {
                 assertFalse(awaitItem())
+                repository.setLastMonthSummaryDismissed()
+                assertTrue(awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
         }
-
-    @Test
-    fun `isUnknownTransactionPopupEnabledBlocking works`() =
-        runTest {
-            assertTrue(repository.isUnknownTransactionPopupEnabledBlocking())
-            repository.saveUnknownTransactionPopupEnabled(false)
-            assertFalse(repository.isUnknownTransactionPopupEnabledBlocking())
-        }
-
-    @Test
-    fun `dismiss and check last month summary status`() =
-        runTest {
-            assertFalse(repository.hasLastMonthSummaryBeenDismissed())
-            repository.setLastMonthSummaryDismissed()
-            assertTrue(repository.hasLastMonthSummaryBeenDismissed())
-        }
 }
+

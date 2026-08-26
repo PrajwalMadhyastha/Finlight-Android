@@ -17,6 +17,8 @@ import androidx.work.Configuration
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.cash.turbine.test
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockkObject
@@ -67,6 +69,9 @@ class OnboardingViewModelTest : BaseViewModelTest() {
                 .setExecutor(SynchronousExecutor())
                 .build()
         WorkManagerTestInitHelper.initializeTestWorkManager(application, config)
+
+        mockkObject(ReminderManager)
+        coEvery { ReminderManager.rescheduleAllWork(any()) } just runs
 
         viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
     }
@@ -310,22 +315,34 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `finishOnboarding does not save blank user name`() =
+    fun `finishOnboarding saves monthly budget when valid and greater than zero`() =
         runTest {
-            // Act
-            viewModel.onNameChanged("  ")
+            val budget = "25000"
+            viewModel.onBudgetChanged(budget)
             viewModel.finishOnboarding()
             advanceUntilIdle()
-
-            // Assert
-            verify(settingsRepository, never()).saveUserName(anyString())
+            verify(settingsRepository).saveOverallBudgetForCurrentMonth(25000f)
         }
 
     @Test
-    fun `finishOnboarding does not save zero or invalid budget`() =
+    fun `finishOnboarding does not save monthly budget when invalid or zero`() =
         runTest {
             // Act
             viewModel.onBudgetChanged("0")
+            viewModel.finishOnboarding()
+            advanceUntilIdle()
+            // Assert
+            verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(anyFloat())
+
+            // Act
+            viewModel.onBudgetChanged("-100")
+            viewModel.finishOnboarding()
+            advanceUntilIdle()
+            // Assert
+            verify(settingsRepository, never()).saveOverallBudgetForCurrentMonth(anyFloat())
+
+            // Act
+            viewModel.onBudgetChanged("invalid")
             viewModel.finishOnboarding()
             advanceUntilIdle()
             // Assert
@@ -344,13 +361,13 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             mockkObject(ReminderManager)
-            every { ReminderManager.rescheduleAllWork(any()) } just runs
+            coEvery { ReminderManager.rescheduleAllWork(any()) } just runs
 
             // Act
             viewModel.finishOnboarding()
             advanceUntilIdle() // Ensure the coroutine in finishOnboarding completes
 
             // Assert
-            verify(exactly = 1) { ReminderManager.rescheduleAllWork(application) }
+            coVerify(exactly = 1) { ReminderManager.rescheduleAllWork(application) }
         }
 }

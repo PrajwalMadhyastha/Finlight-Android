@@ -12,9 +12,7 @@ import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import java.util.Calendar
 import java.util.Date
@@ -218,16 +216,6 @@ class NotificationSettingsRepository(
             .distinctUntilChanged()
     }
 
-    fun isAutoCaptureNotificationEnabledBlocking(): Boolean {
-        return runBlocking {
-            try {
-                dataStore.data.first()[KEY_AUTOCAPTURE_NOTIFICATION_ENABLED] ?: true
-            } catch (e: Exception) {
-                true
-            }
-        }
-    }
-
     suspend fun saveUnknownTransactionPopupEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED] = isEnabled
@@ -249,16 +237,6 @@ class NotificationSettingsRepository(
             .distinctUntilChanged()
     }
 
-    fun isUnknownTransactionPopupEnabledBlocking(): Boolean {
-        return runBlocking {
-            try {
-                dataStore.data.first()[KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED] ?: true
-            } catch (e: Exception) {
-                true
-            }
-        }
-    }
-
     suspend fun setLastMonthSummaryDismissed() {
         val monthKey = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(Date())
         val prefKey = booleanPreferencesKey(KEY_LAST_MONTH_SUMMARY_DISMISSED_PREFIX + monthKey)
@@ -267,15 +245,20 @@ class NotificationSettingsRepository(
         }
     }
 
-    fun hasLastMonthSummaryBeenDismissed(): Boolean {
+    fun hasLastMonthSummaryBeenDismissed(): Flow<Boolean> {
         val monthKey = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(Date())
         val prefKey = booleanPreferencesKey(KEY_LAST_MONTH_SUMMARY_DISMISSED_PREFIX + monthKey)
-        return runBlocking {
-            try {
-                dataStore.data.first()[prefKey] ?: false
-            } catch (e: Exception) {
-                false
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
+                }
             }
-        }
+            .map { preferences ->
+                preferences[prefKey] ?: false
+            }
+            .distinctUntilChanged()
     }
 }

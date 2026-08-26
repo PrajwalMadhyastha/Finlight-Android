@@ -14,7 +14,8 @@ import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import io.pm.finlight.*
 import io.pm.finlight.data.financeSettingsDataStore
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -24,6 +25,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.util.Calendar
 
+@ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class ReminderManagerTest : BaseViewModelTest() {
@@ -35,7 +37,7 @@ class ReminderManagerTest : BaseViewModelTest() {
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        runBlocking {
+        runTest {
             context.financeSettingsDataStore.edit { it.clear() }
         }
         settingsRepository = SettingsRepository(context)
@@ -86,71 +88,69 @@ class ReminderManagerTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `scheduleDailyReport schedules DailyReportWorker correctly`() {
-        // Arrange: Set time for 2 hours from now
-        val nextRun = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, 2) }
-        runBlocking {
+    fun `scheduleDailyReport schedules DailyReportWorker correctly`() =
+        runTest {
+            // Arrange: Set time for 2 hours from now
+            val nextRun = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, 2) }
             settingsRepository.saveDailyReportTime(
                 nextRun.get(Calendar.HOUR_OF_DAY),
                 nextRun.get(Calendar.MINUTE),
             )
+
+            // Act
+            ReminderManager.scheduleDailyReport(context)
+
+            // Assert
+            assertWorkIsEnqueued("daily_expense_report_work", DailyReportWorker::class.java)
         }
 
-        // Act
-        ReminderManager.scheduleDailyReport(context)
+    @Test
+    fun `cancelDailyReport cancels the work`() =
+        runTest {
+            // Arrange
+            ReminderManager.scheduleDailyReport(context)
+            assertWorkIsEnqueued("daily_expense_report_work", DailyReportWorker::class.java) // Pre-condition
 
-        // Assert
-        assertWorkIsEnqueued("daily_expense_report_work", DailyReportWorker::class.java)
-    }
+            // Act
+            ReminderManager.cancelDailyReport(context)
+
+            // Assert
+            assertWorkIsCancelled("daily_expense_report_work")
+        }
 
     @Test
-    fun `cancelDailyReport cancels the work`() {
-        // Arrange
-        ReminderManager.scheduleDailyReport(context)
-        assertWorkIsEnqueued("daily_expense_report_work", DailyReportWorker::class.java) // Pre-condition
-
-        // Act
-        ReminderManager.cancelDailyReport(context)
-
-        // Assert
-        assertWorkIsCancelled("daily_expense_report_work")
-    }
-
-    @Test
-    fun `scheduleWeeklySummary schedules WeeklySummaryWorker correctly`() {
-        // Arrange
-        runBlocking {
+    fun `scheduleWeeklySummary schedules WeeklySummaryWorker correctly`() =
+        runTest {
+            // Arrange
             settingsRepository.saveWeeklyReportTime(
                 Calendar.getInstance().get(Calendar.DAY_OF_WEEK),
                 Calendar.getInstance().get(Calendar.HOUR_OF_DAY) + 1,
                 Calendar.getInstance().get(Calendar.MINUTE),
             )
+
+            // Act
+            ReminderManager.scheduleWeeklySummary(context)
+
+            // Assert
+            assertWorkIsEnqueued("weekly_summary_work", WeeklySummaryWorker::class.java)
         }
 
-        // Act
-        ReminderManager.scheduleWeeklySummary(context)
-
-        // Assert
-        assertWorkIsEnqueued("weekly_summary_work", WeeklySummaryWorker::class.java)
-    }
-
     @Test
-    fun `scheduleMonthlySummary schedules MonthlySummaryWorker correctly`() {
-        // Arrange
-        runBlocking {
+    fun `scheduleMonthlySummary schedules MonthlySummaryWorker correctly`() =
+        runTest {
+            // Arrange
             settingsRepository.saveMonthlyReportTime(
                 Calendar.getInstance().get(Calendar.DAY_OF_MONTH),
                 Calendar.getInstance().get(Calendar.HOUR_OF_DAY) + 1,
                 Calendar.getInstance().get(Calendar.MINUTE),
             )
+
+            // Act
+            ReminderManager.scheduleMonthlySummary(context)
+
+            // Assert
+            assertWorkIsEnqueued("monthly_summary_work", MonthlySummaryWorker::class.java)
         }
-
-        // Act
-        ReminderManager.scheduleMonthlySummary(context)
-
-        // Assert
-        assertWorkIsEnqueued("monthly_summary_work", MonthlySummaryWorker::class.java)
-    }
 
     @Test
     fun `scheduleAutoBackup schedules BackupWorker correctly`() {
@@ -163,46 +163,44 @@ class ReminderManagerTest : BaseViewModelTest() {
 
     @org.junit.Ignore("Temporarily disabled (Issue #105)")
     @Test
-    fun `rescheduleAllWork schedules enabled workers`() {
-        // Arrange: Enable everything
-        runBlocking {
+    fun `rescheduleAllWork schedules enabled workers`() =
+        runTest {
+            // Arrange: Enable everything
             settingsRepository.saveDailyReportEnabled(true)
             settingsRepository.saveWeeklySummaryEnabled(true)
             settingsRepository.saveMonthlySummaryEnabled(true)
             settingsRepository.saveAutoBackupEnabled(true)
             settingsRepository.saveRecurringTransactionsEnabled(true)
+
+            // Act
+            ReminderManager.rescheduleAllWork(context)
+
+            // Assert
+            assertWorkIsEnqueued("daily_expense_report_work", DailyReportWorker::class.java)
+            assertWorkIsEnqueued("weekly_summary_work", WeeklySummaryWorker::class.java)
+            assertWorkIsEnqueued("monthly_summary_work", MonthlySummaryWorker::class.java)
+            assertWorkIsEnqueued("auto_backup_work", BackupWorker::class.java)
         }
 
-        // Act
-        ReminderManager.rescheduleAllWork(context)
-
-        // Assert
-        assertWorkIsEnqueued("daily_expense_report_work", DailyReportWorker::class.java)
-        assertWorkIsEnqueued("weekly_summary_work", WeeklySummaryWorker::class.java)
-        assertWorkIsEnqueued("monthly_summary_work", MonthlySummaryWorker::class.java)
-        assertWorkIsEnqueued("auto_backup_work", BackupWorker::class.java)
-    }
-
     @Test
-    fun `rescheduleAllWork does not schedule disabled workers`() {
-        // Arrange: Disable everything including recurring transactions
-        runBlocking {
+    fun `rescheduleAllWork does not schedule disabled workers`() =
+        runTest {
+            // Arrange: Disable everything including recurring transactions
             settingsRepository.saveDailyReportEnabled(false)
             settingsRepository.saveWeeklySummaryEnabled(false)
             settingsRepository.saveMonthlySummaryEnabled(false)
             settingsRepository.saveAutoBackupEnabled(false)
             settingsRepository.saveRecurringTransactionsEnabled(false)
+
+            // Act
+            ReminderManager.rescheduleAllWork(context)
+
+            // Assert: All workers are cancelled/not present when disabled
+            assertWorkIsCancelled("daily_expense_report_work")
+            assertWorkIsCancelled("weekly_summary_work")
+            assertWorkIsCancelled("monthly_summary_work")
+            assertWorkIsCancelled("auto_backup_work")
+            assertWorkIsCancelled("recurring_transaction_work")
+            assertWorkIsCancelled("recurring_pattern_work")
         }
-
-        // Act
-        ReminderManager.rescheduleAllWork(context)
-
-        // Assert: All workers are cancelled/not present when disabled
-        assertWorkIsCancelled("daily_expense_report_work")
-        assertWorkIsCancelled("weekly_summary_work")
-        assertWorkIsCancelled("monthly_summary_work")
-        assertWorkIsCancelled("auto_backup_work")
-        assertWorkIsCancelled("recurring_transaction_work")
-        assertWorkIsCancelled("recurring_pattern_work")
-    }
 }

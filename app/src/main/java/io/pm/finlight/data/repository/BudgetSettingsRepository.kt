@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import java.util.Calendar
 import java.util.Locale
@@ -53,15 +52,13 @@ class BudgetSettingsRepository(
         }
     }
 
-    fun getOverallBudgetsForYear(year: Int): Map<Int, Float> {
+    suspend fun getOverallBudgetsForYear(year: Int): Map<Int, Float> {
         val budgets = mutableMapOf<Int, Float>()
         val preferences =
-            runBlocking {
-                try {
-                    dataStore.data.first()
-                } catch (e: Exception) {
-                    emptyPreferences()
-                }
+            try {
+                dataStore.data.first()
+            } catch (e: Exception) {
+                emptyPreferences()
             }
         for (month in 1..12) {
             val prefKey = floatPreferencesKey(getBudgetKey(year, month))
@@ -70,21 +67,6 @@ class BudgetSettingsRepository(
             }
         }
         return budgets
-    }
-
-    fun getOverallBudgetForMonthBlocking(
-        year: Int,
-        month: Int,
-    ): Float? {
-        val preferences =
-            runBlocking {
-                try {
-                    dataStore.data.first()
-                } catch (e: Exception) {
-                    emptyPreferences()
-                }
-            }
-        return findCarriedOverBudget(preferences, year, month)
     }
 
     fun getOverallBudgetForMonth(

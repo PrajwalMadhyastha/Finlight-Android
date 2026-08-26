@@ -32,10 +32,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
+import io.pm.finlight.BaseViewModelTest
+import kotlinx.coroutines.delay
+
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class MergeActionReceiverTest {
+class MergeActionReceiverTest : BaseViewModelTest() {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
     private lateinit var transactionWriteDao: TransactionWriteDao
@@ -47,7 +50,8 @@ class MergeActionReceiverTest {
     private lateinit var mockNotificationManager: NotificationManagerCompat
 
     @Before
-    fun setup() {
+    override fun setup() {
+        super.setup()
         context = ApplicationProvider.getApplicationContext()
         db = mockk<AppDatabase>(relaxed = true)
         transactionWriteDao = mockk<TransactionWriteDao>(relaxed = true)
@@ -79,8 +83,9 @@ class MergeActionReceiverTest {
     }
 
     @After
-    fun tearDown() {
+    override fun tearDown() {
         unmockkAll()
+        super.tearDown()
     }
 
     @Test
@@ -98,6 +103,7 @@ class MergeActionReceiverTest {
             coVerify(timeout = 2000) { anyConstructed<MergeTransactionsUseCase>().invoke(1, 2, any(), any()) }
             verify(timeout = 2000) { mockNotificationManager.cancel(10002) }
             verify(timeout = 2000) { mockNotificationManager.cancel(2) }
+            delay(100)
         }
 
     @Test
@@ -114,6 +120,7 @@ class MergeActionReceiverTest {
             coVerify(timeout = 2000) { anyConstructed<TransactionRepository>().dismissMerge(2) }
             verify(timeout = 2000) { mockNotificationManager.cancel(10002) }
             verify(timeout = 2000) { mockNotificationManager.cancel(2) }
+            delay(100)
         }
 
     @Test
@@ -149,5 +156,6 @@ class MergeActionReceiverTest {
             coVerify(timeout = 2000) {
                 anyConstructed<MergeTransactionsUseCase>().invoke(1, 2, "Test SMS body", 1000L)
             }
+            delay(100)
         }
 }
