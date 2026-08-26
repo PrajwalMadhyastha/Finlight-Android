@@ -2,6 +2,7 @@ package io.pm.finlight.workers
 
 import android.app.NotificationManager
 import android.content.Context
+import androidx.datastore.preferences.core.edit
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -11,7 +12,9 @@ import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.TransactionWriteDao
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -32,10 +35,15 @@ class GoalSurplusWorkerTest {
     private lateinit var db: AppDatabase
     private lateinit var transactionWriteDao: TransactionWriteDao
     private lateinit var goalDao: GoalDao
+    private lateinit var settingsRepository: SettingsRepository
 
     @Before
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
+        runBlocking {
+            context.financeSettingsDataStore.edit { it.clear() }
+        }
+        settingsRepository = SettingsRepository(context)
 
         // Use an unencrypted in-memory database!
         db =
@@ -61,14 +69,13 @@ class GoalSurplusWorkerTest {
         runTest {
             ShadowApplication.getInstance().grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
 
-            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
-
             val cal = Calendar.getInstance()
             cal.add(Calendar.MONTH, -1)
             val prevYear = cal.get(Calendar.YEAR)
-            val prevMonth = String.format("%02d", cal.get(Calendar.MONTH) + 1)
-            prefs.edit().putFloat("overall_budget_${prevYear}_$prevMonth", 5000f).apply()
+            val prevMonth = cal.get(Calendar.MONTH) + 1
+
+            settingsRepository.saveGoalNudgesEnabled(true)
+            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 5000f)
 
             // Insert required data
             db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))
@@ -104,8 +111,7 @@ class GoalSurplusWorkerTest {
     @Test
     fun testDoWork_nudgesDisabled() =
         runTest {
-            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("goal_nudges_enabled", false).apply()
+            settingsRepository.saveGoalNudgesEnabled(false)
 
             val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
             val result = worker.doWork()
@@ -119,8 +125,7 @@ class GoalSurplusWorkerTest {
     @Test
     fun testDoWork_noBudgetSet() =
         runTest {
-            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
+            settingsRepository.saveGoalNudgesEnabled(true)
             // No budget is set in prefs
 
             val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
@@ -135,15 +140,13 @@ class GoalSurplusWorkerTest {
     @Test
     fun testDoWork_noSurplus() =
         runTest {
-            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
-
             val cal = Calendar.getInstance()
             cal.add(Calendar.MONTH, -1)
             val prevYear = cal.get(Calendar.YEAR)
-            val prevMonth = String.format("%02d", cal.get(Calendar.MONTH) + 1)
-            // Set budget to a low amount
-            prefs.edit().putFloat("overall_budget_${prevYear}_$prevMonth", 1000f).apply()
+            val prevMonth = cal.get(Calendar.MONTH) + 1
+
+            settingsRepository.saveGoalNudgesEnabled(true)
+            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 1000f)
 
             // Insert expenses greater than budget
             db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))
@@ -169,14 +172,13 @@ class GoalSurplusWorkerTest {
     @Test
     fun testDoWork_noActiveGoals() =
         runTest {
-            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
-
             val cal = Calendar.getInstance()
             cal.add(Calendar.MONTH, -1)
             val prevYear = cal.get(Calendar.YEAR)
-            val prevMonth = String.format("%02d", cal.get(Calendar.MONTH) + 1)
-            prefs.edit().putFloat("overall_budget_${prevYear}_$prevMonth", 5000f).apply()
+            val prevMonth = cal.get(Calendar.MONTH) + 1
+
+            settingsRepository.saveGoalNudgesEnabled(true)
+            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 5000f)
 
             // Insert only income, no expenses, so there is surplus
             db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))
@@ -206,14 +208,13 @@ class GoalSurplusWorkerTest {
     @Test
     fun testDoWork_noTransactionsInPreviousMonth() =
         runTest {
-            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
-
             val cal = Calendar.getInstance()
             cal.add(Calendar.MONTH, -1)
             val prevYear = cal.get(Calendar.YEAR)
-            val prevMonth = String.format("%02d", cal.get(Calendar.MONTH) + 1)
-            prefs.edit().putFloat("overall_budget_${prevYear}_$prevMonth", 1000f).apply()
+            val prevMonth = cal.get(Calendar.MONTH) + 1
+
+            settingsRepository.saveGoalNudgesEnabled(true)
+            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 1000f)
 
             // Insert account and goal, but zero transactions
             db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))

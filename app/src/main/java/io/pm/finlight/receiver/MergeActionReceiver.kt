@@ -40,26 +40,31 @@ class MergeActionReceiver : BroadcastReceiver() {
                 db = db,
             )
 
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            if (action == "ACTION_MERGE" && parentTxnId != -1 && childTxnId != -1) {
-                val childTxn = transactionRepository.getTransactionSync(childTxnId)
-                var childSmsBody: String? = null
-                var childSmsDate: Long? = null
-                if (childTxn?.sourceSmsId != null) {
-                    val smsRepository = SmsRepository(context)
-                    val sms = smsRepository.getSmsDetailsById(childTxn.sourceSmsId)
-                    if (sms != null) {
-                        childSmsBody = sms.body
-                        childSmsDate = sms.date
+            try {
+                if (action == "ACTION_MERGE" && parentTxnId != -1 && childTxnId != -1) {
+                    val childTxn = transactionRepository.getTransactionSync(childTxnId)
+                    var childSmsBody: String? = null
+                    var childSmsDate: Long? = null
+                    if (childTxn?.sourceSmsId != null) {
+                        val smsRepository = SmsRepository(context)
+                        val sms = smsRepository.getSmsDetailsById(childTxn.sourceSmsId)
+                        if (sms != null) {
+                            childSmsBody = sms.body
+                            childSmsDate = sms.date
+                        }
                     }
+                    mergeTransactionsUseCase(parentTxnId, childTxnId, childSmsBody, childSmsDate)
+                } else if (action == "ACTION_DISMISS" && childTxnId != -1) {
+                    transactionRepository.dismissMerge(childTxnId)
                 }
-                mergeTransactionsUseCase(parentTxnId, childTxnId, childSmsBody, childSmsDate)
-            } else if (action == "ACTION_DISMISS" && childTxnId != -1) {
-                transactionRepository.dismissMerge(childTxnId)
-            }
-            with(NotificationManagerCompat.from(context)) {
-                cancel(notificationId)
-                if (childTxnId != -1) cancel(childTxnId)
+                with(NotificationManagerCompat.from(context)) {
+                    cancel(notificationId)
+                    if (childTxnId != -1) cancel(childTxnId)
+                }
+            } finally {
+                pendingResult?.finish()
             }
         }
     }

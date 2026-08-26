@@ -1,9 +1,9 @@
 package io.pm.finlight.data.repository
 
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
@@ -12,6 +12,7 @@ import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.DashboardCardType
 import io.pm.finlight.DashboardSettingsRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -27,16 +28,17 @@ import kotlin.test.assertTrue
 class DashboardSettingsRepositoryTest : BaseViewModelTest() {
     private lateinit var context: Application
     private lateinit var repository: DashboardSettingsRepository
-    private lateinit var prefs: SharedPreferences
     private val gson = Gson()
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
-        repository = DashboardSettingsRepository(context)
+        val dataStore = context.financeSettingsDataStore
+        runTest {
+            dataStore.edit { it.clear() }
+        }
+        repository = DashboardSettingsRepository(dataStore)
     }
 
     @Test
@@ -107,7 +109,9 @@ class DashboardSettingsRepositoryTest : BaseViewModelTest() {
     fun `migration of legacy RECENT_ACTIVITY card name`() =
         runTest {
             val legacyJson = gson.toJson(listOf("RECENT_ACTIVITY", "HERO_BUDGET"))
-            prefs.edit().putString("dashboard_card_order", legacyJson).commit()
+            context.financeSettingsDataStore.edit {
+                it[stringPreferencesKey("dashboard_card_order")] = legacyJson
+            }
 
             repository.getDashboardCardOrder().test {
                 val order = awaitItem()
@@ -122,10 +126,10 @@ class DashboardSettingsRepositoryTest : BaseViewModelTest() {
         runTest {
             val legacyVisibleJson = gson.toJson(setOf("RECENT_ACTIVITY"))
             val legacyOrderJson = gson.toJson(listOf("RECENT_ACTIVITY"))
-            prefs.edit()
-                .putString("dashboard_visible_cards", legacyVisibleJson)
-                .putString("dashboard_card_order", legacyOrderJson)
-                .commit()
+            context.financeSettingsDataStore.edit {
+                it[stringPreferencesKey("dashboard_visible_cards")] = legacyVisibleJson
+                it[stringPreferencesKey("dashboard_card_order")] = legacyOrderJson
+            }
 
             repository.getDashboardVisibleCards().test {
                 val visible = awaitItem()

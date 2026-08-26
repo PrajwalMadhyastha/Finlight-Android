@@ -1,16 +1,17 @@
 package io.pm.finlight.data.repository
 
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.SecuritySettingsRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -24,15 +25,16 @@ import kotlin.test.assertEquals
 class SecuritySettingsRepositoryTest : BaseViewModelTest() {
     private lateinit var context: Application
     private lateinit var repository: SecuritySettingsRepository
-    private lateinit var prefs: SharedPreferences
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
-        repository = SecuritySettingsRepository(context)
+        val dataStore = context.financeSettingsDataStore
+        runTest {
+            dataStore.edit { it.clear() }
+        }
+        repository = SecuritySettingsRepository(dataStore)
     }
 
     @Test
@@ -45,13 +47,6 @@ class SecuritySettingsRepositoryTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
-
-    @Test
-    fun `isAppLockEnabledBlocking works`() {
-        assertEquals(false, repository.isAppLockEnabledBlocking())
-        repository.saveAppLockEnabled(true)
-        assertEquals(true, repository.isAppLockEnabledBlocking())
-    }
 
     @Test
     fun `save and get privacy mode enabled`() =
@@ -77,5 +72,35 @@ class SecuritySettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(false, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `constructor with context initializes properly`() {
+        val repo = SecuritySettingsRepository(context)
+        kotlin.test.assertNotNull(repo)
+    }
+
+    @Test
+    fun `getters handle IOException by emitting defaults`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw java.io.IOException("Disk error") }
+            val repo = SecuritySettingsRepository(mockDataStore)
+
+            assertEquals(false, repo.getAppLockEnabled().first())
+            assertEquals(false, repo.getPrivacyModeEnabled().first())
+            assertEquals(false, repo.getSimulatorPrivacyModeEnabled().first())
+        }
+
+    @Test
+    fun `getters rethrow non-IOException exceptions`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
+            val repo = SecuritySettingsRepository(mockDataStore)
+
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getAppLockEnabled().first() }
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getPrivacyModeEnabled().first() }
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getSimulatorPrivacyModeEnabled().first() }
         }
 }

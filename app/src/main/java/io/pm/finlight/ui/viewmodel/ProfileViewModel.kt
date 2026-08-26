@@ -16,6 +16,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -59,12 +60,7 @@ class ProfileViewModel(
      */
     private suspend fun migrateProfilePictureIfNeeded() {
         withContext(Dispatchers.IO) {
-            val currentUri =
-                settingsRepository.getProfilePictureUri().let {
-                    // Read the current value once (blocking-style from prefs)
-                    context.getSharedPreferences("finance_app_settings", android.content.Context.MODE_PRIVATE)
-                        .getString("profile_picture_uri", null)
-                } ?: return@withContext
+            val currentUri = settingsRepository.getProfilePictureUri().firstOrNull() ?: return@withContext
 
             val oldAttachmentsDir = File(context.filesDir, "attachments")
             val oldFile = File(currentUri)

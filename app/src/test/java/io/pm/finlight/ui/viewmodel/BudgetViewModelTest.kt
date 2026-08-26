@@ -88,6 +88,9 @@ class BudgetViewModelTest : BaseViewModelTest() {
         `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
         `when`(budgetRepository.getBudgetsForMonth(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
         `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(null)) // Default to null
+        runTest {
+            `when`(settingsRepository.getOverallBudgetsForYear(anyInt())).thenReturn(emptyMap())
+        }
         `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
         `when`(budgetRepository.getActualSpendingForCategory(anyString(), anyInt(), anyInt())).thenReturn(flowOf(0.0))
 

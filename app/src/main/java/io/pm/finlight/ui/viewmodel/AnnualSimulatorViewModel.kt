@@ -133,6 +133,8 @@ class AnnualSimulatorViewModel(
     }
 
     fun togglePrivacyMode() {
-        settingsRepository.saveSimulatorPrivacyModeEnabled(!privacyModeEnabled.value)
+        viewModelScope.launch {
+            settingsRepository.saveSimulatorPrivacyModeEnabled(!privacyModeEnabled.value)
+        }
     }
 }

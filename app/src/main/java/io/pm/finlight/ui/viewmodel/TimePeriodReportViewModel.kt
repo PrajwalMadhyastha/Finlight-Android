@@ -20,6 +20,7 @@ import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import java.util.*
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
@@ -495,11 +496,15 @@ class TimePeriodReportViewModel(
     }
 
     fun toggleIncomeExclusion(monthKey: String) {
-        settingsRepository.toggleIncomeMonthExclusion(monthKey)
+        viewModelScope.launch {
+            settingsRepository.toggleIncomeMonthExclusion(monthKey)
+        }
     }
 
     fun toggleExpenseExclusion(monthKey: String) {
-        settingsRepository.toggleExpenseMonthExclusion(monthKey)
+        viewModelScope.launch {
+            settingsRepository.toggleExpenseMonthExclusion(monthKey)
+        }
     }
 
     private fun getPeriodDateRange(calendar: Calendar): Pair<Long, Long> {

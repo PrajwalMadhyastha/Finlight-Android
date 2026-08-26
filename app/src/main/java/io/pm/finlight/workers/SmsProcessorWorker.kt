@@ -33,6 +33,7 @@ import io.pm.finlight.SmsParser
 import io.pm.finlight.TagRepository
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionNotificationWorker
+import kotlinx.coroutines.flow.first
 import io.pm.finlight.TransactionType
 import io.pm.finlight.TripType
 import io.pm.finlight.data.db.AppDatabase
@@ -43,7 +44,6 @@ import io.pm.finlight.utils.SmsProviderHelper
 import io.pm.finlight.utils.SmsTransactionSaver
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import kotlinx.coroutines.flow.first
 import java.util.Date
 
 @Suppress("DEPRECATION")
@@ -265,7 +265,7 @@ class SmsProcessorWorker(
                     savedTxn,
                     potentialTxn.suspicionReason ?: "Amount flagged for review.",
                 )
-            } else if (settingsRepository.isAutoCaptureNotificationEnabledBlocking()) {
+            } else if (settingsRepository.getAutoCaptureNotificationEnabled().first()) {
                 val workRequest =
                     OneTimeWorkRequestBuilder<TransactionNotificationWorker>()
                         .setInputData(workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to newTransactionId.toInt()))

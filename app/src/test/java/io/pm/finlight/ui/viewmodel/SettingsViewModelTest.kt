@@ -530,16 +530,18 @@ class SettingsViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `setPrivacyModeEnabled calls repository`() {
-        // Arrange
-        initializeViewModel()
+    fun `setPrivacyModeEnabled calls repository`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
 
-        // Act
-        viewModel.setPrivacyModeEnabled(true)
+            // Act
+            viewModel.setPrivacyModeEnabled(true)
+            advanceUntilIdle()
 
-        // Assert
-        verify(settingsRepository).savePrivacyModeEnabled(true)
-    }
+            // Assert
+            verify(settingsRepository).savePrivacyModeEnabled(true)
+        }
 
     @Test
     fun `simulatorPrivacyModeEnabled flow emits value from repository`() =
@@ -556,40 +558,46 @@ class SettingsViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `setSimulatorPrivacyModeEnabled calls repository`() {
-        // Arrange
-        initializeViewModel()
+    fun `setSimulatorPrivacyModeEnabled calls repository`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
 
-        // Act
-        viewModel.setSimulatorPrivacyModeEnabled(true)
+            // Act
+            viewModel.setSimulatorPrivacyModeEnabled(true)
+            advanceUntilIdle()
 
-        // Assert
-        verify(settingsRepository).saveSimulatorPrivacyModeEnabled(true)
-    }
-
-    @Test
-    fun `saveSelectedTheme calls repository`() {
-        // Arrange
-        initializeViewModel()
-
-        // Act
-        viewModel.saveSelectedTheme(AppTheme.AURORA)
-
-        // Assert
-        verify(settingsRepository).saveSelectedTheme(AppTheme.AURORA)
-    }
+            // Assert
+            verify(settingsRepository).saveSimulatorPrivacyModeEnabled(true)
+        }
 
     @Test
-    fun `setAppLockEnabled calls repository`() {
-        // Arrange
-        initializeViewModel()
+    fun `saveSelectedTheme calls repository`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
 
-        // Act
-        viewModel.setAppLockEnabled(true)
+            // Act
+            viewModel.saveSelectedTheme(AppTheme.AURORA)
+            advanceUntilIdle()
 
-        // Assert
-        verify(settingsRepository).saveAppLockEnabled(true)
-    }
+            // Assert
+            verify(settingsRepository).saveSelectedTheme(AppTheme.AURORA)
+        }
+
+    @Test
+    fun `setAppLockEnabled calls repository`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+
+            // Act
+            viewModel.setAppLockEnabled(true)
+            advanceUntilIdle()
+
+            // Assert
+            verify(settingsRepository).saveAppLockEnabled(true)
+        }
 
     // --- UPDATED: Test for backup success dialog ---
     @Test

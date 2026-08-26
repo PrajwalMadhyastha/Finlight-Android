@@ -1,16 +1,17 @@
 package io.pm.finlight.data.repository
 
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.BudgetSettingsRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -26,73 +27,71 @@ import kotlin.test.assertNull
 class BudgetSettingsRepositoryTest : BaseViewModelTest() {
     private lateinit var context: Application
     private lateinit var repository: BudgetSettingsRepository
-    private lateinit var prefs: SharedPreferences
-
-    private fun getBudgetKey(
-        year: Int,
-        month: Int,
-    ): String {
-        return "overall_budget_${year}_${String.format("%02d", month)}"
-    }
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
-        repository = BudgetSettingsRepository(context)
+        val dataStore = context.financeSettingsDataStore
+        runTest {
+            dataStore.edit { it.clear() }
+        }
+        repository = BudgetSettingsRepository(dataStore)
     }
 
     @Test
-    fun `save and get overall budget for specific month blocking`() {
-        val year = 2026
-        val month = 5
-        val budget = 12000f
+    fun `save and get overall budget for specific month`() =
+        runTest {
+            val year = 2026
+            val month = 5
+            val budget = 12000f
 
-        assertNull(repository.getOverallBudgetForMonthBlocking(year, month))
+            assertNull(repository.getOverallBudgetForMonth(year, month).first())
 
-        repository.saveOverallBudgetForMonth(year, month, budget)
-        assertEquals(budget, repository.getOverallBudgetForMonthBlocking(year, month))
-    }
-
-    @Test
-    fun `saveOverallBudgetForCurrentMonth saves to current year and month`() {
-        val calendar = Calendar.getInstance()
-        val year = calendar.get(Calendar.YEAR)
-        val month = calendar.get(Calendar.MONTH) + 1
-        val budget = 15000f
-
-        repository.saveOverallBudgetForCurrentMonth(budget)
-        assertEquals(budget, repository.getOverallBudgetForMonthBlocking(year, month))
-    }
+            repository.saveOverallBudgetForMonth(year, month, budget)
+            assertEquals(budget, repository.getOverallBudgetForMonth(year, month).first())
+        }
 
     @Test
-    fun `getOverallBudgetForMonthBlocking carries over budget from previous months within 12 months`() {
-        // Set budget for Jan 2026
-        repository.saveOverallBudgetForMonth(2026, 1, 10000f)
+    fun `saveOverallBudgetForCurrentMonth saves to current year and month`() =
+        runTest {
+            val calendar = Calendar.getInstance()
+            val year = calendar.get(Calendar.YEAR)
+            val month = calendar.get(Calendar.MONTH) + 1
+            val budget = 15000f
 
-        // Query April 2026 (should carry over 10000f)
-        assertEquals(10000f, repository.getOverallBudgetForMonthBlocking(2026, 4))
-
-        // Query Dec 2026 (11 months later, should carry over)
-        assertEquals(10000f, repository.getOverallBudgetForMonthBlocking(2026, 12))
-
-        // Query Feb 2027 (13 months later, beyond 12 month lookback, returns null)
-        assertNull(repository.getOverallBudgetForMonthBlocking(2027, 2))
-    }
+            repository.saveOverallBudgetForCurrentMonth(budget)
+            assertEquals(budget, repository.getOverallBudgetForMonth(year, month).first())
+        }
 
     @Test
-    fun `getOverallBudgetsForYear returns only months with explicitly set budgets`() {
-        repository.saveOverallBudgetForMonth(2026, 3, 20000f)
-        repository.saveOverallBudgetForMonth(2026, 7, 25000f)
+    fun `getOverallBudgetForMonth carries over budget from previous months within 12 months`() =
+        runTest {
+            // Set budget for Jan 2026
+            repository.saveOverallBudgetForMonth(2026, 1, 10000f)
 
-        val yearBudgets = repository.getOverallBudgetsForYear(2026)
-        assertEquals(2, yearBudgets.size)
-        assertEquals(20000f, yearBudgets[3])
-        assertEquals(25000f, yearBudgets[7])
-        assertNull(yearBudgets[1])
-    }
+            // Query April 2026 (should carry over 10000f)
+            assertEquals(10000f, repository.getOverallBudgetForMonth(2026, 4).first())
+
+            // Query Dec 2026 (11 months later, should carry over)
+            assertEquals(10000f, repository.getOverallBudgetForMonth(2026, 12).first())
+
+            // Query Feb 2027 (13 months later, beyond 12 month lookback, returns null)
+            assertNull(repository.getOverallBudgetForMonth(2027, 2).first())
+        }
+
+    @Test
+    fun `getOverallBudgetsForYear returns only months with explicitly set budgets`() =
+        runTest {
+            repository.saveOverallBudgetForMonth(2026, 3, 20000f)
+            repository.saveOverallBudgetForMonth(2026, 7, 25000f)
+
+            val yearBudgets = repository.getOverallBudgetsForYear(2026)
+            assertEquals(2, yearBudgets.size)
+            assertEquals(20000f, yearBudgets[3])
+            assertEquals(25000f, yearBudgets[7])
+            assertNull(yearBudgets[1])
+        }
 
     @Test
     fun `getOverallBudgetForMonth flow emits carry-over and reacts to changes`() =
@@ -110,5 +109,32 @@ class BudgetSettingsRepositoryTest : BaseViewModelTest() {
 
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `constructor with context initializes properly`() {
+        val repo = BudgetSettingsRepository(context)
+        kotlin.test.assertNotNull(repo)
+    }
+
+    @Test
+    fun `getters handle IOException by emitting defaults`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw java.io.IOException("Disk error") }
+            val repo = BudgetSettingsRepository(mockDataStore)
+
+            assertNull(repo.getOverallBudgetForMonth(2026, 1).first())
+            assertEquals(emptyMap(), repo.getOverallBudgetsForYear(2026))
+        }
+
+    @Test
+    fun `getters rethrow non-IOException exceptions`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
+            val repo = BudgetSettingsRepository(mockDataStore)
+
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getOverallBudgetForMonth(2026, 1).first() }
         }
 }

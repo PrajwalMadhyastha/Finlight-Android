@@ -712,7 +712,6 @@ class NotificationHelperTest : BaseViewModelTest() {
         }
     }
 
-    @Config(sdk = [Build.VERSION_CODES.R])
     @Test
     fun `showNotification_onOlderSdk_worksWithoutPermissionCheck`() {
         // Arrange

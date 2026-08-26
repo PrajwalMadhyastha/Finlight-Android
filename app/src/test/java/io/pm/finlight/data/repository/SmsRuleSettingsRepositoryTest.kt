@@ -1,16 +1,17 @@
 package io.pm.finlight.data.repository
 
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.SmsRuleSettingsRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -24,23 +25,25 @@ import kotlin.test.assertEquals
 class SmsRuleSettingsRepositoryTest : BaseViewModelTest() {
     private lateinit var context: Application
     private lateinit var repository: SmsRuleSettingsRepository
-    private lateinit var prefs: SharedPreferences
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
-        repository = SmsRuleSettingsRepository(context)
+        val dataStore = context.financeSettingsDataStore
+        runTest {
+            dataStore.edit { it.clear() }
+        }
+        repository = SmsRuleSettingsRepository(dataStore)
     }
 
     @Test
     fun `save and get sms scan start date`() =
         runTest {
-            val date = 1690000000000L
             repository.getSmsScanStartDate().test {
-                awaitItem() // Default 30 days ago
+                val defaultDate = awaitItem()
+                kotlin.test.assertTrue(defaultDate > 0L) // Default is approx 30 days ago
+                val date = 1700000000000L
                 repository.saveSmsScanStartDate(date)
                 assertEquals(date, awaitItem())
                 cancelAndIgnoreRemainingEvents()
@@ -48,11 +51,12 @@ class SmsRuleSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `save and get ignore rules checksum`() {
-        assertEquals(0, repository.getIgnoreRulesChecksum())
-        repository.saveIgnoreRulesChecksum(12345)
-        assertEquals(12345, repository.getIgnoreRulesChecksum())
-    }
+    fun `save and get ignore rules checksum`() =
+        runTest {
+            assertEquals(0, repository.getIgnoreRulesChecksum())
+            repository.saveIgnoreRulesChecksum(12345)
+            assertEquals(12345, repository.getIgnoreRulesChecksum())
+        }
 
     @Test
     fun `add and get dismissed merge suggestions`() =
@@ -65,5 +69,34 @@ class SmsRuleSettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(setOf("suggestion_1", "suggestion_2"), awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `constructor with context initializes properly`() {
+        val repo = SmsRuleSettingsRepository(context)
+        kotlin.test.assertNotNull(repo)
+    }
+
+    @Test
+    fun `getters handle IOException by emitting defaults`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw java.io.IOException("Disk error") }
+            val repo = SmsRuleSettingsRepository(mockDataStore)
+
+            kotlin.test.assertTrue(repo.getSmsScanStartDate().first() > 0L)
+            assertEquals(0, repo.getIgnoreRulesChecksum())
+            assertEquals(emptySet<String>(), repo.getDismissedMergeSuggestions().first())
+        }
+
+    @Test
+    fun `getters rethrow non-IOException exceptions`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
+            val repo = SmsRuleSettingsRepository(mockDataStore)
+
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getSmsScanStartDate().first() }
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getDismissedMergeSuggestions().first() }
         }
 }

@@ -1,9 +1,9 @@
 package io.pm.finlight.data.repository
 
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
@@ -14,18 +14,19 @@ import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TripType
+import io.pm.finlight.data.financeSettingsDataStore
+import io.pm.finlight.data.internalSettingsDataStore
 import io.pm.finlight.ui.theme.AppTheme
-import junit.framework.TestCase.assertFalse
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
-import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.test.DefaultAsserter.assertTrue
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -35,29 +36,19 @@ import kotlin.test.assertTrue
 class SettingsRepositoryTest : BaseViewModelTest() {
     private lateinit var context: Application
     private lateinit var repository: SettingsRepository
-    private lateinit var prefs: SharedPreferences
-    private lateinit var internalPrefs: SharedPreferences
     private val gson = Gson()
-
-    // Helper to get the key format used by the repository
-    private fun getBudgetKey(
-        year: Int,
-        month: Int,
-    ): String {
-        return "overall_budget_${year}_${String.format("%02d", month)}"
-    }
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        // Use the real SharedPreferences provided by Robolectric's context
-        prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        internalPrefs = context.getSharedPreferences("finlight_internal_state", Context.MODE_PRIVATE)
+        val dataStore = context.financeSettingsDataStore
+        val internalDataStore = context.internalSettingsDataStore
 
-        // Clear prefs before each test to ensure a clean state
-        prefs.edit().clear().commit()
-        internalPrefs.edit().clear().commit()
+        runTest {
+            dataStore.edit { it.clear() }
+            internalDataStore.edit { it.clear() }
+        }
 
         repository = SettingsRepository(context)
     }
@@ -100,13 +91,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isAppLockEnabledBlocking works`() {
-        assertEquals(false, repository.isAppLockEnabledBlocking())
-        repository.saveAppLockEnabled(true)
-        assertEquals(true, repository.isAppLockEnabledBlocking())
-    }
-
-    @Test
     fun `save and get home currency`() =
         runTest {
             val testCurrency = "USD"
@@ -138,8 +122,10 @@ class SettingsRepositoryTest : BaseViewModelTest() {
             val pastEndDate = 0L
             val expiredSettings = TravelModeSettings(true, "Old Trip", TripType.DOMESTIC, 1L, pastEndDate, null, null)
 
-            // Bypass saveTravelModeSettings to directly inject an "expired" state
-            prefs.edit().putString("travel_mode_settings", gson.toJson(expiredSettings)).commit()
+            val prefKey = stringPreferencesKey("travel_mode_settings")
+            context.financeSettingsDataStore.edit {
+                it[prefKey] = gson.toJson(expiredSettings)
+            }
 
             repository.getTravelModeSettings().test {
                 val item = awaitItem()
@@ -148,7 +134,7 @@ class SettingsRepositoryTest : BaseViewModelTest() {
             }
 
             // Verify it was actually removed from prefs
-            assertNull(prefs.getString("travel_mode_settings", null))
+            assertNull(context.financeSettingsDataStore.data.first()[prefKey])
         }
 
     @Test
@@ -168,11 +154,9 @@ class SettingsRepositoryTest : BaseViewModelTest() {
     fun `getDashboardCardOrder_emitsDefaultOrder`() =
         runTest {
             repository.getDashboardCardOrder().test {
-                // Check default
                 val defaultOrder = awaitItem()
                 assertTrue(defaultOrder.isNotEmpty())
                 assertEquals(DashboardCardType.HERO_BUDGET, defaultOrder.first())
-                // --- FIX: Correct the order to match the implementation's default ---
                 assertEquals(
                     listOf(
                         DashboardCardType.HERO_BUDGET,
@@ -196,7 +180,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
     fun `getDashboardVisibleCards_emitsDefaultSet`() =
         runTest {
             repository.getDashboardVisibleCards().test {
-                // Check default
                 val defaultVisible = awaitItem()
                 assertTrue(defaultVisible.isNotEmpty())
                 assertEquals(DashboardCardType.entries.toSet(), defaultVisible)
@@ -352,8 +335,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(false, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            // Test blocking getter
-            assertEquals(false, repository.isUnknownTransactionPopupEnabledBlocking())
         }
 
     @Test
@@ -391,29 +372,33 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `first launch flag is managed correctly in internal prefs`() {
-        // Initial state
-        assertFalse(repository.isFirstLaunchCompleteBlocking())
+    fun `first launch flag is managed correctly in internal prefs`() =
+        runTest {
+            repository.getIsFirstLaunchComplete().test {
+                // Initial state
+                assertFalse(awaitItem())
 
-        // Set the flag
-        repository.setFirstLaunchComplete()
+                // Set the flag
+                repository.setFirstLaunchComplete()
 
-        // Verify
-        assertTrue(repository.isFirstLaunchCompleteBlocking())
-        assertTrue(internalPrefs.contains("is_first_launch_complete"))
-        assertFalse("Main prefs should not contain the internal flag", prefs.contains("is_first_launch_complete"))
-    }
+                // Verify
+                assertTrue(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 
     @Test
-    fun `last month summary dismissal is stored and checked correctly`() {
-        assertFalse("Should not be dismissed initially", repository.hasLastMonthSummaryBeenDismissed())
+    fun `last month summary dismissal is stored and checked correctly`() =
+        runTest {
+            repository.hasLastMonthSummaryBeenDismissed().test {
+                assertFalse(awaitItem(), "Should not be dismissed initially")
 
-        repository.setLastMonthSummaryDismissed()
+                repository.setLastMonthSummaryDismissed()
 
-        assertTrue("Should be dismissed after setting", repository.hasLastMonthSummaryBeenDismissed())
-        val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
-        assertTrue(prefs.contains("last_month_summary_dismissed_$monthKey"))
-    }
+                assertTrue(awaitItem(), "Should be dismissed after setting")
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 
     // --- Tests for Budget Carry-over Logic ---
 
@@ -424,20 +409,18 @@ class SettingsRepositoryTest : BaseViewModelTest() {
                 assertNull(awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            assertNull(repository.getOverallBudgetForMonthBlocking(2025, 10))
         }
 
     @Test
     fun `getOverallBudgetForMonth returns current month budget if set`() =
         runTest {
             val budget = 50000f
-            prefs.edit().putFloat(getBudgetKey(2025, 10), budget).commit()
+            repository.saveOverallBudgetForMonth(2025, 10, budget)
 
             repository.getOverallBudgetForMonth(2025, 10).test {
                 assertEquals(budget, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            assertEquals(budget, repository.getOverallBudgetForMonthBlocking(2025, 10))
         }
 
     @Test
@@ -445,14 +428,13 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         runTest {
             val budget = 40000f
             // Budget set for September 2025
-            prefs.edit().putFloat(getBudgetKey(2025, 9), budget).commit()
+            repository.saveOverallBudgetForMonth(2025, 9, budget)
 
             // Asking for October 2025
             repository.getOverallBudgetForMonth(2025, 10).test {
                 assertEquals(budget, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            assertEquals(budget, repository.getOverallBudgetForMonthBlocking(2025, 10))
         }
 
     @Test
@@ -460,14 +442,13 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         runTest {
             val budget = 30000f
             // Budget set for June 2025
-            prefs.edit().putFloat(getBudgetKey(2025, 6), budget).commit()
+            repository.saveOverallBudgetForMonth(2025, 6, budget)
 
             // Asking for October 2025
             repository.getOverallBudgetForMonth(2025, 10).test {
                 assertEquals(budget, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            assertEquals(budget, repository.getOverallBudgetForMonthBlocking(2025, 10))
         }
 
     @Test
@@ -476,28 +457,25 @@ class SettingsRepositoryTest : BaseViewModelTest() {
             val oldBudget = 30000f
             val currentBudget = 60000f
             // Budget set for June 2025
-            prefs.edit().putFloat(getBudgetKey(2025, 6), oldBudget).commit()
+            repository.saveOverallBudgetForMonth(2025, 6, oldBudget)
             // Budget also set for October 2025
-            prefs.edit().putFloat(getBudgetKey(2025, 10), currentBudget).commit()
+            repository.saveOverallBudgetForMonth(2025, 10, currentBudget)
 
             // Asking for October 2025
             repository.getOverallBudgetForMonth(2025, 10).test {
                 assertEquals(currentBudget, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
-            assertEquals(currentBudget, repository.getOverallBudgetForMonthBlocking(2025, 10))
         }
 
     @Test
     fun `getOverallBudgetsForYear returns list of Pair of month and budget`() =
         runTest {
             val year = 2026
-            prefs.edit()
-                .putFloat(getBudgetKey(year, 1), 1000f)
-                .putFloat(getBudgetKey(year, 3), 3000f)
-                .putFloat(getBudgetKey(year, 12), 12000f)
-                .putFloat(getBudgetKey(2025, 1), 500f) // Should be ignored
-                .commit()
+            repository.saveOverallBudgetForMonth(year, 1, 1000f)
+            repository.saveOverallBudgetForMonth(year, 3, 3000f)
+            repository.saveOverallBudgetForMonth(year, 12, 12000f)
+            repository.saveOverallBudgetForMonth(2025, 1, 500f) // Should be ignored
 
             val budgets = repository.getOverallBudgetsForYear(year)
             assertEquals(3, budgets.size)
@@ -540,13 +518,6 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isGoalNudgesEnabledBlocking works correctly`() {
-        assertTrue(repository.isGoalNudgesEnabledBlocking()) // Default
-        repository.saveGoalNudgesEnabled(false)
-        assertFalse(repository.isGoalNudgesEnabledBlocking())
-    }
-
-    @Test
     fun `toggle and get excluded income months`() =
         runTest {
             repository.getExcludedIncomeMonths().test {
@@ -582,9 +553,51 @@ class SettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `save and get ignore rules checksum`() {
-        assertEquals(0, repository.getIgnoreRulesChecksum()) // Default
-        repository.saveIgnoreRulesChecksum(12345)
-        assertEquals(12345, repository.getIgnoreRulesChecksum())
+    fun `save and get ignore rules checksum`() =
+        runTest {
+            assertEquals(0, repository.getIgnoreRulesChecksum()) // Default
+            repository.saveIgnoreRulesChecksum(12345)
+            assertEquals(12345, repository.getIgnoreRulesChecksum())
+        }
+
+    @Test
+    fun `save and get has seen onboarding`() =
+        runTest {
+            repository.getHasSeenOnboarding().test {
+                assertFalse(awaitItem())
+                repository.setHasSeenOnboarding(true)
+                assertTrue(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `saveOverallBudgetForCurrentMonth saves to current year and month`() =
+        runTest {
+            val calendar = Calendar.getInstance()
+            val year = calendar.get(Calendar.YEAR)
+            val month = calendar.get(Calendar.MONTH) + 1
+            val budget = 18000f
+
+            repository.saveOverallBudgetForCurrentMonth(budget)
+            assertEquals(budget, repository.getOverallBudgetForMonth(year, month).first())
+        }
+
+    @Test
+    fun `primary constructor initializes all domain repositories properly`() {
+        val repo =
+            SettingsRepository(
+                io.pm.finlight.AppConfigRepository(context),
+                io.pm.finlight.DashboardSettingsRepository(context),
+                io.pm.finlight.SecuritySettingsRepository(context),
+                io.pm.finlight.BudgetSettingsRepository(context),
+                io.pm.finlight.BackupSettingsRepository(context),
+                io.pm.finlight.NotificationSettingsRepository(context),
+                io.pm.finlight.SmsRuleSettingsRepository(context),
+                io.pm.finlight.TravelSettingsRepository(context),
+                io.pm.finlight.FirstLaunchSettingsRepository(context),
+                io.pm.finlight.FeatureSettingsRepository(context),
+            )
+        kotlin.test.assertNotNull(repo)
     }
 }

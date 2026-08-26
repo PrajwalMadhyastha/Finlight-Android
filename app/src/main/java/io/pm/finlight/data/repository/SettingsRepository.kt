@@ -52,7 +52,7 @@ class SettingsRepository(
 
     // --- Recurring Transaction Settings ---
 
-    fun saveRecurringTransactionsEnabled(isEnabled: Boolean) =
+    suspend fun saveRecurringTransactionsEnabled(isEnabled: Boolean) =
         featureSettingsRepository.saveRecurringTransactionsEnabled(isEnabled)
 
     fun getRecurringTransactionsEnabled(): Flow<Boolean> =
@@ -60,20 +60,17 @@ class SettingsRepository(
 
     // --- Savings Goals Settings ---
 
-    fun saveGoalIncomeThreshold(amount: Int) =
+    suspend fun saveGoalIncomeThreshold(amount: Int) =
         featureSettingsRepository.saveGoalIncomeThreshold(amount)
 
     fun getGoalIncomeThreshold(): Flow<Int> =
         featureSettingsRepository.getGoalIncomeThreshold()
 
-    fun saveGoalNudgesEnabled(isEnabled: Boolean) =
+    suspend fun saveGoalNudgesEnabled(isEnabled: Boolean) =
         featureSettingsRepository.saveGoalNudgesEnabled(isEnabled)
 
     fun getGoalNudgesEnabled(): Flow<Boolean> =
         featureSettingsRepository.getGoalNudgesEnabled()
-
-    fun isGoalNudgesEnabledBlocking(): Boolean =
-        featureSettingsRepository.isGoalNudgesEnabledBlocking()
 
     // --- Outlier Month Management Functions ---
 
@@ -83,36 +80,33 @@ class SettingsRepository(
     fun getExcludedExpenseMonths(): Flow<Set<String>> =
         featureSettingsRepository.getExcludedExpenseMonths()
 
-    fun toggleIncomeMonthExclusion(monthKey: String) =
+    suspend fun toggleIncomeMonthExclusion(monthKey: String) =
         featureSettingsRepository.toggleIncomeMonthExclusion(monthKey)
 
-    fun toggleExpenseMonthExclusion(monthKey: String) =
+    suspend fun toggleExpenseMonthExclusion(monthKey: String) =
         featureSettingsRepository.toggleExpenseMonthExclusion(monthKey)
 
     // --- Backup Settings ---
 
-    fun saveBackupEnabled(isEnabled: Boolean) =
+    suspend fun saveBackupEnabled(isEnabled: Boolean) =
         backupSettingsRepository.saveBackupEnabled(isEnabled)
 
     fun getBackupEnabled(): Flow<Boolean> =
         backupSettingsRepository.getBackupEnabled()
 
-    fun saveAutoBackupEnabled(isEnabled: Boolean) =
+    suspend fun saveAutoBackupEnabled(isEnabled: Boolean) =
         backupSettingsRepository.saveAutoBackupEnabled(isEnabled)
 
     fun getAutoBackupEnabled(): Flow<Boolean> =
         backupSettingsRepository.getAutoBackupEnabled()
 
-    fun saveAutoBackupNotificationEnabled(isEnabled: Boolean) =
+    suspend fun saveAutoBackupNotificationEnabled(isEnabled: Boolean) =
         backupSettingsRepository.saveAutoBackupNotificationEnabled(isEnabled)
 
     fun getAutoBackupNotificationEnabled(): Flow<Boolean> =
         backupSettingsRepository.getAutoBackupNotificationEnabled()
 
-    fun isAutoBackupNotificationEnabledBlocking(): Boolean =
-        backupSettingsRepository.isAutoBackupNotificationEnabledBlocking()
-
-    fun saveLastBackupTimestamp(timestamp: Long) =
+    suspend fun saveLastBackupTimestamp(timestamp: Long) =
         backupSettingsRepository.saveLastBackupTimestamp(timestamp)
 
     fun getLastBackupTimestamp(): Flow<Long> =
@@ -120,118 +114,112 @@ class SettingsRepository(
 
     // --- SMS Rule and Merge Settings ---
 
-    fun saveSmsScanStartDate(date: Long) =
+    suspend fun saveSmsScanStartDate(date: Long) =
         smsRuleSettingsRepository.saveSmsScanStartDate(date)
 
     fun getSmsScanStartDate(): Flow<Long> =
         smsRuleSettingsRepository.getSmsScanStartDate()
 
-    fun saveIgnoreRulesChecksum(checksum: Int) =
+    suspend fun saveIgnoreRulesChecksum(checksum: Int) =
         smsRuleSettingsRepository.saveIgnoreRulesChecksum(checksum)
 
-    fun getIgnoreRulesChecksum(): Int =
+    suspend fun getIgnoreRulesChecksum(): Int =
         smsRuleSettingsRepository.getIgnoreRulesChecksum()
 
     fun getDismissedMergeSuggestions(): Flow<Set<String>> =
         smsRuleSettingsRepository.getDismissedMergeSuggestions()
 
-    fun addDismissedMergeSuggestion(suggestionKey: String) =
+    suspend fun addDismissedMergeSuggestion(suggestionKey: String) =
         smsRuleSettingsRepository.addDismissedMergeSuggestion(suggestionKey)
 
     // --- Notification and Report Settings ---
 
-    fun saveDailyReportEnabled(isEnabled: Boolean) =
+    suspend fun saveDailyReportEnabled(isEnabled: Boolean) =
         notificationSettingsRepository.saveDailyReportEnabled(isEnabled)
 
     fun getDailyReportEnabled(): Flow<Boolean> =
         notificationSettingsRepository.getDailyReportEnabled()
 
-    fun saveDailyReportTime(
+    suspend fun saveDailyReportTime(
         hour: Int,
-        minute: Int
+        minute: Int,
     ) =
         notificationSettingsRepository.saveDailyReportTime(hour, minute)
 
     fun getDailyReportTime(): Flow<Pair<Int, Int>> =
         notificationSettingsRepository.getDailyReportTime()
 
-    fun saveWeeklySummaryEnabled(isEnabled: Boolean) =
+    suspend fun saveWeeklySummaryEnabled(isEnabled: Boolean) =
         notificationSettingsRepository.saveWeeklySummaryEnabled(isEnabled)
 
     fun getWeeklySummaryEnabled(): Flow<Boolean> =
         notificationSettingsRepository.getWeeklySummaryEnabled()
 
-    fun saveWeeklyReportTime(
+    suspend fun saveWeeklyReportTime(
         dayOfWeek: Int,
         hour: Int,
-        minute: Int
+        minute: Int,
     ) =
         notificationSettingsRepository.saveWeeklyReportTime(dayOfWeek, hour, minute)
 
     fun getWeeklyReportTime(): Flow<Triple<Int, Int, Int>> =
         notificationSettingsRepository.getWeeklyReportTime()
 
-    fun saveMonthlySummaryEnabled(isEnabled: Boolean) =
+    suspend fun saveMonthlySummaryEnabled(isEnabled: Boolean) =
         notificationSettingsRepository.saveMonthlySummaryEnabled(isEnabled)
 
     fun getMonthlySummaryEnabled(): Flow<Boolean> =
         notificationSettingsRepository.getMonthlySummaryEnabled()
 
-    fun saveMonthlyReportTime(
+    suspend fun saveMonthlyReportTime(
         dayOfMonth: Int,
         hour: Int,
-        minute: Int
+        minute: Int,
     ) =
         notificationSettingsRepository.saveMonthlyReportTime(dayOfMonth, hour, minute)
 
     fun getMonthlyReportTime(): Flow<Triple<Int, Int, Int>> =
         notificationSettingsRepository.getMonthlyReportTime()
 
-    fun saveAutoCaptureNotificationEnabled(isEnabled: Boolean) =
+    suspend fun saveAutoCaptureNotificationEnabled(isEnabled: Boolean) =
         notificationSettingsRepository.saveAutoCaptureNotificationEnabled(isEnabled)
 
     fun getAutoCaptureNotificationEnabled(): Flow<Boolean> =
         notificationSettingsRepository.getAutoCaptureNotificationEnabled()
 
-    fun isAutoCaptureNotificationEnabledBlocking(): Boolean =
-        notificationSettingsRepository.isAutoCaptureNotificationEnabledBlocking()
-
-    fun saveUnknownTransactionPopupEnabled(isEnabled: Boolean) =
+    suspend fun saveUnknownTransactionPopupEnabled(isEnabled: Boolean) =
         notificationSettingsRepository.saveUnknownTransactionPopupEnabled(isEnabled)
 
     fun getUnknownTransactionPopupEnabled(): Flow<Boolean> =
         notificationSettingsRepository.getUnknownTransactionPopupEnabled()
 
-    fun isUnknownTransactionPopupEnabledBlocking(): Boolean =
-        notificationSettingsRepository.isUnknownTransactionPopupEnabledBlocking()
-
-    fun setLastMonthSummaryDismissed() =
+    suspend fun setLastMonthSummaryDismissed() =
         notificationSettingsRepository.setLastMonthSummaryDismissed()
 
-    fun hasLastMonthSummaryBeenDismissed(): Boolean =
+    fun hasLastMonthSummaryBeenDismissed(): Flow<Boolean> =
         notificationSettingsRepository.hasLastMonthSummaryBeenDismissed()
 
     // --- App Config (User, Theme, Currency) ---
 
-    fun saveUserName(name: String) =
+    suspend fun saveUserName(name: String) =
         appConfigRepository.saveUserName(name)
 
     fun getUserName(): Flow<String> =
         appConfigRepository.getUserName()
 
-    fun saveProfilePictureUri(uriString: String?) =
+    suspend fun saveProfilePictureUri(uriString: String?) =
         appConfigRepository.saveProfilePictureUri(uriString)
 
     fun getProfilePictureUri(): Flow<String?> =
         appConfigRepository.getProfilePictureUri()
 
-    fun saveSelectedTheme(theme: AppTheme) =
+    suspend fun saveSelectedTheme(theme: AppTheme) =
         appConfigRepository.saveSelectedTheme(theme)
 
     fun getSelectedTheme(): Flow<AppTheme> =
         appConfigRepository.getSelectedTheme()
 
-    fun saveHomeCurrency(currencyCode: String) =
+    suspend fun saveHomeCurrency(currencyCode: String) =
         appConfigRepository.saveHomeCurrency(currencyCode)
 
     fun getHomeCurrency(): Flow<String> =
@@ -239,7 +227,7 @@ class SettingsRepository(
 
     // --- Travel Mode Settings ---
 
-    fun saveTravelModeSettings(settings: TravelModeSettings?) =
+    suspend fun saveTravelModeSettings(settings: TravelModeSettings?) =
         travelSettingsRepository.saveTravelModeSettings(settings)
 
     fun getTravelModeSettings(): Flow<TravelModeSettings?> =
@@ -247,22 +235,17 @@ class SettingsRepository(
 
     // --- Budget Settings ---
 
-    fun saveOverallBudgetForCurrentMonth(amount: Float) =
+    suspend fun saveOverallBudgetForCurrentMonth(amount: Float) =
         budgetSettingsRepository.saveOverallBudgetForCurrentMonth(amount)
 
-    fun saveOverallBudgetForMonth(
+    suspend fun saveOverallBudgetForMonth(
         year: Int,
         month: Int,
         amount: Float,
     ) = budgetSettingsRepository.saveOverallBudgetForMonth(year, month, amount)
 
-    fun getOverallBudgetsForYear(year: Int): Map<Int, Float> =
+    suspend fun getOverallBudgetsForYear(year: Int): Map<Int, Float> =
         budgetSettingsRepository.getOverallBudgetsForYear(year)
-
-    fun getOverallBudgetForMonthBlocking(
-        year: Int,
-        month: Int,
-    ): Float? = budgetSettingsRepository.getOverallBudgetForMonthBlocking(year, month)
 
     fun getOverallBudgetForMonth(
         year: Int,
@@ -271,7 +254,7 @@ class SettingsRepository(
 
     // --- Dashboard Settings ---
 
-    fun saveDashboardLayout(
+    suspend fun saveDashboardLayout(
         order: List<DashboardCardType>,
         visible: Set<DashboardCardType>,
     ) = dashboardSettingsRepository.saveDashboardLayout(order, visible)
@@ -284,22 +267,19 @@ class SettingsRepository(
 
     // --- Security Settings ---
 
-    fun saveAppLockEnabled(isEnabled: Boolean) =
+    suspend fun saveAppLockEnabled(isEnabled: Boolean) =
         securitySettingsRepository.saveAppLockEnabled(isEnabled)
 
     fun getAppLockEnabled(): Flow<Boolean> =
         securitySettingsRepository.getAppLockEnabled()
 
-    fun isAppLockEnabledBlocking(): Boolean =
-        securitySettingsRepository.isAppLockEnabledBlocking()
-
-    fun savePrivacyModeEnabled(isEnabled: Boolean) =
+    suspend fun savePrivacyModeEnabled(isEnabled: Boolean) =
         securitySettingsRepository.savePrivacyModeEnabled(isEnabled)
 
     fun getPrivacyModeEnabled(): Flow<Boolean> =
         securitySettingsRepository.getPrivacyModeEnabled()
 
-    fun saveSimulatorPrivacyModeEnabled(isEnabled: Boolean) =
+    suspend fun saveSimulatorPrivacyModeEnabled(isEnabled: Boolean) =
         securitySettingsRepository.saveSimulatorPrivacyModeEnabled(isEnabled)
 
     fun getSimulatorPrivacyModeEnabled(): Flow<Boolean> =
@@ -307,15 +287,15 @@ class SettingsRepository(
 
     // --- First Launch and Onboarding State ---
 
-    fun hasSeenOnboarding(): Boolean =
-        firstLaunchSettingsRepository.hasSeenOnboarding()
+    fun getHasSeenOnboarding(): Flow<Boolean> =
+        firstLaunchSettingsRepository.getHasSeenOnboarding()
 
-    fun setHasSeenOnboarding(hasSeen: Boolean) =
+    suspend fun setHasSeenOnboarding(hasSeen: Boolean) =
         firstLaunchSettingsRepository.setHasSeenOnboarding(hasSeen)
 
-    fun isFirstLaunchCompleteBlocking(): Boolean =
-        firstLaunchSettingsRepository.isFirstLaunchCompleteBlocking()
+    fun getIsFirstLaunchComplete(): Flow<Boolean> =
+        firstLaunchSettingsRepository.getIsFirstLaunchComplete()
 
-    fun setFirstLaunchComplete() =
+    suspend fun setFirstLaunchComplete() =
         firstLaunchSettingsRepository.setFirstLaunchComplete()
 }

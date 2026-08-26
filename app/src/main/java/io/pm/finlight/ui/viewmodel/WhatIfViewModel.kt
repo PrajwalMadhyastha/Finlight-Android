@@ -6,6 +6,7 @@ import io.pm.finlight.utils.DateUtils
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
@@ -98,6 +99,8 @@ class WhatIfViewModel(
     }
 
     fun togglePrivacyMode() {
-        settingsRepository.saveSimulatorPrivacyModeEnabled(!privacyModeEnabled.value)
+        viewModelScope.launch {
+            settingsRepository.saveSimulatorPrivacyModeEnabled(!privacyModeEnabled.value)
+        }
     }
 }

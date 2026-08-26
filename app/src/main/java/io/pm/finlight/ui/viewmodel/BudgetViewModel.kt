@@ -220,8 +220,9 @@ class BudgetViewModel(
         val year = forCalendar.get(Calendar.YEAR)
         val month = forCalendar.get(Calendar.MONTH) + 1
 
-        // Call the new repository function to save for the specific month
-        settingsRepository.saveOverallBudgetForMonth(year, month, budgetFloat)
+        viewModelScope.launch {
+            settingsRepository.saveOverallBudgetForMonth(year, month, budgetFloat)
+        }
     }
 
     fun getBudgetById(id: Int): Flow<Budget?> {
