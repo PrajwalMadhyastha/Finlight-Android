@@ -38,7 +38,7 @@ enum class ReportViewType {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReportsViewModel(
-    private val transactionRepository: TransactionRepository,
+    private val transactionRepository: ITransactionRepository,
     private val categoryDao: CategoryDao,
     private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
 ) : ViewModel() {

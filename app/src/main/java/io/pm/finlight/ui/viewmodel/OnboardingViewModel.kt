@@ -28,8 +28,8 @@ import java.util.Locale
 
 class OnboardingViewModel(
     private val application: Application,
-    private val categoryRepository: CategoryRepository,
-    private val settingsRepository: SettingsRepository,
+    private val categoryRepository: ICategoryRepository,
+    private val settingsRepository: ISettingsRepository,
 ) : ViewModel() {
     private val _userName = MutableStateFlow("")
     val userName = _userName.asStateFlow()

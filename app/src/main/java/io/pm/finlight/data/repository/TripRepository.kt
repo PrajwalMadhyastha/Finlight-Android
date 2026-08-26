@@ -11,29 +11,29 @@ import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.db.entity.Trip
 import kotlinx.coroutines.flow.Flow
 
-class TripRepository(private val tripDao: TripDao) {
-    suspend fun insert(trip: Trip): Long {
+class TripRepository(private val tripDao: TripDao) : ITripRepository {
+    override suspend fun insert(trip: Trip): Long {
         return tripDao.insert(trip)
     }
 
-    fun getAllTripsWithStats(): Flow<List<TripWithStats>> {
+    override fun getAllTripsWithStats(): Flow<List<TripWithStats>> {
         return tripDao.getAllTripsWithStats()
     }
 
-    fun getTripWithStatsById(tripId: Int): Flow<TripWithStats?> {
+    override fun getTripWithStatsById(tripId: Int): Flow<TripWithStats?> {
         return tripDao.getTripWithStatsById(tripId)
     }
 
-    suspend fun getTripByTagId(tagId: Int): Trip? {
+    override suspend fun getTripByTagId(tagId: Int): Trip? {
         return tripDao.getTripByTagId(tagId)
     }
 
-    suspend fun deleteTripById(tripId: Int) {
+    override suspend fun deleteTripById(tripId: Int) {
         tripDao.deleteTripById(tripId)
     }
 
     // --- NEW: Check if a tag is associated with any trip ---
-    suspend fun isTagUsedByTrip(tagId: Int): Boolean {
+    override suspend fun isTagUsedByTrip(tagId: Int): Boolean {
         return tripDao.isTagUsedByTrip(tagId) > 0
     }
 }

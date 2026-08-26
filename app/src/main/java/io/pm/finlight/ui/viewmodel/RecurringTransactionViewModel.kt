@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 
 class RecurringTransactionViewModel(
     private val application: Application,
-    private val repository: RecurringTransactionRepository,
+    private val repository: IRecurringTransactionRepository,
     private val patternDao: RecurringPatternDao,
 ) : ViewModel() {
     val allRecurringTransactions: Flow<List<RecurringTransaction>> = repository.getAll()

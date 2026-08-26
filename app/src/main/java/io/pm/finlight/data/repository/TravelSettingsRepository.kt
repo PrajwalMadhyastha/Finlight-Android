@@ -17,7 +17,7 @@ import java.io.IOException
 class TravelSettingsRepository(
     private val dataStore: DataStore<Preferences>,
     private val gson: Gson = Gson(),
-) {
+) : ITravelSettingsRepository {
     constructor(context: Context) : this(
         dataStore = context.financeSettingsDataStore,
         gson = Gson(),
@@ -27,7 +27,7 @@ class TravelSettingsRepository(
         private val KEY_TRAVEL_MODE_SETTINGS = stringPreferencesKey("travel_mode_settings")
     }
 
-    suspend fun saveTravelModeSettings(settings: TravelModeSettings?) {
+    override suspend fun saveTravelModeSettings(settings: TravelModeSettings?) {
         val json = if (settings == null) null else gson.toJson(settings)
         dataStore.edit { preferences ->
             if (json != null) {
@@ -38,7 +38,7 @@ class TravelSettingsRepository(
         }
     }
 
-    fun getTravelModeSettings(): Flow<TravelModeSettings?> {
+    override fun getTravelModeSettings(): Flow<TravelModeSettings?> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {

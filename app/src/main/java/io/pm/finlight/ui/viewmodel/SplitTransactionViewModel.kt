@@ -32,9 +32,9 @@ data class SplitTransactionUiState(
 )
 
 class SplitTransactionViewModel(
-    private val transactionRepository: TransactionRepository,
-    val categoryRepository: CategoryRepository,
-    private val splitTransactionRepository: SplitTransactionRepository,
+    private val transactionRepository: ITransactionRepository,
+    val categoryRepository: ICategoryRepository,
+    private val splitTransactionRepository: ISplitTransactionRepository,
     private val transactionId: Int,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SplitTransactionUiState())

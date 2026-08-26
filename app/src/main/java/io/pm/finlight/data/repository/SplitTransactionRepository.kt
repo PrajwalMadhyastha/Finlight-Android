@@ -8,8 +8,10 @@ package io.pm.finlight
 
 import kotlinx.coroutines.flow.Flow
 
-class SplitTransactionRepository(private val splitTransactionDao: SplitTransactionDao) {
-    fun getSplitsForParent(parentTransactionId: Int): Flow<List<SplitTransactionDetails>> {
+class SplitTransactionRepository(
+    private val splitTransactionDao: SplitTransactionDao,
+) : ISplitTransactionRepository {
+    override fun getSplitsForParent(parentTransactionId: Int): Flow<List<SplitTransactionDetails>> {
         return splitTransactionDao.getSplitsForParent(parentTransactionId)
     }
 }

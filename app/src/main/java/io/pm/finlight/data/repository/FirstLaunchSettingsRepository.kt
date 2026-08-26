@@ -17,7 +17,7 @@ import java.io.IOException
 class FirstLaunchSettingsRepository(
     private val dataStore: DataStore<Preferences>,
     private val internalDataStore: DataStore<Preferences>,
-) {
+) : IFirstLaunchSettingsRepository {
     constructor(context: Context) : this(
         dataStore = context.financeSettingsDataStore,
         internalDataStore = context.internalSettingsDataStore,
@@ -28,7 +28,7 @@ class FirstLaunchSettingsRepository(
         private val KEY_IS_FIRST_LAUNCH_COMPLETE = booleanPreferencesKey("is_first_launch_complete")
     }
 
-    fun getHasSeenOnboarding(): Flow<Boolean> {
+    override fun getHasSeenOnboarding(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -43,13 +43,13 @@ class FirstLaunchSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun setHasSeenOnboarding(hasSeen: Boolean) {
+    override suspend fun setHasSeenOnboarding(hasSeen: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_HAS_SEEN_ONBOARDING] = hasSeen
         }
     }
 
-    fun getIsFirstLaunchComplete(): Flow<Boolean> {
+    override fun getIsFirstLaunchComplete(): Flow<Boolean> {
         return internalDataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -64,7 +64,7 @@ class FirstLaunchSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun setFirstLaunchComplete() {
+    override suspend fun setFirstLaunchComplete() {
         internalDataStore.edit { preferences ->
             preferences[KEY_IS_FIRST_LAUNCH_COMPLETE] = true
         }

@@ -47,11 +47,11 @@ data class LastMonthSummary(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel(
-    private val transactionRepository: TransactionRepository,
-    private val accountRepository: AccountRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val accountRepository: IAccountRepository,
     private val budgetDao: BudgetDao,
-    private val settingsRepository: SettingsRepository,
-    private val merchantRenameRuleRepository: MerchantRenameRuleRepository,
+    private val settingsRepository: ISettingsRepository,
+    private val merchantRenameRuleRepository: IMerchantRenameRuleRepository,
     // Added dependency
     private val timeProvider: TimeProvider,
     private val recurringTransactionDao: RecurringTransactionDao,

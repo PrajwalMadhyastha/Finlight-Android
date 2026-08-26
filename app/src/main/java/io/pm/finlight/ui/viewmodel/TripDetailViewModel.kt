@@ -9,17 +9,17 @@ package io.pm.finlight.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TransactionDetails
-import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.dao.TripWithStats
-import io.pm.finlight.data.repository.TripRepository
+import io.pm.finlight.data.repository.ITripRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 
 class TripDetailViewModel(
-    tripRepository: TripRepository,
-    transactionRepository: TransactionRepository,
+    tripRepository: ITripRepository,
+    transactionRepository: ITransactionRepository,
     tripId: Int,
     tagId: Int,
 ) : ViewModel() {

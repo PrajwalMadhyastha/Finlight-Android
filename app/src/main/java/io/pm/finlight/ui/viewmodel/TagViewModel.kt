@@ -10,7 +10,7 @@ package io.pm.finlight
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.repository.TripRepository
+import io.pm.finlight.data.repository.ITripRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,8 +20,8 @@ import kotlinx.coroutines.launch
 
 class TagViewModel(
     application: Application,
-    private val tagRepository: TagRepository,
-    private val tripRepository: TripRepository,
+    private val tagRepository: ITagRepository,
+    private val tripRepository: ITripRepository,
 ) : AndroidViewModel(application) {
     private val _uiEvent = Channel<String>()
     val uiEvent = _uiEvent.receiveAsFlow()

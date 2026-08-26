@@ -18,70 +18,70 @@ class GoalRepository(
     private val linkDao: GoalTransactionLinkDao,
     private val transactionQueryDao: TransactionQueryDao,
     private val contributionDao: GoalContributionDao,
-) {
-    fun getAllGoalsWithAccountName(): Flow<List<GoalWithAccountName>> = goalDao.getAllGoalsWithAccountName()
+) : IGoalRepository {
+    override fun getAllGoalsWithAccountName(): Flow<List<GoalWithAccountName>> = goalDao.getAllGoalsWithAccountName()
 
-    fun getGoalById(id: Int): Flow<Goal?> = goalDao.getGoalById(id)
+    override fun getGoalById(id: Int): Flow<Goal?> = goalDao.getGoalById(id)
 
-    fun getActiveGoals(): Flow<List<Goal>> = goalDao.getActiveGoals()
+    override fun getActiveGoals(): Flow<List<Goal>> = goalDao.getActiveGoals()
 
-    suspend fun getActiveGoalsSnapshot(): List<Goal> {
+    override suspend fun getActiveGoalsSnapshot(): List<Goal> {
         val flowList = goalDao.getActiveGoalsSnapshot()
         return flowList
     }
 
-    fun getRecentTransactions(
+    override fun getRecentTransactions(
         startTime: Long,
         endTime: Long
     ): Flow<List<Transaction>> {
         return transactionQueryDao.getAllTransactionsForRange(startTime, endTime)
     }
 
-    suspend fun insert(goal: Goal) {
+    override suspend fun insert(goal: Goal) {
         goalDao.insert(goal)
     }
 
-    suspend fun update(goal: Goal) {
+    override suspend fun update(goal: Goal) {
         goalDao.update(goal)
     }
 
-    suspend fun delete(goal: Goal) {
+    override suspend fun delete(goal: Goal) {
         goalDao.delete(goal)
     }
 
     // --- Transaction Linking ---
 
-    suspend fun linkTransaction(
+    override suspend fun linkTransaction(
         goalId: Int,
         transactionId: Int
     ) {
         linkDao.insertLink(GoalTransactionLink(goalId = goalId, transactionId = transactionId))
     }
 
-    suspend fun unlinkTransaction(
+    override suspend fun unlinkTransaction(
         goalId: Int,
         transactionId: Int
     ) {
         linkDao.deleteLink(goalId, transactionId)
     }
 
-    fun getLinkedTotal(goalId: Int): Flow<Double> = linkDao.getLinkedTransactionsTotal(goalId)
+    override fun getLinkedTotal(goalId: Int): Flow<Double> = linkDao.getLinkedTransactionsTotal(goalId)
 
-    fun getLinkedTransactions(goalId: Int): Flow<List<Transaction>> = linkDao.getLinkedTransactions(goalId)
+    override fun getLinkedTransactions(goalId: Int): Flow<List<Transaction>> = linkDao.getLinkedTransactions(goalId)
 
-    fun getLinkedTransactionCount(goalId: Int): Flow<Int> = linkDao.getLinkedTransactionCount(goalId)
+    override fun getLinkedTransactionCount(goalId: Int): Flow<Int> = linkDao.getLinkedTransactionCount(goalId)
 
-    fun getLinkedTransactionIds(goalId: Int): Flow<List<Int>> = linkDao.getLinkedTransactionIds(goalId)
+    override fun getLinkedTransactionIds(goalId: Int): Flow<List<Int>> = linkDao.getLinkedTransactionIds(goalId)
 
     // --- Manual Contributions ---
 
-    fun getContributionsForGoal(goalId: Int): Flow<List<GoalContribution>> = contributionDao.getContributionsForGoal(goalId)
+    override fun getContributionsForGoal(goalId: Int): Flow<List<GoalContribution>> = contributionDao.getContributionsForGoal(goalId)
 
-    fun getTotalContributionForGoal(goalId: Int): Flow<Double> = contributionDao.getTotalContributionForGoal(goalId)
+    override fun getTotalContributionForGoal(goalId: Int): Flow<Double> = contributionDao.getTotalContributionForGoal(goalId)
 
-    suspend fun insertContribution(contribution: GoalContribution) = contributionDao.insertContribution(contribution)
+    override suspend fun insertContribution(contribution: GoalContribution) = contributionDao.insertContribution(contribution)
 
-    suspend fun updateContribution(contribution: GoalContribution) = contributionDao.updateContribution(contribution)
+    override suspend fun updateContribution(contribution: GoalContribution) = contributionDao.updateContribution(contribution)
 
-    suspend fun deleteContribution(contribution: GoalContribution) = contributionDao.deleteContribution(contribution)
+    override suspend fun deleteContribution(contribution: GoalContribution) = contributionDao.deleteContribution(contribution)
 }

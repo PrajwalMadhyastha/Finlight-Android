@@ -18,7 +18,7 @@ import java.util.Locale
 
 class BudgetSettingsRepository(
     private val dataStore: DataStore<Preferences>,
-) {
+) : IBudgetSettingsRepository {
     constructor(context: Context) : this(
         context.financeSettingsDataStore,
     )
@@ -34,14 +34,14 @@ class BudgetSettingsRepository(
         }
     }
 
-    suspend fun saveOverallBudgetForCurrentMonth(amount: Float) {
+    override suspend fun saveOverallBudgetForCurrentMonth(amount: Float) {
         val calendar = Calendar.getInstance()
         val year = calendar.get(Calendar.YEAR)
         val month = calendar.get(Calendar.MONTH) + 1
         saveOverallBudgetForMonth(year, month, amount)
     }
 
-    suspend fun saveOverallBudgetForMonth(
+    override suspend fun saveOverallBudgetForMonth(
         year: Int,
         month: Int,
         amount: Float,
@@ -52,7 +52,7 @@ class BudgetSettingsRepository(
         }
     }
 
-    suspend fun getOverallBudgetsForYear(year: Int): Map<Int, Float> {
+    override suspend fun getOverallBudgetsForYear(year: Int): Map<Int, Float> {
         val budgets = mutableMapOf<Int, Float>()
         val preferences =
             try {
@@ -69,7 +69,7 @@ class BudgetSettingsRepository(
         return budgets
     }
 
-    fun getOverallBudgetForMonth(
+    override fun getOverallBudgetForMonth(
         year: Int,
         month: Int,
     ): Flow<Float?> {

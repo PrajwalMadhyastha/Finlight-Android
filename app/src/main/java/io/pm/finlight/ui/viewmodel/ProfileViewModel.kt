@@ -25,7 +25,7 @@ import java.io.FileOutputStream
 
 class ProfileViewModel(
     application: Application,
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: ISettingsRepository,
 ) : AndroidViewModel(application) {
     private val context = application
 

@@ -41,7 +41,7 @@ data class SmsDebugUiState(
 
 class SmsDebugViewModel(
     private val application: Application,
-    private val smsRepository: SmsRepository,
+    private val smsRepository: ISmsRepository,
     private val db: AppDatabase,
     private val smsClassifier: SmsClassifier,
     private val nerExtractor: SmsEntityExtractor,

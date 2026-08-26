@@ -12,7 +12,7 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.db.entity.Trip
-import io.pm.finlight.data.repository.TripRepository
+import io.pm.finlight.data.repository.ITripRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -20,10 +20,10 @@ import kotlinx.coroutines.sync.withLock
 
 class CurrencyViewModel(
     application: Application,
-    private val settingsRepository: SettingsRepository,
-    private val tripRepository: TripRepository,
-    private val transactionRepository: TransactionRepository,
-    private val tagRepository: TagRepository,
+    private val settingsRepository: ISettingsRepository,
+    private val tripRepository: ITripRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val tagRepository: ITagRepository,
 ) : AndroidViewModel(application) {
     private val mutex = Mutex()
 

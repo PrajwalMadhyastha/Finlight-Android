@@ -15,7 +15,7 @@ import java.io.IOException
 
 class SecuritySettingsRepository(
     private val dataStore: DataStore<Preferences>,
-) {
+) : ISecuritySettingsRepository {
     constructor(context: Context) : this(
         context.financeSettingsDataStore,
     )
@@ -26,13 +26,13 @@ class SecuritySettingsRepository(
         private val KEY_SIMULATOR_PRIVACY_MODE_ENABLED = booleanPreferencesKey("simulator_privacy_mode_enabled")
     }
 
-    suspend fun saveAppLockEnabled(isEnabled: Boolean) {
+    override suspend fun saveAppLockEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_APP_LOCK_ENABLED] = isEnabled
         }
     }
 
-    fun getAppLockEnabled(): Flow<Boolean> {
+    override fun getAppLockEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -47,13 +47,13 @@ class SecuritySettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun savePrivacyModeEnabled(isEnabled: Boolean) {
+    override suspend fun savePrivacyModeEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_PRIVACY_MODE_ENABLED] = isEnabled
         }
     }
 
-    fun getPrivacyModeEnabled(): Flow<Boolean> {
+    override fun getPrivacyModeEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -68,13 +68,13 @@ class SecuritySettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveSimulatorPrivacyModeEnabled(isEnabled: Boolean) {
+    override suspend fun saveSimulatorPrivacyModeEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_SIMULATOR_PRIVACY_MODE_ENABLED] = isEnabled
         }
     }
 
-    fun getSimulatorPrivacyModeEnabled(): Flow<Boolean> {
+    override fun getSimulatorPrivacyModeEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {

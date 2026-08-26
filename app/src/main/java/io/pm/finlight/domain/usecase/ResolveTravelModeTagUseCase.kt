@@ -1,10 +1,10 @@
 package io.pm.finlight.domain.usecase
 
-import io.pm.finlight.SettingsRepository
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ITagRepository
+import io.pm.finlight.ITravelSettingsRepository
 import io.pm.finlight.Tag
-import io.pm.finlight.TagRepository
 import io.pm.finlight.TravelModeSettings
-import io.pm.finlight.TravelSettingsRepository
 import kotlinx.coroutines.flow.first
 
 /**
@@ -14,19 +14,19 @@ import kotlinx.coroutines.flow.first
  */
 class ResolveTravelModeTagUseCase(
     private val travelSettingsProvider: suspend () -> TravelModeSettings?,
-    private val tagRepository: TagRepository,
+    private val tagRepository: ITagRepository,
 ) {
     constructor(
-        travelSettingsRepository: TravelSettingsRepository,
-        tagRepository: TagRepository,
+        travelSettingsRepository: ITravelSettingsRepository,
+        tagRepository: ITagRepository,
     ) : this(
         travelSettingsProvider = { travelSettingsRepository.getTravelModeSettings().first() },
         tagRepository = tagRepository,
     )
 
     constructor(
-        settingsRepository: SettingsRepository,
-        tagRepository: TagRepository,
+        settingsRepository: ISettingsRepository,
+        tagRepository: ITagRepository,
     ) : this(
         travelSettingsProvider = { settingsRepository.getTravelModeSettings().first() },
         tagRepository = tagRepository,

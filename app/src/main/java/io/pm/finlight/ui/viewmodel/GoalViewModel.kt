@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class GoalViewModel(private val goalRepository: GoalRepository) : ViewModel() {
+class GoalViewModel(private val goalRepository: IGoalRepository) : ViewModel() {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
