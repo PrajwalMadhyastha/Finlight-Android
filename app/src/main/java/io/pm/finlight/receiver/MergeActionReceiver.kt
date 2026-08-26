@@ -32,8 +32,15 @@ class MergeActionReceiver : BroadcastReceiver() {
                 transactionReimbursementDao = db.transactionReimbursementDao(),
                 settingsRepository = SettingsRepository(context),
                 tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao()),
-                deletedSmsHashDao = db.deletedSmsHashDao(),
+                db = db,
+            )
+        val mergeTransactionsUseCase =
+            io.pm.finlight.domain.usecase.MergeTransactionsUseCase(
+                transactionQueryDao = db.transactionQueryDao(),
+                transactionWriteDao = db.transactionWriteDao(),
+                transactionReimbursementDao = db.transactionReimbursementDao(),
                 mergeRecordDao = db.mergeRecordDao(),
+                deletedSmsHashDao = db.deletedSmsHashDao(),
                 db = db,
             )
 
@@ -50,7 +57,7 @@ class MergeActionReceiver : BroadcastReceiver() {
                         childSmsDate = sms.date
                     }
                 }
-                transactionRepository.mergeTransactions(parentTxnId, childTxnId, childSmsBody, childSmsDate)
+                mergeTransactionsUseCase(parentTxnId, childTxnId, childSmsBody, childSmsDate)
             } else if (action == "ACTION_DISMISS" && childTxnId != -1) {
                 transactionRepository.dismissMerge(childTxnId)
             }

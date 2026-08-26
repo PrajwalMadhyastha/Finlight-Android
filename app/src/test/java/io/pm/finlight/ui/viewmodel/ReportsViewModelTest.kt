@@ -37,6 +37,9 @@ class ReportsViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var settingsRepository: SettingsRepository
 
+    @Mock
+    private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+
     private lateinit var viewModel: ReportsViewModel
 
     @Before
@@ -55,13 +58,13 @@ class ReportsViewModelTest : BaseViewModelTest() {
         `when`(transactionRepository.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
         // --- ADDED: Mock the new dependency for consistency flows ---
-        `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+        `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
-        viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository)
+        viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository, getMonthlyConsistencyDataUseCase)
     }
 
     private fun initializeViewModel() {
-        viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository)
+        viewModel = ReportsViewModel(transactionRepository, categoryDao, settingsRepository, getMonthlyConsistencyDataUseCase)
     }
 
     @Test
@@ -139,7 +142,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
             val currentYear = Calendar.getInstance().get(Calendar.YEAR)
 
             // Mock all 12 calls for the YEARLY view. One month (current) returns monthlyData, the rest return yearlyData.
-            `when`(transactionRepository.getMonthlyConsistencyData(eq(currentYear), anyInt())).thenAnswer { invocation ->
+            `when`(getMonthlyConsistencyDataUseCase(eq(currentYear), anyInt())).thenAnswer { invocation ->
                 val month = invocation.getArgument<Int>(1)
                 if (month == currentMonth) {
                     flowOf(monthlyData)
@@ -148,7 +151,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
                 }
             }
             // This mock is for the MONTHLY view (detailedMonthData flow)
-            `when`(transactionRepository.getMonthlyConsistencyData(eq(currentYear), eq(currentMonth))).thenReturn(flowOf(monthlyData))
+            `when`(getMonthlyConsistencyDataUseCase(eq(currentYear), eq(currentMonth))).thenReturn(flowOf(monthlyData))
 
             // Act
             initializeViewModel()

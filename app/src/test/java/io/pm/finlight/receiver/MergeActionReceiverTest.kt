@@ -23,6 +23,7 @@ import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionType
 import io.pm.finlight.SmsRepository
+import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -61,11 +62,12 @@ class MergeActionReceiverTest {
         every { db.transactionWriteDao() } returns transactionWriteDao
         every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
         every { db.transactionReimbursementDao() } returns transactionReimbursementDao
-        // Normally we'd use koin, but we inject or mockk constructor if needed
-        // For receiver which instantiates repository, we need to mockkConstructor
+
         io.mockk.mockkConstructor(TransactionRepository::class)
         io.mockk.mockkConstructor(SmsRepository::class)
-        coEvery { anyConstructed<TransactionRepository>().mergeTransactions(any(), any(), any(), any()) } returns Unit
+        io.mockk.mockkConstructor(MergeTransactionsUseCase::class)
+
+        coEvery { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) } returns Unit
         coEvery { anyConstructed<TransactionRepository>().getTransactionSync(any()) } returns null
         coEvery { anyConstructed<TransactionRepository>().dismissMerge(any()) } returns Unit
 
@@ -93,7 +95,7 @@ class MergeActionReceiverTest {
 
             receiver.onReceive(context, intent)
 
-            coVerify(timeout = 2000) { anyConstructed<TransactionRepository>().mergeTransactions(1, 2, any(), any()) }
+            coVerify(timeout = 2000) { anyConstructed<MergeTransactionsUseCase>().invoke(1, 2, any(), any()) }
             verify(timeout = 2000) { mockNotificationManager.cancel(10002) }
             verify(timeout = 2000) { mockNotificationManager.cancel(2) }
         }
@@ -128,7 +130,7 @@ class MergeActionReceiverTest {
                     categoryId = 1,
                     notes = null,
                     originalDescription = "Child",
-                    sourceSmsId = 5
+                    sourceSmsId = 5,
                 )
             val sms = io.pm.finlight.SmsMessage(id = 5, sender = "Bank", body = "Test SMS body", date = 1000L)
 
@@ -145,7 +147,7 @@ class MergeActionReceiverTest {
             receiver.onReceive(context, intent)
 
             coVerify(timeout = 2000) {
-                anyConstructed<TransactionRepository>().mergeTransactions(1, 2, "Test SMS body", 1000L)
+                anyConstructed<MergeTransactionsUseCase>().invoke(1, 2, "Test SMS body", 1000L)
             }
         }
 }

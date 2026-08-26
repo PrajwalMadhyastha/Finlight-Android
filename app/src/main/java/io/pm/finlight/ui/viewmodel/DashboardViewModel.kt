@@ -35,6 +35,9 @@ import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToLong
 
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+
 data class ConsistencyStats(val goodDays: Int, val badDays: Int, val noSpendDays: Int, val noDataDays: Int)
 
 data class LastMonthSummary(
@@ -54,6 +57,9 @@ class DashboardViewModel(
     private val recurringTransactionDao: RecurringTransactionDao,
     private val recurringPatternDao: RecurringPatternDao,
     private val smsRepository: SmsRepository,
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
+        GetMonthlyConsistencyDataUseCase(settingsRepository, transactionRepository),
+    private val mergeTransactionsUseCase: MergeTransactionsUseCase,
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
@@ -410,7 +416,7 @@ class DashboardViewModel(
                 // --- FIX: Add explicit types to resolve build error ---
                 val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> =
                     (1..12).map { month ->
-                        transactionRepository.getMonthlyConsistencyData(year, month)
+                        getMonthlyConsistencyDataUseCase(year, month)
                     }
 
                 // Combine all 12 flows
@@ -501,10 +507,10 @@ class DashboardViewModel(
 
     fun executeMerge(
         parentTxnId: Int,
-        childTxnIds: List<Int>
+        childTxnIds: List<Int>,
     ) {
         viewModelScope.launch {
-            transactionRepository.manualMergeTransactions(parentTxnId, childTxnIds)
+            mergeTransactionsUseCase.manualMerge(parentTxnId, childTxnIds)
         }
     }
 }

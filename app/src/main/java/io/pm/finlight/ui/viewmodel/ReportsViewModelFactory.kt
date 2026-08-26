@@ -29,16 +29,17 @@ class ReportsViewModelFactory(private val application: Application) : ViewModelP
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     settingsRepository = settingsRepository,
                     tagRepository = tagRepository,
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
+
+            val getMonthlyConsistencyDataUseCase = io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase(settingsRepository, transactionRepository)
 
             @Suppress("UNCHECKED_CAST")
             return ReportsViewModel(
                 transactionRepository = transactionRepository,
                 categoryDao = db.categoryDao(),
                 settingsRepository = settingsRepository,
+                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

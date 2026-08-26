@@ -1,8 +1,8 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/repository/TransactionRepository.kt
-// REASON: FEATURE (Manual Merge) - Added `manualMergeTransactions()` for atomic
-// N-to-1 user-initiated transaction merges. Updated `unmergeTransactions()` to
-// handle both the legacy 1-to-1 AUTO path and the new N-to-1 MANUAL path.
+// REASON: REFACTOR (Issue #242) - Extracted business logic (monthly consistency
+// calculations and merge/unmerge operations) into dedicated UseCases
+// (`GetMonthlyConsistencyDataUseCase` and `MergeTransactionsUseCase`).
 // =================================================================================
 package io.pm.finlight
 
@@ -10,16 +10,10 @@ import android.util.Log
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
-import io.pm.finlight.data.model.MergedTransactionItem
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
-import java.util.Calendar
 import java.util.Locale
-import kotlin.math.roundToLong
 
 import io.pm.finlight.data.db.dao.DeletedSmsHashDao
 import io.pm.finlight.data.db.dao.MergeRecordDao
@@ -27,8 +21,6 @@ import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.db.dao.TransactionReimbursementDao
 import io.pm.finlight.data.db.dao.TransactionWriteDao
-import io.pm.finlight.data.db.entity.DeletedSmsHash
-import io.pm.finlight.data.db.entity.MergeRecord
 
 class TransactionRepository(
     private val transactionWriteDao: TransactionWriteDao,
@@ -37,10 +29,29 @@ class TransactionRepository(
     private val transactionReimbursementDao: TransactionReimbursementDao,
     private val settingsRepository: SettingsRepository,
     private val tagRepository: TagRepository,
-    private val deletedSmsHashDao: DeletedSmsHashDao,
-    private val mergeRecordDao: MergeRecordDao,
     private val db: AppDatabase,
 ) {
+    @Deprecated("Use domain DAO constructor without deletedSmsHashDao/mergeRecordDao", level = DeprecationLevel.WARNING)
+    constructor(
+        transactionWriteDao: TransactionWriteDao,
+        transactionQueryDao: TransactionQueryDao,
+        transactionAnalyticsDao: TransactionAnalyticsDao,
+        transactionReimbursementDao: TransactionReimbursementDao,
+        settingsRepository: SettingsRepository,
+        tagRepository: TagRepository,
+        deletedSmsHashDao: DeletedSmsHashDao,
+        mergeRecordDao: MergeRecordDao,
+        db: AppDatabase,
+    ) : this(
+        transactionWriteDao = transactionWriteDao,
+        transactionQueryDao = transactionQueryDao,
+        transactionAnalyticsDao = transactionAnalyticsDao,
+        transactionReimbursementDao = transactionReimbursementDao,
+        settingsRepository = settingsRepository,
+        tagRepository = tagRepository,
+        db = db,
+    )
+
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
         transactionDao: TransactionDao,
@@ -56,8 +67,6 @@ class TransactionRepository(
         transactionReimbursementDao = transactionDao,
         settingsRepository = settingsRepository,
         tagRepository = tagRepository,
-        deletedSmsHashDao = deletedSmsHashDao,
-        mergeRecordDao = mergeRecordDao,
         db = db,
     )
 
@@ -436,119 +445,6 @@ class TransactionRepository(
         transactionWriteDao.removeAllTransactionsForTag(tagId)
     }
 
-    // --- NEW: Centralized "Monthly-First" Consistency Logic ---
-
-    /**
-     * Helper to check if cal1 is on a day *before* cal2, ignoring time.
-     */
-    private fun isBeforeDay(
-        cal1: Calendar,
-        cal2: Calendar,
-    ): Boolean {
-        return cal1.get(Calendar.YEAR) < cal2.get(Calendar.YEAR) ||
-            (
-                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-                    cal1.get(Calendar.DAY_OF_YEAR) < cal2.get(Calendar.DAY_OF_YEAR)
-            )
-    }
-
-    /**
-     * Generates the consistency data for a single month, based on that month's budget.
-     * This is the new single source of truth for all heatmap/calendar logic.
-     */
-    fun getMonthlyConsistencyData(
-        year: Int,
-        month: Int,
-    ): Flow<List<CalendarDayStatus>> {
-        // Calculate start and end of the given month
-        val monthStartCal =
-            Calendar.getInstance().apply {
-                set(Calendar.YEAR, year)
-                set(Calendar.MONTH, month - 1) // Calendar.MONTH is 0-indexed
-                set(Calendar.DAY_OF_MONTH, 1)
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-        val monthEndCal =
-            (monthStartCal.clone() as Calendar).apply {
-                add(Calendar.MONTH, 1)
-                add(Calendar.MILLISECOND, -1)
-            }
-        val daysInMonth = monthStartCal.getActualMaximum(Calendar.DAY_OF_MONTH)
-
-        // Combine the three flows we need
-        // --- UPDATED: The budget flow is now nullable (Flow<Float?>) ---
-        return combine(
-            settingsRepository.getOverallBudgetForMonth(year, month),
-            transactionAnalyticsDao.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
-            transactionQueryDao.getFirstTransactionDate(),
-        ) { budget: Float?, dailyTotals: List<DailyTotal>, firstTransactionDate: Long? ->
-            val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
-            val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
-            val resultList = mutableListOf<CalendarDayStatus>()
-            val dayIterator = (monthStartCal.clone() as Calendar)
-            val today = Calendar.getInstance()
-
-            // --- UPDATED LOGIC (Fix for "green day" and "blue day" bugs) ---
-            if (budget == null) {
-                // CASE 1: NO BUDGET SET (null)
-                // All past days are NO_DATA (gray).
-                for (i in 1..daysInMonth) {
-                    dayIterator.set(Calendar.DAY_OF_MONTH, i)
-                    val date = dayIterator.time
-
-                    if (dayIterator.after(today) || (firstDataCal != null && isBeforeDay(dayIterator, firstDataCal))) {
-                        resultList.add(CalendarDayStatus(date, SpendingStatus.NO_DATA, 0L, 0L))
-                    } else {
-                        // Any past day with NO BUDGET is NO_DATA, even if there was no spending.
-                        val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
-                        val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
-                        val status = SpendingStatus.NO_DATA
-                        resultList.add(CalendarDayStatus(date, status, amountSpent, 0L))
-                    }
-                }
-            } else {
-                // CASE 2: A BUDGET IS SET (e.g., 0f or 145000f)
-                var cumulativeSpending = 0.0
-                val totalBudget = budget.toDouble()
-
-                for (i in 1..daysInMonth) {
-                    dayIterator.set(Calendar.DAY_OF_MONTH, i)
-                    val date = dayIterator.time
-
-                    if (dayIterator.after(today) || (firstDataCal != null && isBeforeDay(dayIterator, firstDataCal))) {
-                        resultList.add(CalendarDayStatus(date, SpendingStatus.NO_DATA, 0L, 0L))
-                        continue
-                    }
-
-                    val remainingBudget = totalBudget - cumulativeSpending
-                    val remainingDays = (daysInMonth - i + 1).coerceAtLeast(1)
-                    val safeToSpend = if (remainingBudget > 0) (remainingBudget / remainingDays).roundToLong() else 0L
-
-                    val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
-                    val amountSpent = (spendingMap[dateKey] ?: 0.0)
-                    val amountSpentLong = amountSpent.roundToLong()
-
-                    // This is the new, more robust 'when' block that fixes the original bug
-                    val status =
-                        when {
-                            amountSpentLong == 0L && safeToSpend == 0L -> SpendingStatus.WITHIN_LIMIT // Met 0 budget (blue)
-                            amountSpentLong == 0L && safeToSpend > 0L -> SpendingStatus.NO_SPEND // No spend on a day with a budget (green)
-                            amountSpentLong > 0L && safeToSpend == 0L -> SpendingStatus.OVER_LIMIT // Spent > 0 on a 0 budget (red)
-                            amountSpentLong > safeToSpend -> SpendingStatus.OVER_LIMIT // Spent > budget (red)
-                            else -> SpendingStatus.WITHIN_LIMIT // Spent <= budget (and not 0) (blue)
-                        }
-                    Log.d("HeatmapDebug", "Date: $dateKey, Spent: $amountSpentLong, Threshold: $safeToSpend, Status: $status")
-                    resultList.add(CalendarDayStatus(date, status, amountSpentLong, safeToSpend))
-                    cumulativeSpending += amountSpent
-                }
-            }
-            resultList // This is the value emitted by the combine
-        }.flowOn(Dispatchers.Default) // Run the calculation on a background thread
-    }
-
     // --- NEW: Expose the quick fill query ---
     fun getRecentManualTransactions(limit: Int): Flow<List<TransactionDetails>> {
         return transactionQueryDao.getRecentManualTransactions(limit)
@@ -609,456 +505,6 @@ class TransactionRepository(
 
     suspend fun dismissMerge(id: Int) {
         transactionWriteDao.updateMergeDismissed(id, true)
-    }
-
-    suspend fun mergeTransactions(
-        parentTxnId: Int,
-        childTxnId: Int,
-        childSmsBody: String? = null,
-        childSmsDate: Long? = null
-    ) {
-        var activeParentId = parentTxnId
-        var parentTxn = transactionQueryDao.getTransactionByIdSync(activeParentId)
-        val childTxn = transactionQueryDao.getTransactionByIdSync(childTxnId)
-
-        if (childTxn == null) return
-
-        if (parentTxn == null) {
-            val timeWindowStart = childTxn.date - (3 * 60 * 60 * 1000L)
-            val newParent =
-                transactionQueryDao.findRecentTransactionForMerge(
-                    merchant = childTxn.description,
-                    accountId = childTxn.accountId,
-                    transactionType = childTxn.transactionType,
-                    timeWindowStart = timeWindowStart,
-                    newTxnId = childTxnId,
-                )
-            if (newParent != null) {
-                activeParentId = newParent.id
-                parentTxn = newParent
-            } else {
-                return
-            }
-        }
-
-        val finalParentTxn = parentTxn ?: return
-
-        // ── Snapshot BEFORE any mutation so the merge is fully reversible ────
-        mergeRecordDao.insert(
-            createMergeRecord(
-                parentTxnId = activeParentId,
-                originalParentAmount = finalParentTxn.amount,
-                originalParentDate = finalParentTxn.date,
-                originalParentNotes = finalParentTxn.notes,
-                childTxn = childTxn,
-                mergeGroupId = "",
-                mergeType = "AUTO",
-            )
-        )
-
-        transactionWriteDao.updateMergeDismissed(childTxnId, true)
-
-        val newAmount = finalParentTxn.amount + childTxn.amount
-        val newDate = maxOf(finalParentTxn.date, childTxn.date)
-
-        val existingNotes = finalParentTxn.notes ?: ""
-        val dateString =
-            if (childSmsDate != null) {
-                java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault()).format(java.util.Date(childSmsDate))
-            } else {
-                java.util.Date(childTxn.date).toString()
-            }
-
-        var childNote =
-            if (childSmsBody != null) {
-                "Merged on $dateString:\n$childSmsBody"
-            } else {
-                "Merged Transaction: ${childTxn.amount} on $dateString"
-            }
-
-        if (!childTxn.notes.isNullOrBlank()) {
-            childNote += "\n\n${childTxn.notes}"
-        }
-
-        val newNotes =
-            if (existingNotes.isBlank()) {
-                childNote
-            } else {
-                "$existingNotes\n\n$childNote"
-            }
-
-        transactionWriteDao.updateAmount(activeParentId, newAmount)
-        transactionWriteDao.updateDate(activeParentId, newDate)
-        transactionWriteDao.updateNotes(activeParentId, newNotes)
-
-        childTxn.sourceSmsHash?.let { hash ->
-            deletedSmsHashDao.insert(DeletedSmsHash(smsHash = hash))
-        }
-
-        transactionWriteDao.delete(childTxn)
-    }
-
-    // --- FEATURE: Manual Transaction Merge ---
-
-    private fun createMergeRecord(
-        parentTxnId: Int,
-        originalParentAmount: Double,
-        originalParentDate: Long,
-        originalParentNotes: String?,
-        childTxn: Transaction,
-        mergeGroupId: String,
-        mergeType: String
-    ): MergeRecord {
-        return MergeRecord(
-            parentTxnId = parentTxnId,
-            originalParentAmount = originalParentAmount,
-            originalParentDate = originalParentDate,
-            originalParentNotes = originalParentNotes,
-            childDescription = childTxn.description,
-            childAmount = childTxn.amount,
-            childDate = childTxn.date,
-            childAccountId = childTxn.accountId,
-            childCategoryId = childTxn.categoryId,
-            childTransactionType = childTxn.transactionType,
-            childSource = childTxn.source,
-            childNotes = childTxn.notes,
-            childSourceSmsId = childTxn.sourceSmsId,
-            childSourceSmsHash = childTxn.sourceSmsHash,
-            childSmsSignature = childTxn.smsSignature,
-            childOriginalDescription = childTxn.originalDescription,
-            childOriginalAmount = childTxn.originalAmount,
-            childCurrencyCode = childTxn.currencyCode,
-            childConversionRate = childTxn.conversionRate,
-            mergeGroupId = mergeGroupId,
-            mergeType = mergeType,
-        )
-    }
-
-    /**
-     * Merges [anchorTxnId] with all [childTxnIds] into a single transaction.
-     *
-     * Algorithm:
-     *  1. Anchor = transaction provided by the user (largest amount by default).
-     *  2. Net amount = anchor_signed + sum(child_signed), where income = positive, expense = negative.
-     *  3. Final type = "income" if net > 0, else "expense". Amount stored as absolute value.
-     *  4. Date = most recent date across all transactions.
-     *  5. Tags = union of all tags from anchor + all children.
-     *  6. Notes = anchor's notes + appended block per child.
-     *  7. One MergeRecord per child, all sharing the same UUID [mergeGroupId], type = "MANUAL".
-     *
-     * The entire operation is wrapped in a Room [withTransaction] for full atomicity.
-     */
-    suspend fun manualMergeTransactions(
-        anchorTxnId: Int,
-        childTxnIds: List<Int>,
-    ) {
-        db.withTransaction {
-            val anchorTxn = transactionQueryDao.getTransactionByIdSync(anchorTxnId) ?: return@withTransaction
-            val childTxns = childTxnIds.mapNotNull { transactionQueryDao.getTransactionByIdSync(it) }
-            if (childTxns.isEmpty()) return@withTransaction
-
-            val groupId = java.util.UUID.randomUUID().toString()
-            val sdf = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault())
-
-            // ── Snapshot parent state ─────────────────────────────────────────
-            val originalParentAmount = anchorTxn.amount
-            val originalParentDate = anchorTxn.date
-            val originalParentNotes = anchorTxn.notes
-
-            // ── Compute net amount using signed arithmetic ─────────────────
-            fun signedAmount(txn: Transaction): Double =
-                if (txn.transactionType == TransactionType.INCOME) txn.amount else -txn.amount
-
-            val anchorSigned = signedAmount(anchorTxn)
-            val netSigned = anchorSigned + childTxns.sumOf { signedAmount(it) }
-            val hasReimbursements = transactionReimbursementDao.getReimbursementsCountSync(anchorTxnId) > 0
-
-            val finalType =
-                if (hasReimbursements) {
-                    TransactionType.EXPENSE
-                } else if (netSigned >= 0.0) {
-                    TransactionType.INCOME
-                } else {
-                    TransactionType.EXPENSE
-                }
-
-            val finalAmount = if (finalType == TransactionType.EXPENSE) -netSigned else netSigned
-
-            // ── Compute most-recent date ──────────────────────────────────
-            val finalDate = (childTxns.map { it.date } + anchorTxn.date).max()
-
-            // ── Union all tags ──────────────────────────────────────────────
-            val anchorTags = transactionQueryDao.getTagsForTransactionSimple(anchorTxnId).map { it.id }.toMutableSet()
-            for (childTxn in childTxns) {
-                val childTagIds = transactionQueryDao.getTagsForTransactionSimple(childTxn.id).map { it.id }
-                anchorTags.addAll(childTagIds)
-            }
-            transactionWriteDao.clearTagsForTransaction(anchorTxnId)
-            if (anchorTags.isNotEmpty()) {
-                transactionWriteDao.addTagsToTransaction(
-                    anchorTags.map { tagId -> TransactionTagCrossRef(transactionId = anchorTxnId, tagId = tagId) }
-                )
-            }
-
-            // ── Build appended notes ──────────────────────────────────────
-            // Each merged child is stamped with a structured prefix so the UI
-            // can differentiate merged entries from hand-typed notes.
-            var notes = anchorTxn.notes ?: ""
-            for (childTxn in childTxns) {
-                val dateStr = sdf.format(java.util.Date(childTxn.date))
-                val sign = if (childTxn.transactionType == TransactionType.INCOME) "+" else "-"
-                var childNote = "[Merged] ${childTxn.description} ($sign₹${"%.2f".format(childTxn.amount)}) · $dateStr"
-                if (!childTxn.notes.isNullOrBlank()) {
-                    childNote += "\n\n${childTxn.notes}"
-                }
-                notes = if (notes.isBlank()) childNote else "$notes\n\n$childNote"
-            }
-
-            // ── Persist one MergeRecord per child ──────────────────────────
-            for (childTxn in childTxns) {
-                mergeRecordDao.insert(
-                    createMergeRecord(
-                        parentTxnId = anchorTxnId,
-                        originalParentAmount = originalParentAmount,
-                        originalParentDate = originalParentDate,
-                        originalParentNotes = originalParentNotes,
-                        childTxn = childTxn,
-                        mergeGroupId = groupId,
-                        mergeType = "MANUAL",
-                    )
-                )
-                // Prevent SMS re-processing of merged children
-                childTxn.sourceSmsHash?.let { hash ->
-                    deletedSmsHashDao.insert(DeletedSmsHash(smsHash = hash))
-                }
-                transactionWriteDao.delete(childTxn)
-            }
-
-            // ── Update the anchor ──────────────────────────────────────────
-            transactionWriteDao.updateAmount(anchorTxnId, finalAmount)
-            transactionWriteDao.updateDate(anchorTxnId, finalDate)
-            transactionWriteDao.updateNotes(anchorTxnId, notes)
-            if (anchorTxn.transactionType != finalType) {
-                transactionWriteDao.updateTransactionType(anchorTxnId, finalType)
-            }
-        }
-    }
-
-    // ─── Unmerge ────────────────────────────────────────────────────────────
-
-    private fun restoreTransactionFromMergeRecord(r: MergeRecord): Transaction {
-        return Transaction(
-            description = r.childDescription,
-            amount = r.childAmount,
-            date = r.childDate,
-            accountId = r.childAccountId,
-            categoryId = r.childCategoryId,
-            transactionType = r.childTransactionType,
-            source = r.childSource,
-            notes = r.childNotes,
-            sourceSmsId = r.childSourceSmsId,
-            sourceSmsHash = r.childSourceSmsHash,
-            smsSignature = r.childSmsSignature,
-            originalDescription = r.childOriginalDescription,
-            originalAmount = r.childOriginalAmount,
-            currencyCode = r.childCurrencyCode,
-            conversionRate = r.childConversionRate,
-            mergeDismissed = false,
-        )
-    }
-
-    /**
-     * Observes whether a merge snapshot exists for the given parent transaction.
-     * The UI uses this to decide whether to show the "Unmerge" option.
-     * Emits null when no snapshot is found (never merged, or already unmerged).
-     */
-    fun observeMergeRecord(parentTxnId: Int): Flow<MergeRecord?> =
-        mergeRecordDao.observeForParent(parentTxnId)
-
-    /**
-     * Builds the per-account contribution breakdown for a merged transaction.
-     * Returns an empty list if the transaction has no merge records.
-     *
-     * The list always contains:
-     *  - The anchor account entry: shows the anchor's original amount BEFORE the merge
-     *    (sourced from [MergeRecord.originalParentAmount] on the oldest record).
-     *  - One entry per child account: amount from [MergeRecord.childAmount].
-     *
-     * Works for both MANUAL (N-to-1) and AUTO (chained 1-to-1) merges.
-     * The UI uses this to render [MergedAccountsCard] when multiple accounts are involved.
-     */
-    suspend fun getMergedTransactionBreakdown(parentTxnId: Int): List<MergedTransactionItem> {
-        val records = mergeRecordDao.getAllForParentAnyType(parentTxnId)
-        if (records.isEmpty()) return emptyList()
-
-        val anchorTxn = transactionQueryDao.getTransactionByIdSync(parentTxnId) ?: return emptyList()
-        val anchorAccount = db.accountDao().getAccountByIdBlocking(anchorTxn.accountId)
-
-        val entries = mutableListOf<MergedTransactionItem>()
-
-        fun signedAmount(
-            type: TransactionType,
-            amount: Double,
-        ): Double =
-            if (type == TransactionType.INCOME) amount else -amount
-
-        val currentSigned = signedAmount(anchorTxn.transactionType, anchorTxn.amount)
-        val childrenSigned = records.sumOf { signedAmount(it.childTransactionType, it.childAmount) }
-        val anchorSigned = currentSigned - childrenSigned
-
-        val anchorOriginalType =
-            if (anchorSigned > 0.0) {
-                TransactionType.INCOME
-            } else if (anchorSigned < 0.0) {
-                TransactionType.EXPENSE
-            } else {
-                anchorTxn.transactionType
-            }
-
-        // Anchor entry — use the pre-merge snapshot amount so that each account's
-        // contribution reflects what actually left/arrived at that account.
-        // The oldest record (ASC order) holds the true original parent state.
-        val firstRecord = records.first()
-        val anchorOriginalAmount = firstRecord.originalParentAmount
-        entries.add(
-            MergedTransactionItem(
-                accountId = anchorTxn.accountId,
-                accountName = anchorAccount?.name ?: "Unknown",
-                amount = anchorOriginalAmount,
-                transactionType = anchorOriginalType,
-                isAnchor = true,
-                description = anchorTxn.description,
-                date = firstRecord.originalParentDate,
-            ),
-        )
-
-        // One entry per child — each record fully snapshots the child's account + amount.
-        for (r in records) {
-            val childAccount = db.accountDao().getAccountByIdBlocking(r.childAccountId)
-            entries.add(
-                MergedTransactionItem(
-                    accountId = r.childAccountId,
-                    accountName = childAccount?.name ?: "Unknown",
-                    amount = r.childAmount,
-                    transactionType = r.childTransactionType,
-                    isAnchor = false,
-                    description = r.childDescription,
-                    date = r.childDate
-                )
-            )
-        }
-
-        return entries
-    }
-
-    /**
-     * Fully reverses the most recent merge for [parentTxnId].
-     *
-     * For AUTO merges (legacy 1-to-1): restores parent + re-inserts the single child.
-     * For MANUAL merges (N-to-1): restores parent to its pre-merge state + re-inserts ALL children
-     * using the shared [MergeRecord.mergeGroupId].
-     *
-     * This is a no-op if no snapshot exists for the given parent.
-     */
-    suspend fun unmergeTransactions(parentTxnId: Int) {
-        val record = mergeRecordDao.getForParentSync(parentTxnId) ?: return
-
-        if (record.mergeType == "MANUAL" && record.mergeGroupId.isNotBlank()) {
-            // ── MANUAL path: restore all N children ──────────────────────
-            val groupId = record.mergeGroupId
-            // Defensive guard: a blank groupId would match all AUTO rows (mergeGroupId=''),
-            // which would catastrophically wipe unrelated merge records.
-            require(groupId.isNotBlank()) {
-                "Manual merge groupId must not be blank for parentTxnId=$parentTxnId"
-            }
-            val allRecords = mergeRecordDao.getAllForGroup(groupId)
-            if (allRecords.isEmpty()) return
-
-            db.withTransaction {
-                val currentParent = transactionQueryDao.getTransactionByIdSync(parentTxnId) ?: return@withTransaction
-
-                fun signedAmount(
-                    type: TransactionType,
-                    amount: Double
-                ): Double =
-                    if (type == TransactionType.INCOME) amount else -amount
-
-                val currentSigned = signedAmount(currentParent.transactionType, currentParent.amount)
-                val childrenSigned = allRecords.sumOf { signedAmount(it.childTransactionType, it.childAmount) }
-                val newSigned = currentSigned - childrenSigned
-                val hasReimbursements = transactionReimbursementDao.getReimbursementsCountSync(parentTxnId) > 0
-
-                val finalType =
-                    if (hasReimbursements) {
-                        TransactionType.EXPENSE
-                    } else if (newSigned > 0.0) {
-                        TransactionType.INCOME
-                    } else if (newSigned < 0.0) {
-                        TransactionType.EXPENSE
-                    } else {
-                        currentParent.transactionType
-                    }
-
-                // If finalType is "expense", the signed amount is negative, so we negate it to get the mathematical amount.
-                // This preserves any negative balance if the transaction was over-repaid.
-                val finalAmount = if (finalType == TransactionType.EXPENSE) -newSigned else newSigned
-
-                // Restore parent to its pre-merge state (all records share the same parent snapshot)
-                val first = allRecords.first()
-                transactionWriteDao.updateAmount(parentTxnId, finalAmount)
-                if (currentParent.transactionType != finalType) {
-                    transactionWriteDao.updateTransactionType(parentTxnId, finalType)
-                }
-                transactionWriteDao.updateDate(parentTxnId, first.originalParentDate)
-                transactionWriteDao.updateNotes(parentTxnId, first.originalParentNotes)
-
-                // Re-insert each child
-                for (r in allRecords) {
-                    val restoredChild = restoreTransactionFromMergeRecord(r)
-                    transactionWriteDao.insert(restoredChild)
-
-                    // Unblock the child's SMS so it can be re-scanned
-                    r.childSourceSmsHash?.let { hash ->
-                        deletedSmsHashDao.deleteByHash(hash)
-                    }
-                }
-
-                // Clean up all records in this group atomically with the restore
-                mergeRecordDao.deleteByGroupId(groupId)
-            }
-        } else {
-            // ── AUTO path (chained 1-to-1): restore ALL children for this parent ───────────
-            val allAutoRecords =
-                mergeRecordDao.getAllForParentSync(parentTxnId)
-                    .filter { it.mergeType == "AUTO" }
-            if (allAutoRecords.isEmpty()) return
-
-            db.withTransaction {
-                val currentParent = transactionQueryDao.getTransactionByIdSync(parentTxnId) ?: return@withTransaction
-
-                // AUTO merges just sum the absolute amounts.
-                val totalMergedAmount = allAutoRecords.sumOf { it.childAmount }
-                val newAmount = currentParent.amount - totalMergedAmount
-
-                // The VERY FIRST record (oldest) has the original parent state
-                val first = allAutoRecords.first()
-                transactionWriteDao.updateAmount(parentTxnId, newAmount)
-                transactionWriteDao.updateDate(parentTxnId, first.originalParentDate)
-                transactionWriteDao.updateNotes(parentTxnId, first.originalParentNotes)
-
-                // Re-insert each child
-                for (r in allAutoRecords) {
-                    val restoredChild = restoreTransactionFromMergeRecord(r)
-                    transactionWriteDao.insert(restoredChild)
-
-                    r.childSourceSmsHash?.let { hash ->
-                        deletedSmsHashDao.deleteByHash(hash)
-                    }
-
-                    mergeRecordDao.deleteById(r.id)
-                }
-            }
-        }
     }
 
     // ─── Self Transfer Detection ──────────────────────────────────────────

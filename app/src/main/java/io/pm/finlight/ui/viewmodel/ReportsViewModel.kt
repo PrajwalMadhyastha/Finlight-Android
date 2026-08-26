@@ -27,6 +27,8 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+
 /**
  * Enum to manage the state of the view toggle on the reports screen.
  */
@@ -40,6 +42,8 @@ class ReportsViewModel(
     private val transactionRepository: TransactionRepository,
     private val categoryDao: CategoryDao,
     private val settingsRepository: SettingsRepository,
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
+        GetMonthlyConsistencyDataUseCase(settingsRepository, transactionRepository),
 ) : ViewModel() {
     val allCategories: StateFlow<List<Category>>
 
@@ -161,7 +165,7 @@ class ReportsViewModel(
                 // --- FIX: Add explicit types to resolve build error ---
                 val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> =
                     (1..12).map { month ->
-                        transactionRepository.getMonthlyConsistencyData(year, month)
+                        getMonthlyConsistencyDataUseCase(year, month)
                     }
 
                 // Combine all 12 flows
@@ -182,12 +186,12 @@ class ReportsViewModel(
                     initialValue = emptyList(),
                 )
 
-        // --- REFACTORED: Use the new centralized repository function ---
+        // --- REFACTORED: Use the new centralized use case ---
         detailedMonthData =
             _selectedMonth.flatMapLatest { monthCal ->
                 val month = monthCal.get(Calendar.MONTH) + 1
                 val year = monthCal.get(Calendar.YEAR)
-                transactionRepository.getMonthlyConsistencyData(year, month)
+                getMonthlyConsistencyDataUseCase(year, month)
             }.flowOn(Dispatchers.Default)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

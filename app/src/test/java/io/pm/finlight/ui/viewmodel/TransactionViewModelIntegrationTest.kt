@@ -11,6 +11,7 @@ import io.mockk.mockk
 import io.pm.finlight.*
 import io.pm.finlight.core.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.entity.MergeType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -44,6 +45,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
     private lateinit var merchantCategoryMappingRepository: MerchantCategoryMappingRepository
     private lateinit var merchantMappingRepository: MerchantMappingRepository
     private lateinit var splitTransactionRepository: SplitTransactionRepository
+    private lateinit var mergeTransactionsUseCase: io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 
     // Mocked Repositories (Non-DB / External)
     private lateinit var settingsRepository: SettingsRepository
@@ -80,8 +82,6 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 transactionReimbursementDao = db.transactionReimbursementDao(),
                 settingsRepository = settingsRepository,
                 tagRepository = tagRepository,
-                deletedSmsHashDao = db.deletedSmsHashDao(),
-                mergeRecordDao = db.mergeRecordDao(),
                 db = db,
             )
         accountRepository = AccountRepository(db)
@@ -90,6 +90,15 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
         merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao())
         merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
+        mergeTransactionsUseCase =
+            io.pm.finlight.domain.usecase.MergeTransactionsUseCase(
+                transactionQueryDao = db.transactionQueryDao(),
+                transactionWriteDao = db.transactionWriteDao(),
+                transactionReimbursementDao = db.transactionReimbursementDao(),
+                mergeRecordDao = db.mergeRecordDao(),
+                deletedSmsHashDao = db.deletedSmsHashDao(),
+                db = db,
+            )
 
         // 4. Initialize ViewModel
         viewModel =
@@ -107,6 +116,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 merchantMappingRepository = merchantMappingRepository,
                 splitTransactionRepository = splitTransactionRepository,
                 smsParseTemplateDao = db.smsParseTemplateDao(),
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
             )
     }
 
@@ -206,7 +216,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 ).toLong()
 
             // Act
-            transactionRepository.mergeTransactions(parentTxnId.toInt(), childTxnId.toInt())
+            mergeTransactionsUseCase(parentTxnId.toInt(), childTxnId.toInt())
 
             // Assert
             val deletedHashes = db.deletedSmsHashDao().getAllHashes()
@@ -280,7 +290,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 ).toInt()
 
             // Act
-            transactionRepository.manualMergeTransactions(anchorId, listOf(child1Id, child2Id))
+            mergeTransactionsUseCase.manualMerge(anchorId, listOf(child1Id, child2Id))
 
             advanceUntilIdle()
 
@@ -299,7 +309,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
             val groupIds = records.map { it.mergeGroupId }.toSet()
             assertEquals("All records share one non-blank groupId", 1, groupIds.size)
             assertTrue("groupId must not be blank", groupIds.first().isNotBlank())
-            assertTrue("All records have mergeType=MANUAL", records.all { it.mergeType == "MANUAL" })
+            assertTrue("All records have mergeType=MANUAL", records.all { it.mergeType == MergeType.MANUAL })
 
             // Assert: child SMS hash recorded in deny-list
             val deletedHashes = db.deletedSmsHashDao().getAllHashes()
@@ -364,7 +374,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                     emptyList(),
                 ).toInt()
 
-            transactionRepository.manualMergeTransactions(anchorId, listOf(child1Id, child2Id))
+            mergeTransactionsUseCase.manualMerge(anchorId, listOf(child1Id, child2Id))
             advanceUntilIdle()
 
             // Verify pre-condition: anchor exists, children deleted
@@ -373,7 +383,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
             assertNull(transactionRepository.getTransactionSync(child2Id))
 
             // Act: unmerge
-            transactionRepository.unmergeTransactions(anchorId)
+            mergeTransactionsUseCase.unmerge(anchorId)
             advanceUntilIdle()
 
             // Assert: anchor restored to original values

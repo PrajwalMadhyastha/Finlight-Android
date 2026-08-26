@@ -35,10 +35,10 @@ class TimePeriodReportViewModelFactory(
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     settingsRepository = settingsRepository,
                     tagRepository = tagRepository,
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
                     db = db,
                 )
+
+            val getMonthlyConsistencyDataUseCase = io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase(settingsRepository, transactionRepository)
 
             @Suppress("UNCHECKED_CAST")
             return TimePeriodReportViewModel(
@@ -49,6 +49,7 @@ class TimePeriodReportViewModelFactory(
                 timePeriod = timePeriod,
                 initialDateMillis = initialDateMillis,
                 showPreviousMonth = showPreviousMonth,
+                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

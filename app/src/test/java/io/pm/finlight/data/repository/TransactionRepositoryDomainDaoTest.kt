@@ -52,8 +52,6 @@ class TransactionRepositoryDomainDaoTest {
                 transactionReimbursementDao = reimbursementDao,
                 settingsRepository = settingsRepository,
                 tagRepository = tagRepository,
-                deletedSmsHashDao = deletedSmsHashDao,
-                mergeRecordDao = mergeRecordDao,
                 db = db,
             )
     }

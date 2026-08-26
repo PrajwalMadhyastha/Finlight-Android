@@ -22,8 +22,6 @@ class AnnualSimulatorViewModelFactory(private val application: Application) : Vi
                     transactionReimbursementDao = database.transactionReimbursementDao(),
                     settingsRepository = settingsRepository,
                     tagRepository = tagRepository,
-                    deletedSmsHashDao = database.deletedSmsHashDao(),
-                    mergeRecordDao = database.mergeRecordDao(),
                     db = database,
                 )
             @Suppress("UNCHECKED_CAST")
