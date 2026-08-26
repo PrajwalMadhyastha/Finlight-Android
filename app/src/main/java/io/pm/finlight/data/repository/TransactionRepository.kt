@@ -11,16 +11,10 @@ import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.data.model.MergedTransactionItem
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
-import java.util.Calendar
 import java.util.Locale
-import kotlin.math.roundToLong
-
 import io.pm.finlight.data.db.dao.DeletedSmsHashDao
 import io.pm.finlight.data.db.dao.MergeRecordDao
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
@@ -35,8 +29,6 @@ class TransactionRepository(
     private val transactionQueryDao: TransactionQueryDao,
     private val transactionAnalyticsDao: TransactionAnalyticsDao,
     private val transactionReimbursementDao: TransactionReimbursementDao,
-    private val settingsRepository: SettingsRepository,
-    private val tagRepository: TagRepository,
     private val deletedSmsHashDao: DeletedSmsHashDao,
     private val mergeRecordDao: MergeRecordDao,
     private val db: AppDatabase,
@@ -44,8 +36,6 @@ class TransactionRepository(
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
         transactionDao: TransactionDao,
-        settingsRepository: SettingsRepository,
-        tagRepository: TagRepository,
         deletedSmsHashDao: DeletedSmsHashDao,
         mergeRecordDao: MergeRecordDao,
         db: AppDatabase,
@@ -54,8 +44,6 @@ class TransactionRepository(
         transactionQueryDao = transactionDao,
         transactionAnalyticsDao = transactionDao,
         transactionReimbursementDao = transactionDao,
-        settingsRepository = settingsRepository,
-        tagRepository = tagRepository,
         deletedSmsHashDao = deletedSmsHashDao,
         mergeRecordDao = mergeRecordDao,
         db = db,
@@ -289,28 +277,14 @@ class TransactionRepository(
         }
     }
 
-    private suspend fun getFinalTagsForTransaction(
-        transaction: Transaction,
-        initialTags: Set<Tag>,
-    ): Set<Tag> {
-        val finalTags = initialTags.toMutableSet()
-        val travelSettings = settingsRepository.getTravelModeSettings().first()
-        if (travelSettings?.isEnabled == true && transaction.date >= travelSettings.startDate && transaction.date <= travelSettings.endDate) {
-            val tripTag = tagRepository.findOrCreateTag(travelSettings.tripName)
-            finalTags.add(tripTag)
-        }
-        return finalTags
-    }
-
     suspend fun insertTransactionWithTags(
         transaction: Transaction,
         tags: Set<Tag>,
     ): Long {
-        val finalTags = getFinalTagsForTransaction(transaction, tags)
         val transactionId = transactionWriteDao.insert(transaction)
-        if (finalTags.isNotEmpty()) {
+        if (tags.isNotEmpty()) {
             val crossRefs =
-                finalTags.map { tag ->
+                tags.map { tag ->
                     TransactionTagCrossRef(transactionId = transactionId.toInt(), tagId = tag.id)
                 }
             transactionWriteDao.addTagsToTransaction(crossRefs)
@@ -322,12 +296,11 @@ class TransactionRepository(
         transaction: Transaction,
         tags: Set<Tag>,
     ) {
-        val finalTags = getFinalTagsForTransaction(transaction, tags)
         transactionWriteDao.update(transaction)
         transactionWriteDao.clearTagsForTransaction(transaction.id)
-        if (finalTags.isNotEmpty()) {
+        if (tags.isNotEmpty()) {
             val crossRefs =
-                finalTags.map { tag ->
+                tags.map { tag ->
                     TransactionTagCrossRef(transactionId = transaction.id, tagId = tag.id)
                 }
             transactionWriteDao.addTagsToTransaction(crossRefs)
@@ -339,11 +312,10 @@ class TransactionRepository(
         tags: Set<Tag>,
         imagePaths: List<String>,
     ): Long {
-        val finalTags = getFinalTagsForTransaction(transaction, tags)
         val newTransactionId = transactionWriteDao.insert(transaction)
-        if (finalTags.isNotEmpty()) {
+        if (tags.isNotEmpty()) {
             val crossRefs =
-                finalTags.map { tag ->
+                tags.map { tag ->
                     TransactionTagCrossRef(transactionId = newTransactionId.toInt(), tagId = tag.id)
                 }
             transactionWriteDao.addTagsToTransaction(crossRefs)
@@ -434,119 +406,6 @@ class TransactionRepository(
     // --- NEW: Expose the function to remove all tags ---
     suspend fun removeAllTransactionsForTag(tagId: Int) {
         transactionWriteDao.removeAllTransactionsForTag(tagId)
-    }
-
-    // --- NEW: Centralized "Monthly-First" Consistency Logic ---
-
-    /**
-     * Helper to check if cal1 is on a day *before* cal2, ignoring time.
-     */
-    private fun isBeforeDay(
-        cal1: Calendar,
-        cal2: Calendar,
-    ): Boolean {
-        return cal1.get(Calendar.YEAR) < cal2.get(Calendar.YEAR) ||
-            (
-                cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-                    cal1.get(Calendar.DAY_OF_YEAR) < cal2.get(Calendar.DAY_OF_YEAR)
-            )
-    }
-
-    /**
-     * Generates the consistency data for a single month, based on that month's budget.
-     * This is the new single source of truth for all heatmap/calendar logic.
-     */
-    fun getMonthlyConsistencyData(
-        year: Int,
-        month: Int,
-    ): Flow<List<CalendarDayStatus>> {
-        // Calculate start and end of the given month
-        val monthStartCal =
-            Calendar.getInstance().apply {
-                set(Calendar.YEAR, year)
-                set(Calendar.MONTH, month - 1) // Calendar.MONTH is 0-indexed
-                set(Calendar.DAY_OF_MONTH, 1)
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-        val monthEndCal =
-            (monthStartCal.clone() as Calendar).apply {
-                add(Calendar.MONTH, 1)
-                add(Calendar.MILLISECOND, -1)
-            }
-        val daysInMonth = monthStartCal.getActualMaximum(Calendar.DAY_OF_MONTH)
-
-        // Combine the three flows we need
-        // --- UPDATED: The budget flow is now nullable (Flow<Float?>) ---
-        return combine(
-            settingsRepository.getOverallBudgetForMonth(year, month),
-            transactionAnalyticsDao.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
-            transactionQueryDao.getFirstTransactionDate(),
-        ) { budget: Float?, dailyTotals: List<DailyTotal>, firstTransactionDate: Long? ->
-            val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
-            val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })
-            val resultList = mutableListOf<CalendarDayStatus>()
-            val dayIterator = (monthStartCal.clone() as Calendar)
-            val today = Calendar.getInstance()
-
-            // --- UPDATED LOGIC (Fix for "green day" and "blue day" bugs) ---
-            if (budget == null) {
-                // CASE 1: NO BUDGET SET (null)
-                // All past days are NO_DATA (gray).
-                for (i in 1..daysInMonth) {
-                    dayIterator.set(Calendar.DAY_OF_MONTH, i)
-                    val date = dayIterator.time
-
-                    if (dayIterator.after(today) || (firstDataCal != null && isBeforeDay(dayIterator, firstDataCal))) {
-                        resultList.add(CalendarDayStatus(date, SpendingStatus.NO_DATA, 0L, 0L))
-                    } else {
-                        // Any past day with NO BUDGET is NO_DATA, even if there was no spending.
-                        val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
-                        val amountSpent = (spendingMap[dateKey] ?: 0.0).roundToLong()
-                        val status = SpendingStatus.NO_DATA
-                        resultList.add(CalendarDayStatus(date, status, amountSpent, 0L))
-                    }
-                }
-            } else {
-                // CASE 2: A BUDGET IS SET (e.g., 0f or 145000f)
-                var cumulativeSpending = 0.0
-                val totalBudget = budget.toDouble()
-
-                for (i in 1..daysInMonth) {
-                    dayIterator.set(Calendar.DAY_OF_MONTH, i)
-                    val date = dayIterator.time
-
-                    if (dayIterator.after(today) || (firstDataCal != null && isBeforeDay(dayIterator, firstDataCal))) {
-                        resultList.add(CalendarDayStatus(date, SpendingStatus.NO_DATA, 0L, 0L))
-                        continue
-                    }
-
-                    val remainingBudget = totalBudget - cumulativeSpending
-                    val remainingDays = (daysInMonth - i + 1).coerceAtLeast(1)
-                    val safeToSpend = if (remainingBudget > 0) (remainingBudget / remainingDays).roundToLong() else 0L
-
-                    val dateKey = String.format(Locale.ROOT, "%d-%02d-%02d", year, month, i)
-                    val amountSpent = (spendingMap[dateKey] ?: 0.0)
-                    val amountSpentLong = amountSpent.roundToLong()
-
-                    // This is the new, more robust 'when' block that fixes the original bug
-                    val status =
-                        when {
-                            amountSpentLong == 0L && safeToSpend == 0L -> SpendingStatus.WITHIN_LIMIT // Met 0 budget (blue)
-                            amountSpentLong == 0L && safeToSpend > 0L -> SpendingStatus.NO_SPEND // No spend on a day with a budget (green)
-                            amountSpentLong > 0L && safeToSpend == 0L -> SpendingStatus.OVER_LIMIT // Spent > 0 on a 0 budget (red)
-                            amountSpentLong > safeToSpend -> SpendingStatus.OVER_LIMIT // Spent > budget (red)
-                            else -> SpendingStatus.WITHIN_LIMIT // Spent <= budget (and not 0) (blue)
-                        }
-                    Log.d("HeatmapDebug", "Date: $dateKey, Spent: $amountSpentLong, Threshold: $safeToSpend, Status: $status")
-                    resultList.add(CalendarDayStatus(date, status, amountSpentLong, safeToSpend))
-                    cumulativeSpending += amountSpent
-                }
-            }
-            resultList // This is the value emitted by the combine
-        }.flowOn(Dispatchers.Default) // Run the calculation on a background thread
     }
 
     // --- NEW: Expose the quick fill query ---

@@ -26,8 +26,6 @@ class CurrencyViewModelFactory(private val application: Application) : ViewModel
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    settingsRepository = settingsRepository,
-                    tagRepository = tagRepository,
                     deletedSmsHashDao = db.deletedSmsHashDao(),
                     mergeRecordDao = db.mergeRecordDao(),
                     db = db,

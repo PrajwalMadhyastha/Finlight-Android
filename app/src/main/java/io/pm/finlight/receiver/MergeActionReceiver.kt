@@ -6,8 +6,6 @@ import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.TransactionRepository
-import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TagRepository
 import io.pm.finlight.SmsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,8 +28,6 @@ class MergeActionReceiver : BroadcastReceiver() {
                 transactionQueryDao = db.transactionQueryDao(),
                 transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 transactionReimbursementDao = db.transactionReimbursementDao(),
-                settingsRepository = SettingsRepository(context),
-                tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao()),
                 deletedSmsHashDao = db.deletedSmsHashDao(),
                 mergeRecordDao = db.mergeRecordDao(),
                 db = db,

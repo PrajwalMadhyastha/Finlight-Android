@@ -60,6 +60,9 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var smsRepository: SmsRepository
 
+    @Mock
+    private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+
     protected lateinit var viewModel: DashboardViewModel
 
     // --- List of possible messages from ViewModel for assertions ---
@@ -138,7 +141,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
 
         // --- FIX: Add missing mock for the new dependency ---
-        `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+        `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
         `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(emptyList()))
         `when`(recurringPatternDao.getUnacknowledgedPatterns()).thenReturn(flowOf(emptyList()))
@@ -159,6 +162,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
                 smsRepository = smsRepository,
+                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
             )
     }
 
@@ -671,7 +675,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
 
             `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(firstTransactionDate))
             // --- FIX: Mock the new dependency, not the old one ---
-            `when`(transactionRepository.getMonthlyConsistencyData(eq(year), anyInt())).thenAnswer { invocation ->
+            `when`(getMonthlyConsistencyDataUseCase(eq(year), anyInt())).thenAnswer { invocation ->
                 val month = invocation.getArgument<Int>(1)
                 if (month == 1) { // Assuming test days are in January
                     // Generate a full list for the month

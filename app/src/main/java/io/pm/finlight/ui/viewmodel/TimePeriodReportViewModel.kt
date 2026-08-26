@@ -15,6 +15,7 @@ import com.github.mikephil.charting.data.BarEntry
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -42,6 +43,8 @@ class TimePeriodReportViewModel(
     private val timePeriod: TimePeriod,
     initialDateMillis: Long?,
     showPreviousMonth: Boolean,
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
+        GetMonthlyConsistencyDataUseCase(transactionRepository, settingsRepository),
 ) : ViewModel() {
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
@@ -412,7 +415,7 @@ class TimePeriodReportViewModel(
     val monthlyConsistencyData: StateFlow<List<CalendarDayStatus>> =
         _selectedDate.flatMapLatest { calendar ->
             if (timePeriod != TimePeriod.MONTHLY) return@flatMapLatest flowOf(emptyList())
-            transactionRepository.getMonthlyConsistencyData(
+            getMonthlyConsistencyDataUseCase(
                 calendar.get(Calendar.YEAR),
                 calendar.get(Calendar.MONTH) + 1,
             )
@@ -426,7 +429,7 @@ class TimePeriodReportViewModel(
                 val year = calendar.get(Calendar.YEAR)
                 val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> =
                     (1..12).map { month ->
-                        transactionRepository.getMonthlyConsistencyData(year, month)
+                        getMonthlyConsistencyDataUseCase(year, month)
                     }
 
                 val combinedFlow =

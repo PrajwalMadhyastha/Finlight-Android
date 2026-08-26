@@ -19,6 +19,8 @@ import io.pm.finlight.TransactionType
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.data.db.AppDatabase
 
+import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
+
 /**
  * A shared utility class that handles the full account-resolution and transaction
  * persistence pipeline for SMS-originated transactions.
@@ -35,6 +37,9 @@ import io.pm.finlight.data.db.AppDatabase
 class SmsTransactionSaver(
     private val db: AppDatabase,
     private val settingsRepository: SettingsRepository,
+    private val tagRepository: TagRepository = TagRepository(db.tagDao(), db.transactionQueryDao()),
+    private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase =
+        ResolveTravelModeTagUseCase(settingsRepository, tagRepository),
 ) {
     private val tag = "SmsTransactionSaver"
 
@@ -55,15 +60,12 @@ class SmsTransactionSaver(
     ): Long? {
         val accountDao = db.accountDao()
         val accountAliasDao = db.accountAliasDao()
-        val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
         val transactionRepository =
             TransactionRepository(
                 transactionWriteDao = db.transactionWriteDao(),
                 transactionQueryDao = db.transactionQueryDao(),
                 transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 transactionReimbursementDao = db.transactionReimbursementDao(),
-                settingsRepository = settingsRepository,
-                tagRepository = tagRepository,
                 deletedSmsHashDao = db.deletedSmsHashDao(),
                 mergeRecordDao = db.mergeRecordDao(),
                 db = db,
@@ -148,8 +150,8 @@ class SmsTransactionSaver(
                 )
             }
 
-        // The repository handles travel-mode tag injection automatically.
-        val newId = transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
+        val finalTags = resolveTravelModeTagUseCase.getFinalTags(potentialTxn.date, emptySet())
+        val newId = transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
 
         // --- NEW: Attempt to detect and link self-transfers ---
         val savedTransaction = transactionToSave.copy(id = newId.toInt())

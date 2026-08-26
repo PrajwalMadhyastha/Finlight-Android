@@ -58,6 +58,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
         every { db.accountDao() } returns accountDao
         every { db.accountAliasDao() } returns accountAliasDao
         every { db.transactionWriteDao() } returns transactionWriteDao
+        every { db.transactionQueryDao() } returns mockk(relaxed = true)
         every { db.tagDao() } returns tagDao
         every { db.merchantRenameRuleDao() } returns merchantRenameRuleDao
         every { db.merchantCategoryMappingDao() } returns merchantCategoryMappingDao

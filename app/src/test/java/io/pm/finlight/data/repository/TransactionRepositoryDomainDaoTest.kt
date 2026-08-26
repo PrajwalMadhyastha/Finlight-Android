@@ -31,8 +31,6 @@ class TransactionRepositoryDomainDaoTest {
     private val queryDao: TransactionQueryDao = mockk(relaxed = true)
     private val analyticsDao: TransactionAnalyticsDao = mockk(relaxed = true)
     private val reimbursementDao: TransactionReimbursementDao = mockk(relaxed = true)
-    private val settingsRepository: SettingsRepository = mockk(relaxed = true)
-    private val tagRepository: TagRepository = mockk(relaxed = true)
     private val deletedSmsHashDao: DeletedSmsHashDao = mockk(relaxed = true)
     private val mergeRecordDao: MergeRecordDao = mockk(relaxed = true)
     private val db: AppDatabase = mockk(relaxed = true)
@@ -41,7 +39,6 @@ class TransactionRepositoryDomainDaoTest {
 
     @Before
     fun setup() {
-        coEvery { settingsRepository.getTravelModeSettings() } returns flowOf(null)
         every { queryDao.getAllTransactions() } returns flowOf(emptyList())
 
         repository =
@@ -50,8 +47,6 @@ class TransactionRepositoryDomainDaoTest {
                 transactionQueryDao = queryDao,
                 transactionAnalyticsDao = analyticsDao,
                 transactionReimbursementDao = reimbursementDao,
-                settingsRepository = settingsRepository,
-                tagRepository = tagRepository,
                 deletedSmsHashDao = deletedSmsHashDao,
                 mergeRecordDao = mergeRecordDao,
                 db = db,

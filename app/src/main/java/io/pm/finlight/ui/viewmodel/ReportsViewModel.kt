@@ -17,6 +17,7 @@ import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,8 @@ class ReportsViewModel(
     private val transactionRepository: TransactionRepository,
     private val categoryDao: CategoryDao,
     private val settingsRepository: SettingsRepository,
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
+        GetMonthlyConsistencyDataUseCase(transactionRepository, settingsRepository),
 ) : ViewModel() {
     val allCategories: StateFlow<List<Category>>
 
@@ -161,7 +164,7 @@ class ReportsViewModel(
                 // --- FIX: Add explicit types to resolve build error ---
                 val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> =
                     (1..12).map { month ->
-                        transactionRepository.getMonthlyConsistencyData(year, month)
+                        getMonthlyConsistencyDataUseCase(year, month)
                     }
 
                 // Combine all 12 flows
@@ -182,12 +185,12 @@ class ReportsViewModel(
                     initialValue = emptyList(),
                 )
 
-        // --- REFACTORED: Use the new centralized repository function ---
+        // --- REFACTORED: Use the new centralized use case ---
         detailedMonthData =
             _selectedMonth.flatMapLatest { monthCal ->
                 val month = monthCal.get(Calendar.MONTH) + 1
                 val year = monthCal.get(Calendar.YEAR)
-                transactionRepository.getMonthlyConsistencyData(year, month)
+                getMonthlyConsistencyDataUseCase(year, month)
             }.flowOn(Dispatchers.Default)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

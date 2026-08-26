@@ -39,6 +39,9 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     @Mock // --- NEW: Add mock for the new dependency ---
     private lateinit var transactionRepository: TransactionRepository
 
+    @Mock
+    private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+
     @Before
     override fun setup() {
         super.setup()
@@ -57,7 +60,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         `when`(transactionQueryDao.getFirstTransactionDate()).thenReturn(flowOf(0L))
 
         // --- NEW: Mock the new repository dependency ---
-        `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+        `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
         // --- FIX: Mock settingsRepository flows to avoid null upstream issue ---
         `when`(settingsRepository.getExcludedIncomeMonths()).thenReturn(flowOf(emptySet()))
@@ -310,20 +313,21 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     }
                 mockData.add(CalendarDayStatus(date, status, amount, safeToSpend))
             }
-            `when`(transactionRepository.getMonthlyConsistencyData(year, month)).thenReturn(flowOf(mockData))
+            `when`(getMonthlyConsistencyDataUseCase(year, month)).thenReturn(flowOf(mockData))
             `when`(transactionQueryDao.getFirstTransactionDate()).thenReturn(flowOf(firstDayOfMonth)) // Mock this for legacy code paths
 
             // Act
             // --- FIX: Pass transactionRepository ---
             val viewModel =
                 TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao,
-                    transactionRepository,
-                    settingsRepository,
-                    TimePeriod.MONTHLY,
-                    testCal.timeInMillis,
-                    false,
+                    transactionQueryDao = transactionQueryDao,
+                    transactionAnalyticsDao = transactionAnalyticsDao,
+                    transactionRepository = transactionRepository,
+                    settingsRepository = settingsRepository,
+                    timePeriod = TimePeriod.MONTHLY,
+                    initialDateMillis = testCal.timeInMillis,
+                    showPreviousMonth = false,
+                    getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
                 )
             advanceUntilIdle()
 

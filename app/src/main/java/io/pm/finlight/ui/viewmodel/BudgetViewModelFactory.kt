@@ -18,7 +18,6 @@ import io.pm.finlight.BudgetRepository
 import io.pm.finlight.BudgetViewModel
 import io.pm.finlight.CategoryRepository
 import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
 
@@ -29,16 +28,12 @@ class BudgetViewModelFactory(private val application: Application) : ViewModelPr
             val budgetRepository = BudgetRepository(db.budgetDao())
             val settingsRepository = SettingsRepository(application)
             val categoryRepository = CategoryRepository(db.categoryDao())
-            // --- NEW: Add TransactionRepository dependency ---
-            val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
             val transactionRepository =
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),
                     transactionQueryDao = db.transactionQueryDao(),
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
-                    settingsRepository = settingsRepository,
-                    tagRepository = tagRepository,
                     deletedSmsHashDao = db.deletedSmsHashDao(),
                     mergeRecordDao = db.mergeRecordDao(),
                     db = db,

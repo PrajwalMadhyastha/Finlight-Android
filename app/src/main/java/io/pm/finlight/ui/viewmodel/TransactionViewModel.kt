@@ -18,6 +18,7 @@ import io.pm.finlight.core.utils.StringSimilarity
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.data.model.MergedTransactionItem
+import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
 import io.pm.finlight.utils.CategoryIconHelper
@@ -115,6 +116,8 @@ class TransactionViewModel(
     private val merchantMappingRepository: MerchantMappingRepository,
     private val splitTransactionRepository: SplitTransactionRepository,
     private val smsParseTemplateDao: SmsParseTemplateDao,
+    private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase =
+        ResolveTravelModeTagUseCase(settingsRepository, tagRepository),
 ) : AndroidViewModel(application) {
     private val context = application
 
@@ -1156,10 +1159,11 @@ class TransactionViewModel(
                 data.imageUris.mapNotNull { uri ->
                     saveImageToInternalStorage(uri)
                 }
+            val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, data.tags)
             val newTransactionId =
                 transactionRepository.insertTransactionWithTagsAndImages(
                     transactionToSave,
-                    data.tags,
+                    finalTags,
                     savedImagePaths,
                 )
             newTransactionId
@@ -1757,7 +1761,8 @@ class TransactionViewModel(
                         )
                     }
 
-                transactionRepository.insertTransactionWithTags(transactionToSave, tags)
+                val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, tags)
+                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
 
                 val merchantName = potentialTxn.merchantName
                 if (categoryId != null && merchantName != null) {
@@ -1835,7 +1840,8 @@ class TransactionViewModel(
                         source = source,
                     )
 
-                transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
+                val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, emptySet())
+                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
                 true
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to auto-save SMS transaction", e)
