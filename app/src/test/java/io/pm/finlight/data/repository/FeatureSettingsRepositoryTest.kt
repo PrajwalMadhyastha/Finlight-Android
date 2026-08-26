@@ -1,15 +1,15 @@
 package io.pm.finlight.data.repository
 
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.FeatureSettingsRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -26,15 +26,16 @@ import kotlin.test.assertTrue
 class FeatureSettingsRepositoryTest : BaseViewModelTest() {
     private lateinit var context: Application
     private lateinit var repository: FeatureSettingsRepository
-    private lateinit var prefs: SharedPreferences
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
-        repository = FeatureSettingsRepository(context)
+        val dataStore = context.financeSettingsDataStore
+        runTest {
+            dataStore.edit { it.clear() }
+        }
+        repository = FeatureSettingsRepository(dataStore)
     }
 
     @Test
@@ -71,11 +72,12 @@ class FeatureSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isGoalNudgesEnabledBlocking works`() {
-        assertTrue(repository.isGoalNudgesEnabledBlocking())
-        repository.saveGoalNudgesEnabled(false)
-        assertFalse(repository.isGoalNudgesEnabledBlocking())
-    }
+    fun `isGoalNudgesEnabledBlocking works`() =
+        runTest {
+            assertTrue(repository.isGoalNudgesEnabledBlocking())
+            repository.saveGoalNudgesEnabled(false)
+            assertFalse(repository.isGoalNudgesEnabledBlocking())
+        }
 
     @Test
     fun `toggle and get excluded income months`() =

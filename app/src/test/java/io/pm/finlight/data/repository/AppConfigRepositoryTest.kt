@@ -1,15 +1,15 @@
 package io.pm.finlight.data.repository
 
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.AppConfigRepository
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.ui.theme.AppTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -26,15 +26,16 @@ import kotlin.test.assertNull
 class AppConfigRepositoryTest : BaseViewModelTest() {
     private lateinit var context: Application
     private lateinit var repository: AppConfigRepository
-    private lateinit var prefs: SharedPreferences
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
-        repository = AppConfigRepository(context)
+        val dataStore = context.financeSettingsDataStore
+        runTest {
+            dataStore.edit { it.clear() }
+        }
+        repository = AppConfigRepository(dataStore)
     }
 
     @Test
@@ -88,12 +89,12 @@ class AppConfigRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `test constructor with shared preferences directly`() =
+    fun `test constructor with context`() =
         runTest {
-            val customRepo = AppConfigRepository(prefs)
-            customRepo.saveUserName("DirectPrefsUser")
+            val customRepo = AppConfigRepository(context)
+            customRepo.saveUserName("ContextUser")
             customRepo.getUserName().test {
-                assertEquals("DirectPrefsUser", awaitItem())
+                assertEquals("ContextUser", awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
         }

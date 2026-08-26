@@ -53,7 +53,7 @@ class FinlightBackupAgentTest {
         // Mock the constructor of SettingsRepository to intercept its creation
         mockkConstructor(SettingsRepository::class)
         // Define behavior for ANY constructed SettingsRepository instance
-        every { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) } just runs
+        coEvery { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) } just runs
     }
 
     @After
@@ -82,7 +82,7 @@ class FinlightBackupAgentTest {
 
             // Assert
             // Verify on ANY constructed instance of SettingsRepository that our method was called.
-            verify(exactly = 1) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(capture(timestampCaptor)) }
+            coVerify(exactly = 1) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(capture(timestampCaptor)) }
 
             // Verify that the captured timestamp is very close to the time the test was run
             val capturedTimestamp = timestampCaptor.captured

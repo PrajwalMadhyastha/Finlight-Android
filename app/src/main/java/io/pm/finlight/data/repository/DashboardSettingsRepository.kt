@@ -1,71 +1,80 @@
 package io.pm.finlight
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.channels.awaitClose
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import java.io.IOException
 
 class DashboardSettingsRepository(
-    private val prefs: SharedPreferences,
+    private val dataStore: DataStore<Preferences>,
     private val gson: Gson = Gson(),
 ) {
     constructor(context: Context) : this(
-        prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE),
+        dataStore = context.financeSettingsDataStore,
         gson = Gson(),
     )
 
     companion object {
-        private const val PREF_NAME = "finance_app_settings"
-        private const val KEY_DASHBOARD_CARD_ORDER = "dashboard_card_order"
-        private const val KEY_DASHBOARD_VISIBLE_CARDS = "dashboard_visible_cards"
+        private val KEY_DASHBOARD_CARD_ORDER = stringPreferencesKey("dashboard_card_order")
+        private val KEY_DASHBOARD_VISIBLE_CARDS = stringPreferencesKey("dashboard_visible_cards")
     }
 
-    fun saveDashboardLayout(
+    suspend fun saveDashboardLayout(
         order: List<DashboardCardType>,
         visible: Set<DashboardCardType>,
     ) {
         val orderJson = gson.toJson(order.map { it.name })
         val visibleJson = gson.toJson(visible.map { it.name })
-        prefs.edit {
-            putString(KEY_DASHBOARD_CARD_ORDER, orderJson)
-            putString(KEY_DASHBOARD_VISIBLE_CARDS, visibleJson)
+        dataStore.edit { preferences ->
+            preferences[KEY_DASHBOARD_CARD_ORDER] = orderJson
+            preferences[KEY_DASHBOARD_VISIBLE_CARDS] = visibleJson
         }
     }
 
     fun getDashboardCardOrder(): Flow<List<DashboardCardType>> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_DASHBOARD_CARD_ORDER) {
-                        trySend(loadCardOrder(sp))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(loadCardOrder(prefs))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                loadCardOrder(preferences[KEY_DASHBOARD_CARD_ORDER])
+            }
+            .distinctUntilChanged()
     }
 
     fun getDashboardVisibleCards(): Flow<Set<DashboardCardType>> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_DASHBOARD_VISIBLE_CARDS) {
-                        trySend(loadVisibleCards(sp))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(loadVisibleCards(prefs))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                loadVisibleCards(
+                    visibleJson = preferences[KEY_DASHBOARD_VISIBLE_CARDS],
+                    orderJson = preferences[KEY_DASHBOARD_CARD_ORDER],
+                )
+            }
+            .distinctUntilChanged()
     }
 
-    private fun loadCardOrder(sp: SharedPreferences): List<DashboardCardType> {
-        val json = sp.getString(KEY_DASHBOARD_CARD_ORDER, null)
+    private fun loadCardOrder(json: String?): List<DashboardCardType> {
         return if (json != null) {
             val type = object : TypeToken<List<String>>() {}.type
             val names: List<String> = gson.fromJson(json, type)
@@ -97,11 +106,13 @@ class DashboardSettingsRepository(
         }
     }
 
-    private fun loadVisibleCards(sp: SharedPreferences): Set<DashboardCardType> {
-        val json = sp.getString(KEY_DASHBOARD_VISIBLE_CARDS, null)
-        return if (json != null) {
+    private fun loadVisibleCards(
+        visibleJson: String?,
+        orderJson: String?,
+    ): Set<DashboardCardType> {
+        return if (visibleJson != null) {
             val type = object : TypeToken<Set<String>>() {}.type
-            val names: Set<String> = gson.fromJson(json, type)
+            val names: Set<String> = gson.fromJson(visibleJson, type)
             val savedVisible =
                 names.mapNotNull { name ->
                     runCatching {
@@ -113,7 +124,6 @@ class DashboardSettingsRepository(
                     }.getOrNull()
                 }.toSet()
 
-            val orderJson = sp.getString(KEY_DASHBOARD_CARD_ORDER, null)
             val knownCards =
                 if (orderJson != null) {
                     val orderType = object : TypeToken<List<String>>() {}.type

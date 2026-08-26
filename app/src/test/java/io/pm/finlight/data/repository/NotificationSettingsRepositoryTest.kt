@@ -1,15 +1,15 @@
 package io.pm.finlight.data.repository
 
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.NotificationSettingsRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -27,15 +27,16 @@ import kotlin.test.assertTrue
 class NotificationSettingsRepositoryTest : BaseViewModelTest() {
     private lateinit var context: Application
     private lateinit var repository: NotificationSettingsRepository
-    private lateinit var prefs: SharedPreferences
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
-        repository = NotificationSettingsRepository(context)
+        val dataStore = context.financeSettingsDataStore
+        runTest {
+            dataStore.edit { it.clear() }
+        }
+        repository = NotificationSettingsRepository(dataStore)
     }
 
     @Test
@@ -116,11 +117,12 @@ class NotificationSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isAutoCaptureNotificationEnabledBlocking works`() {
-        assertTrue(repository.isAutoCaptureNotificationEnabledBlocking())
-        repository.saveAutoCaptureNotificationEnabled(false)
-        assertFalse(repository.isAutoCaptureNotificationEnabledBlocking())
-    }
+    fun `isAutoCaptureNotificationEnabledBlocking works`() =
+        runTest {
+            assertTrue(repository.isAutoCaptureNotificationEnabledBlocking())
+            repository.saveAutoCaptureNotificationEnabled(false)
+            assertFalse(repository.isAutoCaptureNotificationEnabledBlocking())
+        }
 
     @Test
     fun `save and get unknown transaction popup enabled`() =
@@ -134,16 +136,18 @@ class NotificationSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isUnknownTransactionPopupEnabledBlocking works`() {
-        assertTrue(repository.isUnknownTransactionPopupEnabledBlocking())
-        repository.saveUnknownTransactionPopupEnabled(false)
-        assertFalse(repository.isUnknownTransactionPopupEnabledBlocking())
-    }
+    fun `isUnknownTransactionPopupEnabledBlocking works`() =
+        runTest {
+            assertTrue(repository.isUnknownTransactionPopupEnabledBlocking())
+            repository.saveUnknownTransactionPopupEnabled(false)
+            assertFalse(repository.isUnknownTransactionPopupEnabledBlocking())
+        }
 
     @Test
-    fun `dismiss and check last month summary status`() {
-        assertFalse(repository.hasLastMonthSummaryBeenDismissed())
-        repository.setLastMonthSummaryDismissed()
-        assertTrue(repository.hasLastMonthSummaryBeenDismissed())
-    }
+    fun `dismiss and check last month summary status`() =
+        runTest {
+            assertFalse(repository.hasLastMonthSummaryBeenDismissed())
+            repository.setLastMonthSummaryDismissed()
+            assertTrue(repository.hasLastMonthSummaryBeenDismissed())
+        }
 }

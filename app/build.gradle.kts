@@ -29,6 +29,7 @@ val imageCropperVersion = "4.5.0"
 val mockitoVersion = "5.11.0"
 val sqlcipherVersion = "4.10.0"
 val turbineVersion = "1.2.0"
+val dataStoreVersion = "1.1.1"
 
 val mockitoInlineVersion = "5.2.0"
 val mockitoKotlinVersion = "5.2.1"
@@ -297,6 +298,7 @@ dependencies {
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
     implementation("com.google.code.gson:gson:$gsonVersion")
+    implementation("androidx.datastore:datastore-preferences:$dataStoreVersion")
 
     implementation("androidx.tracing:tracing-ktx:$tracingVersion")
 

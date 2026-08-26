@@ -1,16 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/utils/ReminderManager.kt
-// REASON: REFACTOR - The `scheduleAutoBackup` function has been hardcoded to run
-// at 2:00 AM, removing its dependency on SharedPreferences.
-// CLEANUP: The `scheduleSnapshotWorker` function and its associated tag
-// and `rescheduleAllWork` entry have been completely removed.
-//
-// REASON: FIX - Added an app-level preference to enable/disable the recurring
-// transaction feature. This ensures that the RecurringPatternWorker and
-// RecurringTransactionWorker are only scheduled if the feature is explicitly
-// enabled, addressing the user's request to keep the feature disabled during
-// development.
-// =================================================================================
 package io.pm.finlight.utils
 
 import android.content.Context
@@ -25,8 +12,11 @@ import io.pm.finlight.DailyReportWorker
 import io.pm.finlight.MonthlySummaryWorker
 import io.pm.finlight.RecurringPatternWorker
 import io.pm.finlight.RecurringTransactionWorker
+import io.pm.finlight.SettingsRepository
 import io.pm.finlight.WeeklySummaryWorker
 import io.pm.finlight.workers.SmsCatchupWorker
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -39,55 +29,36 @@ object ReminderManager {
     private const val AUTO_BACKUP_WORK_TAG = "auto_backup_work"
     private const val SMS_CATCHUP_WORK_TAG = "sms_catchup_work"
     private const val GOAL_SURPLUS_WORK_TAG = "goal_surplus_work"
-    // --- DELETED: SNAPSHOT_WORKER_TAG ---
-
-    // New preference key for enabling/disabling the recurring transaction feature
-    private const val KEY_RECURRING_TRANSACTION_FEATURE_ENABLED = "recurring_transactions_enabled"
 
     fun rescheduleAllWork(context: Context) {
         Log.d("ReminderManager", "Rescheduling all background work...")
-        val settings = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
+        val settings = SettingsRepository(context)
 
-        if (settings.getBoolean("daily_report_enabled", false)) {
+        val dailyReportEnabled = runBlocking { settings.getDailyReportEnabled().first() }
+        val weeklySummaryEnabled = runBlocking { settings.getWeeklySummaryEnabled().first() }
+        val monthlySummaryEnabled = runBlocking { settings.getMonthlySummaryEnabled().first() }
+        val autoBackupEnabled = runBlocking { settings.getAutoBackupEnabled().first() }
+
+        if (dailyReportEnabled) {
             scheduleDailyReport(context)
         }
-        if (settings.getBoolean("weekly_summary_enabled", true)) {
+        if (weeklySummaryEnabled) {
             scheduleWeeklySummary(context)
         }
-        if (settings.getBoolean("monthly_summary_enabled", true)) {
+        if (monthlySummaryEnabled) {
             scheduleMonthlySummary(context)
         }
-        if (settings.getBoolean("auto_backup_enabled", true)) {
+        if (autoBackupEnabled) {
             scheduleAutoBackup(context)
         }
 
-        // Temporarily disabled (Issue #105)
-        // if (settings.getBoolean(KEY_RECURRING_TRANSACTION_FEATURE_ENABLED, false)) { // Default to false
-        //     scheduleRecurringTransactionWorker(context)
-        //     scheduleRecurringPatternWorker(context)
-        // } else {
         Log.d("ReminderManager", "Recurring transaction feature is disabled. Not scheduling workers.")
-        // Also cancel any existing workers if the feature is now disabled.
         cancelRecurringTransactionWorkers(context)
-        // }
 
-        // --- DELETED: scheduleSnapshotWorker(context) ---
-
-        // Always schedule the SMS catch-up worker — it is always needed regardless
-        // of any user preferences.
         scheduleSmsRecoveryWorker(context)
-
-        // Schedule Goal Surplus Check
         scheduleGoalSurplusWorker(context)
     }
 
-    // --- DELETED: scheduleSnapshotWorker function ---
-
-    /**
-     * Schedules the [SmsCatchupWorker] to run every 4 hours as a periodic job.
-     * This worker silently recovers any SMS transactions missed by [SmsReceiver].
-     * Uses KEEP policy so re-scheduling on boot does not reset the timer.
-     */
     fun scheduleSmsRecoveryWorker(context: Context) {
         val request =
             PeriodicWorkRequestBuilder<SmsCatchupWorker>(4, TimeUnit.HOURS)
@@ -106,17 +77,12 @@ object ReminderManager {
     }
 
     fun scheduleAutoBackup(context: Context) {
-        // --- REFACTORED: Changed to an 8-hour periodic worker ---
-        // This removes the 2 AM hardcoding and runs the backup snapshot
-        // 3 times per day to reduce data staleness, per our discussion.
-
         val backupRequest =
             PeriodicWorkRequestBuilder<BackupWorker>(8, TimeUnit.HOURS)
                 .build()
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             AUTO_BACKUP_WORK_TAG,
-            // Keep the existing work if it's already scheduled
             ExistingPeriodicWorkPolicy.KEEP,
             backupRequest,
         )
@@ -178,7 +144,6 @@ object ReminderManager {
         Log.d("ReminderManager", "Recurring transaction worker scheduled for ${nextRun.time}")
     }
 
-    // New function to cancel recurring transaction workers
     fun cancelRecurringTransactionWorkers(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(RECURRING_PATTERN_WORK_TAG)
         WorkManager.getInstance(context).cancelUniqueWork(RECURRING_TRANSACTION_WORK_TAG)
@@ -186,9 +151,8 @@ object ReminderManager {
     }
 
     fun scheduleDailyReport(context: Context) {
-        val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        val hour = prefs.getInt("daily_report_hour", 9)
-        val minute = prefs.getInt("daily_report_minute", 0)
+        val settings = SettingsRepository(context)
+        val (hour, minute) = runBlocking { settings.getDailyReportTime().first() }
 
         val now = Calendar.getInstance()
         val nextRun =
@@ -221,10 +185,8 @@ object ReminderManager {
     }
 
     fun scheduleWeeklySummary(context: Context) {
-        val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        val dayOfWeek = prefs.getInt("weekly_report_day", Calendar.SUNDAY)
-        val hour = prefs.getInt("weekly_report_hour", 9)
-        val minute = prefs.getInt("weekly_report_minute", 0)
+        val settings = SettingsRepository(context)
+        val (dayOfWeek, hour, minute) = runBlocking { settings.getWeeklyReportTime().first() }
 
         val now = Calendar.getInstance()
         val nextRun =
@@ -235,12 +197,10 @@ object ReminderManager {
                 set(Calendar.MILLISECOND, 0)
             }
 
-        // If today is the target day but the time has already passed, start checking from tomorrow
         if (nextRun.get(Calendar.DAY_OF_WEEK) == dayOfWeek && nextRun.before(now)) {
             nextRun.add(Calendar.DAY_OF_YEAR, 1)
         }
 
-        // Loop until we find the next occurrence of the target day of the week
         while (nextRun.get(Calendar.DAY_OF_WEEK) != dayOfWeek) {
             nextRun.add(Calendar.DAY_OF_YEAR, 1)
         }
@@ -264,10 +224,8 @@ object ReminderManager {
     }
 
     fun scheduleMonthlySummary(context: Context) {
-        val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        val dayOfMonth = prefs.getInt("monthly_report_day", 1)
-        val hour = prefs.getInt("monthly_report_hour", 9)
-        val minute = prefs.getInt("monthly_report_minute", 0)
+        val settings = SettingsRepository(context)
+        val (dayOfMonth, hour, minute) = runBlocking { settings.getMonthlyReportTime().first() }
 
         val now = Calendar.getInstance()
         val nextRun =

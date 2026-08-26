@@ -1,104 +1,126 @@
 package io.pm.finlight
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
-import kotlinx.coroutines.channels.awaitClose
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.longPreferencesKey
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
+import java.io.IOException
 
 class BackupSettingsRepository(
-    private val prefs: SharedPreferences,
+    private val dataStore: DataStore<Preferences>,
 ) {
     constructor(context: Context) : this(
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE),
+        context.financeSettingsDataStore,
     )
 
     companion object {
-        private const val PREF_NAME = "finance_app_settings"
-        private const val KEY_BACKUP_ENABLED = "google_drive_backup_enabled"
-        private const val KEY_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
-        private const val KEY_AUTO_BACKUP_NOTIFICATION_ENABLED = "auto_backup_notification_enabled"
-        private const val KEY_LAST_BACKUP_TIMESTAMP = "last_backup_timestamp"
+        private val KEY_BACKUP_ENABLED = booleanPreferencesKey("google_drive_backup_enabled")
+        private val KEY_AUTO_BACKUP_ENABLED = booleanPreferencesKey("auto_backup_enabled")
+        private val KEY_AUTO_BACKUP_NOTIFICATION_ENABLED = booleanPreferencesKey("auto_backup_notification_enabled")
+        private val KEY_LAST_BACKUP_TIMESTAMP = longPreferencesKey("last_backup_timestamp")
     }
 
-    fun saveBackupEnabled(isEnabled: Boolean) {
-        prefs.edit {
-            putBoolean(KEY_BACKUP_ENABLED, isEnabled)
+    suspend fun saveBackupEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_BACKUP_ENABLED] = isEnabled
         }
     }
 
     fun getBackupEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
-                    if (changedKey == KEY_BACKUP_ENABLED) {
-                        trySend(sharedPreferences.getBoolean(KEY_BACKUP_ENABLED, true))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_BACKUP_ENABLED, true))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_BACKUP_ENABLED] ?: true
+            }
+            .distinctUntilChanged()
     }
 
-    fun saveAutoBackupEnabled(isEnabled: Boolean) {
-        prefs.edit { putBoolean(KEY_AUTO_BACKUP_ENABLED, isEnabled) }
+    suspend fun saveAutoBackupEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_AUTO_BACKUP_ENABLED] = isEnabled
+        }
     }
 
     fun getAutoBackupEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_AUTO_BACKUP_ENABLED) {
-                        trySend(sp.getBoolean(key, true))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_AUTO_BACKUP_ENABLED, true))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_AUTO_BACKUP_ENABLED] ?: true
+            }
+            .distinctUntilChanged()
     }
 
-    fun saveAutoBackupNotificationEnabled(isEnabled: Boolean) {
-        prefs.edit { putBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, isEnabled) }
+    suspend fun saveAutoBackupNotificationEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_AUTO_BACKUP_NOTIFICATION_ENABLED] = isEnabled
+        }
     }
 
     fun getAutoBackupNotificationEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_AUTO_BACKUP_NOTIFICATION_ENABLED) {
-                        trySend(sp.getBoolean(key, false))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, false))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_AUTO_BACKUP_NOTIFICATION_ENABLED] ?: false
+            }
+            .distinctUntilChanged()
     }
 
     fun isAutoBackupNotificationEnabledBlocking(): Boolean {
-        return prefs.getBoolean(KEY_AUTO_BACKUP_NOTIFICATION_ENABLED, false)
+        return runBlocking {
+            try {
+                dataStore.data.first()[KEY_AUTO_BACKUP_NOTIFICATION_ENABLED] ?: false
+            } catch (e: Exception) {
+                false
+            }
+        }
     }
 
-    fun saveLastBackupTimestamp(timestamp: Long) {
-        prefs.edit {
-            putLong(KEY_LAST_BACKUP_TIMESTAMP, timestamp)
+    suspend fun saveLastBackupTimestamp(timestamp: Long) {
+        dataStore.edit { preferences ->
+            preferences[KEY_LAST_BACKUP_TIMESTAMP] = timestamp
         }
     }
 
     fun getLastBackupTimestamp(): Flow<Long> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_LAST_BACKUP_TIMESTAMP) {
-                        trySend(sp.getLong(key, 0L))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getLong(KEY_LAST_BACKUP_TIMESTAMP, 0L))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_LAST_BACKUP_TIMESTAMP] ?: 0L
+            }
+            .distinctUntilChanged()
     }
 }

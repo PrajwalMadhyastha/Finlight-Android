@@ -1,15 +1,15 @@
 package io.pm.finlight.data.repository
 
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.SecuritySettingsRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -24,15 +24,16 @@ import kotlin.test.assertEquals
 class SecuritySettingsRepositoryTest : BaseViewModelTest() {
     private lateinit var context: Application
     private lateinit var repository: SecuritySettingsRepository
-    private lateinit var prefs: SharedPreferences
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
-        repository = SecuritySettingsRepository(context)
+        val dataStore = context.financeSettingsDataStore
+        runTest {
+            dataStore.edit { it.clear() }
+        }
+        repository = SecuritySettingsRepository(dataStore)
     }
 
     @Test
@@ -47,11 +48,12 @@ class SecuritySettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `isAppLockEnabledBlocking works`() {
-        assertEquals(false, repository.isAppLockEnabledBlocking())
-        repository.saveAppLockEnabled(true)
-        assertEquals(true, repository.isAppLockEnabledBlocking())
-    }
+    fun `isAppLockEnabledBlocking works`() =
+        runTest {
+            assertEquals(false, repository.isAppLockEnabledBlocking())
+            repository.saveAppLockEnabled(true)
+            assertEquals(true, repository.isAppLockEnabledBlocking())
+        }
 
     @Test
     fun `save and get privacy mode enabled`() =

@@ -1,9 +1,9 @@
 package io.pm.finlight.data.repository
 
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
@@ -13,7 +13,9 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TravelSettingsRepository
 import io.pm.finlight.TripType
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -28,16 +30,17 @@ import kotlin.test.assertNull
 class TravelSettingsRepositoryTest : BaseViewModelTest() {
     private lateinit var context: Application
     private lateinit var repository: TravelSettingsRepository
-    private lateinit var prefs: SharedPreferences
     private val gson = Gson()
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        prefs.edit().clear().commit()
-        repository = TravelSettingsRepository(context)
+        val dataStore = context.financeSettingsDataStore
+        runTest {
+            dataStore.edit { it.clear() }
+        }
+        repository = TravelSettingsRepository(dataStore)
     }
 
     @Test
@@ -61,7 +64,10 @@ class TravelSettingsRepositoryTest : BaseViewModelTest() {
             val expiredSettings = TravelModeSettings(true, "Old Trip", TripType.DOMESTIC, 1L, pastEndDate, null, null)
 
             // Inject past expired trip directly
-            prefs.edit().putString("travel_mode_settings", gson.toJson(expiredSettings)).commit()
+            val prefKey = stringPreferencesKey("travel_mode_settings")
+            context.financeSettingsDataStore.edit {
+                it[prefKey] = gson.toJson(expiredSettings)
+            }
 
             repository.getTravelModeSettings().test {
                 val item = awaitItem()
@@ -70,6 +76,6 @@ class TravelSettingsRepositoryTest : BaseViewModelTest() {
             }
 
             // Verify it was cleared from preferences
-            assertNull(prefs.getString("travel_mode_settings", null))
+            assertNull(context.financeSettingsDataStore.data.first()[prefKey])
         }
 }

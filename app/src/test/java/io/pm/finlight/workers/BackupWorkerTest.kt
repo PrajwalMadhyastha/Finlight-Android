@@ -1,39 +1,15 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/workers/BackupWorkerTest.kt
-// REASON: REFACTOR - This test suite is updated to reflect the new,
-// consolidated logic of `BackupWorker`.
-// - It now mocks `DataExportService` and `BackupManager`.
-// - It verifies that `doWork` correctly calls `createBackupSnapshot`
-//   and notifies the `BackupManager` on success.
-// - It verifies that `dataChanged` is NOT called if snapshot creation returns
-//   false, but the worker still succeeds and reschedules.
-//
-// REASON: FIX (Test) - All tests in this file were updated to mock
-// `SettingsRepository.isAutoBackupNotificationEnabledBlocking` instead of the
-// flow-based `getAutoBackupNotificationEnabled`. This aligns with the worker's
-// new implementation and resolves the build errors.
-//
-// REASON: FIX (Test) - Removed verification for `saveLastBackupTimestamp`
-// from all tests. This method is now called by `FinlightBackupAgent`, not
-// this worker. This change fixes the failing tests.
-//
-// REASON: FIX (Test) - Removed verification for `ReminderManager.scheduleAutoBackup`
-// from all tests. The worker is now a PeriodicWorkRequest and no longer
-// reschedules itself. This fixes the verification failures.
 // =================================================================================
 package io.pm.finlight.workers
 
 import android.app.backup.BackupManager
 import android.content.Context
 import android.os.Build
-import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.work.Configuration
 import androidx.work.ListenableWorker
-import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.TestListenableWorkerBuilder
-import androidx.work.testing.WorkManagerTestInitHelper
 import io.mockk.*
 import io.pm.finlight.BackupWorker
 import io.pm.finlight.BaseViewModelTest
@@ -53,7 +29,10 @@ import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
+@Config(
+    sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE],
+    application = TestApplication::class,
+)
 class BackupWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
 
@@ -61,17 +40,13 @@ class BackupWorkerTest : BaseViewModelTest() {
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        val config =
-            Configuration.Builder()
-                .setMinimumLoggingLevel(Log.DEBUG)
-                .setExecutor(SynchronousExecutor())
-                .build()
-        WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
 
-        // Mock static objects and constructors
+        // Mock constructors
+        mockkConstructor(BackupManager::class)
         mockkConstructor(SettingsRepository::class)
-        mockkConstructor(BackupManager::class) // <-- NEW
-        mockkObject(DataExportService) // <-- NEW
+
+        // Mock singleton objects
+        mockkObject(DataExportService)
         mockkObject(NotificationHelper)
         mockkObject(ReminderManager)
 
@@ -80,7 +55,7 @@ class BackupWorkerTest : BaseViewModelTest() {
 
         // --- FIX: Mock the blocking call used by the worker ---
         every { anyConstructed<SettingsRepository>().isAutoBackupNotificationEnabledBlocking() } returns true
-        every { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) } just runs
+        coEvery { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) } just runs
         coEvery { ReminderManager.scheduleAutoBackup(any()) } returns Unit
         // --- FIX: Update mock to include the new timestamp argument ---
         every { NotificationHelper.showAutoBackupNotification(any(), any()) } just runs
@@ -118,7 +93,7 @@ class BackupWorkerTest : BaseViewModelTest() {
             // --- FIX: This worker is periodic and does not reschedule itself. ---
             coVerify(exactly = 0) { ReminderManager.scheduleAutoBackup(context) }
             // --- FIX: This worker does not save the timestamp ---
-            verify(exactly = 0) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) }
+            coVerify(exactly = 0) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) }
         }
 
     @Test
@@ -142,7 +117,7 @@ class BackupWorkerTest : BaseViewModelTest() {
             // --- FIX: This worker is periodic and does not reschedule itself. ---
             coVerify(exactly = 0) { ReminderManager.scheduleAutoBackup(context) }
             // --- FIX: This worker does not save the timestamp ---
-            verify(exactly = 0) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) }
+            coVerify(exactly = 0) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) }
         }
 
     @Test
@@ -166,7 +141,7 @@ class BackupWorkerTest : BaseViewModelTest() {
             // --- FIX: This worker is periodic and does not reschedule itself. ---
             coVerify(exactly = 0) { ReminderManager.scheduleAutoBackup(context) } // Reschedule still happens
             // --- FIX: Timestamp should NOT be saved if snapshot fails ---
-            verify(exactly = 0) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) }
+            coVerify(exactly = 0) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) }
         }
 
     @Test
@@ -188,6 +163,6 @@ class BackupWorkerTest : BaseViewModelTest() {
             coVerify(exactly = 0) { ReminderManager.scheduleAutoBackup(any()) }
             // --- FIX: Verify the new function signature is NOT called ---
             verify(exactly = 0) { NotificationHelper.showAutoBackupNotification(any(), any()) }
-            verify(exactly = 0) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) }
+            coVerify(exactly = 0) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) }
         }
 }

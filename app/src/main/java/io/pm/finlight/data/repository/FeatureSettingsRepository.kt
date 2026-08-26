@@ -1,122 +1,150 @@
 package io.pm.finlight
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
-import kotlinx.coroutines.channels.awaitClose
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
+import java.io.IOException
 
 class FeatureSettingsRepository(
-    private val prefs: SharedPreferences,
+    private val dataStore: DataStore<Preferences>,
 ) {
     constructor(context: Context) : this(
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE),
+        context.financeSettingsDataStore,
     )
 
     companion object {
-        private const val PREF_NAME = "finance_app_settings"
-        private const val KEY_RECURRING_TRANSACTIONS_ENABLED = "recurring_transactions_enabled"
-        private const val KEY_EXCLUDED_INCOME_MONTHS = "excluded_income_months"
-        private const val KEY_EXCLUDED_EXPENSE_MONTHS = "excluded_expense_months"
-        private const val KEY_GOAL_INCOME_THRESHOLD = "goal_income_threshold"
-        private const val KEY_GOAL_NUDGES_ENABLED = "goal_nudges_enabled"
+        private val KEY_RECURRING_TRANSACTIONS_ENABLED = booleanPreferencesKey("recurring_transactions_enabled")
+        private val KEY_EXCLUDED_INCOME_MONTHS = stringSetPreferencesKey("excluded_income_months")
+        private val KEY_EXCLUDED_EXPENSE_MONTHS = stringSetPreferencesKey("excluded_expense_months")
+        private val KEY_GOAL_INCOME_THRESHOLD = intPreferencesKey("goal_income_threshold")
+        private val KEY_GOAL_NUDGES_ENABLED = booleanPreferencesKey("goal_nudges_enabled")
     }
 
-    fun saveRecurringTransactionsEnabled(isEnabled: Boolean) {
-        prefs.edit {
-            putBoolean(KEY_RECURRING_TRANSACTIONS_ENABLED, isEnabled)
+    suspend fun saveRecurringTransactionsEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_RECURRING_TRANSACTIONS_ENABLED] = isEnabled
         }
     }
 
     fun getRecurringTransactionsEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_RECURRING_TRANSACTIONS_ENABLED) {
-                        trySend(sp.getBoolean(key, false))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_RECURRING_TRANSACTIONS_ENABLED, false))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_RECURRING_TRANSACTIONS_ENABLED] ?: false
+            }
+            .distinctUntilChanged()
     }
 
-    fun saveGoalIncomeThreshold(amount: Int) {
-        prefs.edit { putInt(KEY_GOAL_INCOME_THRESHOLD, amount) }
+    suspend fun saveGoalIncomeThreshold(amount: Int) {
+        dataStore.edit { preferences ->
+            preferences[KEY_GOAL_INCOME_THRESHOLD] = amount
+        }
     }
 
     fun getGoalIncomeThreshold(): Flow<Int> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_GOAL_INCOME_THRESHOLD) {
-                        trySend(sp.getInt(key, 5000))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getInt(KEY_GOAL_INCOME_THRESHOLD, 5000))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_GOAL_INCOME_THRESHOLD] ?: 5000
+            }
+            .distinctUntilChanged()
     }
 
-    fun saveGoalNudgesEnabled(isEnabled: Boolean) {
-        prefs.edit { putBoolean(KEY_GOAL_NUDGES_ENABLED, isEnabled) }
+    suspend fun saveGoalNudgesEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_GOAL_NUDGES_ENABLED] = isEnabled
+        }
     }
 
     fun getGoalNudgesEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_GOAL_NUDGES_ENABLED) {
-                        trySend(sp.getBoolean(key, true))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_GOAL_NUDGES_ENABLED, true))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_GOAL_NUDGES_ENABLED] ?: true
+            }
+            .distinctUntilChanged()
     }
 
     fun isGoalNudgesEnabledBlocking(): Boolean {
-        return prefs.getBoolean(KEY_GOAL_NUDGES_ENABLED, true)
+        return runBlocking {
+            try {
+                dataStore.data.first()[KEY_GOAL_NUDGES_ENABLED] ?: true
+            } catch (e: Exception) {
+                true
+            }
+        }
     }
 
     fun getExcludedIncomeMonths(): Flow<Set<String>> = getSetFlow(KEY_EXCLUDED_INCOME_MONTHS)
 
     fun getExcludedExpenseMonths(): Flow<Set<String>> = getSetFlow(KEY_EXCLUDED_EXPENSE_MONTHS)
 
-    fun toggleIncomeMonthExclusion(monthKey: String) {
+    suspend fun toggleIncomeMonthExclusion(monthKey: String) {
         toggleInSet(KEY_EXCLUDED_INCOME_MONTHS, monthKey)
     }
 
-    fun toggleExpenseMonthExclusion(monthKey: String) {
+    suspend fun toggleExpenseMonthExclusion(monthKey: String) {
         toggleInSet(KEY_EXCLUDED_EXPENSE_MONTHS, monthKey)
     }
 
-    private fun getSetFlow(key: String): Flow<Set<String>> =
-        callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, k ->
-                    if (k == key) trySend(sp.getStringSet(key, emptySet()) ?: emptySet())
+    private fun getSetFlow(key: Preferences.Key<Set<String>>): Flow<Set<String>> {
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getStringSet(key, emptySet()) ?: emptySet())
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[key] ?: emptySet()
+            }
+            .distinctUntilChanged()
+    }
 
-    private fun toggleInSet(
-        key: String,
+    private suspend fun toggleInSet(
+        key: Preferences.Key<Set<String>>,
         value: String,
     ) {
-        val current = prefs.getStringSet(key, emptySet()) ?: emptySet()
-        val newSet =
-            if (current.contains(value)) {
-                current.toMutableSet().apply { remove(value) }
-            } else {
-                current.toMutableSet().apply { add(value) }
-            }
-        prefs.edit { putStringSet(key, newSet) }
+        dataStore.edit { preferences ->
+            val current = preferences[key] ?: emptySet()
+            val newSet =
+                if (current.contains(value)) {
+                    current.toMutableSet().apply { remove(value) }
+                } else {
+                    current.toMutableSet().apply { add(value) }
+                }
+            preferences[key] = newSet
+        }
     }
 }

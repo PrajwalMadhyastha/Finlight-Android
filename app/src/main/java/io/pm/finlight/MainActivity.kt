@@ -59,7 +59,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -142,7 +144,9 @@ class MainActivity : AppCompatActivity() {
                         OnboardingScreen(
                             viewModel = onboardingViewModel,
                             onOnboardingFinished = {
-                                settingsRepository.setHasSeenOnboarding(true)
+                                lifecycleScope.launch {
+                                    settingsRepository.setHasSeenOnboarding(true)
+                                }
                                 showOnboarding = false
                             },
                         )

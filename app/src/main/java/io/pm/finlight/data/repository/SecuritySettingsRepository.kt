@@ -1,87 +1,103 @@
 package io.pm.finlight
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
-import kotlinx.coroutines.channels.awaitClose
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
+import java.io.IOException
 
 class SecuritySettingsRepository(
-    private val prefs: SharedPreferences,
+    private val dataStore: DataStore<Preferences>,
 ) {
     constructor(context: Context) : this(
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE),
+        context.financeSettingsDataStore,
     )
 
     companion object {
-        private const val PREF_NAME = "finance_app_settings"
-        private const val KEY_APP_LOCK_ENABLED = "app_lock_enabled"
-        private const val KEY_PRIVACY_MODE_ENABLED = "privacy_mode_enabled"
-        private const val KEY_SIMULATOR_PRIVACY_MODE_ENABLED = "simulator_privacy_mode_enabled"
+        private val KEY_APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
+        private val KEY_PRIVACY_MODE_ENABLED = booleanPreferencesKey("privacy_mode_enabled")
+        private val KEY_SIMULATOR_PRIVACY_MODE_ENABLED = booleanPreferencesKey("simulator_privacy_mode_enabled")
     }
 
-    fun saveAppLockEnabled(isEnabled: Boolean) {
-        prefs.edit {
-            putBoolean(KEY_APP_LOCK_ENABLED, isEnabled)
+    suspend fun saveAppLockEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_APP_LOCK_ENABLED] = isEnabled
         }
     }
 
     fun getAppLockEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
-                    if (changedKey == KEY_APP_LOCK_ENABLED) {
-                        trySend(sharedPreferences.getBoolean(KEY_APP_LOCK_ENABLED, false))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_APP_LOCK_ENABLED, false))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_APP_LOCK_ENABLED] ?: false
+            }
+            .distinctUntilChanged()
     }
 
     fun isAppLockEnabledBlocking(): Boolean {
-        return prefs.getBoolean(KEY_APP_LOCK_ENABLED, false)
+        return runBlocking {
+            try {
+                dataStore.data.first()[KEY_APP_LOCK_ENABLED] ?: false
+            } catch (e: Exception) {
+                false
+            }
+        }
     }
 
-    fun savePrivacyModeEnabled(isEnabled: Boolean) {
-        prefs.edit {
-            putBoolean(KEY_PRIVACY_MODE_ENABLED, isEnabled)
+    suspend fun savePrivacyModeEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_PRIVACY_MODE_ENABLED] = isEnabled
         }
     }
 
     fun getPrivacyModeEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_PRIVACY_MODE_ENABLED) {
-                        trySend(sp.getBoolean(key, false))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_PRIVACY_MODE_ENABLED, false))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_PRIVACY_MODE_ENABLED] ?: false
+            }
+            .distinctUntilChanged()
     }
 
-    fun saveSimulatorPrivacyModeEnabled(isEnabled: Boolean) {
-        prefs.edit {
-            putBoolean(KEY_SIMULATOR_PRIVACY_MODE_ENABLED, isEnabled)
+    suspend fun saveSimulatorPrivacyModeEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_SIMULATOR_PRIVACY_MODE_ENABLED] = isEnabled
         }
     }
 
     fun getSimulatorPrivacyModeEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_SIMULATOR_PRIVACY_MODE_ENABLED) {
-                        trySend(sp.getBoolean(key, false))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_SIMULATOR_PRIVACY_MODE_ENABLED, false))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_SIMULATOR_PRIVACY_MODE_ENABLED] ?: false
+            }
+            .distinctUntilChanged()
     }
 }

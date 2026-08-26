@@ -437,7 +437,9 @@ class DashboardViewModel(
     }
 
     fun dismissLastMonthSummaryCard() {
-        settingsRepository.setLastMonthSummaryDismissed()
+        viewModelScope.launch {
+            settingsRepository.setLastMonthSummaryDismissed()
+        }
         _showLastMonthSummaryCard.value = false
     }
 

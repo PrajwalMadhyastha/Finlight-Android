@@ -3,6 +3,7 @@ package io.pm.finlight.workers
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Configuration
@@ -14,9 +15,11 @@ import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -42,10 +45,11 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
         context = ApplicationProvider.getApplicationContext()
 
         // Enable the recurring transaction feature for tests
-        context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean("recurring_transactions_enabled", true)
-            .apply()
+        runBlocking {
+            context.financeSettingsDataStore.edit { it.clear() }
+            val settingsRepo = SettingsRepository(context)
+            settingsRepo.saveRecurringTransactionsEnabled(true)
+        }
 
         db = mockk()
         transactionQueryDao = mockk()

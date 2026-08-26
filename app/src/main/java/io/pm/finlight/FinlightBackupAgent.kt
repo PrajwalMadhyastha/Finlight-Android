@@ -55,7 +55,9 @@ class FinlightBackupAgent : BackupAgentHelper() {
         val backupTime = System.currentTimeMillis()
 
         // 1. Save the timestamp
-        settingsRepository.saveLastBackupTimestamp(backupTime)
+        kotlinx.coroutines.runBlocking {
+            settingsRepository.saveLastBackupTimestamp(backupTime)
+        }
         Log.i(TAG, "onBackup: Last backup timestamp saved.")
 
         // 2. Let the system helpers do their work

@@ -108,7 +108,9 @@ class AccountViewModel(
 
     fun dismissMergeSuggestion(suggestion: Pair<Account, Account>) {
         val key = "${min(suggestion.first.id, suggestion.second.id)}|${max(suggestion.first.id, suggestion.second.id)}"
-        settingsRepository.addDismissedMergeSuggestion(key)
+        viewModelScope.launch {
+            settingsRepository.addDismissedMergeSuggestion(key)
+        }
     }
 
     fun enterSelectionModeWithSuggestions(accounts: List<Account>) {

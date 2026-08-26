@@ -1,266 +1,281 @@
 package io.pm.finlight
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
+import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.utils.FormatUtils
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
+import java.io.IOException
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
 class NotificationSettingsRepository(
-    private val prefs: SharedPreferences,
+    private val dataStore: DataStore<Preferences>,
 ) {
     constructor(context: Context) : this(
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE),
+        context.financeSettingsDataStore,
     )
 
     companion object {
-        private const val PREF_NAME = "finance_app_settings"
-        private const val KEY_DAILY_REPORT_ENABLED = "daily_report_enabled"
-        private const val KEY_DAILY_REPORT_HOUR = "daily_report_hour"
-        private const val KEY_DAILY_REPORT_MINUTE = "daily_report_minute"
-        private const val KEY_WEEKLY_SUMMARY_ENABLED = "weekly_summary_enabled"
-        private const val KEY_WEEKLY_REPORT_DAY = "weekly_report_day"
-        private const val KEY_WEEKLY_REPORT_HOUR = "weekly_report_hour"
-        private const val KEY_WEEKLY_REPORT_MINUTE = "weekly_report_minute"
-        private const val KEY_MONTHLY_SUMMARY_ENABLED = "monthly_summary_enabled"
-        private const val KEY_MONTHLY_REPORT_DAY = "monthly_report_day"
-        private const val KEY_MONTHLY_REPORT_HOUR = "monthly_report_hour"
-        private const val KEY_MONTHLY_REPORT_MINUTE = "monthly_report_minute"
-        private const val KEY_AUTOCAPTURE_NOTIFICATION_ENABLED = "autocapture_notification_enabled"
-        private const val KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED = "unknown_transaction_popup_enabled"
-        private const val KEY_LAST_MONTH_SUMMARY_DISMISSED = "last_month_summary_dismissed_"
+        private val KEY_DAILY_REPORT_ENABLED = booleanPreferencesKey("daily_report_enabled")
+        private val KEY_DAILY_REPORT_HOUR = intPreferencesKey("daily_report_hour")
+        private val KEY_DAILY_REPORT_MINUTE = intPreferencesKey("daily_report_minute")
+        private val KEY_WEEKLY_SUMMARY_ENABLED = booleanPreferencesKey("weekly_summary_enabled")
+        private val KEY_WEEKLY_REPORT_DAY = intPreferencesKey("weekly_report_day")
+        private val KEY_WEEKLY_REPORT_HOUR = intPreferencesKey("weekly_report_hour")
+        private val KEY_WEEKLY_REPORT_MINUTE = intPreferencesKey("weekly_report_minute")
+        private val KEY_MONTHLY_SUMMARY_ENABLED = booleanPreferencesKey("monthly_summary_enabled")
+        private val KEY_MONTHLY_REPORT_DAY = intPreferencesKey("monthly_report_day")
+        private val KEY_MONTHLY_REPORT_HOUR = intPreferencesKey("monthly_report_hour")
+        private val KEY_MONTHLY_REPORT_MINUTE = intPreferencesKey("monthly_report_minute")
+        private val KEY_AUTOCAPTURE_NOTIFICATION_ENABLED = booleanPreferencesKey("autocapture_notification_enabled")
+        private val KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED = booleanPreferencesKey("unknown_transaction_popup_enabled")
+        private const val KEY_LAST_MONTH_SUMMARY_DISMISSED_PREFIX = "last_month_summary_dismissed_"
     }
 
-    fun saveDailyReportEnabled(isEnabled: Boolean) {
-        prefs.edit {
-            putBoolean(KEY_DAILY_REPORT_ENABLED, isEnabled)
+    suspend fun saveDailyReportEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_DAILY_REPORT_ENABLED] = isEnabled
         }
     }
 
     fun getDailyReportEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                    if (key == KEY_DAILY_REPORT_ENABLED) {
-                        trySend(prefs.getBoolean(key, true))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_DAILY_REPORT_ENABLED, true))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_DAILY_REPORT_ENABLED] ?: true
+            }
+            .distinctUntilChanged()
     }
 
-    fun saveDailyReportTime(
+    suspend fun saveDailyReportTime(
         hour: Int,
         minute: Int,
     ) {
-        prefs.edit {
-            putInt(KEY_DAILY_REPORT_HOUR, hour)
-            putInt(KEY_DAILY_REPORT_MINUTE, minute)
+        dataStore.edit { preferences ->
+            preferences[KEY_DAILY_REPORT_HOUR] = hour
+            preferences[KEY_DAILY_REPORT_MINUTE] = minute
         }
     }
 
     fun getDailyReportTime(): Flow<Pair<Int, Int>> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, changedKey ->
-                    if (changedKey == KEY_DAILY_REPORT_HOUR || changedKey == KEY_DAILY_REPORT_MINUTE) {
-                        trySend(
-                            Pair(
-                                sharedPreferences.getInt(KEY_DAILY_REPORT_HOUR, 23),
-                                sharedPreferences.getInt(KEY_DAILY_REPORT_MINUTE, 0),
-                            ),
-                        )
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(
+            }
+            .map { preferences ->
                 Pair(
-                    prefs.getInt(KEY_DAILY_REPORT_HOUR, 23),
-                    prefs.getInt(KEY_DAILY_REPORT_MINUTE, 0),
-                ),
-            )
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+                    preferences[KEY_DAILY_REPORT_HOUR] ?: 23,
+                    preferences[KEY_DAILY_REPORT_MINUTE] ?: 0,
+                )
+            }
+            .distinctUntilChanged()
     }
 
-    fun saveWeeklySummaryEnabled(isEnabled: Boolean) {
-        prefs.edit {
-            putBoolean(KEY_WEEKLY_SUMMARY_ENABLED, isEnabled)
+    suspend fun saveWeeklySummaryEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_WEEKLY_SUMMARY_ENABLED] = isEnabled
         }
     }
 
     fun getWeeklySummaryEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                    if (key == KEY_WEEKLY_SUMMARY_ENABLED) {
-                        trySend(prefs.getBoolean(key, true))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_WEEKLY_SUMMARY_ENABLED, true))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_WEEKLY_SUMMARY_ENABLED] ?: true
+            }
+            .distinctUntilChanged()
     }
 
-    fun saveWeeklyReportTime(
+    suspend fun saveWeeklyReportTime(
         dayOfWeek: Int,
         hour: Int,
         minute: Int,
     ) {
-        prefs.edit {
-            putInt(KEY_WEEKLY_REPORT_DAY, dayOfWeek)
-            putInt(KEY_WEEKLY_REPORT_HOUR, hour)
-            putInt(KEY_WEEKLY_REPORT_MINUTE, minute)
+        dataStore.edit { preferences ->
+            preferences[KEY_WEEKLY_REPORT_DAY] = dayOfWeek
+            preferences[KEY_WEEKLY_REPORT_HOUR] = hour
+            preferences[KEY_WEEKLY_REPORT_MINUTE] = minute
         }
     }
 
     fun getWeeklyReportTime(): Flow<Triple<Int, Int, Int>> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_WEEKLY_REPORT_DAY || key == KEY_WEEKLY_REPORT_HOUR || key == KEY_WEEKLY_REPORT_MINUTE) {
-                        trySend(
-                            Triple(
-                                sp.getInt(KEY_WEEKLY_REPORT_DAY, Calendar.SUNDAY),
-                                sp.getInt(KEY_WEEKLY_REPORT_HOUR, 9),
-                                sp.getInt(KEY_WEEKLY_REPORT_MINUTE, 0),
-                            ),
-                        )
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(
+            }
+            .map { preferences ->
                 Triple(
-                    prefs.getInt(KEY_WEEKLY_REPORT_DAY, Calendar.SUNDAY),
-                    prefs.getInt(KEY_WEEKLY_REPORT_HOUR, 9),
-                    prefs.getInt(KEY_WEEKLY_REPORT_MINUTE, 0),
-                ),
-            )
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+                    preferences[KEY_WEEKLY_REPORT_DAY] ?: Calendar.SUNDAY,
+                    preferences[KEY_WEEKLY_REPORT_HOUR] ?: 9,
+                    preferences[KEY_WEEKLY_REPORT_MINUTE] ?: 0,
+                )
+            }
+            .distinctUntilChanged()
     }
 
-    fun saveMonthlySummaryEnabled(isEnabled: Boolean) {
-        prefs.edit {
-            putBoolean(KEY_MONTHLY_SUMMARY_ENABLED, isEnabled)
+    suspend fun saveMonthlySummaryEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_MONTHLY_SUMMARY_ENABLED] = isEnabled
         }
     }
 
     fun getMonthlySummaryEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                    if (key == KEY_MONTHLY_SUMMARY_ENABLED) {
-                        trySend(prefs.getBoolean(key, true))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_MONTHLY_SUMMARY_ENABLED, true))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_MONTHLY_SUMMARY_ENABLED] ?: true
+            }
+            .distinctUntilChanged()
     }
 
-    fun saveMonthlyReportTime(
+    suspend fun saveMonthlyReportTime(
         dayOfMonth: Int,
         hour: Int,
         minute: Int,
     ) {
-        prefs.edit {
-            putInt(KEY_MONTHLY_REPORT_DAY, dayOfMonth)
-            putInt(KEY_MONTHLY_REPORT_HOUR, hour)
-            putInt(KEY_MONTHLY_REPORT_MINUTE, minute)
+        dataStore.edit { preferences ->
+            preferences[KEY_MONTHLY_REPORT_DAY] = dayOfMonth
+            preferences[KEY_MONTHLY_REPORT_HOUR] = hour
+            preferences[KEY_MONTHLY_REPORT_MINUTE] = minute
         }
     }
 
     fun getMonthlyReportTime(): Flow<Triple<Int, Int, Int>> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_MONTHLY_REPORT_DAY || key == KEY_MONTHLY_REPORT_HOUR || key == KEY_MONTHLY_REPORT_MINUTE) {
-                        trySend(
-                            Triple(
-                                sp.getInt(KEY_MONTHLY_REPORT_DAY, 1),
-                                sp.getInt(KEY_MONTHLY_REPORT_HOUR, 9),
-                                sp.getInt(KEY_MONTHLY_REPORT_MINUTE, 0),
-                            ),
-                        )
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(
+            }
+            .map { preferences ->
                 Triple(
-                    prefs.getInt(KEY_MONTHLY_REPORT_DAY, 1),
-                    prefs.getInt(KEY_MONTHLY_REPORT_HOUR, 9),
-                    prefs.getInt(KEY_MONTHLY_REPORT_MINUTE, 0),
-                ),
-            )
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+                    preferences[KEY_MONTHLY_REPORT_DAY] ?: 1,
+                    preferences[KEY_MONTHLY_REPORT_HOUR] ?: 9,
+                    preferences[KEY_MONTHLY_REPORT_MINUTE] ?: 0,
+                )
+            }
+            .distinctUntilChanged()
     }
 
-    fun saveAutoCaptureNotificationEnabled(isEnabled: Boolean) {
-        prefs.edit { putBoolean(KEY_AUTOCAPTURE_NOTIFICATION_ENABLED, isEnabled) }
+    suspend fun saveAutoCaptureNotificationEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_AUTOCAPTURE_NOTIFICATION_ENABLED] = isEnabled
+        }
     }
 
     fun getAutoCaptureNotificationEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { sp, key ->
-                    if (key == KEY_AUTOCAPTURE_NOTIFICATION_ENABLED) {
-                        trySend(sp.getBoolean(key, true))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_AUTOCAPTURE_NOTIFICATION_ENABLED, true))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_AUTOCAPTURE_NOTIFICATION_ENABLED] ?: true
+            }
+            .distinctUntilChanged()
     }
 
     fun isAutoCaptureNotificationEnabledBlocking(): Boolean {
-        return prefs.getBoolean(KEY_AUTOCAPTURE_NOTIFICATION_ENABLED, true)
+        return runBlocking {
+            try {
+                dataStore.data.first()[KEY_AUTOCAPTURE_NOTIFICATION_ENABLED] ?: true
+            } catch (e: Exception) {
+                true
+            }
+        }
     }
 
-    fun saveUnknownTransactionPopupEnabled(isEnabled: Boolean) {
-        prefs.edit {
-            putBoolean(KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED, isEnabled)
+    suspend fun saveUnknownTransactionPopupEnabled(isEnabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED] = isEnabled
         }
     }
 
     fun getUnknownTransactionPopupEnabled(): Flow<Boolean> {
-        return callbackFlow {
-            val listener =
-                SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                    if (key == KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED) {
-                        trySend(prefs.getBoolean(key, true))
-                    }
+        return dataStore.data
+            .catch { exception ->
+                if (exception is IOException) {
+                    emit(emptyPreferences())
+                } else {
+                    throw exception
                 }
-            prefs.registerOnSharedPreferenceChangeListener(listener)
-            trySend(prefs.getBoolean(KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED, true))
-            awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-        }
+            }
+            .map { preferences ->
+                preferences[KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED] ?: true
+            }
+            .distinctUntilChanged()
     }
 
     fun isUnknownTransactionPopupEnabledBlocking(): Boolean {
-        return prefs.getBoolean(KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED, true)
+        return runBlocking {
+            try {
+                dataStore.data.first()[KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED] ?: true
+            } catch (e: Exception) {
+                true
+            }
+        }
     }
 
-    fun setLastMonthSummaryDismissed() {
+    suspend fun setLastMonthSummaryDismissed() {
         val monthKey = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(Date())
-        prefs.edit {
-            putBoolean(KEY_LAST_MONTH_SUMMARY_DISMISSED + monthKey, true)
+        val prefKey = booleanPreferencesKey(KEY_LAST_MONTH_SUMMARY_DISMISSED_PREFIX + monthKey)
+        dataStore.edit { preferences ->
+            preferences[prefKey] = true
         }
     }
 
     fun hasLastMonthSummaryBeenDismissed(): Boolean {
         val monthKey = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(Date())
-        return prefs.getBoolean(KEY_LAST_MONTH_SUMMARY_DISMISSED + monthKey, false)
+        val prefKey = booleanPreferencesKey(KEY_LAST_MONTH_SUMMARY_DISMISSED_PREFIX + monthKey)
+        return runBlocking {
+            try {
+                dataStore.data.first()[prefKey] ?: false
+            } catch (e: Exception) {
+                false
+            }
+        }
     }
 }

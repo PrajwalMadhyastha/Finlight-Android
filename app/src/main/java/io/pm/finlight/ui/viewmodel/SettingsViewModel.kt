@@ -216,11 +216,15 @@ class SettingsViewModel(
     }
 
     fun setPrivacyModeEnabled(enabled: Boolean) {
-        settingsRepository.savePrivacyModeEnabled(enabled)
+        viewModelScope.launch {
+            settingsRepository.savePrivacyModeEnabled(enabled)
+        }
     }
 
     fun setSimulatorPrivacyModeEnabled(enabled: Boolean) {
-        settingsRepository.saveSimulatorPrivacyModeEnabled(enabled)
+        viewModelScope.launch {
+            settingsRepository.saveSimulatorPrivacyModeEnabled(enabled)
+        }
     }
 
     suspend fun applyLearningAndAutoImport(mapping: MerchantCategoryMapping): Int {
@@ -482,20 +486,28 @@ class SettingsViewModel(
     }
 
     fun setAutoCaptureNotificationEnabled(enabled: Boolean) {
-        settingsRepository.saveAutoCaptureNotificationEnabled(enabled)
+        viewModelScope.launch {
+            settingsRepository.saveAutoCaptureNotificationEnabled(enabled)
+        }
     }
 
     fun setAutoBackupEnabled(enabled: Boolean) {
-        settingsRepository.saveAutoBackupEnabled(enabled)
-        if (enabled) ReminderManager.scheduleAutoBackup(context) else ReminderManager.cancelAutoBackup(context)
+        viewModelScope.launch {
+            settingsRepository.saveAutoBackupEnabled(enabled)
+            if (enabled) ReminderManager.scheduleAutoBackup(context) else ReminderManager.cancelAutoBackup(context)
+        }
     }
 
     fun setAutoBackupNotificationEnabled(enabled: Boolean) {
-        settingsRepository.saveAutoBackupNotificationEnabled(enabled)
+        viewModelScope.launch {
+            settingsRepository.saveAutoBackupNotificationEnabled(enabled)
+        }
     }
 
     fun saveSelectedTheme(theme: AppTheme) {
-        settingsRepository.saveSelectedTheme(theme)
+        viewModelScope.launch {
+            settingsRepository.saveSelectedTheme(theme)
+        }
     }
 
     fun dismissPotentialTransaction(transaction: PotentialTransaction) {
@@ -536,23 +548,29 @@ class SettingsViewModel(
     }
 
     fun setDailyReportEnabled(enabled: Boolean) {
-        settingsRepository.saveDailyReportEnabled(enabled)
-        if (enabled) ReminderManager.scheduleDailyReport(context) else ReminderManager.cancelDailyReport(context)
+        viewModelScope.launch {
+            settingsRepository.saveDailyReportEnabled(enabled)
+            if (enabled) ReminderManager.scheduleDailyReport(context) else ReminderManager.cancelDailyReport(context)
+        }
     }
 
     fun saveDailyReportTime(
         hour: Int,
         minute: Int,
     ) {
-        settingsRepository.saveDailyReportTime(hour, minute)
-        if (dailyReportEnabled.value) {
-            ReminderManager.scheduleDailyReport(context)
+        viewModelScope.launch {
+            settingsRepository.saveDailyReportTime(hour, minute)
+            if (dailyReportEnabled.value) {
+                ReminderManager.scheduleDailyReport(context)
+            }
         }
     }
 
     fun setWeeklySummaryEnabled(enabled: Boolean) {
-        settingsRepository.saveWeeklySummaryEnabled(enabled)
-        if (enabled) ReminderManager.scheduleWeeklySummary(context) else ReminderManager.cancelWeeklySummary(context)
+        viewModelScope.launch {
+            settingsRepository.saveWeeklySummaryEnabled(enabled)
+            if (enabled) ReminderManager.scheduleWeeklySummary(context) else ReminderManager.cancelWeeklySummary(context)
+        }
     }
 
     fun saveWeeklyReportTime(
@@ -560,18 +578,22 @@ class SettingsViewModel(
         hour: Int,
         minute: Int,
     ) {
-        settingsRepository.saveWeeklyReportTime(dayOfWeek, hour, minute)
-        if (weeklySummaryEnabled.value) {
-            ReminderManager.scheduleWeeklySummary(context)
+        viewModelScope.launch {
+            settingsRepository.saveWeeklyReportTime(dayOfWeek, hour, minute)
+            if (weeklySummaryEnabled.value) {
+                ReminderManager.scheduleWeeklySummary(context)
+            }
         }
     }
 
     fun setMonthlySummaryEnabled(enabled: Boolean) {
-        settingsRepository.saveMonthlySummaryEnabled(enabled)
-        if (enabled) {
-            ReminderManager.scheduleMonthlySummary(context)
-        } else {
-            ReminderManager.cancelMonthlySummary(context)
+        viewModelScope.launch {
+            settingsRepository.saveMonthlySummaryEnabled(enabled)
+            if (enabled) {
+                ReminderManager.scheduleMonthlySummary(context)
+            } else {
+                ReminderManager.cancelMonthlySummary(context)
+            }
         }
     }
 
@@ -580,14 +602,18 @@ class SettingsViewModel(
         hour: Int,
         minute: Int,
     ) {
-        settingsRepository.saveMonthlyReportTime(dayOfMonth, hour, minute)
-        if (monthlySummaryEnabled.value) {
-            ReminderManager.scheduleMonthlySummary(context)
+        viewModelScope.launch {
+            settingsRepository.saveMonthlyReportTime(dayOfMonth, hour, minute)
+            if (monthlySummaryEnabled.value) {
+                ReminderManager.scheduleMonthlySummary(context)
+            }
         }
     }
 
     fun setAppLockEnabled(enabled: Boolean) {
-        settingsRepository.saveAppLockEnabled(enabled)
+        viewModelScope.launch {
+            settingsRepository.saveAppLockEnabled(enabled)
+        }
     }
 
     fun setUnknownTransactionPopupEnabled(enabled: Boolean) {
