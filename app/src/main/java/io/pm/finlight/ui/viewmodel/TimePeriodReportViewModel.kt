@@ -44,7 +44,11 @@ class TimePeriodReportViewModel(
     initialDateMillis: Long?,
     showPreviousMonth: Boolean,
     private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
-        GetMonthlyConsistencyDataUseCase(transactionRepository, settingsRepository),
+        GetMonthlyConsistencyDataUseCase(
+            settingsRepository = settingsRepository,
+            transactionAnalyticsDao = transactionAnalyticsDao,
+            transactionQueryDao = transactionQueryDao,
+        ),
 ) : ViewModel() {
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(

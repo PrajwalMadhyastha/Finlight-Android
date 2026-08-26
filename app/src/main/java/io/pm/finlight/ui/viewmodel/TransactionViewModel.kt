@@ -116,8 +116,7 @@ class TransactionViewModel(
     private val merchantMappingRepository: MerchantMappingRepository,
     private val splitTransactionRepository: SplitTransactionRepository,
     private val smsParseTemplateDao: SmsParseTemplateDao,
-    private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase =
-        ResolveTravelModeTagUseCase(settingsRepository, tagRepository),
+    private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
 ) : AndroidViewModel(application) {
     private val context = application
 

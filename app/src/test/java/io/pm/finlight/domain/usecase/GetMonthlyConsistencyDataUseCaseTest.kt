@@ -7,7 +7,8 @@ import io.pm.finlight.BudgetSettingsRepository
 import io.pm.finlight.CalendarDayStatus
 import io.pm.finlight.DailyTotal
 import io.pm.finlight.SpendingStatus
-import io.pm.finlight.TransactionRepository
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -21,7 +22,8 @@ import java.util.Locale
 @OptIn(ExperimentalCoroutinesApi::class)
 class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
     private val budgetSettingsRepository: BudgetSettingsRepository = mockk()
-    private val transactionRepository: TransactionRepository = mockk()
+    private val transactionAnalyticsDao: TransactionAnalyticsDao = mockk()
+    private val transactionQueryDao: TransactionQueryDao = mockk()
 
     private fun getDayOfMonth(dayStatus: CalendarDayStatus): Int {
         val cal = Calendar.getInstance()
@@ -32,7 +34,7 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
     private fun getDateKey(
         year: Int,
         month: Int,
-        day: Int
+        day: Int,
     ): String {
         return String.format(Locale.ROOT, "%d-%02d-%02d", year, month, day)
     }
@@ -40,7 +42,7 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
     private fun getTimestamp(
         month: Int,
         day: Int,
-        year: Int = 2025
+        year: Int = 2025,
     ): Long {
         return Calendar.getInstance().apply {
             set(year, month, day, 12, 0, 0)
@@ -54,7 +56,8 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
             val useCase =
                 GetMonthlyConsistencyDataUseCase(
                     budgetSettingsRepository = budgetSettingsRepository,
-                    transactionRepository = transactionRepository,
+                    transactionAnalyticsDao = transactionAnalyticsDao,
+                    transactionQueryDao = transactionQueryDao,
                     dispatcher = testDispatcher,
                 )
 
@@ -63,13 +66,13 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
             val firstTxDate = getTimestamp(Calendar.SEPTEMBER, 1)
 
             every { budgetSettingsRepository.getOverallBudgetForMonth(year, month) } returns flowOf(null)
-            every { transactionRepository.getFirstTransactionDate() } returns flowOf(firstTxDate)
+            every { transactionQueryDao.getFirstTransactionDate() } returns flowOf(firstTxDate)
             val dailyTotals =
                 listOf(
                     DailyTotal(getDateKey(year, month, 2), 100.0),
                     DailyTotal(getDateKey(year, month, 3), 0.0),
                 )
-            every { transactionRepository.getDailySpendingForDateRange(any(), any()) } returns flowOf(dailyTotals)
+            every { transactionAnalyticsDao.getDailySpendingForDateRange(any(), any()) } returns flowOf(dailyTotals)
 
             val results = useCase(year, month).first()
 
@@ -96,7 +99,8 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
             val useCase =
                 GetMonthlyConsistencyDataUseCase(
                     budgetSettingsRepository = budgetSettingsRepository,
-                    transactionRepository = transactionRepository,
+                    transactionAnalyticsDao = transactionAnalyticsDao,
+                    transactionQueryDao = transactionQueryDao,
                     dispatcher = testDispatcher,
                 )
 
@@ -105,13 +109,13 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
             val firstTxDate = getTimestamp(Calendar.SEPTEMBER, 1)
 
             every { budgetSettingsRepository.getOverallBudgetForMonth(year, month) } returns flowOf(0f)
-            every { transactionRepository.getFirstTransactionDate() } returns flowOf(firstTxDate)
+            every { transactionQueryDao.getFirstTransactionDate() } returns flowOf(firstTxDate)
             val dailyTotals =
                 listOf(
                     DailyTotal(getDateKey(year, month, 2), 100.0),
                     DailyTotal(getDateKey(year, month, 3), 0.0),
                 )
-            every { transactionRepository.getDailySpendingForDateRange(any(), any()) } returns flowOf(dailyTotals)
+            every { transactionAnalyticsDao.getDailySpendingForDateRange(any(), any()) } returns flowOf(dailyTotals)
 
             val results = useCase(year, month).first()
 
@@ -135,7 +139,8 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
             val useCase =
                 GetMonthlyConsistencyDataUseCase(
                     budgetSettingsRepository = budgetSettingsRepository,
-                    transactionRepository = transactionRepository,
+                    transactionAnalyticsDao = transactionAnalyticsDao,
+                    transactionQueryDao = transactionQueryDao,
                     dispatcher = testDispatcher,
                 )
 
@@ -145,14 +150,14 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
             val firstTxDate = getTimestamp(Calendar.SEPTEMBER, 1)
 
             every { budgetSettingsRepository.getOverallBudgetForMonth(year, month) } returns flowOf(totalBudget)
-            every { transactionRepository.getFirstTransactionDate() } returns flowOf(firstTxDate)
+            every { transactionQueryDao.getFirstTransactionDate() } returns flowOf(firstTxDate)
             val dailyTotals =
                 listOf(
                     DailyTotal(getDateKey(year, month, 1), 0.0),
                     DailyTotal(getDateKey(year, month, 2), 50.0),
                     DailyTotal(getDateKey(year, month, 3), 200.0),
                 )
-            every { transactionRepository.getDailySpendingForDateRange(any(), any()) } returns flowOf(dailyTotals)
+            every { transactionAnalyticsDao.getDailySpendingForDateRange(any(), any()) } returns flowOf(dailyTotals)
 
             val results = useCase(year, month).first()
 
@@ -171,7 +176,8 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
             val useCase =
                 GetMonthlyConsistencyDataUseCase(
                     budgetSettingsRepository = budgetSettingsRepository,
-                    transactionRepository = transactionRepository,
+                    transactionAnalyticsDao = transactionAnalyticsDao,
+                    transactionQueryDao = transactionQueryDao,
                     dispatcher = testDispatcher,
                 )
 
@@ -181,8 +187,8 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
             val firstTxDate = getTimestamp(Calendar.SEPTEMBER, 15)
 
             every { budgetSettingsRepository.getOverallBudgetForMonth(year, month) } returns flowOf(1000f)
-            every { transactionRepository.getFirstTransactionDate() } returns flowOf(firstTxDate)
-            every { transactionRepository.getDailySpendingForDateRange(any(), any()) } returns flowOf(emptyList())
+            every { transactionQueryDao.getFirstTransactionDate() } returns flowOf(firstTxDate)
+            every { transactionAnalyticsDao.getDailySpendingForDateRange(any(), any()) } returns flowOf(emptyList())
 
             val results = useCase(year, month).first()
 

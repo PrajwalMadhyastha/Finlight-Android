@@ -178,6 +178,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
                 smsRepository = smsRepository,
+                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
             )
     }
 

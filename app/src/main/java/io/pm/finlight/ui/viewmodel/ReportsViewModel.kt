@@ -40,9 +40,7 @@ enum class ReportViewType {
 class ReportsViewModel(
     private val transactionRepository: TransactionRepository,
     private val categoryDao: CategoryDao,
-    private val settingsRepository: SettingsRepository,
-    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
-        GetMonthlyConsistencyDataUseCase(transactionRepository, settingsRepository),
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
 ) : ViewModel() {
     val allCategories: StateFlow<List<Category>>
 

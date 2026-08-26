@@ -25,7 +25,9 @@ import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
 import io.pm.finlight.SmsRepository
+import io.pm.finlight.TagRepository
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.utils.SmsProviderHelper
 import io.pm.finlight.utils.SmsTransactionSaver
@@ -45,7 +47,9 @@ class SmsCatchupWorker(
 
         val db = AppDatabase.getInstance(context)
         val settingsRepository = SettingsRepository(context)
-        val saver = SmsTransactionSaver(db, settingsRepository)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
+        val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(settingsRepository, tagRepository)
+        val saver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)
         val smsRepository = SmsRepository(context)
 
         val startDate = System.currentTimeMillis() - lookbackMs

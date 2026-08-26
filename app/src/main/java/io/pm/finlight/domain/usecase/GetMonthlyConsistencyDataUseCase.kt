@@ -5,7 +5,8 @@ import io.pm.finlight.CalendarDayStatus
 import io.pm.finlight.DailyTotal
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SpendingStatus
-import io.pm.finlight.TransactionRepository
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -18,30 +19,35 @@ import kotlin.math.roundToLong
 /**
  * UseCase to generate the consistency calendar/heatmap data for a single month.
  * Combines monthly budget settings from [BudgetSettingsRepository] with
- * daily spending totals and first transaction date from [TransactionRepository].
+ * daily spending totals from [TransactionAnalyticsDao] and first transaction date from [TransactionQueryDao].
  */
 class GetMonthlyConsistencyDataUseCase(
     private val budgetProvider: (year: Int, month: Int) -> Flow<Float?>,
-    private val transactionRepository: TransactionRepository,
+    private val transactionAnalyticsDao: TransactionAnalyticsDao,
+    private val transactionQueryDao: TransactionQueryDao,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     constructor(
         budgetSettingsRepository: BudgetSettingsRepository,
-        transactionRepository: TransactionRepository,
+        transactionAnalyticsDao: TransactionAnalyticsDao,
+        transactionQueryDao: TransactionQueryDao,
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
     ) : this(
         budgetProvider = { year, month -> budgetSettingsRepository.getOverallBudgetForMonth(year, month) },
-        transactionRepository = transactionRepository,
+        transactionAnalyticsDao = transactionAnalyticsDao,
+        transactionQueryDao = transactionQueryDao,
         dispatcher = dispatcher,
     )
 
     constructor(
-        transactionRepository: TransactionRepository,
         settingsRepository: SettingsRepository,
+        transactionAnalyticsDao: TransactionAnalyticsDao,
+        transactionQueryDao: TransactionQueryDao,
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
     ) : this(
         budgetProvider = { year, month -> settingsRepository.getOverallBudgetForMonth(year, month) },
-        transactionRepository = transactionRepository,
+        transactionAnalyticsDao = transactionAnalyticsDao,
+        transactionQueryDao = transactionQueryDao,
         dispatcher = dispatcher,
     )
 
@@ -71,8 +77,8 @@ class GetMonthlyConsistencyDataUseCase(
 
         return combine(
             budgetProvider(year, month),
-            transactionRepository.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
-            transactionRepository.getFirstTransactionDate(),
+            transactionAnalyticsDao.getDailySpendingForDateRange(monthStartCal.timeInMillis, monthEndCal.timeInMillis),
+            transactionQueryDao.getFirstTransactionDate(),
         ) { budget: Float?, dailyTotals: List<DailyTotal>, firstTransactionDate: Long? ->
             val firstDataCal = firstTransactionDate?.let { Calendar.getInstance().apply { timeInMillis = it } }
             val spendingMap = dailyTotals.associateBy({ it.date }, { it.totalAmount })

@@ -30,11 +30,13 @@ import io.pm.finlight.ParseResult
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
+import io.pm.finlight.TagRepository
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionNotificationWorker
 import io.pm.finlight.TransactionType
 import io.pm.finlight.TripType
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.SmsProviderHelper
@@ -44,6 +46,7 @@ import androidx.work.WorkManager
 import kotlinx.coroutines.flow.first
 import java.util.Date
 
+@Suppress("DEPRECATION")
 class SmsProcessorWorker(
     private val context: Context,
     workerParams: WorkerParameters,
@@ -65,7 +68,9 @@ class SmsProcessorWorker(
 
         val db = AppDatabase.getInstance(context)
         val settingsRepository = SettingsRepository(context)
-        val saver = SmsTransactionSaver(db, settingsRepository)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
+        val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(settingsRepository, tagRepository)
+        val saver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)
 
         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })

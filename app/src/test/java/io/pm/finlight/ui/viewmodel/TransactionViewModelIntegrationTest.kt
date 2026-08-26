@@ -90,6 +90,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
         splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
 
         // 4. Initialize ViewModel
+        val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(settingsRepository, tagRepository)
         viewModel =
             TransactionViewModel(
                 application = context,
@@ -105,6 +106,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 merchantMappingRepository = merchantMappingRepository,
                 splitTransactionRepository = splitTransactionRepository,
                 smsParseTemplateDao = db.smsParseTemplateDao(),
+                resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
             )
     }
 

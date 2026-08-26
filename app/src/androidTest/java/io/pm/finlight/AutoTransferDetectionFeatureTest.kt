@@ -36,7 +36,9 @@ class AutoTransferDetectionFeatureTest {
 
             // Setup sms transaction saver
             val settingsRepo = io.pm.finlight.SettingsRepository(context)
-            smsTransactionSaver = SmsTransactionSaver(db, settingsRepo)
+            val tagRepo = io.pm.finlight.TagRepository(db.tagDao(), db.transactionQueryDao())
+            val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(settingsRepo, tagRepo)
+            smsTransactionSaver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)
         }
     }
 

@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 
 class TimePeriodReportViewModelFactory(
     private val application: Application,
@@ -26,6 +27,12 @@ class TimePeriodReportViewModelFactory(
             val db = AppDatabase.getInstance(application)
             // --- NEW: Instantiate all repositories ---
             val settingsRepository = SettingsRepository(application)
+            val getMonthlyConsistencyDataUseCase =
+                GetMonthlyConsistencyDataUseCase(
+                    settingsRepository = settingsRepository,
+                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                    transactionQueryDao = db.transactionQueryDao(),
+                )
             val transactionRepository =
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),
@@ -46,6 +53,7 @@ class TimePeriodReportViewModelFactory(
                 timePeriod = timePeriod,
                 initialDateMillis = initialDateMillis,
                 showPreviousMonth = showPreviousMonth,
+                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

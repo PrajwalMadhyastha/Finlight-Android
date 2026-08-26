@@ -11,14 +11,11 @@ package io.pm.finlight.utils
 import android.util.Log
 import io.pm.finlight.Account
 import io.pm.finlight.PotentialTransaction
-import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TagRepository
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionType
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.data.db.AppDatabase
-
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 
 /**
@@ -36,10 +33,7 @@ import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
  */
 class SmsTransactionSaver(
     private val db: AppDatabase,
-    private val settingsRepository: SettingsRepository,
-    private val tagRepository: TagRepository = TagRepository(db.tagDao(), db.transactionQueryDao()),
-    private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase =
-        ResolveTravelModeTagUseCase(settingsRepository, tagRepository),
+    private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
 ) {
     private val tag = "SmsTransactionSaver"
 

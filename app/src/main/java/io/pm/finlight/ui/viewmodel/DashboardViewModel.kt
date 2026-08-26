@@ -55,8 +55,7 @@ class DashboardViewModel(
     private val recurringTransactionDao: RecurringTransactionDao,
     private val recurringPatternDao: RecurringPatternDao,
     private val smsRepository: SmsRepository,
-    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
-        GetMonthlyConsistencyDataUseCase(transactionRepository, settingsRepository),
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>

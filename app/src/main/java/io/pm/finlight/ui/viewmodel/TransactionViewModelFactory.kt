@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 
 class TransactionViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -19,6 +20,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
             val db = AppDatabase.getInstance(application)
             val settingsRepository = SettingsRepository(application)
             val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
+            val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(settingsRepository, tagRepository)
             val transactionRepository =
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),
@@ -45,6 +47,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                 merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao()),
                 splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao()),
                 smsParseTemplateDao = db.smsParseTemplateDao(),
+                resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

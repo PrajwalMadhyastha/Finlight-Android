@@ -13,12 +13,19 @@ import io.pm.finlight.ReportsViewModel
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 
 class ReportsViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ReportsViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = SettingsRepository(application)
+            val getMonthlyConsistencyDataUseCase =
+                GetMonthlyConsistencyDataUseCase(
+                    settingsRepository = settingsRepository,
+                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                    transactionQueryDao = db.transactionQueryDao(),
+                )
             val transactionRepository =
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),
@@ -34,7 +41,7 @@ class ReportsViewModelFactory(private val application: Application) : ViewModelP
             return ReportsViewModel(
                 transactionRepository = transactionRepository,
                 categoryDao = db.categoryDao(),
-                settingsRepository = settingsRepository,
+                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
