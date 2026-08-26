@@ -559,4 +559,45 @@ class SettingsRepositoryTest : BaseViewModelTest() {
             repository.saveIgnoreRulesChecksum(12345)
             assertEquals(12345, repository.getIgnoreRulesChecksum())
         }
+
+    @Test
+    fun `save and get has seen onboarding`() =
+        runTest {
+            repository.getHasSeenOnboarding().test {
+                assertFalse(awaitItem())
+                repository.setHasSeenOnboarding(true)
+                assertTrue(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `saveOverallBudgetForCurrentMonth saves to current year and month`() =
+        runTest {
+            val calendar = Calendar.getInstance()
+            val year = calendar.get(Calendar.YEAR)
+            val month = calendar.get(Calendar.MONTH) + 1
+            val budget = 18000f
+
+            repository.saveOverallBudgetForCurrentMonth(budget)
+            assertEquals(budget, repository.getOverallBudgetForMonth(year, month).first())
+        }
+
+    @Test
+    fun `primary constructor initializes all domain repositories properly`() {
+        val repo =
+            SettingsRepository(
+                io.pm.finlight.AppConfigRepository(context),
+                io.pm.finlight.DashboardSettingsRepository(context),
+                io.pm.finlight.SecuritySettingsRepository(context),
+                io.pm.finlight.BudgetSettingsRepository(context),
+                io.pm.finlight.BackupSettingsRepository(context),
+                io.pm.finlight.NotificationSettingsRepository(context),
+                io.pm.finlight.SmsRuleSettingsRepository(context),
+                io.pm.finlight.TravelSettingsRepository(context),
+                io.pm.finlight.FirstLaunchSettingsRepository(context),
+                io.pm.finlight.FeatureSettingsRepository(context),
+            )
+        kotlin.test.assertNotNull(repo)
+    }
 }

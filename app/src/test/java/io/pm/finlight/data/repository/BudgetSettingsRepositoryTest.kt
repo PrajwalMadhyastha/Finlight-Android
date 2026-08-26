@@ -110,4 +110,31 @@ class BudgetSettingsRepositoryTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `constructor with context initializes properly`() {
+        val repo = BudgetSettingsRepository(context)
+        kotlin.test.assertNotNull(repo)
+    }
+
+    @Test
+    fun `getters handle IOException by emitting defaults`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw java.io.IOException("Disk error") }
+            val repo = BudgetSettingsRepository(mockDataStore)
+
+            assertNull(repo.getOverallBudgetForMonth(2026, 1).first())
+            assertEquals(emptyMap(), repo.getOverallBudgetsForYear(2026))
+        }
+
+    @Test
+    fun `getters rethrow non-IOException exceptions`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
+            val repo = BudgetSettingsRepository(mockDataStore)
+
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getOverallBudgetForMonth(2026, 1).first() }
+        }
 }

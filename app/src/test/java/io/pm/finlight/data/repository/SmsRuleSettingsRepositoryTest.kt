@@ -11,6 +11,7 @@ import io.pm.finlight.SmsRuleSettingsRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -39,9 +40,10 @@ class SmsRuleSettingsRepositoryTest : BaseViewModelTest() {
     @Test
     fun `save and get sms scan start date`() =
         runTest {
-            val date = 1690000000000L
             repository.getSmsScanStartDate().test {
-                awaitItem() // Default 30 days ago
+                val defaultDate = awaitItem()
+                kotlin.test.assertTrue(defaultDate > 0L) // Default is approx 30 days ago
+                val date = 1700000000000L
                 repository.saveSmsScanStartDate(date)
                 assertEquals(date, awaitItem())
                 cancelAndIgnoreRemainingEvents()
@@ -67,5 +69,34 @@ class SmsRuleSettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(setOf("suggestion_1", "suggestion_2"), awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `constructor with context initializes properly`() {
+        val repo = SmsRuleSettingsRepository(context)
+        kotlin.test.assertNotNull(repo)
+    }
+
+    @Test
+    fun `getters handle IOException by emitting defaults`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw java.io.IOException("Disk error") }
+            val repo = SmsRuleSettingsRepository(mockDataStore)
+
+            kotlin.test.assertTrue(repo.getSmsScanStartDate().first() > 0L)
+            assertEquals(0, repo.getIgnoreRulesChecksum())
+            assertEquals(emptySet<String>(), repo.getDismissedMergeSuggestions().first())
+        }
+
+    @Test
+    fun `getters rethrow non-IOException exceptions`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
+            val repo = SmsRuleSettingsRepository(mockDataStore)
+
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getSmsScanStartDate().first() }
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getDismissedMergeSuggestions().first() }
         }
 }

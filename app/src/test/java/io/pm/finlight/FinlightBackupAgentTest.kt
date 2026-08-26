@@ -89,4 +89,35 @@ class FinlightBackupAgentTest {
             val timeDifference = kotlin.math.abs(currentTime - capturedTimestamp)
             assertTrue("Timestamp should be very recent (within 1 second)", timeDifference < 1000)
         }
+
+    @Test
+    fun `onBackup triggers notification when notifications enabled`() =
+        runTest {
+            coEvery { anyConstructed<SettingsRepository>().getAutoBackupNotificationEnabled() } returns kotlinx.coroutines.flow.flowOf(true)
+            mockkObject(io.pm.finlight.utils.NotificationHelper)
+            every { io.pm.finlight.utils.NotificationHelper.showAutoBackupNotification(any(), any()) } just runs
+
+            agent.onBackup(null, null, null)
+
+            verify(exactly = 1) { io.pm.finlight.utils.NotificationHelper.showAutoBackupNotification(any(), any()) }
+            unmockkObject(io.pm.finlight.utils.NotificationHelper)
+        }
+
+    @Test
+    fun `onBackup does not trigger notification when notifications disabled`() =
+        runTest {
+            coEvery { anyConstructed<SettingsRepository>().getAutoBackupNotificationEnabled() } returns kotlinx.coroutines.flow.flowOf(false)
+            mockkObject(io.pm.finlight.utils.NotificationHelper)
+            every { io.pm.finlight.utils.NotificationHelper.showAutoBackupNotification(any(), any()) } just runs
+
+            agent.onBackup(null, null, null)
+
+            verify(exactly = 0) { io.pm.finlight.utils.NotificationHelper.showAutoBackupNotification(any(), any()) }
+            unmockkObject(io.pm.finlight.utils.NotificationHelper)
+        }
+
+    @Test
+    fun `onRestore handles restore process`() {
+        agent.onRestore(null, 1, null)
+    }
 }

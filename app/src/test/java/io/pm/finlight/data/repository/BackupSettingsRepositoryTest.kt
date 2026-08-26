@@ -11,6 +11,7 @@ import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -81,5 +82,37 @@ class BackupSettingsRepositoryTest : BaseViewModelTest() {
                 assertEquals(time, awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `constructor with context initializes properly`() {
+        val repo = BackupSettingsRepository(context)
+        kotlin.test.assertNotNull(repo)
+    }
+
+    @Test
+    fun `getters handle IOException by emitting defaults`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw java.io.IOException("Disk error") }
+            val repo = BackupSettingsRepository(mockDataStore)
+
+            assertTrue(repo.getBackupEnabled().first())
+            assertTrue(repo.getAutoBackupEnabled().first())
+            assertFalse(repo.getAutoBackupNotificationEnabled().first())
+            assertEquals(0L, repo.getLastBackupTimestamp().first())
+        }
+
+    @Test
+    fun `getters rethrow non-IOException exceptions`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
+            val repo = BackupSettingsRepository(mockDataStore)
+
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getBackupEnabled().first() }
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getAutoBackupEnabled().first() }
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getAutoBackupNotificationEnabled().first() }
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getLastBackupTimestamp().first() }
         }
 }

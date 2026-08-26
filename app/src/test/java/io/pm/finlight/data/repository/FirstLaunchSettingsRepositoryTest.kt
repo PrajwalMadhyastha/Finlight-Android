@@ -12,6 +12,7 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.data.internalSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -62,5 +63,33 @@ class FirstLaunchSettingsRepositoryTest : BaseViewModelTest() {
                 assertTrue(awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `constructor with context initializes properly`() {
+        val repo = FirstLaunchSettingsRepository(context)
+        kotlin.test.assertNotNull(repo)
+    }
+
+    @Test
+    fun `getters handle IOException by emitting defaults`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw java.io.IOException("Disk error") }
+            val repo = FirstLaunchSettingsRepository(mockDataStore, mockDataStore)
+
+            assertFalse(repo.getHasSeenOnboarding().first())
+            assertFalse(repo.getIsFirstLaunchComplete().first())
+        }
+
+    @Test
+    fun `getters rethrow non-IOException exceptions`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
+            val repo = FirstLaunchSettingsRepository(mockDataStore, mockDataStore)
+
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getHasSeenOnboarding().first() }
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getIsFirstLaunchComplete().first() }
         }
 }

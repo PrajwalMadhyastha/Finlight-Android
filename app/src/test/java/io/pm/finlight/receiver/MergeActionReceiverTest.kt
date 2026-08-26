@@ -158,4 +158,88 @@ class MergeActionReceiverTest : BaseViewModelTest() {
             }
             delay(100)
         }
+
+    @Test
+    fun `onReceive with null action does nothing`() =
+        runTest {
+            val intent = Intent()
+            receiver.onReceive(context, intent)
+            coVerify(exactly = 0) { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { anyConstructed<TransactionRepository>().dismissMerge(any()) }
+        }
+
+    @Test
+    fun `onReceive with unknown action cancels notification if childId valid`() =
+        runTest {
+            val intent =
+                Intent("UNKNOWN_ACTION").apply {
+                    putExtra("childTxnId", 2)
+                    putExtra("notificationId", 10002)
+                }
+            receiver.onReceive(context, intent)
+            coVerify(exactly = 0) { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { anyConstructed<TransactionRepository>().dismissMerge(any()) }
+            verify(timeout = 2000) { mockNotificationManager.cancel(10002) }
+            verify(timeout = 2000) { mockNotificationManager.cancel(2) }
+            delay(100)
+        }
+
+    @Test
+    fun `ACTION_MERGE with invalid IDs does not trigger merge`() =
+        runTest {
+            val intent =
+                Intent("ACTION_MERGE").apply {
+                    putExtra("parentTxnId", -1)
+                    putExtra("childTxnId", -1)
+                }
+            receiver.onReceive(context, intent)
+            coVerify(exactly = 0) { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) }
+            delay(100)
+        }
+
+    @Test
+    fun `ACTION_DISMISS with invalid childId does not call dismissMerge`() =
+        runTest {
+            val intent =
+                Intent("ACTION_DISMISS").apply {
+                    putExtra("childTxnId", -1)
+                }
+            receiver.onReceive(context, intent)
+            coVerify(exactly = 0) { anyConstructed<TransactionRepository>().dismissMerge(any()) }
+            delay(100)
+        }
+
+    @Test
+    fun `ACTION_MERGE handles missing SMS details gracefully`() =
+        runTest {
+            val childTxn =
+                io.pm.finlight.Transaction(
+                    id = 2,
+                    description = "Child",
+                    amount = 100.0,
+                    transactionType = TransactionType.EXPENSE,
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    originalDescription = "Child",
+                    sourceSmsId = 5,
+                )
+            coEvery { anyConstructed<TransactionRepository>().getTransactionSync(2) } returns childTxn
+            coEvery { anyConstructed<SmsRepository>().getSmsDetailsById(5) } returns null
+
+            val intent =
+                Intent("ACTION_MERGE").apply {
+                    putExtra("parentTxnId", 1)
+                    putExtra("childTxnId", 2)
+                    putExtra("notificationId", 10002)
+                }
+
+            receiver.onReceive(context, intent)
+
+            coVerify(timeout = 2000) {
+                anyConstructed<MergeTransactionsUseCase>().invoke(1, 2, null, null)
+            }
+            delay(100)
+        }
 }

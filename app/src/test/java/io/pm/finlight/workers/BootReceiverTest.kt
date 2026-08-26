@@ -69,4 +69,17 @@ class BootReceiverTest : BaseViewModelTest() {
             // Assert
             coVerify(exactly = 0) { ReminderManager.rescheduleAllWork(any()) }
         }
+
+    @Test
+    fun `onReceive with null action does not call ReminderManager`() =
+        runTest {
+            // Arrange
+            val intent = Intent()
+
+            // Act
+            receiver.onReceive(context, intent)
+
+            // Assert
+            coVerify(exactly = 0) { ReminderManager.rescheduleAllWork(any()) }
+        }
 }

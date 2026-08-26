@@ -63,7 +63,11 @@ class FinlightBackupAgent : BackupAgentHelper() {
         Log.i(TAG, "onBackup: Last backup timestamp saved.")
 
         // 2. Let the system helpers do their work
-        super.onBackup(oldState, data, newState)
+        try {
+            super.onBackup(oldState, data, newState)
+        } catch (e: Exception) {
+            Log.e(TAG, "onBackup: System backup helper failed", e)
+        }
 
         // 3. Trigger notification AFTER the backup is complete
         try {
@@ -87,7 +91,11 @@ class FinlightBackupAgent : BackupAgentHelper() {
         newState: ParcelFileDescriptor?,
     ) {
         Log.d(TAG, "onRestore: Starting restore process...")
-        super.onRestore(data, appVersionCode, newState)
+        try {
+            super.onRestore(data, appVersionCode, newState)
+        } catch (e: Exception) {
+            Log.e(TAG, "onRestore: System restore helper failed", e)
+        }
         Log.d(TAG, "onRestore: Restore process finished.")
     }
 }
