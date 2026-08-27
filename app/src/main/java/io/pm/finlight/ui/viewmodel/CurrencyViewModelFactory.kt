@@ -8,6 +8,7 @@ import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.repository.TripRepository
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class CurrencyViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -22,6 +23,7 @@ class CurrencyViewModelFactory(private val application: Application) : ViewModel
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = DefaultDispatcherProvider(),
                 )
             val tripRepository = TripRepository(db.tripDao())
 

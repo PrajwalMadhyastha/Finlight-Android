@@ -14,11 +14,13 @@ class ReportsViewModelFactory(private val application: Application) : ViewModelP
         if (modelClass.isAssignableFrom(ReportsViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             val getMonthlyConsistencyDataUseCase =
                 GetMonthlyConsistencyDataUseCase(
                     settingsRepository = settingsRepository,
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionQueryDao = db.transactionQueryDao(),
+                    dispatcherProvider = dispatcherProvider,
                 )
             val transactionRepository =
                 TransactionRepository(
@@ -27,6 +29,7 @@ class ReportsViewModelFactory(private val application: Application) : ViewModelP
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = dispatcherProvider,
                 )
 
             @Suppress("UNCHECKED_CAST")
@@ -34,6 +37,7 @@ class ReportsViewModelFactory(private val application: Application) : ViewModelP
                 transactionRepository = transactionRepository,
                 categoryDao = db.categoryDao(),
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

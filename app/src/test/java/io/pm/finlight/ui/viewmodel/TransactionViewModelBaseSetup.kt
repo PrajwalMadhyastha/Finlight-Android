@@ -166,6 +166,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
                 smsParseTemplateDao = smsParseTemplateDao,
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
+                dispatcherProvider = io.pm.finlight.utils.TestDispatcherProvider(testDispatcher),
             )
     }
 }

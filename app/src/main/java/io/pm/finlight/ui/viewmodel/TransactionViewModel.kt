@@ -23,11 +23,12 @@ import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
 import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.HeuristicCategorizer
-import io.pm.finlight.utils.applyAliases
 import io.pm.finlight.utils.ShareImageGenerator
-import kotlinx.coroutines.Dispatchers
+import io.pm.finlight.utils.applyAliases
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -127,6 +128,7 @@ class TransactionViewModel(
             deletedSmsHashDao = db.deletedSmsHashDao(),
             db = db,
         ),
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : AndroidViewModel(application) {
     private val context = application
 
@@ -605,7 +607,7 @@ class TransactionViewModel(
         // Load merged account breakdown separately so it doesn't block the reimbursement flow.
         // This is a one-shot suspend call — the detail screen never stays open across an
         // unmerge (navigation pops back), so a Flow is unnecessary.
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatcherProvider.io) {
             _mergedTransactionBreakdown.value =
                 mergeTransactionsUseCase.getMergedTransactionBreakdown(transactionId)
         }
@@ -870,7 +872,7 @@ class TransactionViewModel(
 
             if (selectedTransactionsDetails.isNotEmpty()) {
                 val transactionsWithData =
-                    withContext(Dispatchers.IO) {
+                    withContext(dispatcherProvider.io) {
                         selectedTransactionsDetails.map { details ->
                             val tags = transactionRepository.getTagsForTransactionSimple(details.transaction.id)
                             ShareImageGenerator.TransactionSnapshotData(details = details, tags = tags)
@@ -927,7 +929,7 @@ class TransactionViewModel(
                         }
                     db.splitTransactionDao().insertAll(newSplits)
                 }
-                withContext(Dispatchers.Main) {
+                withContext(dispatcherProvider.main) {
                     onComplete()
                 }
             } catch (e: Exception) {
@@ -1210,7 +1212,7 @@ class TransactionViewModel(
     }
 
     suspend fun getOriginalSmsMessage(smsId: Long): SmsMessage? {
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatcherProvider.io) {
             smsRepository.getSmsDetailsById(smsId)
         }
     }
@@ -1419,7 +1421,7 @@ class TransactionViewModel(
     fun deleteTransactionImage(image: TransactionImage) {
         viewModelScope.launch {
             transactionRepository.deleteImage(image)
-            withContext(Dispatchers.IO) {
+            withContext(dispatcherProvider.io) {
                 try {
                     if (!File(image.imageUri).delete()) {
                         Log.w(TAG, "Failed to delete image file: ${image.imageUri}")
@@ -1440,7 +1442,7 @@ class TransactionViewModel(
     }
 
     private suspend fun saveImageToInternalStorage(sourceUri: Uri): String? {
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatcherProvider.io) {
             try {
                 val inputStream = context.contentResolver.openInputStream(sourceUri)
                 val filesDir = File(context.filesDir, "attachments")
@@ -1712,7 +1714,7 @@ class TransactionViewModel(
         tags: Set<Tag>,
         isForeign: Boolean,
     ): Boolean {
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatcherProvider.io) {
             try {
                 val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
@@ -1792,7 +1794,7 @@ class TransactionViewModel(
         potentialTxn: PotentialTransaction,
         source: String = "Auto-Captured",
     ): Boolean {
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatcherProvider.io) {
             try {
                 val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
@@ -2142,7 +2144,7 @@ class TransactionViewModel(
      * transaction is re-inserted as a fresh row.
      */
     fun unmergeTransaction(parentTxnId: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 mergeTransactionsUseCase.unmerge(parentTxnId)
             } catch (e: Exception) {

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class SplitTransactionViewModelFactory(
     private val application: Application,
@@ -19,6 +20,7 @@ class SplitTransactionViewModelFactory(
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = DefaultDispatcherProvider(),
                 )
             val categoryRepository = CategoryRepository(db.categoryDao())
             val splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())

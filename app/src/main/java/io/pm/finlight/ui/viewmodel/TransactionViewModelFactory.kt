@@ -25,6 +25,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                     deletedSmsHashDao = db.deletedSmsHashDao(),
                     db = db,
                 )
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             val transactionRepository =
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),
@@ -32,6 +33,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = dispatcherProvider,
                 )
 
             @Suppress("UNCHECKED_CAST")
@@ -51,6 +53,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                 smsParseTemplateDao = db.smsParseTemplateDao(),
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

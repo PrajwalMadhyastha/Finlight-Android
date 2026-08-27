@@ -17,11 +17,13 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
         if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             val getMonthlyConsistencyDataUseCase =
                 GetMonthlyConsistencyDataUseCase(
                     settingsRepository = settingsRepository,
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionQueryDao = db.transactionQueryDao(),
+                    dispatcherProvider = dispatcherProvider,
                 )
             val transactionRepository =
                 TransactionRepository(
@@ -30,6 +32,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = dispatcherProvider,
                 )
             val accountRepository = AccountRepository(db)
             val merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao())
@@ -55,6 +58,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                 recurringPatternDao = db.recurringPatternDao(),
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

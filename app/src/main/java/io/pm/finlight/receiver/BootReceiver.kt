@@ -4,9 +4,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
@@ -22,7 +22,8 @@ class BootReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             Log.d("BootReceiver", "Device boot completed. Delegating to ReminderManager to reschedule all work.")
             val pendingResult = goAsync()
-            CoroutineScope(Dispatchers.IO).launch {
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+            CoroutineScope(dispatcherProvider.io).launch {
                 try {
                     ReminderManager.rescheduleAllWork(context)
                 } finally {

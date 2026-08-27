@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.repository.TripRepository
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class TripDetailViewModelFactory(
     private val application: Application,
@@ -23,6 +24,7 @@ class TripDetailViewModelFactory(
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = DefaultDispatcherProvider(),
                 )
 
             @Suppress("UNCHECKED_CAST")

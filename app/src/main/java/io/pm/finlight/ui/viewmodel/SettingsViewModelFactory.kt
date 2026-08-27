@@ -14,6 +14,7 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class SettingsViewModelFactory(
     private val application: Application,
@@ -23,6 +24,7 @@ class SettingsViewModelFactory(
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
+            val dispatcherProvider = DefaultDispatcherProvider()
             val transactionRepository =
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),
@@ -30,6 +32,7 @@ class SettingsViewModelFactory(
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = dispatcherProvider,
                 )
             val merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
             val accountRepository = AccountRepository(db)
@@ -53,6 +56,7 @@ class SettingsViewModelFactory(
                 smsClassifier,
                 nerExtractor,
                 transactionRunner,
+                dispatchers = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

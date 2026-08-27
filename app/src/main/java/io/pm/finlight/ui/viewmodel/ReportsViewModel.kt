@@ -19,8 +19,9 @@ import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import java.util.Calendar
@@ -41,6 +42,7 @@ class ReportsViewModel(
     private val transactionRepository: ITransactionRepository,
     private val categoryDao: CategoryDao,
     private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     val allCategories: StateFlow<List<Category>>
 
@@ -176,7 +178,7 @@ class ReportsViewModel(
                 combinedFlow.collect { combinedYearlyData: List<CalendarDayStatus> ->
                     emit(combinedYearlyData)
                 }
-            }.flowOn(Dispatchers.Default)
+            }.flowOn(dispatcherProvider.default)
                 .stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(5000),
@@ -189,7 +191,7 @@ class ReportsViewModel(
                 val month = monthCal.get(Calendar.MONTH) + 1
                 val year = monthCal.get(Calendar.YEAR)
                 getMonthlyConsistencyDataUseCase(year, month)
-            }.flowOn(Dispatchers.Default)
+            }.flowOn(dispatcherProvider.default)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         val today = Calendar.getInstance()

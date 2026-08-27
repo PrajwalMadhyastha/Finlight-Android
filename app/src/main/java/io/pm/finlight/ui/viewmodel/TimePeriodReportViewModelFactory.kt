@@ -18,11 +18,13 @@ class TimePeriodReportViewModelFactory(
         if (modelClass.isAssignableFrom(TimePeriodReportViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             val getMonthlyConsistencyDataUseCase =
                 GetMonthlyConsistencyDataUseCase(
                     settingsRepository = settingsRepository,
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionQueryDao = db.transactionQueryDao(),
+                    dispatcherProvider = dispatcherProvider,
                 )
             val transactionRepository =
                 TransactionRepository(
@@ -31,6 +33,7 @@ class TimePeriodReportViewModelFactory(
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = dispatcherProvider,
                 )
 
             @Suppress("UNCHECKED_CAST")
@@ -42,6 +45,7 @@ class TimePeriodReportViewModelFactory(
                 timePeriod = timePeriod,
                 initialDateMillis = initialDateMillis,
                 showPreviousMonth = showPreviousMonth,
+                dispatcherProvider = dispatcherProvider,
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
             ) as T
         }

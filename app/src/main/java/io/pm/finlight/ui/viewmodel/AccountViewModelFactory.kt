@@ -7,6 +7,7 @@ import io.pm.finlight.AccountRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class AccountViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -20,6 +21,7 @@ class AccountViewModelFactory(private val application: Application) : ViewModelP
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = DefaultDispatcherProvider(),
                 )
             val accountRepository = AccountRepository(db)
 

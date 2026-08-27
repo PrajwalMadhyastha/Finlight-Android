@@ -202,4 +202,62 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
             // Day 15 is on/after firstTxDate
             assertEquals(SpendingStatus.NO_SPEND, day15?.status)
         }
+
+    @Test
+    fun `useCase works with DispatcherProvider constructor`() =
+        runTest(testDispatcher) {
+            val testDispatcherProvider = io.pm.finlight.utils.TestDispatcherProvider(testDispatcher)
+            val useCase =
+                GetMonthlyConsistencyDataUseCase(
+                    budgetSettingsRepository = budgetSettingsRepository,
+                    transactionAnalyticsDao = transactionAnalyticsDao,
+                    transactionQueryDao = transactionQueryDao,
+                    dispatcherProvider = testDispatcherProvider,
+                )
+
+            val year = 2025
+            val month = 9
+            val firstTxDate = getTimestamp(Calendar.SEPTEMBER, 1)
+
+            every { budgetSettingsRepository.getOverallBudgetForMonth(year, month) } returns flowOf(null)
+            every { transactionQueryDao.getFirstTransactionDate() } returns flowOf(firstTxDate)
+            every { transactionAnalyticsDao.getDailySpendingForDateRange(any(), any()) } returns flowOf(emptyList())
+
+            val results = useCase(year, month).first()
+            assertNotNull(results)
+            assertEquals(testDispatcherProvider, useCase.dispatcherProvider)
+        }
+
+    @Test
+    fun `useCase constructors with ISettingsRepository work properly`() =
+        runTest(testDispatcher) {
+            val mockSettingsRepo = mockk<io.pm.finlight.ISettingsRepository>()
+            val testDispatcherProvider = io.pm.finlight.utils.TestDispatcherProvider(testDispatcher)
+
+            val useCase1 =
+                GetMonthlyConsistencyDataUseCase(
+                    settingsRepository = mockSettingsRepo,
+                    transactionAnalyticsDao = transactionAnalyticsDao,
+                    transactionQueryDao = transactionQueryDao,
+                    dispatcherProvider = testDispatcherProvider,
+                )
+            assertEquals(testDispatcherProvider, useCase1.dispatcherProvider)
+
+            val useCase2 =
+                GetMonthlyConsistencyDataUseCase(
+                    settingsRepository = mockSettingsRepo,
+                    transactionAnalyticsDao = transactionAnalyticsDao,
+                    transactionQueryDao = transactionQueryDao,
+                    dispatcher = testDispatcher,
+                )
+            assertNotNull(useCase2.dispatcherProvider)
+
+            val defaultUseCase =
+                GetMonthlyConsistencyDataUseCase(
+                    budgetSettingsRepository = budgetSettingsRepository,
+                    transactionAnalyticsDao = transactionAnalyticsDao,
+                    transactionQueryDao = transactionQueryDao,
+                )
+            org.junit.Assert.assertTrue(defaultUseCase.dispatcherProvider is io.pm.finlight.utils.DefaultDispatcherProvider)
+        }
 }

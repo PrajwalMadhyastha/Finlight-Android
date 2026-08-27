@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.SystemTimeProvider
 
 class WhatIfViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
@@ -19,6 +20,7 @@ class WhatIfViewModelFactory(private val application: Application) : ViewModelPr
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = DefaultDispatcherProvider(),
                 )
 
             @Suppress("UNCHECKED_CAST")

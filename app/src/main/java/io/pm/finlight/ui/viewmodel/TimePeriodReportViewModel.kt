@@ -16,8 +16,9 @@ import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -44,11 +45,13 @@ class TimePeriodReportViewModel(
     private val timePeriod: TimePeriod,
     initialDateMillis: Long?,
     showPreviousMonth: Boolean,
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
     private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
         GetMonthlyConsistencyDataUseCase(
             settingsRepository = settingsRepository,
             transactionAnalyticsDao = transactionAnalyticsDao,
             transactionQueryDao = transactionQueryDao,
+            dispatcherProvider = dispatcherProvider,
         ),
 ) : ViewModel() {
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
@@ -59,6 +62,7 @@ class TimePeriodReportViewModel(
         timePeriod: TimePeriod,
         initialDateMillis: Long?,
         showPreviousMonth: Boolean,
+        dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
     ) : this(
         transactionQueryDao = transactionDao,
         transactionAnalyticsDao = transactionDao,
@@ -67,6 +71,7 @@ class TimePeriodReportViewModel(
         timePeriod = timePeriod,
         initialDateMillis = initialDateMillis,
         showPreviousMonth = showPreviousMonth,
+        dispatcherProvider = dispatcherProvider,
     )
 
     private val _selectedDate =
@@ -445,7 +450,7 @@ class TimePeriodReportViewModel(
                 combinedFlow.collect { combinedYearlyData: List<CalendarDayStatus> ->
                     emit(combinedYearlyData)
                 }
-            }.flowOn(Dispatchers.Default)
+            }.flowOn(dispatcherProvider.default)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val consistencyStats: StateFlow<ConsistencyStats> =

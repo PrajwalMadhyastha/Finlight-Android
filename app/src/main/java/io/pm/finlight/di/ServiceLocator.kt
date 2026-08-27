@@ -24,6 +24,8 @@ import io.pm.finlight.SecuritySettingsRepository
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsRuleSettingsRepository
 import io.pm.finlight.TravelSettingsRepository
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 
 /**
  * ServiceLocator provides centralized, decoupled dependency resolution for repositories
@@ -32,6 +34,9 @@ import io.pm.finlight.TravelSettingsRepository
  * Supports dependency overriding for testing.
  */
 object ServiceLocator {
+    @Volatile
+    private var dispatcherProvider: DispatcherProvider? = null
+
     @Volatile
     private var settingsRepository: ISettingsRepository? = null
 
@@ -64,6 +69,14 @@ object ServiceLocator {
 
     @Volatile
     private var featureSettingsRepository: IFeatureSettingsRepository? = null
+
+    fun provideDispatcherProvider(context: Context? = null): DispatcherProvider {
+        return dispatcherProvider ?: synchronized(this) {
+            dispatcherProvider ?: DefaultDispatcherProvider().also {
+                dispatcherProvider = it
+            }
+        }
+    }
 
     fun provideAppConfigRepository(context: Context): IAppConfigRepository {
         return appConfigRepository ?: synchronized(this) {
@@ -220,7 +233,13 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setDispatcherProvider(provider: DispatcherProvider?) {
+        dispatcherProvider = provider
+    }
+
+    @VisibleForTesting
     fun reset() {
+        dispatcherProvider = null
         settingsRepository = null
         appConfigRepository = null
         dashboardSettingsRepository = null

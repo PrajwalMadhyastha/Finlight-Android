@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class LinkTransactionViewModelFactory(
     private val application: Application,
@@ -20,6 +21,7 @@ class LinkTransactionViewModelFactory(
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = DefaultDispatcherProvider(),
                 )
             val recurringTransactionDao = db.recurringTransactionDao()
             @Suppress("UNCHECKED_CAST")

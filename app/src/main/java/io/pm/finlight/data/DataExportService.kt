@@ -13,8 +13,8 @@ import android.util.Log
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.AppDataBackup
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.FormatUtils
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -39,7 +39,8 @@ object DataExportService {
         }
 
     suspend fun createBackupSnapshot(context: Context): Boolean {
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             try {
                 val jsonString = exportToJsonString(context) ?: return@withContext false
 
@@ -64,7 +65,8 @@ object DataExportService {
     }
 
     suspend fun restoreFromBackupSnapshot(context: Context): Boolean {
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
             if (!snapshotFile.exists()) {
                 Log.d("DataExportService", "No backup snapshot found. Proceeding with normal startup.")
@@ -105,7 +107,8 @@ object DataExportService {
     }
 
     suspend fun exportToJsonString(context: Context): String? {
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             try {
                 val db = AppDatabase.getInstance(context)
 
@@ -146,7 +149,8 @@ object DataExportService {
         context: Context,
         uri: Uri,
     ): Boolean {
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             try {
                 val jsonString =
                     context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -170,7 +174,8 @@ object DataExportService {
         context: Context,
         jsonString: String,
     ): Boolean {
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             try {
                 val backupData = json.decodeFromString<AppDataBackup>(jsonString)
                 val db = AppDatabase.getInstance(context)
@@ -227,7 +232,8 @@ object DataExportService {
     }
 
     suspend fun exportToCsvString(context: Context): String? {
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             try {
                 val db = AppDatabase.getInstance(context)
                 val transactionQueryDao = db.transactionQueryDao()

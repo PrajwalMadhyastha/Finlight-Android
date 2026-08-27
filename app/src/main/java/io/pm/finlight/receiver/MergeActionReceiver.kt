@@ -8,7 +8,6 @@ import io.pm.finlight.SmsRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class MergeActionReceiver : BroadcastReceiver() {
@@ -22,6 +21,7 @@ class MergeActionReceiver : BroadcastReceiver() {
         val notificationId = childTxnId + 10000
 
         val db = AppDatabase.getInstance(context)
+        val dispatcherProvider = io.pm.finlight.di.ServiceLocator.provideDispatcherProvider(context)
         val transactionRepository =
             TransactionRepository(
                 transactionWriteDao = db.transactionWriteDao(),
@@ -29,6 +29,7 @@ class MergeActionReceiver : BroadcastReceiver() {
                 transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 transactionReimbursementDao = db.transactionReimbursementDao(),
                 db = db,
+                dispatcherProvider = dispatcherProvider,
             )
         val mergeTransactionsUseCase =
             io.pm.finlight.domain.usecase.MergeTransactionsUseCase(
@@ -41,7 +42,7 @@ class MergeActionReceiver : BroadcastReceiver() {
             )
 
         val pendingResult = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(dispatcherProvider.io).launch {
             try {
                 if (action == "ACTION_MERGE" && parentTxnId != -1 && childTxnId != -1) {
                     val childTxn = transactionRepository.getTransactionSync(childTxnId)
