@@ -12,8 +12,8 @@ import io.pm.finlight.DailyReportWorker
 import io.pm.finlight.MonthlySummaryWorker
 import io.pm.finlight.RecurringPatternWorker
 import io.pm.finlight.RecurringTransactionWorker
-import io.pm.finlight.SettingsRepository
 import io.pm.finlight.WeeklySummaryWorker
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.workers.SmsCatchupWorker
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
@@ -31,7 +31,7 @@ object ReminderManager {
 
     suspend fun rescheduleAllWork(context: Context) {
         Log.d("ReminderManager", "Rescheduling all background work...")
-        val settings = SettingsRepository(context)
+        val settings = ServiceLocator.provideSettingsRepository(context)
 
         val dailyReportEnabled = settings.getDailyReportEnabled().first()
         val weeklySummaryEnabled = settings.getWeeklySummaryEnabled().first()
@@ -150,7 +150,7 @@ object ReminderManager {
     }
 
     suspend fun scheduleDailyReport(context: Context) {
-        val settings = SettingsRepository(context)
+        val settings = ServiceLocator.provideSettingsRepository(context)
         val (hour, minute) = settings.getDailyReportTime().first()
 
         val now = Calendar.getInstance()
@@ -184,7 +184,7 @@ object ReminderManager {
     }
 
     suspend fun scheduleWeeklySummary(context: Context) {
-        val settings = SettingsRepository(context)
+        val settings = ServiceLocator.provideSettingsRepository(context)
         val (dayOfWeek, hour, minute) = settings.getWeeklyReportTime().first()
 
         val now = Calendar.getInstance()
@@ -223,7 +223,7 @@ object ReminderManager {
     }
 
     suspend fun scheduleMonthlySummary(context: Context) {
-        val settings = SettingsRepository(context)
+        val settings = ServiceLocator.provideSettingsRepository(context)
         val (dayOfMonth, hour, minute) = settings.getMonthlyReportTime().first()
 
         val now = Calendar.getInstance()

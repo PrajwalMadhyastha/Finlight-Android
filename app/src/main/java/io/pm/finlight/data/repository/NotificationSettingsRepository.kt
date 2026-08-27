@@ -20,7 +20,7 @@ import java.util.Locale
 
 class NotificationSettingsRepository(
     private val dataStore: DataStore<Preferences>,
-) {
+) : INotificationSettingsRepository {
     constructor(context: Context) : this(
         context.financeSettingsDataStore,
     )
@@ -42,13 +42,13 @@ class NotificationSettingsRepository(
         private const val KEY_LAST_MONTH_SUMMARY_DISMISSED_PREFIX = "last_month_summary_dismissed_"
     }
 
-    suspend fun saveDailyReportEnabled(isEnabled: Boolean) {
+    override suspend fun saveDailyReportEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_DAILY_REPORT_ENABLED] = isEnabled
         }
     }
 
-    fun getDailyReportEnabled(): Flow<Boolean> {
+    override fun getDailyReportEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -63,7 +63,7 @@ class NotificationSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveDailyReportTime(
+    override suspend fun saveDailyReportTime(
         hour: Int,
         minute: Int,
     ) {
@@ -73,7 +73,7 @@ class NotificationSettingsRepository(
         }
     }
 
-    fun getDailyReportTime(): Flow<Pair<Int, Int>> {
+    override fun getDailyReportTime(): Flow<Pair<Int, Int>> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -91,13 +91,13 @@ class NotificationSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveWeeklySummaryEnabled(isEnabled: Boolean) {
+    override suspend fun saveWeeklySummaryEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_WEEKLY_SUMMARY_ENABLED] = isEnabled
         }
     }
 
-    fun getWeeklySummaryEnabled(): Flow<Boolean> {
+    override fun getWeeklySummaryEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -112,7 +112,7 @@ class NotificationSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveWeeklyReportTime(
+    override suspend fun saveWeeklyReportTime(
         dayOfWeek: Int,
         hour: Int,
         minute: Int,
@@ -124,7 +124,7 @@ class NotificationSettingsRepository(
         }
     }
 
-    fun getWeeklyReportTime(): Flow<Triple<Int, Int, Int>> {
+    override fun getWeeklyReportTime(): Flow<Triple<Int, Int, Int>> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -143,13 +143,13 @@ class NotificationSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveMonthlySummaryEnabled(isEnabled: Boolean) {
+    override suspend fun saveMonthlySummaryEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_MONTHLY_SUMMARY_ENABLED] = isEnabled
         }
     }
 
-    fun getMonthlySummaryEnabled(): Flow<Boolean> {
+    override fun getMonthlySummaryEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -164,7 +164,7 @@ class NotificationSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveMonthlyReportTime(
+    override suspend fun saveMonthlyReportTime(
         dayOfMonth: Int,
         hour: Int,
         minute: Int,
@@ -176,7 +176,7 @@ class NotificationSettingsRepository(
         }
     }
 
-    fun getMonthlyReportTime(): Flow<Triple<Int, Int, Int>> {
+    override fun getMonthlyReportTime(): Flow<Triple<Int, Int, Int>> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -195,13 +195,13 @@ class NotificationSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveAutoCaptureNotificationEnabled(isEnabled: Boolean) {
+    override suspend fun saveAutoCaptureNotificationEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_AUTOCAPTURE_NOTIFICATION_ENABLED] = isEnabled
         }
     }
 
-    fun getAutoCaptureNotificationEnabled(): Flow<Boolean> {
+    override fun getAutoCaptureNotificationEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -216,13 +216,13 @@ class NotificationSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveUnknownTransactionPopupEnabled(isEnabled: Boolean) {
+    override suspend fun saveUnknownTransactionPopupEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED] = isEnabled
         }
     }
 
-    fun getUnknownTransactionPopupEnabled(): Flow<Boolean> {
+    override fun getUnknownTransactionPopupEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -237,7 +237,7 @@ class NotificationSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun setLastMonthSummaryDismissed() {
+    override suspend fun setLastMonthSummaryDismissed() {
         val monthKey = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(Date())
         val prefKey = booleanPreferencesKey(KEY_LAST_MONTH_SUMMARY_DISMISSED_PREFIX + monthKey)
         dataStore.edit { preferences ->
@@ -245,7 +245,7 @@ class NotificationSettingsRepository(
         }
     }
 
-    fun hasLastMonthSummaryBeenDismissed(): Flow<Boolean> {
+    override fun hasLastMonthSummaryBeenDismissed(): Flow<Boolean> {
         val monthKey = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(Date())
         val prefKey = booleanPreferencesKey(KEY_LAST_MONTH_SUMMARY_DISMISSED_PREFIX + monthKey)
         return dataStore.data

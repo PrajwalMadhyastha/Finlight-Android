@@ -24,7 +24,7 @@ class TransactionRepository(
     private val transactionAnalyticsDao: TransactionAnalyticsDao,
     private val transactionReimbursementDao: TransactionReimbursementDao,
     private val db: AppDatabase,
-) {
+) : ITransactionRepository {
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
         transactionDao: TransactionDao,
@@ -38,24 +38,24 @@ class TransactionRepository(
     )
 
     // --- NEW: Function for Spending Velocity feature ---
-    suspend fun getTotalExpensesSince(startDate: Long): Double {
+    override suspend fun getTotalExpensesSince(startDate: Long): Double {
         return transactionAnalyticsDao.getTotalExpensesSince(startDate) ?: 0.0
     }
 
     // --- NEW: Function to search for merchant predictions ---
-    fun searchMerchants(query: String): Flow<List<MerchantPrediction>> {
+    override fun searchMerchants(query: String): Flow<List<MerchantPrediction>> {
         return transactionQueryDao.searchMerchants(query)
     }
 
-    suspend fun deleteByIds(transactionIds: List<Int>) {
+    override suspend fun deleteByIds(transactionIds: List<Int>) {
         transactionWriteDao.deleteByIds(transactionIds)
     }
 
-    fun getTransactionWithSplits(transactionId: Int): Flow<TransactionWithSplits?> {
+    override fun getTransactionWithSplits(transactionId: Int): Flow<TransactionWithSplits?> {
         return transactionQueryDao.getTransactionWithSplits(transactionId)
     }
 
-    val allTransactions: Flow<List<TransactionDetails>> =
+    override val allTransactions: Flow<List<TransactionDetails>> =
         transactionQueryDao.getAllTransactions()
             .onEach { transactions ->
                 Log.d(
@@ -64,25 +64,25 @@ class TransactionRepository(
                 )
             }
 
-    fun getFirstTransactionDate(): Flow<Long?> {
+    override fun getFirstTransactionDate(): Flow<Long?> {
         return transactionQueryDao.getFirstTransactionDate()
     }
 
-    fun getFinancialSummaryForRangeFlow(
+    override fun getFinancialSummaryForRangeFlow(
         startDate: Long,
         endDate: Long,
     ): Flow<FinancialSummary?> {
         return transactionAnalyticsDao.getFinancialSummaryForRangeFlow(startDate, endDate)
     }
 
-    fun getTopSpendingCategoriesForRangeFlow(
+    override fun getTopSpendingCategoriesForRangeFlow(
         startDate: Long,
         endDate: Long,
     ): Flow<CategorySpending?> {
         return transactionAnalyticsDao.getTopSpendingCategoriesForRangeFlow(startDate, endDate)
     }
 
-    fun getIncomeTransactionsForRange(
+    override fun getIncomeTransactionsForRange(
         startDate: Long,
         endDate: Long,
         keyword: String?,
@@ -92,7 +92,7 @@ class TransactionRepository(
         return transactionQueryDao.getIncomeTransactionsForRange(startDate, endDate, keyword, accountId, categoryId)
     }
 
-    fun getIncomeByCategoryForMonth(
+    override fun getIncomeByCategoryForMonth(
         startDate: Long,
         endDate: Long,
         keyword: String?,
@@ -102,7 +102,7 @@ class TransactionRepository(
         return transactionAnalyticsDao.getIncomeByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId)
     }
 
-    fun getSpendingByMerchantForMonth(
+    override fun getSpendingByMerchantForMonth(
         startDate: Long,
         endDate: Long,
         keyword: String?,
@@ -113,7 +113,7 @@ class TransactionRepository(
         return transactionAnalyticsDao.getSpendingByMerchantForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
     }
 
-    suspend fun addImageToTransaction(
+    override suspend fun addImageToTransaction(
         transactionId: Int,
         imageUri: String,
     ) {
@@ -121,81 +121,81 @@ class TransactionRepository(
         transactionWriteDao.insertImage(transactionImage)
     }
 
-    suspend fun deleteImage(transactionImage: TransactionImage) {
+    override suspend fun deleteImage(transactionImage: TransactionImage) {
         transactionWriteDao.deleteImage(transactionImage)
     }
 
-    fun getImagesForTransaction(transactionId: Int): Flow<List<TransactionImage>> {
+    override fun getImagesForTransaction(transactionId: Int): Flow<List<TransactionImage>> {
         return transactionQueryDao.getImagesForTransaction(transactionId)
     }
 
-    suspend fun updateDescription(
+    override suspend fun updateDescription(
         id: Int,
         description: String,
     ) = transactionWriteDao.updateDescription(id, description)
 
-    suspend fun updateAmount(
+    override suspend fun updateAmount(
         id: Int,
         amount: Double,
     ) = transactionWriteDao.updateAmount(id, amount)
 
-    suspend fun updateManualAmountEdit(
+    override suspend fun updateManualAmountEdit(
         id: Int,
         amount: Double,
     ) = transactionWriteDao.updateManualAmountEdit(id, amount)
 
-    suspend fun updateNotes(
+    override suspend fun updateNotes(
         id: Int,
         notes: String?,
     ) = transactionWriteDao.updateNotes(id, notes)
 
-    suspend fun updateCategoryId(
+    override suspend fun updateCategoryId(
         id: Int,
         categoryId: Int?,
     ) = transactionWriteDao.updateCategoryId(id, categoryId)
 
-    suspend fun updateAccountId(
+    override suspend fun updateAccountId(
         id: Int,
         accountId: Int,
     ) = transactionWriteDao.updateAccountId(id, accountId)
 
-    suspend fun updateDate(
+    override suspend fun updateDate(
         id: Int,
         date: Long,
     ) = transactionWriteDao.updateDate(id, date)
 
-    suspend fun updateExclusionStatus(
+    override suspend fun updateExclusionStatus(
         id: Int,
         isExcluded: Boolean,
     ) = transactionWriteDao.updateExclusionStatus(id, isExcluded)
 
     // --- NEW: Function to update transaction type ---
-    suspend fun updateTransactionType(
+    override suspend fun updateTransactionType(
         id: Int,
         transactionType: TransactionType,
     ) {
         transactionWriteDao.updateTransactionType(id, transactionType)
     }
 
-    suspend fun clearReviewFlag(id: Int) {
+    override suspend fun clearReviewFlag(id: Int) {
         transactionWriteDao.clearReviewFlag(id)
     }
 
-    fun getTransactionDetailsById(id: Int): Flow<TransactionDetails?> {
+    override fun getTransactionDetailsById(id: Int): Flow<TransactionDetails?> {
         return transactionQueryDao.getTransactionDetailsById(id)
     }
 
-    val recentTransactions: Flow<List<TransactionDetails>> = transactionQueryDao.getRecentTransactionDetails()
+    override val recentTransactions: Flow<List<TransactionDetails>> = transactionQueryDao.getRecentTransactionDetails()
 
-    fun getAllSmsHashes(): Flow<List<String>> {
+    override fun getAllSmsHashes(): Flow<List<String>> {
         return transactionQueryDao.getAllSmsHashes()
     }
 
-    fun getTransactionsForAccountDetails(accountId: Int): Flow<List<TransactionDetails>> {
+    override fun getTransactionsForAccountDetails(accountId: Int): Flow<List<TransactionDetails>> {
         return transactionQueryDao.getTransactionsForAccountDetails(accountId)
     }
 
-    fun getTransactionDetailsForRange(
+    override fun getTransactionDetailsForRange(
         startDate: Long,
         endDate: Long,
         keyword: String?,
@@ -205,26 +205,26 @@ class TransactionRepository(
         return transactionQueryDao.getTransactionDetailsForRange(startDate, endDate, keyword, accountId, categoryId)
     }
 
-    fun getAllTransactionsForRange(
+    override fun getAllTransactionsForRange(
         startDate: Long,
         endDate: Long,
     ): Flow<List<Transaction>> {
         return transactionQueryDao.getAllTransactionsForRange(startDate, endDate)
     }
 
-    fun getTransactionById(id: Int): Flow<Transaction?> {
+    override fun getTransactionById(id: Int): Flow<Transaction?> {
         return transactionQueryDao.getTransactionById(id)
     }
 
-    suspend fun getTransactionSync(id: Int): Transaction? {
+    override suspend fun getTransactionSync(id: Int): Transaction? {
         return transactionQueryDao.getTransactionByIdSync(id)
     }
 
-    fun getTransactionsForAccount(accountId: Int): Flow<List<Transaction>> {
+    override fun getTransactionsForAccount(accountId: Int): Flow<List<Transaction>> {
         return transactionQueryDao.getTransactionsForAccount(accountId)
     }
 
-    fun getSpendingByCategoryForMonth(
+    override fun getSpendingByCategoryForMonth(
         startDate: Long,
         endDate: Long,
         keyword: String?,
@@ -235,23 +235,23 @@ class TransactionRepository(
         return transactionAnalyticsDao.getSpendingByCategoryForMonth(startDate, endDate, keyword, accountId, categoryId, transactionType)
     }
 
-    fun getMonthlyTrends(startDate: Long): Flow<List<MonthlyTrend>> {
+    override fun getMonthlyTrends(startDate: Long): Flow<List<MonthlyTrend>> {
         return transactionAnalyticsDao.getMonthlyTrends(startDate)
     }
 
-    suspend fun countTransactionsForCategory(categoryId: Int): Int {
+    override suspend fun countTransactionsForCategory(categoryId: Int): Int {
         return transactionQueryDao.countTransactionsForCategory(categoryId)
     }
 
-    fun getTagsForTransaction(transactionId: Int): Flow<List<Tag>> {
+    override fun getTagsForTransaction(transactionId: Int): Flow<List<Tag>> {
         return transactionQueryDao.getTagsForTransaction(transactionId)
     }
 
-    suspend fun getTagsForTransactionSimple(transactionId: Int): List<Tag> {
+    override suspend fun getTagsForTransactionSimple(transactionId: Int): List<Tag> {
         return transactionQueryDao.getTagsForTransactionSimple(transactionId)
     }
 
-    suspend fun updateTagsForTransaction(
+    override suspend fun updateTagsForTransaction(
         transactionId: Int,
         tags: Set<Tag>,
     ) {
@@ -265,7 +265,7 @@ class TransactionRepository(
         }
     }
 
-    suspend fun insertTransactionWithTags(
+    override suspend fun insertTransactionWithTags(
         transaction: Transaction,
         tags: Set<Tag>,
     ): Long {
@@ -280,7 +280,7 @@ class TransactionRepository(
         return transactionId
     }
 
-    suspend fun updateTransactionWithTags(
+    override suspend fun updateTransactionWithTags(
         transaction: Transaction,
         tags: Set<Tag>,
     ) {
@@ -295,7 +295,7 @@ class TransactionRepository(
         }
     }
 
-    suspend fun insertTransactionWithTagsAndImages(
+    override suspend fun insertTransactionWithTagsAndImages(
         transaction: Transaction,
         tags: Set<Tag>,
         imagePaths: List<String>,
@@ -319,22 +319,22 @@ class TransactionRepository(
         return newTransactionId
     }
 
-    suspend fun delete(transaction: Transaction) {
+    override suspend fun delete(transaction: Transaction) {
         transactionWriteDao.delete(transaction)
     }
 
-    suspend fun setSmsHash(
+    override suspend fun setSmsHash(
         transactionId: Int,
         smsHash: String,
     ) {
         transactionWriteDao.setSmsHash(transactionId, smsHash)
     }
 
-    fun getTransactionCountForMerchant(description: String): Flow<Int> {
+    override fun getTransactionCountForMerchant(description: String): Flow<Int> {
         return transactionQueryDao.getTransactionCountForMerchant(description)
     }
 
-    suspend fun findSimilarTransactions(
+    override suspend fun findSimilarTransactions(
         description: String,
         excludeId: Int,
     ): List<Transaction> {
@@ -342,27 +342,27 @@ class TransactionRepository(
     }
 
     /** Returns all distinct [Transaction.originalDescription] values for cross-account nudge scanning. */
-    suspend fun getDistinctOriginalDescriptions(): List<String> = transactionQueryDao.getDistinctOriginalDescriptions()
+    override suspend fun getDistinctOriginalDescriptions(): List<String> = transactionQueryDao.getDistinctOriginalDescriptions()
 
     /** Returns IDs of all transactions sharing the given [originalDesc] (case-insensitive). */
-    suspend fun getTransactionIdsByOriginalDescription(originalDesc: String): List<Int> =
+    override suspend fun getTransactionIdsByOriginalDescription(originalDesc: String): List<Int> =
         transactionQueryDao.getTransactionIdsByOriginalDescription(originalDesc)
 
-    suspend fun updateCategoryForIds(
+    override suspend fun updateCategoryForIds(
         ids: List<Int>,
         categoryId: Int,
     ) {
         transactionWriteDao.updateCategoryForIds(ids, categoryId)
     }
 
-    suspend fun updateDescriptionForIds(
+    override suspend fun updateDescriptionForIds(
         ids: List<Int>,
         newDescription: String,
     ) {
         transactionWriteDao.updateDescriptionForIds(ids, newDescription)
     }
 
-    fun getDailySpendingForDateRange(
+    override fun getDailySpendingForDateRange(
         startDate: Long,
         endDate: Long,
     ): Flow<List<DailyTotal>> {
@@ -370,7 +370,7 @@ class TransactionRepository(
     }
 
     // --- NEW: Functions for retrospective tagging ---
-    suspend fun addTagForDateRange(
+    override suspend fun addTagForDateRange(
         tagId: Int,
         startDate: Long,
         endDate: Long,
@@ -378,7 +378,7 @@ class TransactionRepository(
         transactionWriteDao.addTagForDateRange(tagId, startDate, endDate)
     }
 
-    suspend fun removeTagForDateRange(
+    override suspend fun removeTagForDateRange(
         tagId: Int,
         startDate: Long,
         endDate: Long,
@@ -387,29 +387,29 @@ class TransactionRepository(
     }
 
     // --- NEW: Get all transactions for a specific tag ---
-    fun getTransactionsByTagId(tagId: Int): Flow<List<TransactionDetails>> {
+    override fun getTransactionsByTagId(tagId: Int): Flow<List<TransactionDetails>> {
         return transactionQueryDao.getTransactionsByTagId(tagId)
     }
 
     // --- NEW: Expose the function to remove all tags ---
-    suspend fun removeAllTransactionsForTag(tagId: Int) {
+    override suspend fun removeAllTransactionsForTag(tagId: Int) {
         transactionWriteDao.removeAllTransactionsForTag(tagId)
     }
 
     // --- NEW: Expose the quick fill query ---
-    fun getRecentManualTransactions(limit: Int): Flow<List<TransactionDetails>> {
+    override fun getRecentManualTransactions(limit: Int): Flow<List<TransactionDetails>> {
         return transactionQueryDao.getRecentManualTransactions(limit)
     }
 
     // --- NEW: Reimbursement / Offset Feature ---
 
-    fun getReimbursementsForExpense(expenseId: Int): Flow<List<TransactionDetails>> =
+    override fun getReimbursementsForExpense(expenseId: Int): Flow<List<TransactionDetails>> =
         transactionReimbursementDao.getReimbursementsForExpense(expenseId)
 
-    fun getCandidateReimbursements(excludeExpenseId: Int): Flow<List<TransactionDetails>> =
+    override fun getCandidateReimbursements(excludeExpenseId: Int): Flow<List<TransactionDetails>> =
         transactionReimbursementDao.getCandidateReimbursements(excludeExpenseId)
 
-    fun getLinkedExpenseForReimbursement(incomeId: Int): Flow<TransactionDetails?> =
+    override fun getLinkedExpenseForReimbursement(incomeId: Int): Flow<TransactionDetails?> =
         transactionReimbursementDao.getLinkedExpenseForReimbursement(incomeId)
 
     /**
@@ -418,7 +418,7 @@ class TransactionRepository(
      * - Deducts the income amount from the expense, so budget/spending totals
      *   automatically reflect the net cost.
      */
-    suspend fun linkReimbursement(
+    override suspend fun linkReimbursement(
         incomeId: Int,
         expenseId: Int
     ) {
@@ -434,7 +434,7 @@ class TransactionRepository(
      * - Clears parentReimbursementId and removes the excluded flag.
      * - Adds the income amount back onto the parent expense.
      */
-    suspend fun unlinkReimbursement(incomeId: Int) {
+    override suspend fun unlinkReimbursement(incomeId: Int) {
         val incomeTxn = transactionQueryDao.getTransactionByIdSync(incomeId) ?: return
         val parentId = incomeTxn.parentReimbursementId ?: return
         val expenseTxn = transactionQueryDao.getTransactionByIdSync(parentId) ?: return
@@ -444,7 +444,7 @@ class TransactionRepository(
     }
 
     // --- NEW: Smart Transaction Merge ---
-    suspend fun findRecentTransactionForMerge(
+    override suspend fun findRecentTransactionForMerge(
         merchant: String,
         accountId: Int,
         transactionType: TransactionType,
@@ -454,7 +454,7 @@ class TransactionRepository(
         return transactionQueryDao.findRecentTransactionForMerge(merchant, accountId, transactionType, timeWindowStart, newTxnId)
     }
 
-    suspend fun dismissMerge(id: Int) {
+    override suspend fun dismissMerge(id: Int) {
         transactionWriteDao.updateMergeDismissed(id, true)
     }
 
@@ -466,7 +466,7 @@ class TransactionRepository(
      * 1. Strict Time (<= 5 mins): Matches exactly on Amount.
      * 2. Loose Time (<= 6 hours): Matches on Amount AND Account Alias/Name text.
      */
-    suspend fun detectAndLinkSelfTransfer(newTxn: Transaction) {
+    override suspend fun detectAndLinkSelfTransfer(newTxn: Transaction) {
         if (newTxn.sourceSmsId == null || newTxn.linkedTransferId != null || newTxn.isExcluded || newTxn.isSplit) return
 
         // 6-hour window

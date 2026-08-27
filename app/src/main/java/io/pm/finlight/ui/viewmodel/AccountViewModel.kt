@@ -15,11 +15,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.Account
-import io.pm.finlight.AccountRepository
 import io.pm.finlight.AccountWithBalance
-import io.pm.finlight.SettingsRepository
+import io.pm.finlight.IAccountRepository
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TransactionDetails
-import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionType
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -31,9 +31,9 @@ import kotlin.math.roundToLong
 
 class AccountViewModel(
     application: Application,
-    private val repository: AccountRepository,
-    private val transactionRepository: TransactionRepository,
-    private val settingsRepository: SettingsRepository,
+    private val repository: IAccountRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val settingsRepository: ISettingsRepository,
 ) : AndroidViewModel(application) {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()

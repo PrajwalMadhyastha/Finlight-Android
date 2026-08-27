@@ -1,9 +1,9 @@
 package io.pm.finlight.domain.usecase
 
-import io.pm.finlight.BudgetSettingsRepository
 import io.pm.finlight.CalendarDayStatus
 import io.pm.finlight.DailyTotal
-import io.pm.finlight.SettingsRepository
+import io.pm.finlight.IBudgetSettingsRepository
+import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.SpendingStatus
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.db.dao.TransactionQueryDao
@@ -18,7 +18,7 @@ import kotlin.math.roundToLong
 
 /**
  * UseCase to generate the consistency calendar/heatmap data for a single month.
- * Combines monthly budget settings from [BudgetSettingsRepository] with
+ * Combines monthly budget settings from [IBudgetSettingsRepository] with
  * daily spending totals from [TransactionAnalyticsDao] and first transaction date from [TransactionQueryDao].
  */
 class GetMonthlyConsistencyDataUseCase(
@@ -28,7 +28,7 @@ class GetMonthlyConsistencyDataUseCase(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     constructor(
-        budgetSettingsRepository: BudgetSettingsRepository,
+        budgetSettingsRepository: IBudgetSettingsRepository,
         transactionAnalyticsDao: TransactionAnalyticsDao,
         transactionQueryDao: TransactionQueryDao,
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -40,7 +40,7 @@ class GetMonthlyConsistencyDataUseCase(
     )
 
     constructor(
-        settingsRepository: SettingsRepository,
+        settingsRepository: ISettingsRepository,
         transactionAnalyticsDao: TransactionAnalyticsDao,
         transactionQueryDao: TransactionQueryDao,
         dispatcher: CoroutineDispatcher = Dispatchers.Default,

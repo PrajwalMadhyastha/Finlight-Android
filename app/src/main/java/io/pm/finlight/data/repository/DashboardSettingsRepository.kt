@@ -18,7 +18,7 @@ import java.io.IOException
 class DashboardSettingsRepository(
     private val dataStore: DataStore<Preferences>,
     private val gson: Gson = Gson(),
-) {
+) : IDashboardSettingsRepository {
     constructor(context: Context) : this(
         dataStore = context.financeSettingsDataStore,
         gson = Gson(),
@@ -29,7 +29,7 @@ class DashboardSettingsRepository(
         private val KEY_DASHBOARD_VISIBLE_CARDS = stringPreferencesKey("dashboard_visible_cards")
     }
 
-    suspend fun saveDashboardLayout(
+    override suspend fun saveDashboardLayout(
         order: List<DashboardCardType>,
         visible: Set<DashboardCardType>,
     ) {
@@ -41,7 +41,7 @@ class DashboardSettingsRepository(
         }
     }
 
-    fun getDashboardCardOrder(): Flow<List<DashboardCardType>> {
+    override fun getDashboardCardOrder(): Flow<List<DashboardCardType>> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -56,7 +56,7 @@ class DashboardSettingsRepository(
             .distinctUntilChanged()
     }
 
-    fun getDashboardVisibleCards(): Flow<Set<DashboardCardType>> {
+    override fun getDashboardVisibleCards(): Flow<Set<DashboardCardType>> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {

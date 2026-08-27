@@ -16,7 +16,7 @@ import java.io.IOException
 
 class AppConfigRepository(
     private val dataStore: DataStore<Preferences>,
-) {
+) : IAppConfigRepository {
     constructor(context: Context) : this(
         context.financeSettingsDataStore,
     )
@@ -28,13 +28,13 @@ class AppConfigRepository(
         private val KEY_HOME_CURRENCY = stringPreferencesKey("home_currency_code")
     }
 
-    suspend fun saveUserName(name: String) {
+    override suspend fun saveUserName(name: String) {
         dataStore.edit { preferences ->
             preferences[KEY_USER_NAME] = name
         }
     }
 
-    fun getUserName(): Flow<String> {
+    override fun getUserName(): Flow<String> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -49,7 +49,7 @@ class AppConfigRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveProfilePictureUri(uriString: String?) {
+    override suspend fun saveProfilePictureUri(uriString: String?) {
         dataStore.edit { preferences ->
             if (uriString != null) {
                 preferences[KEY_PROFILE_PICTURE_URI] = uriString
@@ -59,7 +59,7 @@ class AppConfigRepository(
         }
     }
 
-    fun getProfilePictureUri(): Flow<String?> {
+    override fun getProfilePictureUri(): Flow<String?> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -74,13 +74,13 @@ class AppConfigRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveSelectedTheme(theme: AppTheme) {
+    override suspend fun saveSelectedTheme(theme: AppTheme) {
         dataStore.edit { preferences ->
             preferences[KEY_SELECTED_THEME] = theme.key
         }
     }
 
-    fun getSelectedTheme(): Flow<AppTheme> {
+    override fun getSelectedTheme(): Flow<AppTheme> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -96,13 +96,13 @@ class AppConfigRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveHomeCurrency(currencyCode: String) {
+    override suspend fun saveHomeCurrency(currencyCode: String) {
         dataStore.edit { preferences ->
             preferences[KEY_HOME_CURRENCY] = currencyCode
         }
     }
 
-    fun getHomeCurrency(): Flow<String> {
+    override fun getHomeCurrency(): Flow<String> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {

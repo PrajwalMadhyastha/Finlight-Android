@@ -6,12 +6,12 @@ import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.AccountRepository
 import io.pm.finlight.CategoryRepository
 import io.pm.finlight.MerchantMappingRepository
-import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.RoomTransactionRunner
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 
@@ -22,7 +22,7 @@ class SettingsViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
-            val settingsRepository = SettingsRepository(application)
+            val settingsRepository = ServiceLocator.provideSettingsRepository(application)
             val transactionRepository =
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),

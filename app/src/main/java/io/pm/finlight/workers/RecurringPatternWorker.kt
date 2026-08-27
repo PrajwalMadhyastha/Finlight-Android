@@ -11,6 +11,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +44,7 @@ class RecurringPatternWorker(
         return withContext(Dispatchers.IO) {
             try {
                 // FIX: Check if the feature is enabled before proceeding
-                val settingsRepo = SettingsRepository(context)
+                val settingsRepo = ServiceLocator.provideSettingsRepository(context)
                 val isEnabled = settingsRepo.getRecurringTransactionsEnabled().first()
 
                 if (!isEnabled) {

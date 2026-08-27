@@ -19,8 +19,8 @@ data class HypotheticalExpense(
 )
 
 class WhatIfViewModel(
-    private val transactionRepository: TransactionRepository,
-    private val settingsRepository: SettingsRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val settingsRepository: ISettingsRepository,
     private val timeProvider: TimeProvider
 ) : ViewModel() {
     private val _hypotheticalExpenses = MutableStateFlow<List<HypotheticalExpense>>(emptyList())

@@ -16,7 +16,7 @@ import java.io.IOException
 
 class BackupSettingsRepository(
     private val dataStore: DataStore<Preferences>,
-) {
+) : IBackupSettingsRepository {
     constructor(context: Context) : this(
         context.financeSettingsDataStore,
     )
@@ -28,13 +28,13 @@ class BackupSettingsRepository(
         private val KEY_LAST_BACKUP_TIMESTAMP = longPreferencesKey("last_backup_timestamp")
     }
 
-    suspend fun saveBackupEnabled(isEnabled: Boolean) {
+    override suspend fun saveBackupEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_BACKUP_ENABLED] = isEnabled
         }
     }
 
-    fun getBackupEnabled(): Flow<Boolean> {
+    override fun getBackupEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -49,13 +49,13 @@ class BackupSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveAutoBackupEnabled(isEnabled: Boolean) {
+    override suspend fun saveAutoBackupEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_AUTO_BACKUP_ENABLED] = isEnabled
         }
     }
 
-    fun getAutoBackupEnabled(): Flow<Boolean> {
+    override fun getAutoBackupEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -70,13 +70,13 @@ class BackupSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveAutoBackupNotificationEnabled(isEnabled: Boolean) {
+    override suspend fun saveAutoBackupNotificationEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_AUTO_BACKUP_NOTIFICATION_ENABLED] = isEnabled
         }
     }
 
-    fun getAutoBackupNotificationEnabled(): Flow<Boolean> {
+    override fun getAutoBackupNotificationEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -91,13 +91,13 @@ class BackupSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveLastBackupTimestamp(timestamp: Long) {
+    override suspend fun saveLastBackupTimestamp(timestamp: Long) {
         dataStore.edit { preferences ->
             preferences[KEY_LAST_BACKUP_TIMESTAMP] = timestamp
         }
     }
 
-    fun getLastBackupTimestamp(): Flow<Long> {
+    override fun getLastBackupTimestamp(): Flow<Long> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {

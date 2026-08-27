@@ -47,13 +47,13 @@ sealed class ScanResult {
 
 class SettingsViewModel(
     application: Application,
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: ISettingsRepository,
     private val db: AppDatabase,
-    private val transactionRepository: TransactionRepository,
-    private val merchantMappingRepository: MerchantMappingRepository,
-    private val accountRepository: AccountRepository,
-    private val categoryRepository: CategoryRepository,
-    private val smsRepository: SmsRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val merchantMappingRepository: IMerchantMappingRepository,
+    private val accountRepository: IAccountRepository,
+    private val categoryRepository: ICategoryRepository,
+    private val smsRepository: ISmsRepository,
     private val transactionViewModel: TransactionViewModel,
     private val smsClassifier: SmsClassifier,
     private val nerExtractor: SmsEntityExtractor,
@@ -194,6 +194,27 @@ class SettingsViewModel(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = 0L,
         )
+
+    val hasSeenOnboarding: StateFlow<Boolean?> =
+        settingsRepository.getHasSeenOnboarding().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null,
+        )
+
+    val isFirstLaunchComplete: Flow<Boolean> = settingsRepository.getIsFirstLaunchComplete()
+
+    fun setHasSeenOnboarding(hasSeen: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setHasSeenOnboarding(hasSeen)
+        }
+    }
+
+    fun setFirstLaunchComplete() {
+        viewModelScope.launch {
+            settingsRepository.setFirstLaunchComplete()
+        }
+    }
 
     init {
         smsScanStartDate =

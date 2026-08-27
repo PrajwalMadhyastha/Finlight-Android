@@ -9,6 +9,7 @@ import android.app.backup.BackupDataOutput
 import android.app.backup.FileBackupHelper
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -30,7 +31,7 @@ class FinlightBackupAgent : BackupAgentHelper() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "onCreate: BackupAgent is being created.")
+        Log.d(TAG, "onCreate: Initializing BackupAgentHelper...")
 
         // Helper for backing up DataStore preferences
         FileBackupHelper(this, DATASTORE_PREFS_FILE, DATASTORE_INTERNAL_FILE).also {
@@ -51,14 +52,14 @@ class FinlightBackupAgent : BackupAgentHelper() {
         newState: ParcelFileDescriptor?,
     ) {
         Log.d(TAG, "onBackup: Starting backup process...")
-        val settingsRepository = SettingsRepository(applicationContext)
+        val backupSettingsRepository = ServiceLocator.provideBackupSettingsRepository(applicationContext)
 
         // Capture timestamp to use for both saving and notification
         val backupTime = System.currentTimeMillis()
 
         // 1. Save the timestamp
         runBlocking {
-            settingsRepository.saveLastBackupTimestamp(backupTime)
+            backupSettingsRepository.saveLastBackupTimestamp(backupTime)
         }
         Log.i(TAG, "onBackup: Last backup timestamp saved.")
 
@@ -73,7 +74,7 @@ class FinlightBackupAgent : BackupAgentHelper() {
         try {
             val notificationsEnabled =
                 runBlocking {
-                    settingsRepository.getAutoBackupNotificationEnabled().first()
+                    backupSettingsRepository.getAutoBackupNotificationEnabled().first()
                 }
             if (notificationsEnabled) {
                 NotificationHelper.showAutoBackupNotification(applicationContext, backupTime)

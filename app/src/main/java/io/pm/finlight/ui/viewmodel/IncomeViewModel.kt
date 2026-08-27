@@ -23,11 +23,11 @@ import kotlin.math.roundToLong
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class IncomeViewModel(
-    private val transactionRepository: TransactionRepository,
-    val accountRepository: AccountRepository,
-    val categoryRepository: CategoryRepository,
+    private val transactionRepository: ITransactionRepository,
+    val accountRepository: IAccountRepository,
+    val categoryRepository: ICategoryRepository,
     // --- NEW: Add SettingsRepository dependency ---
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: ISettingsRepository,
 ) : ViewModel() {
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
     val selectedMonth: StateFlow<Calendar> = _selectedMonth.asStateFlow()

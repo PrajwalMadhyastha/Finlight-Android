@@ -18,9 +18,9 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 class CategoryViewModel(
-    private val categoryRepository: CategoryRepository,
-    private val transactionRepository: TransactionRepository,
-    private val categoryDao: CategoryDao,
+    private val categoryRepository: ICategoryRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val categoryDao: CategoryDao? = null,
 ) : ViewModel() {
     val allCategories: Flow<List<Category>>
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
@@ -37,7 +37,7 @@ class CategoryViewModel(
     ) = viewModelScope.launch {
         try {
             // Check if a category with this name already exists
-            val existingCategory = categoryDao.findByName(name)
+            val existingCategory = categoryDao?.findByName(name) ?: categoryRepository.findByName(name)
             if (existingCategory != null) {
                 _uiEvent.send("A category named '$name' already exists.")
                 return@launch

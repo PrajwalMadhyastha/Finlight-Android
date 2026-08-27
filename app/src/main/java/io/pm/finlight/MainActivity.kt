@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import androidx.navigation.NavHostController
@@ -123,8 +122,6 @@ class MainActivity : AppCompatActivity() {
 //            WindowManager.LayoutParams.FLAG_SECURE
 //        )
 
-        val settingsRepository = SettingsRepository(this)
-
         setContent {
             val application = LocalContext.current.applicationContext as Application
             val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(application))
@@ -133,7 +130,7 @@ class MainActivity : AppCompatActivity() {
                     factory = SettingsViewModelFactory(application, transactionViewModel),
                 )
             val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
-            val hasSeenOnboarding by settingsRepository.getHasSeenOnboarding().collectAsState(initial = null)
+            val hasSeenOnboarding by settingsViewModel.hasSeenOnboarding.collectAsState()
 
             // UPDATED: Using ForceAppScaling to handle both Text and Display scaling
             ForceAppScaling {
@@ -143,14 +140,13 @@ class MainActivity : AppCompatActivity() {
                         OnboardingScreen(
                             viewModel = onboardingViewModel,
                             onOnboardingFinished = {
-                                lifecycleScope.launch {
-                                    settingsRepository.setHasSeenOnboarding(true)
-                                }
+                                settingsViewModel.setHasSeenOnboarding(true)
                             },
                         )
                     } else if (hasSeenOnboarding == true) {
                         FinanceAppWithLockScreen(
                             shortcutAction = intent?.action,
+                            settingsViewModel = settingsViewModel,
                         )
                     }
                 }
@@ -168,11 +164,10 @@ class MainActivity : AppCompatActivity() {
 @Composable
 fun FinanceAppWithLockScreen(
     shortcutAction: String? = null,
+    settingsViewModel: SettingsViewModel,
 ) {
     val context = LocalContext.current
-    val settingsRepository = remember { SettingsRepository(context) }
-
-    val appLockEnabled by settingsRepository.getAppLockEnabled().collectAsState(initial = null)
+    val appLockEnabled by settingsViewModel.appLockEnabled.collectAsState()
     var isUnlocked by remember { mutableStateOf(false) }
 
     val permissionsToRequest =
@@ -770,7 +765,7 @@ fun AppNavHost(
         }
 
         composable("splash_screen") {
-            SplashScreen(navController = navController)
+            SplashScreen(navController = navController, settingsViewModel = settingsViewModel)
         }
 
         composable(
@@ -1440,13 +1435,15 @@ fun AppNavHost(
 }
 
 @Composable
-fun SplashScreen(navController: NavHostController) {
+fun SplashScreen(
+    navController: NavHostController,
+    settingsViewModel: SettingsViewModel,
+) {
     var statusText by remember { mutableStateOf("Initializing...") }
     val context = LocalContext.current
-    val settingsRepository = remember { SettingsRepository(context) }
 
     LaunchedEffect(key1 = true) {
-        val isFirstLaunch = !settingsRepository.getIsFirstLaunchComplete().first()
+        val isFirstLaunch = !settingsViewModel.isFirstLaunchComplete.first()
 
         if (isFirstLaunch) {
             statusText = "Checking for restored data..."
@@ -1459,7 +1456,7 @@ fun SplashScreen(navController: NavHostController) {
                 delay(1500) // Give user time to see the message
             }
             // Set the flag *after* the first-launch check is complete
-            settingsRepository.setFirstLaunchComplete()
+            settingsViewModel.setFirstLaunchComplete()
         }
 
         statusText = "Loading dashboard..."

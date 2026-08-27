@@ -14,12 +14,12 @@ import android.util.Log
  * A repository class dedicated to handling data operations related to SMS messages.
  * This abstracts the logic of querying the Android ContentResolver away from ViewModels or Workers.
  */
-class SmsRepository(private val context: Context) {
+class SmsRepository(private val context: Context) : ISmsRepository {
     /**
      * Fetches all SMS messages from the device's inbox.
      * @return A list of SmsMessage objects.
      */
-    fun fetchAllSms(startDate: Long?): List<SmsMessage> {
+    override fun fetchAllSms(startDate: Long?): List<SmsMessage> {
         val smsList = mutableListOf<SmsMessage>()
         // Define the columns we want to retrieve
         val projection =
@@ -82,7 +82,7 @@ class SmsRepository(private val context: Context) {
      * @param lookupValue The value to search for, which could be the SMS _ID or its timestamp.
      * @return An SmsMessage object if found, otherwise null.
      */
-    fun getSmsDetailsById(lookupValue: Long): SmsMessage? {
+    override fun getSmsDetailsById(lookupValue: Long): SmsMessage? {
         val projection = arrayOf(Telephony.Sms._ID, Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE)
 
         // --- First Attempt: Query by the proper database _ID ---

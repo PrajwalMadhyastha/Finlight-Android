@@ -15,7 +15,7 @@ class ResetPrivacyModeRule : TestRule {
             override fun evaluate() {
                 val context = InstrumentationRegistry.getInstrumentation().targetContext
                 runBlocking {
-                    val settingsRepository = SettingsRepository(context)
+                    val settingsRepository = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
                     settingsRepository.saveSimulatorPrivacyModeEnabled(false)
                 }
                 base.evaluate()

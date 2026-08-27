@@ -39,8 +39,8 @@ data class MonthlyBreakdown(
 class TimePeriodReportViewModel(
     private val transactionQueryDao: TransactionQueryDao,
     private val transactionAnalyticsDao: TransactionAnalyticsDao,
-    private val transactionRepository: TransactionRepository,
-    private val settingsRepository: SettingsRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val settingsRepository: ISettingsRepository,
     private val timePeriod: TimePeriod,
     initialDateMillis: Long?,
     showPreviousMonth: Boolean,
@@ -54,8 +54,8 @@ class TimePeriodReportViewModel(
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
         transactionDao: TransactionDao,
-        transactionRepository: TransactionRepository,
-        settingsRepository: SettingsRepository,
+        transactionRepository: ITransactionRepository,
+        settingsRepository: ISettingsRepository,
         timePeriod: TimePeriod,
         initialDateMillis: Long?,
         showPreviousMonth: Boolean,

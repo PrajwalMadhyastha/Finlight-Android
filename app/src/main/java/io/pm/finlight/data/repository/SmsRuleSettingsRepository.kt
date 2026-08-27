@@ -19,7 +19,7 @@ import java.util.Calendar
 
 class SmsRuleSettingsRepository(
     private val dataStore: DataStore<Preferences>,
-) {
+) : ISmsRuleSettingsRepository {
     constructor(context: Context) : this(
         context.financeSettingsDataStore,
     )
@@ -30,13 +30,13 @@ class SmsRuleSettingsRepository(
         private val KEY_DISMISSED_MERGES = stringSetPreferencesKey("dismissed_merge_suggestions")
     }
 
-    suspend fun saveSmsScanStartDate(date: Long) {
+    override suspend fun saveSmsScanStartDate(date: Long) {
         dataStore.edit { preferences ->
             preferences[KEY_SMS_SCAN_START_DATE] = date
         }
     }
 
-    fun getSmsScanStartDate(): Flow<Long> {
+    override fun getSmsScanStartDate(): Flow<Long> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -55,13 +55,13 @@ class SmsRuleSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveIgnoreRulesChecksum(checksum: Int) {
+    override suspend fun saveIgnoreRulesChecksum(checksum: Int) {
         dataStore.edit { preferences ->
             preferences[KEY_IGNORE_RULES_CHECKSUM] = checksum
         }
     }
 
-    suspend fun getIgnoreRulesChecksum(): Int {
+    override suspend fun getIgnoreRulesChecksum(): Int {
         return try {
             dataStore.data.first()[KEY_IGNORE_RULES_CHECKSUM] ?: 0
         } catch (e: Exception) {
@@ -69,7 +69,7 @@ class SmsRuleSettingsRepository(
         }
     }
 
-    fun getDismissedMergeSuggestions(): Flow<Set<String>> {
+    override fun getDismissedMergeSuggestions(): Flow<Set<String>> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -84,7 +84,7 @@ class SmsRuleSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun addDismissedMergeSuggestion(suggestionKey: String) {
+    override suspend fun addDismissedMergeSuggestion(suggestionKey: String) {
         dataStore.edit { preferences ->
             val currentDismissed = preferences[KEY_DISMISSED_MERGES] ?: emptySet()
             preferences[KEY_DISMISSED_MERGES] = currentDismissed + suggestionKey

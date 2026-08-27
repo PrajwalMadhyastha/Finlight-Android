@@ -17,7 +17,7 @@ import java.io.IOException
 
 class FeatureSettingsRepository(
     private val dataStore: DataStore<Preferences>,
-) {
+) : IFeatureSettingsRepository {
     constructor(context: Context) : this(
         context.financeSettingsDataStore,
     )
@@ -30,13 +30,13 @@ class FeatureSettingsRepository(
         private val KEY_GOAL_NUDGES_ENABLED = booleanPreferencesKey("goal_nudges_enabled")
     }
 
-    suspend fun saveRecurringTransactionsEnabled(isEnabled: Boolean) {
+    override suspend fun saveRecurringTransactionsEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_RECURRING_TRANSACTIONS_ENABLED] = isEnabled
         }
     }
 
-    fun getRecurringTransactionsEnabled(): Flow<Boolean> {
+    override fun getRecurringTransactionsEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -51,13 +51,13 @@ class FeatureSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveGoalIncomeThreshold(amount: Int) {
+    override suspend fun saveGoalIncomeThreshold(amount: Int) {
         dataStore.edit { preferences ->
             preferences[KEY_GOAL_INCOME_THRESHOLD] = amount
         }
     }
 
-    fun getGoalIncomeThreshold(): Flow<Int> {
+    override fun getGoalIncomeThreshold(): Flow<Int> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -72,13 +72,13 @@ class FeatureSettingsRepository(
             .distinctUntilChanged()
     }
 
-    suspend fun saveGoalNudgesEnabled(isEnabled: Boolean) {
+    override suspend fun saveGoalNudgesEnabled(isEnabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_GOAL_NUDGES_ENABLED] = isEnabled
         }
     }
 
-    fun getGoalNudgesEnabled(): Flow<Boolean> {
+    override fun getGoalNudgesEnabled(): Flow<Boolean> {
         return dataStore.data
             .catch { exception ->
                 if (exception is IOException) {
@@ -93,15 +93,15 @@ class FeatureSettingsRepository(
             .distinctUntilChanged()
     }
 
-    fun getExcludedIncomeMonths(): Flow<Set<String>> = getSetFlow(KEY_EXCLUDED_INCOME_MONTHS)
+    override fun getExcludedIncomeMonths(): Flow<Set<String>> = getSetFlow(KEY_EXCLUDED_INCOME_MONTHS)
 
-    fun getExcludedExpenseMonths(): Flow<Set<String>> = getSetFlow(KEY_EXCLUDED_EXPENSE_MONTHS)
+    override fun getExcludedExpenseMonths(): Flow<Set<String>> = getSetFlow(KEY_EXCLUDED_EXPENSE_MONTHS)
 
-    suspend fun toggleIncomeMonthExclusion(monthKey: String) {
+    override suspend fun toggleIncomeMonthExclusion(monthKey: String) {
         toggleInSet(KEY_EXCLUDED_INCOME_MONTHS, monthKey)
     }
 
-    suspend fun toggleExpenseMonthExclusion(monthKey: String) {
+    override suspend fun toggleExpenseMonthExclusion(monthKey: String) {
         toggleInSet(KEY_EXCLUDED_EXPENSE_MONTHS, monthKey)
     }
 

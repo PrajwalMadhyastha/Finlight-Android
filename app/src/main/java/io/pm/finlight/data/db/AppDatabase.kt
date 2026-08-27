@@ -1050,7 +1050,7 @@ abstract class AppDatabase : RoomDatabase() {
                 super.onOpen(db)
                 CoroutineScope(Dispatchers.IO).launch {
                     val database = getInstance(context)
-                    val settingsRepository = SettingsRepository(context)
+                    val smsRuleSettingsRepository = io.pm.finlight.di.ServiceLocator.provideSmsRuleSettingsRepository(context)
 
                     val categoryDao = database.categoryDao()
                     val categoryCount = categoryDao.getAllCategories().first().size
@@ -1064,7 +1064,7 @@ abstract class AppDatabase : RoomDatabase() {
                     // This ensures that if a rule is moved from BODY to SENDER (or vice versa),
                     // the checksum changes and the DB is updated.
                     val liveChecksum = DEFAULT_IGNORE_PHRASES.joinToString { "${it.pattern}|${it.type}" }.hashCode()
-                    val storedChecksum = settingsRepository.getIgnoreRulesChecksum()
+                    val storedChecksum = smsRuleSettingsRepository.getIgnoreRulesChecksum()
 
                     Log.d("DatabaseCallback", "Checking ignore rules... Live: $liveChecksum, Stored: $storedChecksum")
 
@@ -1073,7 +1073,7 @@ abstract class AppDatabase : RoomDatabase() {
                         try {
                             ignoreRuleDao.deleteDefaultRules()
                             ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
-                            settingsRepository.saveIgnoreRulesChecksum(liveChecksum)
+                            smsRuleSettingsRepository.saveIgnoreRulesChecksum(liveChecksum)
                             Log.i("DatabaseCallback", "Default ignore rules synced successfully.")
                         } catch (e: Exception) {
                             Log.e("DatabaseCallback", "Failed to sync ignore rules", e)

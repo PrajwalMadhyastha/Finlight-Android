@@ -16,22 +16,22 @@ import kotlinx.coroutines.flow.Flow
 class TagRepository(
     private val tagDao: TagDao,
     private val transactionQueryDao: TransactionQueryDao,
-) {
-    val allTags: Flow<List<Tag>> = tagDao.getAllTags()
+) : ITagRepository {
+    override val allTags: Flow<List<Tag>> = tagDao.getAllTags()
 
-    suspend fun insert(tag: Tag): Long {
+    override suspend fun insert(tag: Tag): Long {
         return tagDao.insert(tag)
     }
 
-    suspend fun update(tag: Tag) {
+    override suspend fun update(tag: Tag) {
         tagDao.update(tag)
     }
 
-    suspend fun delete(tag: Tag) {
+    override suspend fun delete(tag: Tag) {
         tagDao.delete(tag)
     }
 
-    suspend fun isTagInUse(tagId: Int): Boolean {
+    override suspend fun isTagInUse(tagId: Int): Boolean {
         return transactionQueryDao.countTransactionsForTag(tagId) > 0
     }
 
@@ -40,7 +40,7 @@ class TagRepository(
      * @param tagName The name of the tag to find or create.
      * @return The existing or newly created Tag object.
      */
-    suspend fun findOrCreateTag(tagName: String): Tag {
+    override suspend fun findOrCreateTag(tagName: String): Tag {
         val existingTag = tagDao.findByName(tagName)
         if (existingTag != null) {
             return existingTag
@@ -51,12 +51,12 @@ class TagRepository(
     }
 
     // --- NEW: Function to find a tag by its ID ---
-    suspend fun findTagById(id: Int): Tag? {
+    override suspend fun findTagById(id: Int): Tag? {
         return tagDao.getTagById(id)
     }
 
     // --- NEW: Expose findByName for ViewModel logic ---
-    suspend fun findByName(name: String): Tag? {
+    override suspend fun findByName(name: String): Tag? {
         return tagDao.findByName(name)
     }
 }
