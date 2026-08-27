@@ -8,6 +8,7 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class TransactionViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -32,6 +33,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = DefaultDispatcherProvider(),
                 )
 
             @Suppress("UNCHECKED_CAST")

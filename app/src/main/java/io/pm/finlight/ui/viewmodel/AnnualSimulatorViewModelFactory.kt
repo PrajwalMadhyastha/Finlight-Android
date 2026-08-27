@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.TransactionRepository
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class AnnualSimulatorViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -19,6 +20,7 @@ class AnnualSimulatorViewModelFactory(private val application: Application) : Vi
                     transactionAnalyticsDao = database.transactionAnalyticsDao(),
                     transactionReimbursementDao = database.transactionReimbursementDao(),
                     db = database,
+                    dispatcherProvider = DefaultDispatcherProvider(),
                 )
             @Suppress("UNCHECKED_CAST")
             return AnnualSimulatorViewModel(transactionRepository, settingsRepository) as T

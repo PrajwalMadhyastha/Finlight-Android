@@ -61,6 +61,7 @@ class SmsTransactionSaver(
                 transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 transactionReimbursementDao = db.transactionReimbursementDao(),
                 db = db,
+                dispatcherProvider = DefaultDispatcherProvider(),
             )
 
         val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"

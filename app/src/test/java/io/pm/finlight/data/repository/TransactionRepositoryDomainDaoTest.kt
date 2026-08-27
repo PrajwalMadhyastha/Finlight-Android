@@ -21,6 +21,8 @@ import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
+import io.pm.finlight.utils.TestDispatcherProvider
+
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
@@ -30,6 +32,7 @@ class TransactionRepositoryDomainDaoTest {
     private val analyticsDao: TransactionAnalyticsDao = mockk(relaxed = true)
     private val reimbursementDao: TransactionReimbursementDao = mockk(relaxed = true)
     private val db: AppDatabase = mockk(relaxed = true)
+    private val testDispatcherProvider = TestDispatcherProvider()
 
     private lateinit var repository: TransactionRepository
 
@@ -44,6 +47,7 @@ class TransactionRepositoryDomainDaoTest {
                 transactionAnalyticsDao = analyticsDao,
                 transactionReimbursementDao = reimbursementDao,
                 db = db,
+                dispatcherProvider = testDispatcherProvider,
             )
     }
 

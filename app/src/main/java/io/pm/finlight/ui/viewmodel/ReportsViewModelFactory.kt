@@ -8,17 +8,20 @@ import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class ReportsViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ReportsViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
+            val dispatcherProvider = DefaultDispatcherProvider()
             val getMonthlyConsistencyDataUseCase =
                 GetMonthlyConsistencyDataUseCase(
                     settingsRepository = settingsRepository,
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionQueryDao = db.transactionQueryDao(),
+                    dispatcherProvider = dispatcherProvider,
                 )
             val transactionRepository =
                 TransactionRepository(
@@ -27,6 +30,7 @@ class ReportsViewModelFactory(private val application: Application) : ViewModelP
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = dispatcherProvider,
                 )
 
             @Suppress("UNCHECKED_CAST")

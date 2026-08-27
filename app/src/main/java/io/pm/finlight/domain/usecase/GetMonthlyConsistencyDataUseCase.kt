@@ -7,8 +7,9 @@ import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.SpendingStatus
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
@@ -25,30 +26,66 @@ class GetMonthlyConsistencyDataUseCase(
     private val budgetProvider: (year: Int, month: Int) -> Flow<Float?>,
     private val transactionAnalyticsDao: TransactionAnalyticsDao,
     private val transactionQueryDao: TransactionQueryDao,
-    private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) {
     constructor(
         budgetSettingsRepository: IBudgetSettingsRepository,
         transactionAnalyticsDao: TransactionAnalyticsDao,
         transactionQueryDao: TransactionQueryDao,
-        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+        dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
     ) : this(
         budgetProvider = { year, month -> budgetSettingsRepository.getOverallBudgetForMonth(year, month) },
         transactionAnalyticsDao = transactionAnalyticsDao,
         transactionQueryDao = transactionQueryDao,
-        dispatcher = dispatcher,
+        dispatcherProvider = dispatcherProvider,
     )
 
     constructor(
         settingsRepository: ISettingsRepository,
         transactionAnalyticsDao: TransactionAnalyticsDao,
         transactionQueryDao: TransactionQueryDao,
-        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+        dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
     ) : this(
         budgetProvider = { year, month -> settingsRepository.getOverallBudgetForMonth(year, month) },
         transactionAnalyticsDao = transactionAnalyticsDao,
         transactionQueryDao = transactionQueryDao,
-        dispatcher = dispatcher,
+        dispatcherProvider = dispatcherProvider,
+    )
+
+    constructor(
+        budgetSettingsRepository: IBudgetSettingsRepository,
+        transactionAnalyticsDao: TransactionAnalyticsDao,
+        transactionQueryDao: TransactionQueryDao,
+        dispatcher: CoroutineDispatcher,
+    ) : this(
+        budgetProvider = { year, month -> budgetSettingsRepository.getOverallBudgetForMonth(year, month) },
+        transactionAnalyticsDao = transactionAnalyticsDao,
+        transactionQueryDao = transactionQueryDao,
+        dispatcherProvider =
+            object : DispatcherProvider {
+                override val main: CoroutineDispatcher get() = dispatcher
+                override val io: CoroutineDispatcher get() = dispatcher
+                override val default: CoroutineDispatcher get() = dispatcher
+                override val unconfined: CoroutineDispatcher get() = dispatcher
+            },
+    )
+
+    constructor(
+        settingsRepository: ISettingsRepository,
+        transactionAnalyticsDao: TransactionAnalyticsDao,
+        transactionQueryDao: TransactionQueryDao,
+        dispatcher: CoroutineDispatcher,
+    ) : this(
+        budgetProvider = { year, month -> settingsRepository.getOverallBudgetForMonth(year, month) },
+        transactionAnalyticsDao = transactionAnalyticsDao,
+        transactionQueryDao = transactionQueryDao,
+        dispatcherProvider =
+            object : DispatcherProvider {
+                override val main: CoroutineDispatcher get() = dispatcher
+                override val io: CoroutineDispatcher get() = dispatcher
+                override val default: CoroutineDispatcher get() = dispatcher
+                override val unconfined: CoroutineDispatcher get() = dispatcher
+            },
     )
 
     /**
@@ -137,7 +174,7 @@ class GetMonthlyConsistencyDataUseCase(
                 }
             }
             resultList
-        }.flowOn(dispatcher)
+        }.flowOn(dispatcherProvider.default)
     }
 
     private fun isBeforeDay(

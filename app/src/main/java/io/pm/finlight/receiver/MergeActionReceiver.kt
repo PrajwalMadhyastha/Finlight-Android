@@ -29,6 +29,7 @@ class MergeActionReceiver : BroadcastReceiver() {
                 transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 transactionReimbursementDao = db.transactionReimbursementDao(),
                 db = db,
+                dispatcherProvider = io.pm.finlight.utils.DefaultDispatcherProvider(),
             )
         val mergeTransactionsUseCase =
             io.pm.finlight.domain.usecase.MergeTransactionsUseCase(

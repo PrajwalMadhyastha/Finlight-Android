@@ -7,6 +7,7 @@ import io.pm.finlight.CategoryRepository
 import io.pm.finlight.CategoryViewModel
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class CategoryViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -19,6 +20,7 @@ class CategoryViewModelFactory(private val application: Application) : ViewModel
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = DefaultDispatcherProvider(),
                 )
 
             @Suppress("UNCHECKED_CAST")

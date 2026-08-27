@@ -48,6 +48,8 @@ import org.mockito.Mockito.*
 import io.mockk.coEvery
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.TestDispatcherProvider
 import org.robolectric.annotation.Config
 import java.util.*
 import kotlin.test.assertEquals
@@ -73,6 +75,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     @Mock
     private lateinit var accountAliasDao: io.pm.finlight.data.db.dao.AccountAliasDao
 
+    private lateinit var testDispatcherProvider: TestDispatcherProvider
     private lateinit var repository: TransactionRepository
 
     // Use a fixed "today" for all tests to make them deterministic
@@ -114,6 +117,8 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     @Before
     override fun setup() {
         super.setup()
+
+        testDispatcherProvider = TestDispatcherProvider(testDispatcher)
 
         // Mock DB dependencies
         `when`(db.accountDao()).thenReturn(accountDao)
@@ -937,5 +942,40 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                     db,
                 )
             assertNotNull(repo)
+            assertTrue(repo.dispatcherProvider is DefaultDispatcherProvider)
+        }
+
+    @Suppress("DEPRECATION")
+    @Test
+    fun `legacy constructor injects custom DispatcherProvider properly`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val customDispatcher = TestDispatcherProvider(testDispatcher)
+            val repo =
+                TransactionRepository(
+                    transactionDao = transactionDao,
+                    db = db,
+                    dispatcherProvider = customDispatcher,
+                )
+            assertNotNull(repo)
+            assertEquals(customDispatcher, repo.dispatcherProvider)
+        }
+
+    @Test
+    fun `domain dao constructor injects custom DispatcherProvider properly`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            val customDispatcher = TestDispatcherProvider(testDispatcher)
+            val repo =
+                TransactionRepository(
+                    transactionWriteDao = transactionDao,
+                    transactionQueryDao = transactionDao,
+                    transactionAnalyticsDao = transactionDao,
+                    transactionReimbursementDao = transactionDao,
+                    db = db,
+                    dispatcherProvider = customDispatcher,
+                )
+            assertNotNull(repo)
+            assertEquals(customDispatcher, repo.dispatcherProvider)
         }
 }

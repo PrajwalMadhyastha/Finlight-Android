@@ -28,6 +28,7 @@ import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
@@ -258,13 +259,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
                 transactionRunner,
                 dispatchers = TestDispatcherProvider(testDispatcher),
             )
-    }
-
-    class TestDispatcherProvider(private val testDispatcher: kotlinx.coroutines.test.TestDispatcher) : io.pm.finlight.utils.DispatcherProvider {
-        override val main: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
-        override val io: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
-        override val default: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
-        override val unconfined: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
     }
 
     @After

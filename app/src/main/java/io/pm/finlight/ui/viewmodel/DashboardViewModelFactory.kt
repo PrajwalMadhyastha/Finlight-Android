@@ -7,6 +7,7 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.SystemTimeProvider
 
 /**
@@ -17,11 +18,13 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
         if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
+            val dispatcherProvider = DefaultDispatcherProvider()
             val getMonthlyConsistencyDataUseCase =
                 GetMonthlyConsistencyDataUseCase(
                     settingsRepository = settingsRepository,
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionQueryDao = db.transactionQueryDao(),
+                    dispatcherProvider = dispatcherProvider,
                 )
             val transactionRepository =
                 TransactionRepository(
@@ -30,6 +33,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
+                    dispatcherProvider = dispatcherProvider,
                 )
             val accountRepository = AccountRepository(db)
             val merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao())
