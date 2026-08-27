@@ -17,7 +17,10 @@ object TransactionTypeSerializer : KSerializer<TransactionType> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("TransactionType", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: Encoder, value: TransactionType) {
+    override fun serialize(
+        encoder: Encoder,
+        value: TransactionType
+    ) {
         encoder.encodeString(value.name)
     }
 
@@ -55,7 +58,10 @@ object TransactionStatusSerializer : KSerializer<TransactionStatus> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("TransactionStatus", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: Encoder, value: TransactionStatus) {
+    override fun serialize(
+        encoder: Encoder,
+        value: TransactionStatus
+    ) {
         encoder.encodeString(value.name)
     }
 

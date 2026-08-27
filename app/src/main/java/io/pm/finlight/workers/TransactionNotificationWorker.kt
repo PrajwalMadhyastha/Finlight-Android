@@ -11,8 +11,8 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
@@ -34,7 +34,8 @@ class TransactionNotificationWorker(
             return Result.failure()
         }
 
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             try {
                 val db = AppDatabase.getInstance(context)
                 val transactionQueryDao = db.transactionQueryDao()

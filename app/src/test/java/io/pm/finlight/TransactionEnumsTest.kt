@@ -1,13 +1,5 @@
-package io.pm.finlight.core
+package io.pm.finlight
 
-import io.pm.finlight.DB_STATUS_CONFIRMED
-import io.pm.finlight.DB_STATUS_PENDING
-import io.pm.finlight.DB_STATUS_SKIPPED
-import io.pm.finlight.DB_TYPE_EXPENSE
-import io.pm.finlight.DB_TYPE_INCOME
-import io.pm.finlight.DB_TYPE_TRANSFER
-import io.pm.finlight.TransactionStatus
-import io.pm.finlight.TransactionType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows

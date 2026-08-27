@@ -8,7 +8,6 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
-import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class TransactionViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -26,6 +25,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                     deletedSmsHashDao = db.deletedSmsHashDao(),
                     db = db,
                 )
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             val transactionRepository =
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),
@@ -33,7 +33,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                     transactionAnalyticsDao = db.transactionAnalyticsDao(),
                     transactionReimbursementDao = db.transactionReimbursementDao(),
                     db = db,
-                    dispatcherProvider = DefaultDispatcherProvider(),
+                    dispatcherProvider = dispatcherProvider,
                 )
 
             @Suppress("UNCHECKED_CAST")
@@ -53,6 +53,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                 smsParseTemplateDao = db.smsParseTemplateDao(),
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

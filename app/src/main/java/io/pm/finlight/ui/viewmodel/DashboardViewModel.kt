@@ -25,10 +25,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.DateUtils
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
 import io.pm.finlight.utils.applyAliases
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -58,6 +59,7 @@ class DashboardViewModel(
     private val recurringPatternDao: RecurringPatternDao,
     private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
     private val mergeTransactionsUseCase: MergeTransactionsUseCase,
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
@@ -428,7 +430,7 @@ class DashboardViewModel(
                 combinedFlow.collect { combinedYearlyData: List<CalendarDayStatus> ->
                     emit(combinedYearlyData)
                 }
-            }.flowOn(Dispatchers.Default)
+            }.flowOn(dispatcherProvider.default)
                 .stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(5000),

@@ -28,7 +28,8 @@ import io.pm.finlight.DEFAULT_IGNORE_PHRASES
 import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
-import kotlinx.coroutines.Dispatchers
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -42,14 +43,17 @@ data class BatchStatus(
     val resultFile: File? = null,
 )
 
-class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
+class BatchAnalysisViewModel(
+    private val context: Context,
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+) : ViewModel() {
     private val classifier = SmsClassifier(context)
     private val nerExtractor: SmsEntityExtractor = NerExtractor(context)
     var status by mutableStateOf(BatchStatus())
         private set
 
     fun processFile(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 updateStatus { it.copy(isRunning = true, processed = 0, resultFile = null) }
 
@@ -87,7 +91,7 @@ class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
                 updateStatus { it.copy(isRunning = false, processed = processedCount, resultFile = outputFile) }
             } catch (e: Exception) {
                 e.printStackTrace()
-                withContext(Dispatchers.Main) {
+                withContext(dispatcherProvider.main) {
                     Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
                 updateStatus { it.copy(isRunning = false) }
@@ -238,7 +242,7 @@ class BatchAnalysisViewModel(private val context: Context) : ViewModel() {
     }
 
     private suspend fun updateStatus(update: (BatchStatus) -> BatchStatus) {
-        withContext(Dispatchers.Main) {
+        withContext(dispatcherProvider.main) {
             status = update(status)
         }
     }

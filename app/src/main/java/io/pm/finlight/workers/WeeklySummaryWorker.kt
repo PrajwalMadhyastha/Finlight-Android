@@ -15,9 +15,9 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import kotlin.math.roundToInt
@@ -27,7 +27,8 @@ class WeeklySummaryWorker(
     workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
     override suspend fun doWork(): Result {
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             try {
                 val transactionAnalyticsDao = AppDatabase.getInstance(context).transactionAnalyticsDao()
 

@@ -7,7 +7,6 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
-import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.SystemTimeProvider
 
 /**
@@ -18,7 +17,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
         if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
-            val dispatcherProvider = DefaultDispatcherProvider()
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             val getMonthlyConsistencyDataUseCase =
                 GetMonthlyConsistencyDataUseCase(
                     settingsRepository = settingsRepository,
@@ -59,6 +58,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                 recurringPatternDao = db.recurringPatternDao(),
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

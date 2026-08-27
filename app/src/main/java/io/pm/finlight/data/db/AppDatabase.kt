@@ -26,7 +26,6 @@ import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.security.SecurityManager
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
@@ -1040,7 +1039,8 @@ abstract class AppDatabase : RoomDatabase() {
         private class DatabaseCallback(private val context: Context) : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
-                CoroutineScope(Dispatchers.IO).launch {
+                val dispatcherProvider = io.pm.finlight.di.ServiceLocator.provideDispatcherProvider(context)
+                CoroutineScope(dispatcherProvider.io).launch {
                     val database = getInstance(context)
                     database.accountDao().insert(Account(id = 1, name = "Cash Spends", type = "Cash"))
                 }
@@ -1048,7 +1048,8 @@ abstract class AppDatabase : RoomDatabase() {
 
             override fun onOpen(db: SupportSQLiteDatabase) {
                 super.onOpen(db)
-                CoroutineScope(Dispatchers.IO).launch {
+                val dispatcherProvider = io.pm.finlight.di.ServiceLocator.provideDispatcherProvider(context)
+                CoroutineScope(dispatcherProvider.io).launch {
                     val database = getInstance(context)
                     val smsRuleSettingsRepository = io.pm.finlight.di.ServiceLocator.provideSmsRuleSettingsRepository(context)
 
