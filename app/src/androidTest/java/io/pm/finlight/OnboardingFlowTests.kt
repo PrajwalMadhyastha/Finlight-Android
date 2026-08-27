@@ -22,7 +22,7 @@ class EnableOnboardingRule : TestRule {
             override fun evaluate() {
                 val context = InstrumentationRegistry.getInstrumentation().targetContext
                 kotlinx.coroutines.runBlocking {
-                    val settingsRepository = SettingsRepository(context)
+                    val settingsRepository = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
                     settingsRepository.setHasSeenOnboarding(false)
                 }
                 base.evaluate()

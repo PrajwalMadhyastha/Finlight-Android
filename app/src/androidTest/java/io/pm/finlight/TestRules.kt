@@ -24,7 +24,7 @@ class DisableOnboardingRule : TestRule {
                 try {
                     val context = InstrumentationRegistry.getInstrumentation().targetContext
                     runBlocking {
-                        val settingsRepository = SettingsRepository(context)
+                        val settingsRepository = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
                         settingsRepository.setHasSeenOnboarding(true)
                     }
                     base.evaluate()
@@ -51,7 +51,7 @@ class DisableAppLockRule : TestRule {
                 try {
                     val context = InstrumentationRegistry.getInstrumentation().targetContext
                     runBlocking {
-                        val settingsRepository = SettingsRepository(context)
+                        val settingsRepository = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
                         settingsRepository.saveAppLockEnabled(false)
                     }
                     base.evaluate()
