@@ -82,6 +82,9 @@ class SmsCatchupWorker(
         val classifier = MlModelFactory.getClassifier(context)
         val nerExtractor = MlModelFactory.getNerExtractor(context)
 
+        // Load travel settings once for the entire scan batch.
+        val travelSettings = settingsRepository.getCurrentTravelModeSettings()
+
         // Track hashes we save during this run so we don't double-save within one batch.
         val savedHashesThisRun = mutableSetOf<String>()
         var savedCount = 0
@@ -132,6 +135,7 @@ class SmsCatchupWorker(
                 val newId =
                     saver.resolveAndSaveTransaction(
                         potentialTxn = potentialTxn,
+                        travelSettings = travelSettings,
                         source = "Auto-Recovered",
                     )
 

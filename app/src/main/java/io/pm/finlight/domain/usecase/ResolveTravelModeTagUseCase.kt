@@ -5,7 +5,6 @@ import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITravelSettingsRepository
 import io.pm.finlight.Tag
 import io.pm.finlight.TravelModeSettings
-import kotlinx.coroutines.flow.first
 
 /**
  * UseCase to resolve the travel mode trip tag for a transaction based on its timestamp.
@@ -20,7 +19,7 @@ class ResolveTravelModeTagUseCase(
         travelSettingsRepository: ITravelSettingsRepository,
         tagRepository: ITagRepository,
     ) : this(
-        travelSettingsProvider = { travelSettingsRepository.getTravelModeSettings().first() },
+        travelSettingsProvider = { travelSettingsRepository.getCurrentTravelModeSettings() },
         tagRepository = tagRepository,
     )
 
@@ -28,33 +27,39 @@ class ResolveTravelModeTagUseCase(
         settingsRepository: ISettingsRepository,
         tagRepository: ITagRepository,
     ) : this(
-        travelSettingsProvider = { settingsRepository.getTravelModeSettings().first() },
+        travelSettingsProvider = { settingsRepository.getCurrentTravelModeSettings() },
         tagRepository = tagRepository,
     )
 
     /**
      * Returns the trip tag if travel mode is enabled and [transactionDate] is within the trip window,
      * or null otherwise.
+     * If [travelSettings] is provided, it is used directly without querying the provider.
      */
-    suspend operator fun invoke(transactionDate: Long): Tag? {
-        val travelSettings = travelSettingsProvider()
-        if (travelSettings?.isEnabled == true &&
-            transactionDate >= travelSettings.startDate &&
-            transactionDate <= travelSettings.endDate
+    suspend operator fun invoke(
+        transactionDate: Long,
+        travelSettings: TravelModeSettings? = null,
+    ): Tag? {
+        val settings = travelSettings ?: travelSettingsProvider()
+        if (settings?.isEnabled == true &&
+            transactionDate >= settings.startDate &&
+            transactionDate <= settings.endDate
         ) {
-            return tagRepository.findOrCreateTag(travelSettings.tripName)
+            return tagRepository.findOrCreateTag(settings.tripName)
         }
         return null
     }
 
     /**
      * Returns the combined set of tags including the trip tag if travel mode is active.
+     * If [travelSettings] is provided, it is used directly without querying the provider.
      */
     suspend fun getFinalTags(
         transactionDate: Long,
         initialTags: Set<Tag>,
+        travelSettings: TravelModeSettings? = null,
     ): Set<Tag> {
-        val tripTag = invoke(transactionDate)
+        val tripTag = invoke(transactionDate, travelSettings)
         return if (tripTag != null) initialTags + tripTag else initialTags
     }
 }

@@ -139,6 +139,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
             whenever(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
             whenever(db.accountDao().findByName(anyString())).thenReturn(null)
             whenever(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
+            whenever(settingsRepository.getCurrentTravelModeSettings()).thenReturn(null)
             whenever(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
             whenever(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getRecentManualTransactions(anyInt())).thenReturn(flowOf(emptyList()))

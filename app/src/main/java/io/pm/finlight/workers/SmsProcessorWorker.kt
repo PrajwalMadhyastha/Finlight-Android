@@ -153,28 +153,28 @@ class SmsProcessorWorker(
         }
 
         // --- Travel mode routing ---
-        val travelSettings = settingsRepository.getTravelModeSettings().first()
+        val travelSettings = settingsRepository.getCurrentTravelModeSettings()
         val homeCurrency = settingsRepository.getHomeCurrency().first()
         val isTravelModeActive =
             travelSettings?.isEnabled == true &&
                 Date().time in travelSettings.startDate..travelSettings.endDate
 
         val newTransactionId: Long? =
-            if (isTravelModeActive && travelSettings != null &&
+            if (isTravelModeActive &&
                 travelSettings.tripType == TripType.INTERNATIONAL
             ) {
                 when (potentialTxn.detectedCurrencyCode) {
                     travelSettings.currencyCode ->
                         saver.resolveAndSaveTransaction(potentialTxn, isForeign = true, travelSettings = travelSettings)
                     homeCurrency ->
-                        saver.resolveAndSaveTransaction(potentialTxn, isForeign = false)
+                        saver.resolveAndSaveTransaction(potentialTxn, isForeign = false, travelSettings = travelSettings)
                     else -> {
                         NotificationHelper.showTravelModeSmsNotification(context, potentialTxn, travelSettings)
                         null
                     }
                 }
             } else {
-                saver.resolveAndSaveTransaction(potentialTxn, isForeign = false)
+                saver.resolveAndSaveTransaction(potentialTxn, isForeign = false, travelSettings = travelSettings)
             }
 
         newTransactionId ?: return Result.success()

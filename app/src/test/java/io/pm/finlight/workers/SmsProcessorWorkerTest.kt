@@ -136,6 +136,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
         mockSettingsRepo = mockk(relaxed = true)
         every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(null)
+        coEvery { mockSettingsRepo.getCurrentTravelModeSettings() } returns null
         every { mockSettingsRepo.getHomeCurrency() } returns flowOf("INR")
         every { mockSettingsRepo.getAutoCaptureNotificationEnabled() } returns flowOf(false)
         io.pm.finlight.di.ServiceLocator.setSettingsRepository(mockSettingsRepo)
@@ -311,6 +312,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
                     startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "USD", conversionRate = 80f
                 )
             every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(travelSettings)
+            coEvery { mockSettingsRepo.getCurrentTravelModeSettings() } returns travelSettings
 
             val txn =
                 PotentialTransaction(

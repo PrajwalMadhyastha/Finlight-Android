@@ -486,6 +486,25 @@ class SettingsRepositoryTest {
             assertEquals(settings, result)
         }
 
+    @Test
+    fun `getCurrentTravelModeSettings delegates to travelSettingsRepository`() =
+        runTest {
+            val settings =
+                TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "Paris Trip",
+                    tripType = TripType.INTERNATIONAL,
+                    startDate = 1000L,
+                    endDate = 2000L,
+                    currencyCode = "EUR",
+                    conversionRate = 1.1f,
+                )
+            coEvery { travelSettingsRepository.getCurrentTravelModeSettings() } returns settings
+            val result = repository.getCurrentTravelModeSettings()
+            assertEquals(settings, result)
+            coVerify(exactly = 1) { travelSettingsRepository.getCurrentTravelModeSettings() }
+        }
+
     // --- Budget Settings ---
 
     @Test

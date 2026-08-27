@@ -78,4 +78,41 @@ class TravelSettingsRepositoryTest : BaseViewModelTest() {
             // Verify it was cleared from preferences
             assertNull(context.financeSettingsDataStore.data.first()[prefKey])
         }
+
+    @Test
+    fun `getCurrentTravelModeSettings returns null when empty`() =
+        runTest {
+            val result = repository.getCurrentTravelModeSettings()
+            assertNull(result)
+        }
+
+    @Test
+    fun `getCurrentTravelModeSettings returns saved settings`() =
+        runTest {
+            val futureEndDate = System.currentTimeMillis() + 100000L
+            val settings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 1L, futureEndDate, "USD", 83.5f)
+
+            repository.saveTravelModeSettings(settings)
+            val result = repository.getCurrentTravelModeSettings()
+
+            assertEquals(settings, result)
+        }
+
+    @Test
+    fun `getCurrentTravelModeSettings auto-expires past trips`() =
+        runTest {
+            val pastEndDate = 0L
+            val expiredSettings = TravelModeSettings(true, "Old Trip", TripType.DOMESTIC, 1L, pastEndDate, null, null)
+
+            val prefKey = stringPreferencesKey("travel_mode_settings")
+            context.financeSettingsDataStore.edit {
+                it[prefKey] = gson.toJson(expiredSettings)
+            }
+
+            val result = repository.getCurrentTravelModeSettings()
+            assertNull(result)
+
+            // Verify it was cleared from preferences
+            assertNull(context.financeSettingsDataStore.data.first()[prefKey])
+        }
 }

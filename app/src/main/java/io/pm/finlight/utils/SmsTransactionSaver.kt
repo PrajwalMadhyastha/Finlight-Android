@@ -143,7 +143,7 @@ class SmsTransactionSaver(
                 )
             }
 
-        val finalTags = resolveTravelModeTagUseCase.getFinalTags(potentialTxn.date, emptySet())
+        val finalTags = resolveTravelModeTagUseCase.getFinalTags(potentialTxn.date, emptySet(), travelSettings)
         val newId = transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
 
         // --- NEW: Attempt to detect and link self-transfers ---

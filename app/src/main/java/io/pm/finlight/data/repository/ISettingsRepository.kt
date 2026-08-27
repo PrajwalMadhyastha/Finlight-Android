@@ -127,6 +127,8 @@ interface ISettingsRepository {
 
     fun getTravelModeSettings(): Flow<TravelModeSettings?>
 
+    suspend fun getCurrentTravelModeSettings(): TravelModeSettings?
+
     // --- Budget Settings ---
     suspend fun saveOverallBudgetForCurrentMonth(amount: Float)
 

@@ -123,6 +123,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
 
         mockkConstructor(SettingsRepository::class)
         every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(null)
+        coEvery { anyConstructed<SettingsRepository>().getCurrentTravelModeSettings() } returns null
         every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
 
         mockClassifier = mockk(relaxed = true)

@@ -65,6 +65,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
 
         val mockSettingsRepo = mockk<ISettingsRepository>()
         every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(null)
+        coEvery { mockSettingsRepo.getCurrentTravelModeSettings() } returns null
         every { mockSettingsRepo.getHomeCurrency() } returns flowOf("INR")
 
         val tagRepository = TagRepository(tagDao, db.transactionQueryDao())

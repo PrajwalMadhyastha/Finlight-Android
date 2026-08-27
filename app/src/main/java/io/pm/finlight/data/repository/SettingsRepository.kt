@@ -219,6 +219,9 @@ class SettingsRepository(
     override fun getTravelModeSettings(): Flow<TravelModeSettings?> =
         travelSettingsRepository.getTravelModeSettings()
 
+    override suspend fun getCurrentTravelModeSettings(): TravelModeSettings? =
+        travelSettingsRepository.getCurrentTravelModeSettings()
+
     // --- Budget Settings ---
 
     override suspend fun saveOverallBudgetForCurrentMonth(amount: Float) =
