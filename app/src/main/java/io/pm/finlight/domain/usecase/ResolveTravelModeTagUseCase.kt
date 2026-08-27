@@ -41,4 +41,3 @@ class ResolveTravelModeTagUseCase(
         return if (tripTag != null) initialTags + tripTag else initialTags
     }
 }
-
