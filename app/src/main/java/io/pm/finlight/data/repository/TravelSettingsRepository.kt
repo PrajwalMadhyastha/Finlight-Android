@@ -11,6 +11,7 @@ import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
 
@@ -58,5 +59,16 @@ class TravelSettingsRepository(
                 settings
             }
             .distinctUntilChanged()
+    }
+
+    override suspend fun getCurrentTravelModeSettings(): TravelModeSettings? {
+        val preferences =
+            try {
+                dataStore.data.first()
+            } catch (e: Exception) {
+                emptyPreferences()
+            }
+        val json = preferences[KEY_TRAVEL_MODE_SETTINGS] ?: return null
+        return gson.fromJson(json, TravelModeSettings::class.java)
     }
 }

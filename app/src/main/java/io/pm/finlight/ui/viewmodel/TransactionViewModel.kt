@@ -1167,7 +1167,7 @@ class TransactionViewModel(
                 data.imageUris.mapNotNull { uri ->
                     saveImageToInternalStorage(uri)
                 }
-            val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, data.tags)
+            val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, data.tags, travelModeSettings.value)
             val newTransactionId =
                 transactionRepository.insertTransactionWithTagsAndImages(
                     transactionToSave,
@@ -1728,9 +1728,10 @@ class TransactionViewModel(
 
                 if (account == null) return@withContext false
 
+                val currentTravelSettings = travelModeSettings.value
                 val transactionToSave =
                     if (isForeign) {
-                        val travelSettings = settingsRepository.getTravelModeSettings().first()
+                        val travelSettings = currentTravelSettings
                         if (travelSettings == null) {
                             Log.e(TAG, "Attempted to save foreign SMS transaction, but Travel Mode is not configured.")
                             return@withContext false
@@ -1769,7 +1770,7 @@ class TransactionViewModel(
                         )
                     }
 
-                val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, tags)
+                val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, tags, currentTravelSettings)
                 transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
 
                 val merchantName = potentialTxn.merchantName
@@ -1848,7 +1849,7 @@ class TransactionViewModel(
                         source = source,
                     )
 
-                val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, emptySet())
+                val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, emptySet(), travelModeSettings.value)
                 transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
                 true
             } catch (e: Exception) {

@@ -65,10 +65,11 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
 
         val mockSettingsRepo = mockk<ISettingsRepository>()
         every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(null)
+        coEvery { mockSettingsRepo.getCurrentTravelModeSettings() } returns null
         every { mockSettingsRepo.getHomeCurrency() } returns flowOf("INR")
 
         val tagRepository = TagRepository(tagDao, db.transactionQueryDao())
-        val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(mockSettingsRepo, tagRepository)
+        val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(tagRepository)
         saver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)
     }
 

@@ -6,4 +6,6 @@ interface ITravelSettingsRepository {
     suspend fun saveTravelModeSettings(settings: TravelModeSettings?)
 
     fun getTravelModeSettings(): Flow<TravelModeSettings?>
+
+    suspend fun getCurrentTravelModeSettings(): TravelModeSettings?
 }

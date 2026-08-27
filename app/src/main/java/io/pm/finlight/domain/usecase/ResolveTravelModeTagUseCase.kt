@@ -1,11 +1,8 @@
 package io.pm.finlight.domain.usecase
 
-import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.ITagRepository
-import io.pm.finlight.ITravelSettingsRepository
 import io.pm.finlight.Tag
 import io.pm.finlight.TravelModeSettings
-import kotlinx.coroutines.flow.first
 
 /**
  * UseCase to resolve the travel mode trip tag for a transaction based on its timestamp.
@@ -13,31 +10,16 @@ import kotlinx.coroutines.flow.first
  * the corresponding trip tag is resolved (found or created).
  */
 class ResolveTravelModeTagUseCase(
-    private val travelSettingsProvider: suspend () -> TravelModeSettings?,
     private val tagRepository: ITagRepository,
 ) {
-    constructor(
-        travelSettingsRepository: ITravelSettingsRepository,
-        tagRepository: ITagRepository,
-    ) : this(
-        travelSettingsProvider = { travelSettingsRepository.getTravelModeSettings().first() },
-        tagRepository = tagRepository,
-    )
-
-    constructor(
-        settingsRepository: ISettingsRepository,
-        tagRepository: ITagRepository,
-    ) : this(
-        travelSettingsProvider = { settingsRepository.getTravelModeSettings().first() },
-        tagRepository = tagRepository,
-    )
-
     /**
-     * Returns the trip tag if travel mode is enabled and [transactionDate] is within the trip window,
+     * Returns the trip tag if travel mode is enabled in [travelSettings] and [transactionDate] is within the trip window,
      * or null otherwise.
      */
-    suspend operator fun invoke(transactionDate: Long): Tag? {
-        val travelSettings = travelSettingsProvider()
+    suspend operator fun invoke(
+        transactionDate: Long,
+        travelSettings: TravelModeSettings?,
+    ): Tag? {
         if (travelSettings?.isEnabled == true &&
             transactionDate >= travelSettings.startDate &&
             transactionDate <= travelSettings.endDate
@@ -53,8 +35,9 @@ class ResolveTravelModeTagUseCase(
     suspend fun getFinalTags(
         transactionDate: Long,
         initialTags: Set<Tag>,
+        travelSettings: TravelModeSettings?,
     ): Set<Tag> {
-        val tripTag = invoke(transactionDate)
+        val tripTag = invoke(transactionDate, travelSettings)
         return if (tripTag != null) initialTags + tripTag else initialTags
     }
 }

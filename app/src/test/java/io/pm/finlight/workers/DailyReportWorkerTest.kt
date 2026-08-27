@@ -263,4 +263,34 @@ class DailyReportWorkerTest : BaseViewModelTest() {
             assertEquals(ListenableWorker.Result.retry(), result)
             coVerify(exactly = 0) { ReminderManager.scheduleDailyReport(any()) }
         }
+
+    @Test
+    fun `doWork clears expired travel mode settings`() =
+        runTest {
+            val travelSettingsRepo: ITravelSettingsRepository = mockk(relaxed = true)
+            val expiredSettings =
+                TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "Past Trip",
+                    tripType = TripType.DOMESTIC,
+                    startDate = 0L,
+                    endDate = 1000L,
+                    currencyCode = null,
+                    conversionRate = null,
+                )
+            coEvery { travelSettingsRepo.getCurrentTravelModeSettings() } returns expiredSettings
+            coEvery { travelSettingsRepo.saveTravelModeSettings(null) } returns Unit
+            io.pm.finlight.di.ServiceLocator.setTravelSettingsRepository(travelSettingsRepo)
+
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
+            coEvery { transactionAnalyticsDao.getAverageDailySpendingForRange(any(), any()) } returns 0.0
+            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+
+            val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 1) { travelSettingsRepo.saveTravelModeSettings(null) }
+            io.pm.finlight.di.ServiceLocator.reset()
+        }
 }

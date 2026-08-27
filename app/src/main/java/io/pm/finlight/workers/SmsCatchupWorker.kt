@@ -48,7 +48,7 @@ class SmsCatchupWorker(
         val db = AppDatabase.getInstance(context)
         val settingsRepository = ServiceLocator.provideSettingsRepository(context)
         val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
-        val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(settingsRepository, tagRepository)
+        val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
         val saver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)
         val smsRepository = SmsRepository(context)
 
@@ -81,6 +81,9 @@ class SmsCatchupWorker(
         // Load ML models once for the entire scan batch (more efficient than per-SMS).
         val classifier = MlModelFactory.getClassifier(context)
         val nerExtractor = MlModelFactory.getNerExtractor(context)
+
+        // Load travel settings once for the entire scan batch.
+        val travelSettings = settingsRepository.getCurrentTravelModeSettings()
 
         // Track hashes we save during this run so we don't double-save within one batch.
         val savedHashesThisRun = mutableSetOf<String>()
@@ -132,6 +135,7 @@ class SmsCatchupWorker(
                 val newId =
                     saver.resolveAndSaveTransaction(
                         potentialTxn = potentialTxn,
+                        travelSettings = travelSettings,
                         source = "Auto-Recovered",
                     )
 
