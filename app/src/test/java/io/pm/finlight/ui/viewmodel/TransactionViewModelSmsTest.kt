@@ -59,7 +59,7 @@ class TransactionViewModelSmsTest : TransactionViewModelBaseSetup() {
                     startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "EUR", conversionRate = 90f
                 )
             whenever(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(travelSettings))
-            whenever(settingsRepository.getCurrentTravelModeSettings()).thenReturn(travelSettings)
+            initializeViewModel()
             whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
 
             // ACT

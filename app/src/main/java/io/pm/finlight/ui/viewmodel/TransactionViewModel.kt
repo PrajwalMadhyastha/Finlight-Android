@@ -1728,7 +1728,7 @@ class TransactionViewModel(
 
                 if (account == null) return@withContext false
 
-                val currentTravelSettings = travelModeSettings.value ?: settingsRepository.getCurrentTravelModeSettings()
+                val currentTravelSettings = travelModeSettings.value
                 val transactionToSave =
                     if (isForeign) {
                         val travelSettings = currentTravelSettings

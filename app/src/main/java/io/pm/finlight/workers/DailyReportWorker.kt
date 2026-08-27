@@ -100,6 +100,16 @@ class DailyReportWorker(
 
                 NotificationHelper.showDailyReportNotification(context, title, yesterdayExpenses, topCategories, now.timeInMillis)
 
+                try {
+                    val travelSettingsRepository = ServiceLocator.provideTravelSettingsRepository(context)
+                    val currentTravelSettings = travelSettingsRepository.getCurrentTravelModeSettings()
+                    if (currentTravelSettings != null && now.timeInMillis > currentTravelSettings.endDate) {
+                        travelSettingsRepository.saveTravelModeSettings(null)
+                    }
+                } catch (e: Exception) {
+                    Log.w("DailyReportWorker", "Failed to check or expire travel mode settings", e)
+                }
+
                 ReminderManager.scheduleDailyReport(context)
                 Result.success()
             } catch (e: Exception) {

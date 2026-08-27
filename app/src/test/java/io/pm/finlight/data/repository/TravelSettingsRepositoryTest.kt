@@ -2,12 +2,16 @@ package io.pm.finlight.data.repository
 
 import android.app.Application
 import android.os.Build
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import com.google.gson.Gson
+import io.mockk.every
+import io.mockk.mockk
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.TestApplication
 import io.pm.finlight.TravelModeSettings
@@ -16,11 +20,13 @@ import io.pm.finlight.TripType
 import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.io.IOException
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
@@ -99,7 +105,7 @@ class TravelSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `getCurrentTravelModeSettings auto-expires past trips`() =
+    fun `getCurrentTravelModeSettings does not mutate DataStore when trip is expired`() =
         runTest {
             val pastEndDate = 0L
             val expiredSettings = TravelModeSettings(true, "Old Trip", TripType.DOMESTIC, 1L, pastEndDate, null, null)
@@ -110,9 +116,20 @@ class TravelSettingsRepositoryTest : BaseViewModelTest() {
             }
 
             val result = repository.getCurrentTravelModeSettings()
-            assertNull(result)
+            assertEquals(expiredSettings, result)
 
-            // Verify it was cleared from preferences
-            assertNull(context.financeSettingsDataStore.data.first()[prefKey])
+            // Verify DataStore was NOT mutated (preserving Query-Command Separation)
+            assertEquals(gson.toJson(expiredSettings), context.financeSettingsDataStore.data.first()[prefKey])
+        }
+
+    @Test
+    fun `getCurrentTravelModeSettings returns null on IOException`() =
+        runTest {
+            val mockDataStore: DataStore<Preferences> = mockk()
+            every { mockDataStore.data } returns flow { throw IOException("Disk read failure") }
+            val repo = TravelSettingsRepository(mockDataStore)
+
+            val result = repo.getCurrentTravelModeSettings()
+            assertNull(result)
         }
 }

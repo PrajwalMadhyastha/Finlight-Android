@@ -15,7 +15,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
             val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
-            val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(settingsRepository, tagRepository)
+            val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
             val mergeTransactionsUseCase =
                 MergeTransactionsUseCase(
                     transactionQueryDao = db.transactionQueryDao(),

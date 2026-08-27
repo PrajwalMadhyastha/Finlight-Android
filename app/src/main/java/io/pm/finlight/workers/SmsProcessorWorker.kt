@@ -69,7 +69,7 @@ class SmsProcessorWorker(
         val db = AppDatabase.getInstance(context)
         val settingsRepository = ServiceLocator.provideSettingsRepository(context)
         val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
-        val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(settingsRepository, tagRepository)
+        val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
         val saver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)
 
         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())

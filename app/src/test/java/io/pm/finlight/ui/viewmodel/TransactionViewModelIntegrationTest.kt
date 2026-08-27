@@ -99,7 +99,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
             )
 
         // 4. Initialize ViewModel
-        val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(settingsRepository, tagRepository)
+        val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(tagRepository)
         viewModel =
             TransactionViewModel(
                 application = context,

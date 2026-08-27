@@ -69,12 +69,6 @@ class TravelSettingsRepository(
                 emptyPreferences()
             }
         val json = preferences[KEY_TRAVEL_MODE_SETTINGS] ?: return null
-        var settings = gson.fromJson(json, TravelModeSettings::class.java)
-
-        if (settings != null && System.currentTimeMillis() > settings.endDate) {
-            saveTravelModeSettings(null)
-            settings = null
-        }
-        return settings
+        return gson.fromJson(json, TravelModeSettings::class.java)
     }
 }
