@@ -90,6 +90,7 @@ abstract class BaseViewModelTest {
      */
     @Before
     open fun setup() {
+        io.pm.finlight.di.ServiceLocator.reset()
         MockitoAnnotations.openMocks(this)
         Dispatchers.setMain(testDispatcher)
     }
@@ -97,9 +98,11 @@ abstract class BaseViewModelTest {
     /**
      * Tears down the test environment after each test case.
      * - Resets the main coroutine dispatcher to its original state.
+     * - Resets ServiceLocator singletons.
      */
     @After
     open fun tearDown() {
+        io.pm.finlight.di.ServiceLocator.reset()
         Dispatchers.resetMain()
     }
 }

@@ -43,6 +43,8 @@ jobs:
 
       # 5. Run unit tests (107 test files, ~2 min on ubuntu-latest)
       - name: Run unit tests
+        env:
+          TZ: 'Asia/Kolkata'
         run: ./gradlew testDebugUnitTest
 
       # 6. Build debug APK — confirms the project compiles cleanly

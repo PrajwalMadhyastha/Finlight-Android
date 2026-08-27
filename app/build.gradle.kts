@@ -250,6 +250,16 @@ android {
     }
 }
 
+tasks.withType<Test>().configureEach {
+    maxHeapSize = "2048m"
+    jvmArgs(
+        "-XX:MaxMetaspaceSize=1024m",
+        "-Duser.timezone=Asia/Kolkata",
+    )
+    // Recycles test worker process every 35 test classes to release Robolectric memory
+    forkEvery = 35
+}
+
 // --- UPDATED: Added a resolution strategy to force a single version of Guava ---
 configurations.all {
     resolutionStrategy {
