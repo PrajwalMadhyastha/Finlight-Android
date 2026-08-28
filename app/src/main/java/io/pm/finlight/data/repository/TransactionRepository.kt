@@ -11,6 +11,7 @@ import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import java.util.Locale
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
@@ -368,6 +369,22 @@ class TransactionRepository(
     ) {
         transactionWriteDao.updateDescriptionForIds(ids, newDescription)
     }
+
+    override fun getTransactionCountsByOriginalDescription(): Flow<Map<String, Int>> =
+        transactionQueryDao.getTransactionCountsByOriginalDescription().map { list ->
+            list.associate { it.originalDesc.lowercase() to it.count }
+        }
+
+    override fun getTransactionsByOriginalDescription(originalDesc: String): Flow<List<TransactionDetails>> =
+        transactionQueryDao.getTransactionsByOriginalDescription(originalDesc)
+
+    override suspend fun updateDescriptionByOriginalDescription(
+        originalDesc: String,
+        newDescription: String,
+    ): Int =
+        withContext(dispatcherProvider.io) {
+            transactionWriteDao.updateDescriptionByOriginalDescription(originalDesc, newDescription)
+        }
 
     override fun getDailySpendingForDateRange(
         startDate: Long,
