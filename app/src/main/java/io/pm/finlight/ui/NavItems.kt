@@ -63,6 +63,7 @@ val screenTitles =
         "rule_creation_screen?potentialTransactionJson={potentialTransactionJson}&ruleId={ruleId}" to "Create/Edit Rule",
         "manage_parse_rules" to "Manage Parsing Rules",
         "manage_ignore_rules" to "Manage Ignore List",
+        "manage_merchant_rules" to "Merchant Rename Rules",
         "link_transaction_screen/{potentialTransactionJson}" to "Link to Existing Transaction",
         "retrospective_update_screen/{transactionId}/{originalDescription}?newDescription={newDescription}&newCategoryId={newCategoryId}" to "Update Similar",
         "appearance_settings" to "Theme & Appearance",
