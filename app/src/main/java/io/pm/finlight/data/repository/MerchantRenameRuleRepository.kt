@@ -15,6 +15,14 @@ import kotlinx.coroutines.flow.map
 class MerchantRenameRuleRepository(private val dao: MerchantRenameRuleDao) :
     IMerchantRenameRuleRepository {
     /**
+     * Retrieves all rename rules from the database as a Flow.
+     * @return A Flow emitting a List of MerchantRenameRule objects.
+     */
+    override fun getAllRules(): Flow<List<MerchantRenameRule>> {
+        return dao.getAllRules()
+    }
+
+    /**
      * Retrieves all rename rules and transforms them into a key-value map
      * for efficient lookups at display time.
      * @return A Flow emitting a Map where the key is the original name and the value is the new name.

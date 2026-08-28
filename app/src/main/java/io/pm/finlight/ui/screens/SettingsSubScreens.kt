@@ -210,6 +210,13 @@ fun AutomationSettingsScreen(
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsActionItem(
+                        text = "Merchant Rename Rules",
+                        subtitle = "View rules for auto-renaming merchants",
+                        icon = Icons.Default.Storefront,
+                        onClick = { navController.navigate("manage_merchant_rules") },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsActionItem(
                         text = "Debug SMS Parsing",
                         subtitle = "See why recent messages were parsed or ignored",
                         icon = Icons.Default.BugReport,

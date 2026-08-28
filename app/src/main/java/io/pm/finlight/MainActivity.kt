@@ -296,6 +296,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
     val reportsViewModel: ReportsViewModel = viewModel(factory = ReportsViewModelFactory(context))
     val manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = viewModel(factory = ManageIgnoreRulesViewModelFactory(context))
     val manageParseRulesViewModel: ManageParseRulesViewModel = viewModel(factory = ManageParseRulesViewModelFactory(context))
+    val manageMerchantRulesViewModel: ManageMerchantRulesViewModel = viewModel(factory = ManageMerchantRulesViewModelFactory(context))
     val tagViewModel: TagViewModel = viewModel(factory = TagViewModelFactory(context))
 
     val userName by dashboardViewModel.userName.collectAsState()
@@ -540,6 +541,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                 "tag_management" -> HelpActionIcon(helpKey = "tag_management")
                                 "manage_parse_rules" -> HelpActionIcon(helpKey = "manage_parse_rules")
                                 "manage_ignore_rules" -> HelpActionIcon(helpKey = "manage_ignore_rules")
+                                "manage_merchant_rules" -> HelpActionIcon(helpKey = "manage_merchant_rules")
                                 "add_budget", "edit_budget" -> HelpActionIcon(helpKey = "add_budget")
                                 "analysis_detail_screen" -> HelpActionIcon(helpKey = "analysis_detail_screen")
                                 "trip_detail" -> HelpActionIcon(helpKey = "trip_detail")
@@ -604,6 +606,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                 reportsViewModel = reportsViewModel,
                 manageIgnoreRulesViewModel = manageIgnoreRulesViewModel,
                 manageParseRulesViewModel = manageParseRulesViewModel,
+                manageMerchantRulesViewModel = manageMerchantRulesViewModel,
                 tagViewModel = tagViewModel,
             )
         }
@@ -679,6 +682,7 @@ fun AppNavHost(
     reportsViewModel: ReportsViewModel,
     manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel,
     manageParseRulesViewModel: ManageParseRulesViewModel,
+    manageMerchantRulesViewModel: ManageMerchantRulesViewModel,
     tagViewModel: TagViewModel,
 ) {
     NavHost(
@@ -799,6 +803,15 @@ fun AppNavHost(
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             ManageIgnoreRulesScreen(navController = navController, viewModel = manageIgnoreRulesViewModel)
+        }
+        composable(
+            "manage_merchant_rules",
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
+        ) {
+            ManageMerchantRulesScreen(navController = navController, viewModel = manageMerchantRulesViewModel)
         }
 
         composable(BottomNavItem.Dashboard.route) {
