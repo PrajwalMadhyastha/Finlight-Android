@@ -40,8 +40,7 @@ data class RecurringTransaction(
     val id: Int = 0,
     val description: String,
     val amount: Double,
-    // "income" or "expense"
-    val transactionType: String,
+    val transactionType: TransactionType = TransactionType.EXPENSE,
     // e.g., "Daily", "Weekly", "Monthly", "Yearly"
     val recurrenceInterval: String,
     // Timestamp for the first occurrence

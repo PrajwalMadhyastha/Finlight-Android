@@ -320,7 +320,7 @@ class AccountViewModelTest : BaseViewModelTest() {
                             date = 0,
                             accountId = accountId,
                             notes = null,
-                            transactionType = "income",
+                            transactionType = TransactionType.INCOME,
                         ),
                         emptyList(),
                         "",
@@ -338,7 +338,7 @@ class AccountViewModelTest : BaseViewModelTest() {
                             date = 0,
                             accountId = accountId,
                             notes = null,
-                            transactionType = "expense",
+                            transactionType = TransactionType.EXPENSE,
                         ),
                         emptyList(),
                         "",
@@ -356,7 +356,7 @@ class AccountViewModelTest : BaseViewModelTest() {
                             date = 0,
                             accountId = accountId,
                             notes = null,
-                            transactionType = "expense",
+                            transactionType = TransactionType.EXPENSE,
                         ),
                         emptyList(),
                         "",
@@ -447,19 +447,20 @@ class AccountViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `dismissMergeSuggestion calls settings repository`() {
-        // Arrange
-        val account1 = Account(id = 1, name = "Acc 1", type = "Bank")
-        val account2 = Account(id = 2, name = "Acc 2", type = "Bank")
-        val suggestion = Pair(account1, account2)
-        val expectedKey = "${min(account1.id, account2.id)}|${max(account1.id, account2.id)}"
+    fun `dismissMergeSuggestion calls settings repository`() =
+        runTest {
+            // Arrange
+            val account1 = Account(id = 1, name = "Acc 1", type = "Bank")
+            val account2 = Account(id = 2, name = "Acc 2", type = "Bank")
+            val suggestion = Pair(account1, account2)
+            val expectedKey = "${min(account1.id, account2.id)}|${max(account1.id, account2.id)}"
 
-        // Act
-        viewModel.dismissMergeSuggestion(suggestion)
+            // Act
+            viewModel.dismissMergeSuggestion(suggestion)
 
-        // Assert
-        verify(settingsRepository).addDismissedMergeSuggestion(expectedKey)
-    }
+            // Assert
+            verify(settingsRepository).addDismissedMergeSuggestion(expectedKey)
+        }
 
     @Test
     fun `enterSelectionModeWithSuggestions sets state correctly`() =

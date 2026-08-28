@@ -16,9 +16,14 @@ import io.mockk.verify
 import androidx.core.app.NotificationManagerCompat
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.TransactionDao
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.data.db.dao.TransactionReimbursementDao
+import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.TransactionRepository
+import io.pm.finlight.TransactionType
 import io.pm.finlight.SmsRepository
+import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -27,32 +32,46 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 
+import io.pm.finlight.BaseViewModelTest
+import kotlinx.coroutines.delay
+
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class MergeActionReceiverTest {
+class MergeActionReceiverTest : BaseViewModelTest() {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionWriteDao: TransactionWriteDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
+    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+    private lateinit var transactionReimbursementDao: TransactionReimbursementDao
     private lateinit var transactionRepository: TransactionRepository
     private lateinit var receiver: MergeActionReceiver
     private lateinit var mockNotificationManager: NotificationManagerCompat
 
     @Before
-    fun setup() {
+    override fun setup() {
+        super.setup()
         context = ApplicationProvider.getApplicationContext()
         db = mockk<AppDatabase>(relaxed = true)
-        transactionDao = mockk<TransactionDao>(relaxed = true)
+        transactionWriteDao = mockk<TransactionWriteDao>(relaxed = true)
+        transactionQueryDao = mockk<TransactionQueryDao>(relaxed = true)
+        transactionAnalyticsDao = mockk<TransactionAnalyticsDao>(relaxed = true)
+        transactionReimbursementDao = mockk<TransactionReimbursementDao>(relaxed = true)
         transactionRepository = mockk<TransactionRepository>(relaxed = true)
 
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionDao() } returns transactionDao
-        // Normally we'd use koin, but we inject or mockk constructor if needed
-        // For receiver which instantiates repository, we need to mockkConstructor
+        every { db.transactionQueryDao() } returns transactionQueryDao
+        every { db.transactionWriteDao() } returns transactionWriteDao
+        every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
+        every { db.transactionReimbursementDao() } returns transactionReimbursementDao
+
         io.mockk.mockkConstructor(TransactionRepository::class)
         io.mockk.mockkConstructor(SmsRepository::class)
-        coEvery { anyConstructed<TransactionRepository>().mergeTransactions(any(), any(), any(), any()) } returns Unit
+        io.mockk.mockkConstructor(MergeTransactionsUseCase::class)
+
+        coEvery { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) } returns Unit
         coEvery { anyConstructed<TransactionRepository>().getTransactionSync(any()) } returns null
         coEvery { anyConstructed<TransactionRepository>().dismissMerge(any()) } returns Unit
 
@@ -64,8 +83,9 @@ class MergeActionReceiverTest {
     }
 
     @After
-    fun tearDown() {
+    override fun tearDown() {
         unmockkAll()
+        super.tearDown()
     }
 
     @Test
@@ -80,9 +100,10 @@ class MergeActionReceiverTest {
 
             receiver.onReceive(context, intent)
 
-            coVerify(timeout = 2000) { anyConstructed<TransactionRepository>().mergeTransactions(1, 2, any(), any()) }
+            coVerify(timeout = 2000) { anyConstructed<MergeTransactionsUseCase>().invoke(1, 2, any(), any()) }
             verify(timeout = 2000) { mockNotificationManager.cancel(10002) }
             verify(timeout = 2000) { mockNotificationManager.cancel(2) }
+            delay(100)
         }
 
     @Test
@@ -99,6 +120,7 @@ class MergeActionReceiverTest {
             coVerify(timeout = 2000) { anyConstructed<TransactionRepository>().dismissMerge(2) }
             verify(timeout = 2000) { mockNotificationManager.cancel(10002) }
             verify(timeout = 2000) { mockNotificationManager.cancel(2) }
+            delay(100)
         }
 
     @Test
@@ -109,13 +131,13 @@ class MergeActionReceiverTest {
                     id = 2,
                     description = "Child",
                     amount = 100.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     date = 0L,
                     accountId = 1,
                     categoryId = 1,
                     notes = null,
                     originalDescription = "Child",
-                    sourceSmsId = 5
+                    sourceSmsId = 5,
                 )
             val sms = io.pm.finlight.SmsMessage(id = 5, sender = "Bank", body = "Test SMS body", date = 1000L)
 
@@ -132,7 +154,92 @@ class MergeActionReceiverTest {
             receiver.onReceive(context, intent)
 
             coVerify(timeout = 2000) {
-                anyConstructed<TransactionRepository>().mergeTransactions(1, 2, "Test SMS body", 1000L)
+                anyConstructed<MergeTransactionsUseCase>().invoke(1, 2, "Test SMS body", 1000L)
             }
+            delay(100)
+        }
+
+    @Test
+    fun `onReceive with null action does nothing`() =
+        runTest {
+            val intent = Intent()
+            receiver.onReceive(context, intent)
+            coVerify(exactly = 0) { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { anyConstructed<TransactionRepository>().dismissMerge(any()) }
+        }
+
+    @Test
+    fun `onReceive with unknown action cancels notification if childId valid`() =
+        runTest {
+            val intent =
+                Intent("UNKNOWN_ACTION").apply {
+                    putExtra("childTxnId", 2)
+                    putExtra("notificationId", 10002)
+                }
+            receiver.onReceive(context, intent)
+            coVerify(exactly = 0) { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { anyConstructed<TransactionRepository>().dismissMerge(any()) }
+            verify(timeout = 2000) { mockNotificationManager.cancel(10002) }
+            verify(timeout = 2000) { mockNotificationManager.cancel(2) }
+            delay(100)
+        }
+
+    @Test
+    fun `ACTION_MERGE with invalid IDs does not trigger merge`() =
+        runTest {
+            val intent =
+                Intent("ACTION_MERGE").apply {
+                    putExtra("parentTxnId", -1)
+                    putExtra("childTxnId", -1)
+                }
+            receiver.onReceive(context, intent)
+            coVerify(exactly = 0) { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) }
+            delay(100)
+        }
+
+    @Test
+    fun `ACTION_DISMISS with invalid childId does not call dismissMerge`() =
+        runTest {
+            val intent =
+                Intent("ACTION_DISMISS").apply {
+                    putExtra("childTxnId", -1)
+                }
+            receiver.onReceive(context, intent)
+            coVerify(exactly = 0) { anyConstructed<TransactionRepository>().dismissMerge(any()) }
+            delay(100)
+        }
+
+    @Test
+    fun `ACTION_MERGE handles missing SMS details gracefully`() =
+        runTest {
+            val childTxn =
+                io.pm.finlight.Transaction(
+                    id = 2,
+                    description = "Child",
+                    amount = 100.0,
+                    transactionType = TransactionType.EXPENSE,
+                    date = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    originalDescription = "Child",
+                    sourceSmsId = 5,
+                )
+            coEvery { anyConstructed<TransactionRepository>().getTransactionSync(2) } returns childTxn
+            coEvery { anyConstructed<SmsRepository>().getSmsDetailsById(5) } returns null
+
+            val intent =
+                Intent("ACTION_MERGE").apply {
+                    putExtra("parentTxnId", 1)
+                    putExtra("childTxnId", 2)
+                    putExtra("notificationId", 10002)
+                }
+
+            receiver.onReceive(context, intent)
+
+            coVerify(timeout = 2000) {
+                anyConstructed<MergeTransactionsUseCase>().invoke(1, 2, null, null)
+            }
+            delay(100)
         }
 }

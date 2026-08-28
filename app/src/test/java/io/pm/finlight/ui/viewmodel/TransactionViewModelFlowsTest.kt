@@ -295,7 +295,7 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
                         accountId = 1,
                         accountName = "Test Account",
                         amount = 100.0,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         isAnchor = true,
                         description = "Test Desc",
                         date = 1000L
@@ -308,7 +308,7 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
                     amount = 100.0,
                     date = 1000L,
                     accountId = 1,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     categoryId = null,
                     notes = null
                 )
@@ -317,7 +317,7 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
             whenever(transactionRepository.getImagesForTransaction(1)).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getReimbursementsForExpense(1)).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getTransactionCountForMerchant(anyOrNull())).thenReturn(flowOf(0))
-            whenever(transactionRepository.getMergedTransactionBreakdown(1)).thenReturn(breakdown)
+            whenever(mergeTransactionsUseCase.getMergedTransactionBreakdown(1)).thenReturn(breakdown)
             initializeViewModel()
 
             // Act

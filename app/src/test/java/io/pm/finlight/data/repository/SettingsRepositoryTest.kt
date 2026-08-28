@@ -1,590 +1,648 @@
 package io.pm.finlight.data.repository
 
-import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
-import android.os.Build
-import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import app.cash.turbine.test
-import com.google.gson.Gson
-import io.pm.finlight.BaseViewModelTest
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
 import io.pm.finlight.DashboardCardType
+import io.pm.finlight.IAppConfigRepository
+import io.pm.finlight.IBackupSettingsRepository
+import io.pm.finlight.IBudgetSettingsRepository
+import io.pm.finlight.IDashboardSettingsRepository
+import io.pm.finlight.IFeatureSettingsRepository
+import io.pm.finlight.IFirstLaunchSettingsRepository
+import io.pm.finlight.INotificationSettingsRepository
+import io.pm.finlight.ISecuritySettingsRepository
+import io.pm.finlight.ISmsRuleSettingsRepository
+import io.pm.finlight.ITravelSettingsRepository
 import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TestApplication
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TripType
 import io.pm.finlight.ui.theme.AppTheme
-import junit.framework.TestCase.assertFalse
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.annotation.Config
-import java.text.SimpleDateFormat
-import java.util.*
-import kotlin.test.DefaultAsserter.assertTrue
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
-@ExperimentalCoroutinesApi
-@RunWith(AndroidJUnit4::class)
-@Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class SettingsRepositoryTest : BaseViewModelTest() {
-    private lateinit var context: Application
+class SettingsRepositoryTest {
+    private val appConfigRepository: IAppConfigRepository = mockk(relaxed = true)
+    private val dashboardSettingsRepository: IDashboardSettingsRepository = mockk(relaxed = true)
+    private val securitySettingsRepository: ISecuritySettingsRepository = mockk(relaxed = true)
+    private val budgetSettingsRepository: IBudgetSettingsRepository = mockk(relaxed = true)
+    private val backupSettingsRepository: IBackupSettingsRepository = mockk(relaxed = true)
+    private val notificationSettingsRepository: INotificationSettingsRepository = mockk(relaxed = true)
+    private val smsRuleSettingsRepository: ISmsRuleSettingsRepository = mockk(relaxed = true)
+    private val travelSettingsRepository: ITravelSettingsRepository = mockk(relaxed = true)
+    private val firstLaunchSettingsRepository: IFirstLaunchSettingsRepository = mockk(relaxed = true)
+    private val featureSettingsRepository: IFeatureSettingsRepository = mockk(relaxed = true)
+
     private lateinit var repository: SettingsRepository
-    private lateinit var prefs: SharedPreferences
-    private lateinit var internalPrefs: SharedPreferences
-    private val gson = Gson()
-
-    // Helper to get the key format used by the repository
-    private fun getBudgetKey(
-        year: Int,
-        month: Int,
-    ): String {
-        return "overall_budget_${year}_${String.format("%02d", month)}"
-    }
 
     @Before
-    override fun setup() {
-        super.setup()
-        context = ApplicationProvider.getApplicationContext()
-        // Use the real SharedPreferences provided by Robolectric's context
-        prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-        internalPrefs = context.getSharedPreferences("finlight_internal_state", Context.MODE_PRIVATE)
-
-        // Clear prefs before each test to ensure a clean state
-        prefs.edit().clear().commit()
-        internalPrefs.edit().clear().commit()
-
-        repository = SettingsRepository(context)
+    fun setup() {
+        repository =
+            SettingsRepository(
+                appConfigRepository = appConfigRepository,
+                dashboardSettingsRepository = dashboardSettingsRepository,
+                securitySettingsRepository = securitySettingsRepository,
+                budgetSettingsRepository = budgetSettingsRepository,
+                backupSettingsRepository = backupSettingsRepository,
+                notificationSettingsRepository = notificationSettingsRepository,
+                smsRuleSettingsRepository = smsRuleSettingsRepository,
+                travelSettingsRepository = travelSettingsRepository,
+                firstLaunchSettingsRepository = firstLaunchSettingsRepository,
+                featureSettingsRepository = featureSettingsRepository,
+            )
     }
 
+    // --- Recurring Transaction Settings ---
+
     @Test
-    fun `save and get user name`() =
+    fun `saveRecurringTransactionsEnabled delegates to featureSettingsRepository`() =
         runTest {
-            val testName = "Jane Doe"
-            repository.getUserName().test {
-                assertEquals("User", awaitItem()) // Default value
-                repository.saveUserName(testName)
-                assertEquals(testName, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            repository.saveRecurringTransactionsEnabled(true)
+            coVerify(exactly = 1) { featureSettingsRepository.saveRecurringTransactionsEnabled(true) }
         }
 
     @Test
-    fun `save and get profile picture uri`() =
+    fun `getRecurringTransactionsEnabled delegates to featureSettingsRepository`() =
         runTest {
-            val testUri = "content://pictures/1"
-            repository.getProfilePictureUri().test {
-                assertNull(awaitItem()) // Initial state is null
-                repository.saveProfilePictureUri(testUri)
-                assertEquals(testUri, awaitItem())
-                repository.saveProfilePictureUri(null) // Test clearing
-                assertNull(awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            every { featureSettingsRepository.getRecurringTransactionsEnabled() } returns flowOf(true)
+            val result = repository.getRecurringTransactionsEnabled().first()
+            assertEquals(true, result)
+        }
+
+    // --- Savings Goals Settings ---
+
+    @Test
+    fun `saveGoalIncomeThreshold delegates to featureSettingsRepository`() =
+        runTest {
+            repository.saveGoalIncomeThreshold(5000)
+            coVerify(exactly = 1) { featureSettingsRepository.saveGoalIncomeThreshold(5000) }
         }
 
     @Test
-    fun `save and get app lock enabled`() =
+    fun `getGoalIncomeThreshold delegates to featureSettingsRepository`() =
         runTest {
-            repository.getAppLockEnabled().test {
-                assertEquals(false, awaitItem()) // Default
-                repository.saveAppLockEnabled(true)
-                assertEquals(true, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            every { featureSettingsRepository.getGoalIncomeThreshold() } returns flowOf(5000)
+            val result = repository.getGoalIncomeThreshold().first()
+            assertEquals(5000, result)
         }
 
     @Test
-    fun `isAppLockEnabledBlocking works`() {
-        assertEquals(false, repository.isAppLockEnabledBlocking())
-        repository.saveAppLockEnabled(true)
-        assertEquals(true, repository.isAppLockEnabledBlocking())
-    }
-
-    @Test
-    fun `save and get home currency`() =
+    fun `saveGoalNudgesEnabled delegates to featureSettingsRepository`() =
         runTest {
-            val testCurrency = "USD"
-            repository.getHomeCurrency().test {
-                assertEquals("INR", awaitItem()) // Default
-                repository.saveHomeCurrency(testCurrency)
-                assertEquals(testCurrency, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            repository.saveGoalNudgesEnabled(true)
+            coVerify(exactly = 1) { featureSettingsRepository.saveGoalNudgesEnabled(true) }
         }
 
     @Test
-    fun `save and get travel mode settings`() =
+    fun `getGoalNudgesEnabled delegates to featureSettingsRepository`() =
         runTest {
-            val futureEndDate = System.currentTimeMillis() + 100000L
-            val settings = TravelModeSettings(true, "US Trip", TripType.INTERNATIONAL, 1L, futureEndDate, "USD", 83.5f)
+            every { featureSettingsRepository.getGoalNudgesEnabled() } returns flowOf(true)
+            val result = repository.getGoalNudgesEnabled().first()
+            assertEquals(true, result)
+        }
 
-            repository.getTravelModeSettings().test {
-                assertNull(awaitItem()) // Initial
-                repository.saveTravelModeSettings(settings)
-                assertEquals(settings, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+    // --- Outlier Month Management Functions ---
+
+    @Test
+    fun `getExcludedIncomeMonths delegates to featureSettingsRepository`() =
+        runTest {
+            val months = setOf("2026-01", "2026-02")
+            every { featureSettingsRepository.getExcludedIncomeMonths() } returns flowOf(months)
+            val result = repository.getExcludedIncomeMonths().first()
+            assertEquals(months, result)
         }
 
     @Test
-    fun `getTravelModeSettings auto-expires past trips`() =
+    fun `getExcludedExpenseMonths delegates to featureSettingsRepository`() =
         runTest {
-            val pastEndDate = 0L
-            val expiredSettings = TravelModeSettings(true, "Old Trip", TripType.DOMESTIC, 1L, pastEndDate, null, null)
-
-            // Bypass saveTravelModeSettings to directly inject an "expired" state
-            prefs.edit().putString("travel_mode_settings", gson.toJson(expiredSettings)).commit()
-
-            repository.getTravelModeSettings().test {
-                val item = awaitItem()
-                assertEquals(null, item, "Item was $item")
-                cancelAndIgnoreRemainingEvents()
-            }
-
-            // Verify it was actually removed from prefs
-            assertNull(prefs.getString("travel_mode_settings", null))
+            val months = setOf("2026-03")
+            every { featureSettingsRepository.getExcludedExpenseMonths() } returns flowOf(months)
+            val result = repository.getExcludedExpenseMonths().first()
+            assertEquals(months, result)
         }
 
     @Test
-    fun `save and get selected theme`() =
+    fun `toggleIncomeMonthExclusion delegates to featureSettingsRepository`() =
         runTest {
-            val theme = AppTheme.AURORA
-
-            repository.getSelectedTheme().test {
-                assertEquals(AppTheme.SYSTEM_DEFAULT, awaitItem()) // Initial
-                repository.saveSelectedTheme(theme)
-                assertEquals(theme, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            repository.toggleIncomeMonthExclusion("2026-01")
+            coVerify(exactly = 1) { featureSettingsRepository.toggleIncomeMonthExclusion("2026-01") }
         }
 
     @Test
-    fun `getDashboardCardOrder_emitsDefaultOrder`() =
+    fun `toggleExpenseMonthExclusion delegates to featureSettingsRepository`() =
         runTest {
-            repository.getDashboardCardOrder().test {
-                // Check default
-                val defaultOrder = awaitItem()
-                assertTrue(defaultOrder.isNotEmpty())
-                assertEquals(DashboardCardType.HERO_BUDGET, defaultOrder.first())
-                // --- FIX: Correct the order to match the implementation's default ---
-                assertEquals(
-                    listOf(
-                        DashboardCardType.HERO_BUDGET,
-                        DashboardCardType.QUICK_ACTIONS,
-                        DashboardCardType.RECENT_TRANSACTIONS,
-                        DashboardCardType.SPENDING_CONSISTENCY,
-                        DashboardCardType.FINANCIAL_SIMULATORS,
-                        DashboardCardType.BUDGET_WATCH,
-                        DashboardCardType.ACCOUNTS_CAROUSEL,
-                        DashboardCardType.UPCOMING_PAYMENTS,
-                        DashboardCardType.RECURRING_SUGGESTIONS,
-                        DashboardCardType.SAVINGS_GOALS,
-                    ),
-                    defaultOrder,
+            repository.toggleExpenseMonthExclusion("2026-02")
+            coVerify(exactly = 1) { featureSettingsRepository.toggleExpenseMonthExclusion("2026-02") }
+        }
+
+    // --- Backup Settings ---
+
+    @Test
+    fun `saveBackupEnabled delegates to backupSettingsRepository`() =
+        runTest {
+            repository.saveBackupEnabled(true)
+            coVerify(exactly = 1) { backupSettingsRepository.saveBackupEnabled(true) }
+        }
+
+    @Test
+    fun `getBackupEnabled delegates to backupSettingsRepository`() =
+        runTest {
+            every { backupSettingsRepository.getBackupEnabled() } returns flowOf(true)
+            val result = repository.getBackupEnabled().first()
+            assertEquals(true, result)
+        }
+
+    @Test
+    fun `saveAutoBackupEnabled delegates to backupSettingsRepository`() =
+        runTest {
+            repository.saveAutoBackupEnabled(false)
+            coVerify(exactly = 1) { backupSettingsRepository.saveAutoBackupEnabled(false) }
+        }
+
+    @Test
+    fun `getAutoBackupEnabled delegates to backupSettingsRepository`() =
+        runTest {
+            every { backupSettingsRepository.getAutoBackupEnabled() } returns flowOf(false)
+            val result = repository.getAutoBackupEnabled().first()
+            assertEquals(false, result)
+        }
+
+    @Test
+    fun `saveAutoBackupNotificationEnabled delegates to backupSettingsRepository`() =
+        runTest {
+            repository.saveAutoBackupNotificationEnabled(true)
+            coVerify(exactly = 1) { backupSettingsRepository.saveAutoBackupNotificationEnabled(true) }
+        }
+
+    @Test
+    fun `getAutoBackupNotificationEnabled delegates to backupSettingsRepository`() =
+        runTest {
+            every { backupSettingsRepository.getAutoBackupNotificationEnabled() } returns flowOf(true)
+            val result = repository.getAutoBackupNotificationEnabled().first()
+            assertEquals(true, result)
+        }
+
+    @Test
+    fun `saveLastBackupTimestamp delegates to backupSettingsRepository`() =
+        runTest {
+            repository.saveLastBackupTimestamp(123456789L)
+            coVerify(exactly = 1) { backupSettingsRepository.saveLastBackupTimestamp(123456789L) }
+        }
+
+    @Test
+    fun `getLastBackupTimestamp delegates to backupSettingsRepository`() =
+        runTest {
+            every { backupSettingsRepository.getLastBackupTimestamp() } returns flowOf(123456789L)
+            val result = repository.getLastBackupTimestamp().first()
+            assertEquals(123456789L, result)
+        }
+
+    // --- SMS Rule and Merge Settings ---
+
+    @Test
+    fun `saveSmsScanStartDate delegates to smsRuleSettingsRepository`() =
+        runTest {
+            repository.saveSmsScanStartDate(1000L)
+            coVerify(exactly = 1) { smsRuleSettingsRepository.saveSmsScanStartDate(1000L) }
+        }
+
+    @Test
+    fun `getSmsScanStartDate delegates to smsRuleSettingsRepository`() =
+        runTest {
+            every { smsRuleSettingsRepository.getSmsScanStartDate() } returns flowOf(1000L)
+            val result = repository.getSmsScanStartDate().first()
+            assertEquals(1000L, result)
+        }
+
+    @Test
+    fun `saveIgnoreRulesChecksum delegates to smsRuleSettingsRepository`() =
+        runTest {
+            repository.saveIgnoreRulesChecksum(42)
+            coVerify(exactly = 1) { smsRuleSettingsRepository.saveIgnoreRulesChecksum(42) }
+        }
+
+    @Test
+    fun `getIgnoreRulesChecksum delegates to smsRuleSettingsRepository`() =
+        runTest {
+            coEvery { smsRuleSettingsRepository.getIgnoreRulesChecksum() } returns 42
+            val result = repository.getIgnoreRulesChecksum()
+            assertEquals(42, result)
+        }
+
+    @Test
+    fun `getDismissedMergeSuggestions delegates to smsRuleSettingsRepository`() =
+        runTest {
+            val suggestions = setOf("sug1", "sug2")
+            every { smsRuleSettingsRepository.getDismissedMergeSuggestions() } returns flowOf(suggestions)
+            val result = repository.getDismissedMergeSuggestions().first()
+            assertEquals(suggestions, result)
+        }
+
+    @Test
+    fun `addDismissedMergeSuggestion delegates to smsRuleSettingsRepository`() =
+        runTest {
+            repository.addDismissedMergeSuggestion("sug1")
+            coVerify(exactly = 1) { smsRuleSettingsRepository.addDismissedMergeSuggestion("sug1") }
+        }
+
+    // --- Notification and Report Settings ---
+
+    @Test
+    fun `saveDailyReportEnabled delegates to notificationSettingsRepository`() =
+        runTest {
+            repository.saveDailyReportEnabled(true)
+            coVerify(exactly = 1) { notificationSettingsRepository.saveDailyReportEnabled(true) }
+        }
+
+    @Test
+    fun `getDailyReportEnabled delegates to notificationSettingsRepository`() =
+        runTest {
+            every { notificationSettingsRepository.getDailyReportEnabled() } returns flowOf(true)
+            val result = repository.getDailyReportEnabled().first()
+            assertEquals(true, result)
+        }
+
+    @Test
+    fun `saveDailyReportTime delegates to notificationSettingsRepository`() =
+        runTest {
+            repository.saveDailyReportTime(20, 30)
+            coVerify(exactly = 1) { notificationSettingsRepository.saveDailyReportTime(20, 30) }
+        }
+
+    @Test
+    fun `getDailyReportTime delegates to notificationSettingsRepository`() =
+        runTest {
+            every { notificationSettingsRepository.getDailyReportTime() } returns flowOf(Pair(20, 30))
+            val result = repository.getDailyReportTime().first()
+            assertEquals(Pair(20, 30), result)
+        }
+
+    @Test
+    fun `saveWeeklySummaryEnabled delegates to notificationSettingsRepository`() =
+        runTest {
+            repository.saveWeeklySummaryEnabled(true)
+            coVerify(exactly = 1) { notificationSettingsRepository.saveWeeklySummaryEnabled(true) }
+        }
+
+    @Test
+    fun `getWeeklySummaryEnabled delegates to notificationSettingsRepository`() =
+        runTest {
+            every { notificationSettingsRepository.getWeeklySummaryEnabled() } returns flowOf(true)
+            val result = repository.getWeeklySummaryEnabled().first()
+            assertEquals(true, result)
+        }
+
+    @Test
+    fun `saveWeeklyReportTime delegates to notificationSettingsRepository`() =
+        runTest {
+            repository.saveWeeklyReportTime(1, 10, 0)
+            coVerify(exactly = 1) { notificationSettingsRepository.saveWeeklyReportTime(1, 10, 0) }
+        }
+
+    @Test
+    fun `getWeeklyReportTime delegates to notificationSettingsRepository`() =
+        runTest {
+            every { notificationSettingsRepository.getWeeklyReportTime() } returns flowOf(Triple(1, 10, 0))
+            val result = repository.getWeeklyReportTime().first()
+            assertEquals(Triple(1, 10, 0), result)
+        }
+
+    @Test
+    fun `saveMonthlySummaryEnabled delegates to notificationSettingsRepository`() =
+        runTest {
+            repository.saveMonthlySummaryEnabled(false)
+            coVerify(exactly = 1) { notificationSettingsRepository.saveMonthlySummaryEnabled(false) }
+        }
+
+    @Test
+    fun `getMonthlySummaryEnabled delegates to notificationSettingsRepository`() =
+        runTest {
+            every { notificationSettingsRepository.getMonthlySummaryEnabled() } returns flowOf(false)
+            val result = repository.getMonthlySummaryEnabled().first()
+            assertEquals(false, result)
+        }
+
+    @Test
+    fun `saveMonthlyReportTime delegates to notificationSettingsRepository`() =
+        runTest {
+            repository.saveMonthlyReportTime(15, 9, 30)
+            coVerify(exactly = 1) { notificationSettingsRepository.saveMonthlyReportTime(15, 9, 30) }
+        }
+
+    @Test
+    fun `getMonthlyReportTime delegates to notificationSettingsRepository`() =
+        runTest {
+            every { notificationSettingsRepository.getMonthlyReportTime() } returns flowOf(Triple(15, 9, 30))
+            val result = repository.getMonthlyReportTime().first()
+            assertEquals(Triple(15, 9, 30), result)
+        }
+
+    @Test
+    fun `saveAutoCaptureNotificationEnabled delegates to notificationSettingsRepository`() =
+        runTest {
+            repository.saveAutoCaptureNotificationEnabled(false)
+            coVerify(exactly = 1) { notificationSettingsRepository.saveAutoCaptureNotificationEnabled(false) }
+        }
+
+    @Test
+    fun `getAutoCaptureNotificationEnabled delegates to notificationSettingsRepository`() =
+        runTest {
+            every { notificationSettingsRepository.getAutoCaptureNotificationEnabled() } returns flowOf(false)
+            val result = repository.getAutoCaptureNotificationEnabled().first()
+            assertEquals(false, result)
+        }
+
+    @Test
+    fun `saveUnknownTransactionPopupEnabled delegates to notificationSettingsRepository`() =
+        runTest {
+            repository.saveUnknownTransactionPopupEnabled(true)
+            coVerify(exactly = 1) { notificationSettingsRepository.saveUnknownTransactionPopupEnabled(true) }
+        }
+
+    @Test
+    fun `getUnknownTransactionPopupEnabled delegates to notificationSettingsRepository`() =
+        runTest {
+            every { notificationSettingsRepository.getUnknownTransactionPopupEnabled() } returns flowOf(true)
+            val result = repository.getUnknownTransactionPopupEnabled().first()
+            assertEquals(true, result)
+        }
+
+    @Test
+    fun `setLastMonthSummaryDismissed delegates to notificationSettingsRepository`() =
+        runTest {
+            repository.setLastMonthSummaryDismissed()
+            coVerify(exactly = 1) { notificationSettingsRepository.setLastMonthSummaryDismissed() }
+        }
+
+    @Test
+    fun `hasLastMonthSummaryBeenDismissed delegates to notificationSettingsRepository`() =
+        runTest {
+            every { notificationSettingsRepository.hasLastMonthSummaryBeenDismissed() } returns flowOf(true)
+            val result = repository.hasLastMonthSummaryBeenDismissed().first()
+            assertEquals(true, result)
+        }
+
+    // --- App Config (User, Theme, Currency) ---
+
+    @Test
+    fun `saveUserName delegates to appConfigRepository`() =
+        runTest {
+            repository.saveUserName("Alice")
+            coVerify(exactly = 1) { appConfigRepository.saveUserName("Alice") }
+        }
+
+    @Test
+    fun `getUserName delegates to appConfigRepository`() =
+        runTest {
+            every { appConfigRepository.getUserName() } returns flowOf("Alice")
+            val result = repository.getUserName().first()
+            assertEquals("Alice", result)
+        }
+
+    @Test
+    fun `saveProfilePictureUri delegates to appConfigRepository`() =
+        runTest {
+            repository.saveProfilePictureUri("content://uri")
+            coVerify(exactly = 1) { appConfigRepository.saveProfilePictureUri("content://uri") }
+        }
+
+    @Test
+    fun `getProfilePictureUri delegates to appConfigRepository`() =
+        runTest {
+            every { appConfigRepository.getProfilePictureUri() } returns flowOf("content://uri")
+            val result = repository.getProfilePictureUri().first()
+            assertEquals("content://uri", result)
+        }
+
+    @Test
+    fun `saveSelectedTheme delegates to appConfigRepository`() =
+        runTest {
+            repository.saveSelectedTheme(AppTheme.SYSTEM_DEFAULT)
+            coVerify(exactly = 1) { appConfigRepository.saveSelectedTheme(AppTheme.SYSTEM_DEFAULT) }
+        }
+
+    @Test
+    fun `getSelectedTheme delegates to appConfigRepository`() =
+        runTest {
+            every { appConfigRepository.getSelectedTheme() } returns flowOf(AppTheme.SYSTEM_DEFAULT)
+            val result = repository.getSelectedTheme().first()
+            assertEquals(AppTheme.SYSTEM_DEFAULT, result)
+        }
+
+    @Test
+    fun `saveHomeCurrency delegates to appConfigRepository`() =
+        runTest {
+            repository.saveHomeCurrency("EUR")
+            coVerify(exactly = 1) { appConfigRepository.saveHomeCurrency("EUR") }
+        }
+
+    @Test
+    fun `getHomeCurrency delegates to appConfigRepository`() =
+        runTest {
+            every { appConfigRepository.getHomeCurrency() } returns flowOf("EUR")
+            val result = repository.getHomeCurrency().first()
+            assertEquals("EUR", result)
+        }
+
+    // --- Travel Mode Settings ---
+
+    @Test
+    fun `saveTravelModeSettings delegates to travelSettingsRepository`() =
+        runTest {
+            val settings =
+                TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "Paris Trip",
+                    tripType = TripType.INTERNATIONAL,
+                    startDate = 1000L,
+                    endDate = 2000L,
+                    currencyCode = "EUR",
+                    conversionRate = 1.1f,
                 )
-                cancelAndIgnoreRemainingEvents()
-            }
+            repository.saveTravelModeSettings(settings)
+            coVerify(exactly = 1) { travelSettingsRepository.saveTravelModeSettings(settings) }
         }
 
     @Test
-    fun `getDashboardVisibleCards_emitsDefaultSet`() =
+    fun `getTravelModeSettings delegates to travelSettingsRepository`() =
         runTest {
-            repository.getDashboardVisibleCards().test {
-                // Check default
-                val defaultVisible = awaitItem()
-                assertTrue(defaultVisible.isNotEmpty())
-                assertEquals(DashboardCardType.entries.toSet(), defaultVisible)
-                cancelAndIgnoreRemainingEvents()
-            }
+            val settings =
+                TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "Paris Trip",
+                    tripType = TripType.INTERNATIONAL,
+                    startDate = 1000L,
+                    endDate = 2000L,
+                    currencyCode = "EUR",
+                    conversionRate = 1.1f,
+                )
+            every { travelSettingsRepository.getTravelModeSettings() } returns flowOf(settings)
+            val result = repository.getTravelModeSettings().first()
+            assertEquals(settings, result)
         }
 
     @Test
-    fun `saveDashboardLayout_updatesOrderAndVisibility`() =
+    fun `getCurrentTravelModeSettings delegates to travelSettingsRepository`() =
         runTest {
-            val newOrder = listOf(DashboardCardType.RECENT_TRANSACTIONS, DashboardCardType.HERO_BUDGET)
-            val newVisible = setOf(DashboardCardType.RECENT_TRANSACTIONS)
-
-            // Act
-            repository.saveDashboardLayout(newOrder, newVisible)
-
-            // Assert Order
-            repository.getDashboardCardOrder().test {
-                val missingCards = DashboardCardType.entries.filter { it !in newOrder }
-                assertEquals(newOrder + missingCards, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-
-            // Assert Visibility
-            repository.getDashboardVisibleCards().test {
-                val missingCards = DashboardCardType.entries.filter { it !in newOrder }.toSet()
-                assertEquals(newVisible + missingCards, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            val settings =
+                TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "Paris Trip",
+                    tripType = TripType.INTERNATIONAL,
+                    startDate = 1000L,
+                    endDate = 2000L,
+                    currencyCode = "EUR",
+                    conversionRate = 1.1f,
+                )
+            coEvery { travelSettingsRepository.getCurrentTravelModeSettings() } returns settings
+            val result = repository.getCurrentTravelModeSettings()
+            assertEquals(settings, result)
+            coVerify(exactly = 1) { travelSettingsRepository.getCurrentTravelModeSettings() }
         }
 
+    // --- Budget Settings ---
+
     @Test
-    fun `loadCardOrder_appendsNewFeatures`() =
+    fun `saveOverallBudgetForCurrentMonth delegates to budgetSettingsRepository`() =
         runTest {
-            val oldOrder = listOf(DashboardCardType.HERO_BUDGET)
-            repository.saveDashboardLayout(oldOrder, setOf(DashboardCardType.HERO_BUDGET))
-
-            repository.getDashboardCardOrder().test {
-                val missingCards = DashboardCardType.entries.filter { it !in oldOrder }
-                assertEquals(oldOrder + missingCards, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            repository.saveOverallBudgetForCurrentMonth(1500f)
+            coVerify(exactly = 1) { budgetSettingsRepository.saveOverallBudgetForCurrentMonth(1500f) }
         }
 
     @Test
-    fun `loadVisibleCards_makesNewFeaturesVisible`() =
+    fun `saveOverallBudgetForMonth delegates to budgetSettingsRepository`() =
         runTest {
-            val oldOrder = listOf(DashboardCardType.HERO_BUDGET)
-            val oldVisible = setOf(DashboardCardType.HERO_BUDGET)
-            repository.saveDashboardLayout(oldOrder, oldVisible)
-
-            repository.getDashboardVisibleCards().test {
-                val missingCards = DashboardCardType.entries.filter { it !in oldOrder }.toSet()
-                assertEquals(oldVisible + missingCards, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            repository.saveOverallBudgetForMonth(2026, 8, 2000f)
+            coVerify(exactly = 1) { budgetSettingsRepository.saveOverallBudgetForMonth(2026, 8, 2000f) }
         }
 
     @Test
-    fun `save and get auto backup enabled`() =
+    fun `getOverallBudgetsForYear delegates to budgetSettingsRepository`() =
         runTest {
-            repository.getAutoBackupEnabled().test {
-                assertEquals(true, awaitItem()) // Default
-                repository.saveAutoBackupEnabled(false)
-                assertEquals(false, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            val yearBudgets = mapOf(1 to 1000f, 2 to 1200f)
+            coEvery { budgetSettingsRepository.getOverallBudgetsForYear(2026) } returns yearBudgets
+            val result = repository.getOverallBudgetsForYear(2026)
+            assertEquals(yearBudgets, result)
         }
 
     @Test
-    fun `save and get auto backup notification enabled`() =
+    fun `getOverallBudgetForMonth delegates to budgetSettingsRepository`() =
         runTest {
-            repository.getAutoBackupNotificationEnabled().test {
-                assertEquals(false, awaitItem()) // Default
-                repository.saveAutoBackupNotificationEnabled(true)
-                assertEquals(true, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            every { budgetSettingsRepository.getOverallBudgetForMonth(2026, 8) } returns flowOf(2000f)
+            val result = repository.getOverallBudgetForMonth(2026, 8).first()
+            assertEquals(2000f, result)
         }
 
+    // --- Dashboard Settings ---
+
     @Test
-    fun `save and get daily report enabled`() =
+    fun `saveDashboardLayout delegates to dashboardSettingsRepository`() =
         runTest {
-            repository.getDailyReportEnabled().test {
-                assertEquals(true, awaitItem()) // Default
-                repository.saveDailyReportEnabled(false)
-                assertEquals(false, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            val order = listOf(DashboardCardType.HERO_BUDGET, DashboardCardType.RECENT_TRANSACTIONS)
+            val visible = setOf(DashboardCardType.HERO_BUDGET)
+            repository.saveDashboardLayout(order, visible)
+            coVerify(exactly = 1) { dashboardSettingsRepository.saveDashboardLayout(order, visible) }
         }
 
     @Test
-    fun `save and get daily report time`() =
+    fun `getDashboardCardOrder delegates to dashboardSettingsRepository`() =
         runTest {
-            repository.getDailyReportTime().test {
-                assertEquals(Pair(23, 0), awaitItem()) // Default
-                repository.saveDailyReportTime(8, 30)
-                assertEquals(Pair(8, 30), awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            val order = listOf(DashboardCardType.HERO_BUDGET, DashboardCardType.RECENT_TRANSACTIONS)
+            every { dashboardSettingsRepository.getDashboardCardOrder() } returns flowOf(order)
+            val result = repository.getDashboardCardOrder().first()
+            assertEquals(order, result)
         }
 
     @Test
-    fun `save and get weekly summary enabled`() =
+    fun `getDashboardVisibleCards delegates to dashboardSettingsRepository`() =
         runTest {
-            repository.getWeeklySummaryEnabled().test {
-                assertEquals(true, awaitItem()) // Default
-                repository.saveWeeklySummaryEnabled(false)
-                assertEquals(false, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            val visible = setOf(DashboardCardType.HERO_BUDGET)
+            every { dashboardSettingsRepository.getDashboardVisibleCards() } returns flowOf(visible)
+            val result = repository.getDashboardVisibleCards().first()
+            assertEquals(visible, result)
         }
 
+    // --- Security Settings ---
+
     @Test
-    fun `save and get weekly report time`() =
+    fun `saveAppLockEnabled delegates to securitySettingsRepository`() =
         runTest {
-            repository.getWeeklyReportTime().test {
-                assertEquals(Triple(Calendar.SUNDAY, 9, 0), awaitItem()) // Default
-                repository.saveWeeklyReportTime(Calendar.TUESDAY, 10, 0)
-                assertEquals(Triple(Calendar.TUESDAY, 10, 0), awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            repository.saveAppLockEnabled(true)
+            coVerify(exactly = 1) { securitySettingsRepository.saveAppLockEnabled(true) }
         }
 
     @Test
-    fun `save and get monthly summary enabled`() =
+    fun `getAppLockEnabled delegates to securitySettingsRepository`() =
         runTest {
-            repository.getMonthlySummaryEnabled().test {
-                assertEquals(true, awaitItem()) // Default
-                repository.saveMonthlySummaryEnabled(false)
-                assertEquals(false, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            every { securitySettingsRepository.getAppLockEnabled() } returns flowOf(true)
+            val result = repository.getAppLockEnabled().first()
+            assertEquals(true, result)
         }
 
     @Test
-    fun `save and get monthly report time`() =
+    fun `savePrivacyModeEnabled delegates to securitySettingsRepository`() =
         runTest {
-            repository.getMonthlyReportTime().test {
-                assertEquals(Triple(1, 9, 0), awaitItem()) // Default
-                repository.saveMonthlyReportTime(15, 12, 0)
-                assertEquals(Triple(15, 12, 0), awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            repository.savePrivacyModeEnabled(true)
+            coVerify(exactly = 1) { securitySettingsRepository.savePrivacyModeEnabled(true) }
         }
 
     @Test
-    fun `save and get popup setting`() =
+    fun `getPrivacyModeEnabled delegates to securitySettingsRepository`() =
         runTest {
-            repository.getUnknownTransactionPopupEnabled().test {
-                assertEquals(true, awaitItem()) // Default
-                repository.saveUnknownTransactionPopupEnabled(false)
-                assertEquals(false, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-            // Test blocking getter
-            assertEquals(false, repository.isUnknownTransactionPopupEnabledBlocking())
+            every { securitySettingsRepository.getPrivacyModeEnabled() } returns flowOf(true)
+            val result = repository.getPrivacyModeEnabled().first()
+            assertEquals(true, result)
         }
 
     @Test
-    fun `save and get privacy mode`() =
+    fun `saveSimulatorPrivacyModeEnabled delegates to securitySettingsRepository`() =
         runTest {
-            repository.getPrivacyModeEnabled().test {
-                assertEquals(false, awaitItem()) // Default
-                repository.savePrivacyModeEnabled(true)
-                assertEquals(true, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            repository.saveSimulatorPrivacyModeEnabled(false)
+            coVerify(exactly = 1) { securitySettingsRepository.saveSimulatorPrivacyModeEnabled(false) }
         }
 
     @Test
-    fun `save and get simulator privacy mode`() =
+    fun `getSimulatorPrivacyModeEnabled delegates to securitySettingsRepository`() =
         runTest {
-            repository.getSimulatorPrivacyModeEnabled().test {
-                assertEquals(false, awaitItem()) // Default
-                repository.saveSimulatorPrivacyModeEnabled(true)
-                assertEquals(true, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            every { securitySettingsRepository.getSimulatorPrivacyModeEnabled() } returns flowOf(false)
+            val result = repository.getSimulatorPrivacyModeEnabled().first()
+            assertEquals(false, result)
         }
 
+    // --- First Launch and Onboarding State ---
+
     @Test
-    fun `save and get last backup timestamp`() =
+    fun `getHasSeenOnboarding delegates to firstLaunchSettingsRepository`() =
         runTest {
-            val timestamp = System.currentTimeMillis()
-            repository.getLastBackupTimestamp().test {
-                assertEquals(0L, awaitItem()) // Default
-                repository.saveLastBackupTimestamp(timestamp)
-                assertEquals(timestamp, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
+            every { firstLaunchSettingsRepository.getHasSeenOnboarding() } returns flowOf(true)
+            val result = repository.getHasSeenOnboarding().first()
+            assertEquals(true, result)
         }
 
     @Test
-    fun `first launch flag is managed correctly in internal prefs`() {
-        // Initial state
-        assertFalse(repository.isFirstLaunchCompleteBlocking())
-
-        // Set the flag
-        repository.setFirstLaunchComplete()
-
-        // Verify
-        assertTrue(repository.isFirstLaunchCompleteBlocking())
-        assertTrue(internalPrefs.contains("is_first_launch_complete"))
-        assertFalse("Main prefs should not contain the internal flag", prefs.contains("is_first_launch_complete"))
-    }
-
-    @Test
-    fun `last month summary dismissal is stored and checked correctly`() {
-        assertFalse("Should not be dismissed initially", repository.hasLastMonthSummaryBeenDismissed())
-
-        repository.setLastMonthSummaryDismissed()
-
-        assertTrue("Should be dismissed after setting", repository.hasLastMonthSummaryBeenDismissed())
-        val monthKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
-        assertTrue(prefs.contains("last_month_summary_dismissed_$monthKey"))
-    }
-
-    // --- Tests for Budget Carry-over Logic ---
-
-    @Test
-    fun `getOverallBudgetForMonth returns null when no budget is set`() =
+    fun `setHasSeenOnboarding delegates to firstLaunchSettingsRepository`() =
         runTest {
-            repository.getOverallBudgetForMonth(2025, 10).test {
-                assertNull(awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-            assertNull(repository.getOverallBudgetForMonthBlocking(2025, 10))
+            repository.setHasSeenOnboarding(true)
+            coVerify(exactly = 1) { firstLaunchSettingsRepository.setHasSeenOnboarding(true) }
         }
 
     @Test
-    fun `getOverallBudgetForMonth returns current month budget if set`() =
+    fun `getIsFirstLaunchComplete delegates to firstLaunchSettingsRepository`() =
         runTest {
-            val budget = 50000f
-            prefs.edit().putFloat(getBudgetKey(2025, 10), budget).commit()
-
-            repository.getOverallBudgetForMonth(2025, 10).test {
-                assertEquals(budget, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-            assertEquals(budget, repository.getOverallBudgetForMonthBlocking(2025, 10))
+            every { firstLaunchSettingsRepository.getIsFirstLaunchComplete() } returns flowOf(true)
+            val result = repository.getIsFirstLaunchComplete().first()
+            assertEquals(true, result)
         }
 
     @Test
-    fun `getOverallBudgetForMonth carries over budget from previous month`() =
+    fun `setFirstLaunchComplete delegates to firstLaunchSettingsRepository`() =
         runTest {
-            val budget = 40000f
-            // Budget set for September 2025
-            prefs.edit().putFloat(getBudgetKey(2025, 9), budget).commit()
-
-            // Asking for October 2025
-            repository.getOverallBudgetForMonth(2025, 10).test {
-                assertEquals(budget, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-            assertEquals(budget, repository.getOverallBudgetForMonthBlocking(2025, 10))
+            repository.setFirstLaunchComplete()
+            coVerify(exactly = 1) { firstLaunchSettingsRepository.setFirstLaunchComplete() }
         }
-
-    @Test
-    fun `getOverallBudgetForMonth carries over from several months ago`() =
-        runTest {
-            val budget = 30000f
-            // Budget set for June 2025
-            prefs.edit().putFloat(getBudgetKey(2025, 6), budget).commit()
-
-            // Asking for October 2025
-            repository.getOverallBudgetForMonth(2025, 10).test {
-                assertEquals(budget, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-            assertEquals(budget, repository.getOverallBudgetForMonthBlocking(2025, 10))
-        }
-
-    @Test
-    fun `getOverallBudgetForMonth prefers current month budget over carry-over`() =
-        runTest {
-            val oldBudget = 30000f
-            val currentBudget = 60000f
-            // Budget set for June 2025
-            prefs.edit().putFloat(getBudgetKey(2025, 6), oldBudget).commit()
-            // Budget also set for October 2025
-            prefs.edit().putFloat(getBudgetKey(2025, 10), currentBudget).commit()
-
-            // Asking for October 2025
-            repository.getOverallBudgetForMonth(2025, 10).test {
-                assertEquals(currentBudget, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-            assertEquals(currentBudget, repository.getOverallBudgetForMonthBlocking(2025, 10))
-        }
-
-    @Test
-    fun `getOverallBudgetsForYear returns list of Pair of month and budget`() =
-        runTest {
-            val year = 2026
-            prefs.edit()
-                .putFloat(getBudgetKey(year, 1), 1000f)
-                .putFloat(getBudgetKey(year, 3), 3000f)
-                .putFloat(getBudgetKey(year, 12), 12000f)
-                .putFloat(getBudgetKey(2025, 1), 500f) // Should be ignored
-                .commit()
-
-            val budgets = repository.getOverallBudgetsForYear(year)
-            assertEquals(3, budgets.size)
-            assertEquals(1000f, budgets[1])
-            assertEquals(3000f, budgets[3])
-            assertEquals(12000f, budgets[12])
-        }
-
-    @Test
-    fun `save and get recurring transactions enabled`() =
-        runTest {
-            repository.getRecurringTransactionsEnabled().test {
-                assertEquals(false, awaitItem()) // Default
-                repository.saveRecurringTransactionsEnabled(true)
-                assertEquals(true, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-        }
-
-    @Test
-    fun `save and get goal income threshold`() =
-        runTest {
-            repository.getGoalIncomeThreshold().test {
-                assertEquals(5000, awaitItem()) // Default
-                repository.saveGoalIncomeThreshold(10000)
-                assertEquals(10000, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-        }
-
-    @Test
-    fun `save and get goal nudges enabled`() =
-        runTest {
-            repository.getGoalNudgesEnabled().test {
-                assertEquals(true, awaitItem()) // Default
-                repository.saveGoalNudgesEnabled(false)
-                assertEquals(false, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-        }
-
-    @Test
-    fun `isGoalNudgesEnabledBlocking works correctly`() {
-        assertTrue(repository.isGoalNudgesEnabledBlocking()) // Default
-        repository.saveGoalNudgesEnabled(false)
-        assertFalse(repository.isGoalNudgesEnabledBlocking())
-    }
-
-    @Test
-    fun `toggle and get excluded income months`() =
-        runTest {
-            repository.getExcludedIncomeMonths().test {
-                assertEquals(emptySet(), awaitItem())
-
-                repository.toggleIncomeMonthExclusion("2026_01")
-                assertEquals(setOf("2026_01"), awaitItem())
-
-                repository.toggleIncomeMonthExclusion("2026_02")
-                assertEquals(setOf("2026_01", "2026_02"), awaitItem())
-
-                repository.toggleIncomeMonthExclusion("2026_01")
-                assertEquals(setOf("2026_02"), awaitItem())
-
-                cancelAndIgnoreRemainingEvents()
-            }
-        }
-
-    @Test
-    fun `toggle and get excluded expense months`() =
-        runTest {
-            repository.getExcludedExpenseMonths().test {
-                assertEquals(emptySet(), awaitItem())
-
-                repository.toggleExpenseMonthExclusion("2026_03")
-                assertEquals(setOf("2026_03"), awaitItem())
-
-                repository.toggleExpenseMonthExclusion("2026_03")
-                assertEquals(emptySet(), awaitItem())
-
-                cancelAndIgnoreRemainingEvents()
-            }
-        }
-
-    @Test
-    fun `save and get ignore rules checksum`() {
-        assertEquals(0, repository.getIgnoreRulesChecksum()) // Default
-        repository.saveIgnoreRulesChecksum(12345)
-        assertEquals(12345, repository.getIgnoreRulesChecksum())
-    }
 }

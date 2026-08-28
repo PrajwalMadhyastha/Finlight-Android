@@ -1,6 +1,5 @@
 package io.pm.finlight
 
-import android.content.Context
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -22,8 +21,10 @@ class EnableOnboardingRule : TestRule {
         return object : Statement() {
             override fun evaluate() {
                 val context = InstrumentationRegistry.getInstrumentation().targetContext
-                val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-                prefs.edit().putBoolean("has_seen_onboarding", false).commit()
+                kotlinx.coroutines.runBlocking {
+                    val settingsRepository = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
+                    settingsRepository.setHasSeenOnboarding(false)
+                }
                 base.evaluate()
             }
         }

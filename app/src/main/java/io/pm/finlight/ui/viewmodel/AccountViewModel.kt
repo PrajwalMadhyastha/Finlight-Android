@@ -15,11 +15,12 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.Account
-import io.pm.finlight.AccountRepository
 import io.pm.finlight.AccountWithBalance
-import io.pm.finlight.SettingsRepository
+import io.pm.finlight.IAccountRepository
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TransactionDetails
-import io.pm.finlight.TransactionRepository
+import io.pm.finlight.TransactionType
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -30,9 +31,9 @@ import kotlin.math.roundToLong
 
 class AccountViewModel(
     application: Application,
-    private val repository: AccountRepository,
-    private val transactionRepository: TransactionRepository,
-    private val settingsRepository: SettingsRepository,
+    private val repository: IAccountRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val settingsRepository: ISettingsRepository,
 ) : AndroidViewModel(application) {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
@@ -107,7 +108,9 @@ class AccountViewModel(
 
     fun dismissMergeSuggestion(suggestion: Pair<Account, Account>) {
         val key = "${min(suggestion.first.id, suggestion.second.id)}|${max(suggestion.first.id, suggestion.second.id)}"
-        settingsRepository.addDismissedMergeSuggestion(key)
+        viewModelScope.launch {
+            settingsRepository.addDismissedMergeSuggestion(key)
+        }
     }
 
     fun enterSelectionModeWithSuggestions(accounts: List<Account>) {
@@ -209,7 +212,7 @@ class AccountViewModel(
 
     fun getAccountBalance(accountId: Int): Flow<Long> {
         return transactionRepository.getTransactionsForAccount(accountId).map { transactions ->
-            transactions.sumOf { if (it.transactionType == "income") it.amount else -it.amount }.roundToLong()
+            transactions.sumOf { if (it.transactionType == TransactionType.INCOME) it.amount else -it.amount }.roundToLong()
         }
     }
 

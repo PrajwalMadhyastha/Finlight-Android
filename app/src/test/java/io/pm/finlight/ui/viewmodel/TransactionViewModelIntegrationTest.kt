@@ -11,7 +11,9 @@ import io.mockk.mockk
 import io.pm.finlight.*
 import io.pm.finlight.core.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.entity.MergeType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -43,6 +45,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
     private lateinit var merchantCategoryMappingRepository: MerchantCategoryMappingRepository
     private lateinit var merchantMappingRepository: MerchantMappingRepository
     private lateinit var splitTransactionRepository: SplitTransactionRepository
+    private lateinit var mergeTransactionsUseCase: io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 
     // Mocked Repositories (Non-DB / External)
     private lateinit var settingsRepository: SettingsRepository
@@ -70,14 +73,14 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
         every { settingsRepository.getOverallBudgetForMonth(any(), any()) } returns flowOf(0f)
 
         // 3. Initialize Real Repositories with DB DAOs
-        tagRepository = TagRepository(db.tagDao(), db.transactionDao())
+        tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
         transactionRepository =
             TransactionRepository(
-                transactionDao = db.transactionDao(),
-                settingsRepository = settingsRepository,
-                tagRepository = tagRepository,
-                deletedSmsHashDao = db.deletedSmsHashDao(),
-                mergeRecordDao = db.mergeRecordDao(), db = db,
+                transactionWriteDao = db.transactionWriteDao(),
+                transactionQueryDao = db.transactionQueryDao(),
+                transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                transactionReimbursementDao = db.transactionReimbursementDao(),
+                db = db,
             )
         accountRepository = AccountRepository(db)
         categoryRepository = CategoryRepository(db.categoryDao())
@@ -85,8 +88,18 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
         merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao())
         merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
+        mergeTransactionsUseCase =
+            io.pm.finlight.domain.usecase.MergeTransactionsUseCase(
+                transactionQueryDao = db.transactionQueryDao(),
+                transactionWriteDao = db.transactionWriteDao(),
+                transactionReimbursementDao = db.transactionReimbursementDao(),
+                mergeRecordDao = db.mergeRecordDao(),
+                deletedSmsHashDao = db.deletedSmsHashDao(),
+                db = db,
+            )
 
         // 4. Initialize ViewModel
+        val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(tagRepository)
         viewModel =
             TransactionViewModel(
                 application = context,
@@ -102,6 +115,8 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 merchantMappingRepository = merchantMappingRepository,
                 splitTransactionRepository = splitTransactionRepository,
                 smsParseTemplateDao = db.smsParseTemplateDao(),
+                resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
             )
     }
 
@@ -178,7 +193,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                         accountId = 1,
                         categoryId = 1,
                         notes = "Parent note",
-                        transactionType = "expense"
+                        transactionType = TransactionType.EXPENSE
                     ),
                     emptySet(),
                     emptyList()
@@ -193,7 +208,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                         accountId = 1,
                         categoryId = 1,
                         notes = "Child note",
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         sourceSmsHash = "xyz_hash_123"
                     ),
                     emptySet(),
@@ -201,7 +216,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 ).toLong()
 
             // Act
-            transactionRepository.mergeTransactions(parentTxnId.toInt(), childTxnId.toInt())
+            mergeTransactionsUseCase(parentTxnId.toInt(), childTxnId.toInt())
 
             // Assert
             val deletedHashes = db.deletedSmsHashDao().getAllHashes()
@@ -237,7 +252,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                         accountId = 1,
                         categoryId = 1,
                         notes = "anchor-note",
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                     ),
                     emptySet(),
                     emptyList(),
@@ -252,7 +267,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                         accountId = 1,
                         categoryId = 1,
                         notes = "child-note-1",
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         sourceSmsHash = "sms_hash_child1",
                     ),
                     emptySet(),
@@ -268,14 +283,14 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                         accountId = 1,
                         categoryId = 1,
                         notes = null,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                     ),
                     emptySet(),
                     emptyList(),
                 ).toInt()
 
             // Act
-            transactionRepository.manualMergeTransactions(anchorId, listOf(child1Id, child2Id))
+            mergeTransactionsUseCase.manualMerge(anchorId, listOf(child1Id, child2Id))
 
             advanceUntilIdle()
 
@@ -294,7 +309,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
             val groupIds = records.map { it.mergeGroupId }.toSet()
             assertEquals("All records share one non-blank groupId", 1, groupIds.size)
             assertTrue("groupId must not be blank", groupIds.first().isNotBlank())
-            assertTrue("All records have mergeType=MANUAL", records.all { it.mergeType == "MANUAL" })
+            assertTrue("All records have mergeType=MANUAL", records.all { it.mergeType == MergeType.MANUAL })
 
             // Assert: child SMS hash recorded in deny-list
             val deletedHashes = db.deletedSmsHashDao().getAllHashes()
@@ -322,7 +337,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                         accountId = 1,
                         categoryId = 1,
                         notes = "original-note",
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                     ),
                     emptySet(),
                     emptyList(),
@@ -337,7 +352,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                         accountId = 1,
                         categoryId = 1,
                         notes = null,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         sourceSmsHash = "undo_hash_A",
                     ),
                     emptySet(),
@@ -353,13 +368,13 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                         accountId = 1,
                         categoryId = 1,
                         notes = "child-b-note",
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                     ),
                     emptySet(),
                     emptyList(),
                 ).toInt()
 
-            transactionRepository.manualMergeTransactions(anchorId, listOf(child1Id, child2Id))
+            mergeTransactionsUseCase.manualMerge(anchorId, listOf(child1Id, child2Id))
             advanceUntilIdle()
 
             // Verify pre-condition: anchor exists, children deleted
@@ -368,7 +383,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
             assertNull(transactionRepository.getTransactionSync(child2Id))
 
             // Act: unmerge
-            transactionRepository.unmergeTransactions(anchorId)
+            mergeTransactionsUseCase.unmerge(anchorId)
             advanceUntilIdle()
 
             // Assert: anchor restored to original values
@@ -378,7 +393,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
             assertEquals("Anchor notes must be restored", "original-note", restoredAnchor.notes)
 
             // Assert: both children re-inserted with correct descriptions
-            val allTxns = db.transactionDao().getAllTransactionsSync()
+            val allTxns = db.transactionQueryDao().getAllTransactionsSimple().first()
             val childDescs = allTxns.map { it.description }
             assertTrue("Child A must be re-inserted", childDescs.contains("Child A"))
             assertTrue("Child B must be re-inserted", childDescs.contains("Child B"))

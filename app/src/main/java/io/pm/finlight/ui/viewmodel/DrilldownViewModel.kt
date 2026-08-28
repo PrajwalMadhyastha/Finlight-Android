@@ -15,6 +15,7 @@ import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.flow.*
 import java.util.*
@@ -36,7 +37,7 @@ class DrilldownViewModelFactory(
             val db = AppDatabase.getInstance(application)
             @Suppress("UNCHECKED_CAST")
             return DrilldownViewModel(
-                transactionDao = db.transactionDao(),
+                transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 drilldownType = drilldownType,
                 entityName = entityName,
                 month = month,
@@ -48,7 +49,7 @@ class DrilldownViewModelFactory(
 }
 
 class DrilldownViewModel(
-    private val transactionDao: TransactionDao,
+    private val transactionAnalyticsDao: TransactionAnalyticsDao,
     private val drilldownType: DrilldownType,
     val entityName: String,
     private val month: Int,
@@ -77,8 +78,8 @@ class DrilldownViewModel(
 
         transactionsForMonth =
             when (drilldownType) {
-                DrilldownType.CATEGORY -> transactionDao.getTransactionsForCategoryName(entityName, monthStart, monthEnd)
-                DrilldownType.MERCHANT -> transactionDao.getTransactionsForMerchantName(entityName, monthStart, monthEnd)
+                DrilldownType.CATEGORY -> transactionAnalyticsDao.getTransactionsForCategoryName(entityName, monthStart, monthEnd)
+                DrilldownType.MERCHANT -> transactionAnalyticsDao.getTransactionsForMerchantName(entityName, monthStart, monthEnd)
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         monthlyTrendChartData =
@@ -96,7 +97,7 @@ class DrilldownViewModel(
                     }
 
                 // Use getMonthlyTrends to show both income and expense
-                val monthlyTrends = transactionDao.getMonthlyTrends(startCal.timeInMillis).first()
+                val monthlyTrends = transactionAnalyticsDao.getMonthlyTrends(startCal.timeInMillis).first()
 
                 if (monthlyTrends.isEmpty()) {
                     emit(null)

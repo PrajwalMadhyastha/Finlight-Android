@@ -57,6 +57,8 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
 
     @Mock protected lateinit var smsParseTemplateDao: SmsParseTemplateDao
 
+    @Mock protected lateinit var mergeTransactionsUseCase: io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+
     // Mocks for DAOs used by the ViewModel and internal logic
     @Mock protected lateinit var accountDao: AccountDao
 
@@ -64,7 +66,13 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
 
     @Mock protected lateinit var tagDao: TagDao
 
-    @Mock protected lateinit var transactionDao: TransactionDao
+    @Mock protected lateinit var transactionWriteDao: TransactionWriteDao
+
+    @Mock protected lateinit var transactionQueryDao: TransactionQueryDao
+
+    @Mock protected lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+
+    @Mock protected lateinit var transactionReimbursementDao: TransactionReimbursementDao
 
     @Mock protected lateinit var customSmsRuleDao: CustomSmsRuleDao
 
@@ -90,7 +98,10 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
         whenever(db.accountDao()).thenReturn(accountDao)
         whenever(db.categoryDao()).thenReturn(categoryDao)
         whenever(db.tagDao()).thenReturn(tagDao)
-        whenever(db.transactionDao()).thenReturn(transactionDao)
+        whenever(db.transactionQueryDao()).thenReturn(transactionQueryDao)
+        whenever(db.transactionWriteDao()).thenReturn(transactionWriteDao)
+        whenever(db.transactionAnalyticsDao()).thenReturn(transactionAnalyticsDao)
+        whenever(db.transactionReimbursementDao()).thenReturn(transactionReimbursementDao)
         whenever(db.customSmsRuleDao()).thenReturn(customSmsRuleDao)
         whenever(db.ignoreRuleDao()).thenReturn(ignoreRuleDao)
         whenever(db.merchantCategoryMappingDao()).thenReturn(merchantCategoryMappingDao)
@@ -128,15 +139,17 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
             whenever(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(0f))
             whenever(db.accountDao().findByName(anyString())).thenReturn(null)
             whenever(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(null))
+            whenever(settingsRepository.getCurrentTravelModeSettings()).thenReturn(null)
             whenever(settingsRepository.getPrivacyModeEnabled()).thenReturn(flowOf(false))
             whenever(transactionRepository.searchMerchants(anyString())).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getRecentManualTransactions(anyInt())).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getReimbursementsForExpense(anyInt())).thenReturn(flowOf(emptyList()))
-            whenever(transactionDao.getSmsHashesByIds(any())).thenReturn(emptyList())
+            whenever(transactionQueryDao.getSmsHashesByIds(any())).thenReturn(emptyList())
         }
     }
 
     protected fun initializeViewModel() {
+        val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(tagRepository)
         viewModel =
             TransactionViewModel(
                 application = applicationContext,
@@ -152,6 +165,9 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
                 merchantMappingRepository = merchantMappingRepository,
                 splitTransactionRepository = splitTransactionRepository,
                 smsParseTemplateDao = smsParseTemplateDao,
+                resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
+                dispatcherProvider = io.pm.finlight.utils.TestDispatcherProvider(testDispatcher),
             )
     }
 }

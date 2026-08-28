@@ -58,7 +58,10 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     private lateinit var recurringPatternDao: RecurringPatternDao
 
     @Mock
-    private lateinit var smsRepository: SmsRepository
+    private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+
+    @Mock
+    private lateinit var mergeTransactionsUseCase: io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 
     protected lateinit var viewModel: DashboardViewModel
 
@@ -138,7 +141,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
 
         // --- FIX: Add missing mock for the new dependency ---
-        `when`(transactionRepository.getMonthlyConsistencyData(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
+        `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
         `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(emptyList()))
         `when`(recurringPatternDao.getUnacknowledgedPatterns()).thenReturn(flowOf(emptyList()))
@@ -158,7 +161,8 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 timeProvider = timeProvider,
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
-                smsRepository = smsRepository,
+                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
             )
     }
 
@@ -173,7 +177,8 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 timeProvider = timeProvider,
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
-                smsRepository = smsRepository,
+                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
             )
     }
 
@@ -203,7 +208,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val summary = FinancialSummary(1000.0, 500.0)
-            Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
+            Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(flowOf(false))
             Mockito.`when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
                 .thenReturn(flowOf(summary))
 
@@ -225,7 +230,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val summary = FinancialSummary(1000.0, 500.0)
-            Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
+            Mockito.`when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(flowOf(false))
             Mockito.`when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
                 .thenReturn(flowOf(summary))
 
@@ -517,7 +522,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             // Arrange - Force the time to be the 1st of the month
             val firstOfMonth = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1) }
             `when`(timeProvider.now()).thenReturn(firstOfMonth)
-            `when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(false)
+            `when`(settingsRepository.hasLastMonthSummaryBeenDismissed()).thenReturn(flowOf(false))
             `when`(
                 transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()),
             ).thenReturn(flowOf(FinancialSummary(1.0, 1.0)))
@@ -671,7 +676,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
 
             `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(firstTransactionDate))
             // --- FIX: Mock the new dependency, not the old one ---
-            `when`(transactionRepository.getMonthlyConsistencyData(eq(year), anyInt())).thenAnswer { invocation ->
+            `when`(getMonthlyConsistencyDataUseCase(eq(year), anyInt())).thenAnswer { invocation ->
                 val month = invocation.getArgument<Int>(1)
                 if (month == 1) { // Assuming test days are in January
                     // Generate a full list for the month
@@ -756,7 +761,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val now = System.currentTimeMillis()
-            val rule = RecurringTransaction(1, "Netflix", 149.0, "expense", "Monthly", now, 1, 1, null)
+            val rule = RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", now, 1, 1, null)
             `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(listOf(rule)))
             initializeViewModel()
 
@@ -777,11 +782,11 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             // Arrange
             val now = System.currentTimeMillis()
             // rule1 is due today + 10 days
-            val rule1 = RecurringTransaction(1, "Sub1", 10.0, "expense", "Monthly", now - 20L * 24 * 60 * 60 * 1000, 1, 1, null)
+            val rule1 = RecurringTransaction(1, "Sub1", 10.0, TransactionType.EXPENSE, "Monthly", now - 20L * 24 * 60 * 60 * 1000, 1, 1, null)
             // rule2 is due today + 40 days (should be filtered out)
-            val rule2 = RecurringTransaction(2, "Sub2", 20.0, "expense", "Monthly", now + 10L * 24 * 60 * 60 * 1000, 1, 1, null)
+            val rule2 = RecurringTransaction(2, "Sub2", 20.0, TransactionType.EXPENSE, "Monthly", now + 10L * 24 * 60 * 60 * 1000, 1, 1, null)
             // rule3 is due today + 5 days
-            val rule3 = RecurringTransaction(3, "Sub3", 30.0, "expense", "Monthly", now - 25L * 24 * 60 * 60 * 1000, 1, 1, null)
+            val rule3 = RecurringTransaction(3, "Sub3", 30.0, TransactionType.EXPENSE, "Monthly", now - 25L * 24 * 60 * 60 * 1000, 1, 1, null)
 
             `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(listOf(rule1, rule2, rule3)))
             initializeViewModel()
@@ -802,7 +807,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     fun `patternSuggestions flow receives data from dao`() =
         runTest {
             // Arrange
-            val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, "expense", 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
+            val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, TransactionType.EXPENSE, 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
             `when`(recurringPatternDao.getUnacknowledgedPatterns()).thenReturn(flowOf(listOf(pattern)))
             initializeViewModel()
 
@@ -819,8 +824,8 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     fun `mergeSuggestion identifies valid mergeable transactions`() =
         runTest {
             val now = System.currentTimeMillis()
-            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = now - 3600000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = false)
-            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = now, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = false)
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = now - 3600000L, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE, mergeDismissed = false)
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = now, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE, mergeDismissed = false)
 
             val parentDetails = TransactionDetails(parentTxn, emptyList(), "Account", "Category", null, null, null)
             val childDetails = TransactionDetails(childTxn, emptyList(), "Account", "Category", null, null, null)
@@ -843,8 +848,8 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     fun `mergeSuggestion ignores dismissed transactions`() =
         runTest {
             val now = System.currentTimeMillis()
-            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = now - 3600000L, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = true)
-            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = now, accountId = 1, categoryId = 1, notes = null, transactionType = "expense", mergeDismissed = false)
+            val parentTxn = Transaction(id = 1, description = "Test", amount = 100.0, date = now - 3600000L, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE, mergeDismissed = true)
+            val childTxn = Transaction(id = 2, description = "Test", amount = 50.0, date = now, accountId = 1, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE, mergeDismissed = false)
 
             val parentDetails = TransactionDetails(parentTxn, emptyList(), "Account", "Category", null, null, null)
             val childDetails = TransactionDetails(childTxn, emptyList(), "Account", "Category", null, null, null)
@@ -868,7 +873,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             viewModel.executeMerge(1, listOf(2))
             advanceUntilIdle()
 
-            verify(transactionRepository).manualMergeTransactions(1, listOf(2))
+            verify(mergeTransactionsUseCase).manualMerge(1, listOf(2))
         }
 
     @Test

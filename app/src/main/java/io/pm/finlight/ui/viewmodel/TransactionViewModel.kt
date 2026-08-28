@@ -18,14 +18,17 @@ import io.pm.finlight.core.utils.StringSimilarity
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.data.model.MergedTransactionItem
+import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
 import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.HeuristicCategorizer
-import io.pm.finlight.utils.applyAliases
 import io.pm.finlight.utils.ShareImageGenerator
-import kotlinx.coroutines.Dispatchers
+import io.pm.finlight.utils.applyAliases
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -70,7 +73,7 @@ data class ManualTransactionData(
     val accountId: Int,
     val notes: String?,
     val date: Long,
-    val transactionType: String,
+    val transactionType: TransactionType,
     val imageUris: List<Uri>,
     val tags: Set<Tag>,
 )
@@ -104,17 +107,28 @@ data class CanonicalNudgeSheetState(
 class TransactionViewModel(
     application: Application,
     private val db: AppDatabase,
-    val transactionRepository: TransactionRepository,
-    val accountRepository: AccountRepository,
-    val categoryRepository: CategoryRepository,
-    private val tagRepository: TagRepository,
-    private val settingsRepository: SettingsRepository,
-    private val smsRepository: SmsRepository,
-    private val merchantRenameRuleRepository: MerchantRenameRuleRepository,
-    private val merchantCategoryMappingRepository: MerchantCategoryMappingRepository,
-    private val merchantMappingRepository: MerchantMappingRepository,
-    private val splitTransactionRepository: SplitTransactionRepository,
+    val transactionRepository: ITransactionRepository,
+    val accountRepository: IAccountRepository,
+    val categoryRepository: ICategoryRepository,
+    private val tagRepository: ITagRepository,
+    private val settingsRepository: ISettingsRepository,
+    private val smsRepository: ISmsRepository,
+    private val merchantRenameRuleRepository: IMerchantRenameRuleRepository,
+    private val merchantCategoryMappingRepository: IMerchantCategoryMappingRepository,
+    private val merchantMappingRepository: IMerchantMappingRepository,
+    private val splitTransactionRepository: ISplitTransactionRepository,
     private val smsParseTemplateDao: SmsParseTemplateDao,
+    private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
+    private val mergeTransactionsUseCase: MergeTransactionsUseCase =
+        MergeTransactionsUseCase(
+            transactionQueryDao = db.transactionQueryDao(),
+            transactionWriteDao = db.transactionWriteDao(),
+            transactionReimbursementDao = db.transactionReimbursementDao(),
+            mergeRecordDao = db.mergeRecordDao(),
+            deletedSmsHashDao = db.deletedSmsHashDao(),
+            db = db,
+        ),
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : AndroidViewModel(application) {
     private val context = application
 
@@ -146,8 +160,8 @@ class TransactionViewModel(
         combine(_selectedTransactionIds, transactionsForSelectedMonth) { ids, txns ->
             if (ids.size < 2) return@combine false
             val selected = txns.filter { it.transaction.id in ids }
-            val expenseCount = selected.count { it.transaction.transactionType == "expense" }
-            val incomeCount = selected.count { it.transaction.transactionType == "income" }
+            val expenseCount = selected.count { it.transaction.transactionType == TransactionType.EXPENSE }
+            val incomeCount = selected.count { it.transaction.transactionType == TransactionType.INCOME }
             expenseCount == 1 && incomeCount >= 1
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     }
@@ -176,7 +190,7 @@ class TransactionViewModel(
             if (ids.size < 2) return@combine false
             val selected = txns.filter { it.transaction.id in ids }
             val hasSplit = selected.any { it.transaction.isSplit }
-            val hasPending = selected.any { it.transaction.status == "PENDING" || it.transaction.status == "SKIPPED" }
+            val hasPending = selected.any { it.transaction.status == TransactionStatus.PENDING || it.transaction.status == TransactionStatus.SKIPPED }
             !hasSplit && !hasPending
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     }
@@ -218,10 +232,7 @@ class TransactionViewModel(
             Pair(month, filters)
         }
 
-    val hasSeenOnboarding: Flow<Boolean> =
-        flow {
-            emit(settingsRepository.hasSeenOnboarding())
-        }
+    val hasSeenOnboarding: Flow<Boolean> = settingsRepository.getHasSeenOnboarding()
 
     val goalIncomeThreshold: StateFlow<Int> =
         settingsRepository.getGoalIncomeThreshold()
@@ -465,10 +476,10 @@ class TransactionViewModel(
                         set(Calendar.MINUTE, 59)
                         set(Calendar.SECOND, 59)
                     }.timeInMillis
-                val typeStr =
+                val typeEnum =
                     when (filters.transactionType) {
-                        AnalysisTransactionType.EXPENSE -> "expense"
-                        AnalysisTransactionType.INCOME -> "income"
+                        AnalysisTransactionType.EXPENSE -> TransactionType.EXPENSE
+                        AnalysisTransactionType.INCOME -> TransactionType.INCOME
                         AnalysisTransactionType.ALL -> null
                     }
                 transactionRepository.getSpendingByCategoryForMonth(
@@ -476,7 +487,7 @@ class TransactionViewModel(
                     filters.keyword.takeIf {
                         it.isNotBlank()
                     },
-                    filters.account?.id, filters.category?.id, typeStr,
+                    filters.account?.id, filters.category?.id, typeEnum,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -498,10 +509,10 @@ class TransactionViewModel(
                         set(Calendar.MINUTE, 59)
                         set(Calendar.SECOND, 59)
                     }.timeInMillis
-                val typeStr =
+                val typeEnum =
                     when (filters.transactionType) {
-                        AnalysisTransactionType.EXPENSE -> "expense"
-                        AnalysisTransactionType.INCOME -> "income"
+                        AnalysisTransactionType.EXPENSE -> TransactionType.EXPENSE
+                        AnalysisTransactionType.INCOME -> TransactionType.INCOME
                         AnalysisTransactionType.ALL -> null
                     }
                 transactionRepository.getSpendingByMerchantForMonth(
@@ -509,7 +520,7 @@ class TransactionViewModel(
                     filters.keyword.takeIf {
                         it.isNotBlank()
                     },
-                    filters.account?.id, filters.category?.id, typeStr,
+                    filters.account?.id, filters.category?.id, typeEnum,
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -581,11 +592,11 @@ class TransactionViewModel(
                 loadVisitCount(it.description)
 
                 // --- Reimbursement data ---
-                if (it.transactionType == "expense") {
+                if (it.transactionType == TransactionType.EXPENSE) {
                     transactionRepository.getReimbursementsForExpense(it.id).collect { reimbursements ->
                         _reimbursementsForCurrentExpense.value = reimbursements
                     }
-                } else if (it.transactionType == "income" && it.parentReimbursementId != null) {
+                } else if (it.transactionType == TransactionType.INCOME && it.parentReimbursementId != null) {
                     transactionRepository.getLinkedExpenseForReimbursement(it.id).collect { expense ->
                         _linkedExpenseForCurrentIncome.value = expense
                     }
@@ -596,9 +607,9 @@ class TransactionViewModel(
         // Load merged account breakdown separately so it doesn't block the reimbursement flow.
         // This is a one-shot suspend call — the detail screen never stays open across an
         // unmerge (navigation pops back), so a Flow is unnecessary.
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatcherProvider.io) {
             _mergedTransactionBreakdown.value =
-                transactionRepository.getMergedTransactionBreakdown(transactionId)
+                mergeTransactionsUseCase.getMergedTransactionBreakdown(transactionId)
         }
     }
 
@@ -675,7 +686,7 @@ class TransactionViewModel(
             val childIds = selectedIds.filter { it != anchorId }
 
             try {
-                transactionRepository.manualMergeTransactions(anchorId, childIds)
+                mergeTransactionsUseCase.manualMerge(anchorId, childIds)
                 _uiEvent.send("Successfully merged ${selectedIds.size} transactions.")
                 dismissReviewMergeSheet()
                 clearSelectionMode()
@@ -694,8 +705,8 @@ class TransactionViewModel(
         viewModelScope.launch {
             val allTxns = transactionsForSelectedMonth.value
             val selected = allTxns.filter { it.transaction.id in _selectedTransactionIds.value }
-            val expenses = selected.filter { it.transaction.transactionType == "expense" }
-            val incomes = selected.filter { it.transaction.transactionType == "income" }
+            val expenses = selected.filter { it.transaction.transactionType == TransactionType.EXPENSE }
+            val incomes = selected.filter { it.transaction.transactionType == TransactionType.INCOME }
             if (expenses.size != 1 || incomes.isEmpty()) {
                 _uiEvent.send("Select exactly 1 expense and 1 or more income transactions.")
                 return@launch
@@ -812,7 +823,7 @@ class TransactionViewModel(
                 if (idsToDelete.isNotEmpty()) {
                     // Record all SMS hashes for the to-be-deleted transactions so
                     // SmsCatchupWorker never re-creates them.
-                    val hashes = db.transactionDao().getSmsHashesByIds(idsToDelete)
+                    val hashes = db.transactionQueryDao().getSmsHashesByIds(idsToDelete)
                     hashes.forEach { hash ->
                         db.deletedSmsHashDao().insert(
                             io.pm.finlight.data.db.entity.DeletedSmsHash(hash),
@@ -861,7 +872,7 @@ class TransactionViewModel(
 
             if (selectedTransactionsDetails.isNotEmpty()) {
                 val transactionsWithData =
-                    withContext(Dispatchers.IO) {
+                    withContext(dispatcherProvider.io) {
                         selectedTransactionsDetails.map { details ->
                             val tags = transactionRepository.getTagsForTransactionSimple(details.transaction.id)
                             ShareImageGenerator.TransactionSnapshotData(details = details, tags = tags)
@@ -902,7 +913,7 @@ class TransactionViewModel(
                 val conversionRate = parentTxn.conversionRate ?: 1.0
 
                 db.withTransaction {
-                    db.transactionDao().markAsSplit(parentTransactionId, true)
+                    db.transactionWriteDao().markAsSplit(parentTransactionId, true)
                     db.splitTransactionDao().deleteSplitsForParent(parentTransactionId)
 
                     val newSplits =
@@ -918,7 +929,7 @@ class TransactionViewModel(
                         }
                     db.splitTransactionDao().insertAll(newSplits)
                 }
-                withContext(Dispatchers.Main) {
+                withContext(dispatcherProvider.main) {
                     onComplete()
                 }
             } catch (e: Exception) {
@@ -1014,7 +1025,7 @@ class TransactionViewModel(
         categoryId: Int?,
         notes: String?,
         date: Long,
-        transactionType: String,
+        transactionType: TransactionType,
         imageUris: List<Uri>,
         onSaveComplete: (Long?) -> Unit,
     ) {
@@ -1058,6 +1069,30 @@ class TransactionViewModel(
                 }
             }
         }
+    }
+
+    fun onSaveTapped(
+        description: String,
+        amountStr: String,
+        accountId: Int?,
+        categoryId: Int?,
+        notes: String?,
+        date: Long,
+        transactionType: String,
+        imageUris: List<Uri>,
+        onSaveComplete: (Long?) -> Unit,
+    ) {
+        onSaveTapped(
+            description = description,
+            amountStr = amountStr,
+            accountId = accountId,
+            categoryId = categoryId,
+            notes = notes,
+            date = date,
+            transactionType = TransactionType.fromString(transactionType),
+            imageUris = imageUris,
+            onSaveComplete = onSaveComplete,
+        )
     }
 
     fun saveWithSelectedCategory(
@@ -1132,10 +1167,11 @@ class TransactionViewModel(
                 data.imageUris.mapNotNull { uri ->
                     saveImageToInternalStorage(uri)
                 }
+            val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, data.tags, travelModeSettings.value)
             val newTransactionId =
                 transactionRepository.insertTransactionWithTagsAndImages(
                     transactionToSave,
-                    data.tags,
+                    finalTags,
                     savedImagePaths,
                 )
             newTransactionId
@@ -1176,7 +1212,7 @@ class TransactionViewModel(
     }
 
     suspend fun getOriginalSmsMessage(smsId: Long): SmsMessage? {
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatcherProvider.io) {
             smsRepository.getSmsDetailsById(smsId)
         }
     }
@@ -1385,7 +1421,7 @@ class TransactionViewModel(
     fun deleteTransactionImage(image: TransactionImage) {
         viewModelScope.launch {
             transactionRepository.deleteImage(image)
-            withContext(Dispatchers.IO) {
+            withContext(dispatcherProvider.io) {
                 try {
                     if (!File(image.imageUri).delete()) {
                         Log.w(TAG, "Failed to delete image file: ${image.imageUri}")
@@ -1406,7 +1442,7 @@ class TransactionViewModel(
     }
 
     private suspend fun saveImageToInternalStorage(sourceUri: Uri): String? {
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatcherProvider.io) {
             try {
                 val inputStream = context.contentResolver.openInputStream(sourceUri)
                 val filesDir = File(context.filesDir, "attachments")
@@ -1585,7 +1621,7 @@ class TransactionViewModel(
     // --- NEW: Function to update transaction type ---
     fun updateTransactionType(
         id: Int,
-        transactionType: String,
+        transactionType: TransactionType,
     ) = viewModelScope.launch {
         try {
             transactionRepository.updateTransactionType(id, transactionType)
@@ -1678,7 +1714,7 @@ class TransactionViewModel(
         tags: Set<Tag>,
         isForeign: Boolean,
     ): Boolean {
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatcherProvider.io) {
             try {
                 val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
@@ -1692,9 +1728,10 @@ class TransactionViewModel(
 
                 if (account == null) return@withContext false
 
+                val currentTravelSettings = travelModeSettings.value
                 val transactionToSave =
                     if (isForeign) {
-                        val travelSettings = settingsRepository.getTravelModeSettings().first()
+                        val travelSettings = currentTravelSettings
                         if (travelSettings == null) {
                             Log.e(TAG, "Attempted to save foreign SMS transaction, but Travel Mode is not configured.")
                             return@withContext false
@@ -1708,7 +1745,7 @@ class TransactionViewModel(
                             date = potentialTxn.date,
                             accountId = account.id,
                             notes = notes,
-                            transactionType = potentialTxn.transactionType,
+                            transactionType = TransactionType.fromString(potentialTxn.transactionType),
                             sourceSmsId = potentialTxn.sourceSmsId,
                             sourceSmsHash = potentialTxn.sourceSmsHash,
                             source = "Imported",
@@ -1726,14 +1763,15 @@ class TransactionViewModel(
                             date = potentialTxn.date,
                             accountId = account.id,
                             notes = notes,
-                            transactionType = potentialTxn.transactionType,
+                            transactionType = TransactionType.fromString(potentialTxn.transactionType),
                             sourceSmsId = potentialTxn.sourceSmsId,
                             sourceSmsHash = potentialTxn.sourceSmsHash,
                             source = "Imported",
                         )
                     }
 
-                transactionRepository.insertTransactionWithTags(transactionToSave, tags)
+                val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, tags, currentTravelSettings)
+                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
 
                 val merchantName = potentialTxn.merchantName
                 if (categoryId != null && merchantName != null) {
@@ -1757,7 +1795,7 @@ class TransactionViewModel(
         potentialTxn: PotentialTransaction,
         source: String = "Auto-Captured",
     ): Boolean {
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatcherProvider.io) {
             try {
                 val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
@@ -1805,13 +1843,14 @@ class TransactionViewModel(
                         date = potentialTxn.date,
                         accountId = finalAccountId,
                         notes = null,
-                        transactionType = potentialTxn.transactionType,
+                        transactionType = TransactionType.fromString(potentialTxn.transactionType),
                         sourceSmsId = potentialTxn.sourceSmsId,
                         sourceSmsHash = potentialTxn.sourceSmsHash,
                         source = source,
                     )
 
-                transactionRepository.insertTransactionWithTags(transactionToSave, emptySet())
+                val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, emptySet(), travelModeSettings.value)
+                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
                 true
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to auto-save SMS transaction", e)
@@ -1846,7 +1885,7 @@ class TransactionViewModel(
                     ).firstOrNull()?.splitTransaction?.categoryId
                 db.splitTransactionDao().deleteSplitsForParent(transaction.id)
                 val originalDescription = transaction.originalDescription ?: transaction.description
-                db.transactionDao().unmarkAsSplit(transaction.id, originalDescription, firstSplitCategory)
+                db.transactionWriteDao().unmarkAsSplit(transaction.id, originalDescription, firstSplitCategory)
             }
         }
     }
@@ -2098,7 +2137,7 @@ class TransactionViewModel(
      * The UI collects this to decide whether to show the "Unmerge" option.
      */
     fun observeMergeRecord(parentTxnId: Int) =
-        transactionRepository.observeMergeRecord(parentTxnId)
+        mergeTransactionsUseCase.observeMergeRecord(parentTxnId)
 
     /**
      * Fully reverses the most recent merge for [parentTxnId].
@@ -2106,9 +2145,9 @@ class TransactionViewModel(
      * transaction is re-inserted as a fresh row.
      */
     fun unmergeTransaction(parentTxnId: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
-                transactionRepository.unmergeTransactions(parentTxnId)
+                mergeTransactionsUseCase.unmerge(parentTxnId)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to unmerge transaction $parentTxnId", e)
                 _uiEvent.send("Failed to unmerge. Please try again.")

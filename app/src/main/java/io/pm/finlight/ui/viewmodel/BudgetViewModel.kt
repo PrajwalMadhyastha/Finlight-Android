@@ -41,11 +41,11 @@ import kotlin.math.roundToLong
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class BudgetViewModel(
-    private val budgetRepository: BudgetRepository,
-    private val settingsRepository: SettingsRepository,
-    categoryRepository: CategoryRepository,
+    private val budgetRepository: IBudgetRepository,
+    private val settingsRepository: ISettingsRepository,
+    categoryRepository: ICategoryRepository,
     // --- NEW: Add TransactionRepository dependency ---
-    transactionRepository: TransactionRepository,
+    transactionRepository: ITransactionRepository,
 ) : ViewModel() {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
 
@@ -220,8 +220,9 @@ class BudgetViewModel(
         val year = forCalendar.get(Calendar.YEAR)
         val month = forCalendar.get(Calendar.MONTH) + 1
 
-        // Call the new repository function to save for the specific month
-        settingsRepository.saveOverallBudgetForMonth(year, month, budgetFloat)
+        viewModelScope.launch {
+            settingsRepository.saveOverallBudgetForMonth(year, month, budgetFloat)
+        }
     }
 
     fun getBudgetById(id: Int): Flow<Budget?> {

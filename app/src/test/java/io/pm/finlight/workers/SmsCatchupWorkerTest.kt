@@ -37,7 +37,8 @@ import org.robolectric.annotation.Config
 class SmsCatchupWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
+    private lateinit var transactionWriteDao: TransactionWriteDao
     private lateinit var merchantMappingDao: MerchantMappingDao
     private lateinit var customSmsRuleDao: CustomSmsRuleDao
     private lateinit var ignoreRuleDao: IgnoreRuleDao
@@ -65,11 +66,12 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
         WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
 
         db = mockk(relaxed = true)
-        transactionDao =
+        transactionWriteDao =
             mockk(relaxed = true) {
                 coEvery { insert(any()) } returns 1L
                 coEvery { addTagsToTransaction(any()) } just runs
             }
+        transactionQueryDao = mockk(relaxed = true)
         merchantMappingDao = mockk(relaxed = true)
         customSmsRuleDao = mockk(relaxed = true)
         ignoreRuleDao = mockk(relaxed = true)
@@ -83,7 +85,8 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
 
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionDao() } returns transactionDao
+        every { db.transactionQueryDao() } returns transactionQueryDao
+        every { db.transactionWriteDao() } returns transactionWriteDao
         every { db.merchantMappingDao() } returns merchantMappingDao
         every { db.customSmsRuleDao() } returns customSmsRuleDao
         every { db.ignoreRuleDao() } returns ignoreRuleDao
@@ -102,7 +105,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
         coEvery { anyConstructed<SmsRepository>().fetchAllSms(any()) } returns emptyList()
 
         coEvery { merchantMappingDao.getAllMappings() } returns flowOf(emptyList())
-        coEvery { transactionDao.getAllSmsHashes() } returns flowOf(emptyList())
+        coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
         coEvery { customSmsRuleDao.getAllRules() } returns flowOf(emptyList())
         coEvery { ignoreRuleDao.getEnabledRules() } returns emptyList()
         coEvery { merchantRenameRuleDao.getAllRules() } returns flowOf(emptyList())
@@ -120,6 +123,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
 
         mockkConstructor(SettingsRepository::class)
         every { anyConstructed<SettingsRepository>().getTravelModeSettings() } returns flowOf(null)
+        coEvery { anyConstructed<SettingsRepository>().getCurrentTravelModeSettings() } returns null
         every { anyConstructed<SettingsRepository>().getHomeCurrency() } returns flowOf("INR")
 
         mockClassifier = mockk(relaxed = true)
@@ -151,7 +155,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
             val result = worker.doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
         }
 
     @Test
@@ -168,16 +172,16 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
                 )
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
-            coEvery { transactionDao.getAllSmsHashes() } returns flowOf(emptyList()) // Hash not in DB
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList()) // Hash not in DB
 
             val captor = slot<Transaction>()
-            coEvery { transactionDao.insert(capture(captor)) } returns 99L
+            coEvery { transactionWriteDao.insert(capture(captor)) } returns 99L
 
             val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
             val result = worker.doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 1) { transactionDao.insert(any()) }
+            coVerify(exactly = 1) { transactionWriteDao.insert(any()) }
             assertEquals("Auto-Recovered", captor.captured.source)
         }
 
@@ -197,13 +201,13 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
             // Mock DB returning the hash
-            coEvery { transactionDao.getAllSmsHashes() } returns flowOf(listOf("existing_hash"))
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(listOf("existing_hash"))
 
             val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
             val result = worker.doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
         }
 
     @Test
@@ -222,14 +226,14 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
                 )
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
-            coEvery { transactionDao.getAllSmsHashes() } returns flowOf(emptyList()) // Not in DB yet
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList()) // Not in DB yet
 
             val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
             val result = worker.doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
             // Should only be inserted once because the worker tracks saved hashes internally during the run
-            coVerify(exactly = 1) { transactionDao.insert(any()) }
+            coVerify(exactly = 1) { transactionWriteDao.insert(any()) }
         }
 
     @Test
@@ -250,7 +254,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
             } returns ParseResult.Success(txn)
 
             // Hash is NOT in the live transactions table …
-            coEvery { transactionDao.getAllSmsHashes() } returns flowOf(emptyList())
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
             // … but IS in the deleted deny-list
             coEvery { deletedSmsHashDao.getAllHashes() } returns listOf("deleted_hash")
 
@@ -259,6 +263,6 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
 
             assertEquals(ListenableWorker.Result.success(), result)
             // Must NOT be re-created
-            coVerify(exactly = 0) { transactionDao.insert(any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
         }
 }

@@ -41,7 +41,7 @@ data class SmsDebugUiState(
 
 class SmsDebugViewModel(
     private val application: Application,
-    private val smsRepository: SmsRepository,
+    private val smsRepository: ISmsRepository,
     private val db: AppDatabase,
     private val smsClassifier: SmsClassifier,
     private val nerExtractor: SmsEntityExtractor,
@@ -179,7 +179,7 @@ class SmsDebugViewModel(
             val newResults = mutableListOf<SmsDebugResult>()
             val transactionsToImport = mutableListOf<PotentialTransaction>()
 
-            val existingSmsHashes = db.transactionDao().getAllSmsHashes().first().toSet()
+            val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toSet()
 
             for (sms in recentSms) {
                 // --- REMOVED: withContext(Dispatchers.IO) to make ViewModel more testable ---

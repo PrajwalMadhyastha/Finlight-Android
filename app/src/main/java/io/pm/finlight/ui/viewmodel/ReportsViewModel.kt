@@ -17,9 +17,11 @@ import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import java.util.Calendar
@@ -37,9 +39,10 @@ enum class ReportViewType {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReportsViewModel(
-    private val transactionRepository: TransactionRepository,
+    private val transactionRepository: ITransactionRepository,
     private val categoryDao: CategoryDao,
-    private val settingsRepository: SettingsRepository,
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     val allCategories: StateFlow<List<Category>>
 
@@ -79,7 +82,7 @@ class ReportsViewModel(
                     transactionRepository.getSpendingByCategoryForMonth(
                         startDate = currentStartDate,
                         endDate = currentEndDate,
-                        keyword = null, accountId = null, categoryId = null, transactionType = "expense",
+                        keyword = null, accountId = null, categoryId = null, transactionType = TransactionType.EXPENSE,
                     )
 
                 val monthlyTrendFlow = transactionRepository.getMonthlyTrends(trendStartDate)
@@ -161,7 +164,7 @@ class ReportsViewModel(
                 // --- FIX: Add explicit types to resolve build error ---
                 val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> =
                     (1..12).map { month ->
-                        transactionRepository.getMonthlyConsistencyData(year, month)
+                        getMonthlyConsistencyDataUseCase(year, month)
                     }
 
                 // Combine all 12 flows
@@ -175,20 +178,20 @@ class ReportsViewModel(
                 combinedFlow.collect { combinedYearlyData: List<CalendarDayStatus> ->
                     emit(combinedYearlyData)
                 }
-            }.flowOn(Dispatchers.Default)
+            }.flowOn(dispatcherProvider.default)
                 .stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(5000),
                     initialValue = emptyList(),
                 )
 
-        // --- REFACTORED: Use the new centralized repository function ---
+        // --- REFACTORED: Use the new centralized use case ---
         detailedMonthData =
             _selectedMonth.flatMapLatest { monthCal ->
                 val month = monthCal.get(Calendar.MONTH) + 1
                 val year = monthCal.get(Calendar.YEAR)
-                transactionRepository.getMonthlyConsistencyData(year, month)
-            }.flowOn(Dispatchers.Default)
+                getMonthlyConsistencyDataUseCase(year, month)
+            }.flowOn(dispatcherProvider.default)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         val today = Calendar.getInstance()

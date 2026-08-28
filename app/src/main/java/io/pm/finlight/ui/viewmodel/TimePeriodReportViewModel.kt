@@ -12,11 +12,16 @@ import androidx.lifecycle.viewModelScope
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import java.util.*
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
@@ -33,13 +38,42 @@ data class MonthlyBreakdown(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimePeriodReportViewModel(
-    private val transactionDao: TransactionDao,
-    private val transactionRepository: TransactionRepository,
-    private val settingsRepository: SettingsRepository,
+    private val transactionQueryDao: TransactionQueryDao,
+    private val transactionAnalyticsDao: TransactionAnalyticsDao,
+    private val transactionRepository: ITransactionRepository,
+    private val settingsRepository: ISettingsRepository,
     private val timePeriod: TimePeriod,
     initialDateMillis: Long?,
     showPreviousMonth: Boolean,
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
+        GetMonthlyConsistencyDataUseCase(
+            settingsRepository = settingsRepository,
+            transactionAnalyticsDao = transactionAnalyticsDao,
+            transactionQueryDao = transactionQueryDao,
+            dispatcherProvider = dispatcherProvider,
+        ),
 ) : ViewModel() {
+    @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
+    constructor(
+        transactionDao: TransactionDao,
+        transactionRepository: ITransactionRepository,
+        settingsRepository: ISettingsRepository,
+        timePeriod: TimePeriod,
+        initialDateMillis: Long?,
+        showPreviousMonth: Boolean,
+        dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+    ) : this(
+        transactionQueryDao = transactionDao,
+        transactionAnalyticsDao = transactionDao,
+        transactionRepository = transactionRepository,
+        settingsRepository = settingsRepository,
+        timePeriod = timePeriod,
+        initialDateMillis = initialDateMillis,
+        showPreviousMonth = showPreviousMonth,
+        dispatcherProvider = dispatcherProvider,
+    )
+
     private val _selectedDate =
         MutableStateFlow(
             Calendar.getInstance().apply {
@@ -55,7 +89,7 @@ class TimePeriodReportViewModel(
     val transactionsForPeriod: StateFlow<List<TransactionDetails>> =
         _selectedDate.flatMapLatest { calendar ->
             val (start, end) = getPeriodDateRange(calendar)
-            transactionDao.getTransactionDetailsForRange(start, end, null, null, null)
+            transactionQueryDao.getTransactionDetailsForRange(start, end, null, null, null)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val excludedIncomeMonths: StateFlow<Set<String>> =
@@ -87,9 +121,9 @@ class TimePeriodReportViewModel(
             transactions.forEach { txn ->
                 val monthKey = sdf.format(Date(txn.transaction.date))
                 val current = breakdownMap[monthKey] ?: Pair(0.0, 0.0)
-                if (txn.transaction.transactionType == "income" && !txn.transaction.isExcluded) {
+                if (txn.transaction.transactionType == TransactionType.INCOME && !txn.transaction.isExcluded) {
                     breakdownMap[monthKey] = current.copy(first = current.first + txn.transaction.amount)
-                } else if (txn.transaction.transactionType == "expense" && !txn.transaction.isExcluded) {
+                } else if (txn.transaction.transactionType == TransactionType.EXPENSE && !txn.transaction.isExcluded) {
                     breakdownMap[monthKey] = current.copy(second = current.second + txn.transaction.amount)
                 }
             }
@@ -115,7 +149,7 @@ class TimePeriodReportViewModel(
                 breakdowns.filter { !it.isIncomeExcluded }.sumOf { it.income }.roundToLong()
             } else {
                 transactions
-                    .filter { it.transaction.transactionType == "income" && !it.transaction.isExcluded }
+                    .filter { it.transaction.transactionType == TransactionType.INCOME && !it.transaction.isExcluded }
                     .sumOf { it.transaction.amount }.roundToLong()
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
@@ -126,7 +160,7 @@ class TimePeriodReportViewModel(
                 breakdowns.filter { !it.isExpenseExcluded }.sumOf { it.expenses }.roundToLong()
             } else {
                 transactions
-                    .filter { it.transaction.transactionType == "expense" && !it.transaction.isExcluded }
+                    .filter { it.transaction.transactionType == TransactionType.EXPENSE && !it.transaction.isExcluded }
                     .sumOf { it.transaction.amount }.roundToLong()
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
@@ -180,9 +214,9 @@ class TimePeriodReportViewModel(
                         }
                     }
 
-                val currentSummary = transactionDao.getFinancialSummaryForRange(currentStart, currentEnd)
-                val previousSummary = transactionDao.getFinancialSummaryForRange(previousStart, previousEnd)
-                val topCategories = transactionDao.getTopSpendingCategoriesForRange(currentStart, currentEnd)
+                val currentSummary = transactionAnalyticsDao.getFinancialSummaryForRange(currentStart, currentEnd)
+                val previousSummary = transactionAnalyticsDao.getFinancialSummaryForRange(previousStart, previousEnd)
+                val topCategories = transactionAnalyticsDao.getTopSpendingCategoriesForRange(currentStart, currentEnd)
 
                 val percentageChange =
                     if (previousSummary != null && previousSummary.totalExpenses > 0) {
@@ -214,7 +248,7 @@ class TimePeriodReportViewModel(
                             set(Calendar.SECOND, 0)
                         }
 
-                    transactionDao.getDailyTrends(startCal.timeInMillis, endCal.timeInMillis).map { dailyTrends ->
+                    transactionAnalyticsDao.getDailyTrends(startCal.timeInMillis, endCal.timeInMillis).map { dailyTrends ->
                         if (dailyTrends.isEmpty()) return@map null
 
                         val incomeEntries = mutableListOf<BarEntry>()
@@ -258,7 +292,7 @@ class TimePeriodReportViewModel(
                             set(Calendar.DAY_OF_WEEK, firstDayOfWeek)
                         }
 
-                    transactionDao.getWeeklyTrends(startCal.timeInMillis, endCal.timeInMillis).map { weeklyTrends ->
+                    transactionAnalyticsDao.getWeeklyTrends(startCal.timeInMillis, endCal.timeInMillis).map { weeklyTrends ->
                         if (weeklyTrends.isEmpty()) return@map null
 
                         val incomeEntries = mutableListOf<BarEntry>()
@@ -298,7 +332,7 @@ class TimePeriodReportViewModel(
                             set(Calendar.DAY_OF_MONTH, 1)
                         }
 
-                    transactionDao.getMonthlyTrends(startCal.timeInMillis).map { monthlyTrends ->
+                    transactionAnalyticsDao.getMonthlyTrends(startCal.timeInMillis).map { monthlyTrends ->
                         if (monthlyTrends.isEmpty()) return@map null
 
                         val incomeEntries = mutableListOf<BarEntry>()
@@ -348,7 +382,7 @@ class TimePeriodReportViewModel(
                         }
 
                     // Use getMonthlyTrends but filter results to only include current year
-                    transactionDao.getMonthlyTrends(startCal.timeInMillis).map { monthlyTrends ->
+                    transactionAnalyticsDao.getMonthlyTrends(startCal.timeInMillis).map { monthlyTrends ->
                         val incomeEntries = mutableListOf<BarEntry>()
                         val expenseEntries = mutableListOf<BarEntry>()
                         val labels = mutableListOf<String>()
@@ -391,7 +425,7 @@ class TimePeriodReportViewModel(
     val monthlyConsistencyData: StateFlow<List<CalendarDayStatus>> =
         _selectedDate.flatMapLatest { calendar ->
             if (timePeriod != TimePeriod.MONTHLY) return@flatMapLatest flowOf(emptyList())
-            transactionRepository.getMonthlyConsistencyData(
+            getMonthlyConsistencyDataUseCase(
                 calendar.get(Calendar.YEAR),
                 calendar.get(Calendar.MONTH) + 1,
             )
@@ -405,7 +439,7 @@ class TimePeriodReportViewModel(
                 val year = calendar.get(Calendar.YEAR)
                 val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> =
                     (1..12).map { month ->
-                        transactionRepository.getMonthlyConsistencyData(year, month)
+                        getMonthlyConsistencyDataUseCase(year, month)
                     }
 
                 val combinedFlow =
@@ -416,7 +450,7 @@ class TimePeriodReportViewModel(
                 combinedFlow.collect { combinedYearlyData: List<CalendarDayStatus> ->
                     emit(combinedYearlyData)
                 }
-            }.flowOn(Dispatchers.Default)
+            }.flowOn(dispatcherProvider.default)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val consistencyStats: StateFlow<ConsistencyStats> =
@@ -467,11 +501,15 @@ class TimePeriodReportViewModel(
     }
 
     fun toggleIncomeExclusion(monthKey: String) {
-        settingsRepository.toggleIncomeMonthExclusion(monthKey)
+        viewModelScope.launch {
+            settingsRepository.toggleIncomeMonthExclusion(monthKey)
+        }
     }
 
     fun toggleExpenseExclusion(monthKey: String) {
-        settingsRepository.toggleExpenseMonthExclusion(monthKey)
+        viewModelScope.launch {
+            settingsRepository.toggleExpenseMonthExclusion(monthKey)
+        }
     }
 
     private fun getPeriodDateRange(calendar: Calendar): Pair<Long, Long> {

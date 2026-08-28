@@ -7,19 +7,22 @@ import android.app.backup.BackupAgentHelper
 import android.app.backup.BackupDataInput
 import android.app.backup.BackupDataOutput
 import android.app.backup.FileBackupHelper
-import android.app.backup.SharedPreferencesBackupHelper
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 class FinlightBackupAgent : BackupAgentHelper() {
     companion object {
         // A unique tag for Logcat filtering
         private const val TAG = "FinlightBackup"
 
-        // The name of our SharedPreferences file
-        private const val PREFS_NAME = "finance_app_settings"
-        private const val PREFS_BACKUP_KEY = "finlight_prefs"
+        // Relative paths from filesDir for DataStore files
+        private const val DATASTORE_PREFS_FILE = "datastore/finance_app_settings.preferences_pb"
+        private const val DATASTORE_INTERNAL_FILE = "datastore/finlight_internal_state.preferences_pb"
+        private const val DATASTORE_BACKUP_KEY = "finlight_datastore_prefs"
 
         // The specific snapshot file we want to back up
         private const val SNAPSHOT_FILE_NAME = "backup_snapshot.gz"
@@ -28,12 +31,12 @@ class FinlightBackupAgent : BackupAgentHelper() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "onCreate: BackupAgent is being created.")
+        Log.d(TAG, "onCreate: Initializing BackupAgentHelper...")
 
-        // Helper for backing up our main SharedPreferences
-        SharedPreferencesBackupHelper(this, PREFS_NAME).also {
-            addHelper(PREFS_BACKUP_KEY, it)
-            Log.d(TAG, "onCreate: SharedPreferencesBackupHelper added for '$PREFS_NAME'.")
+        // Helper for backing up DataStore preferences
+        FileBackupHelper(this, DATASTORE_PREFS_FILE, DATASTORE_INTERNAL_FILE).also {
+            addHelper(DATASTORE_BACKUP_KEY, it)
+            Log.d(TAG, "onCreate: FileBackupHelper added for DataStore files.")
         }
 
         // Helper for backing up the specific snapshot file from our internal storage
@@ -49,23 +52,31 @@ class FinlightBackupAgent : BackupAgentHelper() {
         newState: ParcelFileDescriptor?,
     ) {
         Log.d(TAG, "onBackup: Starting backup process...")
-        val settingsRepository = SettingsRepository(applicationContext)
+        val backupSettingsRepository = ServiceLocator.provideBackupSettingsRepository(applicationContext)
 
-        // --- UPDATED: Capture timestamp to use for both saving and notification ---
+        // Capture timestamp to use for both saving and notification
         val backupTime = System.currentTimeMillis()
 
         // 1. Save the timestamp
-        settingsRepository.saveLastBackupTimestamp(backupTime)
+        runBlocking {
+            backupSettingsRepository.saveLastBackupTimestamp(backupTime)
+        }
         Log.i(TAG, "onBackup: Last backup timestamp saved.")
 
         // 2. Let the system helpers do their work
-        super.onBackup(oldState, data, newState)
-
-        // 3. (NEW) Trigger notification AFTER the backup is complete
         try {
-            val notificationsEnabled = settingsRepository.isAutoBackupNotificationEnabledBlocking()
+            super.onBackup(oldState, data, newState)
+        } catch (e: Exception) {
+            Log.e(TAG, "onBackup: System backup helper failed", e)
+        }
+
+        // 3. Trigger notification AFTER the backup is complete
+        try {
+            val notificationsEnabled =
+                runBlocking {
+                    backupSettingsRepository.getAutoBackupNotificationEnabled().first()
+                }
             if (notificationsEnabled) {
-                // --- UPDATED: Pass the timestamp to the notification helper ---
                 NotificationHelper.showAutoBackupNotification(applicationContext, backupTime)
             }
         } catch (e: Exception) {
@@ -81,7 +92,11 @@ class FinlightBackupAgent : BackupAgentHelper() {
         newState: ParcelFileDescriptor?,
     ) {
         Log.d(TAG, "onRestore: Starting restore process...")
-        super.onRestore(data, appVersionCode, newState)
+        try {
+            super.onRestore(data, appVersionCode, newState)
+        } catch (e: Exception) {
+            Log.e(TAG, "onRestore: System restore helper failed", e)
+        }
         Log.d(TAG, "onRestore: Restore process finished.")
     }
 }

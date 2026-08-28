@@ -122,7 +122,7 @@ object TestDataSeeder {
                     categoryId = CATEGORY_FOOD_ID,
                     accountId = ACCOUNT_WALLET_ID,
                     date = baseTime - 1 * 60_000L,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -133,7 +133,7 @@ object TestDataSeeder {
                     categoryId = CATEGORY_TRANSPORT_ID,
                     accountId = ACCOUNT_WALLET_ID,
                     date = baseTime - 2 * 60_000L,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -144,7 +144,7 @@ object TestDataSeeder {
                     categoryId = CATEGORY_FOOD_ID,
                     accountId = ACCOUNT_BANK_ID,
                     date = baseTime - 3 * 60_000L,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = "Weekly groceries",
                 ),
             )
@@ -155,7 +155,7 @@ object TestDataSeeder {
                     categoryId = CATEGORY_SHOPPING_ID,
                     accountId = ACCOUNT_BANK_ID,
                     date = baseTime - 4 * 60_000L,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -166,7 +166,7 @@ object TestDataSeeder {
                     categoryId = CATEGORY_TRANSPORT_ID,
                     accountId = ACCOUNT_WALLET_ID,
                     date = baseTime - 5 * 60_000L,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                 ),
             )
@@ -178,7 +178,7 @@ object TestDataSeeder {
                     categoryId = null,
                     accountId = ACCOUNT_BANK_ID,
                     date = baseTime - 6 * 60_000L,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     notes = "Monthly salary",
                 ),
             )
@@ -189,7 +189,7 @@ object TestDataSeeder {
                     categoryId = null,
                     accountId = ACCOUNT_BANK_ID,
                     date = baseTime - 7 * 60_000L,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     notes = null,
                 ),
             )

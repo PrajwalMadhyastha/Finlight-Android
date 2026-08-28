@@ -10,6 +10,7 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 
 /**
  * Factory for creating an OnboardingViewModel.
@@ -19,7 +20,7 @@ class OnboardingViewModelFactory(private val application: Application) : ViewMod
         if (modelClass.isAssignableFrom(OnboardingViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val categoryRepository = CategoryRepository(db.categoryDao())
-            val settingsRepository = SettingsRepository(application)
+            val settingsRepository = ServiceLocator.provideSettingsRepository(application)
 
             @Suppress("UNCHECKED_CAST")
             // --- UPDATED: Pass the application context to the ViewModel ---

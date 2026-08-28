@@ -8,16 +8,16 @@ package io.pm.finlight
 
 import kotlinx.coroutines.flow.Flow
 
-class BudgetRepository(private val budgetDao: BudgetDao) {
+class BudgetRepository(private val budgetDao: BudgetDao) : IBudgetRepository {
     // --- NEW: Function to get budgets for a specific month ---
-    fun getBudgetsForMonth(
+    override fun getBudgetsForMonth(
         month: Int,
         year: Int,
     ): Flow<List<Budget>> {
         return budgetDao.getBudgetsForMonth(month, year)
     }
 
-    fun getBudgetsForMonthWithSpending(
+    override fun getBudgetsForMonthWithSpending(
         yearMonth: String,
         month: Int,
         year: Int,
@@ -25,7 +25,7 @@ class BudgetRepository(private val budgetDao: BudgetDao) {
         return budgetDao.getBudgetsWithSpendingForMonth(yearMonth, month, year)
     }
 
-    fun getActualSpendingForCategory(
+    override fun getActualSpendingForCategory(
         categoryName: String,
         month: Int,
         year: Int,
@@ -33,30 +33,30 @@ class BudgetRepository(private val budgetDao: BudgetDao) {
         return budgetDao.getActualSpendingForCategory(categoryName, month, year)
     }
 
-    suspend fun update(budget: Budget) {
+    override suspend fun update(budget: Budget) {
         budgetDao.update(budget)
     }
 
-    suspend fun insert(budget: Budget) {
+    override suspend fun insert(budget: Budget) {
         budgetDao.insert(budget)
     }
 
-    suspend fun insertAll(budgets: List<Budget>) {
+    override suspend fun insertAll(budgets: List<Budget>) {
         budgetDao.insertAll(budgets)
     }
 
-    suspend fun getBudgetsForCategoryAndYear(
+    override suspend fun getBudgetsForCategoryAndYear(
         categoryName: String,
         year: Int,
     ): List<Budget> {
         return budgetDao.getBudgetsForCategoryAndYear(categoryName, year)
     }
 
-    suspend fun delete(budget: Budget) {
+    override suspend fun delete(budget: Budget) {
         budgetDao.delete(budget)
     }
 
-    fun getBudgetById(id: Int): Flow<Budget?> {
+    override fun getBudgetById(id: Int): Flow<Budget?> {
         return budgetDao.getById(id)
     }
 }

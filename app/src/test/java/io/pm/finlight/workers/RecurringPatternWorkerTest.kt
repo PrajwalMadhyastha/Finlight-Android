@@ -3,6 +3,7 @@ package io.pm.finlight.workers
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Configuration
@@ -13,9 +14,12 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -25,14 +29,13 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.util.concurrent.TimeUnit
 
-@org.junit.Ignore("Temporarily disabled (Issue #105)")
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class RecurringPatternWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
     private lateinit var patternDao: RecurringPatternDao
     private lateinit var recurringTransactionDao: RecurringTransactionDao
 
@@ -42,19 +45,21 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
         context = ApplicationProvider.getApplicationContext()
 
         // Enable the recurring transaction feature for tests
-        context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean("recurring_transactions_enabled", true)
-            .apply()
+        runBlocking {
+            context.financeSettingsDataStore.edit { it.clear() }
+            io.pm.finlight.di.ServiceLocator.reset()
+            val settingsRepo = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
+            settingsRepo.saveRecurringTransactionsEnabled(true)
+        }
 
         db = mockk()
-        transactionDao = mockk()
+        transactionQueryDao = mockk()
         patternDao = mockk()
         recurringTransactionDao = mockk()
 
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionDao() } returns transactionDao
+        every { db.transactionQueryDao() } returns transactionQueryDao
         every { db.recurringPatternDao() } returns patternDao
         every { db.recurringTransactionDao() } returns recurringTransactionDao
 
@@ -73,16 +78,51 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
+        io.pm.finlight.di.ServiceLocator.reset()
         unmockkAll()
         super.tearDown()
     }
+
+    @Test
+    fun `doWork inserts new pattern when signed transaction is processed`() =
+        runTest {
+            val signature = "new_pattern_sig"
+            val now = System.currentTimeMillis()
+            val txn =
+                Transaction(
+                    id = 10,
+                    smsSignature = signature,
+                    date = now,
+                    description = "Spotify",
+                    amount = 119.0,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 2,
+                    notes = null,
+                )
+
+            coEvery { transactionQueryDao.getTransactionsWithSignatureSince(any()) } returns listOf(txn)
+            coEvery { patternDao.getPatternBySignature(signature) } returns null
+            val patternCaptor = slot<RecurringPattern>()
+            coEvery { patternDao.insert(capture(patternCaptor)) } just runs
+            coEvery { patternDao.getAllPatterns() } returns emptyList()
+
+            val worker = TestListenableWorkerBuilder<RecurringPatternWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            assertEquals(TransactionType.EXPENSE, patternCaptor.captured.transactionType)
+            assertEquals("Spotify", patternCaptor.captured.description)
+            assertEquals(119.0, patternCaptor.captured.amount, 0.0)
+            assertEquals(1, patternCaptor.captured.occurrences)
+        }
 
     @Test
     fun `doWork correctly detects monthly pattern and notifies user`() =
         runTest {
             // Arrange
             val signature = "monthly_sig"
-            val pattern = RecurringPattern(signature, "Netflix", 149.0, "expense", 1, 1, 4, 0L, 0L)
+            val pattern = RecurringPattern(signature, "Netflix", 149.0, TransactionType.EXPENSE, 1, 1, 4, 0L, 0L)
             val transactions =
                 listOf(
                     Transaction(
@@ -117,15 +157,14 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
                     ),
                 )
 
-            coEvery { transactionDao.getTransactionsWithSignatureSince(any()) } returns emptyList()
+            coEvery { transactionQueryDao.getTransactionsWithSignatureSince(any()) } returns emptyList()
             coEvery { patternDao.getAllPatterns() } returns listOf(pattern)
-            coEvery { transactionDao.getTransactionsBySignature(signature) } returns transactions
+            coEvery { transactionQueryDao.getTransactionsBySignature(signature) } returns transactions
             coEvery { recurringTransactionDao.insert(any()) } returns 1L
             coEvery { NotificationHelper.showRecurringPatternDetectedNotification(any(), any()) } just runs
             coEvery { patternDao.deleteBySignature(signature) } just runs
 
             val worker = TestListenableWorkerBuilder<RecurringPatternWorker>(context).build()
-            val ruleCaptor = slot<RecurringTransaction>()
 
             // Act
             val result = worker.doWork()
@@ -140,7 +179,7 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
     fun `doWork returns retry on failure`() =
         runTest {
             // Arrange
-            coEvery { transactionDao.getTransactionsWithSignatureSince(any()) } throws RuntimeException("DB Error")
+            coEvery { transactionQueryDao.getTransactionsWithSignatureSince(any()) } throws RuntimeException("DB Error")
             val worker = TestListenableWorkerBuilder<RecurringPatternWorker>(context).build()
 
             // Act

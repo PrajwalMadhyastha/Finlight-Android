@@ -15,9 +15,9 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import kotlin.math.roundToInt
@@ -27,9 +27,10 @@ class WeeklySummaryWorker(
     workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
     override suspend fun doWork(): Result {
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             try {
-                val transactionDao = AppDatabase.getInstance(context).transactionDao()
+                val transactionAnalyticsDao = AppDatabase.getInstance(context).transactionAnalyticsDao()
 
                 // Date range for LAST 7 DAYS
                 val thisWeekEnd =
@@ -66,13 +67,13 @@ class WeeklySummaryWorker(
                         set(Calendar.MILLISECOND, 0)
                     }.timeInMillis
 
-                val thisWeekSummary = transactionDao.getFinancialSummaryForRange(thisWeekStart, thisWeekEnd)
+                val thisWeekSummary = transactionAnalyticsDao.getFinancialSummaryForRange(thisWeekStart, thisWeekEnd)
                 val thisWeekExpenses = thisWeekSummary?.totalExpenses ?: 0.0
 
-                val lastWeekSummary = transactionDao.getFinancialSummaryForRange(lastWeekStart, lastWeekEnd)
+                val lastWeekSummary = transactionAnalyticsDao.getFinancialSummaryForRange(lastWeekStart, lastWeekEnd)
                 val lastWeekExpenses = lastWeekSummary?.totalExpenses ?: 0.0
 
-                val topCategories = transactionDao.getTopSpendingCategoriesForRange(thisWeekStart, thisWeekEnd)
+                val topCategories = transactionAnalyticsDao.getTopSpendingCategoriesForRange(thisWeekStart, thisWeekEnd)
 
                 val percentageChange =
                     if (lastWeekExpenses > 0) {

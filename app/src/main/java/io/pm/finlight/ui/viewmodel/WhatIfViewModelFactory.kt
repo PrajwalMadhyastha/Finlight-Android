@@ -4,21 +4,30 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.SystemTimeProvider
 
 class WhatIfViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(WhatIfViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
-            val settingsRepository = SettingsRepository(application)
-            val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao(), db)
+            val settingsRepository = ServiceLocator.provideSettingsRepository(application)
+            val transactionRepository =
+                TransactionRepository(
+                    transactionWriteDao = db.transactionWriteDao(),
+                    transactionQueryDao = db.transactionQueryDao(),
+                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                    transactionReimbursementDao = db.transactionReimbursementDao(),
+                    db = db,
+                    dispatcherProvider = DefaultDispatcherProvider(),
+                )
 
             @Suppress("UNCHECKED_CAST")
             return WhatIfViewModel(
                 transactionRepository = transactionRepository,
                 settingsRepository = settingsRepository,
-                timeProvider = SystemTimeProvider()
+                timeProvider = SystemTimeProvider(),
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

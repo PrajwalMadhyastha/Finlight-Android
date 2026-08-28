@@ -47,13 +47,13 @@ sealed class ScanResult {
 
 class SettingsViewModel(
     application: Application,
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: ISettingsRepository,
     private val db: AppDatabase,
-    private val transactionRepository: TransactionRepository,
-    private val merchantMappingRepository: MerchantMappingRepository,
-    private val accountRepository: AccountRepository,
-    private val categoryRepository: CategoryRepository,
-    private val smsRepository: SmsRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val merchantMappingRepository: IMerchantMappingRepository,
+    private val accountRepository: IAccountRepository,
+    private val categoryRepository: ICategoryRepository,
+    private val smsRepository: ISmsRepository,
     private val transactionViewModel: TransactionViewModel,
     private val smsClassifier: SmsClassifier,
     private val nerExtractor: SmsEntityExtractor,
@@ -195,6 +195,27 @@ class SettingsViewModel(
             initialValue = 0L,
         )
 
+    val hasSeenOnboarding: StateFlow<Boolean?> =
+        settingsRepository.getHasSeenOnboarding().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null,
+        )
+
+    val isFirstLaunchComplete: Flow<Boolean> = settingsRepository.getIsFirstLaunchComplete()
+
+    fun setHasSeenOnboarding(hasSeen: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setHasSeenOnboarding(hasSeen)
+        }
+    }
+
+    fun setFirstLaunchComplete() {
+        viewModelScope.launch {
+            settingsRepository.setFirstLaunchComplete()
+        }
+    }
+
     init {
         smsScanStartDate =
             settingsRepository.getSmsScanStartDate()
@@ -216,11 +237,15 @@ class SettingsViewModel(
     }
 
     fun setPrivacyModeEnabled(enabled: Boolean) {
-        settingsRepository.savePrivacyModeEnabled(enabled)
+        viewModelScope.launch {
+            settingsRepository.savePrivacyModeEnabled(enabled)
+        }
     }
 
     fun setSimulatorPrivacyModeEnabled(enabled: Boolean) {
-        settingsRepository.saveSimulatorPrivacyModeEnabled(enabled)
+        viewModelScope.launch {
+            settingsRepository.saveSimulatorPrivacyModeEnabled(enabled)
+        }
     }
 
     suspend fun applyLearningAndAutoImport(mapping: MerchantCategoryMapping): Int {
@@ -482,20 +507,28 @@ class SettingsViewModel(
     }
 
     fun setAutoCaptureNotificationEnabled(enabled: Boolean) {
-        settingsRepository.saveAutoCaptureNotificationEnabled(enabled)
+        viewModelScope.launch {
+            settingsRepository.saveAutoCaptureNotificationEnabled(enabled)
+        }
     }
 
     fun setAutoBackupEnabled(enabled: Boolean) {
-        settingsRepository.saveAutoBackupEnabled(enabled)
-        if (enabled) ReminderManager.scheduleAutoBackup(context) else ReminderManager.cancelAutoBackup(context)
+        viewModelScope.launch {
+            settingsRepository.saveAutoBackupEnabled(enabled)
+            if (enabled) ReminderManager.scheduleAutoBackup(context) else ReminderManager.cancelAutoBackup(context)
+        }
     }
 
     fun setAutoBackupNotificationEnabled(enabled: Boolean) {
-        settingsRepository.saveAutoBackupNotificationEnabled(enabled)
+        viewModelScope.launch {
+            settingsRepository.saveAutoBackupNotificationEnabled(enabled)
+        }
     }
 
     fun saveSelectedTheme(theme: AppTheme) {
-        settingsRepository.saveSelectedTheme(theme)
+        viewModelScope.launch {
+            settingsRepository.saveSelectedTheme(theme)
+        }
     }
 
     fun dismissPotentialTransaction(transaction: PotentialTransaction) {
@@ -536,23 +569,29 @@ class SettingsViewModel(
     }
 
     fun setDailyReportEnabled(enabled: Boolean) {
-        settingsRepository.saveDailyReportEnabled(enabled)
-        if (enabled) ReminderManager.scheduleDailyReport(context) else ReminderManager.cancelDailyReport(context)
+        viewModelScope.launch {
+            settingsRepository.saveDailyReportEnabled(enabled)
+            if (enabled) ReminderManager.scheduleDailyReport(context) else ReminderManager.cancelDailyReport(context)
+        }
     }
 
     fun saveDailyReportTime(
         hour: Int,
         minute: Int,
     ) {
-        settingsRepository.saveDailyReportTime(hour, minute)
-        if (dailyReportEnabled.value) {
-            ReminderManager.scheduleDailyReport(context)
+        viewModelScope.launch {
+            settingsRepository.saveDailyReportTime(hour, minute)
+            if (dailyReportEnabled.value) {
+                ReminderManager.scheduleDailyReport(context)
+            }
         }
     }
 
     fun setWeeklySummaryEnabled(enabled: Boolean) {
-        settingsRepository.saveWeeklySummaryEnabled(enabled)
-        if (enabled) ReminderManager.scheduleWeeklySummary(context) else ReminderManager.cancelWeeklySummary(context)
+        viewModelScope.launch {
+            settingsRepository.saveWeeklySummaryEnabled(enabled)
+            if (enabled) ReminderManager.scheduleWeeklySummary(context) else ReminderManager.cancelWeeklySummary(context)
+        }
     }
 
     fun saveWeeklyReportTime(
@@ -560,18 +599,22 @@ class SettingsViewModel(
         hour: Int,
         minute: Int,
     ) {
-        settingsRepository.saveWeeklyReportTime(dayOfWeek, hour, minute)
-        if (weeklySummaryEnabled.value) {
-            ReminderManager.scheduleWeeklySummary(context)
+        viewModelScope.launch {
+            settingsRepository.saveWeeklyReportTime(dayOfWeek, hour, minute)
+            if (weeklySummaryEnabled.value) {
+                ReminderManager.scheduleWeeklySummary(context)
+            }
         }
     }
 
     fun setMonthlySummaryEnabled(enabled: Boolean) {
-        settingsRepository.saveMonthlySummaryEnabled(enabled)
-        if (enabled) {
-            ReminderManager.scheduleMonthlySummary(context)
-        } else {
-            ReminderManager.cancelMonthlySummary(context)
+        viewModelScope.launch {
+            settingsRepository.saveMonthlySummaryEnabled(enabled)
+            if (enabled) {
+                ReminderManager.scheduleMonthlySummary(context)
+            } else {
+                ReminderManager.cancelMonthlySummary(context)
+            }
         }
     }
 
@@ -580,14 +623,18 @@ class SettingsViewModel(
         hour: Int,
         minute: Int,
     ) {
-        settingsRepository.saveMonthlyReportTime(dayOfMonth, hour, minute)
-        if (monthlySummaryEnabled.value) {
-            ReminderManager.scheduleMonthlySummary(context)
+        viewModelScope.launch {
+            settingsRepository.saveMonthlyReportTime(dayOfMonth, hour, minute)
+            if (monthlySummaryEnabled.value) {
+                ReminderManager.scheduleMonthlySummary(context)
+            }
         }
     }
 
     fun setAppLockEnabled(enabled: Boolean) {
-        settingsRepository.saveAppLockEnabled(enabled)
+        viewModelScope.launch {
+            settingsRepository.saveAppLockEnabled(enabled)
+        }
     }
 
     fun setUnknownTransactionPopupEnabled(enabled: Boolean) {
@@ -838,7 +885,7 @@ class SettingsViewModel(
             date = date,
             description = description,
             amount = amount,
-            transactionType = type,
+            transactionType = TransactionType.fromString(type),
             categoryId = category?.id,
             accountId = account.id,
             notes = notes,

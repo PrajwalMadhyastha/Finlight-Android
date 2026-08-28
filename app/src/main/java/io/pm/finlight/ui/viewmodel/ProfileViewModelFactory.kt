@@ -10,12 +10,12 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.ProfileViewModel
-import io.pm.finlight.SettingsRepository
+import io.pm.finlight.di.ServiceLocator
 
 class ProfileViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
-            val settingsRepository = SettingsRepository(application)
+            val settingsRepository = ServiceLocator.provideSettingsRepository(application)
             @Suppress("UNCHECKED_CAST")
             return ProfileViewModel(application, settingsRepository) as T
         }

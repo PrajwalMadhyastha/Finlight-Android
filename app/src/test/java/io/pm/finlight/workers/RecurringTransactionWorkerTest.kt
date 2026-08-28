@@ -3,6 +3,7 @@ package io.pm.finlight.workers
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Configuration
@@ -13,9 +14,13 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.data.db.dao.TransactionWriteDao
+import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -25,7 +30,6 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.util.Calendar
 
-@org.junit.Ignore("Temporarily disabled (Issue #105)")
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
@@ -33,7 +37,8 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
     private lateinit var recurringTransactionDao: RecurringTransactionDao
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
+    private lateinit var transactionWriteDao: TransactionWriteDao
 
     @Before
     override fun setup() {
@@ -41,21 +46,25 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
         context = ApplicationProvider.getApplicationContext()
 
         // Enable the recurring transaction feature for tests
-        context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean("recurring_transactions_enabled", true)
-            .apply()
+        runBlocking {
+            context.financeSettingsDataStore.edit { it.clear() }
+            io.pm.finlight.di.ServiceLocator.reset()
+            val settingsRepo = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
+            settingsRepo.saveRecurringTransactionsEnabled(true)
+        }
 
         db = mockk(relaxed = true)
         recurringTransactionDao = mockk(relaxed = true)
 
         mockkObject(AppDatabase)
-        transactionDao = mockk<TransactionDao>(relaxed = true)
+        transactionQueryDao = mockk<TransactionQueryDao>(relaxed = true)
+        transactionWriteDao = mockk<TransactionWriteDao>(relaxed = true)
         every { AppDatabase.getInstance(any()) } returns db
         every { db.recurringTransactionDao() } returns recurringTransactionDao
-        every { db.transactionDao() } returns transactionDao
-        coEvery { transactionDao.insert(any<Transaction>()) } returns 101L
-        coEvery { transactionDao.getPendingTransactionForRule(any()) } returns null
+        every { db.transactionQueryDao() } returns transactionQueryDao
+        every { db.transactionWriteDao() } returns transactionWriteDao
+        coEvery { transactionWriteDao.insert(any<Transaction>()) } returns 101L
+        coEvery { transactionQueryDao.getPendingTransactionForRule(any()) } returns null
 
         val config =
             Configuration.Builder()
@@ -72,6 +81,7 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
+        io.pm.finlight.di.ServiceLocator.reset()
         unmockkAll()
         super.tearDown()
     }
@@ -85,15 +95,15 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
             val tomorrow = now + 86400000
 
             val dueRule =
-                RecurringTransaction(id = 1, description = "Due", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, lastRunDate = yesterday, accountId = 1, categoryId = null)
+                RecurringTransaction(id = 1, description = "Due", amount = 10.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Daily", startDate = 0L, lastRunDate = yesterday, accountId = 1, categoryId = null)
             val notDueRule =
-                RecurringTransaction(id = 2, description = "Not Due", amount = 20.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, lastRunDate = now, accountId = 1, categoryId = null)
+                RecurringTransaction(id = 2, description = "Not Due", amount = 20.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Daily", startDate = 0L, lastRunDate = now, accountId = 1, categoryId = null)
             val futureRule =
                 RecurringTransaction(
                     id = 3,
                     description = "Future",
                     amount = 30.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Daily",
                     startDate = tomorrow,
                     accountId = 1,
@@ -140,51 +150,52 @@ class RecurringTransactionWorkerTest : BaseViewModelTest() {
         runTest {
             val now = System.currentTimeMillis()
             val past = now - 86400000
-            val rule = RecurringTransaction(id = 1, description = "Expired", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, endDate = past, lastRunDate = null, accountId = 1, categoryId = 1)
+            val rule = RecurringTransaction(id = 1, description = "Expired", amount = 10.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Daily", startDate = 0L, endDate = past, lastRunDate = null, accountId = 1, categoryId = 1)
 
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
             val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
 
             worker.doWork()
 
-            coVerify(exactly = 0) { transactionDao.insert(any<Transaction>()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any<Transaction>()) }
         }
 
     @Test
     fun `doWork skips rule if pending draft already exists`() =
         runTest {
             val now = System.currentTimeMillis()
-            val rule = RecurringTransaction(id = 1, description = "Draft Exists", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, lastRunDate = null, accountId = 1, categoryId = 1)
-            val draft = Transaction(id = 100, description = "Draft", amount = 10.0, transactionType = "expense", date = now, accountId = 1, categoryId = 1, notes = null, status = "PENDING")
+            val rule = RecurringTransaction(id = 1, description = "Draft Exists", amount = 10.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Daily", startDate = 0L, lastRunDate = null, accountId = 1, categoryId = 1)
+            val draft = Transaction(id = 100, description = "Draft", amount = 10.0, transactionType = TransactionType.EXPENSE, date = now, accountId = 1, categoryId = 1, notes = null, status = TransactionStatus.PENDING)
 
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
-            coEvery { db.transactionDao().getPendingTransactionForRule(1) } returns draft
+            coEvery { transactionQueryDao.getPendingTransactionForRule(1) } returns draft
 
             val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
             worker.doWork()
 
-            coVerify(exactly = 0) { transactionDao.insert(any<Transaction>()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any<Transaction>()) }
         }
 
     @Test
     fun `doWork creates CONFIRMED transaction and updates lastRunDate if autoApprove is true`() =
         runTest {
             val now = System.currentTimeMillis()
-            val rule = RecurringTransaction(id = 1, description = "Auto Approve", amount = 10.0, transactionType = "expense", recurrenceInterval = "Daily", startDate = 0L, lastRunDate = null, accountId = 1, categoryId = 1, autoApprove = true)
+            val rule = RecurringTransaction(id = 1, description = "Auto Approve", amount = 10.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Daily", startDate = 0L, lastRunDate = null, accountId = 1, categoryId = 1, autoApprove = true)
 
             coEvery { recurringTransactionDao.getAllRulesList() } returns listOf(rule)
             val capturedTxn = slot<Transaction>()
-            coEvery { transactionDao.insert(capture(capturedTxn)) } returns 101L
+            coEvery { transactionWriteDao.insert(capture(capturedTxn)) } returns 101L
             every { NotificationHelper.showAutoApprovedPaymentNotification(any(), any()) } just runs
 
             val worker = TestListenableWorkerBuilder<RecurringTransactionWorker>(context).build()
             worker.doWork()
 
-            coVerify(exactly = 1) { transactionDao.insert(any<Transaction>()) }
+            coVerify(exactly = 1) { transactionWriteDao.insert(any<Transaction>()) }
             coVerify(exactly = 1) { recurringTransactionDao.updateLastRunDate(1, any()) }
             verify(exactly = 1) { NotificationHelper.showAutoApprovedPaymentNotification(any(), any()) }
 
-            assertEquals("CONFIRMED", capturedTxn.captured.status)
+            assertEquals(TransactionStatus.CONFIRMED, capturedTxn.captured.status)
+            assertEquals(TransactionType.EXPENSE, capturedTxn.captured.transactionType)
             assertEquals("Auto Approve", capturedTxn.captured.description)
         }
 

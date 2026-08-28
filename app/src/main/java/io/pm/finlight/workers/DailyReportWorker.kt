@@ -21,9 +21,9 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
@@ -32,9 +32,10 @@ class DailyReportWorker(
     workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
     override suspend fun doWork(): Result {
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             try {
-                val transactionDao = AppDatabase.getInstance(context).transactionDao()
+                val transactionAnalyticsDao = AppDatabase.getInstance(context).transactionAnalyticsDao()
 
                 // --- Define Date Ranges ---
                 val now = Calendar.getInstance()
@@ -67,13 +68,13 @@ class DailyReportWorker(
 
                 // --- Fetch Data ---
                 // --- UPDATED: Use the new rolling 24-hour window ---
-                val reportSummary = transactionDao.getFinancialSummaryForRange(reportStartTime, reportEndTime)
+                val reportSummary = transactionAnalyticsDao.getFinancialSummaryForRange(reportStartTime, reportEndTime)
                 val yesterdayExpenses = reportSummary?.totalExpenses ?: 0.0
 
-                val weeklyAverage = transactionDao.getAverageDailySpendingForRange(sevenDaysAgoStart, sevenDaysAgoEnd) ?: 0.0
+                val weeklyAverage = transactionAnalyticsDao.getAverageDailySpendingForRange(sevenDaysAgoStart, sevenDaysAgoEnd) ?: 0.0
 
                 // --- UPDATED: Use the new rolling 24-hour window ---
-                val topCategories = transactionDao.getTopSpendingCategoriesForRange(reportStartTime, reportEndTime)
+                val topCategories = transactionAnalyticsDao.getTopSpendingCategoriesForRange(reportStartTime, reportEndTime)
 
                 // --- Apply Contextual Logic ---
                 val title =
@@ -98,6 +99,16 @@ class DailyReportWorker(
                     }
 
                 NotificationHelper.showDailyReportNotification(context, title, yesterdayExpenses, topCategories, now.timeInMillis)
+
+                try {
+                    val travelSettingsRepository = ServiceLocator.provideTravelSettingsRepository(context)
+                    val currentTravelSettings = travelSettingsRepository.getCurrentTravelModeSettings()
+                    if (currentTravelSettings != null && now.timeInMillis > currentTravelSettings.endDate) {
+                        travelSettingsRepository.saveTravelModeSettings(null)
+                    }
+                } catch (e: Exception) {
+                    Log.w("DailyReportWorker", "Failed to check or expire travel mode settings", e)
+                }
 
                 ReminderManager.scheduleDailyReport(context)
                 Result.success()

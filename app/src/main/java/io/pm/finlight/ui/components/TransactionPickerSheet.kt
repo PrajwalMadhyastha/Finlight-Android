@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionType
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.FormatUtils
@@ -101,7 +102,7 @@ fun TransactionPickerSheet(
                                     text = currencyFormat.format(transaction.amount),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (transaction.transactionType == "income") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    color = if (transaction.transactionType == TransactionType.INCOME) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }

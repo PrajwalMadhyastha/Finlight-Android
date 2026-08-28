@@ -2,6 +2,7 @@ package io.pm.finlight.workers
 
 import android.app.NotificationManager
 import android.content.Context
+import androidx.datastore.preferences.core.edit
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -10,7 +11,10 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionWriteDao
+import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -29,12 +33,18 @@ import java.util.Calendar
 class GoalSurplusWorkerTest {
     private lateinit var context: Context
     private lateinit var db: AppDatabase
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionWriteDao: TransactionWriteDao
     private lateinit var goalDao: GoalDao
+    private lateinit var settingsRepository: ISettingsRepository
 
     @Before
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
+        runBlocking {
+            context.financeSettingsDataStore.edit { it.clear() }
+        }
+        io.pm.finlight.di.ServiceLocator.reset()
+        settingsRepository = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
 
         // Use an unencrypted in-memory database!
         db =
@@ -42,7 +52,7 @@ class GoalSurplusWorkerTest {
                 .allowMainThreadQueries()
                 .build()
 
-        transactionDao = db.transactionDao()
+        transactionWriteDao = db.transactionWriteDao()
         goalDao = db.goalDao()
 
         mockkObject(AppDatabase.Companion)
@@ -52,6 +62,7 @@ class GoalSurplusWorkerTest {
     @After
     fun teardown() {
         db.close()
+        io.pm.finlight.di.ServiceLocator.reset()
         unmockkAll()
     }
 
@@ -60,14 +71,13 @@ class GoalSurplusWorkerTest {
         runTest {
             ShadowApplication.getInstance().grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
 
-            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
-
             val cal = Calendar.getInstance()
             cal.add(Calendar.MONTH, -1)
             val prevYear = cal.get(Calendar.YEAR)
-            val prevMonth = String.format("%02d", cal.get(Calendar.MONTH) + 1)
-            prefs.edit().putFloat("overall_budget_${prevYear}_$prevMonth", 5000f).apply()
+            val prevMonth = cal.get(Calendar.MONTH) + 1
+
+            settingsRepository.saveGoalNudgesEnabled(true)
+            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 5000f)
 
             // Insert required data
             db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))
@@ -81,11 +91,11 @@ class GoalSurplusWorkerTest {
             calDate.add(Calendar.MONTH, -1)
             val txDate = calDate.timeInMillis
 
-            transactionDao.insert(
-                Transaction(accountId = 1, categoryId = 1, amount = 5000.0, date = txDate, notes = "", description = "Salary", transactionType = "income")
+            transactionWriteDao.insert(
+                Transaction(accountId = 1, categoryId = 1, amount = 5000.0, date = txDate, notes = "", description = "Salary", transactionType = TransactionType.INCOME)
             )
-            transactionDao.insert(
-                Transaction(accountId = 1, categoryId = 2, amount = 2000.0, date = txDate, notes = "", description = "Food", transactionType = "expense")
+            transactionWriteDao.insert(
+                Transaction(accountId = 1, categoryId = 2, amount = 2000.0, date = txDate, notes = "", description = "Food", transactionType = TransactionType.EXPENSE)
             )
 
             val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
@@ -103,8 +113,7 @@ class GoalSurplusWorkerTest {
     @Test
     fun testDoWork_nudgesDisabled() =
         runTest {
-            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("goal_nudges_enabled", false).apply()
+            settingsRepository.saveGoalNudgesEnabled(false)
 
             val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
             val result = worker.doWork()
@@ -118,8 +127,7 @@ class GoalSurplusWorkerTest {
     @Test
     fun testDoWork_noBudgetSet() =
         runTest {
-            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
+            settingsRepository.saveGoalNudgesEnabled(true)
             // No budget is set in prefs
 
             val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
@@ -134,15 +142,13 @@ class GoalSurplusWorkerTest {
     @Test
     fun testDoWork_noSurplus() =
         runTest {
-            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
-
             val cal = Calendar.getInstance()
             cal.add(Calendar.MONTH, -1)
             val prevYear = cal.get(Calendar.YEAR)
-            val prevMonth = String.format("%02d", cal.get(Calendar.MONTH) + 1)
-            // Set budget to a low amount
-            prefs.edit().putFloat("overall_budget_${prevYear}_$prevMonth", 1000f).apply()
+            val prevMonth = cal.get(Calendar.MONTH) + 1
+
+            settingsRepository.saveGoalNudgesEnabled(true)
+            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 1000f)
 
             // Insert expenses greater than budget
             db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))
@@ -152,8 +158,8 @@ class GoalSurplusWorkerTest {
             calDate.add(Calendar.MONTH, -1)
             val txDate = calDate.timeInMillis
 
-            transactionDao.insert(
-                Transaction(accountId = 1, categoryId = 1, amount = 1500.0, date = txDate, notes = "", description = "Food", transactionType = "expense")
+            transactionWriteDao.insert(
+                Transaction(accountId = 1, categoryId = 1, amount = 1500.0, date = txDate, notes = "", description = "Food", transactionType = TransactionType.EXPENSE)
             )
 
             val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
@@ -168,14 +174,13 @@ class GoalSurplusWorkerTest {
     @Test
     fun testDoWork_noActiveGoals() =
         runTest {
-            val prefs = context.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("goal_nudges_enabled", true).apply()
-
             val cal = Calendar.getInstance()
             cal.add(Calendar.MONTH, -1)
             val prevYear = cal.get(Calendar.YEAR)
-            val prevMonth = String.format("%02d", cal.get(Calendar.MONTH) + 1)
-            prefs.edit().putFloat("overall_budget_${prevYear}_$prevMonth", 5000f).apply()
+            val prevMonth = cal.get(Calendar.MONTH) + 1
+
+            settingsRepository.saveGoalNudgesEnabled(true)
+            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 5000f)
 
             // Insert only income, no expenses, so there is surplus
             db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))
@@ -185,8 +190,8 @@ class GoalSurplusWorkerTest {
             calDate.add(Calendar.MONTH, -1)
             val txDate = calDate.timeInMillis
 
-            transactionDao.insert(
-                Transaction(accountId = 1, categoryId = 1, amount = 5000.0, date = txDate, notes = "", description = "Salary", transactionType = "income")
+            transactionWriteDao.insert(
+                Transaction(accountId = 1, categoryId = 1, amount = 5000.0, date = txDate, notes = "", description = "Salary", transactionType = TransactionType.INCOME)
             )
 
             // DO NOT insert any active goals
@@ -200,5 +205,26 @@ class GoalSurplusWorkerTest {
             // Worker only sends notification when surplus > 0 AND activeGoals.isNotEmpty().
             // Since no goals exist, no notification is sent.
             assertTrue("No notification should be sent when no active goals exist", notifications.isEmpty())
+        }
+
+    @Test
+    fun testDoWork_noTransactionsInPreviousMonth() =
+        runTest {
+            val cal = Calendar.getInstance()
+            cal.add(Calendar.MONTH, -1)
+            val prevYear = cal.get(Calendar.YEAR)
+            val prevMonth = cal.get(Calendar.MONTH) + 1
+
+            settingsRepository.saveGoalNudgesEnabled(true)
+            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 1000f)
+
+            // Insert account and goal, but zero transactions
+            db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))
+            goalDao.insert(Goal(id = 1, name = "Trip", targetAmount = 5000.0, savedAmount = 100.0, targetDate = System.currentTimeMillis() + 100000000L, accountId = 1))
+
+            val worker = TestListenableWorkerBuilder<GoalSurplusWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
         }
 }

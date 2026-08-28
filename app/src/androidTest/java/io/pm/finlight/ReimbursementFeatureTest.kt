@@ -47,7 +47,7 @@ class ReimbursementFeatureTest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = now,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = ""
                 )
             )
@@ -59,7 +59,7 @@ class ReimbursementFeatureTest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = now,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     notes = "",
                     parentReimbursementId = expenseId
                 )
@@ -267,7 +267,7 @@ class ReimbursementFeatureTest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = now,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = ""
                 )
             )

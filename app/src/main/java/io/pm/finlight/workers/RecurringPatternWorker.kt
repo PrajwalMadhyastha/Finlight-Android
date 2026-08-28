@@ -11,9 +11,9 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
@@ -23,7 +23,7 @@ class RecurringPatternWorker(
     private val context: Context,
     workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
-    private val transactionDao = AppDatabase.getInstance(context).transactionDao()
+    private val transactionQueryDao = AppDatabase.getInstance(context).transactionQueryDao()
     private val patternDao = AppDatabase.getInstance(context).recurringPatternDao()
     private val recurringTransactionDao = AppDatabase.getInstance(context).recurringTransactionDao()
 
@@ -40,10 +40,11 @@ class RecurringPatternWorker(
     }
 
     override suspend fun doWork(): Result {
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             try {
                 // FIX: Check if the feature is enabled before proceeding
-                val settingsRepo = SettingsRepository(context)
+                val settingsRepo = ServiceLocator.provideSettingsRepository(context)
                 val isEnabled = settingsRepo.getRecurringTransactionsEnabled().first()
 
                 if (!isEnabled) {
@@ -56,7 +57,7 @@ class RecurringPatternWorker(
 
                 // 1. Fetch recent transactions that have an SMS signature.
                 val recentTransactions =
-                    transactionDao.getTransactionsWithSignatureSince(
+                    transactionQueryDao.getTransactionsWithSignatureSince(
                         System.currentTimeMillis() - TimeUnit.DAYS.toMillis(ANALYSIS_WINDOW_DAYS),
                     )
 
@@ -107,7 +108,7 @@ class RecurringPatternWorker(
     }
 
     private suspend fun analyzeAndCreateRuleIfNeeded(pattern: RecurringPattern) {
-        val transactions = transactionDao.getTransactionsBySignature(pattern.smsSignature)
+        val transactions = transactionQueryDao.getTransactionsBySignature(pattern.smsSignature)
         if (transactions.size < MIN_OCCURRENCES_FOR_PATTERN) return
 
         val timestamps = transactions.map { it.date }.sorted()

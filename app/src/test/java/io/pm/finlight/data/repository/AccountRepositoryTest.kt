@@ -41,7 +41,7 @@ class AccountRepositoryTest : BaseViewModelTest() {
     private lateinit var goalDao: GoalDao
 
     @Mock
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionWriteDao: io.pm.finlight.data.db.dao.TransactionWriteDao
 
     @Mock
     private lateinit var accountAliasDao: AccountAliasDao
@@ -61,7 +61,7 @@ class AccountRepositoryTest : BaseViewModelTest() {
         // Stub the database to return mocked DAOs
         `when`(db.accountDao()).thenReturn(accountDao)
         `when`(db.goalDao()).thenReturn(goalDao)
-        `when`(db.transactionDao()).thenReturn(transactionDao)
+        `when`(db.transactionWriteDao()).thenReturn(transactionWriteDao)
         `when`(db.accountAliasDao()).thenReturn(accountAliasDao)
 
         // Mock the underlying components that `withTransaction` uses.
@@ -225,7 +225,7 @@ class AccountRepositoryTest : BaseViewModelTest() {
 
             // Assert
             // Use inOrder to verify the sequence of operations within the transaction
-            val inOrder = inOrder(goalDao, transactionDao, accountAliasDao, accountDao, writableDb)
+            val inOrder = inOrder(goalDao, transactionWriteDao, accountAliasDao, accountDao, writableDb)
 
             // Verify transaction block execution
             inOrder.verify(writableDb).beginTransaction()
@@ -241,7 +241,7 @@ class AccountRepositoryTest : BaseViewModelTest() {
             inOrder.verify(goalDao).reassignGoals(eq(sourceIds), eq(destinationId))
 
             // 3. Verify transactions are reassigned
-            inOrder.verify(transactionDao).reassignTransactions(eq(sourceIds), eq(destinationId))
+            inOrder.verify(transactionWriteDao).reassignTransactions(eq(sourceIds), eq(destinationId))
 
             // 4. Verify source accounts are deleted last
             inOrder.verify(accountDao).deleteByIds(eq(sourceIds))

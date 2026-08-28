@@ -3,6 +3,7 @@ package io.pm.finlight.ui.viewmodel
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TransactionRepository
+import io.pm.finlight.TransactionType
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -51,7 +52,9 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
 
         // Mock SettingsRepository
         val mockBudgets = mapOf(1 to 1000f, 2 to 1000f, 3 to 1000f, 4 to 1000f, 5 to 1000f, 6 to 1000f)
-        `when`(settingsRepository.getOverallBudgetsForYear(2026)).thenReturn(mockBudgets)
+        runTest {
+            `when`(settingsRepository.getOverallBudgetsForYear(2026)).thenReturn(mockBudgets)
+        }
         `when`(settingsRepository.getSimulatorPrivacyModeEnabled()).thenReturn(flowOf(false))
 
         // Mock TransactionRepository
@@ -95,7 +98,7 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
         runTest {
             val incomeTxn =
                 io.pm.finlight.TransactionDetails(
-                    transaction = io.pm.finlight.Transaction(id = 1, description = "Salary", amount = 5000.0, transactionType = "income", date = 100L, accountId = 1, categoryId = null, notes = null),
+                    transaction = io.pm.finlight.Transaction(id = 1, description = "Salary", amount = 5000.0, transactionType = TransactionType.INCOME, date = 100L, accountId = 1, categoryId = null, notes = null),
                     images = emptyList(),
                     accountName = "Bank",
                     categoryName = "Salary",

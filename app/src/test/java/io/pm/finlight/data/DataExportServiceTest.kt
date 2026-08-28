@@ -40,7 +40,10 @@ class DataExportServiceTest : BaseViewModelTest() {
     private lateinit var db: AppDatabase
 
     // Mock all DAOs
-    private val transactionDao: TransactionDao = mockk(relaxed = true)
+    private val transactionQueryDao: TransactionQueryDao = mockk(relaxed = true)
+    private val transactionWriteDao: TransactionWriteDao = mockk(relaxed = true)
+    private val transactionAnalyticsDao: TransactionAnalyticsDao = mockk(relaxed = true)
+    private val transactionReimbursementDao: TransactionReimbursementDao = mockk(relaxed = true)
     private val accountDao: AccountDao = mockk(relaxed = true)
     private val categoryDao: CategoryDao = mockk(relaxed = true)
     private val budgetDao: BudgetDao = mockk(relaxed = true)
@@ -69,7 +72,10 @@ class DataExportServiceTest : BaseViewModelTest() {
         every { AppDatabase.getInstance(any()) } returns db
 
         // Link the DAOs to the mocked db instance
-        every { db.transactionDao() } returns transactionDao
+        every { db.transactionQueryDao() } returns transactionQueryDao
+        every { db.transactionWriteDao() } returns transactionWriteDao
+        every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
+        every { db.transactionReimbursementDao() } returns transactionReimbursementDao
         every { db.accountDao() } returns accountDao
         every { db.categoryDao() } returns categoryDao
         every { db.budgetDao() } returns budgetDao
@@ -97,7 +103,7 @@ class DataExportServiceTest : BaseViewModelTest() {
     private fun setupMockData() {
         // Setup DAOs to return some mock data
         coEvery {
-            transactionDao.getAllTransactionsSimple()
+            transactionQueryDao.getAllTransactionsSimple()
         } returns flowOf(listOf(Transaction(id = 1, description = "Test Tx", amount = 100.0, date = 1L, accountId = 1, categoryId = 1, notes = null)))
         coEvery { accountDao.getAllAccounts() } returns flowOf(listOf(Account(id = 1, name = "Test Acc", type = "Bank")))
         coEvery { categoryDao.getAllCategories() } returns flowOf(listOf(Category(id = 1, name = "Test Cat", iconKey = "icon", colorKey = "color")))
@@ -120,7 +126,7 @@ class DataExportServiceTest : BaseViewModelTest() {
             smsParseTemplateDao.getAllTemplates()
         } returns listOf(SmsParseTemplate(templateSignature = "sig", correctedMerchantName = "merchant", originalSmsBody = "body", originalMerchantStartIndex = 0, originalMerchantEndIndex = 1, originalAmountStartIndex = 2, originalAmountEndIndex = 3))
         coEvery { tagDao.getAllTagsList() } returns listOf(Tag(id = 1, name = "Test Tag"))
-        coEvery { transactionDao.getAllCrossRefs() } returns listOf(TransactionTagCrossRef(transactionId = 1, tagId = 1))
+        coEvery { transactionQueryDao.getAllCrossRefs() } returns listOf(TransactionTagCrossRef(transactionId = 1, tagId = 1))
         coEvery {
             goalDao.getAll()
         } returns listOf(Goal(id = 1, name = "Test Goal", targetAmount = 1000.0, savedAmount = 100.0, targetDate = null, accountId = 1))
@@ -236,7 +242,7 @@ class DataExportServiceTest : BaseViewModelTest() {
 
             // 3. Mock the clear and insert calls (relaxed mocks will accept any args)
             coJustRun { splitTransactionDao.deleteAll() }
-            coJustRun { transactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
             coJustRun { tagDao.deleteAll() }
             coJustRun { accountDao.deleteAll() }
             coJustRun { categoryDao.deleteAll() }
@@ -259,8 +265,8 @@ class DataExportServiceTest : BaseViewModelTest() {
             coJustRun { accountDao.insertAll(any()) }
             coJustRun { categoryDao.insertAll(any()) }
             coJustRun { tagDao.insertAll(any()) }
-            coJustRun { transactionDao.insertAll(any()) }
-            coJustRun { transactionDao.addTagsToTransaction(any()) }
+            coJustRun { transactionWriteDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.addTagsToTransaction(any()) }
 
             // Act
             val success = DataExportService.restoreFromBackupSnapshot(context)
@@ -272,7 +278,7 @@ class DataExportServiceTest : BaseViewModelTest() {
             // Verify that the import logic was actually called
             coVerifyOrder {
                 splitTransactionDao.deleteAll()
-                transactionDao.deleteAll()
+                transactionWriteDao.deleteAll()
                 tagDao.deleteAll()
                 accountDao.deleteAll()
                 categoryDao.deleteAll()
@@ -293,8 +299,8 @@ class DataExportServiceTest : BaseViewModelTest() {
             coVerify { accountDao.insertAll(backupData.accounts) }
             coVerify { categoryDao.insertAll(backupData.categories) }
             coVerify { tagDao.insertAll(backupData.tags) }
-            coVerify { transactionDao.insertAll(backupData.transactions) }
-            coVerify { transactionDao.addTagsToTransaction(backupData.transactionTagCrossRefs) }
+            coVerify { transactionWriteDao.insertAll(backupData.transactions) }
+            coVerify { transactionWriteDao.addTagsToTransaction(backupData.transactionTagCrossRefs) }
         }
 
     @Test
@@ -306,7 +312,7 @@ class DataExportServiceTest : BaseViewModelTest() {
                     smsSignature = "sig_abc",
                     description = "Netflix",
                     amount = 199.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     accountId = 1,
                     categoryId = null,
                     occurrences = 3,
@@ -332,7 +338,7 @@ class DataExportServiceTest : BaseViewModelTest() {
             }
 
             coJustRun { splitTransactionDao.deleteAll() }
-            coJustRun { transactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
             coJustRun { tagDao.deleteAll() }
             coJustRun { accountDao.deleteAll() }
             coJustRun { categoryDao.deleteAll() }
@@ -397,7 +403,7 @@ class DataExportServiceTest : BaseViewModelTest() {
                     notes = "Work expense",
                     // This is a regular transaction
                     isSplit = false,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     isExcluded = false,
                 )
             val details =
@@ -413,8 +419,8 @@ class DataExportServiceTest : BaseViewModelTest() {
                 )
             val tags = listOf(Tag(id = tagId, name = "Work"))
 
-            coEvery { transactionDao.getAllTransactions() } returns flowOf(listOf(details))
-            coEvery { transactionDao.getTagsForTransactionSimple(txId) } returns tags
+            coEvery { transactionQueryDao.getAllTransactions() } returns flowOf(listOf(details))
+            coEvery { transactionQueryDao.getTagsForTransactionSimple(txId) } returns tags
             // No need to mock splitTransactionDao as isSplit is false
 
             // Act
@@ -456,7 +462,7 @@ class DataExportServiceTest : BaseViewModelTest() {
 
             // 1. Parent Transaction Details
             val parentTransaction =
-                Transaction(id = parentTxId, description = "Market Visit", amount = 150.0, date = transactionTime, accountId = 1, categoryId = null, notes = "Parent Note", isSplit = true, transactionType = "expense", isExcluded = false)
+                Transaction(id = parentTxId, description = "Market Visit", amount = 150.0, date = transactionTime, accountId = 1, categoryId = null, notes = "Parent Note", isSplit = true, transactionType = TransactionType.EXPENSE, isExcluded = false)
             val parentDetails =
                 TransactionDetails(
                     transaction = parentTransaction,
@@ -490,8 +496,8 @@ class DataExportServiceTest : BaseViewModelTest() {
                 )
 
             // 4. Mock DAO calls
-            coEvery { transactionDao.getAllTransactions() } returns flowOf(listOf(parentDetails))
-            coEvery { transactionDao.getTagsForTransactionSimple(parentTxId) } returns tags
+            coEvery { transactionQueryDao.getAllTransactions() } returns flowOf(listOf(parentDetails))
+            coEvery { transactionQueryDao.getTagsForTransactionSimple(parentTxId) } returns tags
             coEvery { splitTransactionDao.getSplitsForParentSimple(parentTxId) } returns splitDetails
 
             // Act
@@ -525,5 +531,300 @@ class DataExportServiceTest : BaseViewModelTest() {
             val childRow2 = lines[3].split(',')
             assertEquals(11, childRow2.size)
             assertEquals("", childRow2[10]) // Tags column should be present but empty
+        }
+
+    @Test
+    fun `importDataFromJson successfully parses and imports backup from URI`() =
+        runTest {
+            val backupData =
+                AppDataBackup(
+                    transactions =
+                        listOf(
+                            Transaction(id = 1, description = "Test", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, notes = null)
+                        ),
+                    accounts = listOf(Account(id = 1, name = "Bank", type = "Savings")),
+                    categories = listOf(Category(id = 1, name = "Food", iconKey = "food", colorKey = "red")),
+                    tags = emptyList(),
+                    transactionTagCrossRefs = emptyList(),
+                    budgets = emptyList(),
+                    merchantMappings = emptyList(),
+                )
+            val jsonString = Json.encodeToString(AppDataBackup.serializer(), backupData)
+
+            val tempFile = File(context.cacheDir, "test_import.json")
+            tempFile.writeText(jsonString)
+            val uri = android.net.Uri.fromFile(tempFile)
+
+            coJustRun { splitTransactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
+            coJustRun { tagDao.deleteAll() }
+            coJustRun { accountDao.deleteAll() }
+            coJustRun { categoryDao.deleteAll() }
+            coJustRun { budgetDao.deleteAll() }
+            coJustRun { merchantMappingDao.deleteAll() }
+            coJustRun { goalDao.deleteAll() }
+            coJustRun { goalTransactionLinkDao.deleteAll() }
+            coJustRun { tripDao.deleteAll() }
+            coJustRun { accountAliasDao.deleteAll() }
+            coJustRun { customSmsRuleDao.deleteAll() }
+            coJustRun { merchantRenameRuleDao.deleteAll() }
+            coJustRun { merchantCategoryMappingDao.deleteAll() }
+            coJustRun { ignoreRuleDao.deleteAll() }
+            coJustRun { smsParseTemplateDao.deleteAll() }
+            coJustRun { recurringPatternDao.deleteAll() }
+
+            coJustRun { accountDao.insertAll(any()) }
+            coJustRun { categoryDao.insertAll(any()) }
+            coJustRun { budgetDao.insertAll(any()) }
+            coJustRun { merchantMappingDao.insertAll(any()) }
+            coJustRun { tagDao.insertAll(any()) }
+            coJustRun { goalDao.insertAll(any()) }
+            coJustRun { goalTransactionLinkDao.insertAll(any()) }
+            coJustRun { tripDao.insertAll(any()) }
+            coJustRun { accountAliasDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.insertAll(any()) }
+            coJustRun { splitTransactionDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.addTagsToTransaction(any()) }
+            coJustRun { customSmsRuleDao.insertAll(any()) }
+            coJustRun { merchantRenameRuleDao.insertAll(any()) }
+            coJustRun { merchantCategoryMappingDao.insertAll(any()) }
+            coJustRun { ignoreRuleDao.insertAll(any()) }
+            coJustRun { smsParseTemplateDao.insertAll(any()) }
+
+            val result = DataExportService.importDataFromJson(context, uri)
+            assertTrue("importDataFromJson should succeed with valid JSON file", result)
+            tempFile.delete()
+        }
+
+    @Test
+    fun `importDataFromJson returns false when file is empty or blank`() =
+        runTest {
+            val tempFile = File(context.cacheDir, "empty_import.json")
+            tempFile.writeText("   ")
+            val uri = android.net.Uri.fromFile(tempFile)
+
+            val result = DataExportService.importDataFromJson(context, uri)
+            assertFalse("importDataFromJson should return false for blank JSON", result)
+            tempFile.delete()
+        }
+
+    @Test
+    fun `importDataFromJson returns false when URI cannot be opened`() =
+        runTest {
+            val uri = android.net.Uri.parse("content://invalid/path/does_not_exist.json")
+            val result = DataExportService.importDataFromJson(context, uri)
+            assertFalse("importDataFromJson should return false for invalid content URI", result)
+        }
+
+    @Test
+    fun `exportToCsvString handles transactions with null account notes and tags`() =
+        runTest {
+            val transaction =
+                Transaction(
+                    id = 10,
+                    description = "Simple",
+                    amount = 20.0,
+                    date = 1000L,
+                    transactionType = TransactionType.INCOME,
+                    accountId = 1,
+                    categoryId = null,
+                    notes = null,
+                    isExcluded = true
+                )
+            val details =
+                TransactionDetails(
+                    transaction = transaction,
+                    images = emptyList(),
+                    accountName = null,
+                    categoryName = null,
+                    categoryColorKey = null,
+                    categoryIconKey = null,
+                    tagNames = null
+                )
+
+            coEvery { transactionQueryDao.getAllTransactions() } returns flowOf(listOf(details))
+            coEvery { transactionQueryDao.getTagsForTransactionSimple(10) } returns emptyList()
+
+            val csv = DataExportService.exportToCsvString(context)
+            assertNotNull(csv)
+            assertTrue(csv!!.contains("N/A"))
+            assertTrue(csv.contains("income"))
+            assertTrue(csv.contains("true"))
+        }
+
+    private fun mockAllDaoImportOperations() {
+        coJustRun { splitTransactionDao.deleteAll() }
+        coJustRun { transactionWriteDao.deleteAll() }
+        coJustRun { tagDao.deleteAll() }
+        coJustRun { accountDao.deleteAll() }
+        coJustRun { categoryDao.deleteAll() }
+        coJustRun { budgetDao.deleteAll() }
+        coJustRun { merchantMappingDao.deleteAll() }
+        coJustRun { goalDao.deleteAll() }
+        coJustRun { goalTransactionLinkDao.deleteAll() }
+        coJustRun { tripDao.deleteAll() }
+        coJustRun { accountAliasDao.deleteAll() }
+        coJustRun { customSmsRuleDao.deleteAll() }
+        coJustRun { merchantRenameRuleDao.deleteAll() }
+        coJustRun { merchantCategoryMappingDao.deleteAll() }
+        coJustRun { ignoreRuleDao.deleteAll() }
+        coJustRun { smsParseTemplateDao.deleteAll() }
+        coJustRun { recurringPatternDao.deleteAll() }
+
+        coJustRun { accountDao.insertAll(any()) }
+        coJustRun { categoryDao.insertAll(any()) }
+        coJustRun { budgetDao.insertAll(any()) }
+        coJustRun { merchantMappingDao.insertAll(any()) }
+        coJustRun { tagDao.insertAll(any()) }
+        coJustRun { goalDao.insertAll(any()) }
+        coJustRun { goalTransactionLinkDao.insertAll(any()) }
+        coJustRun { tripDao.insertAll(any()) }
+        coJustRun { accountAliasDao.insertAll(any()) }
+        coJustRun { transactionWriteDao.insertAll(any()) }
+        coJustRun { splitTransactionDao.insertAll(any()) }
+        coJustRun { transactionWriteDao.addTagsToTransaction(any()) }
+        coJustRun { customSmsRuleDao.insertAll(any()) }
+        coJustRun { merchantRenameRuleDao.insertAll(any()) }
+        coJustRun { merchantCategoryMappingDao.insertAll(any()) }
+        coJustRun { ignoreRuleDao.insertAll(any()) }
+        coJustRun { smsParseTemplateDao.insertAll(any()) }
+        coJustRun { recurringPatternDao.insert(any()) }
+    }
+
+    @Test
+    fun `importDataFromJson successfully decodes legacy backup JSON with lowercase enum values`() =
+        runTest {
+            mockAllDaoImportOperations()
+            val legacyJson =
+                """
+                {
+                    "transactions": [
+                        {
+                            "id": 101,
+                            "description": "Legacy Expense",
+                            "amount": 150.0,
+                            "date": 1700000000000,
+                            "accountId": 1,
+                            "categoryId": 1,
+                            "notes": null,
+                            "transactionType": "expense",
+                            "status": "confirmed"
+                        },
+                        {
+                            "id": 102,
+                            "description": "Legacy Income",
+                            "amount": 5000.0,
+                            "date": 1700000001000,
+                            "accountId": 1,
+                            "categoryId": 2,
+                            "notes": null,
+                            "transactionType": "income",
+                            "status": "pending"
+                        },
+                        {
+                            "id": 103,
+                            "description": "Legacy Transfer",
+                            "amount": 200.0,
+                            "date": 1700000002000,
+                            "accountId": 1,
+                            "categoryId": null,
+                            "notes": null,
+                            "transactionType": "transfer",
+                            "status": "skipped"
+                        }
+                    ],
+                    "accounts": [{"id": 1, "name": "Main Bank", "type": "Bank"}],
+                    "categories": [{"id": 1, "name": "Food", "iconKey": "food", "colorKey": "green"}],
+                    "budgets": [],
+                    "merchantMappings": [],
+                    "recurringPatterns": [
+                        {
+                            "smsSignature": "legacy_pattern_sig",
+                            "description": "Legacy Subscription",
+                            "amount": 99.0,
+                            "transactionType": "expense",
+                            "accountId": 1,
+                            "categoryId": 1,
+                            "occurrences": 3,
+                            "firstSeen": 1700000000000,
+                            "lastSeen": 1700000000000,
+                            "isDismissed": false
+                        }
+                    ]
+                }
+                """.trimIndent()
+
+            val tempFile = File(context.cacheDir, "legacy_backup.json")
+            tempFile.writeText(legacyJson)
+            val uri = android.net.Uri.fromFile(tempFile)
+
+            val capturedTransactions = slot<List<Transaction>>()
+            val capturedPatterns = slot<RecurringPattern>()
+            coEvery { transactionWriteDao.insertAll(capture(capturedTransactions)) } just runs
+            coEvery { recurringPatternDao.insert(capture(capturedPatterns)) } just runs
+
+            val success = DataExportService.importDataFromJson(context, uri)
+            assertTrue("Import of legacy JSON with lowercase enums should succeed", success)
+
+            val txns = capturedTransactions.captured
+            assertEquals(3, txns.size)
+
+            assertEquals(TransactionType.EXPENSE, txns[0].transactionType)
+            assertEquals(TransactionStatus.CONFIRMED, txns[0].status)
+
+            assertEquals(TransactionType.INCOME, txns[1].transactionType)
+            assertEquals(TransactionStatus.PENDING, txns[1].status)
+
+            assertEquals(TransactionType.TRANSFER, txns[2].transactionType)
+            assertEquals(TransactionStatus.SKIPPED, txns[2].status)
+
+            assertEquals(TransactionType.EXPENSE, capturedPatterns.captured.transactionType)
+
+            tempFile.delete()
+        }
+
+    @Test
+    fun `importDataFromJson successfully decodes modern backup JSON with uppercase enum values`() =
+        runTest {
+            mockAllDaoImportOperations()
+            val modernJson =
+                """
+                {
+                    "transactions": [
+                        {
+                            "id": 201,
+                            "description": "Modern Expense",
+                            "amount": 250.0,
+                            "date": 1700000000000,
+                            "accountId": 1,
+                            "categoryId": 1,
+                            "notes": null,
+                            "transactionType": "EXPENSE",
+                            "status": "CONFIRMED"
+                        }
+                    ],
+                    "accounts": [{"id": 1, "name": "Main Bank", "type": "Bank"}],
+                    "categories": [{"id": 1, "name": "Food", "iconKey": "food", "colorKey": "green"}],
+                    "budgets": [],
+                    "merchantMappings": []
+                }
+                """.trimIndent()
+
+            val tempFile = File(context.cacheDir, "modern_backup.json")
+            tempFile.writeText(modernJson)
+            val uri = android.net.Uri.fromFile(tempFile)
+
+            val capturedTransactions = slot<List<Transaction>>()
+            coEvery { transactionWriteDao.insertAll(capture(capturedTransactions)) } just runs
+
+            val success = DataExportService.importDataFromJson(context, uri)
+            assertTrue("Import of modern JSON with uppercase enums should succeed", success)
+
+            val txns = capturedTransactions.captured
+            assertEquals(1, txns.size)
+            assertEquals(TransactionType.EXPENSE, txns[0].transactionType)
+            assertEquals(TransactionStatus.CONFIRMED, txns[0].status)
+
+            tempFile.delete()
         }
 }

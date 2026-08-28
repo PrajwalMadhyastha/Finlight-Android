@@ -21,11 +21,13 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.ParseResult
-import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
 import io.pm.finlight.SmsRepository
+import io.pm.finlight.TagRepository
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.utils.SmsProviderHelper
 import io.pm.finlight.utils.SmsTransactionSaver
@@ -44,8 +46,10 @@ class SmsCatchupWorker(
         Log.d(tag, "Starting catch-up scan for missed SMS transactions...")
 
         val db = AppDatabase.getInstance(context)
-        val settingsRepository = SettingsRepository(context)
-        val saver = SmsTransactionSaver(db, settingsRepository)
+        val settingsRepository = ServiceLocator.provideSettingsRepository(context)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
+        val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
+        val saver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)
         val smsRepository = SmsRepository(context)
 
         val startDate = System.currentTimeMillis() - lookbackMs
@@ -57,7 +61,7 @@ class SmsCatchupWorker(
         }
 
         // Load current hashes once — this is our duplicate guard.
-        val existingSmsHashes = db.transactionDao().getAllSmsHashes().first().toSet()
+        val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toSet()
 
         // Load deleted hashes — transactions the user intentionally removed should
         // never be re-created by this worker, even if their SMS reappears in the inbox.
@@ -77,6 +81,9 @@ class SmsCatchupWorker(
         // Load ML models once for the entire scan batch (more efficient than per-SMS).
         val classifier = MlModelFactory.getClassifier(context)
         val nerExtractor = MlModelFactory.getNerExtractor(context)
+
+        // Load travel settings once for the entire scan batch.
+        val travelSettings = settingsRepository.getCurrentTravelModeSettings()
 
         // Track hashes we save during this run so we don't double-save within one batch.
         val savedHashesThisRun = mutableSetOf<String>()
@@ -128,6 +135,7 @@ class SmsCatchupWorker(
                 val newId =
                     saver.resolveAndSaveTransaction(
                         potentialTxn = potentialTxn,
+                        travelSettings = travelSettings,
                         source = "Auto-Recovered",
                     )
 

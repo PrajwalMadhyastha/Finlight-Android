@@ -36,6 +36,7 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,7 +58,7 @@ class DailyReportWorkerTest : BaseViewModelTest() {
 
     // --- FIX: Remove @Mock annotations ---
     private lateinit var db: AppDatabase
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
 
     @Before
     override fun setup() {
@@ -66,13 +67,13 @@ class DailyReportWorkerTest : BaseViewModelTest() {
 
         // --- FIX: Initialize as MockK mocks ---
         db = mockk()
-        transactionDao = mockk()
+        transactionAnalyticsDao = mockk()
 
         // Mock the static AppDatabase companion object to return our mock db instance.
         // This is the key to preventing the UnsatisfiedLinkError.
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionDao() } returns transactionDao
+        every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
 
         // Initialize WorkManager for testing. This is required for TestListenableWorkerBuilder.
         val config =
@@ -103,9 +104,9 @@ class DailyReportWorkerTest : BaseViewModelTest() {
         runTest {
             // Arrange
             // --- USE GENERIC MATCHERS ---
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 200.0)
-            coEvery { transactionDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
-            coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 200.0)
+            coEvery { transactionAnalyticsDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
+            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
             val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
             val titleCaptor = slot<String>()
@@ -127,9 +128,9 @@ class DailyReportWorkerTest : BaseViewModelTest() {
 
             // --- VERIFY DAO CALLS WITH CAPTORS ---
             coVerify {
-                transactionDao.getFinancialSummaryForRange(capture(reportStartSlot), capture(reportEndSlot))
-                transactionDao.getAverageDailySpendingForRange(capture(avgStartSlot), capture(avgEndSlot))
-                transactionDao.getTopSpendingCategoriesForRange(capture(reportStartSlot), capture(reportEndSlot))
+                transactionAnalyticsDao.getFinancialSummaryForRange(capture(reportStartSlot), capture(reportEndSlot))
+                transactionAnalyticsDao.getAverageDailySpendingForRange(capture(avgStartSlot), capture(avgEndSlot))
+                transactionAnalyticsDao.getTopSpendingCategoriesForRange(capture(reportStartSlot), capture(reportEndSlot))
             }
 
             // --- VERIFY TIME BOUNDS ---
@@ -196,9 +197,9 @@ class DailyReportWorkerTest : BaseViewModelTest() {
     fun `doWork with lower spending generates 'well below average' title`() =
         runTest {
             // Arrange
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 10.0)
-            coEvery { transactionDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
-            coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 10.0)
+            coEvery { transactionAnalyticsDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
+            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
             val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
             val titleCaptor = slot<String>()
@@ -224,9 +225,9 @@ class DailyReportWorkerTest : BaseViewModelTest() {
     fun `doWork with no spending generates 'no spending' title`() =
         runTest {
             // Arrange
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
-            coEvery { transactionDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
-            coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
+            coEvery { transactionAnalyticsDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
+            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
             val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
             val titleCaptor = slot<String>()
@@ -252,7 +253,7 @@ class DailyReportWorkerTest : BaseViewModelTest() {
     fun `doWork returns retry on failure`() =
         runTest {
             // Arrange
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
             val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
 
             // Act
@@ -261,5 +262,35 @@ class DailyReportWorkerTest : BaseViewModelTest() {
             // Assert
             assertEquals(ListenableWorker.Result.retry(), result)
             coVerify(exactly = 0) { ReminderManager.scheduleDailyReport(any()) }
+        }
+
+    @Test
+    fun `doWork clears expired travel mode settings`() =
+        runTest {
+            val travelSettingsRepo: ITravelSettingsRepository = mockk(relaxed = true)
+            val expiredSettings =
+                TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "Past Trip",
+                    tripType = TripType.DOMESTIC,
+                    startDate = 0L,
+                    endDate = 1000L,
+                    currencyCode = null,
+                    conversionRate = null,
+                )
+            coEvery { travelSettingsRepo.getCurrentTravelModeSettings() } returns expiredSettings
+            coEvery { travelSettingsRepo.saveTravelModeSettings(null) } returns Unit
+            io.pm.finlight.di.ServiceLocator.setTravelSettingsRepository(travelSettingsRepo)
+
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
+            coEvery { transactionAnalyticsDao.getAverageDailySpendingForRange(any(), any()) } returns 0.0
+            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+
+            val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 1) { travelSettingsRepo.saveTravelModeSettings(null) }
+            io.pm.finlight.di.ServiceLocator.reset()
         }
 }

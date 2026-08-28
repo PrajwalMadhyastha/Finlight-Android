@@ -262,7 +262,7 @@ private fun CreateRuleButton(
                     // Amount is not relevant here, rule screen will re-parse
                     amount = 0.0,
                     // Default, can be changed in rule screen
-                    transactionType = "expense",
+                    transactionType = TransactionType.DB_EXPENSE,
                     merchantName = null,
                     originalMessage = sms.body,
                     date = sms.date,

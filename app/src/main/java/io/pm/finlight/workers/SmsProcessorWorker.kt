@@ -27,22 +27,26 @@ import io.pm.finlight.MerchantCategoryMapping
 import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.MerchantRenameRule
 import io.pm.finlight.ParseResult
-import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
+import io.pm.finlight.TagRepository
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionNotificationWorker
+import kotlinx.coroutines.flow.first
+import io.pm.finlight.TransactionType
 import io.pm.finlight.TripType
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.SmsProviderHelper
 import io.pm.finlight.utils.SmsTransactionSaver
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import kotlinx.coroutines.flow.first
 import java.util.Date
 
+@Suppress("DEPRECATION")
 class SmsProcessorWorker(
     private val context: Context,
     workerParams: WorkerParameters,
@@ -63,12 +67,14 @@ class SmsProcessorWorker(
         val smsMessage = SmsMessage(id = date, sender = sender, body = body, date = date)
 
         val db = AppDatabase.getInstance(context)
-        val settingsRepository = SettingsRepository(context)
-        val saver = SmsTransactionSaver(db, settingsRepository)
+        val settingsRepository = ServiceLocator.provideSettingsRepository(context)
+        val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
+        val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
+        val saver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)
 
         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
-        val existingSmsHashes = db.transactionDao().getAllSmsHashes().first().toSet()
+        val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toSet()
         // Permanently skipped hashes (user deliberately deleted these transactions).
         val deletedHashes = db.deletedSmsHashDao().getAllHashes().toSet()
 
@@ -147,42 +153,43 @@ class SmsProcessorWorker(
         }
 
         // --- Travel mode routing ---
-        val travelSettings = settingsRepository.getTravelModeSettings().first()
+        val travelSettings = settingsRepository.getCurrentTravelModeSettings()
         val homeCurrency = settingsRepository.getHomeCurrency().first()
         val isTravelModeActive =
             travelSettings?.isEnabled == true &&
                 Date().time in travelSettings.startDate..travelSettings.endDate
 
         val newTransactionId: Long? =
-            if (isTravelModeActive && travelSettings != null &&
+            if (isTravelModeActive &&
                 travelSettings.tripType == TripType.INTERNATIONAL
             ) {
                 when (potentialTxn.detectedCurrencyCode) {
                     travelSettings.currencyCode ->
                         saver.resolveAndSaveTransaction(potentialTxn, isForeign = true, travelSettings = travelSettings)
                     homeCurrency ->
-                        saver.resolveAndSaveTransaction(potentialTxn, isForeign = false)
+                        saver.resolveAndSaveTransaction(potentialTxn, isForeign = false, travelSettings = travelSettings)
                     else -> {
                         NotificationHelper.showTravelModeSmsNotification(context, potentialTxn, travelSettings)
                         null
                     }
                 }
             } else {
-                saver.resolveAndSaveTransaction(potentialTxn, isForeign = false)
+                saver.resolveAndSaveTransaction(potentialTxn, isForeign = false, travelSettings = travelSettings)
             }
 
         newTransactionId ?: return Result.success()
 
         // --- NEW: Recurring transaction auto-linking ---
         val recurringDao = db.recurringTransactionDao()
-        val transactionDao = db.transactionDao()
-        val savedTxn = transactionDao.getTransactionByIdSync(newTransactionId.toInt())
+        val transactionQueryDao = db.transactionQueryDao()
+        val transactionWriteDao = db.transactionWriteDao()
+        val savedTxn = transactionQueryDao.getTransactionByIdSync(newTransactionId.toInt())
 
         if (savedTxn != null) {
             // --- NEW: Smart Transaction Merge Check ---
             val timeWindowStart = savedTxn.date - (3 * 60 * 60 * 1000L) // 3 hours ago
             val recentTxn =
-                transactionDao.findRecentTransactionForMerge(
+                transactionQueryDao.findRecentTransactionForMerge(
                     merchant = savedTxn.description,
                     accountId = savedTxn.accountId,
                     transactionType = savedTxn.transactionType,
@@ -199,7 +206,7 @@ class SmsProcessorWorker(
                 // It's a variable bill match
                 val isAnomaly = Math.abs(savedTxn.amount - senderRule.amount) > senderRule.amount * 0.3
 
-                transactionDao.updateRecurringRuleId(savedTxn.id, senderRule.id)
+                transactionWriteDao.updateRecurringRuleId(savedTxn.id, senderRule.id)
                 recurringDao.updateLastRunDate(senderRule.id, savedTxn.date)
 
                 if (isAnomaly) {
@@ -207,7 +214,7 @@ class SmsProcessorWorker(
                 }
             } else {
                 // Check if pending drafts exist
-                val pendingDrafts = transactionDao.getPendingTransactionsSync()
+                val pendingDrafts = transactionQueryDao.getPendingTransactionsSync()
                 val match =
                     pendingDrafts.find {
                         it.description == savedTxn.description &&
@@ -217,9 +224,9 @@ class SmsProcessorWorker(
 
                 if (match != null) {
                     // Auto-link fixed bill
-                    transactionDao.delete(match)
+                    transactionWriteDao.delete(match)
                     match.recurringRuleId?.let { ruleId ->
-                        transactionDao.updateRecurringRuleId(savedTxn.id, ruleId)
+                        transactionWriteDao.updateRecurringRuleId(savedTxn.id, ruleId)
                         recurringDao.updateLastRunDate(ruleId, savedTxn.date)
                     }
                 }
@@ -249,7 +256,7 @@ class SmsProcessorWorker(
                         accountId = 0,
                         categoryId = potentialTxn.categoryId,
                         notes = "",
-                        transactionType = potentialTxn.transactionType,
+                        transactionType = TransactionType.fromStringOrNull(potentialTxn.transactionType) ?: TransactionType.EXPENSE,
                         sourceSmsId = potentialTxn.sourceSmsId,
                         sourceSmsHash = potentialTxn.sourceSmsHash,
                     )
@@ -258,7 +265,7 @@ class SmsProcessorWorker(
                     savedTxn,
                     potentialTxn.suspicionReason ?: "Amount flagged for review.",
                 )
-            } else if (settingsRepository.isAutoCaptureNotificationEnabledBlocking()) {
+            } else if (settingsRepository.getAutoCaptureNotificationEnabled().first()) {
                 val workRequest =
                     OneTimeWorkRequestBuilder<TransactionNotificationWorker>()
                         .setInputData(workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to newTransactionId.toInt()))

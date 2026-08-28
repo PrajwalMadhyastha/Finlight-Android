@@ -4,17 +4,24 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.SettingsRepository
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.TransactionRepository
-import io.pm.finlight.TagRepository
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class AnnualSimulatorViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AnnualSimulatorViewModel::class.java)) {
             val database = AppDatabase.getInstance(application)
-            val settingsRepository = SettingsRepository(application)
-            val tagRepository = TagRepository(database.tagDao(), database.transactionDao())
-            val transactionRepository = TransactionRepository(database.transactionDao(), settingsRepository, tagRepository, database.deletedSmsHashDao(), database.mergeRecordDao(), database)
+            val settingsRepository = ServiceLocator.provideSettingsRepository(application)
+            val transactionRepository =
+                TransactionRepository(
+                    transactionWriteDao = database.transactionWriteDao(),
+                    transactionQueryDao = database.transactionQueryDao(),
+                    transactionAnalyticsDao = database.transactionAnalyticsDao(),
+                    transactionReimbursementDao = database.transactionReimbursementDao(),
+                    db = database,
+                    dispatcherProvider = DefaultDispatcherProvider(),
+                )
             @Suppress("UNCHECKED_CAST")
             return AnnualSimulatorViewModel(transactionRepository, settingsRepository) as T
         }

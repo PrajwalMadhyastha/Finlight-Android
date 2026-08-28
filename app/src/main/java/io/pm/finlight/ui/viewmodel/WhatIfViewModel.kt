@@ -6,6 +6,7 @@ import io.pm.finlight.utils.DateUtils
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
@@ -18,8 +19,8 @@ data class HypotheticalExpense(
 )
 
 class WhatIfViewModel(
-    private val transactionRepository: TransactionRepository,
-    private val settingsRepository: SettingsRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val settingsRepository: ISettingsRepository,
     private val timeProvider: TimeProvider
 ) : ViewModel() {
     private val _hypotheticalExpenses = MutableStateFlow<List<HypotheticalExpense>>(emptyList())
@@ -98,6 +99,8 @@ class WhatIfViewModel(
     }
 
     fun togglePrivacyMode() {
-        settingsRepository.saveSimulatorPrivacyModeEnabled(!privacyModeEnabled.value)
+        viewModelScope.launch {
+            settingsRepository.saveSimulatorPrivacyModeEnabled(!privacyModeEnabled.value)
+        }
     }
 }

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.Account
 import io.pm.finlight.TransactionDetails
+import io.pm.finlight.TransactionType
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
@@ -209,7 +210,7 @@ private fun AccountDetailTransactionItem(
             }
             Spacer(Modifier.width(16.dp))
 
-            val isIncome = transactionDetails.transaction.transactionType == "income"
+            val isIncome = transactionDetails.transaction.transactionType == TransactionType.INCOME
             val amountColor =
                 if (isSystemInDarkTheme()) {
                     if (isIncome) IncomeGreenDark else ExpenseRedDark

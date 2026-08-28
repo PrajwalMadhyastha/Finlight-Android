@@ -7,6 +7,7 @@ import io.pm.finlight.Account
 import io.pm.finlight.RecurringTransaction
 import io.pm.finlight.RecurringTransactionDao
 import io.pm.finlight.TestApplication
+import io.pm.finlight.TransactionType
 import io.pm.finlight.util.DatabaseTestRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -47,7 +48,7 @@ class RecurringTransactionDaoTest {
                 RecurringTransaction(
                     description = "Netflix",
                     amount = 149.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Monthly",
                     startDate = 0L,
                     accountId = 1,
@@ -70,7 +71,7 @@ class RecurringTransactionDaoTest {
                     RecurringTransaction(
                         description = "Spotify",
                         amount = 129.0,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         recurrenceInterval = "Monthly",
                         startDate = 0L,
                         accountId = 1,
@@ -101,7 +102,7 @@ class RecurringTransactionDaoTest {
                     RecurringTransaction(
                         description = "Old",
                         amount = 1.0,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         recurrenceInterval = "Monthly",
                         startDate = 0L,
                         accountId = 1,
@@ -113,7 +114,7 @@ class RecurringTransactionDaoTest {
                     id = id,
                     description = "New",
                     amount = 2.0,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     recurrenceInterval = "Weekly",
                     startDate = 1L,
                     accountId = 1,
@@ -140,7 +141,7 @@ class RecurringTransactionDaoTest {
                 RecurringTransaction(
                     description = "Test",
                     amount = 1.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Monthly",
                     startDate = 0L,
                     accountId = 1,
@@ -167,7 +168,7 @@ class RecurringTransactionDaoTest {
                     RecurringTransaction(
                         description = "Rule1",
                         amount = 1.0,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         recurrenceInterval = "Monthly",
                         startDate = 0L,
                         accountId = 1,
@@ -176,7 +177,7 @@ class RecurringTransactionDaoTest {
                     RecurringTransaction(
                         description = "Rule2",
                         amount = 2.0,
-                        transactionType = "expense",
+                        transactionType = TransactionType.EXPENSE,
                         recurrenceInterval = "Weekly",
                         startDate = 0L,
                         accountId = 1,
@@ -204,7 +205,7 @@ class RecurringTransactionDaoTest {
                 RecurringTransaction(
                     description = "Netflix",
                     amount = 149.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Monthly",
                     startDate = 0L,
                     accountId = 1,
@@ -230,7 +231,7 @@ class RecurringTransactionDaoTest {
                 RecurringTransaction(
                     description = "Netflix",
                     amount = 149.0,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Monthly",
                     startDate = 0L,
                     accountId = 1,

@@ -28,6 +28,7 @@ import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
@@ -83,7 +84,13 @@ class SettingsViewModelTest : BaseViewModelTest() {
     private lateinit var transactionRunner: TransactionRunner
 
     // Mocks for all DAOs called by DataExportService and ViewModel
-    @Mock private lateinit var transactionDao: TransactionDao
+    @Mock private lateinit var transactionQueryDao: TransactionQueryDao
+
+    @Mock private lateinit var transactionWriteDao: TransactionWriteDao
+
+    @Mock private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+
+    @Mock private lateinit var transactionReimbursementDao: TransactionReimbursementDao
 
     @Mock private lateinit var accountDao: AccountDao
 
@@ -157,7 +164,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
         coEvery { ReminderManager.cancelMonthlySummary(any()) } just runs
 
         // Stub the db mock to return all the mocked DAOs
-        `when`(db.transactionDao()).thenReturn(transactionDao)
+        `when`(db.transactionQueryDao()).thenReturn(transactionQueryDao)
+        `when`(db.transactionWriteDao()).thenReturn(transactionWriteDao)
+        `when`(db.transactionAnalyticsDao()).thenReturn(transactionAnalyticsDao)
+        `when`(db.transactionReimbursementDao()).thenReturn(transactionReimbursementDao)
         `when`(db.accountDao()).thenReturn(accountDao)
         `when`(db.categoryDao()).thenReturn(categoryDao)
         `when`(db.budgetDao()).thenReturn(budgetDao)
@@ -193,7 +203,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         // REMOVED withTransaction mock to let it run naturally with the mocked executor.
 
         runTest {
-            `when`(transactionDao.getAllTransactionsSimple()).thenReturn(flowOf(emptyList()))
+            `when`(transactionQueryDao.getAllTransactionsSimple()).thenReturn(flowOf(emptyList()))
             `when`(accountDao.getAllAccounts()).thenReturn(flowOf(emptyList()))
             `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
             `when`(budgetDao.getAllBudgets()).thenReturn(flowOf(emptyList()))
@@ -205,7 +215,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(ignoreRuleDao.getAllList()).thenReturn(emptyList())
             `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
             `when`(tagDao.getAllTagsList()).thenReturn(emptyList())
-            `when`(transactionDao.getAllCrossRefs()).thenReturn(emptyList())
+            `when`(transactionQueryDao.getAllCrossRefs()).thenReturn(emptyList())
             `when`(goalDao.getAll()).thenReturn(emptyList())
             `when`(tripDao.getAll()).thenReturn(emptyList())
             `when`(accountAliasDao.getAll()).thenReturn(emptyList())
@@ -249,13 +259,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
                 transactionRunner,
                 dispatchers = TestDispatcherProvider(testDispatcher),
             )
-    }
-
-    class TestDispatcherProvider(private val testDispatcher: kotlinx.coroutines.test.TestDispatcher) : io.pm.finlight.utils.DispatcherProvider {
-        override val main: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
-        override val io: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
-        override val default: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
-        override val unconfined: kotlinx.coroutines.CoroutineDispatcher get() = testDispatcher
     }
 
     @After
@@ -521,16 +524,18 @@ class SettingsViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `setPrivacyModeEnabled calls repository`() {
-        // Arrange
-        initializeViewModel()
+    fun `setPrivacyModeEnabled calls repository`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
 
-        // Act
-        viewModel.setPrivacyModeEnabled(true)
+            // Act
+            viewModel.setPrivacyModeEnabled(true)
+            advanceUntilIdle()
 
-        // Assert
-        verify(settingsRepository).savePrivacyModeEnabled(true)
-    }
+            // Assert
+            verify(settingsRepository).savePrivacyModeEnabled(true)
+        }
 
     @Test
     fun `simulatorPrivacyModeEnabled flow emits value from repository`() =
@@ -547,40 +552,46 @@ class SettingsViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `setSimulatorPrivacyModeEnabled calls repository`() {
-        // Arrange
-        initializeViewModel()
+    fun `setSimulatorPrivacyModeEnabled calls repository`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
 
-        // Act
-        viewModel.setSimulatorPrivacyModeEnabled(true)
+            // Act
+            viewModel.setSimulatorPrivacyModeEnabled(true)
+            advanceUntilIdle()
 
-        // Assert
-        verify(settingsRepository).saveSimulatorPrivacyModeEnabled(true)
-    }
-
-    @Test
-    fun `saveSelectedTheme calls repository`() {
-        // Arrange
-        initializeViewModel()
-
-        // Act
-        viewModel.saveSelectedTheme(AppTheme.AURORA)
-
-        // Assert
-        verify(settingsRepository).saveSelectedTheme(AppTheme.AURORA)
-    }
+            // Assert
+            verify(settingsRepository).saveSimulatorPrivacyModeEnabled(true)
+        }
 
     @Test
-    fun `setAppLockEnabled calls repository`() {
-        // Arrange
-        initializeViewModel()
+    fun `saveSelectedTheme calls repository`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
 
-        // Act
-        viewModel.setAppLockEnabled(true)
+            // Act
+            viewModel.saveSelectedTheme(AppTheme.AURORA)
+            advanceUntilIdle()
 
-        // Assert
-        verify(settingsRepository).saveAppLockEnabled(true)
-    }
+            // Assert
+            verify(settingsRepository).saveSelectedTheme(AppTheme.AURORA)
+        }
+
+    @Test
+    fun `setAppLockEnabled calls repository`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+
+            // Act
+            viewModel.setAppLockEnabled(true)
+            advanceUntilIdle()
+
+            // Assert
+            verify(settingsRepository).saveAppLockEnabled(true)
+        }
 
     // --- UPDATED: Test for backup success dialog ---
     @Test
@@ -1336,7 +1347,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             // Arrange
             `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull()))
                 .thenReturn(listOf(SmsMessage(1, "BANK", "Test", 1L)))
-            `when`(transactionDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
             `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))

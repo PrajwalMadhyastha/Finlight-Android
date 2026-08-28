@@ -57,6 +57,26 @@ class MerchantRenameRuleRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `getAllRules returns Flow of rules from DAO`() =
+        runTest {
+            // Arrange
+            val rules =
+                listOf(
+                    MerchantRenameRule(originalName = "AMZN", newName = "Amazon"),
+                    MerchantRenameRule(originalName = "FLPKRT", newName = "Flipkart"),
+                )
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(rules))
+
+            // Act & Assert
+            repository.getAllRules().test {
+                val emittedRules = awaitItem()
+                assertEquals(2, emittedRules.size)
+                assertEquals(rules, emittedRules)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `insert calls DAO`() =
         runTest {
             // Arrange

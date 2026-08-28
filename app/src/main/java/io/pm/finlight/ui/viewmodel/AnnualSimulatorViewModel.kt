@@ -2,10 +2,10 @@ package io.pm.finlight.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.SettingsRepository
-import io.pm.finlight.TransactionRepository
-import io.pm.finlight.utils.TimeProvider
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.utils.SystemTimeProvider
+import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,8 +26,8 @@ data class LifeEvent(
 )
 
 class AnnualSimulatorViewModel(
-    private val transactionRepository: TransactionRepository,
-    private val settingsRepository: SettingsRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val settingsRepository: ISettingsRepository,
     private val timeProvider: TimeProvider = SystemTimeProvider()
 ) : ViewModel() {
     private val _lifeEvents = MutableStateFlow<List<LifeEvent>>(emptyList())
@@ -133,6 +133,8 @@ class AnnualSimulatorViewModel(
     }
 
     fun togglePrivacyMode() {
-        settingsRepository.saveSimulatorPrivacyModeEnabled(!privacyModeEnabled.value)
+        viewModelScope.launch {
+            settingsRepository.saveSimulatorPrivacyModeEnabled(!privacyModeEnabled.value)
+        }
     }
 }

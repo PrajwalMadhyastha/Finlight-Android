@@ -9,7 +9,6 @@
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
-import android.content.Context
 import android.net.Uri
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
@@ -47,11 +46,6 @@ class ProfileViewModelTest : BaseViewModelTest() {
 
     private lateinit var viewModel: ProfileViewModel
 
-    /** Helper: shared prefs key used by the migration logic */
-    private val prefs by lazy {
-        application.getSharedPreferences("finance_app_settings", Context.MODE_PRIVATE)
-    }
-
     private fun setupDefaultRepo() {
         `when`(settingsRepository.getUserName()).thenReturn(flowOf("User"))
         `when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(null))
@@ -60,8 +54,6 @@ class ProfileViewModelTest : BaseViewModelTest() {
     @Before
     override fun setup() {
         super.setup()
-        // Clear prefs before each test so migration state is clean
-        prefs.edit().clear().commit()
     }
 
     // ---- Existing tests ----
@@ -102,6 +94,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
             viewModel = ProfileViewModel(application, settingsRepository)
 
             viewModel.updateUserName(newName)
+            advanceUntilIdle()
 
             verify(settingsRepository).saveUserName(newName)
         }
@@ -113,6 +106,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
             viewModel = ProfileViewModel(application, settingsRepository)
 
             viewModel.saveProfilePictureUri(null)
+            advanceUntilIdle()
 
             verify(settingsRepository).saveProfilePictureUri(null)
         }
@@ -130,7 +124,6 @@ class ProfileViewModelTest : BaseViewModelTest() {
     @Test
     fun `migration does nothing when no profile picture URI is stored in prefs`() =
         runTest {
-            // Arrange: prefs has no profile_picture_uri key
             setupDefaultRepo()
 
             // Act
@@ -146,8 +139,8 @@ class ProfileViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange: URI points to a non-attachments path
             val outsidePath = File(application.filesDir, "some_other_dir/profile_123.jpg").absolutePath
-            prefs.edit().putString("profile_picture_uri", outsidePath).commit()
-            setupDefaultRepo()
+            `when`(settingsRepository.getUserName()).thenReturn(flowOf("User"))
+            `when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(outsidePath))
 
             // Act
             viewModel = ProfileViewModel(application, settingsRepository)
@@ -163,8 +156,8 @@ class ProfileViewModelTest : BaseViewModelTest() {
             // Arrange: URI points into attachments/ but the actual file is gone (already deleted)
             val attachmentsDir = File(application.filesDir, "attachments")
             val nonExistentFile = File(attachmentsDir, "profile_ghost.jpg")
-            prefs.edit().putString("profile_picture_uri", nonExistentFile.absolutePath).commit()
-            setupDefaultRepo()
+            `when`(settingsRepository.getUserName()).thenReturn(flowOf("User"))
+            `when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(nonExistentFile.absolutePath))
 
             // Act
             viewModel = ProfileViewModel(application, settingsRepository)
@@ -180,8 +173,8 @@ class ProfileViewModelTest : BaseViewModelTest() {
             // Arrange: create a real file in the old attachments/ directory
             val attachmentsDir = File(application.filesDir, "attachments").also { it.mkdirs() }
             val oldFile = File(attachmentsDir, "profile_12345.jpg").also { it.writeText("fake_image_data") }
-            prefs.edit().putString("profile_picture_uri", oldFile.absolutePath).commit()
-            setupDefaultRepo()
+            `when`(settingsRepository.getUserName()).thenReturn(flowOf("User"))
+            `when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(oldFile.absolutePath))
 
             // Act
             viewModel = ProfileViewModel(application, settingsRepository)

@@ -10,44 +10,48 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Repository that abstracts access to the category data source.
  */
-class CategoryRepository(private val categoryDao: CategoryDao) {
+class CategoryRepository(private val categoryDao: CategoryDao) : ICategoryRepository {
     /**
      * Retrieves all categories from the category table, ordered by name.
      */
-    val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
+    override val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
 
     /**
      * Retrieves a single category by its unique ID.
      */
-    suspend fun getCategoryById(id: Int): Category? {
+    override suspend fun getCategoryById(id: Int): Category? {
         return categoryDao.getCategoryById(id)
+    }
+
+    override suspend fun findByName(name: String): Category? {
+        return categoryDao.findByName(name)
     }
 
     /**
      * Inserts a category in a non-blocking way.
      */
-    suspend fun insert(category: Category): Long {
+    override suspend fun insert(category: Category): Long {
         return categoryDao.insert(category)
     }
 
     /**
      * Inserts a list of categories in a non-blocking way.
      */
-    suspend fun insertAll(categories: List<Category>) {
+    override suspend fun insertAll(categories: List<Category>) {
         categoryDao.insertAll(categories)
     }
 
     /**
      * Updates a category in a non-blocking way.
      */
-    suspend fun update(category: Category) {
+    override suspend fun update(category: Category) {
         categoryDao.update(category)
     }
 
     /**
      * Deletes a category in a non-blocking way.
      */
-    suspend fun delete(category: Category) {
+    override suspend fun delete(category: Category) {
         categoryDao.delete(category)
     }
 }

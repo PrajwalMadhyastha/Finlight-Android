@@ -11,7 +11,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.SettingsRepository
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.Goal
 import io.pm.finlight.utils.NotificationHelper
 import kotlinx.coroutines.flow.first
@@ -26,10 +26,10 @@ class GoalSurplusWorker(
         val logTag = "GoalSurplusWorker"
         Log.d(logTag, "Starting GoalSurplusWorker")
 
-        val settingsRepository = SettingsRepository(applicationContext)
+        val settingsRepository = ServiceLocator.provideSettingsRepository(applicationContext)
 
         // 1. Check if feature is enabled
-        val isNudgesEnabled = settingsRepository.isGoalNudgesEnabledBlocking()
+        val isNudgesEnabled = settingsRepository.getGoalNudgesEnabled().first()
         if (!isNudgesEnabled) {
             Log.d(logTag, "Goal nudges disabled, skipping surplus check")
             return Result.success()
@@ -42,7 +42,7 @@ class GoalSurplusWorker(
         val prevMonth = cal.get(Calendar.MONTH) + 1 // 1-indexed for budget storage
 
         // 3. Get budget for previous month
-        val budget = settingsRepository.getOverallBudgetForMonthBlocking(prevYear, prevMonth) ?: 0f
+        val budget = settingsRepository.getOverallBudgetForMonth(prevYear, prevMonth).first() ?: 0f
         if (budget <= 0f) {
             Log.d(logTag, "No budget set for previous month, skipping surplus check")
             return Result.success()
@@ -62,8 +62,8 @@ class GoalSurplusWorker(
         cal.add(Calendar.MILLISECOND, -1)
         val endTime = cal.timeInMillis
 
-        val transactionDao = db.transactionDao()
-        val expenses = transactionDao.getFinancialSummaryForRangeFlow(startTime, endTime).firstOrNull()?.totalExpenses ?: 0.0
+        val transactionAnalyticsDao = db.transactionAnalyticsDao()
+        val expenses = transactionAnalyticsDao.getFinancialSummaryForRangeFlow(startTime, endTime).firstOrNull()?.totalExpenses ?: 0.0
 
         val surplus = budget.toDouble() - expenses
         Log.d(logTag, "Previous month budget: $budget, expenses: $expenses, surplus: $surplus")

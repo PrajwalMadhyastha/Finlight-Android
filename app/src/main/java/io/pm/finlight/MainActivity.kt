@@ -60,6 +60,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -86,6 +87,7 @@ import io.pm.finlight.utils.CategoryIconHelper
 // REMOVED: import io.pm.finlight.ui.common.ForceSmallFonts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.net.URLDecoder
@@ -120,9 +122,6 @@ class MainActivity : AppCompatActivity() {
 //            WindowManager.LayoutParams.FLAG_SECURE
 //        )
 
-        val settingsRepository = SettingsRepository(this)
-        val hasSeenOnboarding = settingsRepository.hasSeenOnboarding()
-
         setContent {
             val application = LocalContext.current.applicationContext as Application
             val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(application))
@@ -131,25 +130,23 @@ class MainActivity : AppCompatActivity() {
                     factory = SettingsViewModelFactory(application, transactionViewModel),
                 )
             val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
+            val hasSeenOnboarding by settingsViewModel.hasSeenOnboarding.collectAsState()
 
             // UPDATED: Using ForceAppScaling to handle both Text and Display scaling
             ForceAppScaling {
                 PersonalFinanceAppTheme(selectedTheme = selectedTheme) {
-                    var showOnboarding by remember { mutableStateOf(!hasSeenOnboarding) }
-
-                    if (showOnboarding) {
+                    if (hasSeenOnboarding == false) {
                         val onboardingViewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModelFactory(application))
                         OnboardingScreen(
                             viewModel = onboardingViewModel,
                             onOnboardingFinished = {
-                                settingsRepository.setHasSeenOnboarding(true)
-                                showOnboarding = false
+                                settingsViewModel.setHasSeenOnboarding(true)
                             },
                         )
-                    } else {
+                    } else if (hasSeenOnboarding == true) {
                         FinanceAppWithLockScreen(
-                            isInitiallyLocked = settingsRepository.isAppLockEnabledBlocking(),
                             shortcutAction = intent?.action,
+                            settingsViewModel = settingsViewModel,
                         )
                     }
                 }
@@ -166,14 +163,12 @@ class MainActivity : AppCompatActivity() {
 @SuppressLint("NewApi")
 @Composable
 fun FinanceAppWithLockScreen(
-    isInitiallyLocked: Boolean,
     shortcutAction: String? = null,
+    settingsViewModel: SettingsViewModel,
 ) {
     val context = LocalContext.current
-    val settingsRepository = remember { SettingsRepository(context) }
-
-    var isLocked by remember { mutableStateOf(isInitiallyLocked) }
-    val appLockEnabled by settingsRepository.getAppLockEnabled().collectAsState(initial = isInitiallyLocked)
+    val appLockEnabled by settingsViewModel.appLockEnabled.collectAsState()
+    var isUnlocked by remember { mutableStateOf(false) }
 
     val permissionsToRequest =
         remember {
@@ -207,15 +202,9 @@ fun FinanceAppWithLockScreen(
         }
     }
 
-    LaunchedEffect(appLockEnabled) {
-        if (!appLockEnabled) {
-            isLocked = false
-        }
-    }
-
-    if (isLocked) {
-        LockScreen(onUnlock = { isLocked = false })
-    } else {
+    if (appLockEnabled == true && !isUnlocked) {
+        LockScreen(onUnlock = { isUnlocked = true })
+    } else if (appLockEnabled != null) {
         MainAppScreen(shortcutAction = shortcutAction)
     }
 }
@@ -307,6 +296,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
     val reportsViewModel: ReportsViewModel = viewModel(factory = ReportsViewModelFactory(context))
     val manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = viewModel(factory = ManageIgnoreRulesViewModelFactory(context))
     val manageParseRulesViewModel: ManageParseRulesViewModel = viewModel(factory = ManageParseRulesViewModelFactory(context))
+    val manageMerchantRulesViewModel: ManageMerchantRulesViewModel = viewModel(factory = ManageMerchantRulesViewModelFactory(context))
     val tagViewModel: TagViewModel = viewModel(factory = TagViewModelFactory(context))
 
     val userName by dashboardViewModel.userName.collectAsState()
@@ -551,6 +541,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                 "tag_management" -> HelpActionIcon(helpKey = "tag_management")
                                 "manage_parse_rules" -> HelpActionIcon(helpKey = "manage_parse_rules")
                                 "manage_ignore_rules" -> HelpActionIcon(helpKey = "manage_ignore_rules")
+                                "manage_merchant_rules" -> HelpActionIcon(helpKey = "manage_merchant_rules")
                                 "add_budget", "edit_budget" -> HelpActionIcon(helpKey = "add_budget")
                                 "analysis_detail_screen" -> HelpActionIcon(helpKey = "analysis_detail_screen")
                                 "trip_detail" -> HelpActionIcon(helpKey = "trip_detail")
@@ -615,6 +606,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                 reportsViewModel = reportsViewModel,
                 manageIgnoreRulesViewModel = manageIgnoreRulesViewModel,
                 manageParseRulesViewModel = manageParseRulesViewModel,
+                manageMerchantRulesViewModel = manageMerchantRulesViewModel,
                 tagViewModel = tagViewModel,
             )
         }
@@ -690,6 +682,7 @@ fun AppNavHost(
     reportsViewModel: ReportsViewModel,
     manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel,
     manageParseRulesViewModel: ManageParseRulesViewModel,
+    manageMerchantRulesViewModel: ManageMerchantRulesViewModel,
     tagViewModel: TagViewModel,
 ) {
     NavHost(
@@ -776,7 +769,7 @@ fun AppNavHost(
         }
 
         composable("splash_screen") {
-            SplashScreen(navController = navController)
+            SplashScreen(navController = navController, settingsViewModel = settingsViewModel)
         }
 
         composable(
@@ -810,6 +803,15 @@ fun AppNavHost(
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
             ManageIgnoreRulesScreen(navController = navController, viewModel = manageIgnoreRulesViewModel)
+        }
+        composable(
+            "manage_merchant_rules",
+            enterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { 1000 }, animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
+        ) {
+            ManageMerchantRulesScreen(navController = navController, viewModel = manageMerchantRulesViewModel)
         }
 
         composable(BottomNavItem.Dashboard.route) {
@@ -1446,13 +1448,15 @@ fun AppNavHost(
 }
 
 @Composable
-fun SplashScreen(navController: NavHostController) {
+fun SplashScreen(
+    navController: NavHostController,
+    settingsViewModel: SettingsViewModel,
+) {
     var statusText by remember { mutableStateOf("Initializing...") }
     val context = LocalContext.current
-    val settingsRepository = remember { SettingsRepository(context) }
 
     LaunchedEffect(key1 = true) {
-        val isFirstLaunch = !settingsRepository.isFirstLaunchCompleteBlocking()
+        val isFirstLaunch = !settingsViewModel.isFirstLaunchComplete.first()
 
         if (isFirstLaunch) {
             statusText = "Checking for restored data..."
@@ -1465,7 +1469,7 @@ fun SplashScreen(navController: NavHostController) {
                 delay(1500) // Give user time to see the message
             }
             // Set the flag *after* the first-launch check is complete
-            settingsRepository.setFirstLaunchComplete()
+            settingsViewModel.setFirstLaunchComplete()
         }
 
         statusText = "Loading dashboard..."

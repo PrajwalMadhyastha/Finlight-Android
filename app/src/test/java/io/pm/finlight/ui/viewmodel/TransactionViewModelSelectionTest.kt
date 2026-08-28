@@ -231,8 +231,8 @@ class TransactionViewModelSelectionTest : TransactionViewModelBaseSetup() {
     @Test
     fun `canManualMerge returns true for same-account selection`() =
         runTest {
-            val t1 = Transaction(id = 1, amount = 100.0, date = 0L, accountId = 1, categoryId = 1, description = "Anchor", transactionType = "expense", notes = null)
-            val t2 = Transaction(id = 2, amount = 50.0, date = 0L, accountId = 1, categoryId = 1, description = "Child", transactionType = "expense", notes = null)
+            val t1 = Transaction(id = 1, amount = 100.0, date = 0L, accountId = 1, categoryId = 1, description = "Anchor", transactionType = TransactionType.EXPENSE, notes = null)
+            val t2 = Transaction(id = 2, amount = 50.0, date = 0L, accountId = 1, categoryId = 1, description = "Child", transactionType = TransactionType.EXPENSE, notes = null)
             // Mock getTransactionDetailsForRange flow
             whenever(transactionRepository.getTransactionDetailsForRange(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull())).thenReturn(
                 kotlinx.coroutines.flow.flowOf(
@@ -264,8 +264,8 @@ class TransactionViewModelSelectionTest : TransactionViewModelBaseSetup() {
     fun `canManualMerge returns true for cross-account selection`() =
         runTest {
             // t1 and t2 are on DIFFERENT accounts — previously this was blocked.
-            val t1 = Transaction(id = 1, amount = 500.0, date = 0L, accountId = 1, categoryId = 1, description = "Anchor", transactionType = "expense", notes = null)
-            val t2 = Transaction(id = 2, amount = 300.0, date = 0L, accountId = 2, categoryId = 1, description = "Child", transactionType = "expense", notes = null)
+            val t1 = Transaction(id = 1, amount = 500.0, date = 0L, accountId = 1, categoryId = 1, description = "Anchor", transactionType = TransactionType.EXPENSE, notes = null)
+            val t2 = Transaction(id = 2, amount = 300.0, date = 0L, accountId = 2, categoryId = 1, description = "Child", transactionType = TransactionType.EXPENSE, notes = null)
             whenever(transactionRepository.getTransactionDetailsForRange(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull())).thenReturn(
                 kotlinx.coroutines.flow.flowOf(
                     listOf(
@@ -292,8 +292,8 @@ class TransactionViewModelSelectionTest : TransactionViewModelBaseSetup() {
     @Test
     fun `confirmManualMerge delegates to repository and clears selection`() =
         runTest {
-            val t1 = Transaction(id = 1, amount = 100.0, date = 0L, accountId = 1, categoryId = 1, description = "Anchor", transactionType = "expense", notes = null)
-            val t2 = Transaction(id = 2, amount = 50.0, date = 0L, accountId = 1, categoryId = 1, description = "Child", transactionType = "expense", notes = null)
+            val t1 = Transaction(id = 1, amount = 100.0, date = 0L, accountId = 1, categoryId = 1, description = "Anchor", transactionType = TransactionType.EXPENSE, notes = null)
+            val t2 = Transaction(id = 2, amount = 50.0, date = 0L, accountId = 1, categoryId = 1, description = "Child", transactionType = TransactionType.EXPENSE, notes = null)
 
             whenever(transactionRepository.getTransactionDetailsForRange(org.mockito.kotlin.any(), org.mockito.kotlin.any(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull(), org.mockito.kotlin.anyOrNull())).thenReturn(
                 kotlinx.coroutines.flow.flowOf(
@@ -310,12 +310,12 @@ class TransactionViewModelSelectionTest : TransactionViewModelBaseSetup() {
             viewModel.toggleTransactionSelection(2)
             viewModel.setAnchorTransaction(1)
 
-            // Mock repository call
-            whenever(transactionRepository.manualMergeTransactions(org.mockito.kotlin.any(), org.mockito.kotlin.any())).thenReturn(Unit)
+            // Mock use case call
+            whenever(mergeTransactionsUseCase.manualMerge(org.mockito.kotlin.any(), org.mockito.kotlin.any())).thenReturn(Unit)
 
             viewModel.confirmManualMerge()
 
-            org.mockito.kotlin.verify(transactionRepository).manualMergeTransactions(1, listOf(2))
+            org.mockito.kotlin.verify(mergeTransactionsUseCase).manualMerge(1, listOf(2))
 
             viewModel.selectedTransactionIds.test {
                 assertTrue(awaitItem().isEmpty())

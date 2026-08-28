@@ -1,10 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/LinkTransactionViewModelFactory.kt
-// REASON: REFACTOR (Testing) - The factory has been updated to instantiate all
-// necessary repository dependencies (TransactionRepository, RecurringTransactionDao)
-// and inject them into the LinkTransactionViewModel's constructor, supporting the new
-// dependency injection pattern required for unit testing.
-// =================================================================================
 package io.pm.finlight
 
 import android.app.Application
@@ -12,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
+import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class LinkTransactionViewModelFactory(
     private val application: Application,
@@ -20,9 +14,15 @@ class LinkTransactionViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LinkTransactionViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
-            val settingsRepository = SettingsRepository(application)
-            val tagRepository = TagRepository(db.tagDao(), db.transactionDao())
-            val transactionRepository = TransactionRepository(db.transactionDao(), settingsRepository, tagRepository, db.deletedSmsHashDao(), db.mergeRecordDao(), db)
+            val transactionRepository =
+                TransactionRepository(
+                    transactionWriteDao = db.transactionWriteDao(),
+                    transactionQueryDao = db.transactionQueryDao(),
+                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                    transactionReimbursementDao = db.transactionReimbursementDao(),
+                    db = db,
+                    dispatcherProvider = DefaultDispatcherProvider(),
+                )
             val recurringTransactionDao = db.recurringTransactionDao()
             @Suppress("UNCHECKED_CAST")
             return LinkTransactionViewModel(

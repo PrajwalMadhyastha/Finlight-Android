@@ -110,6 +110,14 @@ object HelpContentRegistry {
                         - **Wildcards:** For sender rules, you can use an asterisk `*` as a wildcard to match any characters.
                         - **Default vs. Custom:** The app comes with a set of default rules that you can disable. You can also add your own custom rules which can be deleted.
                         """,
+            "manage_merchant_rules",
+            "About Merchant Rename Rules",
+            """
+                        Merchant rename rules automatically transform raw, cryptic merchant descriptions extracted from bank SMS messages into clean, readable display names.
+
+                        - **How they are learned:** When you edit a transaction's description and choose to update future transactions, or when similar merchant patterns are recognized, Finlight saves an alias rule.
+                        - **Visibility:** This screen provides a full searchable list of all active mappings from raw extracted SMS names to their canonical display names.
+                        """,
             "reports_screen",
             "About Reports",
             """

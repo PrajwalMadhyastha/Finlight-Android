@@ -43,7 +43,7 @@ class TransactionMergeUITest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = now - 1000L,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                     mergeDismissed = false
                 ),
@@ -55,7 +55,7 @@ class TransactionMergeUITest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = now - 500L,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = null,
                     mergeDismissed = false
                 ),
@@ -137,7 +137,7 @@ class TransactionMergeUITest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = now,
-                    transactionType = "expense",
+                    transactionType = TransactionType.EXPENSE,
                     notes = "Merged notes"
                 )
             )
@@ -146,7 +146,7 @@ class TransactionMergeUITest {
                     parentTxnId = parentId,
                     mergedAt = now,
                     mergeGroupId = "group-1",
-                    mergeType = "MANUAL",
+                    mergeType = io.pm.finlight.data.db.entity.MergeType.MANUAL,
                     originalParentAmount = 100.0,
                     originalParentDate = now,
                     originalParentNotes = "",
@@ -155,7 +155,7 @@ class TransactionMergeUITest {
                     childDate = now,
                     childAccountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     childCategoryId = TestDataSeeder.CATEGORY_FOOD_ID,
-                    childTransactionType = "expense",
+                    childTransactionType = TransactionType.EXPENSE,
                     childSource = "MANUAL",
                     childNotes = "",
                     childSourceSmsId = null, childSourceSmsHash = null, childSmsSignature = null,
@@ -171,7 +171,7 @@ class TransactionMergeUITest {
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = now,
-                    transactionType = "income",
+                    transactionType = TransactionType.INCOME,
                     notes = "",
                     parentReimbursementId = parentId
                 )

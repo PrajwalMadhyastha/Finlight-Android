@@ -9,17 +9,17 @@ package io.pm.finlight.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.RecurringTransactionDao
 import io.pm.finlight.Transaction
-import io.pm.finlight.TransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
 class LinkTransactionViewModel(
-    private val transactionRepository: TransactionRepository,
+    private val transactionRepository: ITransactionRepository,
     private val recurringTransactionDao: RecurringTransactionDao,
     val potentialTransaction: PotentialTransaction,
 ) : ViewModel() {

@@ -22,7 +22,8 @@ class SearchViewModelFactory(
             val database = AppDatabase.getInstance(application)
             @Suppress("UNCHECKED_CAST")
             return SearchViewModel(
-                transactionDao = database.transactionDao(),
+                transactionQueryDao = database.transactionQueryDao(),
+                transactionAnalyticsDao = database.transactionAnalyticsDao(),
                 accountDao = database.accountDao(),
                 categoryDao = database.categoryDao(),
                 tagDao = database.tagDao(),

@@ -8,6 +8,7 @@
 package io.pm.finlight
 
 import androidx.room.*
+import io.pm.finlight.data.db.dao.SQL_EXPENSE
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -44,11 +45,11 @@ interface BudgetDao {
         ),
         AtomicExpenses AS (
             SELECT T.categoryId, T.amount FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND strftime('%Y-%m', T.date / 1000, 'unixepoch', 'localtime') = :yearMonth AND T.isExcluded = 0
+            WHERE T.isSplit = 0 AND T.transactionType = $SQL_EXPENSE AND strftime('%Y-%m', T.date / 1000, 'unixepoch', 'localtime') = :yearMonth AND T.isExcluded = 0
             UNION ALL
             SELECT S.categoryId, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND strftime('%Y-%m', P.date / 1000, 'unixepoch', 'localtime') = :yearMonth AND P.isExcluded = 0
+            WHERE P.transactionType = $SQL_EXPENSE AND strftime('%Y-%m', P.date / 1000, 'unixepoch', 'localtime') = :yearMonth AND P.isExcluded = 0
         ),
         TxSums AS (
             SELECT
@@ -91,11 +92,11 @@ interface BudgetDao {
         """
         WITH AtomicExpenses AS (
             SELECT T.categoryId, T.amount FROM transactions AS T
-            WHERE T.isSplit = 0 AND T.transactionType = 'expense' AND strftime('%m', T.date / 1000, 'unixepoch', 'localtime') + 0 = :month AND strftime('%Y', T.date / 1000, 'unixepoch', 'localtime') + 0 = :year AND T.isExcluded = 0
+            WHERE T.isSplit = 0 AND T.transactionType = $SQL_EXPENSE AND strftime('%m', T.date / 1000, 'unixepoch', 'localtime') + 0 = :month AND strftime('%Y', T.date / 1000, 'unixepoch', 'localtime') + 0 = :year AND T.isExcluded = 0
             UNION ALL
             SELECT S.categoryId, S.amount FROM split_transactions AS S
             JOIN transactions AS P ON S.parentTransactionId = P.id
-            WHERE P.transactionType = 'expense' AND strftime('%m', P.date / 1000, 'unixepoch', 'localtime') + 0 = :month AND strftime('%Y', P.date / 1000, 'unixepoch', 'localtime') + 0 = :year AND P.isExcluded = 0
+            WHERE P.transactionType = $SQL_EXPENSE AND strftime('%m', P.date / 1000, 'unixepoch', 'localtime') + 0 = :month AND strftime('%Y', P.date / 1000, 'unixepoch', 'localtime') + 0 = :year AND P.isExcluded = 0
         )
         SELECT SUM(AE.amount) FROM AtomicExpenses AS AE
         JOIN categories AS C ON AE.categoryId = C.id

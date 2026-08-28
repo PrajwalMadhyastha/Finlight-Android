@@ -13,9 +13,11 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -24,7 +26,8 @@ import java.io.FileOutputStream
 
 class ProfileViewModel(
     application: Application,
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: ISettingsRepository,
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : AndroidViewModel(application) {
     private val context = application
 
@@ -58,13 +61,8 @@ class ProfileViewModel(
      * 'attachments/' directory, move the file to 'profile/' and update the stored URI.
      */
     private suspend fun migrateProfilePictureIfNeeded() {
-        withContext(Dispatchers.IO) {
-            val currentUri =
-                settingsRepository.getProfilePictureUri().let {
-                    // Read the current value once (blocking-style from prefs)
-                    context.getSharedPreferences("finance_app_settings", android.content.Context.MODE_PRIVATE)
-                        .getString("profile_picture_uri", null)
-                } ?: return@withContext
+        withContext(dispatcherProvider.io) {
+            val currentUri = settingsRepository.getProfilePictureUri().firstOrNull() ?: return@withContext
 
             val oldAttachmentsDir = File(context.filesDir, "attachments")
             val oldFile = File(currentUri)
@@ -123,7 +121,7 @@ class ProfileViewModel(
      * @return The absolute path to the newly created file, or null if an error occurred.
      */
     private suspend fun saveImageToInternalStorage(sourceUri: Uri): String? {
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatcherProvider.io) {
             try {
                 // --- FIXED: Save to 'profile/' which is included in Auto Backup ---
                 val profileDir = File(context.filesDir, "profile")

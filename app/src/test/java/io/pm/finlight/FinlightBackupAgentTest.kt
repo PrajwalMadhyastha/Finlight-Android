@@ -1,12 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/FinlightBackupAgentTest.kt
-// REASON: FIX (Testing) - The test has been completely rewritten to correctly
-// test the BackupAgent. It now uses Robolectric to properly instantiate the agent
-// and MockK's `mockkConstructor` to intercept the creation of SettingsRepository.
-// A try-catch block handles the expected NullPointerException from the framework's
-// `super.onBackup` call, allowing verification of the timestamp save, which
-// occurs before the crash.
-// =================================================================================
 package io.pm.finlight
 
 import android.content.Context
@@ -15,8 +6,10 @@ import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.*
+import io.pm.finlight.di.ServiceLocator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -42,6 +35,7 @@ class FinlightBackupAgentTest {
 
     private lateinit var context: Context
     private lateinit var agent: FinlightBackupAgent
+    private lateinit var mockBackupSettingsRepository: IBackupSettingsRepository
 
     @Before
     fun setup() {
@@ -50,15 +44,15 @@ class FinlightBackupAgentTest {
         // Use Robolectric to build the agent, which correctly handles the lifecycle and context attachment
         agent = Robolectric.buildBackupAgent(FinlightBackupAgent::class.java).create().get()
 
-        // Mock the constructor of SettingsRepository to intercept its creation
-        mockkConstructor(SettingsRepository::class)
-        // Define behavior for ANY constructed SettingsRepository instance
-        every { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(any()) } just runs
+        mockBackupSettingsRepository = mockk(relaxed = true)
+        coEvery { mockBackupSettingsRepository.saveLastBackupTimestamp(any()) } just runs
+        ServiceLocator.setBackupSettingsRepository(mockBackupSettingsRepository)
     }
 
     @After
     fun tearDown() {
-        unmockkConstructor(SettingsRepository::class)
+        ServiceLocator.reset()
+        unmockkAll()
         Dispatchers.resetMain()
     }
 
@@ -81,12 +75,42 @@ class FinlightBackupAgentTest {
             }
 
             // Assert
-            // Verify on ANY constructed instance of SettingsRepository that our method was called.
-            verify(exactly = 1) { anyConstructed<SettingsRepository>().saveLastBackupTimestamp(capture(timestampCaptor)) }
+            coVerify(exactly = 1) { mockBackupSettingsRepository.saveLastBackupTimestamp(capture(timestampCaptor)) }
 
             // Verify that the captured timestamp is very close to the time the test was run
             val capturedTimestamp = timestampCaptor.captured
             val timeDifference = kotlin.math.abs(currentTime - capturedTimestamp)
             assertTrue("Timestamp should be very recent (within 1 second)", timeDifference < 1000)
         }
+
+    @Test
+    fun `onBackup triggers notification when notifications enabled`() =
+        runTest {
+            coEvery { mockBackupSettingsRepository.getAutoBackupNotificationEnabled() } returns flowOf(true)
+            mockkObject(io.pm.finlight.utils.NotificationHelper)
+            every { io.pm.finlight.utils.NotificationHelper.showAutoBackupNotification(any(), any()) } just runs
+
+            agent.onBackup(null, null, null)
+
+            verify(exactly = 1) { io.pm.finlight.utils.NotificationHelper.showAutoBackupNotification(any(), any()) }
+            unmockkObject(io.pm.finlight.utils.NotificationHelper)
+        }
+
+    @Test
+    fun `onBackup does not trigger notification when notifications disabled`() =
+        runTest {
+            coEvery { mockBackupSettingsRepository.getAutoBackupNotificationEnabled() } returns flowOf(false)
+            mockkObject(io.pm.finlight.utils.NotificationHelper)
+            every { io.pm.finlight.utils.NotificationHelper.showAutoBackupNotification(any(), any()) } just runs
+
+            agent.onBackup(null, null, null)
+
+            verify(exactly = 0) { io.pm.finlight.utils.NotificationHelper.showAutoBackupNotification(any(), any()) }
+            unmockkObject(io.pm.finlight.utils.NotificationHelper)
+        }
+
+    @Test
+    fun `onRestore handles restore process`() {
+        agent.onRestore(null, 1, null)
+    }
 }

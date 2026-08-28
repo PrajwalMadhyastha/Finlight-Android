@@ -23,17 +23,21 @@ package io.pm.finlight
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.DateUtils
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
 import io.pm.finlight.utils.applyAliases
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.roundToLong
+
+import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 
 data class ConsistencyStats(val goodDays: Int, val badDays: Int, val noSpendDays: Int, val noDataDays: Int)
 
@@ -44,16 +48,18 @@ data class LastMonthSummary(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel(
-    private val transactionRepository: TransactionRepository,
-    private val accountRepository: AccountRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val accountRepository: IAccountRepository,
     private val budgetDao: BudgetDao,
-    private val settingsRepository: SettingsRepository,
-    private val merchantRenameRuleRepository: MerchantRenameRuleRepository,
+    private val settingsRepository: ISettingsRepository,
+    private val merchantRenameRuleRepository: IMerchantRenameRuleRepository,
     // Added dependency
     private val timeProvider: TimeProvider,
     private val recurringTransactionDao: RecurringTransactionDao,
     private val recurringPatternDao: RecurringPatternDao,
-    private val smsRepository: SmsRepository,
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
+    private val mergeTransactionsUseCase: MergeTransactionsUseCase,
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     val userName: StateFlow<String>
     val profilePictureUri: StateFlow<String?>
@@ -410,7 +416,7 @@ class DashboardViewModel(
                 // --- FIX: Add explicit types to resolve build error ---
                 val monthlyDataFlows: List<Flow<List<CalendarDayStatus>>> =
                     (1..12).map { month ->
-                        transactionRepository.getMonthlyConsistencyData(year, month)
+                        getMonthlyConsistencyDataUseCase(year, month)
                     }
 
                 // Combine all 12 flows
@@ -424,7 +430,7 @@ class DashboardViewModel(
                 combinedFlow.collect { combinedYearlyData: List<CalendarDayStatus> ->
                     emit(combinedYearlyData)
                 }
-            }.flowOn(Dispatchers.Default)
+            }.flowOn(dispatcherProvider.default)
                 .stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(5000),
@@ -433,23 +439,28 @@ class DashboardViewModel(
     }
 
     fun dismissLastMonthSummaryCard() {
-        settingsRepository.setLastMonthSummaryDismissed()
+        viewModelScope.launch {
+            settingsRepository.setLastMonthSummaryDismissed()
+        }
         _showLastMonthSummaryCard.value = false
     }
 
     private fun checkForLastMonthSummary() {
         val today = timeProvider.now()
-        if (today.get(Calendar.DAY_OF_MONTH) == 1 && !settingsRepository.hasLastMonthSummaryBeenDismissed()) {
-            _showLastMonthSummaryCard.value = true
+        if (today.get(Calendar.DAY_OF_MONTH) == 1) {
             viewModelScope.launch {
-                val (start, end) = DateUtils.getPreviousMonthDateRange()
-                transactionRepository.getFinancialSummaryForRangeFlow(start, end).collect { summary ->
-                    if (summary != null) {
-                        _lastMonthSummary.value =
-                            LastMonthSummary(
-                                totalIncome = summary.totalIncome,
-                                totalExpenses = summary.totalExpenses,
-                            )
+                val isDismissed = settingsRepository.hasLastMonthSummaryBeenDismissed().first()
+                if (!isDismissed) {
+                    _showLastMonthSummaryCard.value = true
+                    val (start, end) = DateUtils.getPreviousMonthDateRange()
+                    transactionRepository.getFinancialSummaryForRangeFlow(start, end).collect { summary ->
+                        if (summary != null) {
+                            _lastMonthSummary.value =
+                                LastMonthSummary(
+                                    totalIncome = summary.totalIncome,
+                                    totalExpenses = summary.totalExpenses,
+                                )
+                        }
                     }
                 }
             }
@@ -501,10 +512,10 @@ class DashboardViewModel(
 
     fun executeMerge(
         parentTxnId: Int,
-        childTxnIds: List<Int>
+        childTxnIds: List<Int>,
     ) {
         viewModelScope.launch {
-            transactionRepository.manualMergeTransactions(parentTxnId, childTxnIds)
+            mergeTransactionsUseCase.manualMerge(parentTxnId, childTxnIds)
         }
     }
 }

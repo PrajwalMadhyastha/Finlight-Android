@@ -12,6 +12,7 @@ import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import io.pm.finlight.*
@@ -25,7 +26,6 @@ import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.security.SecurityManager
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
@@ -59,8 +59,17 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
     version = 55,
     exportSchema = true,
 )
+@TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
+
+    abstract fun transactionWriteDao(): TransactionWriteDao
+
+    abstract fun transactionQueryDao(): TransactionQueryDao
+
+    abstract fun transactionAnalyticsDao(): TransactionAnalyticsDao
+
+    abstract fun transactionReimbursementDao(): TransactionReimbursementDao
 
     abstract fun accountDao(): AccountDao
 
@@ -872,7 +881,7 @@ abstract class AppDatabase : RoomDatabase() {
                         val currentAmount = cursor.getDouble(1)
                         val hasOriginal = !cursor.isNull(2)
                         val originalAmount = if (hasOriginal) cursor.getDouble(2) else null
-                        val type = cursor.getString(3) ?: "expense"
+                        val type = cursor.getString(3) ?: TransactionType.DB_EXPENSE
 
                         // Calculate sum of reimbursements
                         var sumReimbursements = 0.0
@@ -897,7 +906,7 @@ abstract class AppDatabase : RoomDatabase() {
                             }
                             val childAmount = mCursor.getDouble(1)
                             val childType = mCursor.getString(2)
-                            val signedChild = if (childType == "income") childAmount else -childAmount
+                            val signedChild = if (childType == TransactionType.DB_INCOME) childAmount else -childAmount
                             sumChildren += signedChild
                         }
                         mCursor.close()
@@ -919,22 +928,22 @@ abstract class AppDatabase : RoomDatabase() {
                             }
 
                         if (baseAmount != null) {
-                            val signedBase = if (type == "income") baseAmount else -baseAmount
+                            val signedBase = if (type == TransactionType.DB_INCOME) baseAmount else -baseAmount
                             val netSigned = signedBase + sumChildren
                             val finalSigned = netSigned + sumReimbursements
 
                             val finalType =
                                 if (sumReimbursements > 0) {
-                                    "expense"
+                                    TransactionType.DB_EXPENSE
                                 } else if (finalSigned > 0) {
-                                    "income"
+                                    TransactionType.DB_INCOME
                                 } else if (finalSigned < 0) {
-                                    "expense"
+                                    TransactionType.DB_EXPENSE
                                 } else {
                                     type
                                 }
 
-                            val finalAmount = if (finalType == "expense") -finalSigned else finalSigned
+                            val finalAmount = if (finalType == TransactionType.DB_EXPENSE) -finalSigned else finalSigned
 
                             if (Math.abs(finalAmount - currentAmount) > 0.001) {
                                 db.execSQL("UPDATE transactions SET amount = ?, transactionType = ? WHERE id = ?", arrayOf(finalAmount, finalType, id))
@@ -1030,7 +1039,8 @@ abstract class AppDatabase : RoomDatabase() {
         private class DatabaseCallback(private val context: Context) : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
-                CoroutineScope(Dispatchers.IO).launch {
+                val dispatcherProvider = io.pm.finlight.di.ServiceLocator.provideDispatcherProvider(context)
+                CoroutineScope(dispatcherProvider.io).launch {
                     val database = getInstance(context)
                     database.accountDao().insert(Account(id = 1, name = "Cash Spends", type = "Cash"))
                 }
@@ -1038,9 +1048,10 @@ abstract class AppDatabase : RoomDatabase() {
 
             override fun onOpen(db: SupportSQLiteDatabase) {
                 super.onOpen(db)
-                CoroutineScope(Dispatchers.IO).launch {
+                val dispatcherProvider = io.pm.finlight.di.ServiceLocator.provideDispatcherProvider(context)
+                CoroutineScope(dispatcherProvider.io).launch {
                     val database = getInstance(context)
-                    val settingsRepository = SettingsRepository(context)
+                    val smsRuleSettingsRepository = io.pm.finlight.di.ServiceLocator.provideSmsRuleSettingsRepository(context)
 
                     val categoryDao = database.categoryDao()
                     val categoryCount = categoryDao.getAllCategories().first().size
@@ -1054,7 +1065,7 @@ abstract class AppDatabase : RoomDatabase() {
                     // This ensures that if a rule is moved from BODY to SENDER (or vice versa),
                     // the checksum changes and the DB is updated.
                     val liveChecksum = DEFAULT_IGNORE_PHRASES.joinToString { "${it.pattern}|${it.type}" }.hashCode()
-                    val storedChecksum = settingsRepository.getIgnoreRulesChecksum()
+                    val storedChecksum = smsRuleSettingsRepository.getIgnoreRulesChecksum()
 
                     Log.d("DatabaseCallback", "Checking ignore rules... Live: $liveChecksum, Stored: $storedChecksum")
 
@@ -1063,7 +1074,7 @@ abstract class AppDatabase : RoomDatabase() {
                         try {
                             ignoreRuleDao.deleteDefaultRules()
                             ignoreRuleDao.insertAll(DEFAULT_IGNORE_PHRASES)
-                            settingsRepository.saveIgnoreRulesChecksum(liveChecksum)
+                            smsRuleSettingsRepository.saveIgnoreRulesChecksum(liveChecksum)
                             Log.i("DatabaseCallback", "Default ignore rules synced successfully.")
                         } catch (e: Exception) {
                             Log.e("DatabaseCallback", "Failed to sync ignore rules", e)

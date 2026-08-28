@@ -22,9 +22,9 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.Calendar
@@ -36,9 +36,10 @@ class RecurringTransactionWorker(
     private val tag = "RecurringTxnWorker"
 
     override suspend fun doWork(): Result {
-        return withContext(Dispatchers.IO) {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
             try {
-                val settingsRepo = SettingsRepository(context)
+                val settingsRepo = ServiceLocator.provideSettingsRepository(context)
                 val isEnabled = settingsRepo.getRecurringTransactionsEnabled().first()
 
                 if (!isEnabled) {
@@ -49,7 +50,8 @@ class RecurringTransactionWorker(
 
                 val db = AppDatabase.getInstance(context)
                 val recurringDao = db.recurringTransactionDao()
-                val transactionDao = db.transactionDao()
+                val transactionQueryDao = db.transactionQueryDao()
+                val transactionWriteDao = db.transactionWriteDao()
 
                 val allRules = recurringDao.getAllRulesList()
                 val now = System.currentTimeMillis()
@@ -63,7 +65,7 @@ class RecurringTransactionWorker(
 
                     if (isDue(rule)) {
                         // --- Guard 2: Idempotency — skip if a PENDING draft already exists ---
-                        val existingDraft = transactionDao.getPendingTransactionForRule(rule.id)
+                        val existingDraft = transactionQueryDao.getPendingTransactionForRule(rule.id)
                         if (existingDraft != null) {
                             Log.d(tag, "Rule '${rule.description}' already has a pending draft (id=${existingDraft.id}). Skipping.")
                             return@forEach
@@ -81,10 +83,10 @@ class RecurringTransactionWorker(
                                     categoryId = rule.categoryId,
                                     notes = "Auto-approved by recurring rule",
                                     source = "Recurring Rule",
-                                    status = "CONFIRMED",
+                                    status = TransactionStatus.CONFIRMED,
                                     recurringRuleId = rule.id,
                                 )
-                            transactionDao.insert(confirmedTxn)
+                            transactionWriteDao.insert(confirmedTxn)
                             recurringDao.updateLastRunDate(rule.id, now)
                             Log.i(tag, "Auto-approved recurring payment: '${rule.description}'")
                             NotificationHelper.showAutoApprovedPaymentNotification(context, rule)
@@ -100,10 +102,10 @@ class RecurringTransactionWorker(
                                     categoryId = rule.categoryId,
                                     notes = "",
                                     source = "Recurring Rule (Pending)",
-                                    status = "PENDING",
+                                    status = TransactionStatus.PENDING,
                                     recurringRuleId = rule.id,
                                 )
-                            val newDraftId = transactionDao.insert(draftTxn)
+                            val newDraftId = transactionWriteDao.insert(draftTxn)
                             Log.i(tag, "Created PENDING draft (id=$newDraftId) for rule '${rule.description}'")
                             NotificationHelper.showRecurringTransactionDueNotification(context, rule, newDraftId.toInt())
                         }

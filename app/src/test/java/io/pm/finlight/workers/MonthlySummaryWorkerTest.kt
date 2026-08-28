@@ -23,6 +23,7 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -44,7 +45,7 @@ class MonthlySummaryWorkerTest : BaseViewModelTest() {
 
     // --- FIX: Remove @Mock annotations ---
     private lateinit var db: AppDatabase
-    private lateinit var transactionDao: TransactionDao
+    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
 
     @Before
     override fun setup() {
@@ -53,12 +54,12 @@ class MonthlySummaryWorkerTest : BaseViewModelTest() {
 
         // --- FIX: Initialize as MockK mocks ---
         db = mockk()
-        transactionDao = mockk()
+        transactionAnalyticsDao = mockk()
 
         // Mock the static AppDatabase companion object to return our mock db instance.
         mockkObject(AppDatabase)
         every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionDao() } returns transactionDao
+        every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
 
         // Initialize WorkManager for testing. This is required for TestListenableWorkerBuilder.
         val config =
@@ -135,8 +136,8 @@ class MonthlySummaryWorkerTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val ranges = getExpectedTimeRanges()
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } returns null
-            coEvery { transactionDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns null
+            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
             val worker = TestListenableWorkerBuilder<MonthlySummaryWorker>(context).build()
 
@@ -146,9 +147,9 @@ class MonthlySummaryWorkerTest : BaseViewModelTest() {
 
             // Assert
             coVerifyOrder {
-                transactionDao.getFinancialSummaryForRange(eq(ranges["lastMonthStart"]!!), eq(ranges["lastMonthEnd"]!!))
-                transactionDao.getFinancialSummaryForRange(eq(ranges["prevMonthStart"]!!), eq(ranges["prevMonthEnd"]!!))
-                transactionDao.getTopSpendingCategoriesForRange(eq(ranges["lastMonthStart"]!!), eq(ranges["lastMonthEnd"]!!))
+                transactionAnalyticsDao.getFinancialSummaryForRange(eq(ranges["lastMonthStart"]!!), eq(ranges["lastMonthEnd"]!!))
+                transactionAnalyticsDao.getFinancialSummaryForRange(eq(ranges["prevMonthStart"]!!), eq(ranges["prevMonthEnd"]!!))
+                transactionAnalyticsDao.getTopSpendingCategoriesForRange(eq(ranges["lastMonthStart"]!!), eq(ranges["lastMonthEnd"]!!))
             }
         }
 
@@ -162,9 +163,9 @@ class MonthlySummaryWorkerTest : BaseViewModelTest() {
             val topCategories = listOf(CategorySpending("Food", 50.0, "red", "icon"))
 
             // Mock DAO to return summary for last month, then for the month before
-            coEvery { transactionDao.getFinancialSummaryForRange(ranges["lastMonthStart"]!!, ranges["lastMonthEnd"]!!) } returns lastMonthSummary
-            coEvery { transactionDao.getFinancialSummaryForRange(ranges["prevMonthStart"]!!, ranges["prevMonthEnd"]!!) } returns prevMonthSummary
-            coEvery { transactionDao.getTopSpendingCategoriesForRange(ranges["lastMonthStart"]!!, ranges["lastMonthEnd"]!!) } returns topCategories
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(ranges["lastMonthStart"]!!, ranges["lastMonthEnd"]!!) } returns lastMonthSummary
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(ranges["prevMonthStart"]!!, ranges["prevMonthEnd"]!!) } returns prevMonthSummary
+            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(ranges["lastMonthStart"]!!, ranges["lastMonthEnd"]!!) } returns topCategories
 
             val worker = TestListenableWorkerBuilder<MonthlySummaryWorker>(context).build()
 
@@ -197,9 +198,9 @@ class MonthlySummaryWorkerTest : BaseViewModelTest() {
             // Arrange
             val ranges = getExpectedTimeRanges()
             val lastMonthSummary = FinancialSummary(0.0, 150.0)
-            coEvery { transactionDao.getFinancialSummaryForRange(ranges["lastMonthStart"]!!, ranges["lastMonthEnd"]!!) } returns lastMonthSummary
-            coEvery { transactionDao.getFinancialSummaryForRange(ranges["prevMonthStart"]!!, ranges["prevMonthEnd"]!!) } returns null
-            coEvery { transactionDao.getTopSpendingCategoriesForRange(ranges["lastMonthStart"]!!, ranges["lastMonthEnd"]!!) } returns emptyList()
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(ranges["lastMonthStart"]!!, ranges["lastMonthEnd"]!!) } returns lastMonthSummary
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(ranges["prevMonthStart"]!!, ranges["prevMonthEnd"]!!) } returns null
+            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(ranges["lastMonthStart"]!!, ranges["lastMonthEnd"]!!) } returns emptyList()
 
             val worker = TestListenableWorkerBuilder<MonthlySummaryWorker>(context).build()
             val percentageCaptor = slot<Int?>()
@@ -226,7 +227,7 @@ class MonthlySummaryWorkerTest : BaseViewModelTest() {
     fun `doWork returns retry on failure`() =
         runTest {
             // Arrange
-            coEvery { transactionDao.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
+            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
             val worker = TestListenableWorkerBuilder<MonthlySummaryWorker>(context).build()
 
             // Act

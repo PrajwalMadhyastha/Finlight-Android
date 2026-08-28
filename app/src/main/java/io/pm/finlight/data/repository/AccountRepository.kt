@@ -12,22 +12,22 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.entity.AccountAlias
 import kotlinx.coroutines.flow.Flow
 
-class AccountRepository(private val db: AppDatabase) {
+class AccountRepository(private val db: AppDatabase) : IAccountRepository {
     private val accountDao = db.accountDao()
 
-    val accountsWithBalance: Flow<List<AccountWithBalance>> = accountDao.getAccountsWithBalance()
+    override val accountsWithBalance: Flow<List<AccountWithBalance>> = accountDao.getAccountsWithBalance()
 
-    val allAccounts: Flow<List<Account>> = accountDao.getAllAccounts()
+    override val allAccounts: Flow<List<Account>> = accountDao.getAllAccounts()
 
-    fun getAccountById(accountId: Int): Flow<Account?> {
+    override fun getAccountById(accountId: Int): Flow<Account?> {
         return accountDao.getAccountById(accountId)
     }
 
-    suspend fun insert(account: Account): Long {
+    override suspend fun insert(account: Account): Long {
         return accountDao.insert(account)
     }
 
-    suspend fun update(account: Account) {
+    override suspend fun update(account: Account) {
         db.withTransaction {
             // Check if the account name is being changed
             val oldAccount = accountDao.getAccountByIdBlocking(account.id)
@@ -40,7 +40,7 @@ class AccountRepository(private val db: AppDatabase) {
         }
     }
 
-    suspend fun delete(account: Account) {
+    override suspend fun delete(account: Account) {
         accountDao.delete(account)
     }
 
@@ -51,7 +51,7 @@ class AccountRepository(private val db: AppDatabase) {
      * @param destinationAccountId The ID of the account to keep.
      * @param sourceAccountIds The IDs of the accounts to merge and delete.
      */
-    suspend fun mergeAccounts(
+    override suspend fun mergeAccounts(
         destinationAccountId: Int,
         sourceAccountIds: List<Int>,
     ) {
@@ -71,7 +71,7 @@ class AccountRepository(private val db: AppDatabase) {
             db.goalDao().reassignGoals(sourceAccountIds, destinationAccountId)
 
             // 2. Re-assign all transactions from source accounts to the destination account.
-            db.transactionDao().reassignTransactions(sourceAccountIds, destinationAccountId)
+            db.transactionWriteDao().reassignTransactions(sourceAccountIds, destinationAccountId)
 
             // 3. Delete the now-empty source accounts.
             db.accountDao().deleteByIds(sourceAccountIds)

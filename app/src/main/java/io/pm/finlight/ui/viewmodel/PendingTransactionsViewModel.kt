@@ -13,20 +13,25 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
-import kotlinx.coroutines.Dispatchers
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class PendingTransactionsViewModel(application: Application) : AndroidViewModel(application) {
+class PendingTransactionsViewModel(
+    application: Application,
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
-    private val transactionDao = db.transactionDao()
+    private val transactionQueryDao = db.transactionQueryDao()
+    private val transactionWriteDao = db.transactionWriteDao()
     private val recurringDao = db.recurringTransactionDao()
 
     /** All PENDING draft transactions, ordered oldest-first (most overdue first). */
     val pendingTransactions: StateFlow<List<Transaction>> =
-        transactionDao.getPendingTransactions()
+        transactionQueryDao.getPendingTransactions()
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
@@ -46,12 +51,12 @@ class PendingTransactionsViewModel(application: Application) : AndroidViewModel(
         ruleId: Int,
         confirmedAmount: Double? = null
     ) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(dispatcherProvider.io) {
             if (confirmedAmount != null) {
                 // Update amount before confirming
-                transactionDao.updateAmount(draftId, confirmedAmount)
+                transactionWriteDao.updateAmount(draftId, confirmedAmount)
             }
-            transactionDao.confirmTransaction(draftId)
+            transactionWriteDao.confirmTransaction(draftId)
             // Update the rule's lastRunDate so it doesn't fire again this cycle
             recurringDao.updateLastRunDate(ruleId, System.currentTimeMillis())
             // Reset skip counter on successful confirmation
@@ -69,8 +74,8 @@ class PendingTransactionsViewModel(application: Application) : AndroidViewModel(
         draftId: Int,
         ruleId: Int
     ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            transactionDao.skipTransaction(draftId)
+        viewModelScope.launch(dispatcherProvider.io) {
+            transactionWriteDao.skipTransaction(draftId)
             // Update lastRunDate so the worker doesn't recreate a draft for this cycle
             recurringDao.updateLastRunDate(ruleId, System.currentTimeMillis())
             // Increment the skip counter (groundwork for future cancellation detection)
