@@ -199,6 +199,15 @@ interface ITransactionRepository {
         newDescription: String,
     )
 
+    fun getTransactionCountsByOriginalDescription(): Flow<Map<String, Int>>
+
+    fun getTransactionsByOriginalDescription(originalDesc: String): Flow<List<TransactionDetails>>
+
+    suspend fun updateDescriptionByOriginalDescription(
+        originalDesc: String,
+        newDescription: String,
+    ): Int
+
     fun getDailySpendingForDateRange(
         startDate: Long,
         endDate: Long,
