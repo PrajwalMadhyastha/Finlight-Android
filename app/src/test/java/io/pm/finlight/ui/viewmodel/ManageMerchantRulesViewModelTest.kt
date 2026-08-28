@@ -18,6 +18,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.`when`
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
+import org.mockito.kotlin.any
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
@@ -145,5 +148,67 @@ class ManageMerchantRulesViewModelTest : BaseViewModelTest() {
                 assertEquals(0, filtered.size)
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `deleteRule calls repository deleteByOriginalName`() =
+        runTest {
+            val ruleToDelete = MerchantRenameRule(originalName = "ZOMATO MEDIA", newName = "Zomato")
+            viewModel.deleteRule(ruleToDelete)
+
+            verify(merchantRenameRuleRepository).deleteByOriginalName("ZOMATO MEDIA")
+        }
+
+    @Test
+    fun `updateRule calls repository insert with trimmed originalName and newName`() =
+        runTest {
+            viewModel.updateRule("  AMZN PAY  ", "  Amazon Pay  ")
+
+            verify(merchantRenameRuleRepository).insert(
+                MerchantRenameRule(
+                    originalName = "AMZN PAY",
+                    newName = "Amazon Pay",
+                ),
+            )
+        }
+
+    @Test
+    fun `updateRule ignores blank originalName or blank newName`() =
+        runTest {
+            viewModel.updateRule("", "Amazon")
+            viewModel.updateRule("AMZN PAY", "   ")
+
+            verify(merchantRenameRuleRepository, never()).insert(any())
+        }
+
+    @Test
+    fun `addRule calls repository insert with trimmed originalName and newName`() =
+        runTest {
+            viewModel.addRule("  UBER *TRIP  ", "  Uber  ")
+
+            verify(merchantRenameRuleRepository).insert(
+                MerchantRenameRule(
+                    originalName = "UBER *TRIP",
+                    newName = "Uber",
+                ),
+            )
+        }
+
+    @Test
+    fun `addRule ignores blank inputs`() =
+        runTest {
+            viewModel.addRule("   ", "Uber")
+            viewModel.addRule("UBER *TRIP", "  ")
+
+            verify(merchantRenameRuleRepository, never()).insert(any())
+        }
+
+    @Test
+    fun `addRule ignores identical originalName and newName`() =
+        runTest {
+            viewModel.addRule("Uber", "Uber")
+            viewModel.addRule("  uber  ", "UBER")
+
+            verify(merchantRenameRuleRepository, never()).insert(any())
         }
 }

@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 class ManageMerchantRulesViewModel(
     private val merchantRenameRuleRepository: IMerchantRenameRuleRepository,
@@ -46,7 +47,7 @@ class ManageMerchantRulesViewModel(
                 }
             baseList.sortedWith(
                 compareBy<MerchantRenameRule, String>(String.CASE_INSENSITIVE_ORDER) { it.newName }
-                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.originalName }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.originalName },
             )
         }.stateIn(
             scope = viewModelScope,
@@ -78,5 +79,59 @@ class ManageMerchantRulesViewModel(
      */
     fun clearSearch() {
         _searchQuery.value = ""
+    }
+
+    /**
+     * Deletes a merchant rename rule by its original merchant name.
+     */
+    fun deleteRule(rule: MerchantRenameRule) {
+        viewModelScope.launch {
+            merchantRenameRuleRepository.deleteByOriginalName(rule.originalName)
+        }
+    }
+
+    /**
+     * Updates the target display name for an existing raw merchant name.
+     */
+    fun updateRule(
+        originalName: String,
+        newName: String,
+    ) {
+        val trimmedOriginal = originalName.trim()
+        val trimmedNew = newName.trim()
+        if (trimmedOriginal.isBlank() || trimmedNew.isBlank()) {
+            return
+        }
+        viewModelScope.launch {
+            merchantRenameRuleRepository.insert(
+                MerchantRenameRule(
+                    originalName = trimmedOriginal,
+                    newName = trimmedNew,
+                ),
+            )
+        }
+    }
+
+    /**
+     * Creates and saves a new merchant rename rule.
+     * Validates that both names are non-blank and distinct.
+     */
+    fun addRule(
+        originalName: String,
+        newName: String,
+    ) {
+        val trimmedOriginal = originalName.trim()
+        val trimmedNew = newName.trim()
+        if (trimmedOriginal.isBlank() || trimmedNew.isBlank() || trimmedOriginal.equals(trimmedNew, ignoreCase = true)) {
+            return
+        }
+        viewModelScope.launch {
+            merchantRenameRuleRepository.insert(
+                MerchantRenameRule(
+                    originalName = trimmedOriginal,
+                    newName = trimmedNew,
+                ),
+            )
+        }
     }
 }
