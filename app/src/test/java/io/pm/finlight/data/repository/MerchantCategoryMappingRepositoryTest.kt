@@ -43,4 +43,11 @@ class MerchantCategoryMappingRepositoryTest : BaseViewModelTest() {
             // Assert
             verify(merchantCategoryMappingDao).insert(newMapping)
         }
+
+    @Test
+    fun `getAllMappings calls DAO getAllMappingsFlow`() =
+        runTest {
+            repository.getAllMappings()
+            verify(merchantCategoryMappingDao).getAllMappingsFlow()
+        }
 }

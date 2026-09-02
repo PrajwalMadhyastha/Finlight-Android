@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Data Access Object (DAO) for the MerchantCategoryMapping entity.
@@ -34,6 +35,13 @@ interface MerchantCategoryMappingDao {
      */
     @Query("SELECT * FROM merchant_category_mapping")
     suspend fun getAll(): List<MerchantCategoryMapping>
+
+    /**
+     * Retrieves all merchant-category mappings as a reactive Flow.
+     * @return A Flow of all MerchantCategoryMapping objects.
+     */
+    @Query("SELECT * FROM merchant_category_mapping")
+    fun getAllMappingsFlow(): Flow<List<MerchantCategoryMapping>>
 
     /**
      * Retrieves the learned category ID for a given merchant name.

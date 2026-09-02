@@ -1,9 +1,6 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/MerchantCategoryMappingRepository.kt
-// REASON: FIX - The unused `getCategoryIdForMerchant` function has been removed
-// to resolve the "UnusedSymbol" warning.
-// =================================================================================
 package io.pm.finlight
+
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Repository that abstracts access to the MerchantCategoryMapping data source.
@@ -19,4 +16,9 @@ class MerchantCategoryMappingRepository(private val dao: MerchantCategoryMapping
     override suspend fun insert(mapping: MerchantCategoryMapping) {
         dao.insert(mapping)
     }
+
+    /**
+     * Retrieves all merchant-category mappings as a reactive Flow.
+     */
+    override fun getAllMappings(): Flow<List<MerchantCategoryMapping>> = dao.getAllMappingsFlow()
 }

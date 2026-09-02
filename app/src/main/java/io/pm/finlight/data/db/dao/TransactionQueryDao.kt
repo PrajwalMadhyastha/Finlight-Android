@@ -432,4 +432,40 @@ interface TransactionQueryDao {
         startTime: Long,
         endTime: Long,
     ): List<Transaction>
+
+    @Query(
+        """
+        SELECT LOWER(originalDescription) AS originalDesc, COUNT(*) AS count
+        FROM transactions
+        WHERE originalDescription IS NOT NULL AND isExcluded = 0 AND $SQL_STATUS_ACTIVE
+        GROUP BY LOWER(originalDescription)
+        """,
+    )
+    fun getTransactionCountsByOriginalDescription(): Flow<List<OriginalDescriptionCount>>
+
+    @RoomTransaction
+    @Query(
+        """
+        SELECT
+            T.*,
+            A.name as accountName,
+            C.name as categoryName,
+            C.iconKey as categoryIconKey,
+            C.colorKey as categoryColorKey,
+            (SELECT GROUP_CONCAT(Tag.name, ', ') FROM tags AS Tag INNER JOIN transaction_tag_cross_ref AS TTCR ON Tag.id = TTCR.tagId WHERE TTCR.transactionId = T.id) as tagNames
+        FROM transactions AS T
+        LEFT JOIN accounts AS A ON T.accountId = A.id
+        LEFT JOIN categories AS C ON T.categoryId = C.id
+        WHERE LOWER(T.originalDescription) = LOWER(:originalDesc)
+          AND T.isExcluded = 0
+          AND $SQL_T_STATUS_ACTIVE
+        ORDER BY T.date DESC
+        """,
+    )
+    fun getTransactionsByOriginalDescription(originalDesc: String): Flow<List<TransactionDetails>>
 }
+
+data class OriginalDescriptionCount(
+    val originalDesc: String,
+    val count: Int,
+)

@@ -212,4 +212,18 @@ interface TransactionWriteDao {
         id: Int,
         dismissed: Boolean,
     )
+
+    @Query(
+        """
+        UPDATE transactions
+        SET description = :newDescription
+        WHERE LOWER(originalDescription) = LOWER(:originalDesc)
+        AND isExcluded = 0
+        AND $SQL_STATUS_ACTIVE
+        """,
+    )
+    suspend fun updateDescriptionByOriginalDescription(
+        originalDesc: String,
+        newDescription: String,
+    ): Int
 }
