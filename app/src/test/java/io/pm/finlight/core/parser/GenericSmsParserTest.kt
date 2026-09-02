@@ -817,4 +817,63 @@ class GenericSmsParserTest : BaseSmsParserTest() {
             assertEquals("Coffee", result?.merchantName)
             assertEquals("STARBUCKS", result?.originalMerchantName)
         }
+
+    @Test
+    fun `test debit card noun phrase is not matched as expense transaction verb`() =
+        runBlocking {
+            // Setup with empty ignore rules to specifically verify regex-level protection
+            setupTest(ignoreRules = emptyList())
+            val smsBody = "Your HDFC Bank Debit Card 5501 was issued on 31/08/2026 and will reach you soon."
+            val mockSms =
+                SmsMessage(
+                    id = 2L,
+                    sender = "AM-HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNull("Debit Card noun phrase must not trigger expense keyword match", result)
+        }
+
+    @Test
+    fun `test currency-less transaction with action verb is correctly parsed`() =
+        runBlocking {
+            setupTest()
+            val smsBody = "Dear UPI user A/C X0763 debited by 185.0 on date 09Dec24 trf to KAGGIS CAKES AND Refno 434416868357. If not u? call9169070230. -SBI"
+            val mockSms =
+                SmsMessage(
+                    id = 3L,
+                    sender = "SBIUPI",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNotNull("Currency-less transaction with action verb must be parsed", result)
+            assertEquals(185.0, result?.amount)
+            assertEquals("expense", result?.transactionType)
+        }
 }
