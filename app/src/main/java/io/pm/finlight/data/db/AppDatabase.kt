@@ -56,7 +56,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         GoalContribution::class,
         MergeRecord::class,
     ],
-    version = 55,
+    version = 56,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -985,6 +985,65 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 55→56: Add linkedSurplusTxnId and heal over-repaid negative expenses ---
+        val MIGRATION_55_56 =
+            object : Migration(55, 56) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `transactions` ADD COLUMN `linkedSurplusTxnId` INTEGER")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_linkedSurplusTxnId` ON `transactions` (`linkedSurplusTxnId`)")
+
+                    val cursor = db.query("SELECT id, amount, date, accountId, categoryId, description FROM transactions WHERE transactionType = '${TransactionType.DB_EXPENSE}' AND amount < 0")
+                    while (cursor.moveToNext()) {
+                        val expenseId = cursor.getInt(0)
+                        val negativeAmount = cursor.getDouble(1)
+                        val date = cursor.getLong(2)
+                        val accountId = cursor.getInt(3)
+                        val categoryId = if (!cursor.isNull(4)) cursor.getInt(4) else null
+                        val desc = cursor.getString(5) ?: "Expense"
+                        val surplus = kotlin.math.abs(negativeAmount)
+
+                        // 1. Reset expense amount to 0.0
+                        db.execSQL("UPDATE transactions SET amount = 0.0 WHERE id = ?", arrayOf(expenseId))
+
+                        // 2. Check for linked reimbursement child
+                        val rCursor = db.query("SELECT id, description, accountId, categoryId, date FROM transactions WHERE parentReimbursementId = ? LIMIT 1", arrayOf(expenseId))
+                        val childId = if (rCursor.moveToNext()) rCursor.getInt(0) else null
+                        val childDesc = if (childId != null) rCursor.getString(1) ?: desc else desc
+                        val childAccId = if (childId != null) rCursor.getInt(2) else accountId
+                        val childCatId = if (childId != null && !rCursor.isNull(3)) rCursor.getInt(3) else categoryId
+                        val childDate = if (childId != null) rCursor.getLong(4) else date
+                        rCursor.close()
+
+                        // 3. Insert surplus active income transaction
+                        db.execSQL(
+                            """
+                            INSERT INTO transactions (description, amount, date, accountId, categoryId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status, notes)
+                            VALUES (?, ?, ?, ?, ?, '${TransactionType.DB_INCOME}', 'Surplus Allocation', 0, 0, 0, 0, 'CONFIRMED', ?)
+                            """,
+                            arrayOf(
+                                "$childDesc (Surplus)",
+                                surplus,
+                                childDate,
+                                childAccId,
+                                childCatId,
+                                "Surplus from repayment for $desc",
+                            ),
+                        )
+
+                        val sCursor = db.query("SELECT last_insert_rowid()")
+                        if (sCursor.moveToNext()) {
+                            val surplusTxnId = sCursor.getInt(0)
+                            if (childId != null) {
+                                db.execSQL("UPDATE transactions SET linkedSurplusTxnId = ? WHERE id = ?", arrayOf(surplusTxnId, childId))
+                            }
+                        }
+                        sCursor.close()
+                    }
+                    cursor.close()
+                    Log.i("Migration_55_56", "Added linkedSurplusTxnId and healed over-repaid expenses.")
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -1027,6 +1086,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_52_53,
                             MIGRATION_53_54,
                             MIGRATION_54_55,
+                            MIGRATION_55_56,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

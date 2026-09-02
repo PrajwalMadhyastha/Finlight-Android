@@ -160,6 +160,12 @@ fun RelatedTransactionsCard(
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
 
                 // --- Summary rows ---
+                val topFormatted =
+                    if (summary.topRowAmount < 0) {
+                        "- " + currencyFormat.format(kotlin.math.abs(summary.topRowAmount))
+                    } else {
+                        currencyFormat.format(summary.topRowAmount)
+                    }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -170,7 +176,7 @@ fun RelatedTransactionsCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = currencyFormat.format(summary.topRowAmount),
+                        text = topFormatted,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -193,6 +199,12 @@ fun RelatedTransactionsCard(
                         )
                     }
                 }
+                val bottomFormatted =
+                    if (summary.bottomRowAmount < 0) {
+                        "- " + currencyFormat.format(kotlin.math.abs(summary.bottomRowAmount))
+                    } else {
+                        currencyFormat.format(summary.bottomRowAmount)
+                    }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -204,7 +216,7 @@ fun RelatedTransactionsCard(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = currencyFormat.format(summary.bottomRowAmount),
+                        text = bottomFormatted,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,

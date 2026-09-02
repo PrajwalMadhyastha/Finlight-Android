@@ -251,7 +251,7 @@ class ReimbursementFeatureTest {
     }
 
     @Test
-    fun testOverRepaymentFlipsUIToIncome() {
+    fun testOverRepaymentSettlesExpenseAndCreatesSurplus() {
         val appDatabase = AppDatabase.getInstance(composeTestRule.activity.applicationContext)
         runBlocking {
             appDatabase.transactionDao().deleteAll()
@@ -261,43 +261,60 @@ class ReimbursementFeatureTest {
             appDatabase.transactionDao().insert(
                 Transaction(
                     id = expenseId,
-                    description = "Over-repaid Expense",
-                    // Over-repaid by 500
-                    amount = -500.0,
+                    description = "Lunch Expense",
+                    amount = 500.0,
                     categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
                     accountId = TestDataSeeder.ACCOUNT_BANK_ID,
                     date = now,
                     transactionType = TransactionType.EXPENSE,
-                    notes = ""
-                )
+                    notes = "",
+                ),
             )
+            appDatabase.transactionDao().insert(
+                Transaction(
+                    id = 9002,
+                    description = "Friend Payback",
+                    amount = 600.0,
+                    categoryId = TestDataSeeder.CATEGORY_FOOD_ID,
+                    accountId = TestDataSeeder.ACCOUNT_BANK_ID,
+                    date = now,
+                    transactionType = TransactionType.INCOME,
+                    notes = "",
+                ),
+            )
+
+            val repo =
+                TransactionRepository(
+                    transactionWriteDao = appDatabase.transactionWriteDao(),
+                    transactionQueryDao = appDatabase.transactionQueryDao(),
+                    transactionAnalyticsDao = appDatabase.transactionAnalyticsDao(),
+                    transactionReimbursementDao = appDatabase.transactionReimbursementDao(),
+                    db = appDatabase,
+                )
+            repo.linkReimbursement(incomeId = 9002, expenseId = expenseId)
         }
 
         openTransactionsTab()
 
-        // Wait for the transaction to appear and navigate into it directly.
-        // We avoid matching on the top-bar title ("Debit transaction") because the visual type
-        // for over-repaid expenses may differ from the DB type. Instead we use the description.
+        // Wait for transactions to appear
         composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText("Over-repaid Expense").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeTestRule.onNode(androidx.compose.ui.test.hasText("Over-repaid Expense"), useUnmergedTree = true)
-            .onAncestors()
-            .filterToOne(androidx.compose.ui.test.hasClickAction())
-            .performClick()
-
-        // Wait for the detail screen to load (top bar uses DB type, so "Debit transaction" is correct
-        // for an expense regardless of amount sign — this is verified here for safety).
-        composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText("Debit transaction", ignoreCase = true)
-                .fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Lunch Expense").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Verify the dynamic UI shows the positive absolute amount (|−500| = 500.00)
+        // Open Lunch Expense details
+        openTransactionDetail("Lunch Expense", "Debit transaction")
+
+        // Net cost should show 0.00
+        composeTestRule.onNodeWithTag("transaction_detail_lazy_column")
+            .performScrollToNode(hasText("Net cost", substring = true, ignoreCase = true))
+        composeTestRule.onNodeWithText("Net cost", substring = true, ignoreCase = true).assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("0.00", substring = true).onFirst().assertIsDisplayed()
+
+        // Navigate back and verify the surplus income transaction appears
+        composeTestRule.onNodeWithContentDescription("Back").performClick()
         composeTestRule.waitUntil(timeoutMillis = 5_000) {
-            composeTestRule.onAllNodesWithText("500.00", substring = true)
-                .fetchSemanticsNodes().isNotEmpty()
+            composeTestRule.onAllNodesWithText("Friend Payback (Surplus)").fetchSemanticsNodes().isNotEmpty()
         }
-        composeTestRule.onNodeWithText("500.00", substring = true).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Friend Payback (Surplus)").assertIsDisplayed()
     }
 }
