@@ -2,11 +2,14 @@ package io.pm.finlight.data
 
 import android.app.Application
 import android.os.Build
+import android.util.Base64
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.*
@@ -20,8 +23,10 @@ import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.data.model.AppDataBackup
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import java.util.Calendar
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.After
@@ -211,13 +216,36 @@ class DataExportServiceTest : BaseViewModelTest() {
                     ),
                 )
 
+            val picFile = File(context.filesDir, "test_avatar.jpg")
+            picFile.writeBytes("image_bytes_for_testing".toByteArray())
+
             context.financeSettingsDataStore.edit { prefs ->
+                prefs[stringPreferencesKey("user_name")] = "Prajwal"
+                prefs[stringPreferencesKey("home_currency_code")] = "INR"
+                prefs[floatPreferencesKey("overall_budget_2026_09")] = 60000f
                 prefs[stringPreferencesKey("selected_app_theme")] = "DARK"
                 prefs[stringPreferencesKey("dashboard_card_order")] = "CARDS_ORDER"
+                prefs[stringPreferencesKey("travel_mode_settings")] = "{\"enabled\":true}"
+                prefs[longPreferencesKey("sms_scan_start_date")] = 123456789L
+                prefs[stringSetPreferencesKey("dismissed_merge_suggestions")] = setOf("sugg_1")
+                prefs[stringSetPreferencesKey("excluded_income_months")] = setOf("2026_01")
+                prefs[stringSetPreferencesKey("excluded_expense_months")] = setOf("2026_02")
                 prefs[booleanPreferencesKey("app_lock_enabled")] = true
+                prefs[booleanPreferencesKey("privacy_mode_enabled")] = true
                 prefs[booleanPreferencesKey("daily_report_enabled")] = true
                 prefs[intPreferencesKey("daily_report_hour")] = 21
                 prefs[intPreferencesKey("daily_report_minute")] = 45
+                prefs[booleanPreferencesKey("weekly_summary_enabled")] = true
+                prefs[intPreferencesKey("weekly_report_day")] = 1
+                prefs[intPreferencesKey("weekly_report_hour")] = 10
+                prefs[intPreferencesKey("weekly_report_minute")] = 30
+                prefs[booleanPreferencesKey("monthly_summary_enabled")] = true
+                prefs[intPreferencesKey("monthly_report_day")] = 28
+                prefs[intPreferencesKey("monthly_report_hour")] = 18
+                prefs[intPreferencesKey("monthly_report_minute")] = 0
+                prefs[booleanPreferencesKey("autocapture_notification_enabled")] = true
+                prefs[booleanPreferencesKey("unknown_transaction_popup_enabled")] = true
+                prefs[stringPreferencesKey("profile_picture_uri")] = picFile.absolutePath
             }
 
             val jsonString = DataExportService.exportToJsonString(context)
@@ -227,12 +255,33 @@ class DataExportServiceTest : BaseViewModelTest() {
             assertEquals("deleted_hash_abc", backupData.deletedSmsHashes.first().smsHash)
             assertEquals(1, backupData.mergeRecords.size)
             assertEquals("group_abc", backupData.mergeRecords.first().mergeGroupId)
+            assertEquals("Prajwal", backupData.userName)
+            assertEquals("INR", backupData.homeCurrency)
+            assertEquals(60000f, backupData.overallBudget)
             assertEquals("DARK", backupData.selectedAppTheme)
             assertEquals("CARDS_ORDER", backupData.dashboardCardOrder)
+            assertEquals("{\"enabled\":true}", backupData.travelModeSettings)
+            assertEquals(123456789L, backupData.smsScanStartDate)
+            assertEquals(setOf("sugg_1"), backupData.dismissedMergeSuggestions)
+            assertEquals(setOf("2026_01"), backupData.excludedIncomeMonths)
+            assertEquals(setOf("2026_02"), backupData.excludedExpenseMonths)
             assertEquals(true, backupData.appLockEnabled)
+            assertEquals(true, backupData.privacyModeEnabled)
             assertEquals(true, backupData.dailyReportEnabled)
             assertEquals(21, backupData.dailyReportHour)
             assertEquals(45, backupData.dailyReportMinute)
+            assertEquals(true, backupData.weeklySummaryEnabled)
+            assertEquals(1, backupData.weeklyReportDay)
+            assertEquals(10, backupData.weeklyReportHour)
+            assertEquals(30, backupData.weeklyReportMinute)
+            assertEquals(true, backupData.monthlySummaryEnabled)
+            assertEquals(28, backupData.monthlyReportDay)
+            assertEquals(18, backupData.monthlyReportHour)
+            assertEquals(0, backupData.monthlyReportMinute)
+            assertEquals(true, backupData.autocaptureNotificationEnabled)
+            assertEquals(true, backupData.unknownTransactionPopupEnabled)
+            assertNotNull(backupData.profilePictureBase64)
+            assertEquals(Base64.encodeToString("image_bytes_for_testing".toByteArray(), Base64.NO_WRAP), backupData.profilePictureBase64)
         }
 
     @Test
@@ -387,6 +436,203 @@ class DataExportServiceTest : BaseViewModelTest() {
             coVerify { tagDao.insertAll(backupData.tags) }
             coVerify { transactionWriteDao.insertAll(backupData.transactions) }
             coVerify { transactionWriteDao.addTagsToTransaction(backupData.transactionTagCrossRefs) }
+        }
+
+    @Test
+    fun `restoreFromBackupSnapshot restores all user preferences and profile picture`() =
+        runTest {
+            val fakeImageData = "avatar_test_bytes".toByteArray()
+            val base64Image = Base64.encodeToString(fakeImageData, Base64.NO_WRAP)
+
+            val backupData =
+                AppDataBackup(
+                    transactions =
+                        listOf(
+                            Transaction(id = 5, description = "Restored Tx", amount = 555.0, date = 1L, accountId = 1, categoryId = 1, notes = null)
+                        ),
+                    accounts = listOf(Account(id = 1, name = "Restored Acc", type = "Bank")),
+                    categories = listOf(Category(id = 1, name = "Restored Cat", iconKey = "icon", colorKey = "color")),
+                    tags = emptyList(),
+                    transactionTagCrossRefs = emptyList(),
+                    budgets = emptyList(),
+                    merchantMappings = emptyList(),
+                    splitTransactions = emptyList(),
+                    customSmsRules = emptyList(),
+                    merchantRenameRules = emptyList(),
+                    merchantCategoryMappings = emptyList(),
+                    ignoreRules = emptyList(),
+                    smsParseTemplates = emptyList(),
+                    goals = emptyList(),
+                    goalTransactionLinks = emptyList(),
+                    trips = emptyList(),
+                    accountAliases = emptyList(),
+                    deletedSmsHashes = listOf(DeletedSmsHash(smsHash = "deleted_hash_xyz")),
+                    mergeRecords =
+                        listOf(
+                            MergeRecord(
+                                id = 1,
+                                parentTxnId = 5,
+                                mergedAt = 1000L,
+                                mergeGroupId = "group_xyz",
+                                mergeType = MergeType.MANUAL,
+                                originalParentAmount = 100.0,
+                                originalParentDate = 1000L,
+                                originalParentNotes = "Notes",
+                                childDescription = "Child Tx",
+                                childAmount = 50.0,
+                                childDate = 1000L,
+                                childAccountId = 1,
+                                childCategoryId = 1,
+                                childNotes = null,
+                            )
+                        ),
+                    userName = "Restored Name",
+                    homeCurrency = "EUR",
+                    overallBudgets = mapOf("2026_09" to 55000f),
+                    selectedAppTheme = "LIGHT",
+                    dashboardCardOrder = "CARDS_2",
+                    travelModeSettings = "{\"enabled\":false}",
+                    smsScanStartDate = 777L,
+                    dismissedMergeSuggestions = setOf("sugg_restore"),
+                    excludedIncomeMonths = setOf("2026_05"),
+                    excludedExpenseMonths = setOf("2026_06"),
+                    appLockEnabled = false,
+                    privacyModeEnabled = false,
+                    dailyReportEnabled = false,
+                    dailyReportHour = 8,
+                    dailyReportMinute = 0,
+                    weeklySummaryEnabled = false,
+                    weeklyReportDay = 2,
+                    weeklyReportHour = 9,
+                    weeklyReportMinute = 15,
+                    monthlySummaryEnabled = false,
+                    monthlyReportDay = 1,
+                    monthlyReportHour = 12,
+                    monthlyReportMinute = 45,
+                    autocaptureNotificationEnabled = false,
+                    unknownTransactionPopupEnabled = false,
+                    profilePictureBase64 = base64Image,
+                )
+
+            val jsonString = Json.encodeToString(AppDataBackup.serializer(), backupData)
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            FileOutputStream(snapshotFile).use { fos ->
+                GZIPOutputStream(fos).use { gzip ->
+                    gzip.write(jsonString.toByteArray())
+                }
+            }
+
+            val success = DataExportService.restoreFromBackupSnapshot(context)
+            assertTrue("Restore should succeed", success)
+
+            coVerify { deletedSmsHashDao.insertAll(match { it.size == 1 && it.first().smsHash == "deleted_hash_xyz" }) }
+            coVerify { mergeRecordDao.insertAll(match { it.size == 1 && it.first().mergeGroupId == "group_xyz" }) }
+
+            val prefs = context.financeSettingsDataStore.data.first()
+            assertEquals("Restored Name", prefs[stringPreferencesKey("user_name")])
+            assertEquals("EUR", prefs[stringPreferencesKey("home_currency_code")])
+            assertEquals(55000f, prefs[floatPreferencesKey("overall_budget_2026_09")])
+            assertEquals("LIGHT", prefs[stringPreferencesKey("selected_app_theme")])
+            assertEquals("CARDS_2", prefs[stringPreferencesKey("dashboard_card_order")])
+            assertEquals("{\"enabled\":false}", prefs[stringPreferencesKey("travel_mode_settings")])
+            assertEquals(777L, prefs[longPreferencesKey("sms_scan_start_date")])
+            assertEquals(setOf("sugg_restore"), prefs[stringSetPreferencesKey("dismissed_merge_suggestions")])
+            assertEquals(setOf("2026_05"), prefs[stringSetPreferencesKey("excluded_income_months")])
+            assertEquals(setOf("2026_06"), prefs[stringSetPreferencesKey("excluded_expense_months")])
+            assertEquals(false, prefs[booleanPreferencesKey("app_lock_enabled")])
+            assertEquals(false, prefs[booleanPreferencesKey("privacy_mode_enabled")])
+            assertEquals(false, prefs[booleanPreferencesKey("daily_report_enabled")])
+            assertEquals(8, prefs[intPreferencesKey("daily_report_hour")])
+            assertEquals(0, prefs[intPreferencesKey("daily_report_minute")])
+            assertEquals(false, prefs[booleanPreferencesKey("weekly_summary_enabled")])
+            assertEquals(2, prefs[intPreferencesKey("weekly_report_day")])
+            assertEquals(9, prefs[intPreferencesKey("weekly_report_hour")])
+            assertEquals(15, prefs[intPreferencesKey("weekly_report_minute")])
+            assertEquals(false, prefs[booleanPreferencesKey("monthly_summary_enabled")])
+            assertEquals(1, prefs[intPreferencesKey("monthly_report_day")])
+            assertEquals(12, prefs[intPreferencesKey("monthly_report_hour")])
+            assertEquals(45, prefs[intPreferencesKey("monthly_report_minute")])
+            assertEquals(false, prefs[booleanPreferencesKey("autocapture_notification_enabled")])
+            assertEquals(false, prefs[booleanPreferencesKey("unknown_transaction_popup_enabled")])
+
+            val restoredPicUri = prefs[stringPreferencesKey("profile_picture_uri")]
+            assertNotNull(restoredPicUri)
+            val restoredPicFile = File(restoredPicUri!!)
+            assertTrue(restoredPicFile.exists())
+            assertEquals("avatar_test_bytes", restoredPicFile.readText())
+        }
+
+    @Test
+    fun `restoreFromBackupSnapshot restores legacy overallBudget when overallBudgets is empty`() =
+        runTest {
+            val backupData =
+                AppDataBackup(
+                    transactions =
+                        listOf(
+                            Transaction(id = 6, description = "Legacy Tx", amount = 10.0, date = 1L, accountId = 1, categoryId = 1, notes = null)
+                        ),
+                    accounts = listOf(Account(id = 1, name = "Acc", type = "Bank")),
+                    categories = listOf(Category(id = 1, name = "Cat", iconKey = "icon", colorKey = "color")),
+                    budgets = emptyList(),
+                    merchantMappings = emptyList(),
+                    overallBudget = 42000f,
+                    overallBudgets = emptyMap(),
+                )
+
+            val jsonString = Json.encodeToString(AppDataBackup.serializer(), backupData)
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            FileOutputStream(snapshotFile).use { fos ->
+                GZIPOutputStream(fos).use { gzip ->
+                    gzip.write(jsonString.toByteArray())
+                }
+            }
+
+            val success = DataExportService.restoreFromBackupSnapshot(context)
+            assertTrue("Restore should succeed", success)
+
+            val prefs = context.financeSettingsDataStore.data.first()
+            val cal = Calendar.getInstance()
+            val currentKey = String.format(java.util.Locale.ROOT, "overall_budget_%d_%02d", cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1)
+            assertEquals(42000f, prefs[floatPreferencesKey(currentKey)])
+        }
+
+    @Test
+    fun `exportToJsonString ignores non-existent or oversized profile picture`() =
+        runTest {
+            setupMockData()
+            context.financeSettingsDataStore.edit { prefs ->
+                prefs[stringPreferencesKey("profile_picture_uri")] = "/path/to/nonexistent/pic.jpg"
+            }
+
+            val jsonString = DataExportService.exportToJsonString(context)
+            assertNotNull(jsonString)
+            val backupData = Json.decodeFromString<AppDataBackup>(jsonString!!)
+            assertNull(backupData.profilePictureBase64)
+        }
+
+    @Test
+    fun `restoreFromBackupSnapshot handles invalid profile picture base64 gracefully`() =
+        runTest {
+            val backupData =
+                AppDataBackup(
+                    transactions = listOf(Transaction(id = 7, description = "Tx", amount = 1.0, date = 1L, accountId = 1, categoryId = 1, notes = null)),
+                    accounts = listOf(Account(id = 1, name = "Acc", type = "Bank")),
+                    categories = listOf(Category(id = 1, name = "Cat", iconKey = "icon", colorKey = "color")),
+                    budgets = emptyList(),
+                    merchantMappings = emptyList(),
+                    profilePictureBase64 = "not_valid_base64_???",
+                )
+
+            val jsonString = Json.encodeToString(AppDataBackup.serializer(), backupData)
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            FileOutputStream(snapshotFile).use { fos ->
+                GZIPOutputStream(fos).use { gzip ->
+                    gzip.write(jsonString.toByteArray())
+                }
+            }
+
+            val success = DataExportService.restoreFromBackupSnapshot(context)
+            assertTrue("Restore should succeed even if profile picture is corrupt", success)
         }
 
     @Test
