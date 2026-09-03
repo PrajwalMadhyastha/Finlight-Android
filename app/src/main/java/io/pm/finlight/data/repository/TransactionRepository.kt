@@ -438,30 +438,73 @@ class TransactionRepository(
 
     /**
      * Links [incomeId] as a reimbursement for [expenseId]:
-     * - Sets parentReimbursementId on the income and marks it as excluded from totals.
-     * - Deducts the income amount from the expense, so budget/spending totals
-     *   automatically reflect the net cost.
+     * - If incomeTxn.amount > expenseTxn.amount (over-repayment):
+     *   - Offsets expenseTxn to 0.0 (fully settled).
+     *   - Adjusts incomeTxn amount to the offset portion, marks it isExcluded = true.
+     *   - Creates an active surplus INCOME transaction for (incomeTxn.amount - offset).
+     *   - Links the surplus transaction to the reimbursement income via linkedSurplusTxnId.
+     * - Else:
+     *   - Deducts the full income amount from the expense.
+     *   - Marks incomeTxn as isExcluded = true and parentReimbursementId = expenseId.
      */
     override suspend fun linkReimbursement(
         incomeId: Int,
-        expenseId: Int
+        expenseId: Int,
     ) {
         val incomeTxn = transactionQueryDao.getTransactionByIdSync(incomeId) ?: return
         val expenseTxn = transactionQueryDao.getTransactionByIdSync(expenseId) ?: return
-        transactionReimbursementDao.linkReimbursement(incomeId, expenseId)
-        val newExpenseAmount = expenseTxn.amount - incomeTxn.amount
-        transactionWriteDao.updateAmount(expenseId, newExpenseAmount)
+
+        if (incomeTxn.amount > expenseTxn.amount) {
+            val offset = expenseTxn.amount
+            val surplus = incomeTxn.amount - offset
+
+            val surplusTxn =
+                Transaction(
+                    description = "${incomeTxn.description} (Surplus)",
+                    amount = surplus,
+                    date = incomeTxn.date,
+                    accountId = incomeTxn.accountId,
+                    categoryId = incomeTxn.categoryId,
+                    transactionType = TransactionType.INCOME,
+                    isExcluded = false,
+                    notes = "Surplus from repayment for ${expenseTxn.description}",
+                    source = "Surplus Allocation",
+                    status = TransactionStatus.CONFIRMED,
+                )
+            val surplusId = transactionWriteDao.insert(surplusTxn).toInt()
+
+            transactionWriteDao.updateAmount(incomeId, offset)
+            transactionReimbursementDao.linkReimbursement(incomeId, expenseId, surplusId)
+            transactionWriteDao.updateAmount(expenseId, 0.0)
+        } else {
+            transactionReimbursementDao.linkReimbursement(incomeId, expenseId, null)
+            val newExpenseAmount = expenseTxn.amount - incomeTxn.amount
+            transactionWriteDao.updateAmount(expenseId, newExpenseAmount)
+        }
     }
 
     /**
      * Removes the reimbursement link from [incomeId]:
-     * - Clears parentReimbursementId and removes the excluded flag.
-     * - Adds the income amount back onto the parent expense.
+     * - If a linked surplus transaction exists, deletes it and merges its amount back.
+     * - Clears parentReimbursementId, linkedSurplusTxnId and removes the excluded flag.
+     * - Adds the offset amount back onto the parent expense.
      */
     override suspend fun unlinkReimbursement(incomeId: Int) {
         val incomeTxn = transactionQueryDao.getTransactionByIdSync(incomeId) ?: return
         val parentId = incomeTxn.parentReimbursementId ?: return
         val expenseTxn = transactionQueryDao.getTransactionByIdSync(parentId) ?: return
+
+        var totalIncomeToRestore = incomeTxn.amount
+        val surplusId = incomeTxn.linkedSurplusTxnId
+        if (surplusId != null) {
+            val surplusTxn = transactionQueryDao.getTransactionByIdSync(surplusId)
+            if (surplusTxn != null) {
+                totalIncomeToRestore += surplusTxn.amount
+                transactionWriteDao.delete(surplusTxn)
+            }
+        }
+
+        transactionWriteDao.updateAmount(incomeId, totalIncomeToRestore)
         transactionReimbursementDao.unlinkReimbursement(incomeId)
         val restoredExpenseAmount = expenseTxn.amount + incomeTxn.amount
         transactionWriteDao.updateAmount(parentId, restoredExpenseAmount)

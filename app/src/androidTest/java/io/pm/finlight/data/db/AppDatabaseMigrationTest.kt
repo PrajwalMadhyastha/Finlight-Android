@@ -732,4 +732,72 @@ class AppDatabaseMigrationTest {
         org.junit.Assert.assertEquals("STARBUCKS", cursor5.getString(0))
         cursor5.close()
     }
+
+    @Test
+    fun migrate55To56_addsLinkedSurplusTxnIdAndHealsNegativeExpenses() {
+        val db = helper.createDatabase(testDbName, 55)
+
+        db.execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank Account')")
+
+        // 1. Over-repaid expense: amount = -10.0
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (1, 'Dinner Expense', -10.0, 1000, 1, 'expense', 'manual', 0, 0, 0, 0, 'cleared')",
+        )
+
+        // Linked reimbursement: amount = 2350.0, parentReimbursementId = 1
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, parentReimbursementId, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (2, 'Pragathi Madhya', 2350.0, 1000, 1, 'income', 1, 'manual', 1, 0, 0, 0, 'cleared')",
+        )
+
+        // 2. Normal positive expense
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (3, 'Coffee', 150.0, 1000, 1, 'expense', 'manual', 0, 0, 0, 0, 'cleared')",
+        )
+
+        db.close()
+
+        val migratedDb = helper.runMigrationsAndValidate(testDbName, 56, true, AppDatabase.MIGRATION_55_56)
+
+        // 1. Verify linkedSurplusTxnId column exists
+        val pragmaCursor = migratedDb.query("PRAGMA table_info(transactions)")
+        var foundSurplusCol = false
+        while (pragmaCursor.moveToNext()) {
+            if (pragmaCursor.getString(pragmaCursor.getColumnIndexOrThrow("name")) == "linkedSurplusTxnId") {
+                foundSurplusCol = true
+            }
+        }
+        pragmaCursor.close()
+        assertTrue("Column 'linkedSurplusTxnId' should exist in transactions table", foundSurplusCol)
+
+        // 2. Verify expense was healed to 0.0
+        val cursor1 = migratedDb.query("SELECT amount, transactionType FROM transactions WHERE id = 1")
+        assertTrue(cursor1.moveToFirst())
+        assertEquals(0.0, cursor1.getDouble(0), 0.001)
+        assertEquals("expense", cursor1.getString(1))
+        cursor1.close()
+
+        // 3. Verify reimbursement child has linkedSurplusTxnId pointing to new surplus transaction
+        val cursor2 = migratedDb.query("SELECT linkedSurplusTxnId FROM transactions WHERE id = 2")
+        assertTrue(cursor2.moveToFirst())
+        val surplusId = cursor2.getInt(0)
+        assertTrue(surplusId > 0)
+        cursor2.close()
+
+        // 4. Verify surplus transaction exists with amount 10.0 and type income
+        val cursorSurplus = migratedDb.query("SELECT amount, transactionType, isExcluded FROM transactions WHERE id = ?", arrayOf(surplusId))
+        assertTrue(cursorSurplus.moveToFirst())
+        assertEquals(10.0, cursorSurplus.getDouble(0), 0.001)
+        assertEquals("income", cursorSurplus.getString(1))
+        assertEquals(0, cursorSurplus.getInt(2))
+        cursorSurplus.close()
+
+        // 5. Verify normal positive expense remains untouched
+        val cursor3 = migratedDb.query("SELECT amount FROM transactions WHERE id = 3")
+        assertTrue(cursor3.moveToFirst())
+        assertEquals(150.0, cursor3.getDouble(0), 0.001)
+        cursor3.close()
+    }
 }

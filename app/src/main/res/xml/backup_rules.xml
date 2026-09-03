@@ -25,4 +25,7 @@
     -->
     <exclude domain="file" path="attachments/" />
 
+    <!-- Exclude internal lifecycle state file so is_first_launch_complete is not preserved across devices -->
+    <exclude domain="file" path="datastore/finlight_internal_state.preferences_pb" />
+
 </full-backup-content>

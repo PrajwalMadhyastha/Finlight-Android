@@ -806,19 +806,11 @@ private fun TransactionPropertiesCard(
                     .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            val isMathematicallyIncome = details.transaction.transactionType == TransactionType.INCOME
-            // An expense with a negative amount is "over-repaid". It renders visually as income
-            // but its DB type remains "expense". We lock the toggle in this state to prevent the
-            // user from accidentally changing the type when the toggle shows the "wrong" side.
-            val isOverRepaid = !isMathematicallyIncome && details.transaction.amount < 0
-            val isVisuallyIncome = isMathematicallyIncome || isOverRepaid
-            val displayType = if (isVisuallyIncome) TransactionType.INCOME else TransactionType.EXPENSE
-
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 TransactionTypeToggle(
-                    selectedType = displayType,
+                    selectedType = details.transaction.transactionType,
                     onTypeSelected = onTypeSelected,
-                    enabled = !details.transaction.isSplit && !isOverRepaid && !hasMerged && !hasReimbursements,
+                    enabled = !details.transaction.isSplit && !hasMerged && !hasReimbursements,
                 )
             }
 

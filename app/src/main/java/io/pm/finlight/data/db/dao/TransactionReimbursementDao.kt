@@ -54,16 +54,17 @@ interface TransactionReimbursementDao {
     /**
      * Links an income transaction to an expense as a reimbursement.
      */
-    @Query("UPDATE transactions SET parentReimbursementId = :expenseId, isExcluded = 1 WHERE id = :incomeId")
+    @Query("UPDATE transactions SET parentReimbursementId = :expenseId, isExcluded = 1, linkedSurplusTxnId = :surplusTxnId WHERE id = :incomeId")
     suspend fun linkReimbursement(
         incomeId: Int,
         expenseId: Int,
+        surplusTxnId: Int? = null,
     )
 
     /**
      * Removes the link from an income transaction, restoring it as a standalone credit.
      */
-    @Query("UPDATE transactions SET parentReimbursementId = NULL, isExcluded = 0 WHERE id = :incomeId")
+    @Query("UPDATE transactions SET parentReimbursementId = NULL, isExcluded = 0, linkedSurplusTxnId = NULL WHERE id = :incomeId")
     suspend fun unlinkReimbursement(incomeId: Int)
 
     /**

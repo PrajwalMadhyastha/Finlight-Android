@@ -979,4 +979,18 @@ class SettingsViewModel(
             }
         }
     }
+
+    fun restoreFromBackupSnapshot() {
+        viewModelScope.launch {
+            val success =
+                withContext(dispatchers.io) {
+                    DataExportService.restoreFromBackupSnapshot(context)
+                }
+            if (success) {
+                _uiEvent.send("Data restored successfully from snapshot! Please restart the app.")
+            } else {
+                _uiEvent.send("No backup snapshot found or restore failed.")
+            }
+        }
+    }
 }

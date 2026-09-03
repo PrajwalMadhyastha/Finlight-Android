@@ -23,6 +23,8 @@
 
         <!-- THIS IS THE FIX: Include the 'file' domain, which contains backup_snapshot.gz -->
         <include domain="file" path="." />
+        <!-- Exclude internal lifecycle state file so is_first_launch_complete is not preserved across devices -->
+        <exclude domain="file" path="datastore/finlight_internal_state.preferences_pb" />
         <!-- But, exclude the large, non-essential image attachments from the backup -->
         <exclude domain="file" path="attachments/" />
     </cloud-backup>
@@ -35,6 +37,7 @@
         <exclude domain="sharedpref" path="finlight_internal_state.xml"/>
         <include domain="database" path="." />
         <include domain="file" path="." />
+        <exclude domain="file" path="datastore/finlight_internal_state.preferences_pb" />
         <exclude domain="file" path="attachments/" />
     </device-transfer>
 </data-extraction-rules>

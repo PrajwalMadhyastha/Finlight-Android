@@ -77,12 +77,26 @@ class TransactionReimbursementDaoTest {
             assertEquals(1, candidates.size)
             assertEquals(incomeId, candidates.first().transaction.id)
 
-            // Link them
-            reimbursementDao.linkReimbursement(incomeId = incomeId, expenseId = expenseId)
+            // Link them with optional surplusTxnId
+            val surplusTxn =
+                Transaction(
+                    description = "Flight Reimbursement (Surplus)",
+                    amount = 500.0,
+                    date = 2000L,
+                    transactionType = TransactionType.INCOME,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    source = "Manual"
+                )
+            val surplusId = writeDao.insert(surplusTxn).toInt()
+
+            reimbursementDao.linkReimbursement(incomeId = incomeId, expenseId = expenseId, surplusTxnId = surplusId)
 
             val reimbursementsForExpense = reimbursementDao.getReimbursementsForExpense(expenseId).first()
             assertEquals(1, reimbursementsForExpense.size)
             assertEquals(incomeId, reimbursementsForExpense.first().transaction.id)
+            assertEquals(surplusId, reimbursementsForExpense.first().transaction.linkedSurplusTxnId)
 
             val linkedExpense = reimbursementDao.getLinkedExpenseForReimbursement(incomeId).first()
             assertNotNull(linkedExpense)

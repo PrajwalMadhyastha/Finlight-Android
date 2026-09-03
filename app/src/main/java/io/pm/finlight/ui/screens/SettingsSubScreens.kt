@@ -461,6 +461,7 @@ fun DataSettingsScreen(
     val scope = rememberCoroutineScope()
     val isAppLockEnabled by settingsViewModel.appLockEnabled.collectAsState()
     var showImportJsonDialog by remember { mutableStateOf(false) }
+    var showRestoreSnapshotDialog by remember { mutableStateOf(false) }
     var showCsvInfoDialog by remember { mutableStateOf(false) }
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
@@ -681,6 +682,13 @@ fun DataSettingsScreen(
                         onClick = { settingsViewModel.createBackupSnapshot() },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsActionItem(
+                        text = "Restore from Snapshot",
+                        subtitle = "Restore data from local backup snapshot",
+                        icon = Icons.Default.SettingsBackupRestore,
+                        onClick = { showRestoreSnapshotDialog = true },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     // --- Photo receipts disclaimer ---
                     Row(
                         modifier =
@@ -737,6 +745,20 @@ fun DataSettingsScreen(
             onConfirm = {
                 showImportJsonDialog = false
                 jsonImportLauncher.launch(arrayOf("application/json"))
+            },
+        )
+    }
+
+    if (showRestoreSnapshotDialog) {
+        ConfirmationDialog(
+            title = "Restore from Snapshot?",
+            text = "WARNING: This will replace current data with the latest local backup snapshot. This cannot be undone.",
+            confirmButtonText = "Restore",
+            isDestructive = true,
+            onDismiss = { showRestoreSnapshotDialog = false },
+            onConfirm = {
+                showRestoreSnapshotDialog = false
+                settingsViewModel.restoreFromBackupSnapshot()
             },
         )
     }

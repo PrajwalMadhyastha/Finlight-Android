@@ -47,9 +47,10 @@ Current App Map:
 Output ONLY valid JSON.
 """
 
+    model_name = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
     try:
         response = client.models.generate_content(
-            model='gemini-3.1-flash-lite',
+            model=model_name,
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0

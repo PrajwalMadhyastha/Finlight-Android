@@ -94,7 +94,7 @@ interface TransactionQueryDao {
             UNION ALL
             SELECT
                 P.id, P.description, S.categoryId, S.amount, P.date, P.accountId, S.notes, P.transactionType, P.sourceSmsId, P.sourceSmsHash, P.source,
-                P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit, P.needsReview, P.status, P.recurringRuleId, P.mergeDismissed, P.parentReimbursementId, P.linkedTransferId
+                P.originalDescription, P.isExcluded, P.smsSignature, P.originalAmount, P.currencyCode, P.conversionRate, P.isSplit, P.needsReview, P.status, P.recurringRuleId, P.mergeDismissed, P.parentReimbursementId, P.linkedTransferId, P.linkedSurplusTxnId
             FROM split_transactions AS S JOIN transactions AS P ON S.parentTransactionId = P.id
             WHERE P.transactionType = $SQL_INCOME AND P.date BETWEEN :startDate AND :endDate AND P.isExcluded = 0 AND $SQL_P_STATUS_ACTIVE
               AND (:accountId IS NULL OR P.accountId = :accountId)

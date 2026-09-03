@@ -197,17 +197,16 @@ fun TransactionItem(
                 )
             }
 
-            val isMathematicallyIncome = transactionDetails.transaction.transactionType == TransactionType.INCOME
-            val isVisuallyIncome = isMathematicallyIncome || (!isMathematicallyIncome && transactionDetails.transaction.amount < 0)
+            val isIncome = transactionDetails.transaction.transactionType == TransactionType.INCOME
             val displayAmount = kotlin.math.abs(transactionDetails.transaction.amount)
 
             val amountColor =
                 if (isSystemInDarkTheme()) {
-                    if (isVisuallyIncome) IncomeGreenDark else ExpenseRedDark
+                    if (isIncome) IncomeGreenDark else ExpenseRedDark
                 } else {
-                    if (isVisuallyIncome) IncomeGreenLight else ExpenseRedLight
+                    if (isIncome) IncomeGreenLight else ExpenseRedLight
                 }.copy(alpha = contentAlpha)
-            val icon = if (isVisuallyIncome) Icons.Default.SouthWest else Icons.Default.NorthEast
+            val icon = if (isIncome) Icons.Default.SouthWest else Icons.Default.NorthEast
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

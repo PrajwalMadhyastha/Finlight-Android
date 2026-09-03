@@ -415,13 +415,13 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             repository.linkReimbursement(incomeId = 2, expenseId = 1)
 
-            verify(transactionDao).linkReimbursement(2, 1)
+            verify(transactionDao).linkReimbursement(2, 1, null)
             // 1500 - 500 = 1000
             verify(transactionDao).updateAmount(1, 1000.0)
         }
 
     @Test
-    fun `linkReimbursement allows expense amount to drop below zero on over-repayment`() =
+    fun `linkReimbursement caps expense at zero and creates surplus income on over-repayment`() =
         runTest {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
@@ -431,12 +431,14 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(incomeTxn)
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(expenseTxn)
+            `when`(transactionDao.insert(any())).thenReturn(99L)
 
             repository.linkReimbursement(incomeId = 2, expenseId = 1)
 
-            verify(transactionDao).linkReimbursement(2, 1)
-            // 300 - 500 = -200
-            verify(transactionDao).updateAmount(1, -200.0)
+            // Offset is 300.0 -> income updated to 300.0, expense updated to 0.0
+            verify(transactionDao).updateAmount(2, 300.0)
+            verify(transactionDao).linkReimbursement(2, 1, 99)
+            verify(transactionDao).updateAmount(1, 0.0)
         }
 
     @Test
@@ -450,7 +452,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             repository.linkReimbursement(incomeId = 1, expenseId = 2)
 
-            verify(transactionDao, never()).linkReimbursement(any(), any())
+            verify(transactionDao, never()).linkReimbursement(any(), any(), any())
             verify(transactionDao, never()).updateAmount(any(), any())
         }
 
@@ -471,25 +473,31 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             verify(transactionDao).unlinkReimbursement(2)
             // 1000 + 500 = 1500
             verify(transactionDao).updateAmount(1, 1500.0)
+            verify(transactionDao).updateAmount(2, 500.0)
         }
 
     @Test
-    fun `unlinkReimbursement on over-repaid negative expense correctly restores amount`() =
+    fun `unlinkReimbursement with linked surplus merges surplus back and restores original amounts`() =
         runTest {
             setupDefaultPropertyMocks()
             repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
 
-            val incomeTxn = Transaction(id = 2, description = "Income", amount = 150.0, date = 2000L, accountId = 1, categoryId = 1, transactionType = TransactionType.INCOME, notes = null, parentReimbursementId = 1)
-            val expenseTxn = Transaction(id = 1, description = "Expense", amount = -50.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = TransactionType.EXPENSE, notes = null)
+            val surplusTxn = Transaction(id = 99, description = "Repayment (Surplus)", amount = 200.0, date = 2000L, accountId = 1, categoryId = 2, transactionType = TransactionType.INCOME, notes = null)
+            val incomeTxn = Transaction(id = 2, description = "Repayment", amount = 300.0, date = 2000L, accountId = 1, categoryId = 2, transactionType = TransactionType.INCOME, notes = null, parentReimbursementId = 1, linkedSurplusTxnId = 99)
+            val expenseTxn = Transaction(id = 1, description = "Lunch", amount = 0.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = TransactionType.EXPENSE, notes = null)
 
+            `when`(transactionDao.getTransactionByIdSync(99)).thenReturn(surplusTxn)
             `when`(transactionDao.getTransactionByIdSync(2)).thenReturn(incomeTxn)
             `when`(transactionDao.getTransactionByIdSync(1)).thenReturn(expenseTxn)
 
             repository.unlinkReimbursement(incomeId = 2)
 
-            // -50 + 150 = 100
+            verify(transactionDao).delete(surplusTxn)
+            // 300 + 200 = 500 restored to income
+            verify(transactionDao).updateAmount(2, 500.0)
             verify(transactionDao).unlinkReimbursement(2)
-            verify(transactionDao).updateAmount(1, 100.0)
+            // 0 + 300 = 300 restored to expense
+            verify(transactionDao).updateAmount(1, 300.0)
         }
 
     @Test

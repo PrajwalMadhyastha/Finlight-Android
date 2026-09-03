@@ -69,6 +69,7 @@ import androidx.navigation.navDeepLink
 import coil.compose.AsyncImage
 import com.google.gson.Gson
 import io.pm.finlight.data.DataExportService
+import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModelFactory
@@ -90,6 +91,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.net.URLDecoder
 import java.util.concurrent.Executor
 
@@ -1457,8 +1459,15 @@ fun SplashScreen(
 
     LaunchedEffect(key1 = true) {
         val isFirstLaunch = !settingsViewModel.isFirstLaunchComplete.first()
+        val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+        val shouldCheckRestore =
+            isFirstLaunch ||
+                withContext(Dispatchers.IO) {
+                    snapshotFile.exists() &&
+                        AppDatabase.getInstance(context).transactionQueryDao().getAllTransactionsSimple().first().isEmpty()
+                }
 
-        if (isFirstLaunch) {
+        if (shouldCheckRestore) {
             statusText = "Checking for restored data..."
             val restored =
                 withContext(Dispatchers.IO) {
@@ -1468,7 +1477,7 @@ fun SplashScreen(
                 statusText = "Data restored successfully!"
                 delay(1500) // Give user time to see the message
             }
-            // Set the flag *after* the first-launch check is complete
+            // Set the flag *after* the restore check is complete
             settingsViewModel.setFirstLaunchComplete()
         }
 

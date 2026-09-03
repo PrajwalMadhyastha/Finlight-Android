@@ -110,10 +110,15 @@ class TransactionRepositoryDomainDaoTest {
     @Test
     fun testDelegationToReimbursementDao() =
         runTest {
-            coJustRun { reimbursementDao.linkReimbursement(any(), any()) }
+            val incomeTxn = Transaction(id = 1, description = "Income", amount = 50.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = TransactionType.INCOME, notes = null, parentReimbursementId = 2)
+            val expenseTxn = Transaction(id = 2, description = "Expense", amount = 100.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = TransactionType.EXPENSE, notes = null)
+
+            coEvery { queryDao.getTransactionByIdSync(1) } returns incomeTxn
+            coEvery { queryDao.getTransactionByIdSync(2) } returns expenseTxn
+            coJustRun { reimbursementDao.linkReimbursement(any(), any(), any()) }
 
             repository.linkReimbursement(1, 2)
-            coVerify(exactly = 1) { reimbursementDao.linkReimbursement(1, 2) }
+            coVerify(exactly = 1) { reimbursementDao.linkReimbursement(1, 2, null) }
 
             coJustRun { reimbursementDao.unlinkReimbursement(any()) }
             repository.unlinkReimbursement(1)

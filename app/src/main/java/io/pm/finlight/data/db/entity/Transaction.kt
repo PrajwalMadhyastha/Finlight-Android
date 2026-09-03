@@ -24,6 +24,7 @@ import kotlinx.serialization.Serializable
         Index(value = ["smsSignature"]),
         Index(value = ["date"]), // --- NEW: Add index for date-based queries ---
         Index(value = ["parentReimbursementId"]), // --- NEW: Index for reimbursement lookups ---
+        Index(value = ["linkedSurplusTxnId"]), // --- NEW: Index for reimbursement surplus lookups ---
     ],
     foreignKeys = [
         ForeignKey(
@@ -77,4 +78,6 @@ data class Transaction(
     val parentReimbursementId: Int? = null,
     // --- NEW: Links two transactions that represent a self-transfer between accounts ---
     val linkedTransferId: Int? = null,
+    // --- NEW: Links an income reimbursement to its surplus income transaction if over-repaid ---
+    val linkedSurplusTxnId: Int? = null,
 )

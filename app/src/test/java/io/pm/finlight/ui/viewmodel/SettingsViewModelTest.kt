@@ -659,6 +659,40 @@ class SettingsViewModelTest : BaseViewModelTest() {
             }
         }
 
+    @Test
+    fun `restoreFromBackupSnapshot success sends success message to uiEvent channel`() =
+        runTest {
+            val expectedMessage = "Data restored successfully from snapshot! Please restart the app."
+            mockkObject(DataExportService)
+            coEvery { DataExportService.restoreFromBackupSnapshot(applicationContext) } returns true
+
+            initializeViewModel()
+
+            viewModel.uiEvent.test {
+                viewModel.restoreFromBackupSnapshot()
+                advanceUntilIdle()
+                assertEquals(expectedMessage, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `restoreFromBackupSnapshot failure sends failure message to uiEvent channel`() =
+        runTest {
+            val expectedMessage = "No backup snapshot found or restore failed."
+            mockkObject(DataExportService)
+            coEvery { DataExportService.restoreFromBackupSnapshot(applicationContext) } returns false
+
+            initializeViewModel()
+
+            viewModel.uiEvent.test {
+                viewModel.restoreFromBackupSnapshot()
+                advanceUntilIdle()
+                assertEquals(expectedMessage, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
     // --- NEW: Tests for the objective ---
 
     @Test
