@@ -2,8 +2,10 @@ package io.pm.finlight.data
 
 import android.app.Application
 import android.os.Build
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -11,6 +13,9 @@ import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.data.db.entity.AccountAlias
+import io.pm.finlight.data.db.entity.DeletedSmsHash
+import io.pm.finlight.data.db.entity.MergeRecord
+import io.pm.finlight.data.db.entity.MergeType
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.data.model.AppDataBackup
 import io.mockk.*
@@ -63,6 +68,8 @@ class DataExportServiceTest : BaseViewModelTest() {
     private val accountAliasDao: AccountAliasDao = mockk(relaxed = true)
     private val recurringPatternDao: RecurringPatternDao = mockk(relaxed = true)
     private val goalTransactionLinkDao: GoalTransactionLinkDao = mockk(relaxed = true)
+    private val deletedSmsHashDao: DeletedSmsHashDao = mockk(relaxed = true)
+    private val mergeRecordDao: MergeRecordDao = mockk(relaxed = true)
 
     @Before
     override fun setup() {
@@ -95,6 +102,8 @@ class DataExportServiceTest : BaseViewModelTest() {
         every { db.accountAliasDao() } returns accountAliasDao
         every { db.recurringPatternDao() } returns recurringPatternDao
         every { db.goalTransactionLinkDao() } returns goalTransactionLinkDao
+        every { db.deletedSmsHashDao() } returns deletedSmsHashDao
+        every { db.mergeRecordDao() } returns mergeRecordDao
     }
 
     @After
@@ -139,6 +148,8 @@ class DataExportServiceTest : BaseViewModelTest() {
         coEvery { accountAliasDao.getAll() } returns listOf(AccountAlias(aliasName = "Alias Acc", destinationAccountId = 1))
         coEvery { recurringPatternDao.getAllPatterns() } returns emptyList()
         coEvery { goalTransactionLinkDao.getAll() } returns emptyList()
+        coEvery { deletedSmsHashDao.getAll() } returns listOf(DeletedSmsHash(smsHash = "deleted_hash_1"))
+        coEvery { mergeRecordDao.getAll() } returns emptyList()
     }
 
     @Test
@@ -171,6 +182,57 @@ class DataExportServiceTest : BaseViewModelTest() {
             assertEquals(0, backupData.goalTransactionLinks.size)
             assertEquals(1, backupData.trips.size)
             assertEquals(1, backupData.accountAliases.size)
+            assertEquals(1, backupData.deletedSmsHashes.size)
+            assertEquals("deleted_hash_1", backupData.deletedSmsHashes.first().smsHash)
+            assertEquals(0, backupData.mergeRecords.size)
+        }
+
+    @Test
+    fun `exportToJsonString exports deletedSmsHashes, mergeRecords, and UI preferences`() =
+        runTest {
+            setupMockData()
+            coEvery { deletedSmsHashDao.getAll() } returns listOf(DeletedSmsHash(smsHash = "deleted_hash_abc"))
+            coEvery { mergeRecordDao.getAll() } returns
+                listOf(
+                    MergeRecord(
+                        id = 1,
+                        parentTxnId = 1,
+                        mergeGroupId = "group_abc",
+                        mergeType = MergeType.MANUAL,
+                        originalParentAmount = 100.0,
+                        originalParentDate = 1000L,
+                        originalParentNotes = "Notes",
+                        childDescription = "Child Tx",
+                        childAmount = 50.0,
+                        childDate = 1000L,
+                        childAccountId = 1,
+                        childCategoryId = 1,
+                        childNotes = null,
+                    ),
+                )
+
+            context.financeSettingsDataStore.edit { prefs ->
+                prefs[stringPreferencesKey("selected_app_theme")] = "DARK"
+                prefs[stringPreferencesKey("dashboard_card_order")] = "CARDS_ORDER"
+                prefs[booleanPreferencesKey("app_lock_enabled")] = true
+                prefs[booleanPreferencesKey("daily_report_enabled")] = true
+                prefs[intPreferencesKey("daily_report_hour")] = 21
+                prefs[intPreferencesKey("daily_report_minute")] = 45
+            }
+
+            val jsonString = DataExportService.exportToJsonString(context)
+            assertNotNull(jsonString)
+            val backupData = Json.decodeFromString<AppDataBackup>(jsonString!!)
+            assertEquals(1, backupData.deletedSmsHashes.size)
+            assertEquals("deleted_hash_abc", backupData.deletedSmsHashes.first().smsHash)
+            assertEquals(1, backupData.mergeRecords.size)
+            assertEquals("group_abc", backupData.mergeRecords.first().mergeGroupId)
+            assertEquals("DARK", backupData.selectedAppTheme)
+            assertEquals("CARDS_ORDER", backupData.dashboardCardOrder)
+            assertEquals(true, backupData.appLockEnabled)
+            assertEquals(true, backupData.dailyReportEnabled)
+            assertEquals(21, backupData.dailyReportHour)
+            assertEquals(45, backupData.dailyReportMinute)
         }
 
     @Test
