@@ -21,7 +21,6 @@ class FinlightBackupAgent : BackupAgentHelper() {
 
         // Relative paths from filesDir for DataStore files
         private const val DATASTORE_PREFS_FILE = "datastore/finance_app_settings.preferences_pb"
-        private const val DATASTORE_INTERNAL_FILE = "datastore/finlight_internal_state.preferences_pb"
         private const val DATASTORE_BACKUP_KEY = "finlight_datastore_prefs"
 
         // The specific snapshot file we want to back up
@@ -33,8 +32,8 @@ class FinlightBackupAgent : BackupAgentHelper() {
         super.onCreate()
         Log.d(TAG, "onCreate: Initializing BackupAgentHelper...")
 
-        // Helper for backing up DataStore preferences
-        FileBackupHelper(this, DATASTORE_PREFS_FILE, DATASTORE_INTERNAL_FILE).also {
+        // Helper for backing up user DataStore preferences (internal lifecycle state is excluded)
+        FileBackupHelper(this, DATASTORE_PREFS_FILE).also {
             addHelper(DATASTORE_BACKUP_KEY, it)
             Log.d(TAG, "onCreate: FileBackupHelper added for DataStore files.")
         }
