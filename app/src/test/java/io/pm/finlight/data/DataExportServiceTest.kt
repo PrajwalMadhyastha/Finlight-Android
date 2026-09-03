@@ -2,6 +2,9 @@ package io.pm.finlight.data
 
 import android.app.Application
 import android.os.Build
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.*
@@ -168,6 +171,27 @@ class DataExportServiceTest : BaseViewModelTest() {
             assertEquals(0, backupData.goalTransactionLinks.size)
             assertEquals(1, backupData.trips.size)
             assertEquals(1, backupData.accountAliases.size)
+        }
+
+    @Test
+    fun `exportToJsonString exports userName and historic overall budgets`() =
+        runTest {
+            setupMockData()
+            context.financeSettingsDataStore.edit { prefs ->
+                prefs[stringPreferencesKey("user_name")] = "Prajwal"
+                prefs[stringPreferencesKey("home_currency_code")] = "INR"
+                prefs[floatPreferencesKey("overall_budget_2026_08")] = 50000f
+                prefs[floatPreferencesKey("overall_budget_2026_09")] = 60000f
+            }
+
+            val jsonString = DataExportService.exportToJsonString(context)
+            assertNotNull(jsonString)
+            val backupData = Json.decodeFromString<AppDataBackup>(jsonString!!)
+            assertEquals("Prajwal", backupData.userName)
+            assertEquals("INR", backupData.homeCurrency)
+            assertEquals(2, backupData.overallBudgets.size)
+            assertEquals(50000f, backupData.overallBudgets["2026_08"])
+            assertEquals(60000f, backupData.overallBudgets["2026_09"])
         }
 
     @Test

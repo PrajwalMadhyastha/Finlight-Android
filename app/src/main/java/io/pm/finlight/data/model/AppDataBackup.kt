@@ -38,4 +38,9 @@ data class AppDataBackup(
     val accountAliases: List<AccountAlias> = emptyList(),
     // --- Phase 3: App-Learned Recurring Patterns ---
     val recurringPatterns: List<RecurringPattern> = emptyList(),
+    // --- Phase 4: User Profile & Preferences ---
+    val userName: String? = null,
+    val homeCurrency: String? = null,
+    val overallBudget: Float? = null,
+    val overallBudgets: Map<String, Float> = emptyMap(),
 )
